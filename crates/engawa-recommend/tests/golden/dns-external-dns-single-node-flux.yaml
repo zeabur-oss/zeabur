@@ -1,0 +1,44 @@
+# Profile: single-node. Commit to the repository Flux reconciles.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: external-dns
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://kubernetes-sigs.github.io/external-dns
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: external-dns
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: external-dns
+  targetNamespace: external-dns
+  install:
+    createNamespace: true
+  chart:
+    spec:
+      chart: external-dns
+      version: 1.23.0
+      sourceRef:
+        kind: HelmRepository
+        name: external-dns
+  values:
+    domainFilters: <domain-filters>
+    policy: upsert-only
+    provider:
+      name: <provider>
+    registry: txt
+    resources:
+      limits:
+        memory: 128Mi
+      requests:
+        cpu: 10m
+        memory: 32Mi
+    sources:
+    - gateway-httproute
+    - ingress
+    txtOwnerId: <owner-id>

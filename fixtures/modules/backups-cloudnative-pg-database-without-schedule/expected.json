@@ -1,0 +1,30 @@
+[
+  {
+    "target": {
+      "kind": "database",
+      "name": "analytics-pg"
+    },
+    "scheduledBy": [],
+    "lastRun": null
+  },
+  {
+    "target": {
+      "kind": "database",
+      "name": "pg"
+    },
+    "scheduledBy": [
+      "cloudnative-pg:shop/pg-daily"
+    ],
+    "lastRun": {
+      "outcome": "failed",
+      "message": "can't upload: access denied"
+    }
+  },
+  {
+    "target": {
+      "kind": "namespace",
+      "name": "shop"
+    },
+    "scheduledBy": []
+  }
+]

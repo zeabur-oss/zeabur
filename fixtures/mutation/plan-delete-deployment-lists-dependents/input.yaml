@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  uid: d-web
+  resourceVersion: "41"
+  generation: 3
+spec:
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: example/web:3.0
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: web-7d9f
+  namespace: demo
+  uid: rs-web
+  ownerReferences:
+    - {apiVersion: apps/v1, kind: Deployment, name: web, uid: d-web, controller: true}
+spec:
+  selector:
+    matchLabels: {app: web}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-7d9f-abcde
+  namespace: demo
+  uid: pod-web
+  labels: {app: web}
+  ownerReferences:
+    - {apiVersion: apps/v1, kind: ReplicaSet, name: web-7d9f, uid: rs-web, controller: true}
+spec:
+  containers:
+    - name: app
+      image: example/web:3.0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: other
+  namespace: demo
+  uid: pod-other
+  labels: {app: other}
+spec:
+  containers:
+    - name: app
+      image: example/other:1

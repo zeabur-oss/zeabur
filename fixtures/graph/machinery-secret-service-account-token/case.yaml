@@ -1,0 +1,2 @@
+description: A service account token Secret is machinery, not user configuration.
+operation: graph.isMachinerySecret

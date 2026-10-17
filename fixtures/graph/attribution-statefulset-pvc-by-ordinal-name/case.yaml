@@ -1,0 +1,4 @@
+description: A PVC named after a StatefulSet's claim template, the set's name and an ordinal is owned by that set, while a PVC of a set whose name only starts the same way is not.
+operation: graph.attribution
+params:
+  namespace: demo

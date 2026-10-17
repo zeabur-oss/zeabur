@@ -1,0 +1,3 @@
+description: "A StatefulSet's volumeClaimTemplates cannot change after it is created."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "StatefulSet", "name": "postgresql"}, "volume": {"name": "wal", "size": "5Gi", "mountPath": "/wal"}}]}}

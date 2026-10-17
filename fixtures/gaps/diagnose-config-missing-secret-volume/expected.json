@@ -1,0 +1,47 @@
+[
+  {
+    "kind": "configMissing",
+    "container": "app",
+    "pods": [
+      "app-1"
+    ],
+    "cause": {
+      "key": "diagnosis.configMissing.cause.volume",
+      "params": {
+        "container": "app",
+        "volume": "v",
+        "object": "Secret",
+        "name": "no-secret"
+      }
+    },
+    "why": {
+      "key": "diagnosis.configMissing.why.volume",
+      "params": {
+        "container": "app",
+        "volume": "v",
+        "object": "Secret",
+        "name": "no-secret"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.configMissing.fix.volume",
+      "params": {
+        "container": "app",
+        "volume": "v",
+        "object": "Secret",
+        "name": "no-secret"
+      }
+    },
+    "evidence": [
+      {
+        "kind": "Event",
+        "name": "app-1.failedmount"
+      },
+      {
+        "kind": "Secret",
+        "name": "no-secret"
+      }
+    ],
+    "lastSeen": "2026-10-17T10:08:00Z"
+  }
+]

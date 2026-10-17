@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: demo
+  labels:
+    kustomize.toolkit.fluxcd.io/name: apps
+spec:
+  selector:
+    matchLabels:
+      app: n8n
+  template:
+    metadata:
+      labels:
+        app: n8n
+    spec:
+      containers:
+        - name: n8n
+          image: example/n8n:1.0

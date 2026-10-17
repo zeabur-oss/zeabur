@@ -1,0 +1,3 @@
+description: "A chosen claim name that is taken is refused; the claim that exists is not mounted."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "uploads", "claimName": "shared-uploads", "size": "5Gi", "mountPath": "/srv/uploads"}}]}}

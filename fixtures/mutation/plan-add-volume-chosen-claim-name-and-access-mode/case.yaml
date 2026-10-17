@@ -1,0 +1,3 @@
+description: "A new volume may name its claim and choose a many-node access mode; pods on several nodes may share such a claim, so there is no warning."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "uploads", "claimName": "shared-uploads", "accessMode": "ReadWriteMany", "size": "5Gi", "mountPath": "/srv/uploads"}}]}}

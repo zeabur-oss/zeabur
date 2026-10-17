@@ -1,0 +1,99 @@
+# On k3s, first disable the packaged traefik: add it to `disable` in
+# /etc/rancher/k3s/config.yaml on every server, then restart k3s.
+# That deletes the Traefik CRDs and any IngressRoute or Middleware objects;
+# Ingress traffic stops until this one runs.
+# https://docs.k3s.io/installation/packaged-components
+# Profile: multi-node. Apply in the namespace Argo CD runs in (argocd).
+# gateway-api-crds: apply with `kubectl apply --server-side -f`, or vendor into your repository:
+#   https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml
+# Argo CD reads OCI Helm charts through a repository with enableOCI.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: traefik-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: traefik-oci
+  url: ghcr.io/traefik/helm
+  enableOCI: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: traefik
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/traefik/helm
+    chart: traefik
+    targetRevision: 41.7.1
+    helm:
+      releaseName: traefik
+      valuesObject:
+        accessLog:
+          enabled: true
+          fields:
+            defaultMode: drop
+            headers:
+              defaultMode: drop
+            names:
+              DownstreamContentSize: keep
+              DownstreamStatus: keep
+              Duration: keep
+              RequestContentSize: keep
+              RequestHost: keep
+              RequestMethod: keep
+              RequestPath: keep
+              RequestProtocol: keep
+              RouterName: keep
+              StartUTC: keep
+            queryParameters:
+              defaultMode: drop
+          format: json
+        api:
+          dashboard: false
+        deployment:
+          kind: DaemonSet
+        gateway:
+          enabled: false
+        gatewayClass:
+          enabled: true
+          name: traefik
+        metrics:
+          prometheus:
+            service:
+              enabled: true
+        providers:
+          kubernetesCRD:
+            allowCrossNamespace: false
+            enabled: true
+          kubernetesGateway:
+            enabled: true
+          kubernetesIngress:
+            enabled: true
+        resources:
+          limits:
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        service:
+          spec:
+            externalTrafficPolicy: Local
+        tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/control-plane
+          operator: Exists
+        - key: CriticalAddonsOnly
+          operator: Exists
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: traefik
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: shop
+spec:
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: app
+          image: example/api:1.0
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-credentials
+                  key: password
+          envFrom:
+            - configMapRef:
+                name: settings
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: shop
+spec:
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: app
+          image: example/worker:1.0
+          envFrom:
+            - configMapRef:
+                name: settings
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: shop
+spec:
+  serviceName: db
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          envFrom:
+            - secretRef:
+                name: db-credentials
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: shop
+data:
+  LOG_LEVEL: info
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: shop
+type: Opaque

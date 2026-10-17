@@ -1,0 +1,21 @@
+[
+  {
+    "kind": "imagePull",
+    "container": "web",
+    "pods": ["web-1"],
+    "cause": {
+      "key": "diagnosis.imagePull.cause.notFound",
+      "params": {"container": "web", "image": "nginx:does-not-exist"}
+    },
+    "fix": {"key": "diagnosis.imagePull.fix.notFound", "params": {"container": "web"}},
+    "evidence": [
+      {"kind": "Event", "name": "web-1.pull"},
+      {
+        "kind": "Pod",
+        "name": "web-1",
+        "fieldPath": "status.containerStatuses[name=web].state.waiting"
+      }
+    ],
+    "lastSeen": "2026-10-15T11:59:30Z"
+  }
+]

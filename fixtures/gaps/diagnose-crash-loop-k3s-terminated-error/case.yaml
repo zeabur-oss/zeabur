@@ -1,0 +1,4 @@
+description: A container that keeps exiting with code 1 is a crash loop, read from its restart count and previous run; on k3s it shows terminated Error, not CrashLoopBackOff, most of the time.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

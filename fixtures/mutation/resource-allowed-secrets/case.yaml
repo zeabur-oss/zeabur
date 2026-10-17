@@ -1,0 +1,6 @@
+description: Secrets may be written as YAML; a value shown masked is never written.
+operation: mutation.resourceAllowed
+params:
+  group: ""
+  version: v1
+  resource: secrets

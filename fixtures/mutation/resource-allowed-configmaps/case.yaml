@@ -1,0 +1,6 @@
+description: ConfigMaps may be written as YAML; their keys become key changes.
+operation: mutation.resourceAllowed
+params:
+  group: ""
+  version: v1
+  resource: configmaps

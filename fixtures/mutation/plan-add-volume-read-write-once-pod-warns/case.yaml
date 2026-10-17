@@ -1,0 +1,3 @@
+description: "A ReadWriteOncePod claim mounted by several replicas serves one pod at a time."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "uploads", "accessMode": "ReadWriteOncePod", "size": "5Gi", "mountPath": "/srv/uploads"}}]}}

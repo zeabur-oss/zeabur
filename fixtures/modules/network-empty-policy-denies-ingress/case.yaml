@@ -1,0 +1,5 @@
+description: A policy selecting pods with no rules and no policyTypes isolates them for ingress only, so a caller is blocked at ingress.
+operation: modules.networkReachability
+params:
+  namespace: "shop"
+  connections: [["web", "api"]]

@@ -1,0 +1,2 @@
+description: A pod's reason is a container's waiting reason, else why a not-ready container last stopped; a running, ready pod has none.
+operation: projection.pods

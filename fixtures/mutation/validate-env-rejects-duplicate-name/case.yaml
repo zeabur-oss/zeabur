@@ -1,0 +1,10 @@
+description: Setting the same variable twice in one request is refused.
+operation: mutation.validateEnv
+params:
+  changes:
+    - op: set
+      name: NODE_ENV
+      value: a
+    - op: set
+      name: NODE_ENV
+      value: b

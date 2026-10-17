@@ -1,0 +1,21 @@
+[
+  {
+    "kind": "crashLoop",
+    "container": "worker",
+    "pods": ["worker-7d9c-abcde"],
+    "cause": {
+      "key": "diagnosis.crashLoop.cause.exitCode",
+      "params": {"container": "worker", "restarts": "5", "exitCode": "1", "reason": "Error"}
+    },
+    "why": {"key": "diagnosis.crashLoop.why.backOff", "params": {"container": "worker", "restarts": "5"}},
+    "fix": {"key": "diagnosis.crashLoop.fix.logs", "params": {"container": "worker"}},
+    "evidence": [
+      {
+        "kind": "Pod",
+        "name": "worker-7d9c-abcde",
+        "fieldPath": "status.containerStatuses[name=worker].lastState.terminated.exitCode", "value": "1"
+      }
+    ],
+    "lastSeen": "2026-10-15T11:58:10Z"
+  }
+]

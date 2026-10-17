@@ -1,0 +1,5 @@
+description: A claim carrying another StatefulSet's name does not belong to this one.
+operation: mutation.ownedByStatefulSet
+params:
+  claim: data-other-0
+  statefulSet: postgresql

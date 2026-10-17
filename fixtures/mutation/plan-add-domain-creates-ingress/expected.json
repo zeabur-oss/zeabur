@@ -1,0 +1,48 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "Ingress",
+        "plural": "ingresses",
+        "name": "web-web-example-test"
+      },
+      "resourceVersion": null,
+      "before": null,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "networking.k8s.io/v1",
+          "kind": "Ingress",
+          "metadata": {
+            "name": "web-web-example-test",
+            "namespace": "demo"
+          },
+          "spec": {
+            "rules": [
+              {
+                "host": "web.example.test",
+                "http": {
+                  "paths": [
+                    {
+                      "path": "/",
+                      "pathType": "Prefix",
+                      "backend": {
+                        "service": {
+                          "name": "web",
+                          "port": {
+                            "number": 8080
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

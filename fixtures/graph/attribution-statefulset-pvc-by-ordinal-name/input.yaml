@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgresql
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: pg
+  template:
+    metadata:
+      labels:
+        app: pg
+    spec:
+      containers:
+        - name: pg
+          image: postgres:17
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-postgresql-0
+  namespace: demo
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-postgresql-replica-0
+  namespace: demo

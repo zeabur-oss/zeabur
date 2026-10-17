@@ -1,0 +1,56 @@
+displayName: Falco
+homepage: https://falco.org
+license: Apache-2.0
+maturity: cncf-graduated
+rationale: >
+  Flags suspicious runtime behaviour (container shells, privilege escalation)
+  from kernel events as JSON logs. Optional: needs a privileged eBPF probe and
+  a BTF kernel (5.8+).
+defaults:
+  single-node: optional
+  multi-node: optional
+
+releases:
+  - name: falco
+    namespace: falco
+    chart: oci://ghcr.io/falcosecurity/charts/falco
+    version: 9.2.0
+    values: |
+      driver:
+        # Built-in CO-RE eBPF probe: no kernel module or headers.
+        kind: modern_ebpf
+      falco:
+        # JSON alerts so the log store can index fields.
+        json_output: true
+        json_include_output_property: true
+      falcoctl:
+        artifact:
+          follow:
+            # Rules change only with chart upgrades; no background downloads.
+            enabled: false
+    profiles:
+      single-node: |
+        resources:
+          # The chart asks 512Mi; one node idles well below that.
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {memory: 768Mi}
+      multi-node: |
+        resources:
+          # Busier nodes mean more syscalls to evaluate.
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {memory: 1Gi}
+
+detection:
+  helmCharts: [falco]
+  workloads:
+    - kind: DaemonSet
+      labels: {app.kubernetes.io/name: falco}
+
+security:
+  summary: Reads pod and node metadata to enrich alerts.
+  clusterWide: true
+  privileged: true
+  egress: [ghcr.io]
+  risks:
+    - risk: Alerts include command lines and file paths from every tenant's containers.
+      mitigation: Expose alerts to cluster administrators only.

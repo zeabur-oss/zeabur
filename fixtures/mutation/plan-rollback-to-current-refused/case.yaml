@@ -1,0 +1,3 @@
+description: "Rolling back to the release that runs now is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "rollback", "workload": {"kind": "Deployment", "name": "web"}, "revision": 3}]}, "releases": [[{"kind": "Deployment", "name": "web"}, [{"revision": 3, "name": "web-3", "images": ["example/web:3.0"], "current": true, "pods": {"ready": 2, "total": 2}, "template": {"metadata": {"labels": {"app": "web"}}, "spec": {"containers": [{"name": "app", "image": "example/web:3.0"}]}}}, {"revision": 2, "name": "web-2", "images": ["example/web:2.0"], "current": false, "pods": {"ready": 0, "total": 0}, "template": {"metadata": {"labels": {"app": "web"}}, "spec": {"containers": [{"name": "app", "image": "example/web:2.0"}]}}}]]]}

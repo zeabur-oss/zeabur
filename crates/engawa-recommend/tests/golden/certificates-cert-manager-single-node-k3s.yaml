@@ -1,0 +1,51 @@
+# Profile: single-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cert-manager
+  namespace: kube-system
+spec:
+  chart: oci://quay.io/jetstack/charts/cert-manager
+  version: v1.21.2
+  targetNamespace: cert-manager
+  createNamespace: true
+  valuesContent: |-
+    cainjector:
+      resources:
+        limits:
+          memory: 128Mi
+        requests:
+          cpu: 10m
+          memory: 32Mi
+    config:
+      apiVersion: controller.config.cert-manager.io/v1alpha1
+      enableGatewayAPI: true
+      kind: ControllerConfiguration
+    crds:
+      enabled: true
+      keep: true
+    enableCertificateOwnerRef: true
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: false
+    resources:
+      limits:
+        memory: 128Mi
+      requests:
+        cpu: 10m
+        memory: 32Mi
+    startupapicheck:
+      resources:
+        limits:
+          memory: 64Mi
+        requests:
+          cpu: 10m
+          memory: 16Mi
+    webhook:
+      resources:
+        limits:
+          memory: 64Mi
+        requests:
+          cpu: 10m
+          memory: 24Mi

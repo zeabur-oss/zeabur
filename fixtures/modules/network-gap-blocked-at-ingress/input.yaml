@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: web, namespace: shop}
+spec:
+  selector: {matchLabels: {app: web}}
+  template:
+    metadata: {labels: {app: web}}
+    spec: {containers: [{name: app, image: example/web:1}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: api, namespace: shop}
+spec:
+  selector: {matchLabels: {app: api}}
+  template:
+    metadata: {labels: {app: api}}
+    spec: {containers: [{name: app, image: example/api:1}]}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: worker, namespace: shop}
+spec:
+  selector: {matchLabels: {app: worker}}
+  template:
+    metadata: {labels: {app: worker}}
+    spec: {containers: [{name: app, image: example/worker:1}]}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: api-from-web, namespace: shop}
+spec:
+  podSelector: {matchLabels: {app: api}}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: web}}

@@ -1,0 +1,2 @@
+description: An Ingress's rules are listed one backend at a time, so a host is tied to the Service it reaches; the default backend comes first, and a backend that is not a Service is left out.
+operation: projection.routes

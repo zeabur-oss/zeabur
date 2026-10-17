@@ -1,0 +1,128 @@
+{
+  description = "engawa development environment";
+
+  inputs = {
+    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1"; # unstable Nixpkgs
+    fenix = {
+      url = "https://flakehub.com/f/nix-community/fenix/0.1";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    # The zh-TW wording check (scripts/check-zh-tw.sh, `nix develop .#zh`). Upstream has no
+    # release tags, so it is pinned to a commit; bump it here, to a commit at least seven days old
+    # (the same delay as crates and web packages), then `nix flake lock`.
+    zhtw-mcp = {
+      url = "github:sysprog21/zhtw-mcp/5b385b3d66b1554f6f9ae036017ef06dd8ec0da6";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.fenix.follows = "fenix";
+    };
+  };
+
+  outputs =
+    { self, ... }@inputs:
+
+    let
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
+      forEachSupportedSystem =
+        f:
+        inputs.nixpkgs.lib.genAttrs supportedSystems (
+          system:
+          f {
+            inherit system;
+            pkgs = import inputs.nixpkgs {
+              inherit system;
+              overlays = [
+                inputs.self.overlays.default
+              ];
+            };
+          }
+        );
+    in
+    {
+      overlays.default = final: prev: {
+        # rust-toolchain.toml is the only place the Rust version is set.
+        rustToolchain = inputs.fenix.packages.${prev.stdenv.hostPlatform.system}.fromToolchainFile {
+          file = ./rust-toolchain.toml;
+          sha256 = "sha256-/96ey8V/yeT5cpSxHi2K/cbRMMl75pPwKoNC50lO1Ds=";
+        };
+      };
+
+      devShells = forEachSupportedSystem (
+        { pkgs, system }:
+        {
+          default = pkgs.mkShell {
+            packages = with pkgs; [
+              rustToolchain
+
+              # Quality and supply chain
+              cargo-deny
+              cargo-nextest
+              cargo-auditable
+              cargo-cyclonedx
+              # Mutation testing, weekly in CI (.github/workflows/mutants.yml); a report, not a gate
+              cargo-mutants
+              jq
+              shellcheck
+              actionlint
+
+              # Web interface (web/: dependencies come from bun.lock)
+              bun
+              brotli
+
+              # Kubernetes integration tests
+              k3d
+              kubectl
+
+              # The Helm chart (deploy/chart/engawa, scripts/check-chart.sh) and the in-cluster
+              # end-to-end test (scripts/e2e-l2.sh: a CA and certificates for its host names)
+              kubernetes-helm
+              yq-go
+              openssl
+
+              self.formatter.${system}
+            ];
+
+            env = {
+              # Required by rust-analyzer
+              RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
+              # Mozilla's CA bundle (MPL-2.0), copied into the image for outgoing TLS (Genkan's
+              # discovery and token endpoints); pinned with nixpkgs.
+              ENGAWA_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+            }
+            // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (
+              # Static musl builds of the host architecture: aws-lc-sys must be compiled against musl
+              # headers, not glibc ones (else `__isoc23_strtol`, `__memcpy_chk`... are undefined).
+              let
+                muslCc = pkgs.pkgsStatic.stdenv.cc;
+                bin = "${muslCc}/bin/${muslCc.targetPrefix}";
+                triple = "${pkgs.stdenv.hostPlatform.parsed.cpu.name}_unknown_linux_musl";
+              in
+              {
+                "CC_${triple}" = "${bin}cc";
+                "AR_${triple}" = "${bin}ar";
+                "CARGO_TARGET_${pkgs.lib.toUpper triple}_LINKER" = "${bin}cc";
+                # Browser tests (scripts/e2e-ui.sh): Chromium from nixpkgs, matching the
+                # @playwright/test version pinned in web/package.json (playwright-driver.version).
+                PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers-chromium}";
+                PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+              }
+            );
+          };
+
+          # Only for the zh-TW wording check: zhtw-mcp builds from source, so it stays out of the
+          # default shell that every other CI job enters.
+          zh = pkgs.mkShell {
+            packages = [
+              pkgs.bun
+              inputs.zhtw-mcp.packages.${system}.zhtw-mcp
+            ];
+          };
+        }
+      );
+
+      formatter = forEachSupportedSystem ({ pkgs, ... }: pkgs.nixfmt);
+    };
+}

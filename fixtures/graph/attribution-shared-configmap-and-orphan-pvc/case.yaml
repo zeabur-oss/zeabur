@@ -1,0 +1,4 @@
+description: A ConfigMap imported by two Deployments (one of them twice) is shared, its owners listed once each and sorted; a PVC no workload mounts is an orphan, and a Service selecting one Deployment's pods is owned by it.
+operation: graph.attribution
+params:
+  namespace: demo

@@ -1,0 +1,122 @@
+# The project the browser tests open: a Deployment that writes a numbered line every second and
+# reads a Secret, a Service in front of it, a Deployment that keeps crashing, and a Deployment
+# reading a ConfigMap that the write tests change and restart (so the others stay as they are).
+# Applied by scripts/e2e-ui.sh and scripts/e2e-l2.sh.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: engawa-e2e
+  labels:
+    engawa.engawahq.dev/project: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: talker-secret
+  namespace: engawa-e2e
+stringData:
+  greeting: engawa-e2e-secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: talker
+  namespace: engawa-e2e
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: talker
+  template:
+    metadata:
+      labels:
+        app: talker
+    spec:
+      containers:
+        - name: talker
+          image: busybox:1.37
+          command:
+            ["sh", "-c", 'i=0; while true; do i=$((i+1)); echo "engawa-e2e-line $i"; sleep 1; done']
+          env:
+            - name: GREETING
+              value: hello
+            - name: SECRET_GREETING
+              valueFrom:
+                secretKeyRef:
+                  name: talker-secret
+                  key: greeting
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: talker
+  namespace: engawa-e2e
+spec:
+  selector:
+    app: talker
+  ports:
+    - name: http
+      port: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crasher
+  namespace: engawa-e2e
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crasher
+  template:
+    metadata:
+      labels:
+        app: crasher
+    spec:
+      containers:
+        - name: crasher
+          image: busybox:1.37
+          command: ["sh", "-c", "echo engawa-e2e-crash; exit 1"]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: editor-config
+  namespace: engawa-e2e
+data:
+  mode: blue
+  other: untouched
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: editor
+  namespace: engawa-e2e
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: editor
+  template:
+    metadata:
+      labels:
+        app: editor
+    spec:
+      containers:
+        - name: editor
+          image: busybox:1.37
+          command: ["sh", "-c", "sleep 100000"]
+          env:
+            - name: NOTE
+              value: first
+            - name: MODE
+              valueFrom:
+                configMapKeyRef:
+                  name: editor-config
+                  key: mode
+---
+# A namespace that is not a project: the browser tests adopt it and let it go.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: engawa-e2e-adopt

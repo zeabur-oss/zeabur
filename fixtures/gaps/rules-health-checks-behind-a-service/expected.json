@@ -1,0 +1,18 @@
+[
+  {
+    "rule": "health-checks",
+    "severity": "warning",
+    "subject": {
+      "kind": "Deployment",
+      "name": "api",
+      "fieldPath": "spec.template.spec.containers[name=api]"
+    },
+    "service": "projects/demo/services/deployment/api",
+    "message": {"key": "gap.healthChecks.livenessOnly", "params": {"container": "api"}},
+    "fix": {
+      "kind": "plan",
+      "id": "probes.readiness",
+      "params": {"service": "projects/demo/services/deployment/api", "container": "api"}
+    }
+  }
+]

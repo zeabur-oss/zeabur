@@ -1,0 +1,7 @@
+description: A container that declares no ports accepts a probe on any valid port.
+operation: mutation.probeConfig
+params:
+  container: app
+  probe:
+    handler: TCPSocket
+    port: 5678

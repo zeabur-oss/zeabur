@@ -1,0 +1,8 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: operator
+  namespace: demo
+  labels:
+    engawa.engawahq.dev/group: controller
+    app.kubernetes.io/component: operator

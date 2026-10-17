@@ -1,0 +1,10 @@
+description: "Changing a ConfigMap key a workload reads into an environment variable says the workload needs a restart, since a running container reads its environment only at start."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: data
+        kind: ConfigMap
+        name: settings
+        changes:
+          - {op: set, key: MODE, value: maintenance}

@@ -1,0 +1,8 @@
+description: A claim name may hold dots, as a DNS subdomain.
+operation: mutation.validateStorage
+params:
+  request:
+    name: uploads
+    claimName: web.uploads-2
+    size: 5Gi
+    mountPath: /uploads

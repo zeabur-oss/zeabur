@@ -1,0 +1,4 @@
+description: An HTTPRoute whose backendRef names a port the Service lacks is refused with ResolvedRefs False; the evidence carries the controller's message (as Traefik on k3s v1.36.5 writes it).
+operation: gaps.diagnose
+params:
+  now: "2026-10-17T10:10:00Z"

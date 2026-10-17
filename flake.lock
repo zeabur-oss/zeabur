@@ -1,0 +1,88 @@
+{
+  "nodes": {
+    "fenix": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "rust-analyzer-src": "rust-analyzer-src"
+      },
+      "locked": {
+        "lastModified": 1790858958,
+        "narHash": "sha256-am3DS8g9vyeQLKk9QQvmJoZLHGBUB1rtd6zVaGeq2Mc=",
+        "rev": "025bf5b6b0293c5ee3a3506a7e43ba64bc8bb1b7",
+        "revCount": 2805,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/nix-community/fenix/0.1.2805%2Brev-025bf5b6b0293c5ee3a3506a7e43ba64bc8bb1b7/01a0f7fd-201c-7141-9966-113030740054/source.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://flakehub.com/f/nix-community/fenix/0.1"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1791594108,
+        "narHash": "sha256-XK4KceonkwD8LuMAt/vNrz982mXJM5jeHAxMwsUXXAQ=",
+        "rev": "6510408d147d8c5e6d76043e899e9251756f6a75",
+        "revCount": 1089111,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/NixOS/nixpkgs/0.1.1089111%2Brev-6510408d147d8c5e6d76043e899e9251756f6a75/01a127ba-0ae9-7ff0-9b0a-aacecc0f0c52/source.tar.gz"
+      },
+      "original": {
+        "type": "tarball",
+        "url": "https://flakehub.com/f/NixOS/nixpkgs/0.1"
+      }
+    },
+    "root": {
+      "inputs": {
+        "fenix": "fenix",
+        "nixpkgs": "nixpkgs",
+        "zhtw-mcp": "zhtw-mcp"
+      }
+    },
+    "rust-analyzer-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790532271,
+        "narHash": "sha256-j8y/AO3AMDF9p+11aIDhnA21JnNj5PjvcejTI43vI8Q=",
+        "owner": "rust-lang",
+        "repo": "rust-analyzer",
+        "rev": "03fcb77246f2568adb0e9b2fa60d19c6cc1686f4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "rust-lang",
+        "ref": "nightly",
+        "repo": "rust-analyzer",
+        "type": "github"
+      }
+    },
+    "zhtw-mcp": {
+      "inputs": {
+        "fenix": [
+          "fenix"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791166685,
+        "narHash": "sha256-ncvYESRSMGUNSs+gviiSKxJiyFd+CpBNlAAddgPGLjI=",
+        "owner": "sysprog21",
+        "repo": "zhtw-mcp",
+        "rev": "5b385b3d66b1554f6f9ae036017ef06dd8ec0da6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "sysprog21",
+        "repo": "zhtw-mcp",
+        "rev": "5b385b3d66b1554f6f9ae036017ef06dd8ec0da6",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

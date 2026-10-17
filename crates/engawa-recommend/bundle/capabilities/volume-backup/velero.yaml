@@ -1,0 +1,100 @@
+displayName: Velero
+homepage: https://velero.io
+license: Apache-2.0
+maturity: cncf-sandbox
+rationale: >
+  Whole-cluster backup and disaster recovery to S3. It can touch any
+  namespace, so it is for administrators only.
+alternatives:
+  k8up: Namespace-scoped backups for tenants.
+defaults:
+  single-node: optional
+  multi-node: optional
+
+inputs:
+  - name: bucket
+    description: S3 bucket for backups.
+    path: configuration.backupStorageLocation.0.bucket
+    required: true
+    testValue: recs-ci
+  - name: s3-url
+    description: S3 endpoint URL (any S3-compatible service).
+    path: configuration.backupStorageLocation.0.config.s3Url
+    required: true
+    testValue: http://minio.invalid:9000
+  - name: credentials
+    description: AWS-style credentials file for the bucket.
+    secret: {name: velero-credentials, key: cloud, namespace: velero}
+    required: true
+    testValue: "[default]\naws_access_key_id=ci\naws_secret_access_key=ci\n"
+
+releases:
+  - name: velero
+    namespace: velero
+    repo: https://vmware-tanzu.github.io/helm-charts
+    chart: velero
+    version: 12.2.1
+    values: |
+      initContainers:
+        # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.
+        - name: velero-plugin-for-aws
+          image: velero/velero-plugin-for-aws:v1.14.4
+          volumeMounts:
+            - mountPath: /target
+              name: plugins
+      credentials:
+        # Secret comes from the credentials input, not the chart.
+        useSecret: true
+        existingSecret: velero-credentials
+      configuration:
+        backupStorageLocation:
+          # One S3 location; bucket and URL are inputs.
+          - name: default
+            provider: aws
+            default: true
+            config:
+              region: us-east-1
+              s3ForcePathStyle: "true"
+        # Kopia file-system backups work on any storage class, local-path included.
+        uploaderType: kopia
+        # Back up all volumes unless they opt out.
+        defaultVolumesToFsBackup: true
+      # CSI snapshots need per-driver setup; use file-system backups instead.
+      snapshotsEnabled: false
+      # Needed for file-system backups.
+      deployNodeAgent: true
+    profiles:
+      single-node: |
+        resources:
+          # Idle between backups; chart sets none.
+          requests: {cpu: 20m, memory: 64Mi}
+          limits: {memory: 512Mi}
+      multi-node: |
+        resources:
+          # Bigger clusters, bigger backup item lists.
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {memory: 1Gi}
+
+detection:
+  crds: [backups.velero.io, schedules.velero.io]
+  helmCharts: [velero]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: velero}
+
+security:
+  summary: Bound to cluster-admin; reads and restores every object.
+  clusterWide: true
+  privileged: true
+  credentials: required
+  credentialsNote: Static S3 credentials; one Kopia key is shared by all backups.
+  tenants: admin-only
+  risks:
+    - risk: Backups and Restores can include any namespace, including other tenants' Secrets.
+      mitigation: Never grant Velero CRDs to tenants.
+
+leftovers: [customresourcedefinitions]
+
+upgradeNotes:
+  - versions: "*"
+    note: Upgrade the AWS plugin together with Velero.

@@ -1,0 +1,862 @@
+---
+# Source: crowdsec/templates/acquis-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: acquis-configmap
+data:
+  acquis.yaml: |-
+    ---
+    filenames:
+      - /var/log/containers/traefik-*_traefik_*.log
+    force_inotify: true
+    poll_without_inotify: false
+    labels:
+      type: containerd
+      program: traefik
+---
+# Source: crowdsec/templates/docker-start-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: crowdsec-docker-start-script-configmap
+    labels:
+        k8s-app: crowdsec
+        type: docker-start-script
+        version: v1
+
+data:
+    docker_start.sh: |-
+        #!/bin/bash
+        
+        #### This is based on the docker entrypoint script, but in k8s, this script is only used for LAPI pods.
+        #### Therefore, all agent-related configuration has been removed and check if LAPI is disabled (as the pod will not be created in that case).
+        
+        # shellcheck disable=SC2292      # allow [ test ] syntax
+        # shellcheck disable=SC2310      # allow "if function..." syntax with -e
+        
+        set -e
+        shopt -s inherit_errexit
+        
+        # Note that "if function_name" in bash matches when the function returns 0,
+        # meaning successful execution.
+        
+        # match true, TRUE, True, tRuE, etc.
+        istrue() {
+          case "$(echo "$1" | tr '[:upper:]' '[:lower:]')" in
+            true) return 0 ;;
+            *) return 1 ;;
+          esac
+        }
+        
+        isfalse() {
+            if istrue "$1"; then
+                return 1
+            else
+                return 0
+            fi
+        }
+        
+        if istrue "$DEBUG"; then
+            set -x
+            export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+        fi
+        
+        if istrue "$CI_TESTING"; then
+            echo "githubciXXXXXXXXXXXXXXXXXXXXXXXX" >/etc/machine-id
+        fi
+        
+        # DEFAULTS
+        
+        export CONFIG_FILE="${CONFIG_FILE:=/etc/crowdsec/config.yaml}"
+        export CUSTOM_HOSTNAME="${CUSTOM_HOSTNAME:=localhost}"
+        
+        # HELPER FUNCTIONS
+        
+        # csv2yaml <string>
+        # generate a yaml list from a comma-separated string of values
+        csv2yaml() {
+            [ -z "$1" ] && return
+            echo "$1" | sed 's/,/\n- /g;s/^/- /g'
+        }
+        
+        # wrap cscli with the correct config file location
+        cscli() {
+            command cscli -c "$CONFIG_FILE" "$@"
+        }
+        
+        # conf_get <key> [file_path]
+        # retrieve a value from a file (by default $CONFIG_FILE)
+        conf_get() {
+            if [ $# -ge 2 ]; then
+                yq e "$1" "$2"
+            else
+                cscli config show-yaml | yq e "$1"
+            fi
+        }
+        
+        # conf_set <yq_expression> [file_path]
+        # evaluate a yq command (by default on $CONFIG_FILE),
+        # create the file if it doesn't exist
+        conf_set() {
+            if [ $# -ge 2 ]; then
+                YAML_FILE="$2"
+            else
+                YAML_FILE="$CONFIG_FILE"
+            fi
+            if [ ! -f "$YAML_FILE" ]; then
+                install -m 0600 /dev/null "$YAML_FILE"
+            fi
+            yq e "$1" -i "$YAML_FILE"
+        }
+        
+        # conf_set_if(): used to update the configuration
+        # only if a given variable is provided
+        # conf_set_if "$VAR" <yq_expression> [file_path]
+        conf_set_if() {
+            if [ "$1" != "" ]; then
+                shift
+                conf_set "$@"
+            fi
+        }
+        
+        # register_bouncer <bouncer_name> <bouncer_key>
+        register_bouncer() {
+          if ! cscli bouncers list -o json | sed '/^ *"name"/!d;s/^ *"name": "\(.*\)",/\1/' | grep -q "^${1}$"; then
+              if cscli bouncers add "$1" -k "$2" > /dev/null; then
+                  echo "Registered bouncer for $1"
+              else
+                  echo "Failed to register bouncer for $1"
+              fi
+          fi
+        }
+        
+        # Call cscli to manage objects ignoring taint errors
+        # $1 can be collections, parsers, etc.
+        # $2 can be install, remove, upgrade
+        # $3 is a list of object names separated by space
+        cscli_if_clean() {
+            local itemtype="$1"
+            local action="$2"
+            local objs=$3
+            shift 3
+            # loop over all objects
+            for obj in $objs; do
+                if cscli "$itemtype" inspect "$obj" -o json | yq -e '.tainted // false' >/dev/null 2>&1; then
+                    echo "Object $itemtype/$obj is tainted, skipping"
+                elif cscli "$itemtype" inspect "$obj" -o json | yq -e '.local // false' >/dev/null 2>&1; then
+                    echo "Object $itemtype/$obj is local, skipping"
+                else
+        #            # Too verbose? Only show errors if not in debug mode
+        #            if [ "$DEBUG" != "true" ]; then
+        #                error_only=--error
+        #            fi
+                    error_only=""
+                    echo "Running: cscli $error_only $itemtype $action \"$obj\" $*"
+                    # shellcheck disable=SC2086
+                    if ! cscli $error_only "$itemtype" "$action" "$obj" "$@"; then
+                        echo "Failed to $action $itemtype/$obj, running hub update before retrying"
+                        run_hub_update
+                        # shellcheck disable=SC2086
+                        cscli $error_only "$itemtype" "$action" "$obj" "$@"
+                    fi
+                fi
+            done
+        }
+        
+        # Output the difference between two lists
+        # of items separated by spaces
+        difference() {
+          list1="$1"
+          list2="$2"
+        
+          # split into words
+          # shellcheck disable=SC2086
+          set -- $list1
+          for item in "$@"; do
+            found=false
+            for i in $list2; do
+              if [ "$item" = "$i" ]; then
+                found=true
+                break
+              fi
+            done
+            if [ "$found" = false ]; then
+              echo "$item"
+            fi
+          done
+        }
+        
+        ################################
+        
+        if [ -n "$CERT_FILE" ] || [ -n "$KEY_FILE" ] ; then
+            printf '%b' '\033[0;33m'
+            echo "Warning: the variables CERT_FILE and KEY_FILE have been deprecated." >&2
+            echo "Please use LAPI_CERT_FILE and LAPI_KEY_FILE insted." >&2
+            echo "The old variables will be removed in a future release." >&2
+            printf '%b' '\033[0m'
+            export LAPI_CERT_FILE=${LAPI_CERT_FILE:-$CERT_FILE}
+            export LAPI_KEY_FILE=${LAPI_KEY_FILE:-$KEY_FILE}
+        fi
+        
+        # Check and prestage /etc/crowdsec
+        if [ ! -e "/etc/crowdsec/local_api_credentials.yaml" ] && [ ! -e "/etc/crowdsec/config.yaml" ]; then
+            echo "Populating configuration directory..."
+            # don't overwrite existing configuration files, which may come
+            # from bind-mount or even be read-only (configmaps)
+            if [ -e /staging/etc/crowdsec ]; then
+                mkdir -p /etc/crowdsec/
+                # if you change this, check that it still works
+                # under alpine and k8s, with and without tls
+                rsync -av --ignore-existing /staging/etc/crowdsec/* /etc/crowdsec
+            fi
+        fi
+        
+        # do this as soon as we have a config.yaml, to avoid useless warnings
+        if istrue "$USE_WAL"; then
+            conf_set '.db_config.use_wal = true'
+        elif [ -n "$USE_WAL" ] && isfalse "$USE_WAL"; then
+            conf_set '.db_config.use_wal = false'
+        fi
+        
+        lapi_credentials_path=$(conf_get '.api.client.credentials_path')
+        
+        # generate local agent credentials (even if agent is disabled, cscli needs a
+        # connection to the API)
+        if ( isfalse "$USE_TLS" || [ "$CLIENT_CERT_FILE" = "" ] ); then
+            ## We have 2 possibilities here:
+            ## - LAPI creds are stored in a secret then copied to /etc/crowdsec/local_api_credentials.yaml or /etc/crowdsec/ is persistent. If so, we check if the machine is registered, and register it if not.
+            ## - LAPI creds are not stored in a secret (1st run with persistent volume, or any run without secret). In this case we check if the machine is registered, and register it if not.
+            echo "Check if local agent needs to be registered"
+        
+            lapi_login=$(yq e '.login' "$lapi_credentials_path" 2>/dev/null || echo "")
+            lapi_password=$(yq e '.password' "$lapi_credentials_path" 2>/dev/null || echo "")
+        
+            if [ "$lapi_login" = "null" ] || [ -z "$lapi_login" ] || [ "$lapi_password" = "null" ] || [ -z "$lapi_password" ] ; then
+            # Nothing found, probably first run with persistent volume or without secret
+                echo "Generate local agent credentials"
+                cscli machines add "$CUSTOM_HOSTNAME" --auto --force
+            else
+                echo "Local agent credentials found"
+                if ( cscli machines list -o json | yq -e 'any_c(.machineId==strenv(CUSTOM_HOSTNAME))' >/dev/null ); then
+                    echo "Local agent already registered"
+                else
+                    echo "Registering local agent to lapi from existing credentials"
+                    # --force is necessary, as multiple LAPI pods may try to register at the same time
+                    cscli machines add "$lapi_login" -p "$lapi_password" -f /dev/null --force
+                fi
+            fi
+        fi
+        
+        ################################
+        
+        conf_set_if "$LOCAL_API_URL" '.url = strenv(LOCAL_API_URL)' "$lapi_credentials_path"
+        
+        conf_set_if "$INSECURE_SKIP_VERIFY" '.api.client.insecure_skip_verify = env(INSECURE_SKIP_VERIFY)'
+        
+        # agent-only containers still require USE_TLS
+        if istrue "$USE_TLS"; then
+            # shellcheck disable=SC2153
+            conf_set_if "$CACERT_FILE" '.ca_cert_path = strenv(CACERT_FILE)' "$lapi_credentials_path"
+            conf_set_if "$CLIENT_KEY_FILE" '.key_path = strenv(CLIENT_KEY_FILE)' "$lapi_credentials_path"
+            conf_set_if "$CLIENT_CERT_FILE" '.cert_path = strenv(CLIENT_CERT_FILE)' "$lapi_credentials_path"
+        else
+            conf_set '
+                del(.ca_cert_path) |
+                del(.key_path) |
+                del(.cert_path)
+            ' "$lapi_credentials_path"
+        fi
+        
+        if istrue "$DISABLE_ONLINE_API"; then
+            conf_set 'del(.api.server.online_client)'
+        fi
+        
+        if isfalse "$DISABLE_ONLINE_API" ; then
+            CONFIG_DIR=$(conf_get '.config_paths.config_dir')
+            export CONFIG_DIR
+            config_exists=$(conf_get '.api.server.online_client | has("credentials_path")')
+            if isfalse "$config_exists"; then
+                # no CAPI config in the pod (either 1st run with volume, or any run with CAPI creds stored in secrets)
+                # check if we have a login in online_api_credentials.yaml
+                # if we don't, register to the online API
+                conf_set '.api.server.online_client = {"credentials_path": strenv(CONFIG_DIR) + "/online_api_credentials.yaml"}'
+                has_login=$(conf_get ".login"  "$CONFIG_DIR/online_api_credentials.yaml")
+                if [ "$has_login" = "null" ] || [ -z "$has_login" ]; then
+                    echo "Registering to online API"
+                    cscli capi register
+                    echo "Registration to online API done"
+                fi
+            fi
+        fi
+        
+        # Enroll instance if enroll key is provided
+        if isfalse "$DISABLE_ONLINE_API" && [ "$ENROLL_KEY" != "" ]; then
+            enroll_args=""
+            if [ "$ENROLL_INSTANCE_NAME" != "" ]; then
+                enroll_args="--name $ENROLL_INSTANCE_NAME"
+            fi
+            if [ "$ENROLL_TAGS" != "" ]; then
+                # shellcheck disable=SC2086
+                for tag in ${ENROLL_TAGS}; do
+                    enroll_args="$enroll_args --tags $tag"
+                done
+            fi
+            # shellcheck disable=SC2086
+            cscli console enroll $enroll_args "$ENROLL_KEY"
+        fi
+        
+        # crowdsec sqlite database permissions
+        if [ "$GID" != "" ]; then
+            if istrue "$(conf_get '.db_config.type == "sqlite"')"; then
+                # force the creation of the db file(s)
+                cscli machines inspect create-db --error >/dev/null 2>&1 || :
+                # don't fail if the db is not there yet
+                if chown -f ":$GID" "$(conf_get '.db_config.db_path')" 2>/dev/null; then
+                    echo "sqlite database permissions updated"
+                fi
+            fi
+        fi
+        
+        if istrue "$USE_TLS"; then
+            agents_allowed_yaml=$(csv2yaml "$AGENTS_ALLOWED_OU")
+            export agents_allowed_yaml
+            bouncers_allowed_yaml=$(csv2yaml "$BOUNCERS_ALLOWED_OU")
+            export bouncers_allowed_yaml
+            conf_set_if "$CACERT_FILE" '.api.server.tls.ca_cert_path = strenv(CACERT_FILE)'
+            conf_set_if "$LAPI_CERT_FILE" '.api.server.tls.cert_file = strenv(LAPI_CERT_FILE)'
+            conf_set_if "$LAPI_KEY_FILE" '.api.server.tls.key_file = strenv(LAPI_KEY_FILE)'
+            conf_set_if "$BOUNCERS_ALLOWED_OU" '.api.server.tls.bouncers_allowed_ou = env(bouncers_allowed_yaml)'
+            conf_set_if "$AGENTS_ALLOWED_OU" '.api.server.tls.agents_allowed_ou = env(agents_allowed_yaml)'
+        else
+            conf_set 'del(.api.server.tls)'
+        fi
+        
+        conf_set_if "$PLUGIN_DIR" '.config_paths.plugin_dir = strenv(PLUGIN_DIR)'
+        
+        
+        ## Register bouncers via env
+        for BOUNCER in $(compgen -A variable | grep -i BOUNCER_KEY); do
+            KEY=$(printf '%s' "${!BOUNCER}")
+            NAME=$(printf '%s' "$BOUNCER" | cut -d_  -f3-)
+            if [[ -n $KEY ]] && [[ -n $NAME ]]; then
+                register_bouncer "$NAME" "$KEY"
+            fi
+        done
+        
+        if [ "$ENABLE_CONSOLE_MANAGEMENT" != "" ]; then
+            # shellcheck disable=SC2086
+            cscli console enable console_management
+        fi
+        
+        ## Register bouncers via secrets (Swarm only)
+        shopt -s nullglob extglob
+        for BOUNCER in /run/secrets/@(bouncer_key|BOUNCER_KEY)* ; do
+            KEY=$(cat "${BOUNCER}")
+            NAME=$(echo "${BOUNCER}" | awk -F "/" '{printf $NF}' | cut -d_  -f2-)
+            if [[ -n $KEY ]] && [[ -n $NAME ]]; then
+                register_bouncer "$NAME" "$KEY"
+            fi
+        done
+        shopt -u nullglob extglob
+        
+        # set all options before validating the configuration
+        
+        conf_set_if "$METRICS_PORT" '.prometheus.listen_port=env(METRICS_PORT)'
+        
+        ARGS=""
+        if [ "$CONFIG_FILE" != "" ]; then
+            ARGS="-c $CONFIG_FILE"
+        fi
+        
+        if istrue "$LEVEL_TRACE"; then
+            ARGS="$ARGS -trace"
+        fi
+        
+        if istrue "$LEVEL_DEBUG"; then
+            ARGS="$ARGS -debug"
+        fi
+        
+        if istrue "$LEVEL_INFO"; then
+            ARGS="$ARGS -info"
+        fi
+        
+        if istrue "$LEVEL_WARN"; then
+            ARGS="$ARGS -warning"
+        fi
+        
+        if istrue "$LEVEL_ERROR"; then
+            ARGS="$ARGS -error"
+        fi
+        
+        if istrue "$LEVEL_FATAL"; then
+            ARGS="$ARGS -fatal"
+        fi
+        
+        # shellcheck disable=SC2086
+        exec crowdsec $ARGS
+        
+---
+# Source: crowdsec/templates/lapi-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crowdsec-config-local
+data:
+  config.yaml.local: |
+    api:
+      server:
+        auto_registration: # Activate if not using TLS for authentication
+          enabled: true
+          token: "${REGISTRATION_TOKEN}" # /!\ Do not modify this variable (auto-generated and handled by the chart)
+          allowed_ranges: # /!\ Make sure to adapt to the pod IP ranges used by your cluster
+            - "127.0.0.1/32"
+            - "192.168.0.0/16"
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+    
+
+
+
+---
+# Source: crowdsec/templates/lapi-persistentVolume.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: crowdsec-db-pvc
+  labels:
+    k8s-app: crowdsec
+    type: lapi
+    version: v1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "1Gi"
+
+
+---
+# Source: crowdsec/templates/lapi-persistentVolume.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: crowdsec-config-pvc
+  labels:
+    k8s-app: crowdsec
+    type: lapi
+    version: v1
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "100Mi"
+
+---
+# Source: crowdsec/templates/agent-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: crowdsec-agent-service
+  labels:
+    app: crowdsec-agent-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6060
+      targetPort: 6060
+      protocol: TCP
+      name: metrics
+  selector:
+    k8s-app: crowdsec
+    type: agent
+    version: v1
+---
+# Source: crowdsec/templates/lapi-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: crowdsec-service
+  labels:
+    app: crowdsec-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6060
+      targetPort: 6060
+      protocol: TCP
+      name: metrics
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: lapi
+  selector:
+    k8s-app: crowdsec
+    type: lapi
+    version: v1
+
+---
+# Source: crowdsec/templates/agent-daemonSet.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: crowdsec-agent
+  labels:
+    k8s-app: crowdsec
+    type: agent
+    version: v1
+spec:
+  selector:
+    matchLabels:
+      k8s-app: crowdsec
+      type: agent
+  template:
+    metadata:
+      annotations:
+        checksum/agent-configmap: 524e841fd2661b639b1cc3aee213e22b04572ed44b8d8c81289d7e16b76bab8c
+        checksum/acquis-configmap: afe96ab4c4d3883fae945443e2b028afea416723bf8320b34d5ed1d9898a525d
+      labels:
+        k8s-app: crowdsec
+        type: agent
+        version: v1
+    spec:
+      initContainers:
+      - name: wait-for-lapi-and-register
+        image: "crowdsecurity/crowdsec:v1.8.1"
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'until nc "$LAPI_HOST" "$LAPI_PORT" -z; do echo waiting for lapi to start; sleep 5; done; ln -s /staging/etc/crowdsec /etc/crowdsec && cscli lapi register --machine "$USERNAME" -u "$LAPI_URL" --token "$REGISTRATION_TOKEN" && cp /etc/crowdsec/local_api_credentials.yaml /tmp_config/local_api_credentials.yaml']
+        resources:
+          limits:
+            memory: 50Mi
+          requests:
+            cpu: 1m
+            memory: 10Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+        volumeMounts:
+          - name: crowdsec-config
+            mountPath: /tmp_config
+        env:
+          - name: REGISTRATION_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: crowdsec-lapi
+                key: registrationToken
+          - name: USERNAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: LAPI_URL
+            value: "http://crowdsec-service.crowdsec:8080"
+          - name: LAPI_HOST
+            value: "crowdsec-service.crowdsec"
+          - name: LAPI_PORT
+            value: "8080"
+      containers:
+      - name: crowdsec-agent
+        image: "crowdsecurity/crowdsec:v1.8.1"
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'cp /tmp_config/local_api_credentials.yaml /staging/etc/crowdsec/local_api_credentials.yaml && ./docker_start.sh']
+        env:
+          - name: DISABLE_LOCAL_API
+            value: "true"
+          - name: DISABLE_ONLINE_API
+            value: "true"
+          - name: CROWDSEC_BYPASS_DB_VOLUME_CHECK
+            value: "true"
+
+          # agent - lapi authentication, with TLS or password
+          - name: LOCAL_API_URL
+            value: "http://crowdsec-service.crowdsec:8080"
+          - name: COLLECTIONS
+            value: crowdsecurity/traefik
+        resources:
+          limits:
+            cpu: 500m
+            memory: 192Mi
+          requests:
+            cpu: 20m
+            memory: 48Mi
+        
+        ports:
+          - name: metrics
+            containerPort: 6060
+            protocol: TCP
+
+        
+
+        
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /metrics
+            port: metrics
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        
+        
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /metrics
+            port: metrics
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        
+        
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /metrics
+            port: metrics
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        
+
+        
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+
+        volumeMounts:
+          - name: crowdsec-config
+            mountPath: /tmp_config
+          
+          
+          
+          - name: acquis-config-volume
+            mountPath: /etc/crowdsec/acquis.yaml
+            subPath: acquis.yaml
+          - name: varlog
+            mountPath: /var/log
+            readOnly: true
+
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: acquis-config-volume
+        configMap:
+          name: acquis-configmap
+      - name: crowdsec-config
+        emptyDir: {}
+      - name: varlog
+        hostPath:
+          path: /var/log
+      
+      
+      
+      
+---
+# Source: crowdsec/templates/lapi-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crowdsec-lapi
+  labels:
+    k8s-app: crowdsec
+    type: lapi
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: crowdsec
+      type: lapi
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        checksum/lapi-secret: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+        checksum/lapi-configmap: 5f81bdc08f32bc76fdb8210fa8afd96c741d1bb334f2cbf5d3a76cd7cd8e4ba7
+      labels:
+        k8s-app: crowdsec
+        type: lapi
+        version: v1
+    spec:
+      containers:
+      - name: crowdsec-lapi
+        image: "crowdsecurity/crowdsec:v1.8.1"
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: LOCAL_API_URL
+            value: http://localhost:8080
+          - name: DISABLE_AGENT
+            value: "true"
+          - name: INSECURE_SKIP_VERIFY
+            value: "false"
+          
+          - name: CS_LAPI_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: crowdsec-lapi
+                key: csLapiSecret
+          - name: REGISTRATION_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: crowdsec-lapi
+                key: registrationToken
+          - name: CUSTOM_HOSTNAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: DISABLE_ONLINE_API
+            value: "true"
+          - name: BOUNCER_KEY_traefik
+            valueFrom:
+              secretKeyRef:
+                key: key
+                name: crowdsec-bouncer-key
+        resources:
+          limits:
+            cpu: 500m
+            memory: 256Mi
+          requests:
+            cpu: 20m
+            memory: 64Mi
+
+        livenessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+          httpGet:
+            path: /health
+            port: lapi
+            scheme: HTTP
+        readinessProbe:
+          failureThreshold: 3
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+          httpGet:
+            path: /health
+            port: lapi
+            scheme: HTTP
+        startupProbe:
+          failureThreshold: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+          httpGet:
+            path: /health
+            port: lapi
+            scheme: HTTP
+
+        securityContext:
+          allowPrivilegeEscalation: false
+          privileged: false
+
+        ports:
+          - name: lapi
+            containerPort: 8080
+            protocol: TCP
+          - name: metrics
+            containerPort: 6060
+            protocol: TCP
+        
+        command: ['sh', '-c', 'cp -nR /staging/etc/crowdsec/* /etc/crowdsec_data/ && ln -s /etc/crowdsec_data /etc/crowdsec && bash /docker_start.sh']
+        
+        volumeMounts:
+          - name: crowdsec-docker-start-script
+            mountPath: /docker_start.sh
+            subPath: docker_start.sh
+          
+          - name: crowdsec-db
+            mountPath: /var/lib/crowdsec/data
+            subPath: crowdsec
+          - name: crowdsec-config
+            mountPath: /etc/crowdsec_data
+          
+          
+          
+          
+          - name: crowdsec-config-local-volume
+            mountPath: /etc/crowdsec_data/config.yaml.local
+            subPath: config.yaml.local
+          
+
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: crowdsec-docker-start-script
+        configMap:
+          name: crowdsec-docker-start-script-configmap
+      - name: crowdsec-db
+        persistentVolumeClaim:
+          claimName: crowdsec-db-pvc
+      - name: crowdsec-config
+        persistentVolumeClaim:
+          claimName: crowdsec-config-pvc
+      
+      
+      
+      
+      - name: crowdsec-config-local-volume
+        configMap:
+          name: crowdsec-config-local
+      priorityClassName:
+---
+# Source: crowdsec/templates/tests/test_agent_up.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "crowdsec-test-agent"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+  - name: "crowdsec-test-agent"
+    image: curlimages/curl
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        curl -XGET http://crowdsec-agent-service:6060/metrics
+  restartPolicy: Never
+---
+# Source: crowdsec/templates/tests/test_lapi_up.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "crowdsec-test-lapi-up"
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+  - name: crowdsec-test-lapi-up
+    image: curlimages/curl
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        curl -XGET http://crowdsec-service:8080/health
+  restartPolicy: Never
+---
+# Referenced from Traefik's entrypoints as crowdsec-bouncer@kubernetescrd.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: bouncer
+  namespace: crowdsec
+spec:
+  plugin:
+    crowdsec-bouncer:
+      enabled: true
+      # Local copy of decisions; requests never wait on LAPI.
+      crowdsecMode: stream
+      crowdsecLapiScheme: http
+      crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+      # Read from the Secret in the Middleware's namespace.
+      crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:key
+      # Fail open: if LAPI is unreachable, keep serving traffic.
+      updateMaxFailure: -1

@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongo
+  namespace: demo
+  labels:
+    engawa.engawahq.dev/group: backend
+  ownerReferences:
+    - apiVersion: mongodbcommunity.mongodb.com/v1
+      kind: MongoDBCommunity
+      name: mongo
+      uid: 0c9e7a44-3b2f-4e61-8d0a-7a3c1b5e9f02
+      controller: true

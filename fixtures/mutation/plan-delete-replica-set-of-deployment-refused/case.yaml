@@ -1,0 +1,8 @@
+description: "A ReplicaSet its Deployment controls is not deleted: the Deployment would make it again; deleting or scaling the Deployment is what removes it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: apps, version: v1, resource: replicasets}
+        name: web-7d9f

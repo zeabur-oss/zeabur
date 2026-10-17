@@ -1,0 +1,116 @@
+# Profile: single-node. Apply in the namespace Argo CD runs in (argocd).
+# Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
+# key: Key the Traefik bouncer uses for the CrowdSec local API.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: crowdsec-bouncer-key
+  namespace: crowdsec
+stringData:
+  key: "<random: openssl rand -hex 64>"
+---
+# Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
+# csLapiSecret: Shared secret LAPI signs agent sessions with.
+# registrationToken: Token agents register with.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: crowdsec-lapi
+  namespace: crowdsec
+stringData:
+  csLapiSecret: "<random: openssl rand -hex 64>"
+  registrationToken: "<random: openssl rand -hex 64>"
+---
+# Argo CD reads OCI Helm charts through a repository with enableOCI.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: crowdsec-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: crowdsec-oci
+  url: ghcr.io/crowdsecurity/helm-charts
+  enableOCI: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crowdsec
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/crowdsecurity/helm-charts
+    chart: crowdsec
+    targetRevision: 0.24.2
+    helm:
+      releaseName: crowdsec
+      valuesObject:
+        agent:
+          acquisition:
+          - namespace: traefik
+            podName: traefik-*
+            program: traefik
+          env:
+          - name: COLLECTIONS
+            value: crowdsecurity/traefik
+          resources:
+            limits:
+              memory: 192Mi
+            requests:
+              cpu: 20m
+              memory: 48Mi
+        container_runtime: containerd
+        lapi:
+          env:
+          - name: DISABLE_ONLINE_API
+            value: "true"
+          - name: BOUNCER_KEY_traefik
+            valueFrom:
+              secretKeyRef:
+                key: key
+                name: crowdsec-bouncer-key
+          persistentVolume:
+            config:
+              enabled: true
+            data:
+              enabled: true
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
+        secrets:
+          externalSecret:
+            name: crowdsec-lapi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: crowdsec
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+---
+# bouncer-middleware (namespace crowdsec)
+# Referenced from Traefik's entrypoints as crowdsec-bouncer@kubernetescrd.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: bouncer
+  namespace: crowdsec
+spec:
+  plugin:
+    crowdsec-bouncer:
+      enabled: true
+      # Local copy of decisions; requests never wait on LAPI.
+      crowdsecMode: stream
+      crowdsecLapiScheme: http
+      crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+      # Read from the Secret in the Middleware's namespace.
+      crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:key
+      # Fail open: if LAPI is unreachable, keep serving traffic.
+      updateMaxFailure: -1

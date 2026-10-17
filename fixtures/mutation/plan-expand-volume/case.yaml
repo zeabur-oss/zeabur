@@ -1,0 +1,3 @@
+description: "A claim grows when its StorageClass allows expansion; the StatefulSet whose template names it is affected."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "expandVolume", "claim": "data-postgresql-0", "size": "20Gi"}]}, "storageClasses": [{"name": "local-path", "allowVolumeExpansion": true, "default": true}]}

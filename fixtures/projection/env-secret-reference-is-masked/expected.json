@@ -1,0 +1,22 @@
+[
+  {
+    "name": "NODE_ENV",
+    "value": "production",
+    "source": { "kind": "Literal" }
+  },
+  {
+    "name": "DATABASE_PASSWORD",
+    "value": null,
+    "masked": true,
+    "source": { "kind": "Secret", "name": "postgres", "key": "password" }
+  },
+  {
+    "name": "DATABASE_HOST",
+    "masked": null,
+    "source": { "kind": "ConfigMap", "name": "database", "key": "hostname" }
+  },
+  {
+    "name": "POD_NAME",
+    "source": { "kind": "PodField", "fieldPath": "metadata.name" }
+  }
+]

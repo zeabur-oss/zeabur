@@ -1,0 +1,2 @@
+description: An operator Deployment with an explicit group label stays in that group instead of the operators group.
+operation: graph.classify

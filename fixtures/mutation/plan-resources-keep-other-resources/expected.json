@@ -1,0 +1,68 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "512Mi",
+          "before": "256Mi",
+          "path": "spec.template.spec.containers[name=app].resources.limits.memory"
+        },
+        {
+          "after": "250m",
+          "before": "100m",
+          "path": "spec.template.spec.containers[name=app].resources.requests.cpu"
+        },
+        {
+          "after": "256Mi",
+          "before": "128Mi",
+          "path": "spec.template.spec.containers[name=app].resources.requests.memory"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/spec/containers/0/resources",
+            "value": {
+              "limits": {
+                "memory": "512Mi",
+                "nvidia.com/gpu": "1"
+              },
+              "requests": {
+                "cpu": "250m",
+                "memory": "256Mi",
+                "nvidia.com/gpu": "1"
+              }
+            }
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

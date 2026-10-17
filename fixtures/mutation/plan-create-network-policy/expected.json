@@ -1,0 +1,49 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "plural": "networkpolicies",
+        "name": "engawa-isolate-web"
+      },
+      "resourceVersion": null,
+      "before": null,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "networking.k8s.io/v1",
+          "kind": "NetworkPolicy",
+          "metadata": {
+            "name": "engawa-isolate-web",
+            "namespace": "demo",
+            "labels": {
+              "app.kubernetes.io/managed-by": "engawa"
+            }
+          },
+          "spec": {
+            "podSelector": {
+              "matchLabels": {
+                "app": "web"
+              }
+            },
+            "policyTypes": [
+              "Ingress"
+            ],
+            "ingress": [
+              {
+                "from": [
+                  {
+                    "podSelector": {}
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "impact": [],
+  "warnings": []
+}

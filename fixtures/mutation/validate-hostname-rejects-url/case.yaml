@@ -1,0 +1,4 @@
+description: A URL with a scheme is refused as a hostname.
+operation: mutation.validateHostname
+params:
+  hostname: "http://example.com"

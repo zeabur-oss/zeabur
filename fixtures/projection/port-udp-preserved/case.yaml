@@ -1,0 +1,4 @@
+description: A UDP port with no other signal is reported as UDP from its transport protocol.
+operation: projection.portProtocol
+params:
+  port: dns

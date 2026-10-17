@@ -1,0 +1,5 @@
+description: Without a NetworkPolicy every pod accepts and sends everything.
+operation: modules.networkReachability
+params:
+  namespace: "shop"
+  connections: [["web", "api"]]

@@ -1,0 +1,57 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "/tmp/cache",
+          "before": "/cache",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=cache].mountPath"
+        },
+        {
+          "after": "true",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=cache].readOnly"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/volumeMounts/0/mountPath",
+            "value": "/cache"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/spec/containers/0/volumeMounts/0/mountPath",
+            "value": "/tmp/cache"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/volumeMounts/0/readOnly",
+            "value": true
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

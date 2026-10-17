@@ -1,0 +1,4 @@
+description: A fully qualified subdomain is a valid hostname.
+operation: mutation.validateHostname
+params:
+  hostname: n8n.example.com

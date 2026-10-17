@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-7d9f-abcde
+  namespace: demo
+  uid: pod-web
+  resourceVersion: "77"
+  labels: {app: web, app.kubernetes.io/managed-by: Helm}
+  ownerReferences:
+    - {apiVersion: apps/v1, kind: ReplicaSet, name: web-7d9f, uid: rs-web, controller: true}
+spec:
+  containers:
+    - name: app
+      image: example/web:3.0

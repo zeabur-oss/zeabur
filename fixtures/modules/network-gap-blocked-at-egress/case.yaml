@@ -1,0 +1,5 @@
+description: worker's egress policy lists only api, so its call to web is blocked at worker's egress; the fix is an egress policy from worker to web, to write by hand.
+operation: modules.networkGaps
+params:
+  namespace: "shop"
+  connections: [["worker", "api"], ["worker", "web"]]

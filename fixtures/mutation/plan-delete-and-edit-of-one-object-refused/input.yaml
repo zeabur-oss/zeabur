@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  uid: d-web
+  resourceVersion: "41"
+  generation: 3
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: example/web:3.0

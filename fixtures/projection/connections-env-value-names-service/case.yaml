@@ -1,0 +1,4 @@
+description: A literal value naming a Service by URL or cluster DNS name connects the caller to the workload behind it, inferred from text.
+operation: projection.connections
+params:
+  namespace: shop

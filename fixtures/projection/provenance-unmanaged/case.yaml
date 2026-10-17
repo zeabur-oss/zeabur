@@ -1,0 +1,2 @@
+description: An object with no management labels or annotations has no tool and needs no warning before edits.
+operation: projection.provenance

@@ -1,0 +1,9 @@
+description: "Deleting a claim says its data may be lost and names its volume's reclaim policy, and names the workload that still mounts it."
+operation: mutation.plan
+params:
+  reclaimPolicies: {pv-data: Delete}
+  request:
+    changes:
+      - op: delete
+        resource: {group: "", version: v1, resource: persistentvolumeclaims}
+        name: data

@@ -1,0 +1,4 @@
+description: A request carrying no changes at all is refused.
+operation: mutation.validateEnv
+params:
+  changes: []

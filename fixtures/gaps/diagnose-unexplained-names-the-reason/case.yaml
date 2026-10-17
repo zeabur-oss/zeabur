@@ -1,0 +1,4 @@
+description: A failing pod that no diagnosis explains still gets one, naming the reason the cluster gave, so the raw reason is never the only text.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

@@ -1,0 +1,3 @@
+description: "A probe on a port the container does not declare is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "probe", "workload": {"kind": "Deployment", "name": "web"}, "probe": "readiness", "set": {"handler": "TCPSocket", "port": 9999}}]}}

@@ -1,0 +1,319 @@
+// The ⌘K palette's contents, loaded when it first opens: jump to a project, service, pod (its
+// logs) or domain, run a few actions, and see recent items. The list is Base UI's Autocomplete,
+// inline in the dialog (https://base-ui.com/react/components/autocomplete#command-palette): it
+// moves the highlight, keeps it in view and names it to assistive technology, and Enter while
+// composing a character (an IME) does nothing. The filter is the palette's own.
+import { Autocomplete } from "@base-ui/react/autocomplete"
+import { useQueries, useQuery } from "@tanstack/react-query"
+import { useRouter } from "@tanstack/react-router"
+import { useState, type ReactNode } from "react"
+import ArrowRightIcon from "~icons/ph/arrow-right"
+import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
+import CubeIcon from "~icons/ph/cube"
+import FileTextIcon from "~icons/ph/file-text"
+import FolderSimpleIcon from "~icons/ph/folder-simple"
+import GlobeIcon from "~icons/ph/globe"
+import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
+import MoonIcon from "~icons/ph/moon"
+import PuzzlePieceIcon from "~icons/ph/puzzle-piece"
+import TerminalIcon from "~icons/ph/terminal"
+import TextAlignLeftIcon from "~icons/ph/text-align-left"
+import TranslateIcon from "~icons/ph/translate"
+
+import { projectQuery, projectsQuery } from "@/api/queries"
+import { ServiceIcon } from "@/components/service-icon"
+import { StatusDot } from "@/components/status"
+import { localeNames, locales, useI18n, useT } from "@/i18n"
+import type { Icon } from "@/lib/icon"
+import { addressOf, objectKey } from "@/lib/objects"
+import { serviceLink, usePlace } from "@/lib/place"
+import { palette, recent, remember } from "@/lib/stores"
+import { cn } from "@/lib/utils"
+import { domainsOf, kubectl, serviceId, statusOf } from "@/model/service"
+import { cycleTheme } from "@/theme"
+
+interface Item {
+  id: string
+  group: string
+  label: string
+  hint?: string
+  icon?: Icon
+  node?: ReactNode
+  href?: string
+  run?: () => void
+}
+
+interface Group {
+  label: string
+  items: Item[]
+}
+
+export function PaletteBody() {
+  const t = useT()
+  const router = useRouter()
+  const place = usePlace()
+  const href = (...link: Parameters<typeof serviceLink>) =>
+    router.buildLocation(serviceLink(...link)).href
+  const { locale, setLocale } = useI18n()
+  const [query, setQuery] = useState("")
+  const projects = useQuery(projectsQuery)
+  const adopted = (projects.data?.items ?? []).filter((p) => p.adopted)
+  // Every adopted project at once: read on load, not polled (five-second polls of every project
+  // would multiply the cluster reads). TODO(part C): use the list's health counts instead.
+  const views = useQueries({
+    queries: adopted.map((p) => projectQuery(p.name, { poll: false })),
+  })
+  const recents = recent.useValue()
+
+  const items: Item[] = []
+  const g = {
+    recent: t("palette.recent"),
+    projects: t("shell.projects"),
+    services: t("project.services"),
+    pods: t("pod.pods"),
+    domains: t("common.domains"),
+    objects: t("project.entry.objects"),
+    actions: t("palette.actions"),
+  }
+  if (!query)
+    for (const r of recents)
+      items.push({
+        id: `recent:${r.id}`,
+        group: g.recent,
+        label: r.label,
+        hint: r.hint,
+        icon: ClockCounterClockwiseIcon,
+        href: r.href,
+      })
+
+  // Actions about the current service come first.
+  const currentKey = place.service
+  const currentProject = views.find((v) => v.data?.namespace === place.project)?.data
+  const current = currentProject?.services.find((s) => serviceId(s) === currentKey)
+  if (current && place.project) {
+    items.push({
+      id: "action:logs",
+      group: g.actions,
+      label: t("palette.openLogs", current.name),
+      icon: TextAlignLeftIcon,
+      href: href(place.project, current, { tab: "logs" }),
+    })
+    items.push({
+      id: "action:kubectl",
+      group: g.actions,
+      label: t("palette.copyKubectl", current.name),
+      hint: kubectl(current),
+      icon: TerminalIcon,
+      run: () => void navigator.clipboard.writeText(kubectl(current)).catch(() => {}),
+    })
+  }
+
+  for (const p of projects.data?.items ?? [])
+    items.push({
+      id: `project:${p.name}`,
+      group: g.projects,
+      label: p.name,
+      hint: p.adopted ? t("projects.adopted") : t("projects.namespaceOnly"),
+      icon: FolderSimpleIcon,
+      href: router.buildLocation({ to: "/projects/$project", params: { project: p.name } }).href,
+    })
+
+  for (const view of views) {
+    const data = view.data
+    if (!data) continue
+    for (const s of data.services) {
+      const serviceHref = href(data.namespace, s)
+      items.push({
+        id: `service:${data.namespace}/${serviceId(s)}`,
+        group: g.services,
+        label: s.name,
+        hint: t("palette.in", s.kind, data.namespace),
+        node: (
+          <span className="flex items-center gap-2">
+            <ServiceIcon service={s} size="sm" />
+            <span translate="no">{s.name}</span>
+            <StatusDot health={statusOf(s).health} />
+          </span>
+        ),
+        href: serviceHref,
+      })
+      for (const pod of s.pods)
+        items.push({
+          id: `pod:${data.namespace}/${pod.name}`,
+          group: g.pods,
+          label: pod.name,
+          hint: `${t("palette.in", s.name, data.namespace)}${pod.ready ? "" : `${t("common.sep")}${pod.reason ?? t("pod.notReady")}`}`,
+          icon: CubeIcon,
+          href: href(data.namespace, s, { tab: "logs", pod: pod.name }),
+        })
+      for (const { host } of domainsOf(s))
+        items.push({
+          id: `domain:${host}`,
+          group: g.domains,
+          label: host,
+          hint: t("palette.in", s.name, data.namespace),
+          icon: GlobeIcon,
+          href: href(data.namespace, s, { tab: "networking" }),
+        })
+    }
+    for (const r of data.resources) {
+      const address = addressOf(r.kind, r.name)
+      if (!address) continue
+      items.push({
+        id: `object:${data.namespace}/${r.kind}/${r.name}`,
+        group: g.objects,
+        label: r.name,
+        hint: t("palette.in", r.kind, data.namespace),
+        icon: FileTextIcon,
+        href: router.buildLocation({
+          to: "/projects/$project/objects",
+          params: { project: data.namespace },
+          search: { object: objectKey(address) },
+        }).href,
+      })
+    }
+  }
+
+  items.push({
+    id: "action:theme",
+    group: g.actions,
+    label: t("palette.toggleTheme"),
+    icon: MoonIcon,
+    run: cycleTheme,
+  })
+  items.push({
+    id: "action:components",
+    group: g.actions,
+    label: t("palette.components"),
+    icon: PuzzlePieceIcon,
+    href: "/cluster/components",
+  })
+  for (const value of locales)
+    if (value !== locale)
+      items.push({
+        id: `action:locale:${value}`,
+        group: g.actions,
+        label: `${t("settings.language")}: ${localeNames[value]}`,
+        icon: TranslateIcon,
+        run: () => setLocale(value),
+      })
+
+  const needle = query.trim().toLowerCase()
+  const shown = needle
+    ? items
+        .filter((item) => `${item.label} ${item.hint ?? ""}`.toLowerCase().includes(needle))
+        .slice(0, 40)
+    : items
+        .filter(
+          (item) => item.group !== g.pods && item.group !== g.domains && item.group !== g.objects,
+        )
+        .slice(0, 30)
+
+  const choose = (item: Item | undefined) => {
+    if (!item) return
+    palette.set(false)
+    if (item.href) {
+      if (!item.id.startsWith("action:"))
+        remember({
+          id: item.id.replace(/^recent:/, ""),
+          label: item.label,
+          hint: item.hint ?? "",
+          href: item.href,
+        })
+      router.history.push(item.href)
+    }
+    item.run?.()
+  }
+
+  // Groups in the order their first item comes, each item in its own group's place.
+  const groups: Group[] = []
+  for (const item of shown) {
+    const group = groups.find((g) => g.label === item.group)
+    if (group) group.items.push(item)
+    else groups.push({ label: item.group, items: [item] })
+  }
+
+  return (
+    <Autocomplete.Root
+      open
+      inline
+      items={groups}
+      filter={null}
+      value={query}
+      onValueChange={setQuery}
+      itemToStringValue={(item: Item) => item.label}
+      autoHighlight="always"
+      keepHighlight
+    >
+      <div className="flex items-center gap-2.5 border-b px-4">
+        <MagnifyingGlassIcon className="size-4.5 text-muted-foreground" aria-hidden="true" />
+        <Autocomplete.Input
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the palette exists to be typed into
+          autoFocus
+          aria-label={t("palette.search")}
+          className="h-13 w-full bg-transparent type-heading font-normal outline-none placeholder:text-muted-foreground"
+        />
+        <kbd className="rounded border bg-muted px-1.5 type-nano leading-normal text-muted-foreground">
+          esc
+        </kbd>
+      </div>
+      <Autocomplete.Empty className="px-3 py-6 text-center text-sm text-muted-foreground empty:hidden">
+        {t("palette.empty")}
+      </Autocomplete.Empty>
+      <Autocomplete.List className="flex max-h-palette flex-col overflow-y-auto p-1.5 empty:hidden">
+        {(group: Group) => (
+          <Autocomplete.Group key={group.label} items={group.items}>
+            <Autocomplete.GroupLabel className="px-2.5 pt-2.5 pb-1 type-meta font-medium text-muted-foreground">
+              {group.label}
+            </Autocomplete.GroupLabel>
+            <Autocomplete.Collection>
+              {(item: Item) => {
+                const ItemIcon = item.icon
+                return (
+                  <Autocomplete.Item
+                    key={item.id}
+                    value={item}
+                    onClick={() => choose(item)}
+                    className="group flex h-9 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-sm outline-none data-highlighted:bg-muted"
+                  >
+                    {item.node ?? (
+                      <>
+                        {ItemIcon ? (
+                          <ItemIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+                        ) : null}
+                        <span className="truncate" translate="no">
+                          {item.label}
+                        </span>
+                      </>
+                    )}
+                    {item.hint ? (
+                      <span
+                        className={cn(
+                          "ml-auto truncate pl-3 type-micro leading-4 text-muted-foreground",
+                          item.id === "action:kubectl" && "font-mono",
+                        )}
+                      >
+                        {item.hint}
+                      </span>
+                    ) : null}
+                    <ArrowRightIcon
+                      className={cn(
+                        "hidden size-3.5 text-muted-foreground group-data-highlighted:block",
+                        !item.hint && "ml-auto",
+                      )}
+                      aria-hidden="true"
+                    />
+                  </Autocomplete.Item>
+                )
+              }}
+            </Autocomplete.Collection>
+          </Autocomplete.Group>
+        )}
+      </Autocomplete.List>
+      <div className="flex items-center gap-3 border-t bg-muted/40 px-4 py-2 type-micro leading-normal text-muted-foreground">
+        <span>↑↓ {t("palette.move")}</span>
+        <span>↵ {t("palette.open")}</span>
+      </div>
+    </Autocomplete.Root>
+  )
+}

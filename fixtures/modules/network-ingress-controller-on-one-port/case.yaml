@@ -1,0 +1,5 @@
+description: A rule admitting k3s's Traefik on one port only is limited for the ingress controller and blocks the project's own services.
+operation: modules.networkReachability
+params:
+  namespace: "shop"
+  connections: [["api", "web"]]

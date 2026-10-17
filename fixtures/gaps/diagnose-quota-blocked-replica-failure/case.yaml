@@ -1,0 +1,4 @@
+description: A Deployment whose pods a ResourceQuota refuses carries the ReplicaFailure condition its ReplicaSet reported; the quota is named.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

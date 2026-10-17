@@ -1,0 +1,44 @@
+{
+  "objects": [
+    {
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "9"
+          },
+          {
+            "op": "test",
+            "path": "/spec/rules/0/host",
+            "value": "shop.example.test"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/rules/0/host",
+            "value": "store.example.test"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/tls/0/hosts/0",
+            "value": "store.example.test"
+          }
+        ]
+      }
+    }
+  ],
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "tlsHostChanged",
+      "route": "shop",
+      "hostname": "store.example.test"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+---
+# The log store.
+apiVersion: operator.victoriametrics.com/v1
+kind: VLSingle
+metadata:
+  name: victoria-logs
+  namespace: observability
+spec:
+  # Two weeks, or less when the volume reaches 8GiB of its 10Gi.
+  retentionPeriod: 14d
+  retentionMaxDiskSpaceUsageBytes: 8GiB
+  storage:
+    resources:
+      requests: {storage: 10Gi}
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 1Gi}
+---
+# One collector per node, reading container logs.
+apiVersion: operator.victoriametrics.com/v1
+kind: VLAgent
+metadata:
+  name: collector
+  namespace: observability
+spec:
+  k8sCollector:
+    enabled: true
+    # Namespace, pod and container suffice; labels add cardinality.
+    includePodLabels: false
+  remoteWrite:
+    - url: http://vlsingle-victoria-logs.observability.svc:9428/internal/insert
+  resources:
+    requests: {cpu: 20m, memory: 32Mi}
+    limits: {memory: 256Mi}

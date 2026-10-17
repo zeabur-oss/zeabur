@@ -1,0 +1,7 @@
+description: A variable name that is a C identifier is accepted.
+operation: mutation.validateEnv
+params:
+  changes:
+    - op: set
+      name: NODE_ENV
+      value: production

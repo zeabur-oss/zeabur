@@ -1,0 +1,3 @@
+description: "A YAML edit becomes a patch of the fields that differ, each behind a test; server fields and the last-applied annotation stay."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "networking.k8s.io", "version": "v1", "resource": "networkpolicies"}, "name": "web", "yaml": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: web\n  labels: {team: web}\nspec:\n  podSelector:\n    matchLabels: {app: web}\n  policyTypes: [Ingress]\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels: {app: gateway}\n"}]}}

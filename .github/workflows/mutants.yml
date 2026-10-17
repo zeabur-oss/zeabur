@@ -1,0 +1,69 @@
+name: Mutation testing
+
+# cargo-mutants changes the code one small edit at a time (a condition negated, a value replaced)
+# and runs the tests; a mutant no test fails on is code the tests do not check. The report is read
+# by people (docs/testing.md); it gates nothing. Settings are in .cargo/mutants.toml. The cluster
+# tests are #[ignore]d and do not run here.
+#
+# About 2,400 mutants, each rebuilding its crate: the run is split into shards that each fit in a
+# job's time limit.
+
+on:
+  schedule:
+    - cron: "0 3 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  mutants:
+    name: mutants (shard ${{ matrix.shard }} of 8)
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: mutants
+      # cargo-mutants exits non-zero when a mutant is missed or times out; that is the report,
+      # not a failure of the workflow.
+      - name: Mutants
+        continue-on-error: true
+        run: >-
+          nix develop --command cargo mutants --workspace --no-shuffle --jobs 2
+          --shard ${{ matrix.shard }}/8 --output target/mutants
+      - name: Summary
+        if: always()
+        run: |
+          out=target/mutants/mutants.out
+          count() { if [[ -f "$out/$1.txt" ]]; then wc -l <"$out/$1.txt"; else echo 0; fi; }
+          {
+            echo "### Mutants, shard ${{ matrix.shard }} of 8"
+            echo "| Outcome | Mutants |"
+            echo "|---|---|"
+            for outcome in caught missed timeout unviable; do
+              echo "| $outcome | $(count "$outcome") |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutants-shard-${{ matrix.shard }}
+          path: target/mutants/mutants.out
+          if-no-files-found: warn

@@ -1,0 +1,36 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "gateway.networking.k8s.io/v1",
+        "kind": "HTTPRoute",
+        "name": "web"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "3"
+          },
+          {
+            "op": "test",
+            "path": "/spec/hostnames/1",
+            "value": "old.example.test"
+          },
+          {
+            "op": "remove",
+            "path": "/spec/hostnames/1"
+          }
+        ]
+      }
+    }
+  ],
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ]
+}

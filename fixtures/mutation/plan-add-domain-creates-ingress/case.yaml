@@ -1,0 +1,8 @@
+description: "Without a route to the workload and without Gateways, a new hostname creates an Ingress named after the workload and hostname, left to the default IngressClass."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: Web.Example.test

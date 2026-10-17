@@ -1,0 +1,36 @@
+[
+  {
+    "kind": "unreachable",
+    "container": null,
+    "pods": [],
+    "cause": {
+      "key": "diagnosis.unreachable.cause.noService",
+      "params": {
+        "service": "api",
+        "from": "shop"
+      }
+    },
+    "why": {
+      "key": "diagnosis.unreachable.why.noService",
+      "params": {
+        "service": "api",
+        "from": "shop"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.unreachable.fix.noService"
+    },
+    "evidence": [
+      {
+        "kind": "HTTPRoute",
+        "name": "api",
+        "fieldPath": "spec.rules"
+      },
+      {
+        "kind": "Ingress",
+        "name": "shop",
+        "fieldPath": "spec.rules[0].http.paths[0].backend.service"
+      }
+    ]
+  }
+]

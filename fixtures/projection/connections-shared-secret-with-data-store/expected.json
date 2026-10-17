@@ -1,0 +1,8 @@
+[
+  {
+    "from": { "kind": "Deployment", "name": "api" },
+    "to": { "kind": "StatefulSet", "name": "db" },
+    "inferred": false,
+    "evidence": [{ "basis": "sharedObject", "object": { "kind": "Secret", "name": "db-credentials" } }]
+  }
+]

@@ -1,0 +1,61 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "/ready",
+          "path": "spec.template.spec.containers[name=app].readinessProbe.httpGet.path"
+        },
+        {
+          "after": "8080",
+          "path": "spec.template.spec.containers[name=app].readinessProbe.httpGet.port"
+        },
+        {
+          "after": "5",
+          "path": "spec.template.spec.containers[name=app].readinessProbe.periodSeconds"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/readinessProbe",
+            "value": {
+              "httpGet": {
+                "path": "/ready",
+                "port": 8080
+              },
+              "periodSeconds": 5
+            }
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

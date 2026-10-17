@@ -1,0 +1,2 @@
+description: A Deployment whose desired replicas are all updated and ready is running.
+operation: graph.deploymentPhase

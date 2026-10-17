@@ -1,0 +1,23 @@
+[
+  {
+    "gap": {
+      "rule": "blocked-connection",
+      "subject": { "kind": "Deployment", "name": "web" },
+      "message": {
+        "key": "gap.blockedConnection",
+        "params": { "from": "worker", "to": "web", "at": "egress" }
+      },
+      "fix": { "kind": "snippet", "id": "networkPolicy.allowEgress" }
+    },
+    "object": {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": { "name": "engawa-allow-to-web-worker", "namespace": "shop" },
+      "spec": {
+        "podSelector": { "matchLabels": { "app": "worker" } },
+        "policyTypes": ["Egress"],
+        "egress": [{ "to": [{ "podSelector": { "matchLabels": { "app": "web" } } }] }]
+      }
+    }
+  }
+]

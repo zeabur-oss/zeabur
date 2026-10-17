@@ -1,0 +1,8 @@
+description: "A new hostname for a workload an Ingress already routes to becomes another rule of that Ingress, with the same backend."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: www.example.test

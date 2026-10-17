@@ -1,0 +1,4 @@
+description: A ready container whose last restart ended more than 10 minutes ago (the kubelet's back-off reset window) is not diagnosed.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

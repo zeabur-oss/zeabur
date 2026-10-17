@@ -1,0 +1,2 @@
+description: Fields the server rewrites on every write, and status, are left out of the diff.
+operation: mutation.diff

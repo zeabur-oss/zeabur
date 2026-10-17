@@ -1,0 +1,2 @@
+description: An Ingress's spec.tls hosts are listed, sorted and without duplicates, as hosts with HTTPS configured.
+operation: projection.routes

@@ -1,0 +1,4 @@
+description: An envFrom import stays a single entry with its prefix and the number of keys the ConfigMap holds.
+operation: projection.envFrom
+params:
+  container: app

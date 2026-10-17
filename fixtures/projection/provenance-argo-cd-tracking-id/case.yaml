@@ -1,0 +1,2 @@
+description: An object carrying an Argo CD tracking id is attributed to Argo CD and warns before edits.
+operation: projection.provenance

@@ -1,0 +1,2 @@
+description: A Deployment whose rollout exceeded its progress deadline has failed.
+operation: graph.deploymentPhase

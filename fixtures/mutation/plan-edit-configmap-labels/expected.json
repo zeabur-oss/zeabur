@@ -1,0 +1,54 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "team-a",
+          "path": "metadata.annotations.owner"
+        },
+        {
+          "after": "other",
+          "before": "web",
+          "path": "metadata.labels.app"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "12",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "name": "web-config",
+        "plural": "configmaps"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "12"
+          },
+          {
+            "op": "test",
+            "path": "/metadata/labels/app",
+            "value": "web"
+          },
+          {
+            "op": "replace",
+            "path": "/metadata/labels/app",
+            "value": "other"
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations",
+            "value": {
+              "owner": "team-a"
+            }
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

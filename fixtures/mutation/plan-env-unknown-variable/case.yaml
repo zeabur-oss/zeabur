@@ -1,0 +1,9 @@
+description: "Removing a variable the container does not have is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: env
+        workload: {kind: Deployment, name: web}
+        changes:
+          - {op: remove, name: MISSING}

@@ -1,0 +1,8 @@
+description: "Deleting a Service Helm manages is refused, naming Helm: the release still lists it, so it is removed from the chart instead."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: "", version: v1, resource: services}
+        name: web

@@ -1,0 +1,36 @@
+{
+  "policies": [
+    "worker-egress"
+  ],
+  "services": [
+    {
+      "service": "projects/shop/services/deployment/web"
+    },
+    {
+      "service": "projects/shop/services/deployment/api"
+    },
+    {
+      "service": "projects/shop/services/deployment/worker",
+      "ingressIsolated": false,
+      "egressIsolated": true,
+      "toDns": "blocked",
+      "toOutside": "blocked"
+    }
+  ],
+  "connections": [
+    {
+      "from": "projects/shop/services/deployment/worker",
+      "to": "projects/shop/services/deployment/api",
+      "access": "allowed",
+      "blockedAt": []
+    },
+    {
+      "from": "projects/shop/services/deployment/worker",
+      "to": "projects/shop/services/deployment/web",
+      "access": "blocked",
+      "blockedAt": [
+        "egress"
+      ]
+    }
+  ]
+}

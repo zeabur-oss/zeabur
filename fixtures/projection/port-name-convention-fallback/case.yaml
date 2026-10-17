@@ -1,0 +1,4 @@
+description: Without an appProtocol, a port named http is inferred to speak HTTP from its name.
+operation: projection.portProtocol
+params:
+  port: http

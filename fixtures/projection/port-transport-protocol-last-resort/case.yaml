@@ -1,0 +1,4 @@
+description: A port whose name follows no convention falls back to its TCP transport protocol.
+operation: projection.portProtocol
+params:
+  port: database

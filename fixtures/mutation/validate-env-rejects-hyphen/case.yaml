@@ -1,0 +1,6 @@
+description: A variable name containing a hyphen is refused.
+operation: mutation.validateEnv
+params:
+  changes:
+    - op: set
+      name: NODE-ENV

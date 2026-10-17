@@ -1,0 +1,12 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "target": {"apiVersion": "v1", "kind": "Pod", "name": "web-7d9f-abcde", "plural": "pods"},
+      "write": {"type": "delete", "uid": "pod-web", "resourceVersion": "77"}
+    }
+  ],
+  "warnings": [
+    {"code": "podReplaced", "pod": "web-7d9f-abcde", "owner": {"kind": "ReplicaSet", "name": "web-7d9f"}}
+  ]
+}

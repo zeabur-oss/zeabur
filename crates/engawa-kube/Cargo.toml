@@ -1,0 +1,27 @@
+[package]
+name = "engawa-kube"
+description = "Engawa: the only crate that talks to kube-apiserver, always as the requesting user"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+engawa-core.workspace = true
+futures-util.workspace = true
+http.workspace = true
+k8s-openapi.workspace = true
+kube.workspace = true
+secrecy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# Already under kube's `ws` feature: the byte streams of `pods/exec`.
+tokio.workspace = true
+
+[dev-dependencies]
+engawa-test-support = { workspace = true, features = ["sandbox"] }

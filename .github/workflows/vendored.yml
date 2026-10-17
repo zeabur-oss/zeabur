@@ -1,0 +1,45 @@
+name: Vendored files
+
+# Files copied from other repositories must match their pinned commits. The checks download the
+# pinned sources from GitHub, so they run only when a vendored file, its pin or a check changes:
+# a pin names fixed content, so unchanged files cannot start to differ, and a GitHub outage or rate
+# limit cannot fail CI on unrelated changes. Run them locally with the same scripts.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - crates/engawa-recommend/bundle/**
+      - web/src/styles/genkan/**
+      - web/src/styles/geist-mono/**
+      - scripts/check-recommendations.sh
+      - scripts/check-genkan-files.sh
+      - scripts/check-geist-mono.sh
+      - .github/workflows/vendored.yml
+  pull_request:
+    paths:
+      - crates/engawa-recommend/bundle/**
+      - web/src/styles/genkan/**
+      - web/src/styles/geist-mono/**
+      - scripts/check-recommendations.sh
+      - scripts/check-genkan-files.sh
+      - scripts/check-geist-mono.sh
+      - .github/workflows/vendored.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  vendored:
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - run: nix develop --command bash -c './scripts/check-recommendations.sh && ./scripts/check-genkan-files.sh && ./scripts/check-geist-mono.sh'

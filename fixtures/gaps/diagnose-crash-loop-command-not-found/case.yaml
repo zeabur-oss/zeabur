@@ -1,0 +1,4 @@
+description: A container that keeps exiting with code 127 is a crash loop whose command was not found, and the fix is to check the command, not the logs.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

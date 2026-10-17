@@ -1,0 +1,35 @@
+[
+  {
+    "kind": "unexplained",
+    "container": null,
+    "pods": [
+      "api-1"
+    ],
+    "cause": {
+      "key": "diagnosis.unexplained.cause",
+      "params": {
+        "service": "api",
+        "reason": "RunContainerError"
+      }
+    },
+    "why": {
+      "key": "diagnosis.unexplained.why",
+      "params": {
+        "reason": "RunContainerError"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.unexplained.fix",
+      "params": {
+        "service": "api"
+      }
+    },
+    "evidence": [
+      {
+        "kind": "Pod",
+        "name": "api-1",
+        "fieldPath": "status"
+      }
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+description: "A restart asked together with an edit of the same workload joins its patch, so the object gets one write and one precondition."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: env
+        workload: {kind: Deployment, name: web}
+        changes:
+          - {op: set, name: NODE_ENV, value: production}
+      - op: restart
+        workload: {kind: Deployment, name: web}
+  now: "2026-10-15T08:00:00Z"

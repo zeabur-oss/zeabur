@@ -1,0 +1,31 @@
+[
+  {
+    "kind": "unreachable",
+    "container": null,
+    "pods": [],
+    "cause": {
+      "key": "diagnosis.unreachable.cause.noService",
+      "params": {
+        "service": "api",
+        "from": "web"
+      }
+    },
+    "why": {
+      "key": "diagnosis.unreachable.why.noService",
+      "params": {
+        "service": "api",
+        "from": "web"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.unreachable.fix.noService"
+    },
+    "evidence": [
+      {
+        "kind": "Deployment",
+        "name": "web",
+        "fieldPath": "spec.template.spec.containers[name=web].env[name=API_URL]"
+      }
+    ]
+  }
+]

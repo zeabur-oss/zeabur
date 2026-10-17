@@ -1,0 +1,2 @@
+description: A changed Secret value is reported as a change without revealing either value.
+operation: mutation.diff

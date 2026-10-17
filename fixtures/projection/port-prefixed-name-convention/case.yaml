@@ -1,0 +1,4 @@
+description: A port name with a protocol prefix such as grpc- is inferred from its name.
+operation: projection.portProtocol
+params:
+  port: grpc-internal

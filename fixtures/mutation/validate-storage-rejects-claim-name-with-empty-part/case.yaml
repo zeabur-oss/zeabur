@@ -1,0 +1,8 @@
+description: A claim name with an empty part between dots is refused.
+operation: mutation.validateStorage
+params:
+  request:
+    name: uploads
+    claimName: shared..uploads
+    size: 5Gi
+    mountPath: /uploads

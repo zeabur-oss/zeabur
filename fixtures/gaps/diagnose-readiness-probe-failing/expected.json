@@ -1,0 +1,28 @@
+[
+  {
+    "kind": "probeFailure",
+    "container": "api",
+    "pods": ["api-2"],
+    "cause": {
+      "key": "diagnosis.probeFailure.cause.readiness",
+      "params": {
+        "container": "api",
+        "count": "12",
+        "output": "HTTP probe failed with statuscode: 503"
+      }
+    },
+    "why": {
+      "key": "diagnosis.probeFailure.why.readiness",
+      "params": {
+        "container": "api",
+        "period": "5",
+        "periodDefault": "false",
+        "threshold": "3",
+        "thresholdDefault": "true"
+      }
+    },
+    "fix": {"key": "diagnosis.probeFailure.fix.readiness", "params": {"container": "api"}},
+    "evidence": [{"kind": "Event", "name": "api-2.unhealthy"}],
+    "lastSeen": "2026-10-15T11:58:00Z"
+  }
+]

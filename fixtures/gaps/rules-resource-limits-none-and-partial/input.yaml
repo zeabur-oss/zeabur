@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      initContainers:
+        - name: migrate
+          image: example/api:1.0
+      containers:
+        - name: api
+          image: example/api:1.0
+        - name: proxy
+          image: example/proxy:1.0
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+        - name: done
+          image: example/sidecar:1.0
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 32Mi

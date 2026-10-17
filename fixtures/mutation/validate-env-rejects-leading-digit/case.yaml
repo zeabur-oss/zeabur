@@ -1,0 +1,6 @@
+description: A variable name that starts with a digit is refused.
+operation: mutation.validateEnv
+params:
+  changes:
+    - op: set
+      name: 1_INVALID

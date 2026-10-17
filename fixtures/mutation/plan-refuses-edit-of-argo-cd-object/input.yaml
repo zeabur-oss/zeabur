@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+  annotations:
+    argocd.argoproj.io/tracking-id: "shop:apps/Deployment:demo/web"
+spec:
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: example/web:1.0

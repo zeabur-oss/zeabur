@@ -1,0 +1,96 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "3",
+          "before": "2",
+          "path": "spec.replicas"
+        },
+        {
+          "after": "/ready",
+          "path": "spec.template.spec.containers[name=app].readinessProbe.httpGet.path"
+        },
+        {
+          "after": "8080",
+          "path": "spec.template.spec.containers[name=app].readinessProbe.httpGet.port"
+        },
+        {
+          "after": "512Mi",
+          "before": "256Mi",
+          "path": "spec.template.spec.containers[name=app].resources.limits.memory"
+        },
+        {
+          "after": "200m",
+          "before": "100m",
+          "path": "spec.template.spec.containers[name=app].resources.requests.cpu"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/readinessProbe",
+            "value": {
+              "httpGet": {
+                "path": "/ready",
+                "port": 8080
+              }
+            }
+          },
+          {
+            "op": "replace",
+            "path": "/spec/replicas",
+            "value": 3
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/spec/containers/0/resources",
+            "value": {
+              "limits": {
+                "memory": "512Mi",
+                "nvidia.com/gpu": "1"
+              },
+              "requests": {
+                "cpu": "200m",
+                "memory": "128Mi",
+                "nvidia.com/gpu": "1"
+              }
+            }
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

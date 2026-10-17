@@ -1,0 +1,9 @@
+description: "A NetworkPolicy is deleted at the resourceVersion the request names; the plan shows it as it is and nothing after it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: networking.k8s.io, version: v1, resource: networkpolicies}
+        name: engawa-isolate-web
+        resourceVersion: "70"

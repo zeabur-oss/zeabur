@@ -1,0 +1,61 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "before": "blue",
+          "path": "data.colour"
+        },
+        {
+          "after": "hi",
+          "before": "hello",
+          "path": "data.greeting"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "12",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "name": "web-config",
+        "plural": "configmaps"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "12"
+          },
+          {
+            "op": "add",
+            "path": "/data/greeting",
+            "value": "hi"
+          },
+          {
+            "op": "remove",
+            "path": "/data/colour"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "restartNeeded",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "web"
+        }
+      ]
+    }
+  ]
+}

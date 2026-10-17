@@ -1,0 +1,4 @@
+description: A Service whose targetPort names no container port has nowhere to send; the declared ports are listed.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

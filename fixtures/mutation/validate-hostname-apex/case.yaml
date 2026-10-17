@@ -1,0 +1,4 @@
+description: An apex domain is a valid hostname.
+operation: mutation.validateHostname
+params:
+  hostname: example.com

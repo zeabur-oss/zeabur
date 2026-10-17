@@ -1,0 +1,8 @@
+description: "Removing the only hostname of an Ingress is refused: the Ingress would be invalid, and deleting it is a separate decision."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: removeDomain
+        route: {kind: Ingress, name: shop}
+        hostname: shop.example.test

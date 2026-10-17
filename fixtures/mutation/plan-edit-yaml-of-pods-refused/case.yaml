@@ -1,0 +1,3 @@
+description: "Pods belong to their controller and cannot be edited as YAML."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "pods"}, "name": "web-0", "yaml": "apiVersion: v1\nkind: Pod\nmetadata: {name: web-0}\n"}]}}

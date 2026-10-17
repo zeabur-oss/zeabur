@@ -1,0 +1,40 @@
+[
+  {
+    "rule": "resource-limits",
+    "severity": "warning",
+    "subject": {
+      "kind": "Deployment",
+      "name": "api",
+      "fieldPath": "spec.template.spec.containers[name=api]"
+    },
+    "service": "projects/demo/services/deployment/api",
+    "message": {
+      "key": "gap.resourceLimits.none",
+      "params": {"container": "api", "missing": "requests.cpu,requests.memory,limits.memory"}
+    },
+    "fix": {
+      "kind": "plan",
+      "id": "compute.resources",
+      "params": {"service": "projects/demo/services/deployment/api", "container": "api"}
+    },
+    "citations": [
+      {
+        "title": "Resource Management for Pods and Containers",
+        "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/"
+      },
+      {
+        "title": "Pod Quality of Service Classes",
+        "url": "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/"
+      }
+    ]
+  },
+  {
+    "rule": "resource-limits",
+    "severity": "advice",
+    "subject": {"fieldPath": "spec.template.spec.containers[name=proxy]"},
+    "message": {
+      "key": "gap.resourceLimits.partial",
+      "params": {"container": "proxy", "missing": "limits.memory"}
+    }
+  }
+]

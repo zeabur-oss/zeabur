@@ -1,0 +1,44 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "ConfigMap",
+        "name": "settings"
+      }
+    },
+    {
+      "target": {
+        "kind": "Deployment",
+        "name": "web"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/metadata/annotations",
+            "value": {
+              "kubectl.kubernetes.io/restartedAt": "2026-10-15T08:00:00Z"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "restartAdded",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "web"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+description: Namespaces are refused by the raw apply endpoint because they are tenant-level objects.
+operation: mutation.resourceAllowed
+params:
+  group: ""
+  version: v1
+  resource: namespaces

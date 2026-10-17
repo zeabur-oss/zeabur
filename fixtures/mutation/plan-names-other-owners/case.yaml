@@ -1,0 +1,9 @@
+description: "A variable another manager owns, such as kubectl, may be changed; the plan names that manager so the person knows whose value they replace."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: env
+        workload: {kind: Deployment, name: web}
+        changes:
+          - {op: set, name: LOG_LEVEL, value: debug}

@@ -1,0 +1,99 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Cargo crates, web/ packages (bun.lock), action digests and the k3s test version. The Rust nightly and flake.lock are updated by .github/workflows/update-toolchain.yml, which also has to update the fenix hash in flake.nix.",
+  "extends": [
+    "config:recommended",
+    ":semanticCommitTypeAll(chore)",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Asia/Taipei",
+  "schedule": [
+    "* 0-5 * * 1"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "commitBody": "Signed-off-by: renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>",
+  "enabledManagers": [
+    "cargo",
+    "bun",
+    "github-actions",
+    "custom.regex"
+  ],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "* 0-5 * * 1"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "One pull request for compatible crate updates; majors stay separate.",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "cargo (non-major)"
+    },
+    {
+      "description": "One pull request for compatible web/ package updates; majors stay separate.",
+      "matchManagers": [
+        "bun"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "web (non-major)"
+    },
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions"
+    },
+    {
+      "description": "The test image and the documented release move together.",
+      "matchPackageNames": [
+        "rancher/k3s",
+        "k3s-io/k3s"
+      ],
+      "groupName": "k3s"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "k3s image used by the cluster tests (ci.yml, CONTRIBUTING.md).",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/ci\\.yml$/",
+        "/^CONTRIBUTING\\.md$/"
+      ],
+      "matchStrings": [
+        "k3s: \\[(?<currentValue>v[0-9.]+-k3s[0-9]+)\\]",
+        "rancher/k3s:(?<currentValue>v[0-9.]+-k3s[0-9]+)"
+      ],
+      "depNameTemplate": "rancher/k3s",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)-k3s(?<build>\\d+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "k3s release in the install guide.",
+      "managerFilePatterns": [
+        "/^docs/get-started\\.md$/"
+      ],
+      "matchStrings": [
+        "INSTALL_K3S_VERSION=(?<currentValue>v[0-9.]+\\+k3s[0-9]+)"
+      ],
+      "depNameTemplate": "k3s-io/k3s",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "regex:^v(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)\\+k3s(?<build>\\d+)$"
+    }
+  ]
+}

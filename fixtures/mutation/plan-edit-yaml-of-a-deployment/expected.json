@@ -1,0 +1,53 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "example/web:3.1",
+          "before": "example/web:3.0",
+          "path": "spec.template.spec.containers[name=app].image"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/image",
+            "value": "example/web:3.0"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/spec/containers/0/image",
+            "value": "example/web:3.1"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

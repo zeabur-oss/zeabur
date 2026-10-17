@@ -1,0 +1,3 @@
+description: "A probe, a scale and a resources change to one workload are one patch with one resourceVersion precondition."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "probe", "workload": {"kind": "Deployment", "name": "web"}, "probe": "readiness", "set": {"handler": "HTTPGet", "port": 8080, "path": "/ready"}}, {"op": "scale", "workload": {"kind": "Deployment", "name": "web"}, "replicas": 3}, {"op": "resources", "workload": {"kind": "Deployment", "name": "web"}, "requests": {"cpu": "200m", "memory": "128Mi"}, "limits": {"memory": "512Mi"}}]}}

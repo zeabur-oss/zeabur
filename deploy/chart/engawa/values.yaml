@@ -1,0 +1,92 @@
+# Engawa's in-cluster server. docs/install.md walks through an installation; values.schema.json
+# checks these values.
+
+image:
+  # Engawa has no published image yet: build one with scripts/build-image.sh and load it into
+  # the cluster's nodes.
+  repository: engawa
+  # Defaults to the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The address people open, with no path: https://engawa.example.com. Required. Sign-in comes
+# back to <publicUrl>/auth/callback, the redirect URI registered at Genkan; Ingress and HTTPRoute
+# take their host name from it.
+publicUrl: ""
+
+issuer:
+  # Genkan's public URL (its issuer), exactly as Genkan's discovery document states it.
+  # Required.
+  url: ""
+  # The client registered with `genkanctl client create`.
+  clientId: engawa
+  clientSecret:
+    # The Secret holding the client secret `genkanctl client create` printed. Required; create
+    # it before installing (docs/install.md). The chart never takes the secret as a value, so it
+    # stays out of Helm's release records.
+    existingSecret: ""
+    key: client-secret
+  # A ConfigMap with extra CA certificates (PEM) to trust for the issuer, for an issuer whose
+  # certificate a private CA signed. Empty: the image's Mozilla CA bundle only.
+  caBundle:
+    configMap: ""
+    key: ca.crt
+
+# Anything the cluster refuses offers to ask for the passkey again (Genkan's `elevate` scope) and
+# retry with admin rights. Needs a client registered with `--allow-elevation`.
+elevation:
+  enabled: true
+
+# The key that signs plan tokens. Empty `existingSecret`: the chart creates a Secret with a random
+# key on install and keeps it on upgrades. A new key only invalidates plans not yet applied.
+planKey:
+  existingSecret: ""
+  key: plan-key
+
+# The metrics store usage history is read from, until someone chooses another in Settings (kept
+# in the ConfigMap engawa-settings of this namespace, by whoever may change it): a Service port
+# serving the Prometheus HTTP API, namespace/name:port. Empty: where Engawa's recommendation
+# installs VictoriaMetrics (observability/vmsingle-vm-victoria-metrics-k8s-stack:8428).
+metricsStore:
+  service: ""
+  # Let everyone signed in read the setting (a Role with `get` on that one ConfigMap, bound to
+  # system:authenticated), so every page uses the store chosen in Settings. Off: whoever cannot
+  # read the ConfigMap gets the default store, and the page says why.
+  everyoneReads: true
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  tls:
+    # A TLS Secret for the public URL's host name (for example from cert-manager). Empty: the
+    # Ingress has no `tls` section, and TLS ends in front of it.
+    secretName: ""
+
+# A Gateway API route (gateway.networking.k8s.io/v1) instead of, or next to, the Ingress.
+httpRoute:
+  enabled: false
+  annotations: {}
+  # The Gateway listeners to attach to, for example [{name: public, namespace: gateway}].
+  parentRefs: []
+
+# The budget is 30 MiB working set when idle (scripts/e2e-l2.sh checks it). The limit leaves
+# room for open terminals and large projects.
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

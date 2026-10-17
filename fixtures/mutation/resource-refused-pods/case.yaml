@@ -1,0 +1,6 @@
+description: Pods are refused by the raw apply endpoint because a controller produces them.
+operation: mutation.resourceAllowed
+params:
+  group: ""
+  version: v1
+  resource: pods

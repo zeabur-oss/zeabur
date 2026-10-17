@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-instance1-fk4t
+  namespace: demo
+  labels:
+    app.kubernetes.io/component: pg
+    postgres-operator.crunchydata.com/data: postgres
+  ownerReferences:
+    - apiVersion: upstream.pgv2.percona.com/v1beta1
+      kind: PostgresCluster
+      name: postgres
+      uid: 6b1f0c2e-1d0a-4c55-9a51-2f7d5c0e8a01
+      controller: true

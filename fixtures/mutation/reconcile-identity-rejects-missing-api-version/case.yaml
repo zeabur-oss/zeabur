@@ -1,0 +1,13 @@
+description: A raw apply document without apiVersion and kind is refused.
+operation: mutation.reconcileIdentity
+params:
+  resource:
+    group: apps
+    version: v1
+    resource: deployments
+  kind: Deployment
+  namespace: demo
+  name: n8n
+  body:
+    metadata:
+      name: n8n

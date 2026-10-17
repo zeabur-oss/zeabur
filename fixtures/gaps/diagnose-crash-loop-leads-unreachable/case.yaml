@@ -1,0 +1,4 @@
+description: A crash-looping Deployment behind a Service also leaves the Service without a ready pod; the crash loop, the cause, comes first and the unreachable Service after it.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

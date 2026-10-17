@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: shop
+spec:
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: example/web:1.0
+          env:
+            - name: API_URL
+              value: http://api.shop.svc.cluster.local:8080
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: api
+                  key: token
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: shop
+spec:
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0
+          env:
+            - name: PUBLIC_URL
+              value: http://api:8080
+          ports:
+            - name: http
+              containerPort: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-1
+  namespace: shop
+  labels:
+    app: api
+spec:
+  containers:
+    - name: api
+      image: example/api:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: api
+      image: example/api:1.0
+      imageID: ""
+      ready: true
+      restartCount: 0
+      state:
+        running:
+          startedAt: "2026-10-15T11:00:00Z"

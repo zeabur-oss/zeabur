@@ -1,0 +1,5 @@
+description: A claim named after the StatefulSet with ordinal 0 belongs to it.
+operation: mutation.ownedByStatefulSet
+params:
+  claim: data-postgresql-0
+  statefulSet: postgresql

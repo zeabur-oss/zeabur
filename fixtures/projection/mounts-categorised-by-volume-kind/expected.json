@@ -1,0 +1,30 @@
+[
+  {
+    "name": "data",
+    "mountPath": "/var/lib/postgresql/data",
+    "kind": "PersistentVolumeClaim",
+    "category": "persistent",
+    "claimName": "postgres-data",
+    "size": "20Gi",
+    "accessModes": ["ReadWriteOnce"],
+    "storageClass": "linode-block-storage"
+  },
+  {
+    "name": "config",
+    "mountPath": "/etc/nginx",
+    "kind": "ConfigMap",
+    "category": "config"
+  },
+  {
+    "name": "tls",
+    "mountPath": "/etc/tls",
+    "kind": "Secret",
+    "category": "config"
+  },
+  {
+    "name": "cache",
+    "mountPath": "/cache",
+    "kind": "EmptyDir",
+    "category": "ephemeral"
+  }
+]

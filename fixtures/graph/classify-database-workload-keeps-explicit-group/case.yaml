@@ -1,0 +1,2 @@
+description: A workload controlled by a database operator records its managing resource but keeps the group set by the explicit group label.
+operation: graph.classify

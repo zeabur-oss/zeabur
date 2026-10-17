@@ -1,0 +1,6 @@
+description: "Only kinds Engawa's forms create may be created; a Deployment is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {"op": "create", "object": {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": "x"}}}

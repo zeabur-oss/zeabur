@@ -1,0 +1,5 @@
+description: A claim with no ordinal suffix does not belong to the StatefulSet.
+operation: mutation.ownedByStatefulSet
+params:
+  claim: data-postgresql
+  statefulSet: postgresql

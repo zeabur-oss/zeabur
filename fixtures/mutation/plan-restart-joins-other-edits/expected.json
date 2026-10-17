@@ -1,0 +1,31 @@
+{
+  "objects": [
+    {
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/env/-",
+            "value": {
+              "name": "NODE_ENV",
+              "value": "production"
+            }
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/metadata/annotations",
+            "value": {
+              "kubectl.kubernetes.io/restartedAt": "2026-10-15T08:00:00Z"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+[
+  { "name": "worker-0", "ready": true, "restarts": 0, "reason": null, "created": "2026-10-14T08:00:00Z", "node": "node-a" },
+  { "name": "worker-1", "ready": false, "restarts": 14, "reason": "CrashLoopBackOff", "node": null },
+  { "name": "worker-2", "ready": false, "restarts": 1, "reason": "OOMKilled" }
+]

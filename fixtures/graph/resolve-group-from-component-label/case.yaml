@@ -1,0 +1,5 @@
+description: Without an explicit group label the component label names the group.
+operation: graph.resolveGroup
+params:
+  labels:
+    app.kubernetes.io/component: cache

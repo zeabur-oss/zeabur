@@ -1,0 +1,3 @@
+description: "A Secret value sent back masked is kept, never written as the mask; a changed value and a stringData key are set, a dropped key removed."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web-secret", "yaml": "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret}\ntype: Opaque\ndata:\n  password: (hidden)\n  token: ••••\n  user: YWxpY2U=\nstringData:\n  api-key: new-key\n"}]}, "secretValues": {"web-secret": {"password": "hunter2", "token": "t0k", "user": "admin", "old": "x"}}}

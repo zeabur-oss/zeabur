@@ -1,0 +1,8 @@
+description: A probe on a port the container declares becomes an HTTP GET probe on that port.
+operation: mutation.probeConfig
+params:
+  container: app
+  probe:
+    handler: HTTPGet
+    port: 5678
+    path: /healthz

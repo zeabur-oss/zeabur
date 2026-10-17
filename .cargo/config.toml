@@ -1,0 +1,23 @@
+# Cargo and rustc settings. Every nightly-only entry is explained, with its fallback, in
+# CONTRIBUTING.md, "Toolchain".
+
+[alias]
+# The exact checks CI runs.
+lint = "clippy --workspace --all-targets --all-features --locked -- -D warnings"
+
+[profile.release]
+# No build-host paths in release binaries (reproducible builds). Kept here rather than in Cargo.toml
+# because cargo-geiger embeds an older Cargo that rejects the key in manifests.
+trim-paths = "all"
+
+[build]
+# Parallel compiler front end (nightly).
+rustflags = ["-Zthreads=8"]
+
+[registry]
+# Do not resolve crate versions published less than a week ago (stable since Cargo 1.100).
+# Urgent security fix: CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE="0 days" cargo update -p <crate>
+global-min-publish-age = "7 days"
+
+[resolver]
+incompatible-publish-age = "deny"

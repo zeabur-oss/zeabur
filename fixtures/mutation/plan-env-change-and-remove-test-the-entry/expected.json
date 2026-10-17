@@ -1,0 +1,53 @@
+{
+  "objects": [
+    {
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/env/0/name",
+            "value": "LOG_LEVEL"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/spec/containers/0/env/0",
+            "value": {
+              "name": "LOG_LEVEL",
+              "value": "debug"
+            }
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/env/1/name",
+            "value": "MODE"
+          },
+          {
+            "op": "remove",
+            "path": "/spec/template/spec/containers/0/env/1"
+          }
+        ]
+      },
+      "changes": [
+        {
+          "path": "spec.template.spec.containers[name=app].env[name=LOG_LEVEL].value",
+          "before": "info",
+          "after": "debug"
+        },
+        {
+          "path": "spec.template.spec.containers[name=app].env[name=MODE].name",
+          "before": "MODE"
+        },
+        {
+          "path": "spec.template.spec.containers[name=app].env[name=MODE].value",
+          "before": "production"
+        }
+      ]
+    }
+  ]
+}

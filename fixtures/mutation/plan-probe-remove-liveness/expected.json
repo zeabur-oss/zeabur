@@ -1,0 +1,50 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "before": "/live",
+          "path": "spec.template.spec.containers[name=app].livenessProbe.httpGet.path"
+        },
+        {
+          "before": "8080",
+          "path": "spec.template.spec.containers[name=app].livenessProbe.httpGet.port"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "remove",
+            "path": "/spec/template/spec/containers/0/livenessProbe"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

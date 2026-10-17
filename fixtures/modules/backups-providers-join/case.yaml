@@ -1,0 +1,4 @@
+description: Coverage joins K8up and Velero; a claim only a paused Velero schedule covers is not backed up, and the namespace keeps the active Velero schedule.
+operation: modules.backups
+params:
+  namespace: "shop"

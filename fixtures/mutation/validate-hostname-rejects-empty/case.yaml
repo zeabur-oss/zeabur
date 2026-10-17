@@ -1,0 +1,4 @@
+description: An empty hostname is refused.
+operation: mutation.validateHostname
+params:
+  hostname: ""

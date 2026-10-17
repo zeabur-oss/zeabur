@@ -1,0 +1,4 @@
+description: A container whose previous run ended OOMKilled is out of memory, with its memory limit named, not a generic crash loop.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

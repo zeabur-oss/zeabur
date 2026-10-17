@@ -1,0 +1,3 @@
+description: "A ConfigMap's labels and annotations edited as YAML become JSON Patch operations on its metadata, each testing the value it replaces."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "configmaps"}, "name": "web-config", "yaml": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: web-config\n  labels: {app: other}\n  annotations: {owner: team-a}\ndata:\n  greeting: hello\n  colour: blue\n"}]}}

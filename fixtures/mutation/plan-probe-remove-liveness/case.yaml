@@ -1,0 +1,3 @@
+description: "A liveness probe is removed."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "probe", "workload": {"kind": "Deployment", "name": "web"}, "probe": "liveness"}]}}

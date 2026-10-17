@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: shop
+spec:
+  selector:
+    matchLabels: {"app": "web"}
+  template:
+    metadata:
+      labels: {"app": "web"}
+    spec:
+      containers:
+        - name: app
+          image: example/web:1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: shop
+spec:
+  selector:
+    matchLabels: {"app": "api"}
+  template:
+    metadata:
+      labels: {"app": "api"}
+    spec:
+      containers:
+        - name: app
+          image: example/api:1
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-from-traefik
+  namespace: shop
+spec:
+  podSelector:
+    matchLabels: {app: web}
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: traefik}
+      ports:
+        - port: 8080

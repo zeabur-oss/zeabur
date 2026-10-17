@@ -1,0 +1,8 @@
+description: A claim name that is not a DNS subdomain is refused.
+operation: mutation.validateStorage
+params:
+  request:
+    name: uploads
+    claimName: Shared_Uploads
+    size: 5Gi
+    mountPath: /uploads

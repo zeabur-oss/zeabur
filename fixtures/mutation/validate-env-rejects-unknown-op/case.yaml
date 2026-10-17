@@ -1,0 +1,6 @@
+description: A change whose operation is neither set nor remove is refused.
+operation: mutation.validateEnv
+params:
+  changes:
+    - op: toggle
+      name: NODE_ENV

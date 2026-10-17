@@ -1,0 +1,27 @@
+[
+  {
+    "kind": "unreachable",
+    "container": null,
+    "cause": {
+      "key": "diagnosis.unreachable.cause.targetPort",
+      "params": {
+        "service": "api",
+        "endpoint": "api",
+        "targetPort": "http",
+        "ports": "web (8080)"
+      }
+    },
+    "why": {
+      "key": "diagnosis.unreachable.why.targetPort"
+    },
+    "fix": {
+      "key": "diagnosis.unreachable.fix.targetPort"
+    },
+    "evidence": [
+      {
+        "kind": "Service",
+        "name": "api"
+      }
+    ]
+  }
+]

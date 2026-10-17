@@ -1,0 +1,8 @@
+description: "A restart of a Deployment Helm manages is allowed: a JSON Patch that tests the resourceVersion and adds the restart annotation, which Helm does not own."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: restart
+        workload: {kind: Deployment, name: web}
+  now: "2026-10-15T08:00:00Z"

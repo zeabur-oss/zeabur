@@ -1,0 +1,8 @@
+[
+  {
+    "source": { "kind": "ConfigMap", "name": "app-config" },
+    "prefix": "APP_",
+    "keyCount": 12,
+    "readOnly": false
+  }
+]

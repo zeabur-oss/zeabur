@@ -1,0 +1,37 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "backend",
+          "path": "metadata.labels.tier"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "13",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "name": "web-secret",
+        "plural": "secrets"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "13"
+          },
+          {
+            "op": "add",
+            "path": "/metadata/labels/tier",
+            "value": "backend"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

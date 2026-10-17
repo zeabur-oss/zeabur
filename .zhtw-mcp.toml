@@ -1,0 +1,41 @@
+# zhtw-mcp (https://github.com/sysprog21/zhtw-mcp) settings for scripts/check-zh-tw.sh, which lints
+# the interface's zh-TW strings one per line. Any warning or error fails the check; info findings
+# are printed and do not.
+
+profile = "base"
+# Interface strings, not prose: labels, short sentences, colon-led values.
+relaxed = true
+max_errors = 0
+max_warnings = 0
+
+off = [
+  # A single … is the interface convention (macOS and iOS zh-TW); the rule asks for …… as in prose.
+  "ellipsis",
+  # The `-` in the catalogue is a character people type ("開頭加 -"), never a range.
+  "range",
+]
+
+# Reported as info: the rule is right in general and wrong in these strings.
+ignore_terms = [
+  # 跟隨系統: the theme follows the system setting, not "track".
+  "跟隨",
+  # 只讀取了…: 只 + 讀取 ("only read"), not "read-only".
+  "只讀",
+  # 通行密鑰: the zh-TW name of a passkey on Apple's platforms.
+  "密鑰",
+  # 一次性的工作: a one-off Job, not "disposable".
+  "一次性",
+  # "- 和 .": the characters a name may contain, not a full stop.
+  ".",
+]
+
+[glossary]
+# The terms the catalogue chose; kept here so a change to one is a change to this list too.
+preferred = [
+  "副本", "機密", "設定檔", "日誌", "叢集", "專案", "服務", "連接埠", "通行密鑰", "檢視",
+  "重新啟動", "設定", "變數", "網域", "元件", "權杖", "憑證", "映像檔", "容器", "磁碟區",
+  "命名空間", "用量", "政策", "權限", "工作階段", "節點", "回滾",
+]
+# Never flagged: product names, and catalogue terms the linter would replace (日誌 → 記錄檔,
+# 回滾 → 回溯).
+proper_nouns = ["Engawa", "Genkan", "日誌", "回滾"]

@@ -1,0 +1,33 @@
+[
+  {
+    "target": {
+      "kind": "volume",
+      "name": "data"
+    },
+    "scheduledBy": [
+      "k8up:shop/nightly"
+    ],
+    "lastRun": {
+      "name": "nightly-abc12",
+      "provider": "k8up",
+      "outcome": "succeeded",
+      "started": "2026-10-14T02:00:00Z",
+      "finished": "2026-10-14T02:03:00Z"
+    }
+  },
+  {
+    "target": {
+      "kind": "volume",
+      "name": "scratch"
+    },
+    "scheduledBy": [],
+    "lastRun": null
+  },
+  {
+    "target": {
+      "kind": "namespace",
+      "name": "shop"
+    },
+    "scheduledBy": []
+  }
+]

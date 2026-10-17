@@ -1,0 +1,7 @@
+description: "A Job runs to completion and has no pods to replace, so restarting it is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: restart
+        workload: {kind: Job, name: migrate}

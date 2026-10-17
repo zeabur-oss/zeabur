@@ -1,0 +1,4 @@
+description: A worker that declares an http and a metrics port, scraped on its pods, with no Service and nothing sending to it by name, is not unreachable; declared ports are informational.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

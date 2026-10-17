@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: busybox:1.37
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker-7d9c-abcde
+  namespace: demo
+  labels:
+    app: worker
+spec:
+  containers:
+    - name: worker
+      image: busybox:1.37
+status:
+  phase: Running
+  containerStatuses:
+    - name: worker
+      image: busybox:1.37
+      imageID: ""
+      ready: false
+      restartCount: 5
+      state:
+        terminated:
+          reason: Error
+          exitCode: 127
+          finishedAt: "2026-10-15T11:59:40Z"
+      lastState:
+        terminated:
+          reason: Error
+          exitCode: 127
+          finishedAt: "2026-10-15T11:58:10Z"

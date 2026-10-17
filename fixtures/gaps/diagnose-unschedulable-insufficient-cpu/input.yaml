@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-1
+  namespace: demo
+  labels:
+    app: api
+spec:
+  containers:
+    - name: api
+      image: example/api:1.0
+status:
+  phase: Pending
+  conditions:
+    - type: PodScheduled
+      status: "False"
+      reason: Unschedulable
+      message: "0/1 nodes are available: 1 Insufficient cpu. preemption: 0/1 nodes are available: 1 No preemption victims found for incoming pod."
+      lastTransitionTime: "2026-10-15T11:50:00Z"

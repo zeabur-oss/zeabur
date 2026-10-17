@@ -1,0 +1,9 @@
+{
+  "group": "databases",
+  "displayName": "postgres",
+  "managedBy": {
+    "kind": "PerconaPGCluster",
+    "name": "postgres",
+    "engine": "PostgreSQL"
+  }
+}

@@ -1,0 +1,8 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pg-operator
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: pg-operator
+    pgv2.percona.com/control-plane: postgres-operator

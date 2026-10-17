@@ -1,0 +1,28 @@
+# Profile: single-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: external-dns
+  namespace: kube-system
+spec:
+  chart: external-dns
+  repo: https://kubernetes-sigs.github.io/external-dns
+  version: 1.23.0
+  targetNamespace: external-dns
+  createNamespace: true
+  valuesContent: |-
+    domainFilters: <domain-filters>
+    policy: upsert-only
+    provider:
+      name: <provider>
+    registry: txt
+    resources:
+      limits:
+        memory: 128Mi
+      requests:
+        cpu: 10m
+        memory: 32Mi
+    sources:
+    - gateway-httproute
+    - ingress
+    txtOwnerId: <owner-id>

@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: app
+          image: busybox:1.37
+          volumeMounts:
+            - name: v
+              mountPath: /v
+      volumes:
+        - name: v
+          secret:
+            secretName: no-secret
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-1
+  namespace: demo
+  labels:
+    app: app
+spec:
+  containers:
+    - name: app
+      image: busybox:1.37
+      volumeMounts:
+        - name: v
+          mountPath: /v
+  volumes:
+    - name: v
+      secret:
+        secretName: no-secret
+status:
+  phase: Pending
+  containerStatuses:
+    - name: app
+      image: busybox:1.37
+      imageID: ""
+      ready: false
+      restartCount: 0
+      started: false
+      state:
+        waiting:
+          reason: ContainerCreating
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+metadata:
+  name: app-1.failedmount
+  namespace: demo
+eventTime: null
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning
+reason: FailedMount
+note: 'MountVolume.SetUp failed for volume "v" : secret "no-secret" not found'
+regarding:
+  kind: Pod
+  name: app-1
+  namespace: demo
+deprecatedCount: 5
+deprecatedLastTimestamp: "2026-10-17T10:08:00Z"
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+metadata:
+  name: app-1.old-failedmount
+  namespace: demo
+eventTime: null
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning
+reason: FailedMount
+note: 'MountVolume.SetUp failed for volume "w" : configmap "gone" not found'
+regarding:
+  kind: Pod
+  name: app-1
+  namespace: demo
+deprecatedCount: 2
+deprecatedLastTimestamp: "2026-10-17T09:30:00Z"

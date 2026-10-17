@@ -1,0 +1,4 @@
+description: A CronJob whose newest run exited with code 1 has a failed run; an older run that passed does not hide it, and nothing is called a crash loop.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

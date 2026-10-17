@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: app
+          image: example/web:1.0
+          envFrom:
+            - prefix: APP_
+              configMapRef:
+                name: app-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: demo
+data:
+  KEY_01: value-01
+  KEY_02: value-02
+  KEY_03: value-03
+  KEY_04: value-04
+  KEY_05: value-05
+  KEY_06: value-06
+  KEY_07: value-07
+  KEY_08: value-08
+  KEY_09: value-09
+  KEY_10: value-10
+  KEY_11: value-11
+  KEY_12: value-12

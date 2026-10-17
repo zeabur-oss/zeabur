@@ -1,0 +1,3 @@
+description: "A ConfigMap's YAML edit becomes key changes, with the restart warning of its readers."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "configmaps"}, "name": "web-config", "yaml": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: web-config\n  labels: {app: web}\ndata:\n  greeting: hi\n"}]}}

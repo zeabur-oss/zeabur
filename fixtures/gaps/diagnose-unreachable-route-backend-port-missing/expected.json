@@ -1,0 +1,24 @@
+[
+  {
+    "kind": "unreachable",
+    "container": null,
+    "cause": {
+      "key": "diagnosis.unreachable.cause.routeNotAccepted",
+      "params": {
+        "service": "web",
+        "route": "c-missing-port",
+        "condition": "ResolvedRefs",
+        "reason": "BackendNotFound"
+      }
+    },
+    "evidence": [
+      {
+        "kind": "HTTPRoute",
+        "name": "c-missing-port",
+        "fieldPath": "status.parents",
+        "value": "Cannot load HTTPBackendRef demo/web: service port 8081 not found"
+      }
+    ],
+    "lastSeen": "2026-10-17T10:02:18Z"
+  }
+]

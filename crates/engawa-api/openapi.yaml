@@ -1,0 +1,6182 @@
+openapi: 3.1.0
+info:
+  title: Engawa API
+  description: |-
+    Kubernetes made simple and secure by default. Every request acts as the person making it; errors are RFC 9457 problems that keep kube-apiserver's own answer.
+    
+    **Shapes.** A get returns the resource itself, with `unreadable` naming the kinds the person may not list. A list returns `{items}` with every item; events take a `limit` (100 by default, 500 at most) and say in `totalSize` how many matched. Every value names the Kubernetes object it came from (`origin`), every top-level node has an `id` in the shape of its path, and times are RFC 3339.
+    
+    **Caching.** Every answer carries `Cache-Control: no-store`.
+    
+    **Consistency.** A project is read with one consistent LIST per kind, issued concurrently. Kinds are not read at one shared resourceVersion, which Kubernetes does not offer across kinds, so a response can briefly show, for example, a pod that a just-deleted workload owned; the next read corrects it. Engawa promises freshness (nothing older than the request), not a single-revision snapshot.
+    
+    **Errors.** The problem `kind` and `reason` are open enumerations: expect new values, treat an unknown `kind` by its HTTP status and ignore an unknown `reason`. `429` and `503` carry kube-apiserver's `Retry-After` when it gave one. Where admin rights are offered and not in use (`/api/v1/session`), a `403` from kube-apiserver comes as `elevation-required`, with the same `denied` and `kubernetes`; while they are in use, every request goes with them.
+    
+    **Compatibility.** The embedded web interface ships with the API; other clients are not yet promised a stable `/api/v1`.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+  version: 0.0.1
+paths:
+  /api/v1/cluster:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The cluster: its name, kube-apiserver's version and distribution. Readable by every signed-in
+        person.
+      operationId: getCluster
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cluster"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/capabilities:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Which capabilities the cluster has, by the recommendations catalogue, with the version of
+        each installed component.
+      description: |-
+        Detection reads cluster-wide objects (CRDs, ingress classes, workloads in every namespace) as
+        the person. If any of those reads is refused, the answer would show installed components as
+        missing, so the endpoint answers `403` instead: managing the cluster's components is for
+        people who can see the whole cluster, and the interface hides it for everyone else.
+      operationId: listCapabilities
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapabilityList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/components/{capability}/{component}/install":
+    get:
+      tags:
+      - cluster
+      summary: |-
+        How to install a catalogue component yourself: Helm commands, a k3s `HelmChart`, Flux objects
+        or an Argo CD `Application`, with the catalogue's pinned versions and values. Engawa runs none
+        of them.
+      operationId: guide_for
+      parameters:
+      - name: capability
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: component
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: profile
+        in: query
+        description: "`single-node` or `multi-node`; by default the one that fits the cluster's node count."
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InstallAnswer"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/events:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Events of every namespace, the newest `limit` of them (100 by default), optionally only
+        warnings, only recent ones and only those about the cluster itself: the cluster overview asks
+        for the last hour's warnings with `scope=cluster`, leaving projects' events to their pages.
+      description: |-
+        At most 5,000 events are read (`partial` says when there were more); `totalSize` counts every
+        event read that matched, also those past the limit.
+      operationId: listClusterEvents
+      parameters:
+      - name: type
+        in: query
+        description: "Only events of this type: `Normal` or `Warning` (any case)."
+        required: false
+        schema:
+          type: string
+      - name: sinceSeconds
+        in: query
+        description: Only events that last happened within this many seconds.
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: scope
+        in: query
+        description: |-
+          `cluster`: only events about the cluster itself (no namespace, a Node, or a `kube-`
+          namespace); `all`, the default: every event.
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: |-
+          The most events to return, newest first: 100 by default, at most 500 (a larger value is
+          lowered to 500).
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterEventList"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/gaps:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        What the cluster itself is missing, apart from any project: an IngressClass served by a
+        retired controller.
+      operationId: cluster
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/nodes:
+    get:
+      tags:
+      - cluster
+      summary: "The nodes: roles, health, versions, and what their pods request against what is allocatable."
+      description: |-
+        Requests and limits are summed per node from every unfinished pod, the way
+        `kubectl describe node` sums them (see `capacity`); usage is added only when metrics-server
+        is installed and readable, and is approximate ("meant only for autoscaling purposes"
+        [metrics-server]). `403` when nodes cannot be listed; a refusal of pods or metrics leaves
+        those parts out and says so.
+        
+        [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
+      operationId: listNodes
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/upgrades:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The cluster's version and what it calls for: end of life from the bundled table, version
+        skew between kube-apiserver and the kubelets, and newer patches and minors from
+        system-upgrade-controller's Plans.
+      description: |-
+        Engawa makes no outbound request: without Plans, newer versions are not reported (see
+        [`engawa_recommend::versions`]). Readable by everyone signed in; nodes and Plans the person
+        may not list are named in `unreadable`, so the interface can say which permission is missing.
+      operationId: getUpgrades
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Upgrades"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/projects:
+    get:
+      tags:
+      - projects
+      summary: The projects you may see, with the health of the adopted ones.
+      operationId: list
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}":
+    get:
+      tags:
+      - projects
+      summary: "A project's services, the resources they use, and how they relate: the project document."
+      operationId: get
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDocument"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/apply":
+    post:
+      tags:
+      - projects
+      summary: "Carries out a plan by its token: checks it, dry-runs every write, then writes."
+      description: |-
+        Reads and writes use the elevated credential while the person holds one, as every request
+        does. The plan's binding alone is checked against the everyday identity: elevation adds groups
+        but keeps the user name, so a plan made before elevating still applies after, and one made
+        while elevated still applies once the rights have ended (and is refused then if the everyday
+        credential may not write it). Where elevation is offered and not in use, a `403` from the
+        cluster is answered as `elevation-required` (same status, same `denied`; see the `error`
+        module), so the interface can offer to retry as an administrator.
+      operationId: apply
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplyResponse"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/backups":
+    get:
+      tags:
+      - projects
+      summary: |-
+        Backups of a project: which claims, databases and the namespace a schedule covers, and how
+        the latest backups went, from every backup provider this build has (K8up, Velero,
+        CloudNativePG), read as the person. Outcomes are as each provider reports them; Engawa does
+        not test restores.
+      operationId: getProjectBackups
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectBackups"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/configmaps":
+    get:
+      tags:
+      - resources
+      summary: The ConfigMaps of a project, in full, sorted by name. Lists ConfigMaps only.
+      operationId: config_maps
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigMapList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/events":
+    get:
+      tags:
+      - projects
+      summary: >-
+        Events in a project, the newest `limit` of them (100 by default; see
+        [`crate::query`]).
+      description: |-
+        Ordered by when they last happened, newest first (events that say nothing about when last),
+        then by name. `totalSize` counts every event that matched, also those past the limit.
+      operationId: events
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      - name: regarding
+        in: query
+        description: |-
+          Only events about this object, as `<kind>/<name>` (`pod/web-1`, `Deployment/web`; the
+          kind in any case).
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: |-
+          The most events to return, newest first: 100 by default, at most 500 (a larger value is
+          lowered to 500).
+        required: false
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventList"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/gaps":
+    get:
+      tags:
+      - projects
+      summary: >-
+        What a project is missing, by the built-in rules, each with its citations and
+        fix.
+      operationId: project
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GapList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/namespace":
+    get:
+      tags:
+      - projects
+      summary: "A project's Namespace: adopted or not, its details, and whether you may change them."
+      operationId: getProjectNamespace
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectNamespace"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/network-policy/presets":
+    get:
+      tags:
+      - projects
+      summary: |-
+        Ready-made NetworkPolicy objects for one service, to plan as new objects (`create`): isolate
+        it (its project and cluster DNS stay reachable), let the ingress controller (k3s's Traefik)
+        reach it, or let one other service reach it. Nothing is written; whether the cluster enforces
+        NetworkPolicy depends on its network plugin.
+      operationId: listNetworkPolicyPresets
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: service
+        in: query
+        description: The service, `<kind>/<name>` (`deployment/api`; any case).
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresetList"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/objects":
+    get:
+      tags:
+      - resources
+      summary: |-
+        Every listable namespaced kind of a project, kinds first: the usual kinds (or only those named
+        in `kinds`) and, with `all`, every kind that controllers do not generate are read (names, ages
+        and owners only); the rest come back unread. Each kind carries an access hint; kinds refused
+        when read are named in `unreadable`.
+      operationId: listObjects
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kinds
+        in: query
+        description: |-
+          Kinds to read instead of the usual ones, as `<group>/<resource>` (`core` for the core
+          group), comma-separated: `apps/replicasets,cert-manager.io/certificates`.
+        required: false
+        schema:
+          type: string
+      - name: all
+        in: query
+        description: "`true`: read every kind that controllers do not generate (\"scan all kinds\")."
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectList"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/objects/{group}/{version}/{resource}/{name}":
+    get:
+      tags:
+      - resources
+      summary: |-
+        One object of a project as YAML, without the server's bookkeeping and with a Secret's values
+        hidden; any namespaced kind the cluster serves (`core` names the empty group).
+      operationId: getObject
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: group
+        in: path
+        description: The API group; `core` for the core group
+        required: true
+        schema:
+          type: string
+      - name: version
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: resource
+        in: path
+        description: The plural resource name, such as `deployments`
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ObjectDocument"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/plan":
+    post:
+      tags:
+      - projects
+      summary: >-
+        Computes the writes a change needs and returns them with a token; writes
+        nothing.
+      operationId: plan
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanResponse"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/exec":
+    get:
+      tags:
+      - pods
+      summary: A terminal in a container, over a WebSocket.
+      description: |-
+        Binary messages carry terminal bytes both ways; text messages are JSON control frames,
+        `ClientFrame` to the server and `ServerFrame` to the browser. The handshake answers `101
+        Switching Protocols`; every later failure (`403` with `denied` naming `get` on
+        `pods/exec`, `elevation-required` where admin rights are offered and not in use; a pod or
+        container that does not exist, a container that is not running) arrives as an `error` frame,
+        which a browser can read where it cannot read a refused handshake. After `exit` or `error` the
+        server closes with `1000`; it closes with `4000` when the credential in use expires (the admin
+        one's while it is in use) and `4001` after 15 minutes without a byte either way. A handshake
+        from another origin is refused with `403`.
+      operationId: exec
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: |-
+          The container; by default the one the pod's `kubectl.kubernetes.io/default-container`
+          annotation names, or its first.
+        required: false
+        schema:
+          type: string
+      - name: command
+        in: query
+        description: >-
+          The command, one argument per parameter (`command=ls&command=-l`); `/bin/sh` by
+          default.
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        "101":
+          description: Switched to the terminal's WebSocket
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/logs":
+    get:
+      tags:
+      - pods
+      summary: |-
+        A snapshot of a container's log. A log the kubelet cannot give (the container has not
+        started, has not restarted, or is gone) is a `log-unavailable` problem, never a log line.
+      operationId: logs
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container; required when the pod has several.
+        required: false
+        schema:
+          type: string
+      - name: tailLines
+        in: query
+        description: Only the last lines (default 500).
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: sinceSeconds
+        in: query
+        description: Only lines newer than this many seconds.
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: previous
+        in: query
+        description: The previous instance of the container, after a restart.
+        required: false
+        schema:
+          type: boolean
+      - name: timestamps
+        in: query
+        description: Prefix each line with its timestamp.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogSnapshot"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: The pod does not exist, or the log asked for cannot be read (`log-unavailable`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/logs/follow":
+    get:
+      tags:
+      - pods
+      summary: |-
+        A container's log as it is written, as Server-Sent Events: one `data` line per log line; an
+        `error` event with a problem (JSON) when the stream fails, after which it ends.
+      operationId: follow_logs
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container; required when the pod has several.
+        required: false
+        schema:
+          type: string
+      - name: tailLines
+        in: query
+        description: Only the last lines (default 500).
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: sinceSeconds
+        in: query
+        description: Only lines newer than this many seconds.
+        required: false
+        schema:
+          type: integer
+          format: int64
+      - name: previous
+        in: query
+        description: The previous instance of the container, after a restart.
+        required: false
+        schema:
+          type: boolean
+      - name: timestamps
+        in: query
+        description: Prefix each line with its timestamp.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          description: The pod does not exist, or the log asked for cannot be read (`log-unavailable`)
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/secrets/{name}/reveal":
+    post:
+      tags:
+      - resources
+      summary: |-
+        A Secret's values. A `POST`, so that it is always a deliberate action and never prefetched;
+        the response is never cached, and nothing in Engawa logs or keeps it.
+      operationId: reveal_secret
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RevealedSecret"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}":
+    get:
+      tags:
+      - services
+      summary: |-
+        One service (workload) of a project, cut from the project document: for deep links, scripts
+        and the MCP server. The web interface reads the project document instead.
+      operationId: service
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset, daemonset, job or cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceDocument"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/history":
+    get:
+      tags:
+      - services
+      summary: |-
+        What a service's pods used over the last hour, 6 hours, day or week, from the metrics store,
+        as you: CPU (millicores) and memory (the working set, bytes) per pod, and restarts when the
+        store has kube-state-metrics. Pods are the service's by name, so those a rollout replaced
+        are included. Always `200` once the parameters are valid: `state` says when there is no
+        store, you may not read it (`get` on its `services/proxy`; `unreadable` names it), or it did
+        not answer. Reading the store is reading every project's metrics: see the description of
+        `GET /api/v1/settings/metrics-store`.
+      operationId: getServiceHistory
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: "`deployment`, `statefulset`, `daemonset`, `job` or `cronjob` (any case)"
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: range
+        in: query
+        description: "`1h` (the default, a point every 15 s), `6h` (1 min), `24h` (5 min) or `7d` (30 min)."
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceHistory"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/releases":
+    get:
+      tags:
+      - services
+      summary: |-
+        The releases of a service's workload, newest first, each with its pod template; one is
+        `current`. A rollback is a plan (`rollback` change).
+      operationId: releases
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset, daemonset, job or cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkloadReleaseList"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/usage":
+    get:
+      tags:
+      - projects
+      summary: |-
+        What each pod of a project uses now, from metrics-server: CPU in millicores and memory (the
+        working set) in bytes, per pod and container. Approximate ("meant only for autoscaling
+        purposes"). Always `200`: `state` says when metrics-server is not installed, the person may
+        not read it (`unreadable` names the refusal), or it did not answer.
+      operationId: getProjectUsage
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectUsage"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/session:
+    get:
+      tags:
+      - identity
+      summary: "How you are signed in to Engawa: whether you can sign out, and admin rights in use."
+      operationId: getSession
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionView"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/settings/metrics-store:
+    get:
+      tags:
+      - settings
+      summary: |-
+        The metrics store: which Service history is read from, where that came from, whether it
+        answers and whether you may change it. Readable by everyone signed in; the store answers
+        only those allowed `get` on its `services/proxy`.
+      operationId: getMetricsStore
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricsStoreSetting"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    put:
+      tags:
+      - settings
+      summary: |-
+        Changes the metrics store, or goes back to the default with `null`, by writing the
+        settings ConfigMap as you (created the first time). Who may: whoever may update (and
+        create) the ConfigMap `engawa-settings` in Engawa's namespace. Answers the setting as it
+        now is, with the new store's probe.
+      operationId: setMetricsStore
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MetricsStoreChange"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricsStoreSetting"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/whoami:
+    get:
+      tags:
+      - identity
+      summary: Who the cluster says you are.
+      operationId: whoami
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WhoAmI"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+components:
+  schemas:
+    AccessMode:
+      type: string
+      description: |-
+        How the nodes may mount a new claim [k8s-access-modes].
+        
+        Whether a mode works is up to the `StorageClass`'s provisioner (k3s's local-path provisioner
+        offers only `ReadWriteOnce` and `ReadWriteOncePod`), so no mode is refused here: the plan's
+        dry run and the provisioner decide.
+        
+        [k8s-access-modes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
+      enum:
+      - ReadWriteOnce
+      - ReadWriteOncePod
+      - ReadWriteMany
+      - ReadOnlyMany
+    Applied:
+      type: object
+      description: One object an apply wrote.
+      required:
+      - target
+      properties:
+        resourceVersion:
+          type:
+          - string
+          - "null"
+          description: Its `resourceVersion` after the write.
+        target:
+          $ref: "#/components/schemas/PlanTarget"
+          description: The object.
+    ApplyRequest:
+      type: object
+      description: The token of a plan to apply.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token `plan` returned.
+    ApplyResponse:
+      type: object
+      description: What an apply wrote.
+      required:
+      - applied
+      properties:
+        applied:
+          type: array
+          items:
+            $ref: "#/components/schemas/Applied"
+          description: The objects, in the order written.
+    Attribution:
+      type: object
+      description: The resolved ownership of one resource.
+      required:
+      - ownership
+      - owners
+      properties:
+        owners:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkloadRef"
+          description: |-
+            The referencing workloads, sorted by kind then name, without duplicates; always present,
+            empty for an orphan.
+        ownership:
+          $ref: "#/components/schemas/Ownership"
+          description: Owned, shared or orphan.
+    BackupCoverage:
+      type: object
+      description: One target's coverage across providers.
+      required:
+      - target
+      - scheduledBy
+      properties:
+        lastRun:
+          oneOf:
+          - $ref: "#/components/schemas/BackupRun"
+            description: Its latest run, by any provider.
+          - type: "null"
+        scheduledBy:
+          type: array
+          items:
+            type: string
+          description: The schedules covering it (`<provider>:<namespace>/<name>`), active ones only.
+        target:
+          $ref: "#/components/schemas/BackupTarget"
+          description: The target.
+    BackupOutcome:
+      type: string
+      description: How a backup run went.
+      enum:
+      - succeeded
+      - partiallyFailed
+      - failed
+      - running
+      - unknown
+    BackupProvider:
+      type: object
+      description: One backup provider of this build.
+      required:
+      - module
+      - state
+      properties:
+        module:
+          type: string
+          description: The module (`k8up`).
+        state:
+          $ref: "#/components/schemas/ProviderState"
+          description: Whether it could be read.
+    BackupRun:
+      type: object
+      description: One backup run.
+      required:
+      - name
+      - provider
+      - targets
+      - outcome
+      properties:
+        finished:
+          type:
+          - string
+          - "null"
+          description: When it finished, RFC 3339.
+        message:
+          type:
+          - string
+          - "null"
+          description: The provider's message, for a failure.
+        name:
+          type: string
+          description: The provider's object name.
+        outcome:
+          $ref: "#/components/schemas/BackupOutcome"
+          description: How it went.
+        provider:
+          type: string
+          description: The provider (module id).
+        started:
+          type:
+          - string
+          - "null"
+          description: When it started, RFC 3339.
+        targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupTarget"
+          description: What it covered.
+    BackupSchedule:
+      type: object
+      description: One backup schedule.
+      required:
+      - name
+      - provider
+      - cron
+      - paused
+      - targets
+      properties:
+        cron:
+          type: string
+          description: >-
+            The cron expression, as the provider writes it (CloudNativePG's has a seconds
+            field).
+        name:
+          type: string
+          description: The provider's object, `<namespace>/<name>`.
+        note:
+          type:
+          - string
+          - "null"
+          description: >-
+            What else to know about the coverage (an i18n key), such as
+            `velero.volumesNeedSnapshots`.
+        paused:
+          type: boolean
+          description: The schedule is paused or suspended.
+        provider:
+          type: string
+          description: The provider (module id).
+        targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupTarget"
+          description: What it covers in the project.
+    BackupTarget:
+      type: object
+      description: One thing a backup covers.
+      required:
+      - kind
+      - name
+      properties:
+        kind:
+          $ref: "#/components/schemas/BackupTargetKind"
+          description: What it is.
+        name:
+          type: string
+          description: "Its name: the claim, the database cluster or the namespace."
+    BackupTargetKind:
+      type: string
+      description: What a backup covers.
+      enum:
+      - volume
+      - database
+      - namespace
+    Capability:
+      type: object
+      description: Whether a capability is present on the cluster, and on what evidence.
+      required:
+      - name
+      - existing
+      - evidence
+      - components
+      - installations
+      properties:
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/Component"
+          description: "The catalogue's components for it: what to install when it is missing."
+        evidence:
+          type: array
+          items:
+            type: string
+          description: |-
+            What was found, one line per match (`IngressClass controller
+            traefik.io/ingress-controller`).
+        existing:
+          type: boolean
+          description: "`true` when any component of it was found."
+        installations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Installation"
+          description: The components found installed, with their versions and who manages them.
+        name:
+          type: string
+          description: The capability (`ingress`, `certificates`, …).
+        suggestion:
+          oneOf:
+          - $ref: "#/components/schemas/Suggestion"
+            description: |-
+              For a missing capability, whether the catalogue recommends installing it on a cluster of
+              this shape; `None` when it exists.
+          - type: "null"
+    CapabilityList:
+      type: object
+      description: Which capabilities the cluster has.
+      required:
+      - catalogueCommit
+      - items
+      properties:
+        catalogueCommit:
+          type: string
+          description: The recommendations catalogue's commit.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Capability"
+          description: "Each capability, sorted by name: existing (with evidence) or not (with what to install)."
+    Change:
+      oneOf:
+      - type: object
+        description: Set or remove environment variables of one container of a workload.
+        required:
+        - workload
+        - changes
+        - op
+        properties:
+          changes:
+            type: array
+            items:
+              $ref: "#/components/schemas/EnvEdit"
+            description: The variables to set or remove.
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          op:
+            type: string
+            enum:
+            - env
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: Set or remove keys of a ConfigMap or Secret.
+        required:
+        - kind
+        - name
+        - changes
+        - op
+        properties:
+          changes:
+            type: array
+            items:
+              $ref: "#/components/schemas/DataEdit"
+            description: The keys to set or remove.
+          kind:
+            $ref: "#/components/schemas/DataKind"
+            description: "`ConfigMap` or `Secret`."
+          name:
+            type: string
+            description: Its name.
+          op:
+            type: string
+            enum:
+            - data
+      - type: object
+        description: Route a new hostname to a workload.
+        required:
+        - workload
+        - hostname
+        - op
+        properties:
+          hostname:
+            type: string
+            description: The hostname.
+          op:
+            type: string
+            enum:
+            - addDomain
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: Replace a hostname of a route with another.
+        required:
+        - route
+        - from
+        - to
+        - op
+        properties:
+          from:
+            type: string
+            description: The hostname now.
+          op:
+            type: string
+            enum:
+            - renameDomain
+          route:
+            $ref: "#/components/schemas/RouteRef"
+            description: The route.
+          to:
+            type: string
+            description: The hostname wanted.
+      - type: object
+        description: Stop routing a hostname.
+        required:
+        - route
+        - hostname
+        - op
+        properties:
+          hostname:
+            type: string
+            description: The hostname.
+          op:
+            type: string
+            enum:
+            - removeDomain
+          route:
+            $ref: "#/components/schemas/RouteRef"
+            description: The route.
+      - type: object
+        description: Replace a workload's pods, as `kubectl rollout restart` does.
+        required:
+        - workload
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - restart
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
+          Return a workload's pod template to an earlier release, as `kubectl rollout undo
+          --to-revision` does. ConfigMap and Secret contents stay as they are.
+        required:
+        - workload
+        - revision
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - rollback
+          revision:
+            type: integer
+            format: int64
+            description: The release to return to.
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: "The workload: a Deployment, StatefulSet or DaemonSet."
+      - type: object
+        description: Ask for more space on a PersistentVolumeClaim; claims only grow.
+        required:
+        - claim
+        - size
+        - op
+        properties:
+          claim:
+            type: string
+            description: The claim.
+          op:
+            type: string
+            enum:
+            - expandVolume
+          size:
+            type: string
+            description: The new size, a Kubernetes quantity such as `20Gi`.
+      - type: object
+        description: Create a PersistentVolumeClaim and mount it in a container of a workload.
+        required:
+        - workload
+        - volume
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          op:
+            type: string
+            enum:
+            - addVolume
+          volume:
+            $ref: "#/components/schemas/VolumeRequest"
+            description: The volume.
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: Move a mount, or make it read-only or writable.
+        required:
+        - workload
+        - mountPath
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          mountPath:
+            type: string
+            description: Where it is mounted now.
+          newMountPath:
+            type:
+            - string
+            - "null"
+            description: Where to mount it instead.
+          op:
+            type: string
+            enum:
+            - editMount
+          readOnly:
+            type:
+            - boolean
+            - "null"
+            description: Mount it read-only (or not).
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: Set or remove a liveness, readiness or startup probe of a container.
+        required:
+        - workload
+        - probe
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          op:
+            type: string
+            enum:
+            - probe
+          probe:
+            $ref: "#/components/schemas/ProbeKind"
+            description: Which probe.
+          set:
+            oneOf:
+            - $ref: "#/components/schemas/ProbeRequest"
+              description: The probe; absent to remove it.
+            - type: "null"
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: Run this many pods of a Deployment or StatefulSet.
+        required:
+        - workload
+        - replicas
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - scale
+          replicas:
+            type: integer
+            format: int32
+            description: The replicas.
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
+          Set a container's CPU, memory and ephemeral storage requests and limits; those left out
+          are removed, other resources (such as GPUs) are kept.
+        required:
+        - workload
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          limits:
+            type: object
+            description: Limits, the same way.
+            additionalProperties:
+              type: string
+            propertyNames:
+              type: string
+          op:
+            type: string
+            enum:
+            - resources
+          requests:
+            type: object
+            description: Requests, by resource (`cpu`, `memory`, `ephemeral-storage`).
+            additionalProperties:
+              type: string
+            propertyNames:
+              type: string
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
+          Replace one object of the project with an edited copy, written as YAML.
+          
+          Fields the server sets (`status`, `resourceVersion`, `managedFields`, …) are kept whatever
+          the copy says. A ConfigMap's or Secret's edit becomes key changes: a Secret value shown
+          masked and sent back unchanged is kept.
+        required:
+        - resource
+        - name
+        - yaml
+        - op
+        properties:
+          name:
+            type: string
+            description: Its name.
+          op:
+            type: string
+            enum:
+            - edit
+          resource:
+            $ref: "#/components/schemas/ResourceRef"
+            description: The object's resource.
+          yaml:
+            type: string
+            description: The edited object, YAML (JSON is YAML too).
+      - type: object
+        description: |-
+          Create one object in the project, of a kind [`crate::plan::CREATABLE`] lists (such as a
+          ready-made NetworkPolicy). Its namespace is the project's; an object of that name must not
+          exist yet.
+        required:
+        - object
+        - op
+        properties:
+          object:
+            type: object
+            description: "The object: `apiVersion`, `kind`, `metadata.name`, and its fields."
+          op:
+            type: string
+            enum:
+            - create
+      - type: object
+        description: |-
+          Delete one object of the project, as `kubectl delete` does: what it owns goes after it
+          (background propagation). Refused for an object Helm, Argo CD or Flux manages, and for one
+          a controller owns, except a Pod, which its owner replaces (see the `delete` module).
+        required:
+        - resource
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: Its name.
+          op:
+            type: string
+            enum:
+            - delete
+          resource:
+            $ref: "#/components/schemas/ResourceRef"
+            description: The object's resource.
+          resourceVersion:
+            type:
+            - string
+            - "null"
+            description: |-
+              The `resourceVersion` the object must still have, such as the one an apply returned
+              for an object it just created; when left out, the version the plan reads.
+      - type: object
+        description: |-
+          Make the namespace a project: add the label `engawa.engawahq.dev/project: "true"` to the
+          Namespace, and nothing else. Refused for the namespaces Kubernetes keeps for itself
+          (`kube-` prefix). Planned on its own or with the project's details only.
+        required:
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - adopt
+      - type: object
+        description: |-
+          Stop showing the namespace as a project: remove that label, and nothing else. Nothing in
+          the namespace is deleted.
+        required:
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - unadopt
+      - type: object
+        description: |-
+          Set the project's details, the Namespace's `engawa.engawahq.dev/display-name`,
+          `…/description` and `…/icon` annotations: each one left out (or blank) is removed.
+        required:
+        - op
+        properties:
+          description:
+            type:
+            - string
+            - "null"
+            description: What the project is.
+          displayName:
+            type:
+            - string
+            - "null"
+            description: The name to show instead of the namespace's.
+          icon:
+            oneOf:
+            - $ref: "#/components/schemas/ProjectIcon"
+              description: Its icon.
+            - type: "null"
+          op:
+            type: string
+            enum:
+            - details
+      description: One change a person asks for.
+    Citation:
+      type: object
+      description: A public source a rule rests on.
+      required:
+      - title
+      - url
+      properties:
+        title:
+          type: string
+          description: The document's title.
+        url:
+          type: string
+          description: Where to read it.
+    Classification:
+      type: object
+      description: Where a workload is listed and under which name.
+      required:
+      - group
+      properties:
+        displayName:
+          type:
+          - string
+          - "null"
+          description: |-
+            The name to show instead of the workload's, when it stands for something a person named,
+            such as the database cluster whose data it holds.
+        group:
+          type: string
+          description: The group the workload is listed in.
+        managedBy:
+          oneOf:
+          - $ref: "#/components/schemas/ManagedBy"
+            description: The operator-managed resource the workload belongs to.
+          - type: "null"
+    ClientFrame:
+      oneOf:
+      - type: object
+        description: The terminal's new size, in character cells.
+        required:
+        - cols
+        - rows
+        - type
+        properties:
+          cols:
+            type: integer
+            format: int32
+            description: Columns.
+            minimum: 0
+          rows:
+            type: integer
+            format: int32
+            description: Rows.
+            minimum: 0
+          type:
+            type: string
+            enum:
+            - resize
+      description: A control frame from the browser.
+    Cluster:
+      type: object
+      description: The cluster.
+      required:
+      - name
+      - kubernetesVersion
+      properties:
+        distribution:
+          type:
+          - string
+          - "null"
+          description: "The distribution, when the version names one: `k3s` or `rke2`."
+        kubernetesVersion:
+          type: string
+          description: kube-apiserver's version (`gitVersion`, such as `v1.36.5+k3s1`).
+        name:
+          type: string
+          description: |-
+            What the person calls the cluster: in local mode the kubeconfig's name for the cluster
+            of the context in use, otherwise the host of kube-apiserver's address. Kubernetes gives a
+            cluster no name of its own.
+    ClusterEventList:
+      type: object
+      description: Events of the whole cluster, the newest `limit` of them.
+      required:
+      - items
+      - totalSize
+      - partial
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventView"
+          description: >-
+            Newest first (by `lastSeen`, events without one last), then by namespace and
+            name.
+        partial:
+          type: boolean
+          description: |-
+            `true` when the cluster holds more events than Engawa read (5,000): older ones may be
+            missing.
+        totalSize:
+          type: integer
+          description: How many events matched, also those past `limit`.
+          minimum: 0
+    Component:
+      type: object
+      description: "One component of the catalogue: an upstream project that provides a capability."
+      required:
+      - id
+      - capability
+      - displayName
+      - homepage
+      - license
+      - rationale
+      - defaults
+      - distributions
+      properties:
+        capability:
+          type: string
+          description: The capability it provides (`ingress`).
+        defaults:
+          type: object
+          description: |-
+            Whether the catalogue installs it by default, per profile (`single-node`, `multi-node`):
+            `recommended` or `optional`.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        displayName:
+          type: string
+          description: Human-readable name.
+        distributions:
+          type: array
+          items:
+            type: string
+          description: The distributions it supports (`k3s`, …); empty means all.
+        homepage:
+          type: string
+          description: The project's home page.
+        id:
+          type: string
+          description: Its id, the file name in the catalogue (`traefik`).
+        license:
+          type: string
+          description: Its licence (SPDX).
+        rationale:
+          type: string
+          description: Why the catalogue chose it.
+    ComponentUpgrade:
+      type: string
+      description: The installed version against the tested one. An open set.
+      enum:
+      - current
+      - behind-patch
+      - behind-minor
+      - behind-major
+      - ahead
+      - unknown
+    ConfigMapList:
+      type: object
+      description: The ConfigMaps of a project.
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfigMapView"
+          description: Sorted by name.
+    ConfigMapView:
+      type: object
+      description: "A ConfigMap, in full: ConfigMaps hold configuration, not secrets."
+      required:
+      - id
+      - origin
+      - data
+      - binaryKeys
+      properties:
+        binaryKeys:
+          type: array
+          items:
+            type: string
+          description: Keys holding binary data (not shown).
+        data:
+          type: object
+          description: Its text values.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        id:
+          type: string
+          description: "`projects/<project>/resources/configmap/<name>`."
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The ConfigMap.
+    Connection:
+      type: object
+      description: |-
+        One service appearing to call another.
+        
+        Kubernetes has no field for "this workload talks to that one", so every connection is read
+        from evidence and says which. It describes configuration, never observed traffic.
+      required:
+      - from
+      - to
+      - inferred
+      - evidence
+      properties:
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConnectionEvidence"
+          description: Why the connection is drawn, sorted.
+        from:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The caller.
+        inferred:
+          type: boolean
+          description: |-
+            True when the only evidence is text inside a variable's value, false when a reference
+            field of a Kubernetes object supports it.
+        to:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The service called.
+    ConnectionEvidence:
+      oneOf:
+      - type: object
+        description: |-
+          The caller and a data store read the same Secret or ConfigMap, which usually holds the
+          store's address or credentials.
+        required:
+        - object
+        - basis
+        properties:
+          basis:
+            type: string
+            enum:
+            - sharedObject
+          object:
+            $ref: "#/components/schemas/ObjectRef"
+            description: The Secret or ConfigMap.
+      - type: object
+        description: |-
+          A literal variable's value names a Kubernetes Service that selects the target's pods,
+          such as `redis://redis:6379` or `http://api.shop.svc.cluster.local`.
+        required:
+        - container
+        - variable
+        - service
+        - basis
+        properties:
+          basis:
+            type: string
+            enum:
+            - envValue
+          container:
+            type: string
+            description: The caller's container.
+          service:
+            type: string
+            description: The Kubernetes Service named.
+          variable:
+            type: string
+            description: The variable.
+      description: Why a [`Connection`] is drawn.
+    ConnectionRef:
+      type: object
+      description: A connection between two services of the project.
+      required:
+      - from
+      - to
+      properties:
+        from:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The caller.
+        to:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The callee.
+    Container:
+      type: object
+      description: One container of a workload.
+      required:
+      - name
+      - env
+      - importedEnv
+      - mounts
+      - origin
+      properties:
+        env:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvVar"
+          description: The `env` entries, in order.
+        image:
+          type:
+          - string
+          - "null"
+          description: The image.
+        importedEnv:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImportedEnv"
+          description: The `envFrom` imports, in order.
+        init:
+          type: boolean
+          description: An init container (including a restartable "sidecar").
+        mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Mount"
+          description: The volume mounts, in order.
+        name:
+          type: string
+          description: The container's name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The container in its workload.
+        probes:
+          oneOf:
+          - $ref: "#/components/schemas/Probes"
+            description: Its liveness, readiness and startup probes; absent when it sets none.
+          - type: "null"
+        resources:
+          oneOf:
+          - $ref: "#/components/schemas/ContainerResources"
+            description: The CPU and memory it requests and is limited to; absent when it sets neither.
+          - type: "null"
+    ContainerProbeHandler:
+      type: string
+      description: A probe's handler.
+      enum:
+      - HTTP
+      - TCP
+      - gRPC
+      - exec
+    ContainerResources:
+      type: object
+      description: |-
+        A container's `resources`, as written: requests are what the scheduler reserves, limits what
+        the kubelet enforces [k8s-resources].
+        
+        [k8s-resources]: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+      properties:
+        limits:
+          $ref: "#/components/schemas/Quantities"
+          description: What the kubelet enforces.
+        requests:
+          $ref: "#/components/schemas/Quantities"
+          description: What the scheduler reserves.
+    ContainerStatusSummary:
+      type: object
+      description: |-
+        One container's state in a pod [k8s-container-states].
+        
+        [k8s-container-states]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states
+      required:
+      - name
+      - ready
+      - restarts
+      properties:
+        init:
+          type: boolean
+          description: An init container (including a restartable "sidecar").
+        lastTermination:
+          oneOf:
+          - $ref: "#/components/schemas/ContainerTermination"
+            description: How its previous run ended, after a restart.
+          - type: "null"
+        name:
+          type: string
+          description: The container's name.
+        ready:
+          type: boolean
+          description: Whether it passes its readiness probe.
+        restarts:
+          type: integer
+          format: int32
+          description: How many times the kubelet restarted it.
+        terminated:
+          oneOf:
+          - $ref: "#/components/schemas/ContainerTermination"
+            description: How it ended, when it is terminated now.
+          - type: "null"
+        waiting:
+          oneOf:
+          - $ref: "#/components/schemas/ContainerWaiting"
+            description: Why it is waiting, when it is.
+          - type: "null"
+    ContainerTermination:
+      type: object
+      description: How a container run ended.
+      required:
+      - exitCode
+      properties:
+        exitCode:
+          type: integer
+          format: int32
+          description: The process's exit code.
+        finished:
+          type:
+          - string
+          - "null"
+          description: When it ended, in RFC 3339.
+        message:
+          type:
+          - string
+          - "null"
+          description: The container's termination message, or the runtime's.
+        reason:
+          type:
+          - string
+          - "null"
+          description: "`Error`, `Completed`, `OOMKilled`, `ContainerCannotRun`, …"
+        started:
+          type:
+          - string
+          - "null"
+          description: When it started, in RFC 3339.
+    ContainerUsage:
+      type: object
+      description: What one container uses.
+      required:
+      - name
+      - cpuMillicores
+      - memoryBytes
+      properties:
+        cpuMillicores:
+          type: integer
+          format: int64
+          description: CPU, in millicores, rounded up.
+          minimum: 0
+        memoryBytes:
+          type: integer
+          format: int64
+          description: Memory, the working set, in bytes.
+          minimum: 0
+        name:
+          type: string
+          description: The container.
+    ContainerWaiting:
+      type: object
+      description: Why a container is waiting.
+      properties:
+        message:
+          type:
+          - string
+          - "null"
+          description: The kubelet's message.
+        reason:
+          type:
+          - string
+          - "null"
+          description: "`CrashLoopBackOff`, `ImagePullBackOff`, `ErrImagePull`, `CreateContainerConfigError`, …"
+    DataEdit:
+      type: object
+      description: One requested change to a ConfigMap or Secret key.
+      required:
+      - op
+      - key
+      properties:
+        key:
+          type: string
+          description: The key.
+        op:
+          type: string
+          description: "`set` or `remove`."
+        value:
+          type:
+          - string
+          - "null"
+          description: The value, for `set`; for a Secret, the plain value (Engawa encodes it).
+    DataKind:
+      type: string
+      description: A ConfigMap or a Secret.
+      enum:
+      - ConfigMap
+      - Secret
+    DataStore:
+      type: string
+      description: What kind of data store a service is, as far as its image's name tells.
+      enum:
+      - postgres
+      - mysql
+      - redis
+      - mongo
+      - queue
+      - search
+      - other
+    Denied:
+      type: object
+      description: |-
+        The request kube-apiserver refused with `403`, as Engawa made it.
+        
+        These are the attributes its authorizers decide on [k8s-authz]. kube-apiserver's `Status` names
+        the object (`details.kind`, `details.group`, `details.name`) but not the verb [api-conventions],
+        and its message is not an interface, so these come from the request, not from the answer.
+        
+        [k8s-authz]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/#review-your-request-attributes
+        [api-conventions]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#response-status-kind
+      required:
+      - verb
+      - group
+      - resource
+      properties:
+        group:
+          type: string
+          description: The API group; empty for the core group.
+        name:
+          type:
+          - string
+          - "null"
+          description: The object's name.
+        namespace:
+          type:
+          - string
+          - "null"
+          description: The object's namespace.
+        resource:
+          type: string
+          description: The resource (plural, `deployments`).
+        verb:
+          type: string
+          description: The request verb (`create`, `patch`, …).
+    Diagnosis:
+      type: object
+      description: One explained failure of a service's container.
+      required:
+      - kind
+      - pods
+      - cause
+      - why
+      - fix
+      - evidence
+      properties:
+        cause:
+          $ref: "#/components/schemas/Message"
+          description: The cause, in one sentence.
+        container:
+          type: string
+          description: |-
+            The container it is about; absent for what is about the service as a whole (traffic,
+            quota, scheduling, the fallback).
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: The status fields and events it rests on.
+        fix:
+          $ref: "#/components/schemas/Message"
+          description: What to do about it, in one sentence.
+        kind:
+          $ref: "#/components/schemas/DiagnosisKind"
+          description: What kind of failure.
+        lastSeen:
+          type:
+          - string
+          - "null"
+          description: When it last happened, in RFC 3339, when known.
+        pods:
+          type: array
+          items:
+            type: string
+          description: The pods it was seen in, sorted.
+        why:
+          $ref: "#/components/schemas/Message"
+          description: "Why: the rule that applies, with this occurrence's numbers where Engawa knows them."
+    DiagnosisKind:
+      type: string
+      description: What kind of failure a diagnosis explains.
+      enum:
+      - crashLoop
+      - runFailed
+      - outOfMemory
+      - imagePull
+      - probeFailure
+      - unreachable
+      - quotaBlocked
+      - unschedulable
+      - configMissing
+      - unexplained
+    ElevationState:
+      type: string
+      description: Whether administrator rights are offered and in use.
+      enum:
+      - unavailable
+      - available
+      - active
+    Endpoint:
+      type: object
+      description: "A Kubernetes Service selecting a workload's pods: how it is reached inside the cluster."
+      required:
+      - name
+      - ports
+      - attribution
+      - provenance
+      - origin
+      properties:
+        attribution:
+          $ref: "#/components/schemas/Attribution"
+          description: Which workloads the Service selects.
+        clusterIP:
+          type:
+          - string
+          - "null"
+          description: The cluster IP.
+        name:
+          type: string
+          description: The Service's name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The Service object.
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/Port"
+          description: The ports.
+        provenance:
+          $ref: "#/components/schemas/Provenance"
+          description: The tool that manages the Service, if any.
+        type:
+          type:
+          - string
+          - "null"
+          description: The Service type, such as `ClusterIP`.
+    EnvEdit:
+      type: object
+      description: One requested change to a container's environment.
+      required:
+      - op
+      - name
+      properties:
+        name:
+          type: string
+          description: The variable.
+        op:
+          type: string
+          description: "`set` or `remove`."
+        value:
+          type:
+          - string
+          - "null"
+          description: The literal value, for `set`.
+        valueFrom:
+          oneOf:
+          - $ref: "#/components/schemas/EnvValueFrom"
+            description: Where the value is read from instead, for `set`.
+          - type: "null"
+    EnvValueFrom:
+      type: object
+      description: A value read from a Secret or ConfigMap key, or a pod field.
+      properties:
+        configMapName:
+          type:
+          - string
+          - "null"
+          description: The ConfigMap.
+        fieldPath:
+          type:
+          - string
+          - "null"
+          description: A pod field (the downward API).
+        key:
+          type:
+          - string
+          - "null"
+          description: The key in that object.
+        secretName:
+          type:
+          - string
+          - "null"
+          description: The Secret.
+    EnvVar:
+      type: object
+      description: One `env` entry.
+      required:
+      - name
+      - source
+      - origin
+      properties:
+        masked:
+          type: boolean
+          description: |-
+            A Secret-backed value: it is never part of the projection. Revealing it is a separate
+            read made with the person's own credential.
+        name:
+          type: string
+          description: The variable's name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The entry in its workload.
+        source:
+          $ref: "#/components/schemas/ValueSource"
+          description: Where the value is read from.
+        value:
+          type:
+          - string
+          - "null"
+          description: The value, for a literal only.
+    EventList:
+      type: object
+      description: Events of a project, the newest `limit` of them.
+      required:
+      - items
+      - totalSize
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventView"
+          description: Newest first (by `lastSeen`, events without one last), then by name.
+        totalSize:
+          type: integer
+          description: How many events matched, also those past `limit`.
+          minimum: 0
+    EventView:
+      type: object
+      description: One event about an object.
+      required:
+      - id
+      - origin
+      - type
+      - reason
+      - note
+      - count
+      properties:
+        count:
+          type: integer
+          format: int32
+          description: How many times it happened.
+        id:
+          type: string
+          description: "`projects/<project>/events/<name>`."
+        lastSeen:
+          type:
+          - string
+          - "null"
+          description: When it last happened (RFC 3339).
+        note:
+          type: string
+          description: What happened, as the component reported it.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The Event object itself.
+        reason:
+          type: string
+          description: Machine-readable reason (`BackOff`, `Pulled`, …).
+        regarding:
+          oneOf:
+          - $ref: "#/components/schemas/Origin"
+            description: The object the event is about.
+          - type: "null"
+        reporter:
+          type:
+          - string
+          - "null"
+          description: The component that reported it.
+        type:
+          type: string
+          description: "`Normal` or `Warning`."
+    ExitReason:
+      type: string
+      description: How a terminal's process ended, when it gave no exit code.
+      enum:
+      - command-not-found
+      - failed
+    FieldCause:
+      type: object
+      description: |-
+        A field kube-apiserver, or an admission webhook, found invalid: one of the `causes` in its
+        `Status` details [api-conventions].
+        
+        [api-conventions]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#response-status-kind
+      required:
+      - field
+      properties:
+        field:
+          type: string
+          description: |-
+            The field, as kube-apiserver writes it (`spec.replicas`,
+            `spec.template.spec.containers[0].image`).
+        message:
+          type: string
+          description: kube-apiserver's message about the field.
+        reason:
+          type: string
+          description: Why, as a machine-readable cause (`FieldValueInvalid`, `FieldValueRequired`, …).
+    FieldChange:
+      type: object
+      description: One changed field.
+      required:
+      - path
+      properties:
+        after:
+          type:
+          - string
+          - "null"
+          description: The value after, absent when the field is removed.
+        before:
+          type:
+          - string
+          - "null"
+          description: The value before, absent when the field is new.
+        path:
+          type: string
+          description: The field, dotted; keyed list entries as `[name=app]`, others by position.
+    Fix:
+      type: object
+      description: The fix of a gap.
+      required:
+      - kind
+      - id
+      properties:
+        id:
+          type: string
+          description: The plan template, component or snippet.
+        kind:
+          $ref: "#/components/schemas/FixKind"
+          description: How it is closed.
+        params:
+          type: object
+          description: What the template, component or snippet is filled in with.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+    FixKind:
+      type: string
+      description: How a gap is closed.
+      enum:
+      - plan
+      - install
+      - snippet
+    Gap:
+      type: object
+      description: One finding of a rule.
+      required:
+      - rule
+      - severity
+      - subject
+      - message
+      - fix
+      - citations
+      properties:
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Citation"
+          description: The guidance the rule rests on.
+        fix:
+          $ref: "#/components/schemas/Fix"
+          description: How to close it.
+        message:
+          $ref: "#/components/schemas/Message"
+          description: What is missing, in one sentence.
+        rule:
+          type: string
+          description: The rule's stable id, such as `resource-limits`.
+        service:
+          type:
+          - string
+          - "null"
+          description: The service it concerns, by id, when it concerns one.
+        severity:
+          $ref: "#/components/schemas/GapSeverity"
+          description: How much it matters.
+        subject:
+          $ref: "#/components/schemas/Origin"
+          description: The object, or field of it, the finding is about.
+    GapList:
+      type: object
+      description: What a project or the cluster is missing.
+      required:
+      - items
+      - unreadable
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapView"
+          description: "The findings: warnings first, then by rule and subject."
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; rules that need them did not run on their facts.
+    GapSeverity:
+      type: string
+      description: How much a gap matters.
+      enum:
+      - warning
+      - advice
+    GapView:
+      allOf:
+      - $ref: "#/components/schemas/Gap"
+        description: The finding.
+      - type: object
+        properties:
+          snippet:
+            type:
+            - string
+            - "null"
+            description: |-
+              YAML that fixes it, to copy into the object's manifest; absent when the fix is an install
+              or a plan Engawa writes itself.
+      description: One gap and, when its fix is a YAML fragment to copy, that fragment.
+    Health:
+      type: string
+      description: "A service's health, from worst to best: what a status dot shows."
+      enum:
+      - fail
+      - warn
+      - progress
+      - ok
+      - idle
+    HistorySource:
+      type: object
+      description: The store a history came from.
+      required:
+      - service
+      properties:
+        service:
+          type: string
+          description: Its Service port, `namespace/name:port`.
+    ImportedEnv:
+      type: object
+      description: |-
+        One `envFrom` entry. Imports are not flattened into variables: a ConfigMap's twelve keys
+        shown as twelve entries would misrepresent what the workload says.
+      required:
+      - source
+      - readOnly
+      - origin
+      properties:
+        keyCount:
+          type:
+          - integer
+          - "null"
+          description: |-
+            How many keys the imported object holds now; absent when that is unknown (the object
+            is missing, or its key count was not read).
+          minimum: 0
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The entry in its workload.
+        prefix:
+          type:
+          - string
+          - "null"
+          description: The prefix added to every imported name.
+        readOnly:
+          type: boolean
+          description: The import must not be edited in place; see [`ReadOnlyReason`].
+        readOnlyReason:
+          oneOf:
+          - $ref: "#/components/schemas/ReadOnlyReason"
+            description: Why it is read-only.
+          - type: "null"
+        source:
+          $ref: "#/components/schemas/ValueSource"
+          description: The imported ConfigMap or Secret.
+    InferredFrom:
+      type: string
+      description: |-
+        Which signal decided a [`PortProtocol`], so a client can tell a declared protocol from a
+        guessed one.
+      enum:
+      - appProtocol
+      - name
+      - protocol
+    InstallAnswer:
+      allOf:
+      - $ref: "#/components/schemas/InstallGuide"
+        description: The guide for the chosen profile.
+      - type: object
+        required:
+        - defaultProfile
+        properties:
+          defaultProfile:
+            type: string
+            description: |-
+              The profile that fits the cluster's node count (`single-node` when nodes could not be
+              counted).
+      description: How to install one component, and the profile that fits this cluster.
+    InstallFormat:
+      type: string
+      description: One way to install a component.
+      enum:
+      - helm
+      - k3s
+      - flux
+      - argoCd
+    InstallGuide:
+      type: object
+      description: How to install one catalogue component, for one profile.
+      required:
+      - component
+      - profile
+      - profiles
+      - dependsOn
+      - security
+      - inputs
+      - contributesTo
+      - replacesK3sPackaged
+      - formats
+      properties:
+        component:
+          type: string
+          description: "`<capability>/<id>`."
+        contributesTo:
+          type: array
+          items:
+            type: string
+          description: |-
+            Other components whose releases it adds values to (`<capability>/<id>`); those values
+            are not in these texts.
+        dependsOn:
+          type: array
+          items:
+            type: string
+          description: "What it needs installed first: `<capability>` (any provider) or `<capability>/<id>`."
+        formats:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstallText"
+          description: The texts, one per form.
+        inputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/InstallInput"
+          description: Values asked for or generated.
+        profile:
+          type: string
+          description: The profile the texts are for.
+        profiles:
+          type: array
+          items:
+            type: string
+          description: Every profile the catalogue sizes it for.
+        replacesK3sPackaged:
+          type: array
+          items:
+            type: string
+          description: |-
+            k3s packaged components of the same kind (`traefik`, `metrics-server`) that must be
+            disabled on k3s before installing this one; each text begins by saying how.
+        security:
+          $ref: "#/components/schemas/Security"
+          description: Its RBAC and network access.
+    InstallInput:
+      type: object
+      description: A value the install needs from the person, or generates.
+      required:
+      - name
+      - description
+      - required
+      - generated
+      properties:
+        description:
+          type: string
+          description: What it is.
+        generated:
+          type: boolean
+          description: It is generated at random, not asked for.
+        name:
+          type: string
+          description: Its name, the `<name>` placeholder in the texts.
+        required:
+          type: boolean
+          description: It must be given.
+    InstallSource:
+      type: string
+      description: How a component was installed.
+      enum:
+      - k3s
+      - helm-chart
+      - helm
+      - other
+    InstallText:
+      type: object
+      description: One rendering of the install.
+      required:
+      - format
+      - text
+      properties:
+        format:
+          $ref: "#/components/schemas/InstallFormat"
+          description: The form.
+        text:
+          type: string
+          description: "The text to copy: shell for Helm, YAML for the others."
+    Installation:
+      type: object
+      description: One installed component.
+      required:
+      - component
+      - displayName
+      - source
+      properties:
+        component:
+          type: string
+          description: The catalogue component (`traefik`).
+        displayName:
+          type: string
+          description: Its name for people (`Traefik Proxy`).
+        managedBy:
+          type:
+          - string
+          - "null"
+          description: "The tool that manages it and upgrades it (`k3s`): never flagged for an upgrade."
+        source:
+          $ref: "#/components/schemas/InstallSource"
+          description: How it was installed.
+        tested:
+          type:
+          - string
+          - "null"
+          description: The chart version the catalogue tested, when it pins one.
+        upgrade:
+          oneOf:
+          - $ref: "#/components/schemas/ComponentUpgrade"
+            description: |-
+              The installed version against the tested one. Absent when it is managed by k3s or the
+              version is not known.
+          - type: "null"
+        version:
+          type:
+          - string
+          - "null"
+          description: The installed chart version, when it can be read.
+    Kind:
+      type: string
+      description: |-
+        What went wrong, in categories a person can act on. An open set: clients must expect new
+        values and treat an unknown one by its HTTP status.
+      enum:
+      - bad-request
+      - unauthenticated
+      - signed-out
+      - forbidden
+      - elevation-required
+      - quota-exceeded
+      - policy-denied
+      - not-found
+      - log-unavailable
+      - conflict
+      - managed
+      - plan-expired
+      - system-namespace
+      - invalid
+      - too-many-requests
+      - unavailable
+      - internal
+    KubernetesStatus:
+      type: object
+      description: The answer kube-apiserver gave, unchanged.
+      required:
+      - code
+      - reason
+      - message
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: HTTP status code.
+          minimum: 0
+        message:
+          type: string
+          description: kube-apiserver's message.
+        reason:
+          type: string
+          description: Machine-readable reason (`Forbidden`, `NotFound`, …).
+        retryAfterSeconds:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: |-
+            How long kube-apiserver asked clients to wait before retrying
+            (`details.retryAfterSeconds`).
+          minimum: 0
+    LogSnapshot:
+      type: object
+      description: A snapshot of a container's log.
+      required:
+      - origin
+      - lines
+      properties:
+        lines:
+          type: array
+          items:
+            type: string
+          description: The lines, oldest first.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The pod (and container, as `fieldPath`).
+    ManagedBy:
+      type: object
+      description: |-
+        The custom resource whose operator controls a workload. Direct edits to the workload are
+        reverted by that operator; the resource is what to change.
+      required:
+      - kind
+      - name
+      properties:
+        engine:
+          type:
+          - string
+          - "null"
+          description: The database engine, such as `PostgreSQL`.
+        kind:
+          type: string
+          description: The resource's kind as people create it, such as `PerconaPGCluster`.
+        name:
+          type: string
+          description: The resource's name.
+    Message:
+      type: object
+      description: |-
+        A sentence a client words in its own language: a stable key and the values it names.
+        
+        Engawa never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
+        every interface translates them the same way and a key's meaning is part of the contract.
+      required:
+      - key
+      properties:
+        key:
+          type: string
+          description: The sentence, such as `diagnosis.crashLoop.cause.exitCode`.
+        params:
+          type: object
+          description: The values it names, such as the container and the exit code.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+    MetricsState:
+      type: string
+      description: Whether usage could be read. An open set.
+      enum:
+      - available
+      - not-installed
+      - unreadable
+      - unavailable
+    MetricsStoreChange:
+      type: object
+      description: A change of the metrics store.
+      properties:
+        service:
+          type:
+          - string
+          - "null"
+          description: The Service port, `namespace/name:port`; `null` goes back to the default.
+      additionalProperties: false
+    MetricsStoreSetting:
+      type: object
+      description: The metrics store setting.
+      required:
+      - id
+      - service
+      - default
+      - source
+      - canChange
+      - state
+      - unreadable
+      properties:
+        canChange:
+          $ref: "#/components/schemas/Permission"
+          description: >-
+            Whether the person may change it, as far as their RBAC rules in that namespace
+            tell.
+        default:
+          type: string
+          description: What the server was started with (`ENGAWA_METRICS_SERVICE`).
+        id:
+          type: string
+          description: "`settings/metrics-store`."
+        message:
+          type:
+          - string
+          - "null"
+          description: kube-apiserver's or the store's words when it does not.
+        service:
+          type: string
+          description: The Service port in use, `namespace/name:port`.
+        source:
+          $ref: "#/components/schemas/SettingSource"
+          description: Where `service` comes from.
+        state:
+          $ref: "#/components/schemas/StoreState"
+          description: Whether the store answers, as the person.
+        storedIn:
+          oneOf:
+          - $ref: "#/components/schemas/Origin"
+            description: |-
+              The ConfigMap a change is kept in; absent where Engawa keeps no settings (on a
+              person's computer).
+          - type: "null"
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: "What could not be read: the settings ConfigMap, or the store through the proxy."
+    Mount:
+      type: object
+      description: One volume mount of a container.
+      required:
+      - name
+      - mountPath
+      - kind
+      - category
+      - origin
+      properties:
+        accessModes:
+          type: array
+          items:
+            type: string
+          description: The claim's access modes.
+        attribution:
+          oneOf:
+          - $ref: "#/components/schemas/Attribution"
+            description: Which workloads use the ConfigMap, Secret or PVC.
+          - type: "null"
+        category:
+          $ref: "#/components/schemas/MountCategory"
+          description: Persistent, config or ephemeral.
+        claimName:
+          type:
+          - string
+          - "null"
+          description: "The claim: the PVC's name, or for a StatefulSet's claim template the template's name."
+        kind:
+          type: string
+          description: |-
+            The volume source kind (`PersistentVolumeClaim`, `ConfigMap`, `Secret`, `Projected`,
+            `DownwardAPI`, `EmptyDir`, `Ephemeral`, `Other`), or `Unknown` when no volume has the
+            mount's name.
+        mountPath:
+          type: string
+          description: Where it is mounted.
+        name:
+          type: string
+          description: The volume's name in the pod spec.
+        object:
+          oneOf:
+          - $ref: "#/components/schemas/ObjectRef"
+            description: The ConfigMap, Secret or PVC the volume reads.
+          - type: "null"
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The mount in its workload.
+        readOnly:
+          type: boolean
+          description: Mounted read-only.
+        size:
+          type:
+          - string
+          - "null"
+          description: The requested size, or an `emptyDir` size limit.
+        sizeBytes:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "`size` in bytes, rounded up; absent when `size` is absent or not a quantity."
+          minimum: 0
+        status:
+          type:
+          - string
+          - "null"
+          description: The claim's phase, such as `Bound`, once a PVC exists.
+        storageClass:
+          type:
+          - string
+          - "null"
+          description: The claim's storage class.
+        subPath:
+          type:
+          - string
+          - "null"
+          description: The sub-path mounted, if not the whole volume.
+        volumeMode:
+          type:
+          - string
+          - "null"
+          description: The claim's volume mode.
+    MountCategory:
+      type: string
+      description: What kind of storage a mount is.
+      enum:
+      - persistent
+      - config
+      - ephemeral
+    NetworkPolicyAccess:
+      type: string
+      description: How far a peer may reach.
+      enum:
+      - allowed
+      - limited
+      - blocked
+    NetworkPolicyConnection:
+      type: object
+      description: |-
+        A connection the project shows (inferred from configuration), and whether the policies let it
+        through.
+      required:
+      - from
+      - to
+      - access
+      - blockedAt
+      properties:
+        access:
+          $ref: "#/components/schemas/NetworkPolicyAccess"
+          description: The caller's egress and the callee's ingress together.
+        blockedAt:
+          type: array
+          items:
+            type: string
+          description: "Where it is stopped, when [`Access::Blocked`]: `egress`, `ingress` or both."
+        from:
+          type: string
+          description: The caller's id.
+        to:
+          type: string
+          description: The callee's id.
+    NetworkPolicyPeer:
+      type: object
+      description: A service and how far it may reach another.
+      required:
+      - service
+      - access
+      properties:
+        access:
+          $ref: "#/components/schemas/NetworkPolicyAccess"
+          description: How far.
+        service:
+          type: string
+          description: The service's id.
+    NetworkPolicyPreset:
+      type: object
+      description: A ready-made policy for a service, to plan as a new object.
+      required:
+      - kind
+      - object
+      properties:
+        from:
+          type:
+          - string
+          - "null"
+          description: For `allow-from-service`, the caller's id.
+        kind:
+          type: string
+          description: "`isolate`, `allow-from-service` or `allow-from-ingress-controller`."
+        object:
+          type: object
+          description: The NetworkPolicy to create.
+    NetworkPolicyReachability:
+      type: object
+      description: The project's reachability.
+      required:
+      - policies
+      - services
+      - connections
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkPolicyConnection"
+          description: The connections given, in that order.
+        policies:
+          type: array
+          items:
+            type: string
+          description: The project's policies, by name.
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkPolicyService"
+          description: Every service, in the order given.
+    NetworkPolicyService:
+      type: object
+      description: One service's reachability.
+      required:
+      - service
+      - selectedBy
+      - ingressIsolated
+      - egressIsolated
+      - fromServices
+      - fromIngressController
+      - fromOtherNamespaces
+      - toDns
+      - toOutside
+      properties:
+        egressIsolated:
+          type: boolean
+          description: A policy limits where it goes.
+        fromIngressController:
+          $ref: "#/components/schemas/NetworkPolicyAccess"
+          description: The ingress controller (k3s's Traefik).
+        fromOtherNamespaces:
+          $ref: "#/components/schemas/NetworkPolicyAccess"
+          description: Pods of other namespaces, whatever their labels.
+        fromServices:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkPolicyPeer"
+          description: Services of the project that may reach it, with how far.
+        ingressIsolated:
+          type: boolean
+          description: A policy limits what reaches it.
+        selectedBy:
+          type: array
+          items:
+            type: string
+          description: The policies that select its pods, by name.
+        service:
+          type: string
+          description: The service's id.
+        toDns:
+          $ref: "#/components/schemas/NetworkPolicyAccess"
+          description: Cluster DNS (port 53 in `kube-system`).
+        toOutside:
+          $ref: "#/components/schemas/NetworkPolicyAccess"
+          description: Addresses outside the cluster's pods.
+    NodeCondition:
+      type: object
+      description: |-
+        A node condition that is not as it should be: `Ready` not `True`, or a pressure that is
+        `True`.
+      required:
+      - type
+      - status
+      properties:
+        message:
+          type:
+          - string
+          - "null"
+          description: The kubelet's message.
+        reason:
+          type:
+          - string
+          - "null"
+          description: The kubelet's reason.
+        status:
+          type: string
+          description: "`True`, `False` or `Unknown`."
+        type:
+          type: string
+          description: "`Ready`, `MemoryPressure`, `DiskPressure`, `PIDPressure` or `NetworkUnavailable`."
+    NodeList:
+      type: object
+      description: The nodes, with the cluster's totals.
+      required:
+      - items
+      - totals
+      - podScan
+      - podsScanned
+      - unscheduledPods
+      - metrics
+      - unreadable
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeView"
+          description: Sorted by name.
+        metrics:
+          $ref: "#/components/schemas/MetricsState"
+          description: Whether usage could be read.
+        podScan:
+          $ref: "#/components/schemas/PodScan"
+          description: How much of the pods the requests come from.
+        podsScanned:
+          type: integer
+          description: How many unfinished pods were read.
+          minimum: 0
+        totals:
+          $ref: "#/components/schemas/NodeTotals"
+          description: Totals over every node.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
+        unscheduledPods:
+          type: integer
+          description: Pods not yet placed on a node.
+          minimum: 0
+    NodeSkew:
+      type: object
+      description: A node whose kubelet minor differs from kube-apiserver's.
+      required:
+      - node
+      - kubeletVersion
+      - unsupported
+      properties:
+        kubeletVersion:
+          type: string
+          description: Its kubelet's version.
+        node:
+          type: string
+          description: The node.
+        unsupported:
+          type: boolean
+          description: "`true` when outside the supported window."
+    NodeTotals:
+      type: object
+      description: The cluster's totals over every node.
+      required:
+      - allocatable
+      properties:
+        allocatable:
+          $ref: "#/components/schemas/Resources"
+          description: Allocatable.
+        limits:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: Limits; absent when pods cannot be listed.
+          - type: "null"
+        requests:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: Requested; absent when pods cannot be listed.
+          - type: "null"
+        usage:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: In use; absent without metrics-server.
+          - type: "null"
+    NodeView:
+      type: object
+      description: "A node: its roles, health, versions and capacity."
+      required:
+      - id
+      - origin
+      - name
+      - roles
+      - ready
+      - problems
+      - cordoned
+      - taints
+      - kubeletVersion
+      - osImage
+      - kernelVersion
+      - architecture
+      - containerRuntime
+      - allocatable
+      - capacity
+      properties:
+        allocatable:
+          $ref: "#/components/schemas/Resources"
+          description: "What pods may use: capacity less what is reserved for the system."
+        architecture:
+          type: string
+          description: The CPU architecture (`arm64`, `amd64`).
+        capacity:
+          $ref: "#/components/schemas/Resources"
+          description: The machine's capacity.
+        containerRuntime:
+          type: string
+          description: The container runtime (`containerd://2.1.4-k3s1`).
+        cordoned:
+          type: boolean
+          description: "Cordoned: new pods are not scheduled here (`spec.unschedulable`)."
+        created:
+          type:
+          - string
+          - "null"
+          description: When it joined the cluster (RFC 3339).
+        id:
+          type: string
+          description: "`cluster/nodes/<name>`."
+        kernelVersion:
+          type: string
+          description: The kernel version.
+        kubeletVersion:
+          type: string
+          description: The kubelet's version.
+        limits:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: |-
+              What the pods placed here may use at most (containers without a limit add nothing);
+              absent when pods cannot be listed.
+          - type: "null"
+        name:
+          type: string
+          description: Its name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The Node.
+        osImage:
+          type: string
+          description: The operating system image.
+        problems:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeCondition"
+          description: Conditions that are not as they should be.
+        ready:
+          type: string
+          description: "The `Ready` condition: `True`, `False` or `Unknown`."
+        requests:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: >-
+              What the pods placed here request, with their count; absent when pods cannot be
+              listed.
+          - type: "null"
+        roles:
+          type: array
+          items:
+            type: string
+          description: |-
+            Its roles (`control-plane`, `etcd`, …), from `node-role.kubernetes.io/<role>` labels;
+            empty for a plain worker.
+        taints:
+          type: array
+          items:
+            $ref: "#/components/schemas/Taint"
+          description: Its taints.
+        usage:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: >-
+              What it uses now, from metrics-server (approximate, for autoscaling); absent
+              without it.
+          - type: "null"
+    ObjectAccess:
+      type: string
+      description: |-
+        Whether the person may list a kind, as one `SelfSubjectRulesReview` hints, or as a list
+        answered.
+      enum:
+      - allowed
+      - denied
+      - unknown
+    ObjectDocument:
+      type: object
+      description: One object as YAML.
+      required:
+      - id
+      - resource
+      - yaml
+      - origin
+      - provenance
+      properties:
+        id:
+          type: string
+          description: "`projects/<p>/objects/<group>/<version>/<resource>/<name>`."
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The object.
+        provenance:
+          $ref: "#/components/schemas/Provenance"
+          description: The tool that manages it, if any.
+        resource:
+          type: string
+          description: The plural resource name.
+        yaml:
+          type: string
+          description: The object as YAML, without the server's bookkeeping; a Secret's values hidden.
+    ObjectKind:
+      type: object
+      description: The objects of one kind.
+      required:
+      - group
+      - version
+      - resource
+      - kind
+      - generated
+      - curated
+      - access
+      - listed
+      - items
+      properties:
+        access:
+          $ref: "#/components/schemas/ObjectAccess"
+          description: Whether the person may list it.
+        curated:
+          type: boolean
+          description: One of the kinds a project usually holds, read without being asked for.
+        generated:
+          type: boolean
+          description: Controllers create these on their own; read only when named in `kinds`.
+        group:
+          type: string
+          description: The API group; empty for the core group.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectSummary"
+          description: By name; empty when not `listed`.
+        kind:
+          type: string
+          description: The kind.
+        listed:
+          type: boolean
+          description: >-
+            Whether it was read in this answer; when `false`, `items` is empty and says
+            nothing.
+        resource:
+          type: string
+          description: The plural resource name.
+        version:
+          type: string
+          description: The version.
+    ObjectList:
+      type: object
+      description: Every object of a project, by kind.
+      required:
+      - id
+      - items
+      - scanned
+      - unreadable
+      properties:
+        id:
+          type: string
+          description: "`projects/<p>/objects`."
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectKind"
+          description: >-
+            Every listable namespaced kind the cluster serves, read or not, by group then
+            kind.
+        scanned:
+          type: boolean
+          description: Every kind that controllers do not generate was read (`?all=true`).
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Kinds the person may not list.
+    ObjectName:
+      type: object
+      description: An object of the project, by kind and name.
+      required:
+      - kind
+      - name
+      properties:
+        kind:
+          type: string
+          description: The kind.
+        name:
+          type: string
+          description: The name.
+    ObjectRef:
+      type: object
+      description: A Kubernetes object in the projected namespace.
+      required:
+      - kind
+      - name
+      properties:
+        kind:
+          type: string
+          description: The object's kind, such as `ConfigMap`.
+        name:
+          type: string
+          description: The object's name.
+    ObjectSummary:
+      type: object
+      description: One object in a listing.
+      required:
+      - id
+      - name
+      properties:
+        created:
+          type:
+          - string
+          - "null"
+          description: When it was created, RFC 3339.
+        id:
+          type: string
+          description: "`projects/<p>/objects/<group>/<version>/<resource>/<name>`, `core` for the empty group."
+        name:
+          type: string
+          description: Its name.
+        ownerKind:
+          type:
+          - string
+          - "null"
+          description: The kind of its controlling owner, when it has one (`ReplicaSet` for a pod).
+    Origin:
+      type: object
+      description: |-
+        Where a value is *declared* or read from: the Kubernetes object and the field inside it.
+        
+        Every value the API returns carries one, so a client can always show which object to open,
+        and a change plan knows which field it writes. It is the one provenance type of the API: the
+        projection's values, events, logs, ConfigMaps, Secrets and projects all use it.
+        
+        Inside a project document `apiVersion` and `namespace` are left out: every object is in the
+        project's namespace, and the kind names one API group. Responses that stand alone (an event,
+        a log, a ConfigMap) carry both, so the reference is complete without its context; that is
+        Kubernetes' `ObjectReference` shape [k8s-api-conventions].
+        
+        `field_path` names JSON fields with dots. A list whose entries Kubernetes merges by a key is
+        addressed by that key, `containers[name=app]`; an atomic list by index, `envFrom[0]`.
+        
+        [k8s-api-conventions]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#object-references
+      required:
+      - kind
+      - name
+      properties:
+        apiVersion:
+          type:
+          - string
+          - "null"
+          description: The object's `apiVersion`, when the response stands alone.
+        fieldPath:
+          type:
+          - string
+          - "null"
+          description: The field inside the object, absent when the value is the object as a whole.
+        kind:
+          type: string
+          description: The object's kind, such as `Deployment`.
+        name:
+          type: string
+          description: The object's name.
+        namespace:
+          type:
+          - string
+          - "null"
+          description: >-
+            The object's namespace, when the response stands alone and the object is
+            namespaced.
+        value:
+          type:
+          - string
+          - "null"
+          description: |-
+            The value read at that field, as evidence names it (`4` at a quota's
+            `status.hard.requests.cpu`); absent where the origin only says where a value comes from.
+    Ownership:
+      type: string
+      description: How many workloads reference a resource, which decides where a client shows it.
+      enum:
+      - owned
+      - shared
+      - orphan
+    Permission:
+      type: string
+      description: Whether the person may change something, as far as their RBAC rules tell.
+      enum:
+      - allowed
+      - denied
+      - unknown
+    Phase:
+      type: string
+      description: |-
+        A one-word aggregate of a workload's status for lists. The Kubernetes conditions stay the
+        authority; this is only the badge.
+      enum:
+      - Running
+      - Progressing
+      - Degraded
+      - Paused
+      - Suspended
+      - Completed
+      - Failed
+      - Unknown
+    Plan:
+      type: object
+      description: What a plan will do.
+      required:
+      - objects
+      - impact
+      - warnings
+      properties:
+        impact:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkloadRef"
+          description: The workloads it affects, sorted.
+        objects:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlannedObject"
+          description: The objects it writes, in the order it writes them.
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanWarning"
+          description: What to know before applying.
+    PlanFieldOwners:
+      type: object
+      description: The managers that own a field a write touches.
+      required:
+      - path
+      - managers
+      properties:
+        managers:
+          type: array
+          items:
+            type: string
+          description: Its managers, sorted.
+        path:
+          type: string
+          description: The field.
+    PlanRequest:
+      type: object
+      description: What a person asks to change, as one plan.
+      required:
+      - changes
+      properties:
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Change"
+          description: The changes, applied in order.
+        restartAfter:
+          type: boolean
+          description: |-
+            Also restart the workloads that read a changed ConfigMap or Secret into environment
+            variables, which a running container only reads when it starts.
+    PlanResponse:
+      allOf:
+      - $ref: "#/components/schemas/Plan"
+        description: The plan.
+      - type: object
+        required:
+        - token
+        - expiresAt
+        properties:
+          expiresAt:
+            type: string
+            description: When the token stops working, RFC 3339.
+          token:
+            type: string
+            description: Send this to `apply` to carry out exactly this plan.
+      description: A plan and the token that applies it.
+    PlanTarget:
+      type: object
+      description: The object a planned write addresses.
+      required:
+      - apiVersion
+      - kind
+      - plural
+      - name
+      properties:
+        apiVersion:
+          type: string
+          description: "`apiVersion`."
+        kind:
+          type: string
+          description: The kind.
+        name:
+          type: string
+          description: The name.
+        plural:
+          type: string
+          description: The resource (plural).
+    PlanWarning:
+      oneOf:
+      - type: object
+        description: |-
+          These workloads read a changed ConfigMap or Secret into environment variables, which a
+          running container reads only when it starts: restart them for the change to take effect.
+        required:
+        - workloads
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - restartNeeded
+          workloads:
+            type: array
+            items:
+              $ref: "#/components/schemas/WorkloadRef"
+            description: The workloads.
+      - type: object
+        description: These workloads are restarted by the plan, because `restartAfter` asked for it.
+        required:
+        - workloads
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - restartAdded
+          workloads:
+            type: array
+            items:
+              $ref: "#/components/schemas/WorkloadRef"
+            description: The workloads.
+      - type: object
+        description: |-
+          A changed hostname was also listed for HTTPS; its certificate must be issued again for
+          the new name.
+        required:
+        - route
+        - hostname
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - tlsHostChanged
+          hostname:
+            type: string
+            description: The new hostname.
+          route:
+            type: string
+            description: The route.
+      - type: object
+        description: The new `HTTPRoute` attaches to this Gateway, the first of several.
+        required:
+        - namespace
+        - name
+        - of
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - gatewayChosen
+          name:
+            type: string
+            description: Its name.
+          namespace:
+            type: string
+            description: Its namespace.
+          of:
+            type: integer
+            description: How many Gateways there are.
+            minimum: 0
+      - type: object
+        description: Gateways could not be listed, so the new route is an Ingress.
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - gatewaysUnreadable
+      - type: object
+        description: The Secret's values could not be read, so its diff shows only which keys change.
+        required:
+        - name
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - secretValuesUnknown
+          name:
+            type: string
+            description: The Secret.
+      - type: object
+        description: |-
+          A rollback returns the pod template only; the ConfigMaps and Secrets the workload reads
+          keep their current contents.
+        required:
+        - workload
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - configNotRolledBack
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
+          The claim's `StorageClass` could not be read, so whether it can grow is known only when
+          kube-apiserver answers.
+        required:
+        - claim
+        - code
+        properties:
+          claim:
+            type: string
+            description: The claim.
+          code:
+            type: string
+            enum:
+            - storageClassUnknown
+      - type: object
+        description: |-
+          A new `ReadWriteOnce` claim is mounted by a workload with several pods, which can share
+          it only while they run on one node.
+        required:
+        - workload
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - readWriteOnceShared
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
+          A new `ReadWriteOncePod` claim is mounted by a workload with several pods, of which only
+          one at a time can use it.
+        required:
+        - workload
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - readWriteOncePodShared
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
+          The deleted object owns these objects, as far as the person could read them; the garbage
+          collector deletes them after it [k8s-gc].
+          
+          [k8s-gc]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/
+        required:
+        - target
+        - dependents
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - deletesDependents
+          dependents:
+            type: array
+            items:
+              $ref: "#/components/schemas/ObjectName"
+            description: What goes with it, owners before what they own.
+          target:
+            $ref: "#/components/schemas/ObjectName"
+            description: The deleted object.
+      - type: object
+        description: The deleted Pod belongs to a controller, which starts a new one in its place.
+        required:
+        - pod
+        - owner
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - podReplaced
+          owner:
+            $ref: "#/components/schemas/ObjectName"
+            description: Its controller.
+          pod:
+            type: string
+            description: The Pod.
+      - type: object
+        description: |-
+          Deleting the claim may lose its data: what happens to its PersistentVolume is the volume's
+          reclaim policy, `Delete` (the volume and its data go) or `Retain` (they stay until an
+          administrator removes them) [k8s-reclaim].
+          
+          [k8s-reclaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
+        required:
+        - claim
+        - code
+        properties:
+          claim:
+            type: string
+            description: The claim.
+          code:
+            type: string
+            enum:
+            - claimDataMayBeLost
+          reclaimPolicy:
+            type:
+            - string
+            - "null"
+            description: The volume's `persistentVolumeReclaimPolicy`; absent when it could not be read.
+          volume:
+            type:
+            - string
+            - "null"
+            description: Its PersistentVolume; absent while the claim is not bound.
+      - type: object
+        description: |-
+          These workloads still use the deleted ConfigMap, Secret or claim: their pods that start
+          after it is gone fail to start, and a claim in use stays until no pod uses it
+          [k8s-in-use].
+          
+          [k8s-in-use]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#storage-object-in-use-protection
+        required:
+        - target
+        - workloads
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - stillUsed
+          target:
+            $ref: "#/components/schemas/ObjectName"
+            description: The deleted object.
+          workloads:
+            type: array
+            items:
+              $ref: "#/components/schemas/WorkloadRef"
+            description: The workloads.
+      - type: object
+        description: |-
+          Deleting the NetworkPolicy opens traffic it held back: these services are no longer
+          isolated, and these connections the project shows become allowed.
+        required:
+        - policy
+        - ingressOpened
+        - egressOpened
+        - connectionsOpened
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - networkPolicyRemoved
+          connectionsOpened:
+            type: array
+            items:
+              $ref: "#/components/schemas/ConnectionRef"
+            description: Connections it blocked or limited that become allowed.
+          egressOpened:
+            type: array
+            items:
+              $ref: "#/components/schemas/WorkloadRef"
+            description: Services nothing limits sending once it is gone.
+          ingressOpened:
+            type: array
+            items:
+              $ref: "#/components/schemas/WorkloadRef"
+            description: Services nothing limits reaching once it is gone.
+          policy:
+            type: string
+            description: The policy.
+      description: Something a person should know before applying.
+    PlannedObject:
+      type: object
+      description: One object a plan writes.
+      required:
+      - target
+      - changes
+      - owners
+      - write
+      properties:
+        after:
+          type:
+          - object
+          - "null"
+          description: The object as it will be, the same way; absent when the write deletes it.
+        afterYaml:
+          type:
+          - string
+          - "null"
+          description: "`after` as YAML, the same way."
+        before:
+          type:
+          - object
+          - "null"
+          description: |-
+            The object as it is, without `managedFields` and with Secret values redacted; absent
+            when the write creates it.
+        beforeYaml:
+          type:
+          - string
+          - "null"
+          description: "`before` as YAML, written as the object's YAML view writes it."
+        changes:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldChange"
+          description: The fields that change.
+        owners:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanFieldOwners"
+          description: Who owns the fields the write touches now.
+        resourceVersion:
+          type:
+          - string
+          - "null"
+          description: The `resourceVersion` the plan was computed against; absent for a creation.
+        target:
+          $ref: "#/components/schemas/PlanTarget"
+          description: The object.
+        write:
+          $ref: "#/components/schemas/PlannedWrite"
+          description: The write.
+    PlannedWrite:
+      oneOf:
+      - type: object
+        description: A new object, created with `POST`; it fails if one of that name exists by then.
+        required:
+        - body
+        - type
+        properties:
+          body:
+            type: object
+            description: The object, `apiVersion`, `kind` and `metadata` included.
+          type:
+            type: string
+            enum:
+            - create
+      - type: object
+        description: |-
+          An RFC 6902 JSON Patch whose first operation tests `metadata.generation` (or, for an
+          object without one, `metadata.resourceVersion`), and whose
+          `test` operations check every value it replaces or removes.
+        required:
+        - operations
+        - type
+        properties:
+          operations:
+            type: array
+            items:
+              type: object
+            description: The operations.
+          type:
+            type: string
+            enum:
+            - patch
+      - type: object
+        description: |-
+          A `DELETE` with background propagation, refused (`409`) unless the object still has this
+          `uid` and `resourceVersion`.
+        required:
+        - resourceVersion
+        - type
+        properties:
+          resourceVersion:
+            type: string
+            description: The object's `metadata.resourceVersion`.
+          type:
+            type: string
+            enum:
+            - delete
+          uid:
+            type:
+            - string
+            - "null"
+            description: The object's `metadata.uid`.
+      description: |-
+        How a planned write changes its object: a new object is created whole, an existing one is
+        patched or deleted. Creations and patches go as the field manager `engawa`.
+    PodScan:
+      type: string
+      description: How much of the pods were read for the requests. An open set.
+      enum:
+      - complete
+      - partial
+      - unreadable
+    PodSummary:
+      type: object
+      description: One pod of a workload.
+      required:
+      - id
+      - name
+      - phase
+      - ready
+      - restarts
+      - health
+      - containers
+      - origin
+      properties:
+        containerStatuses:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContainerStatusSummary"
+          description: |-
+            Each container's state as the kubelet reports it, init containers first; empty before
+            the kubelet reports any.
+        containers:
+          type: array
+          items:
+            type: string
+          description: Its containers' names, for picking whose log to read.
+        created:
+          type:
+          - string
+          - "null"
+          description: When it was created, in RFC 3339.
+        health:
+          $ref: "#/components/schemas/Health"
+          description: "`fail` when it keeps failing, `ok` when ready, `idle` when it succeeded, `warn` otherwise."
+        id:
+          type: string
+          description: Its resource name, `projects/<project>/pods/<name>`; see [`crate::id`].
+        name:
+          type: string
+          description: The pod's name.
+        node:
+          type:
+          - string
+          - "null"
+          description: The node it runs on, once scheduled.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The Pod object.
+        phase:
+          type: string
+          description: "`Pending`, `Running`, `Succeeded`, `Failed` or `Unknown`, as the kubelet reports it."
+        ready:
+          type: boolean
+          description: Whether every container is ready.
+        reason:
+          type:
+          - string
+          - "null"
+          description: |-
+            Why it is not running or not ready, as `kubectl get pods` shows it: a container's waiting
+            reason (`CrashLoopBackOff`, `ImagePullBackOff`, `CreateContainerConfigError`), or, for a
+            container that is not ready, why it last stopped (`OOMKilled`, `Error`).
+        restarts:
+          type: integer
+          format: int32
+          description: Restarts, summed over its containers.
+    PodUsage:
+      type: object
+      description: What one pod uses, the sum of its containers.
+      required:
+      - origin
+      - pod
+      - cpuMillicores
+      - memoryBytes
+      - containers
+      properties:
+        containers:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContainerUsage"
+          description: Its containers.
+        cpuMillicores:
+          type: integer
+          format: int64
+          description: CPU, in millicores.
+          minimum: 0
+        memoryBytes:
+          type: integer
+          format: int64
+          description: Memory, the working set, in bytes.
+          minimum: 0
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: Its `PodMetrics`.
+        pod:
+          type: string
+          description: The pod.
+    Port:
+      allOf:
+      - $ref: "#/components/schemas/ProtocolInference"
+        description: The application protocol and how it was inferred.
+      - type: object
+        required:
+        - port
+        - origin
+        properties:
+          name:
+            type:
+            - string
+            - "null"
+            description: The port's name.
+          nodePort:
+            type:
+            - integer
+            - "null"
+            format: int32
+            description: The node port, for `NodePort` and `LoadBalancer` Services.
+          origin:
+            $ref: "#/components/schemas/Origin"
+            description: The port in its Service.
+          port:
+            type: integer
+            format: int32
+            description: The Service port.
+          targetPort:
+            type:
+            - string
+            - "null"
+            description: The target port, a number or a container port name.
+      description: One port of a Kubernetes Service.
+    PortProtocol:
+      type: string
+      description: The application protocol a Service port speaks.
+      enum:
+      - HTTP
+      - HTTPS
+      - gRPC
+      - TCP
+      - UDP
+    PresetList:
+      type: object
+      description: The ready-made policies for one service.
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkPolicyPreset"
+          description: Isolate first, then allow the ingress controller, then one per other service.
+    ProbeHandler:
+      type: string
+      description: How a probe checks the container.
+      enum:
+      - HTTPGet
+      - TCPSocket
+      - GRPC
+      - Exec
+    ProbeKind:
+      type: string
+      description: |-
+        The probes of a container [k8s-probes].
+        
+        [k8s-probes]: https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/
+      enum:
+      - liveness
+      - readiness
+      - startup
+    ProbeRequest:
+      type: object
+      description: A probe as a person asks for it.
+      required:
+      - handler
+      properties:
+        command:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+          description: The command, for exec.
+        failureThreshold:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Failures in a row that count.
+        handler:
+          $ref: "#/components/schemas/ProbeHandler"
+          description: How it checks.
+        initialDelaySeconds:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Seconds before the first check.
+        path:
+          type:
+          - string
+          - "null"
+          description: The path, for HTTP.
+        periodSeconds:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Seconds between checks.
+        port:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: The port, for HTTP and TCP.
+        scheme:
+          type:
+          - string
+          - "null"
+          description: "`HTTP` (the default) or `HTTPS`, for HTTP."
+        timeoutSeconds:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Seconds a check may take.
+    ProbeSummary:
+      type: object
+      description: What one probe checks.
+      required:
+      - handler
+      properties:
+        handler:
+          $ref: "#/components/schemas/ContainerProbeHandler"
+          description: How it checks.
+        path:
+          type:
+          - string
+          - "null"
+          description: The path (HTTP).
+        port:
+          type:
+          - string
+          - "null"
+          description: The port, a number or a container port name (HTTP, TCP and gRPC).
+    Probes:
+      type: object
+      description: |-
+        A container's probes [k8s-probes].
+        
+        Liveness restarts the container when it fails, readiness takes the pod out of its Services'
+        endpoints, and startup holds the other two back until the application has started.
+        
+        [k8s-probes]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes
+      properties:
+        liveness:
+          oneOf:
+          - $ref: "#/components/schemas/ProbeSummary"
+            description: The liveness probe.
+          - type: "null"
+        readiness:
+          oneOf:
+          - $ref: "#/components/schemas/ProbeSummary"
+            description: The readiness probe.
+          - type: "null"
+        startup:
+          oneOf:
+          - $ref: "#/components/schemas/ProbeSummary"
+            description: The startup probe.
+          - type: "null"
+    Problem:
+      type: object
+      description: |-
+        An RFC 9457 problem, with Engawa's extension members `kind`, `summary`, `why`, `fix`,
+        `evidence`, `fields`, `kubernetes`, `managedBy` and `denied`.
+      required:
+      - type
+      - title
+      - status
+      - detail
+      - kind
+      - summary
+      - fix
+      properties:
+        denied:
+          oneOf:
+          - $ref: "#/components/schemas/Denied"
+            description: |-
+              The request the cluster refused, on a `403` from kube-apiserver to a request Engawa can
+              describe. A client names the missing permission from this member, not from the wording
+              of `kubernetes.message`.
+          - type: "null"
+        detail:
+          type: string
+          description: What happened, in plain language, for this occurrence.
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: The objects and fields it rests on.
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldCause"
+          description: The fields kube-apiserver found invalid, so a form can mark them.
+        fix:
+          type: string
+          description: What to do about it.
+        fixKey:
+          oneOf:
+          - $ref: "#/components/schemas/Message"
+            description: |-
+              The fix as a sentence a client words in its own language, where Engawa wrote `fix` for
+              this occasion rather than for the kind (the quota to raise, the rule to ask for); absent
+              when `fix` is the kind's own, which a client words from `kind`.
+          - type: "null"
+        kind:
+          $ref: "#/components/schemas/Kind"
+          description: The category.
+        kubernetes:
+          oneOf:
+          - $ref: "#/components/schemas/KubernetesStatus"
+            description: kube-apiserver's own answer, when the problem came from the cluster.
+          - type: "null"
+        managedBy:
+          oneOf:
+          - $ref: "#/components/schemas/Tool"
+            description: |-
+              The tool that manages the object, or owns the field, a write was refused for: the change
+              belongs in that tool's configuration. A client tells this refusal apart by this member,
+              not by the wording of `detail`.
+          - type: "null"
+        status:
+          type: integer
+          format: int32
+          description: HTTP status code.
+          minimum: 0
+        summary:
+          $ref: "#/components/schemas/Message"
+          description: |-
+            What happened, naming the object where Engawa knows it: `problem.summary.{kind}`, with
+            the values it names (`name`, `namespace`, `resource`, `verb`) as far as they are known.
+        title:
+          type: string
+          description: Short summary of the kind.
+        type:
+          type: string
+          description: Problem type URI.
+        unavailableLog:
+          oneOf:
+          - $ref: "#/components/schemas/UnavailableLog"
+            description: |-
+              Why the container log asked for cannot be read, on a [`Kind::LogUnavailable`]. A client
+              tells the reason by this member, not by the wording of `detail`.
+          - type: "null"
+        why:
+          oneOf:
+          - $ref: "#/components/schemas/Message"
+            description: |-
+              Why: the rule that applied, with this occurrence's numbers. Absent when the summary and
+              fix say all there is.
+          - type: "null"
+    Project:
+      type: object
+      description: >-
+        One namespace projected into services, the resources around them and how they
+        relate.
+      required:
+      - namespace
+      - services
+      - resources
+      - relations
+      - connections
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/Connection"
+          description: Which services appear to call which, sorted by source then target.
+        namespace:
+          type: string
+          description: The namespace.
+        relations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Relation"
+          description: Every reference from a workload to a resource, sorted.
+        resources:
+          type: array
+          items:
+            $ref: "#/components/schemas/Resource"
+          description: The ConfigMaps, Secrets, PVCs, Services and Ingresses, sorted by kind then name.
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/Service"
+          description: One service per workload, sorted by kind then name.
+    ProjectBackups:
+      type: object
+      description: A project's backups across providers.
+      required:
+      - coverage
+      - unscheduled
+      - schedules
+      - runs
+      - providers
+      - unreadable
+      properties:
+        coverage:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupCoverage"
+          description: One row per claim, then per database, then the namespace.
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupProvider"
+          description: The providers this build has.
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupRun"
+          description: The newest runs, newest first, ten at most.
+        schedules:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupSchedule"
+          description: Every schedule that covers something of the project.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
+        unscheduled:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupTarget"
+          description: Claims and databases no active schedule covers.
+    ProjectDetails:
+      type: object
+      description: |-
+        A project's details, as its namespace's annotations give them. Each is absent when its
+        annotation is missing or blank (or, for the icon, names no built-in icon).
+      properties:
+        description:
+          type:
+          - string
+          - "null"
+          description: What the project is.
+        displayName:
+          type:
+          - string
+          - "null"
+          description: The name to show instead of the namespace's.
+        icon:
+          oneOf:
+          - $ref: "#/components/schemas/ProjectIcon"
+            description: Its icon.
+          - type: "null"
+    ProjectDocument:
+      allOf:
+      - $ref: "#/components/schemas/Project"
+        description: The projection.
+      - type: object
+        required:
+        - id
+        - unreadable
+        - extensions
+        properties:
+          extensions:
+            $ref: "#/components/schemas/ProjectExtensions"
+            description: >-
+              What the integrations add, by module; a module whose API is not served adds
+              nothing.
+          id:
+            type: string
+            description: "`projects/<name>`."
+          unreadable:
+            type: array
+            items:
+              $ref: "#/components/schemas/UnreadableView"
+            description: Kinds the person could not list; the projection is missing what they hide.
+      description: |-
+        A project: its services, the resources they use and how they relate, read as the person.
+        
+        The one document a client needs for a project: the service, variables and objects views are
+        cut from it rather than read again.
+    ProjectExtensions:
+      type: object
+      description: What integrations add to a project document, one member per module.
+      properties:
+        networkPolicy:
+          oneOf:
+          - $ref: "#/components/schemas/NetworkPolicyReachability"
+            description: |-
+              Who may reach each service, from the project's NetworkPolicy objects. Whether the
+              cluster's network plugin enforces them is not known.
+          - type: "null"
+    ProjectHealth:
+      type: object
+      description: |-
+        How many of a project's services are in each state, for lists that show a project's health
+        without its whole document.
+      required:
+      - services
+      - healthy
+      - progressing
+      - warning
+      - failing
+      properties:
+        failing:
+          type: integer
+          description: Services failing ([`Health::Fail`]).
+          minimum: 0
+        healthy:
+          type: integer
+          description: "Services that are fine: [`Health::Ok`] or [`Health::Idle`]."
+          minimum: 0
+        progressing:
+          type: integer
+          description: Services rolling out ([`Health::Progress`]).
+          minimum: 0
+        services:
+          type: integer
+          description: Services (workloads, without the Jobs a CronJob runs).
+          minimum: 0
+        warning:
+          type: integer
+          description: Services with too few ready replicas ([`Health::Warn`]).
+          minimum: 0
+    ProjectIcon:
+      type: string
+      description: |-
+        The icons a project may have: a built-in set, so nothing is uploaded and the interface draws
+        each from its own icon font. An annotation naming another value is ignored.
+      enum:
+      - folder
+      - globe
+      - storefront
+      - rocket
+      - cube
+      - database
+      - cloud
+      - code
+      - terminal
+      - chart
+      - chat
+      - book
+      - flask
+      - game
+      - heart
+      - briefcase
+    ProjectList:
+      type: object
+      description: The projects (namespaces) the person may list.
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSummary"
+          description: Adopted projects first, then the other namespaces, each sorted by name.
+    ProjectNamespace:
+      allOf:
+      - $ref: "#/components/schemas/ProjectDetails"
+        description: The name, description and icon given to it.
+      - type: object
+        required:
+        - origin
+        - name
+        - adopted
+        - system
+        - canChange
+        properties:
+          adopted:
+            type: boolean
+            description: It carries Engawa's project label.
+          canChange:
+            $ref: "#/components/schemas/Permission"
+            description: "Whether the person may patch the Namespace: adopt it, let it go, change its details."
+          name:
+            type: string
+            description: Its name.
+          origin:
+            $ref: "#/components/schemas/Origin"
+            description: The Namespace.
+          system:
+            type: boolean
+            description: Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted.
+      description: A project's Namespace.
+    ProjectSummary:
+      allOf:
+      - $ref: "#/components/schemas/ProjectDetails"
+        description: The name, description and icon given to it (its namespace's annotations).
+      - type: object
+        required:
+        - id
+        - origin
+        - name
+        - adopted
+        - system
+        properties:
+          adopted:
+            type: boolean
+            description: |-
+              Whether the namespace carries Engawa's project label. Any namespace can be opened; adopting
+              it only adds the label.
+          health:
+            oneOf:
+            - $ref: "#/components/schemas/ProjectHealth"
+              description: |-
+                How many of its services are healthy, rolling out, warning or failing. Only for adopted
+                projects, and absent when their workloads cannot be read.
+            - type: "null"
+          id:
+            type: string
+            description: "`projects/<name>`."
+          name:
+            type: string
+            description: "The project's name: its namespace's name."
+          origin:
+            $ref: "#/components/schemas/Origin"
+            description: The namespace.
+          services:
+            type:
+            - array
+            - "null"
+            items:
+              $ref: "#/components/schemas/ServiceSummary"
+            description: |-
+              Its services with their health, from the same read as `health`: sorted by kind, then
+              name, as in the project document. Only for adopted projects, and absent when their
+              workloads cannot be read.
+          system:
+            type: boolean
+            description: |-
+              The namespace is one Kubernetes keeps for itself (`kube-` prefix), which cannot be
+              adopted.
+      description: A project in the list.
+    ProjectUsage:
+      type: object
+      description: What a project's pods use now.
+      required:
+      - id
+      - state
+      - pods
+      - unreadable
+      properties:
+        id:
+          type: string
+          description: "`projects/{project}/usage`."
+        pods:
+          type: array
+          items:
+            $ref: "#/components/schemas/PodUsage"
+          description: Every pod with a sample, by name. A running pod missing here has none yet.
+        state:
+          $ref: "#/components/schemas/MetricsState"
+          description: Whether usage could be read.
+        timestamp:
+          type:
+          - string
+          - "null"
+          description: When the newest sample was taken (RFC 3339).
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
+        window:
+          type:
+          - string
+          - "null"
+          description: The window CPU is averaged over, as metrics-server writes it (`15s`).
+    PrometheusRange:
+      type: string
+      description: How far back a history reaches.
+      enum:
+      - 1h
+      - 6h
+      - 24h
+      - 7d
+    PrometheusRestart:
+      type: object
+      description: A restart of a pod's container.
+      required:
+      - pod
+      - at
+      - oomKilled
+      properties:
+        at:
+          type: integer
+          format: int64
+          description: The end of the step it happened in (Unix seconds).
+        oomKilled:
+          type: boolean
+          description: "Its container had last ended `OOMKilled` by then: it went over its memory limit."
+        pod:
+          type: string
+          description: The pod.
+    PrometheusSeries:
+      type: object
+      description: One pod's values, one per time of the range; `null` where it had no sample.
+      required:
+      - pod
+      - values
+      properties:
+        pod:
+          type: string
+          description: The pod.
+        values:
+          type: array
+          items:
+            type:
+            - number
+            - "null"
+            format: double
+          description: The values.
+    ProtocolInference:
+      type: object
+      description: A port's application protocol and how it was decided.
+      required:
+      - protocol
+      - inferredFrom
+      properties:
+        inferredFrom:
+          $ref: "#/components/schemas/InferredFrom"
+          description: The signal that decided it.
+        protocol:
+          $ref: "#/components/schemas/PortProtocol"
+          description: The protocol.
+    Provenance:
+      type: object
+      description: Which tool manages an object, if any.
+      required:
+      - warnBeforeEdit
+      properties:
+        managedBy:
+          type:
+          - string
+          - "null"
+          description: The `app.kubernetes.io/managed-by` label, verbatim.
+        tool:
+          oneOf:
+          - $ref: "#/components/schemas/Tool"
+            description: The managing tool, when its labels or annotations are present.
+          - type: "null"
+        warnBeforeEdit:
+          type: boolean
+          description: A direct edit is likely to be reverted, so a client warns before making one.
+    ProviderState:
+      type: string
+      description: Whether a provider's objects could be read.
+      enum:
+      - installed
+      - not-installed
+      - refused
+    Quantities:
+      type: object
+      description: >-
+        CPU and memory as Kubernetes quantity strings, such as `250m` and `512Mi`, and
+        as numbers.
+      properties:
+        cpu:
+          type:
+          - string
+          - "null"
+          description: CPU.
+        cpuMillicores:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: CPU in millicores, rounded up; absent when `cpu` is absent or not a quantity.
+          minimum: 0
+        memory:
+          type:
+          - string
+          - "null"
+          description: Memory.
+        memoryBytes:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: Memory in bytes, rounded up; absent when `memory` is absent or not a quantity.
+          minimum: 0
+    ReadOnlyReason:
+      oneOf:
+      - type: object
+        description: |-
+          Another field manager owns the container's `envFrom`. The list is atomic, so changing one
+          entry takes the whole list from that manager and its next apply conflicts.
+        required:
+        - manager
+        - reason
+        properties:
+          manager:
+            type: string
+            description: The field manager.
+          reason:
+            type: string
+            enum:
+            - listManagedBy
+      - type: object
+        description: >-
+          The imported object is managed by a tool that restores its contents on the next
+          sync.
+        required:
+        - tool
+        - reason
+        properties:
+          reason:
+            type: string
+            enum:
+            - sourceManagedBy
+          tool:
+            $ref: "#/components/schemas/Tool"
+            description: The tool.
+      description: |-
+        Why an `envFrom` entry is read-only. Either way the way out is the same: override one
+        variable with a same-named `env` entry, which takes precedence and leaves the import alone.
+    Relation:
+      type: object
+      description: One reference between a workload and a resource.
+      required:
+      - workload
+      - object
+      - kind
+      - origin
+      properties:
+        kind:
+          $ref: "#/components/schemas/RelationKind"
+          description: How the workload uses it.
+        object:
+          $ref: "#/components/schemas/ObjectRef"
+          description: The resource.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: |-
+            Where the reference is written: in the workload, or for `Selector` and `Route` in the
+            Service or Ingress.
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
+    RelationKind:
+      type: string
+      description: How a workload uses a resource.
+      enum:
+      - envReference
+      - envImport
+      - volume
+      - claimTemplate
+      - imagePullSecret
+      - selector
+      - route
+    Release:
+      type: object
+      description: One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`.
+      required:
+      - minor
+      - released
+      - maintenanceFrom
+      - endOfLife
+      properties:
+        endOfLife:
+          type: string
+          description: The last day it gets patches.
+        maintenanceFrom:
+          type: string
+          description: From this day only critical fixes are made ("maintenance mode").
+        minor:
+          type: string
+          description: "`1.34`."
+        released:
+          type: string
+          description: Its first release.
+    Replicas:
+      type: object
+      description: Ready and desired replicas (per node for a DaemonSet, completions for a Job).
+      required:
+      - ready
+      - desired
+      properties:
+        desired:
+          type: integer
+          format: int32
+          description: Desired pods.
+        ready:
+          type: integer
+          format: int32
+          description: Ready (or, for a Job, succeeded) pods.
+    Resource:
+      type: object
+      description: A resource of the namespace and the workloads it belongs to.
+      required:
+      - id
+      - kind
+      - name
+      - attribution
+      - provenance
+      - origin
+      properties:
+        attribution:
+          $ref: "#/components/schemas/Attribution"
+          description: Owned, shared or orphan, and by which workloads.
+        id:
+          type: string
+          description: >-
+            Its resource name, `projects/<project>/resources/<kind>/<name>`; see
+            [`crate::id`].
+        keyCount:
+          type:
+          - integer
+          - "null"
+          description: For a ConfigMap or Secret, how many keys it holds, when known.
+          minimum: 0
+        kind:
+          $ref: "#/components/schemas/ResourceKind"
+          description: The resource's kind.
+        name:
+          type: string
+          description: The resource's name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The resource object.
+        provenance:
+          $ref: "#/components/schemas/Provenance"
+          description: The tool that manages the resource, if any.
+    ResourceKind:
+      type: string
+      description: The kinds of resource attributed to workloads.
+      enum:
+      - ConfigMap
+      - Ingress
+      - PersistentVolumeClaim
+      - Secret
+      - Service
+    ResourceRef:
+      type: object
+      description: A namespaced resource, as a request path names it.
+      required:
+      - version
+      - resource
+      properties:
+        group:
+          type: string
+          description: The API group; empty for the core group.
+        resource:
+          type: string
+          description: The resource (plural).
+        version:
+          type: string
+          description: The version.
+    Resources:
+      type: object
+      description: CPU, memory and pods in plain units.
+      required:
+      - cpuMillicores
+      - memoryBytes
+      properties:
+        cpuMillicores:
+          type: integer
+          format: int64
+          description: CPU in millicores (1000 is one core).
+          minimum: 0
+        memoryBytes:
+          type: integer
+          format: int64
+          description: Memory in bytes.
+          minimum: 0
+        pods:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: Pods; only where a count of pods applies.
+          minimum: 0
+    RevealedSecret:
+      type: object
+      description: A Secret's values, shown because the person asked.
+      required:
+      - origin
+      - values
+      properties:
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The Secret.
+        values:
+          type: object
+          description: Its values by key.
+          additionalProperties:
+            $ref: "#/components/schemas/SecretValue"
+          propertyNames:
+            type: string
+    Risk:
+      type: object
+      description: A known risk of a component.
+      required:
+      - risk
+      - mitigation
+      properties:
+        mitigation:
+          type: string
+          description: How to contain it.
+        risk:
+          type: string
+          description: The risk.
+    Route:
+      type: object
+      description: "An Ingress routing to a workload's Services: how it is reached from outside."
+      required:
+      - name
+      - hostnames
+      - backends
+      - rules
+      - attribution
+      - provenance
+      - origin
+      properties:
+        attribution:
+          $ref: "#/components/schemas/Attribution"
+          description: Which workloads the backends select.
+        backends:
+          type: array
+          items:
+            type: string
+          description: The Services it routes to, sorted, without duplicates.
+        class:
+          type:
+          - string
+          - "null"
+          description: |-
+            Its class: `spec.ingressClassName`, else the older `kubernetes.io/ingress.class`
+            annotation [k8s-ingress-class].
+            
+            [k8s-ingress-class]: https://kubernetes.io/docs/concepts/services-networking/ingress/#deprecated-annotation
+        hostnames:
+          type: array
+          items:
+            type: string
+          description: The hosts its rules match.
+        name:
+          type: string
+          description: The Ingress's name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The Ingress object.
+        provenance:
+          $ref: "#/components/schemas/Provenance"
+          description: The tool that manages the Ingress, if any.
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteRule"
+          description: |-
+            Which requests reach which Service port: the default backend first, then each rule's
+            paths in order. Every rule of the Ingress is listed, also those for other workloads'
+            Services, so a client filters by `service`.
+        tlsHosts:
+          type: array
+          items:
+            type: string
+          description: |-
+            The hosts its `spec.tls` serves over HTTPS, sorted, without duplicates. It says HTTPS is
+            configured, not that the certificate is valid.
+    RouteKind:
+      type: string
+      description: The kinds of route object.
+      enum:
+      - Ingress
+      - HTTPRoute
+    RouteRef:
+      type: object
+      description: "A route object: an Ingress or a Gateway API `HTTPRoute`."
+      required:
+      - kind
+      - name
+      properties:
+        kind:
+          $ref: "#/components/schemas/RouteKind"
+          description: "`Ingress` or `HTTPRoute`."
+        name:
+          type: string
+          description: Its name.
+    RouteRule:
+      type: object
+      description: "One backend of an Ingress: the requests that reach a Service port."
+      required:
+      - service
+      - origin
+      properties:
+        host:
+          type:
+          - string
+          - "null"
+          description: The host it matches; absent matches every host.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The backend in its Ingress.
+        path:
+          type:
+          - string
+          - "null"
+          description: The path it matches; absent for the default backend.
+        pathType:
+          type:
+          - string
+          - "null"
+          description: "`Prefix`, `Exact` or `ImplementationSpecific`; absent for the default backend."
+        port:
+          type:
+          - string
+          - "null"
+          description: The backend Service port, a number or a port name.
+        service:
+          type: string
+          description: The backend Service's name.
+    SecretValue:
+      type: object
+      description: One value of a revealed Secret.
+      required:
+      - value
+      - encoding
+      properties:
+        encoding:
+          type: string
+          description: "`utf-8` or `base64`."
+        value:
+          type: string
+          description: "The value: text as is, binary data as base64."
+    Security:
+      type: object
+      description: What a component's RBAC and network access amount to, from the catalogue.
+      required:
+      - summary
+      properties:
+        clusterWide:
+          type: boolean
+          description: It has cluster-scoped RBAC.
+        credentials:
+          type:
+          - string
+          - "null"
+          description: "External credentials: `optional` or `required`; absent means none."
+        credentialsNote:
+          type:
+          - string
+          - "null"
+          description: What the credentials are for.
+        egress:
+          type: array
+          items:
+            type: string
+          description: Hosts it connects to.
+        privileged:
+          type: boolean
+          description: It runs privileged.
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+          description: Known risks and how to contain them.
+        summary:
+          type: string
+          description: What its RBAC lets it do.
+        tenants:
+          type:
+          - string
+          - "null"
+          description: |-
+            Who may use its custom resources: `namespaced` or `admin-only`; absent means tenants never
+            do.
+    ServerFrame:
+      oneOf:
+      - type: object
+        description: The process runs; terminal bytes may flow.
+        required:
+        - container
+        - type
+        properties:
+          container:
+            type: string
+            description: The container it runs in.
+          type:
+            type: string
+            enum:
+            - ready
+      - type: object
+        description: The process ended.
+        required:
+        - type
+        properties:
+          code:
+            type:
+            - integer
+            - "null"
+            format: int32
+            description: Its exit code, when it exited on its own.
+          message:
+            type:
+            - string
+            - "null"
+            description: The container runtime's message, for `failed`.
+          reason:
+            oneOf:
+            - $ref: "#/components/schemas/ExitReason"
+              description: Why it ended, when there is no code.
+            - type: "null"
+          type:
+            type: string
+            enum:
+            - exit
+      - type: object
+        description: The terminal could not be opened.
+        required:
+        - problem
+        - type
+        properties:
+          problem:
+            $ref: "#/components/schemas/Problem"
+            description: What went wrong.
+          type:
+            type: string
+            enum:
+            - error
+      description: A control frame to the browser.
+    Service:
+      allOf:
+      - $ref: "#/components/schemas/WorkloadSummary"
+        description: The workload.
+      - type: object
+        required:
+        - id
+        - status
+        - pods
+        - containers
+        - endpoints
+        - routes
+        properties:
+          containers:
+            type: array
+            items:
+              $ref: "#/components/schemas/Container"
+            description: Its init and regular containers, in that order.
+          dataStore:
+            oneOf:
+            - $ref: "#/components/schemas/DataStore"
+              description: |-
+                What kind of data store it is, when it is one: named like a well-known data store
+                image, in the `databases` group, or a StatefulSet with persistent storage. Image names
+                are a convention, so this is a hint for how to show the service, not a fact about it.
+            - type: "null"
+          diagnoses:
+            type: array
+            items:
+              $ref: "#/components/schemas/Diagnosis"
+            description: |-
+              What is going wrong with it, in plain words, sorted by kind then container. The
+              projection leaves this empty: diagnoses need the namespace's events and the time of the
+              read, so the API fills it in when it serves the project document.
+          endpoints:
+            type: array
+            items:
+              $ref: "#/components/schemas/Endpoint"
+            description: The Kubernetes Services selecting its pods, sorted by name.
+          id:
+            type: string
+            description: >-
+              Its resource name, `projects/<project>/services/<kind>/<name>`; see
+              [`crate::id`].
+          pods:
+            type: array
+            items:
+              $ref: "#/components/schemas/PodSummary"
+            description: Its pods, sorted by name.
+          routes:
+            type: array
+            items:
+              $ref: "#/components/schemas/Route"
+            description: The Ingresses routing to those Services, sorted by name.
+          status:
+            $ref: "#/components/schemas/ServiceStatus"
+            description: Its health and the word for it, from the workload and its pods.
+      description: "A workload and what it uses: what people think of as \"a service\"."
+    ServiceDocument:
+      allOf:
+      - $ref: "#/components/schemas/Service"
+        description: The service.
+      - type: object
+        required:
+        - unreadable
+        properties:
+          unreadable:
+            type: array
+            items:
+              $ref: "#/components/schemas/UnreadableView"
+            description: Kinds the person could not list.
+      description: One service of a project, as the project document holds it.
+    ServiceHistory:
+      type: object
+      description: A service's CPU, memory and restarts over a range, one value per pod and time.
+      required:
+      - id
+      - state
+      - source
+      - range
+      - step
+      - times
+      - cpu
+      - memory
+      - unreadable
+      properties:
+        cpu:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrometheusSeries"
+          description: |-
+            CPU per pod, in millicores; every pod the store knows in the range, also those replaced
+            since.
+        id:
+          type: string
+          description: "`projects/{project}/services/{kind}/{name}/history`."
+        memory:
+          type: array
+          items:
+            $ref: "#/components/schemas/PrometheusSeries"
+          description: Memory per pod, the working set's highest in each step, in bytes.
+        message:
+          type:
+          - string
+          - "null"
+          description: kube-apiserver's or the store's words when it did not answer.
+        range:
+          $ref: "#/components/schemas/PrometheusRange"
+          description: The range.
+        restarts:
+          type:
+          - array
+          - "null"
+          items:
+            $ref: "#/components/schemas/PrometheusRestart"
+          description: |-
+            Restarts, oldest first; absent when the store has no restart counts (it does not scrape
+            kube-state-metrics), which is not the same as none.
+        source:
+          $ref: "#/components/schemas/HistorySource"
+          description: The store.
+        state:
+          $ref: "#/components/schemas/StoreState"
+          description: Whether the store answered.
+        step:
+          type: integer
+          format: int64
+          description: Seconds between two times.
+        times:
+          type: array
+          items:
+            type: integer
+            format: int64
+          description: The times of the values (Unix seconds), oldest first.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: The settings ConfigMap or the store, when the person may not read it.
+    ServiceStatus:
+      type: object
+      description: A service's health, the word for it, and why when a pod keeps failing.
+      required:
+      - health
+      - word
+      properties:
+        health:
+          $ref: "#/components/schemas/Health"
+          description: What its status dot shows.
+        reason:
+          type:
+          - string
+          - "null"
+          description: |-
+            The first failing pod's reason, as `kubectl get pods` shows it (`CrashLoopBackOff`), or,
+            for a pod that runs again after a recent crash, how that crash ended (`Error`); absent
+            when no pod fails or the kubelet gives no reason.
+        word:
+          $ref: "#/components/schemas/StatusWord"
+          description: The word for it.
+    ServiceSummary:
+      type: object
+      description: |-
+        One service of a project in the list: which it is, how healthy and why, without its
+        containers, variables or configuration (those are in the project document).
+      required:
+      - id
+      - kind
+      - name
+      - health
+      - restarts
+      properties:
+        desired:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Desired replicas (completions for a Job); absent for a CronJob.
+        health:
+          $ref: "#/components/schemas/Health"
+          description: Its health, by the rule the project counts use.
+        id:
+          type: string
+          description: "`projects/<project>/services/<kind>/<name>`."
+        kind:
+          $ref: "#/components/schemas/WorkloadKind"
+          description: The workload's kind.
+        name:
+          type: string
+          description: The workload's name.
+        ready:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Ready replicas (succeeded pods for a Job); absent for a CronJob.
+        reason:
+          type:
+          - string
+          - "null"
+          description: |-
+            Why its first failing pod fails, as `kubectl get pods` shows it (`CrashLoopBackOff`);
+            absent when no pod fails or the kubelet gives no reason.
+        restarts:
+          type: integer
+          format: int32
+          description: Restarts, summed over its pods.
+    SessionView:
+      type: object
+      description: How the person is signed in to Engawa.
+      required:
+      - signsIn
+      - elevation
+      properties:
+        elevatedUntil:
+          type:
+          - string
+          - "null"
+          description: When the administrator rights end, RFC 3339, while they are in use.
+        elevation:
+          $ref: "#/components/schemas/ElevationState"
+          description: Whether administrator rights are offered and in use.
+        expiresAt:
+          type:
+          - string
+          - "null"
+          description: |-
+            When the credential in use expires, RFC 3339: the everyday one, which Engawa renews
+            before then while the session lasts, or while admin rights are in use theirs, which is
+            `elevatedUntil` and is not renewed.
+        signsIn:
+          type: boolean
+          description: |-
+            Whether people sign in to this server, and so can sign out. `false` on this machine
+            (`engawactl ui`), which acts with the kubeconfig of whoever started it.
+    SettingSource:
+      type: string
+      description: Where the metrics store in use comes from.
+      enum:
+      - default
+      - setting
+    Severity:
+      type: string
+      description: How much a state matters, from nothing to act on to act now.
+      enum:
+      - none
+      - info
+      - warning
+      - danger
+    SourceKind:
+      type: string
+      description: |-
+        What an environment variable's value is read from.
+        
+        This is the *value's* source, which is what a client needs to show or change it: a literal is
+        edited in place, a Secret or ConfigMap key is edited in that object.
+      enum:
+      - Literal
+      - Secret
+      - ConfigMap
+      - PodField
+      - ResourceField
+      - File
+    StatusWord:
+      type: string
+      description: |-
+        What a service is doing, in one word for a person. An open set: clients must show an unknown
+        value by its [`Health`].
+      enum:
+      - ready
+      - rollingOut
+      - failing
+      - degraded
+      - scheduled
+      - paused
+      - failed
+      - scaledToZero
+      - completed
+      - unknown
+    StoreState:
+      type: string
+      description: Whether the metrics store answered, as the person. An open set.
+      enum:
+      - available
+      - not-configured
+      - unreadable
+      - unavailable
+    Suggestion:
+      type: string
+      description: How strongly the catalogue suggests a missing capability.
+      enum:
+      - recommended
+      - optional
+      - unsupported
+    SystemUpgradeControllerPlan:
+      type: object
+      description: A Plan, reduced to what an upgrade overview needs.
+      required:
+      - namespace
+      - name
+      - applying
+      properties:
+        applying:
+          type: array
+          items:
+            type: string
+          description: "`status.applying`: the nodes being upgraded now."
+        channel:
+          type:
+          - string
+          - "null"
+          description: "`spec.channel`: the URL the controller resolves to the newest version."
+        latestVersion:
+          type:
+          - string
+          - "null"
+          description: "`status.latestVersion`: what the channel (or `version`) resolved to."
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type: string
+          description: Its namespace.
+        version:
+          type:
+          - string
+          - "null"
+          description: "`spec.version`: a fixed target version."
+    SystemUpgradeControllerUpgrades:
+      type: object
+      description: What system-upgrade-controller adds to the cluster's upgrades.
+      required:
+      - plans
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: "#/components/schemas/SystemUpgradeControllerPlan"
+          description: The Plans, by namespace and name.
+    Taint:
+      type: object
+      description: A node taint.
+      required:
+      - key
+      - effect
+      properties:
+        effect:
+          type: string
+          description: "`NoSchedule`, `PreferNoSchedule` or `NoExecute`."
+        key:
+          type: string
+          description: Its key.
+        value:
+          type:
+          - string
+          - "null"
+          description: Its value.
+    Tool:
+      type: string
+      description: A deployment tool that would revert a direct edit on its next sync or upgrade.
+      enum:
+      - Helm
+      - Argo CD
+      - Flux
+    UnavailableLog:
+      type: string
+      description: Why a container's log cannot be read, from the kubelet's answer.
+      enum:
+      - no-previous-run
+      - not-started
+      - removed
+    UnreadableView:
+      type: object
+      description: A kind the person could not read, and kube-apiserver's answer.
+      required:
+      - resource
+      - kubernetes
+      properties:
+        kubernetes:
+          $ref: "#/components/schemas/KubernetesStatus"
+          description: kube-apiserver's answer.
+        resource:
+          type: string
+          description: The resource (`secrets`, `deployments.apps`, …).
+    UpgradeExtensions:
+      type: object
+      description: What integrations add to the cluster's upgrades, one member per module.
+      properties:
+        systemUpgradeController:
+          oneOf:
+          - $ref: "#/components/schemas/SystemUpgradeControllerUpgrades"
+            description: system-upgrade-controller's Plans.
+          - type: "null"
+    UpgradeState:
+      type: string
+      description: |-
+        What the cluster's version calls for. An open set: clients must ignore values they do not
+        know.
+      enum:
+      - patch-available
+      - minor-available
+      - maintenance
+      - end-of-life
+      - skew-unsupported
+      - skew-mixed
+      - upgrading
+      - newer-than-data
+    Upgrades:
+      type: object
+      description: The cluster's own version and what it calls for.
+      required:
+      - id
+      - kubernetesVersion
+      - dataAsOf
+      - states
+      - severity
+      - skew
+      - upgrading
+      - unreadable
+      - extensions
+      properties:
+        dataAsOf:
+          type: string
+          description: When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`).
+        distribution:
+          type:
+          - string
+          - "null"
+          description: "`k3s` or `rke2`, when the version names one."
+        extensions:
+          $ref: "#/components/schemas/UpgradeExtensions"
+          description: |-
+            What the integrations add, by module; a module whose component is not installed adds
+            nothing.
+        id:
+          type: string
+          description: "`cluster/upgrades`."
+        kubernetesVersion:
+          type: string
+          description: kube-apiserver's version.
+        minor:
+          type:
+          - string
+          - "null"
+          description: "`1.34`."
+        nextMinor:
+          type:
+          - string
+          - "null"
+          description: >-
+            The next minor's build a Plan resolved (upgrade one minor at a time); absent
+            otherwise.
+        patch:
+          type:
+          - string
+          - "null"
+          description: |-
+            A newer build of the same minor, from system-upgrade-controller's Plans; absent when no
+            Plan resolved a newer version.
+        release:
+          oneOf:
+          - $ref: "#/components/schemas/Release"
+            description: That minor's support window, from Engawa's bundled table.
+          - type: "null"
+        severity:
+          $ref: "#/components/schemas/Severity"
+          description: The most severe state's severity.
+        skew:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeSkew"
+          description: Nodes whose kubelet minor differs from kube-apiserver's.
+        states:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpgradeState"
+          description: Every state that applies, most severe first. An open set.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read (nodes, Plans); the rest is still right.
+        upgrading:
+          type: array
+          items:
+            type: string
+          description: Nodes system-upgrade-controller is upgrading now.
+    ValueSource:
+      type: object
+      description: "The source of a value: its kind and, for references, the object and key it reads."
+      required:
+      - kind
+      properties:
+        fieldPath:
+          type:
+          - string
+          - "null"
+          description: The pod field (`PodField`), resource (`ResourceField`) or file path (`File`).
+        key:
+          type:
+          - string
+          - "null"
+          description: The key within that object.
+        kind:
+          $ref: "#/components/schemas/SourceKind"
+          description: What the value is read from.
+        name:
+          type:
+          - string
+          - "null"
+          description: |-
+            The referenced Secret or ConfigMap; the container for a `ResourceField`; the volume for
+            a `File`.
+        optional:
+          type: boolean
+          description: "The reference is marked optional: the container starts without it."
+    VolumeRequest:
+      type: object
+      description: "A new volume for a workload: a PersistentVolumeClaim and where it is mounted."
+      required:
+      - size
+      - mountPath
+      properties:
+        accessMode:
+          oneOf:
+          - $ref: "#/components/schemas/AccessMode"
+            description: How the nodes may mount the claim; absent for `ReadWriteOnce`.
+          - type: "null"
+        claimName:
+          type:
+          - string
+          - "null"
+          description: >-
+            The claim's name; absent for `<workload>-<name>`. A claim that exists is never
+            reused.
+        mountPath:
+          type: string
+          description: Where the container sees it; absolute.
+        name:
+          type: string
+          description: The volume's name in the pod.
+        size:
+          type: string
+          description: The size, a Kubernetes quantity such as `5Gi`.
+        storageClass:
+          type:
+          - string
+          - "null"
+          description: The `StorageClass`; absent for the cluster's default.
+    WhoAmI:
+      type: object
+      description: Who the cluster says the person is.
+      required:
+      - username
+      - groups
+      properties:
+        groups:
+          type: array
+          items:
+            type: string
+          description: Groups.
+        username:
+          type: string
+          description: User name.
+    WorkloadKind:
+      type: string
+      description: |-
+        The workload kinds Engawa projects.
+        
+        Declared in alphabetical order, so the derived [`Ord`] sorts as the kind names do.
+      enum:
+      - CronJob
+      - DaemonSet
+      - Deployment
+      - Job
+      - StatefulSet
+    WorkloadRef:
+      type: object
+      description: |-
+        A workload, by kind and name.
+        
+        The derived order is kind, then name, as strings: [`WorkloadKind`]'s variants are declared
+        in alphabetical order.
+      required:
+      - kind
+      - name
+      properties:
+        kind:
+          $ref: "#/components/schemas/WorkloadKind"
+          description: The workload's kind.
+        name:
+          type: string
+          description: The workload's name.
+    WorkloadRelease:
+      type: object
+      description: One pod template a workload has run.
+      required:
+      - revision
+      - name
+      - images
+      - current
+      - pods
+      - template
+      - templateYaml
+      properties:
+        changeCause:
+          type:
+          - string
+          - "null"
+          description: Why it was made, from `kubernetes.io/change-cause`.
+        created:
+          type:
+          - string
+          - "null"
+          description: When it was made, RFC 3339.
+        current:
+          type: boolean
+          description: It is the template the workload runs now.
+        images:
+          type: array
+          items:
+            type: string
+          description: The images of its containers, in order.
+        name:
+          type: string
+          description: The ReplicaSet or ControllerRevision that holds it.
+        pods:
+          $ref: "#/components/schemas/WorkloadReleasePods"
+          description: Its pods.
+        revision:
+          type: integer
+          format: int64
+          description: Its number; higher is newer.
+        template:
+          type: object
+          description: The pod template, as the workload would hold it again after a rollback.
+        templateYaml:
+          type: string
+          description: "`template` as YAML, written as the object's YAML view writes it."
+    WorkloadReleaseList:
+      type: object
+      description: A workload's releases.
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkloadRelease"
+          description: Newest first. Jobs and CronJobs have none.
+    WorkloadReleasePods:
+      type: object
+      description: How many of a release's pods there are and how many are ready.
+      required:
+      - ready
+      - total
+      properties:
+        ready:
+          type: integer
+          format: int32
+          description: Ready.
+        total:
+          type: integer
+          format: int32
+          description: All.
+    WorkloadSummary:
+      allOf:
+      - $ref: "#/components/schemas/Classification"
+        description: Group, display name and managing resource.
+      - type: object
+        required:
+        - kind
+        - name
+        - namespace
+        - phase
+        - provenance
+        - origin
+        properties:
+          image:
+            type:
+            - string
+            - "null"
+            description: The first container's image, as a quick identifier.
+          kind:
+            $ref: "#/components/schemas/WorkloadKind"
+            description: The workload's kind.
+          name:
+            type: string
+            description: The workload's name.
+          namespace:
+            type: string
+            description: The workload's namespace.
+          origin:
+            $ref: "#/components/schemas/Origin"
+            description: The workload object.
+          phase:
+            $ref: "#/components/schemas/Phase"
+            description: The status badge.
+          provenance:
+            $ref: "#/components/schemas/Provenance"
+            description: The tool that manages the workload, if any.
+          replicas:
+            oneOf:
+            - $ref: "#/components/schemas/Replicas"
+              description: Ready and desired replicas; absent for a CronJob, which has no meaningful ratio.
+            - type: "null"
+      description: A workload as lists show it.
+tags:
+- name: identity
+  description: Who you are
+- name: cluster
+  description: The cluster and what it has installed
+- name: projects
+  description: "Projects (namespaces), their events, and changes: plan, then apply"
+- name: services
+  description: "A project's services (workloads): releases and usage history"
+- name: pods
+  description: "A pod's containers: logs, and a terminal over a WebSocket"
+- name: resources
+  description: A project's resources and objects of any kind, as YAML
+- name: settings
+  description: Engawa's own settings

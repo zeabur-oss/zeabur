@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: example/web:1.0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: demo
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop
+  namespace: demo
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: shop.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80
+    - host: api.shop.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: legacy
+  namespace: demo
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: old.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

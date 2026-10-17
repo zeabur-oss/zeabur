@@ -1,0 +1,26 @@
+{
+  "configMaps": {},
+  "secrets": {},
+  "persistentVolumeClaims": {
+    "data-postgresql-0": {
+      "ownership": "owned",
+      "owners": [
+        {
+          "kind": "StatefulSet",
+          "name": "postgresql"
+        }
+      ]
+    },
+    "data-postgresql-replica-0": {
+      "ownership": "orphan",
+      "owners": []
+    }
+  },
+  "services": {},
+  "workloads": [
+    {
+      "kind": "StatefulSet",
+      "name": "postgresql"
+    }
+  ]
+}

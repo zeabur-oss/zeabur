@@ -1,0 +1,43 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "kubernetes.io/tls",
+          "before": "Opaque",
+          "path": "type"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "13",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "name": "web-secret",
+        "plural": "secrets"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "13"
+          },
+          {
+            "op": "test",
+            "path": "/type",
+            "value": "Opaque"
+          },
+          {
+            "op": "replace",
+            "path": "/type",
+            "value": "kubernetes.io/tls"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

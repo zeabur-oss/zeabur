@@ -1,0 +1,7 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: demo
+spec:
+  replicas: 2

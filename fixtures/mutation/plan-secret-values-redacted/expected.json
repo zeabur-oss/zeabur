@@ -1,0 +1,38 @@
+{
+  "objects": [
+    {
+      "after": {
+        "data": {
+          "password": "(hidden)"
+        }
+      },
+      "changes": [
+        {
+          "path": "data.password",
+          "after": "(hidden)"
+        }
+      ],
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "5"
+          },
+          {
+            "op": "add",
+            "path": "/data/password",
+            "value": "aHVudGVyMg=="
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "secretValuesUnknown",
+      "name": "db"
+    }
+  ]
+}

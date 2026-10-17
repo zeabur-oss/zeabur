@@ -1,0 +1,125 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "before": "GREETING",
+          "path": "spec.template.spec.containers[name=app].env[name=GREETING].name"
+        },
+        {
+          "before": "greeting",
+          "path": "spec.template.spec.containers[name=app].env[name=GREETING].valueFrom.configMapKeyRef.key"
+        },
+        {
+          "before": "web-config",
+          "path": "spec.template.spec.containers[name=app].env[name=GREETING].valueFrom.configMapKeyRef.name"
+        },
+        {
+          "after": "example/web:2.0",
+          "before": "example/web:3.0",
+          "path": "spec.template.spec.containers[name=app].image"
+        },
+        {
+          "before": "/live",
+          "path": "spec.template.spec.containers[name=app].livenessProbe.httpGet.path"
+        },
+        {
+          "before": "8080",
+          "path": "spec.template.spec.containers[name=app].livenessProbe.httpGet.port"
+        },
+        {
+          "before": "8080",
+          "path": "spec.template.spec.containers[name=app].ports[containerPort=8080].containerPort"
+        },
+        {
+          "before": "256Mi",
+          "path": "spec.template.spec.containers[name=app].resources.limits.memory"
+        },
+        {
+          "before": "1",
+          "path": "spec.template.spec.containers[name=app].resources.limits.nvidia.com/gpu"
+        },
+        {
+          "before": "100m",
+          "path": "spec.template.spec.containers[name=app].resources.requests.cpu"
+        },
+        {
+          "before": "128Mi",
+          "path": "spec.template.spec.containers[name=app].resources.requests.memory"
+        },
+        {
+          "before": "1",
+          "path": "spec.template.spec.containers[name=app].resources.requests.nvidia.com/gpu"
+        },
+        {
+          "before": "/cache",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=cache].mountPath"
+        },
+        {
+          "before": "cache",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=cache].name"
+        },
+        {
+          "before": "{}",
+          "path": "spec.template.spec.volumes[name=cache].emptyDir"
+        },
+        {
+          "before": "cache",
+          "path": "spec.template.spec.volumes[name=cache].name"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template",
+            "value": {
+              "metadata": {
+                "labels": {
+                  "app": "web"
+                }
+              },
+              "spec": {
+                "containers": [
+                  {
+                    "image": "example/web:2.0",
+                    "name": "app"
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "configNotRolledBack",
+      "workload": {
+        "kind": "Deployment",
+        "name": "web"
+      }
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+description: A container waiting in CreateContainerConfigError names the Secret it reads that does not exist; the cause and fix name it.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

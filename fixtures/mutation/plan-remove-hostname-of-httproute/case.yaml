@@ -1,0 +1,8 @@
+description: "Removing one of several hostnames of an HTTPRoute removes that entry after testing it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: removeDomain
+        route: {kind: HTTPRoute, name: web}
+        hostname: old.example.test

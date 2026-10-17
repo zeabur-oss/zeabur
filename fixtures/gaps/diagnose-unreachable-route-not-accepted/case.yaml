@@ -1,0 +1,4 @@
+description: An HTTPRoute to the service whose parent did not resolve its backends (ResolvedRefs False) does not deliver requests to it.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

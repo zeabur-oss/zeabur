@@ -1,0 +1,5 @@
+description: A hostname differing only in letter case yields the same route name, so a repeated request updates the same route.
+operation: mutation.routeName
+params:
+  workload: n8n
+  hostname: N8N.Example.com

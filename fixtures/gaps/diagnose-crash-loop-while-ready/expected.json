@@ -1,0 +1,32 @@
+[
+  {
+    "kind": "crashLoop",
+    "container": "worker",
+    "pods": [
+      "worker-1"
+    ],
+    "cause": {
+      "key": "diagnosis.crashLoop.cause.exitCode",
+      "params": {
+        "container": "worker",
+        "restarts": "5",
+        "exitCode": "1",
+        "reason": "Error"
+      }
+    },
+    "why": {
+      "key": "diagnosis.crashLoop.why.backOff",
+      "params": {
+        "container": "worker",
+        "restarts": "5"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.crashLoop.fix.logs",
+      "params": {
+        "container": "worker"
+      }
+    },
+    "lastSeen": "2026-10-15T11:59:00Z"
+  }
+]

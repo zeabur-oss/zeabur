@@ -1,0 +1,21 @@
+[
+  {
+    "kind": "runFailed",
+    "container": "migrate",
+    "pods": ["migrate-x7k2p"],
+    "cause": {
+      "key": "diagnosis.runFailed.cause.exitCode",
+      "params": {"container": "migrate", "exitCode": "2", "reason": "Error", "backoffLimit": "3"}
+    },
+    "why": {
+      "key": "diagnosis.runFailed.why.gaveUp",
+      "params": {"container": "migrate", "exitCode": "2", "backoffLimit": "3"}
+    },
+    "evidence": [
+      {"kind": "Job", "name": "migrate", "fieldPath": "spec.backoffLimit", "value": "3"},
+      {"kind": "Job", "name": "migrate", "fieldPath": "status.conditions[type=Failed]", "value": "BackoffLimitExceeded"},
+      {"kind": "Pod", "name": "migrate-x7k2p", "fieldPath": "status.containerStatuses[name=migrate].state.terminated.exitCode", "value": "2"}
+    ],
+    "lastSeen": "2026-10-15T11:58:00Z"
+  }
+]

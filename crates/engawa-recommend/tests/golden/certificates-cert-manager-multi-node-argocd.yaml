@@ -1,0 +1,55 @@
+# Profile: multi-node. Apply in the namespace Argo CD runs in (argocd).
+# Argo CD reads OCI Helm charts through a repository with enableOCI.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cert-manager-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: cert-manager-oci
+  url: quay.io/jetstack/charts
+  enableOCI: "true"
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: quay.io/jetstack/charts
+    chart: cert-manager
+    targetRevision: v1.21.2
+    helm:
+      releaseName: cert-manager
+      valuesObject:
+        cainjector:
+          podDisruptionBudget:
+            enabled: true
+          replicaCount: 2
+        config:
+          apiVersion: controller.config.cert-manager.io/v1alpha1
+          enableGatewayAPI: true
+          kind: ControllerConfiguration
+        crds:
+          enabled: true
+          keep: true
+        enableCertificateOwnerRef: true
+        podDisruptionBudget:
+          enabled: true
+        replicaCount: 2
+        webhook:
+          podDisruptionBudget:
+            enabled: true
+          replicaCount: 2
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

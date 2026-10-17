@@ -1,0 +1,4 @@
+description: A Job controlled by a CronJob is one of its runs and is not listed as a workload, while a standalone Job is.
+operation: graph.attribution
+params:
+  namespace: demo

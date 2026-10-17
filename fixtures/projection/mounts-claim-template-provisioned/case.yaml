@@ -1,0 +1,4 @@
+description: Once the first ordinal's PVC exists, a volumeClaimTemplate mount takes its size, storage class and status from that PVC but keeps the template name as its claim name.
+operation: projection.mounts
+params:
+  container: postgres

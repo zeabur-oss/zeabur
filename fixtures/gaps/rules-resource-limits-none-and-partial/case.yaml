@@ -1,0 +1,4 @@
+description: A container with no resources at all is a warning (BestEffort); one missing only some requests or the memory limit is advice naming what is missing; init containers are left out.
+operation: gaps.rules
+params:
+  rules: [resource-limits]

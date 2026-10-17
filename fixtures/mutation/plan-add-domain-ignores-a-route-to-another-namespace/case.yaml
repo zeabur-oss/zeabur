@@ -1,0 +1,10 @@
+description: "An HTTPRoute whose backend is a same-named Service in another namespace does not route to the workload, so a new hostname gets a route of its own."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: web.example.test
+  gateways:
+    - {namespace: gateway, name: public}

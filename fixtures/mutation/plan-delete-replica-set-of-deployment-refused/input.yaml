@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: web-7d9f
+  namespace: demo
+  uid: rs-web
+  resourceVersion: "50"
+  ownerReferences:
+    - {apiVersion: apps/v1, kind: Deployment, name: web, uid: d-web, controller: true}
+spec:
+  selector:
+    matchLabels: {app: web}

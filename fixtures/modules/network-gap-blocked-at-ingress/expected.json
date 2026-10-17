@@ -1,0 +1,29 @@
+[
+  {
+    "gap": {
+      "rule": "blocked-connection",
+      "severity": "warning",
+      "subject": { "kind": "Deployment", "name": "api" },
+      "service": "projects/shop/services/deployment/api",
+      "message": {
+        "key": "gap.blockedConnection",
+        "params": { "from": "worker", "to": "api", "at": "ingress" }
+      },
+      "fix": {
+        "kind": "plan",
+        "id": "networkPolicy.allowFrom",
+        "params": {
+          "from": "projects/shop/services/deployment/worker",
+          "to": "projects/shop/services/deployment/api"
+        }
+      },
+      "citations": [
+        {
+          "title": "Network Policies",
+          "url": "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+        }
+      ]
+    },
+    "object": null
+  }
+]

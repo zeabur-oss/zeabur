@@ -1,0 +1,17 @@
+[
+  {
+    "target": {"kind": "volume", "name": "cache"},
+    "scheduledBy": [],
+    "lastRun": null
+  },
+  {
+    "target": {"kind": "volume", "name": "data"},
+    "scheduledBy": ["k8up:shop/nightly"],
+    "lastRun": {"name": "nightly-1", "provider": "k8up", "outcome": "succeeded"}
+  },
+  {
+    "target": {"kind": "namespace", "name": "shop"},
+    "scheduledBy": ["velero:velero/daily"],
+    "lastRun": null
+  }
+]

@@ -1,0 +1,78 @@
+name: Update toolchain
+
+# Moves the Rust nightly and flake.lock forward in one pull request, which CI then checks like any
+# other. Crates, action digests and k3s are Renovate's (renovate.json); the nightly is not, because
+# its bump must update the fenix hash in flake.nix in the same commit.
+#
+# The pull request is opened with a GitHub App token (`UPDATE_BOT_CLIENT_ID`,
+# `UPDATE_BOT_PRIVATE_KEY`; contents and pull requests read/write): one made with GITHUB_TOKEN
+# would not start CI.
+
+on:
+  schedule:
+    - cron: "0 18 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-26.04-arm
+    defaults:
+      run:
+        # An explicit bash adds pipefail, so a failing script is not hidden behind `tee`.
+        shell: bash
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app
+        with:
+          client-id: ${{ vars.UPDATE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.UPDATE_BOT_PRIVATE_KEY }}
+      # The commit's author must match its sign-off (scripts/check-dco.sh).
+      - id: bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          echo "identity=${APP_SLUG}[bot] <${id}+${APP_SLUG}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - name: Update flake.lock
+        run: nix flake update 2> "$RUNNER_TEMP/flake-update.log"
+      - name: Update the Rust nightly
+        run: nix develop --command ./scripts/bump-toolchain.sh | tee "$RUNNER_TEMP/toolchain.log"
+      - name: Describe the update
+        run: |
+          {
+            echo "Scheduled update by \`.github/workflows/update-toolchain.yml\`."
+            echo
+            echo "**Rust:** $(tail -n 1 "$RUNNER_TEMP/toolchain.log")"
+            echo
+            echo "**flake.lock:**"
+            echo '```'
+            grep -v '^warning:' "$RUNNER_TEMP/flake-update.log" || echo "no input changed"
+            echo '```'
+            echo
+            echo "A new nightly can bring new clippy lints or change a nightly-only setting"
+            echo "(CONTRIBUTING.md, \"Toolchain\"); fix those on this branch before merging."
+          } > "$RUNNER_TEMP/body.md"
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ steps.app.outputs.token }}
+          author: ${{ steps.bot.outputs.identity }}
+          committer: ${{ steps.bot.outputs.identity }}
+          signoff: true
+          branch: update/toolchain
+          delete-branch: true
+          commit-message: "chore(deps): update the Rust nightly and flake.lock"
+          title: "chore(deps): update the Rust nightly and flake.lock"
+          body-path: ${{ runner.temp }}/body.md
+          labels: dependencies

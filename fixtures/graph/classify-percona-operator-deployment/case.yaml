@@ -1,0 +1,2 @@
+description: A Deployment carrying a known database operator's control-plane label is placed in the operators group.
+operation: graph.classify

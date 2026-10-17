@@ -1,0 +1,2 @@
+description: A data StatefulSet controlled by the PostgresCluster that a PerconaPGCluster creates is shown as that cluster, by its name, in the databases group.
+operation: graph.classify

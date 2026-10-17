@@ -1,0 +1,4 @@
+description: A declared appProtocol decides the protocol even when the port name suggests another.
+operation: projection.portProtocol
+params:
+  port: tcp

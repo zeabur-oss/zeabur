@@ -1,0 +1,32 @@
+[
+  {
+    "kind": "unschedulable",
+    "container": null,
+    "pods": [
+      "api-1"
+    ],
+    "cause": {
+      "key": "diagnosis.unschedulable.cause.cpu",
+      "params": {
+        "service": "api"
+      }
+    },
+    "why": {
+      "key": "diagnosis.unschedulable.why"
+    },
+    "fix": {
+      "key": "diagnosis.unschedulable.fix.cpu",
+      "params": {
+        "service": "api"
+      }
+    },
+    "evidence": [
+      {
+        "kind": "Pod",
+        "name": "api-1",
+        "fieldPath": "status.conditions[type=PodScheduled]"
+      }
+    ],
+    "lastSeen": "2026-10-15T11:50:00Z"
+  }
+]

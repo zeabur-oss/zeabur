@@ -1,0 +1,4 @@
+description: A wildcard hostname whose remainder is a valid domain is accepted.
+operation: mutation.validateHostname
+params:
+  hostname: "*.example.com"

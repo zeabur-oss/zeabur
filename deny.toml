@@ -1,0 +1,47 @@
+# cargo-deny policy. Rationale: CONTRIBUTING.md, "Dependencies".
+
+[graph]
+# Check the dependency graph that ships in the container image.
+targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"]
+all-features = true
+
+[advisories]
+version = 2
+yanked = "deny"
+# Every ignore needs an id and the reason it is acceptable.
+ignore = []
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+# OSI-approved licences only (SPDX `isOsiApproved`).
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-3-Clause",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Zlib",
+]
+unused-allowed-license = "allow"
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace crates refer to each other by path and are never published.
+allow-wildcard-paths = true
+deny = [
+  { crate = "ring", reason = "aws-lc-rs is the only crypto backend for rustls" },
+  { crate = "aws-lc-fips-sys", reason = "FIPS is not needed; it declares the non-OSI OpenSSL licence" },
+  { crate = "openssl", reason = "no system OpenSSL; rustls only" },
+  { crate = "openssl-sys", reason = "no system OpenSSL; rustls only" },
+  { crate = "native-tls", reason = "rustls only" },
+  { crate = "webpki-roots", reason = "CDLA-Permissive-2.0 is not OSI-approved; the image ships a CA bundle" },
+  { crate = "webpki-root-certs", reason = "CDLA-Permissive-2.0 is not OSI-approved" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

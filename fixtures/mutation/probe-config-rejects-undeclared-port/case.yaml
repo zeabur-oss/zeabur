@@ -1,0 +1,8 @@
+description: A probe on a port the container does not declare is refused.
+operation: mutation.probeConfig
+params:
+  container: app
+  probe:
+    handler: HTTPGet
+    port: 8080
+    path: /healthz

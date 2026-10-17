@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+  annotations:
+    deployment.kubernetes.io/revision: "3"
+spec:
+  replicas: 2
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: example/web:3.0
+          ports:
+            - containerPort: 8080
+          env:
+            - name: GREETING
+              valueFrom:
+                configMapKeyRef: {name: web-config, key: greeting}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi, nvidia.com/gpu: "1"}
+            limits: {memory: 256Mi, nvidia.com/gpu: "1"}
+          livenessProbe:
+            httpGet: {path: /live, port: 8080}
+          volumeMounts:
+            - name: cache
+              mountPath: /cache
+      volumes:
+        - name: cache
+          emptyDir: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "70"
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: '{}'
+spec:
+  podSelector:
+    matchLabels: {app: web}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: proxy}

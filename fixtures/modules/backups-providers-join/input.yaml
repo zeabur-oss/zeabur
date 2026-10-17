@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {"name": "data", "namespace": "shop"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {"name": "cache", "namespace": "shop", "annotations": {"k8up.io/backup": "false"}}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}
+---
+apiVersion: k8up.io/v1
+kind: Schedule
+metadata:
+  name: nightly
+  namespace: shop
+spec:
+  backup:
+    schedule: "0 2 * * *"
+---
+apiVersion: k8up.io/v1
+kind: Backup
+metadata:
+  name: nightly-1
+  namespace: shop
+  creationTimestamp: "2026-10-14T02:00:00Z"
+spec: {}
+status:
+  conditions:
+    - type: Completed
+      status: "True"
+      reason: Succeeded
+      lastTransitionTime: "2026-10-14T02:03:00Z"
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: shop-fs
+  namespace: velero
+spec:
+  schedule: "0 4 * * *"
+  paused: true
+  template:
+    includedNamespaces: [shop]
+    defaultVolumesToFsBackup: true
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily
+  namespace: velero
+spec:
+  schedule: "0 3 * * *"
+  template:
+    includedNamespaces: ["*"]

@@ -1,0 +1,2 @@
+description: An Opaque Secret is user configuration.
+operation: graph.isMachinerySecret

@@ -1,0 +1,19 @@
+[
+  {
+    "kind": "crashLoop",
+    "container": "api",
+    "pods": ["api-1"],
+    "cause": {
+      "key": "diagnosis.crashLoop.cause.exitCode",
+      "params": {"container": "api", "restarts": "7", "exitCode": "2", "reason": "Error"}
+    }
+  },
+  {
+    "kind": "unreachable",
+    "container": null,
+    "cause": {
+      "key": "diagnosis.unreachable.cause.noReadyEndpoints",
+      "params": {"service": "api", "endpoint": "api"}
+    }
+  }
+]

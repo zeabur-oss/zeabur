@@ -1,0 +1,2 @@
+description: An ownerReference to a database resource that is not the controller does not make the workload part of that database.
+operation: graph.classify

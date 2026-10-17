@@ -1,0 +1,39 @@
+{
+  "policies": [
+    "deny-api"
+  ],
+  "services": [
+    {
+      "service": "projects/shop/services/deployment/web",
+      "ingressIsolated": false
+    },
+    {
+      "service": "projects/shop/services/deployment/api",
+      "selectedBy": [
+        "deny-api"
+      ],
+      "ingressIsolated": true,
+      "egressIsolated": false,
+      "fromServices": [
+        {
+          "service": "projects/shop/services/deployment/web",
+          "access": "blocked"
+        }
+      ],
+      "fromIngressController": "blocked",
+      "fromOtherNamespaces": "blocked",
+      "toDns": "allowed",
+      "toOutside": "allowed"
+    }
+  ],
+  "connections": [
+    {
+      "from": "projects/shop/services/deployment/web",
+      "to": "projects/shop/services/deployment/api",
+      "access": "blocked",
+      "blockedAt": [
+        "ingress"
+      ]
+    }
+  ]
+}

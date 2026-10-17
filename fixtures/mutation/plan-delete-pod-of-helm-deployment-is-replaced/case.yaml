@@ -1,0 +1,8 @@
+description: "A Pod a ReplicaSet controls may be deleted, even when its labels come from a Helm chart's template: its owner starts a new one, which the plan says."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: "", version: v1, resource: pods}
+        name: web-7d9f-abcde

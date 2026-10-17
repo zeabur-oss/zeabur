@@ -1,0 +1,8 @@
+description: "A workload restarted before keeps one restart annotation: the patch tests the value it has, then replaces it, so a restart made meanwhile fails the plan instead of being overwritten."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: restart
+        workload: {kind: Deployment, name: web}
+  now: "2026-10-15T08:00:00Z"

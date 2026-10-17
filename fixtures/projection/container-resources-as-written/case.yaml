@@ -1,0 +1,4 @@
+description: A container's CPU and memory requests and limits are projected as written; a side with neither is left out.
+operation: projection.containerResources
+params:
+  container: app

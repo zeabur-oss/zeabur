@@ -1,0 +1,48 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "plural": "deployments",
+        "name": "web"
+      },
+      "resourceVersion": "41",
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/env/-",
+            "value": {
+              "name": "NODE_ENV",
+              "value": "production"
+            }
+          }
+        ]
+      },
+      "changes": [
+        {
+          "path": "spec.template.spec.containers[name=app].env[name=NODE_ENV].name",
+          "after": "NODE_ENV"
+        },
+        {
+          "path": "spec.template.spec.containers[name=app].env[name=NODE_ENV].value",
+          "after": "production"
+        }
+      ]
+    }
+  ],
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "warnings": []
+}

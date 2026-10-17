@@ -1,0 +1,5 @@
+description: An egress policy that lists only one service blocks DNS and the outside, and blocks calls to other services at egress.
+operation: modules.networkReachability
+params:
+  namespace: "shop"
+  connections: [["worker", "api"], ["worker", "web"]]

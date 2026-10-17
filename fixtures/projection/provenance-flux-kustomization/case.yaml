@@ -1,0 +1,2 @@
+description: An object labelled by a Flux Kustomization is attributed to Flux and warns before edits.
+operation: projection.provenance

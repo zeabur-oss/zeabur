@@ -1,0 +1,7 @@
+[
+  {"path": "apiVersion", "after": "apps/v1"},
+  {"path": "kind", "after": "Deployment"},
+  {"path": "metadata.name", "after": "n8n"},
+  {"path": "metadata.namespace", "after": "demo"},
+  {"path": "spec.replicas", "after": "2"}
+]

@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0
+          resources:
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-1
+  namespace: demo
+  labels:
+    app: api
+spec:
+  containers:
+    - name: api
+      image: example/api:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: api
+      image: example/api:1.0
+      imageID: ""
+      ready: false
+      restartCount: 2
+      state:
+        waiting:
+          reason: CrashLoopBackOff
+      lastState:
+        terminated:
+          reason: OOMKilled
+          exitCode: 137
+          finishedAt: "2026-10-15T11:59:00Z"

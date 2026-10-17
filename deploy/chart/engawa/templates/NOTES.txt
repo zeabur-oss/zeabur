@@ -1,0 +1,10 @@
+Engawa is starting in {{ .Release.Namespace }}:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "engawa.fullname" . }}
+
+Then open {{ .Values.publicUrl }} and sign in through {{ .Values.issuer.url }}.
+{{- if not (or .Values.ingress.enabled .Values.httpRoute.enabled) }}
+
+Neither ingress.enabled nor httpRoute.enabled is set: route {{ .Values.publicUrl }} to the
+Service {{ include "engawa.fullname" . }} (port {{ .Values.service.port }}) yourself.
+{{- end }}

@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: nginx:does-not-exist
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-1
+  namespace: demo
+  labels:
+    app: web
+spec:
+  containers:
+    - name: web
+      image: nginx:does-not-exist
+status:
+  phase: Pending
+  containerStatuses:
+    - name: web
+      image: nginx:does-not-exist
+      imageID: ""
+      ready: false
+      restartCount: 0
+      state:
+        waiting:
+          reason: ImagePullBackOff
+          message: Back-off pulling image "nginx:does-not-exist"
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+metadata:
+  name: web-1.pull
+  namespace: demo
+eventTime: null
+reportingController: kubelet
+reportingInstance: node-1
+action: Pulling
+type: Warning
+reason: Failed
+note: 'Failed to pull image "nginx:does-not-exist": rpc error: code = NotFound desc = failed to pull and unpack image "docker.io/library/nginx:does-not-exist": failed to resolve reference "docker.io/library/nginx:does-not-exist": docker.io/library/nginx:does-not-exist: not found'
+regarding:
+  kind: Pod
+  name: web-1
+  namespace: demo
+  fieldPath: spec.containers{web}
+deprecatedCount: 4
+deprecatedLastTimestamp: "2026-10-15T11:59:30Z"

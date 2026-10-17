@@ -1,0 +1,14 @@
+{
+  "objects": [
+    {
+      "owners": [
+        {
+          "path": "env LOG_LEVEL of container app",
+          "managers": [
+            "kubectl-client-side-apply"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-config
+  namespace: demo
+  resourceVersion: "12"
+  labels: {app: web}
+data:
+  greeting: hello
+  colour: blue

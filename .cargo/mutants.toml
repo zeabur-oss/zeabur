@@ -1,0 +1,21 @@
+# cargo-mutants (https://mutants.rs), run weekly by .github/workflows/mutants.yml. A mutant no
+# test catches is a prompt to look at the tests of that code, not a failure: see docs/testing.md.
+
+# The features and test runner CI's test job uses.
+all_features = true
+test_tool = "nextest"
+additional_cargo_args = ["--locked"]
+
+# Each mutant runs the tests of the crate it mutates. Downstream crates' tests (the API tests over
+# a mutated planner, say) would catch more but rebuild most of the workspace for every mutant.
+
+# A mutant that makes a test loop is stopped; the floor leaves room for a slow runner.
+minimum_test_timeout = 60
+
+exclude_globs = [
+  # Test doubles and helpers: a mistake in them shows as a failing test elsewhere.
+  "crates/engawa-kube/src/memory.rs",
+  "crates/engawa-test-support/**",
+  # The kube-rs adapter is exercised by the cluster tests only, which need k3s.
+  "crates/engawa-kube/src/adapter.rs",
+]

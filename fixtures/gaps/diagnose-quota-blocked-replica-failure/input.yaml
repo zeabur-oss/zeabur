@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0
+status:
+  replicas: 0
+  conditions:
+    - type: ReplicaFailure
+      status: "True"
+      reason: FailedCreate
+      message: 'pods "api-5d8f7-x2k9q" is forbidden: exceeded quota: compute, requested: requests.cpu=500m, used: requests.cpu=2, limited: requests.cpu=2'
+      lastUpdateTime: "2026-10-15T11:55:00Z"
+      lastTransitionTime: "2026-10-15T11:55:00Z"

@@ -1,0 +1,8 @@
+[
+  {
+    "name": "web",
+    "hostnames": ["example.test", "plain.example.test"],
+    "backends": ["web"],
+    "tlsHosts": ["example.test", "www.example.test"]
+  }
+]

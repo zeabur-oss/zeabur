@@ -1,0 +1,49 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "name": "shared-uploads",
+        "plural": "persistentvolumeclaims"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "PersistentVolumeClaim",
+          "metadata": {
+            "name": "shared-uploads",
+            "namespace": "demo"
+          },
+          "spec": {
+            "accessModes": [
+              "ReadWriteMany"
+            ],
+            "resources": {
+              "requests": {
+                "storage": "5Gi"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Deployment",
+        "name": "web"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "41"},
+          {"op": "test", "path": "/spec/template/spec/containers/0/name", "value": "app"},
+          {"op": "add", "path": "/spec/template/spec/volumes/-", "value": {"name": "uploads", "persistentVolumeClaim": {"claimName": "shared-uploads"}}},
+          {"op": "add", "path": "/spec/template/spec/containers/0/volumeMounts/-", "value": {"name": "uploads", "mountPath": "/srv/uploads"}}
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}

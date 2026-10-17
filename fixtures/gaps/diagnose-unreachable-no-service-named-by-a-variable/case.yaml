@@ -1,0 +1,6 @@
+description: The web Deployment's API_URL names api by its cluster DNS name, but no Service api exists, so api cannot be reached; web's own variable naming itself does not count.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"
+  namespace: shop
+  service: api

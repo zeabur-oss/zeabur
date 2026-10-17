@@ -1,0 +1,8 @@
+description: "When the claim's PersistentVolume could not be read, the plan still says data may be lost, with the policy unknown."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: "", version: v1, resource: persistentvolumeclaims}
+        name: cache

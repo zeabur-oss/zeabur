@@ -1,0 +1,51 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "plural": "configmaps",
+        "name": "settings"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "7"
+          },
+          {
+            "op": "add",
+            "path": "/data/MODE",
+            "value": "maintenance"
+          }
+        ]
+      },
+      "changes": [
+        {
+          "path": "data.MODE",
+          "before": "production",
+          "after": "maintenance"
+        }
+      ]
+    }
+  ],
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "warnings": [
+    {
+      "code": "restartNeeded",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "web"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+description: "A quantity Kubernetes cannot parse is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "resources", "workload": {"kind": "Deployment", "name": "web"}, "limits": {"cpu": "two"}}]}}

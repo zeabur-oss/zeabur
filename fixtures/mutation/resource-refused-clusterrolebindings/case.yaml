@@ -1,0 +1,6 @@
+description: ClusterRoleBindings are refused by the raw apply endpoint because they grant privilege.
+operation: mutation.resourceAllowed
+params:
+  group: "rbac.authorization.k8s.io"
+  version: v1
+  resource: clusterrolebindings

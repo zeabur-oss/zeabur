@@ -1,0 +1,78 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "web",
+          "path": "metadata.labels.team"
+        },
+        {
+          "after": "gateway",
+          "before": "proxy",
+          "path": "spec.ingress[0].from[0].podSelector.matchLabels.app"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "70",
+      "target": {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "name": "web",
+        "plural": "networkpolicies"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "70"
+          },
+          {
+            "op": "add",
+            "path": "/metadata/labels",
+            "value": {
+              "team": "web"
+            }
+          },
+          {
+            "op": "test",
+            "path": "/spec/ingress",
+            "value": [
+              {
+                "from": [
+                  {
+                    "podSelector": {
+                      "matchLabels": {
+                        "app": "proxy"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "replace",
+            "path": "/spec/ingress",
+            "value": [
+              {
+                "from": [
+                  {
+                    "podSelector": {
+                      "matchLabels": {
+                        "app": "gateway"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

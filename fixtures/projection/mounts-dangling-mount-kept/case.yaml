@@ -1,0 +1,4 @@
+description: A volume mount with no matching volume stays visible as an ephemeral mount of unknown kind instead of being dropped.
+operation: projection.mounts
+params:
+  container: app

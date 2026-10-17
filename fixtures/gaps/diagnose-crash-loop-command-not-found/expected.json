@@ -1,0 +1,12 @@
+[
+  {
+    "kind": "crashLoop",
+    "container": "worker",
+    "pods": ["worker-7d9c-abcde"],
+    "cause": {
+      "key": "diagnosis.crashLoop.cause.commandNotFound",
+      "params": {"container": "worker", "restarts": "5", "exitCode": "127", "reason": "Error"}
+    },
+    "fix": {"key": "diagnosis.crashLoop.fix.command", "params": {"container": "worker"}}
+  }
+]

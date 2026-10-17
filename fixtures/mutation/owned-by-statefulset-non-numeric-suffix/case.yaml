@@ -1,0 +1,5 @@
+description: A claim whose suffix is not a number does not belong to the StatefulSet.
+operation: mutation.ownedByStatefulSet
+params:
+  claim: data-postgresql-primary
+  statefulSet: postgresql

@@ -1,0 +1,4 @@
+description: A container behind a Kubernetes Service without a readiness probe is a warning, worded differently when it has only a liveness probe; a worker no Service selects is left out.
+operation: gaps.rules
+params:
+  rules: [health-checks]

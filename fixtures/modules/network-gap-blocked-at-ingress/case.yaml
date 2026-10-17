@@ -1,0 +1,5 @@
+description: A policy admits only web into api, so worker's call to api (from its variables) is blocked at api's ingress; the fix is a plan creating the allow-from-worker preset.
+operation: modules.networkGaps
+params:
+  namespace: "shop"
+  connections: [["worker", "api"], ["web", "api"]]

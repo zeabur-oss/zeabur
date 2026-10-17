@@ -1,0 +1,2 @@
+description: A Deployment whose pod template, but not the Deployment itself, has the operator component label is placed in the operators group.
+operation: graph.classify

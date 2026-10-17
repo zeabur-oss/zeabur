@@ -1,0 +1,227 @@
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  lazyRouteComponent,
+  redirect,
+} from "@tanstack/react-router"
+
+import {
+  capabilitiesQuery,
+  clusterQuery,
+  clusterWarningsQuery,
+  eventsQuery,
+  namespaceQuery,
+  nodesQuery,
+  projectQuery,
+  projectsQuery,
+  queryClient,
+  recentWarningsQuery,
+  upgradesQuery,
+} from "@/api/queries"
+import { AppShell } from "@/components/app-shell"
+import { NotFound } from "@/components/not-found"
+import { RouteError, RoutePending } from "@/components/route-states"
+import {
+  validateArchitectureSearch,
+  validateComponentsSearch,
+  validateObjectsSearch,
+  validateOverviewSearch,
+  validateServiceSearch,
+  validateServicesSearch,
+} from "@/routes/search"
+
+// Routes are defined in code; each page's component loads on first visit, so the first page load
+// carries only the shell (scripts/ui-budget.sh).
+//
+//   /                                          Home: status, what needs attention, projects,
+//                                              recent warnings
+//   /cluster                                   the cluster: version, attention, nodes, warnings
+//   /cluster/components                        installed components and the catalogue
+//   /projects                                  every project and namespace
+//   /projects/$project                         Overview: what is broken, evidence, next step
+//   /projects/$project/architecture            Architecture: how the services relate
+//   /projects/$project/services                Services: search, filter, compare
+//   /projects/$project/settings                Settings: the project's details, adopted or not
+//   /projects/$project/objects                 Objects: every object by kind, ?object=… opens
+//                                              its YAML
+//   /projects/$project/services/$kind/$name    one service, ?tab=…&pod=…
+//   /settings                                  preferences, the signed-in person, About
+//   /settings/components                       moved: redirects to /cluster/components
+//   /problems/$kind                            what one kind of problem means, and what to do
+//
+// Data. Each route's loader asks TanStack Query for what its page reads, so a page opens with its
+// data instead of a loading state (and hovering a link loads it ahead, `defaultPreload`). Query
+// owns the cache: the router keeps no copy (`defaultPreloadStaleTime: 0`) and a loader never
+// fails on an answer from the cluster. A forbidden or missing project is the page's to show, in
+// place, with the rest of the page around it; the loader only waits for it.
+//
+// State. A page's own state (a revealed Secret, the log filter, the canvas's pan and zoom) belongs
+// to one project or service: `remountDeps` gives the page a fresh instance when the project or the
+// service changes, so nothing carries over to the next one.
+
+/** A query's data, from the cache when it is there. */
+const ensure: typeof queryClient.ensureQueryData = (options) => queryClient.ensureQueryData(options)
+
+/** Waits for every read; a failure is left for the page to show. */
+const load = async (...reads: Promise<unknown>[]) => {
+  await Promise.all(reads.map((read) => read.catch(() => null)))
+}
+
+/** The project document and its newest events, which every project page reads. */
+const loadProject = (project: string) =>
+  load(ensure(projectQuery(project)), ensure(eventsQuery(project)))
+
+const rootRoute = createRootRoute({
+  component: AppShell,
+  notFoundComponent: NotFound,
+})
+
+// Home: what is running and what is broken across projects. The cluster's machines have their
+// own page; one cluster for now, and `/cluster` leaves room for a list of them.
+const homeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/",
+  loader: () =>
+    load(
+      ensure(projectsQuery),
+      ensure(clusterQuery),
+      ensure(nodesQuery),
+      ensure(upgradesQuery),
+      ensure(recentWarningsQuery),
+    ),
+  component: lazyRouteComponent(() => import("@/routes/home"), "HomePage"),
+})
+
+const clusterRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cluster",
+  loader: () =>
+    load(
+      ensure(clusterQuery),
+      ensure(upgradesQuery),
+      ensure(nodesQuery),
+      ensure(clusterWarningsQuery),
+    ),
+  component: lazyRouteComponent(() => import("@/routes/cluster/page"), "ClusterPage"),
+})
+
+const projectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects",
+  loader: () => load(ensure(projectsQuery)),
+  component: lazyRouteComponent(() => import("@/routes/projects"), "ProjectsPage"),
+})
+
+const overviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project",
+  validateSearch: validateOverviewSearch,
+  loader: ({ params }) => loadProject(params.project),
+  remountDeps: ({ params }) => params.project,
+  component: lazyRouteComponent(() => import("@/routes/project/overview"), "OverviewPage"),
+})
+
+const architectureRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project/architecture",
+  validateSearch: validateArchitectureSearch,
+  loader: ({ params }) => loadProject(params.project),
+  remountDeps: ({ params }) => params.project,
+  component: lazyRouteComponent(() => import("@/routes/project/architecture"), "ArchitecturePage"),
+})
+
+const servicesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project/services",
+  validateSearch: validateServicesSearch,
+  loader: ({ params }) => load(ensure(projectQuery(params.project))),
+  remountDeps: ({ params }) => params.project,
+  component: lazyRouteComponent(() => import("@/routes/project/services"), "ServicesPage"),
+})
+
+// Objects reads a dozen or so kinds when it opens and more on demand, so its loader does not wait
+// for them: the page shows its own loading state, and reads only while it is open.
+const objectsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project/objects",
+  validateSearch: validateObjectsSearch,
+  remountDeps: ({ params }) => params.project,
+  component: lazyRouteComponent(() => import("@/routes/project/objects"), "ObjectsPage"),
+})
+
+const projectSettingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project/settings",
+  loader: ({ params }) => load(ensure(namespaceQuery(params.project))),
+  remountDeps: ({ params }) => params.project,
+  component: lazyRouteComponent(() => import("@/routes/project/settings"), "ProjectSettingsPage"),
+})
+
+const serviceRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project/services/$kind/$name",
+  validateSearch: validateServiceSearch,
+  loader: ({ params }) => loadProject(params.project),
+  remountDeps: ({ params }) => `${params.project}/${params.kind}/${params.name}`,
+  component: lazyRouteComponent(() => import("@/routes/service/page"), "ServicePage"),
+})
+
+const settingsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings",
+  component: lazyRouteComponent(() => import("@/routes/settings"), "SettingsPage"),
+})
+
+const componentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cluster/components",
+  validateSearch: validateComponentsSearch,
+  loader: () => load(ensure(clusterQuery), ensure(upgradesQuery), ensure(capabilitiesQuery)),
+  component: lazyRouteComponent(() => import("@/routes/cluster/components"), "ComponentsPage"),
+})
+
+// What each problem type means: its `type` URI is this page (RFC 9457, section 3.1.1).
+const problemRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/problems/$kind",
+  component: lazyRouteComponent(() => import("@/routes/problem"), "ProblemPage"),
+})
+
+// Components used to be a settings page; old links still arrive.
+const movedComponentsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/settings/components",
+  beforeLoad: () => {
+    throw redirect({ to: "/cluster/components", replace: true })
+  },
+})
+
+export const router = createRouter({
+  routeTree: rootRoute.addChildren([
+    homeRoute,
+    clusterRoute,
+    projectsRoute,
+    overviewRoute,
+    architectureRoute,
+    servicesRoute,
+    objectsRoute,
+    projectSettingsRoute,
+    serviceRoute,
+    settingsRoute,
+    componentsRoute,
+    problemRoute,
+    movedComponentsRoute,
+  ]),
+  defaultPreload: "intent",
+  defaultPreloadStaleTime: 0,
+  defaultPendingComponent: RoutePending,
+  defaultErrorComponent: RouteError,
+  scrollRestoration: true,
+})
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router
+  }
+}

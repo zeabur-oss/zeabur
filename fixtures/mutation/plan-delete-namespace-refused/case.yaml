@@ -1,0 +1,8 @@
+description: "A Namespace is above a project and is never deleted here."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: "", version: v1, resource: namespaces}
+        name: demo

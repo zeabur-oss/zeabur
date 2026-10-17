@@ -1,0 +1,243 @@
+//! A project: one namespace, seen as services.
+
+pub use engawa_core::data_store::DataStore;
+use serde::{Deserialize, Serialize};
+
+use crate::attribution::{Attribution, WorkloadRef};
+use crate::container::Container;
+use crate::network::{Endpoint, Route};
+use crate::provenance::Provenance;
+use crate::source::{ObjectRef, Origin};
+use crate::workload::WorkloadSummary;
+
+/// One namespace projected into services, the resources around them and how they relate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Project {
+    /// The namespace.
+    pub namespace: String,
+    /// One service per workload, sorted by kind then name.
+    pub services: Vec<Service>,
+    /// The ConfigMaps, Secrets, PVCs, Services and Ingresses, sorted by kind then name.
+    pub resources: Vec<Resource>,
+    /// Every reference from a workload to a resource, sorted.
+    pub relations: Vec<Relation>,
+    /// Which services appear to call which, sorted by source then target.
+    pub connections: Vec<Connection>,
+}
+
+/// One service appearing to call another.
+///
+/// Kubernetes has no field for "this workload talks to that one", so every connection is read
+/// from evidence and says which. It describes configuration, never observed traffic.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Connection {
+    /// The caller.
+    pub from: WorkloadRef,
+    /// The service called.
+    pub to: WorkloadRef,
+    /// True when the only evidence is text inside a variable's value, false when a reference
+    /// field of a Kubernetes object supports it.
+    pub inferred: bool,
+    /// Why the connection is drawn, sorted.
+    pub evidence: Vec<ConnectionEvidence>,
+}
+
+/// Why a [`Connection`] is drawn.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(tag = "basis", rename_all = "camelCase")]
+pub enum ConnectionEvidence {
+    /// The caller and a data store read the same Secret or ConfigMap, which usually holds the
+    /// store's address or credentials.
+    #[serde(rename_all = "camelCase")]
+    SharedObject {
+        /// The Secret or ConfigMap.
+        object: ObjectRef,
+    },
+    /// A literal variable's value names a Kubernetes Service that selects the target's pods,
+    /// such as `redis://redis:6379` or `http://api.shop.svc.cluster.local`.
+    #[serde(rename_all = "camelCase")]
+    EnvValue {
+        /// The caller's container.
+        container: String,
+        /// The variable.
+        variable: String,
+        /// The Kubernetes Service named.
+        service: String,
+    },
+}
+
+/// A workload and what it uses: what people think of as "a service".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Service {
+    /// Its resource name, `projects/<project>/services/<kind>/<name>`; see [`crate::id`].
+    pub id: String,
+    /// The workload.
+    #[serde(flatten)]
+    pub workload: WorkloadSummary,
+    /// Its health and the word for it, from the workload and its pods.
+    pub status: crate::ServiceStatus,
+    /// Its pods, sorted by name.
+    pub pods: Vec<crate::PodSummary>,
+    /// Its init and regular containers, in that order.
+    pub containers: Vec<Container>,
+    /// The Kubernetes Services selecting its pods, sorted by name.
+    pub endpoints: Vec<Endpoint>,
+    /// The Ingresses routing to those Services, sorted by name.
+    pub routes: Vec<Route>,
+    /// What kind of data store it is, when it is one: named like a well-known data store
+    /// image, in the `databases` group, or a StatefulSet with persistent storage. Image names
+    /// are a convention, so this is a hint for how to show the service, not a fact about it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_store: Option<DataStore>,
+    /// What is going wrong with it, in plain words, sorted by kind then container. The
+    /// projection leaves this empty: diagnoses need the namespace's events and the time of the
+    /// read, so the API fills it in when it serves the project document.
+    #[serde(default)]
+    pub diagnoses: Vec<crate::Diagnosis>,
+}
+
+/// The kinds of resource attributed to workloads.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+)]
+pub enum ResourceKind {
+    /// A ConfigMap.
+    ConfigMap,
+    /// An Ingress.
+    Ingress,
+    /// A persistent volume claim.
+    PersistentVolumeClaim,
+    /// A Secret: metadata and type only, never its values.
+    Secret,
+    /// A Kubernetes Service.
+    Service,
+}
+
+/// A resource of the namespace and the workloads it belongs to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Resource {
+    /// Its resource name, `projects/<project>/resources/<kind>/<name>`; see [`crate::id`].
+    pub id: String,
+    /// The resource's kind.
+    pub kind: ResourceKind,
+    /// The resource's name.
+    pub name: String,
+    /// Owned, shared or orphan, and by which workloads.
+    pub attribution: Attribution,
+    /// The tool that manages the resource, if any.
+    pub provenance: Provenance,
+    /// For a ConfigMap or Secret, how many keys it holds, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_count: Option<usize>,
+    /// The resource object.
+    pub origin: Origin,
+}
+
+/// How a workload uses a resource.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum RelationKind {
+    /// An `env` entry reads one key (`valueFrom`).
+    EnvReference,
+    /// An `envFrom` entry imports every key.
+    EnvImport,
+    /// A pod volume (directly, or as a projected volume source).
+    Volume,
+    /// A StatefulSet's claim template created the PVC (`<template>-<set>-<ordinal>`).
+    ClaimTemplate,
+    /// `imagePullSecrets`.
+    ImagePullSecret,
+    /// A Service's selector matches the workload's pod labels.
+    Selector,
+    /// An Ingress routes to a Service that selects the workload.
+    Route,
+}
+
+/// One reference between a workload and a resource.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct Relation {
+    /// The workload.
+    pub workload: WorkloadRef,
+    /// The resource.
+    pub object: ObjectRef,
+    /// How the workload uses it.
+    pub kind: RelationKind,
+    /// Where the reference is written: in the workload, or for `Selector` and `Route` in the
+    /// Service or Ingress.
+    pub origin: Origin,
+}
+
+/// The resource kinds' Kubernetes names.
+impl ResourceKind {
+    /// Every kind, in [`Ord`] order.
+    pub const ALL: [Self; 5] = [
+        Self::ConfigMap,
+        Self::Ingress,
+        Self::PersistentVolumeClaim,
+        Self::Secret,
+        Self::Service,
+    ];
+
+    /// The Kubernetes kind name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ConfigMap => "ConfigMap",
+            Self::Ingress => "Ingress",
+            Self::PersistentVolumeClaim => "PersistentVolumeClaim",
+            Self::Secret => "Secret",
+            Self::Service => "Service",
+        }
+    }
+
+    /// The kind as a path segment: lower case (`configmap`); see [`crate::id`].
+    #[must_use]
+    pub const fn segment(self) -> &'static str {
+        match self {
+            Self::ConfigMap => "configmap",
+            Self::Ingress => "ingress",
+            Self::PersistentVolumeClaim => "persistentvolumeclaim",
+            Self::Secret => "secret",
+            Self::Service => "service",
+        }
+    }
+
+    /// The kind named `text` in any case (`configmap`, `ConfigMap`).
+    #[must_use]
+    pub fn parse(text: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|kind| kind.as_str().eq_ignore_ascii_case(text))
+    }
+}

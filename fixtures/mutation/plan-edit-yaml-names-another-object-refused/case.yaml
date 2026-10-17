@@ -1,0 +1,3 @@
+description: "An edited copy naming another object is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "networking.k8s.io", "version": "v1", "resource": "networkpolicies"}, "name": "web", "yaml": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata: {name: other}\n"}]}}

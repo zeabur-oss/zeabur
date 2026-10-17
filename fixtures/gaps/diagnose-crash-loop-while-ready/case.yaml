@@ -1,0 +1,4 @@
+description: A crash-looping container in the moment it runs again (ready, restarted five times, its last run ended with exit code 1 a minute ago) is still a crash loop, and why says the cluster waits longer each time.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

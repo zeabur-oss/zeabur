@@ -1,0 +1,8 @@
+description: "A hostname that already routes somewhere in the project is refused rather than routed twice."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: shop.example.test

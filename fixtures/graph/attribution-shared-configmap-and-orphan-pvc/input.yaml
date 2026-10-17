@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: app
+          image: app:1
+          envFrom:
+            - configMapRef:
+                name: app-config
+        - name: sidecar
+          image: sidecar:1
+          envFrom:
+            - configMapRef:
+                name: app-config
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n8n
+  template:
+    metadata:
+      labels:
+        app: n8n
+    spec:
+      containers:
+        - name: app
+          image: app:1
+          envFrom:
+            - configMapRef:
+                name: app-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: demo
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: leftover-data
+  namespace: demo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: n8n
+  namespace: demo
+spec:
+  selector:
+    app: n8n

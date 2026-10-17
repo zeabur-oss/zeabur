@@ -1,0 +1,6 @@
+description: Gateways are refused by the raw apply endpoint because they are shared infrastructure.
+operation: mutation.resourceAllowed
+params:
+  group: "gateway.networking.k8s.io"
+  version: v1
+  resource: gateways

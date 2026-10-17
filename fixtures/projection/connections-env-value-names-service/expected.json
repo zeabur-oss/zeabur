@@ -1,0 +1,14 @@
+[
+  {
+    "from": { "kind": "Deployment", "name": "api" },
+    "to": { "kind": "Deployment", "name": "redis" },
+    "inferred": true,
+    "evidence": [{ "basis": "envValue", "container": "app", "variable": "REDIS_URL", "service": "cache" }]
+  },
+  {
+    "from": { "kind": "Deployment", "name": "web" },
+    "to": { "kind": "Deployment", "name": "api" },
+    "inferred": true,
+    "evidence": [{ "basis": "envValue", "container": "app", "variable": "API_URL", "service": "api" }]
+  }
+]

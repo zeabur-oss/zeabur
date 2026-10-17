@@ -1,0 +1,32 @@
+{
+  "policies": [],
+  "services": [
+    {
+      "service": "projects/shop/services/deployment/web",
+      "selectedBy": [],
+      "ingressIsolated": false,
+      "egressIsolated": false,
+      "fromIngressController": "allowed",
+      "fromOtherNamespaces": "allowed",
+      "toDns": "allowed",
+      "toOutside": "allowed"
+    },
+    {
+      "service": "projects/shop/services/deployment/api",
+      "fromServices": [
+        {
+          "service": "projects/shop/services/deployment/web",
+          "access": "allowed"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "projects/shop/services/deployment/web",
+      "to": "projects/shop/services/deployment/api",
+      "access": "allowed",
+      "blockedAt": []
+    }
+  ]
+}

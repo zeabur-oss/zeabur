@@ -1,0 +1,2 @@
+description: A Deployment whose current generation the controller has not yet observed is progressing.
+operation: graph.deploymentPhase

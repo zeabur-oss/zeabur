@@ -1,0 +1,29 @@
+{
+  "services": [
+    {
+      "service": "projects/shop/services/deployment/web",
+      "ingressIsolated": true,
+      "fromIngressController": "limited",
+      "fromOtherNamespaces": "limited",
+      "fromServices": [
+        {
+          "service": "projects/shop/services/deployment/api",
+          "access": "blocked"
+        }
+      ]
+    },
+    {
+      "service": "projects/shop/services/deployment/api"
+    }
+  ],
+  "connections": [
+    {
+      "from": "projects/shop/services/deployment/api",
+      "to": "projects/shop/services/deployment/web",
+      "access": "blocked",
+      "blockedAt": [
+        "ingress"
+      ]
+    }
+  ]
+}

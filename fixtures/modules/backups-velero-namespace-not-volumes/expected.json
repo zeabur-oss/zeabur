@@ -1,0 +1,25 @@
+[
+  {
+    "target": {
+      "kind": "volume",
+      "name": "data"
+    },
+    "scheduledBy": [],
+    "lastRun": null
+  },
+  {
+    "target": {
+      "kind": "namespace",
+      "name": "shop"
+    },
+    "scheduledBy": [
+      "velero:velero/daily"
+    ],
+    "lastRun": {
+      "name": "daily-20261014030000",
+      "provider": "velero",
+      "outcome": "partiallyFailed",
+      "finished": "2026-10-14T03:04:00Z"
+    }
+  }
+]

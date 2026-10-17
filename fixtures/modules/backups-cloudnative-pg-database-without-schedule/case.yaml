@@ -1,0 +1,4 @@
+description: Each CloudNativePG Cluster is a database target; one has a ScheduledBackup whose latest Backup failed, the other has none.
+operation: modules.backups
+params:
+  namespace: "shop"

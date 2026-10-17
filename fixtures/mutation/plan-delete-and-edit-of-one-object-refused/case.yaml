@@ -1,0 +1,11 @@
+description: "One plan does not both change and delete an object."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: scale
+        workload: {kind: Deployment, name: web}
+        replicas: 2
+      - op: delete
+        resource: {group: apps, version: v1, resource: deployments}
+        name: web

@@ -1,0 +1,6 @@
+description: A request without a volume name is refused.
+operation: mutation.validateStorage
+params:
+  request:
+    size: 5Gi
+    mountPath: /data

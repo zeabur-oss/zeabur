@@ -1,0 +1,4 @@
+description: An image the registry does not have is an image pull failure classified as not found, from the kubelet's pull event; the event is evidence.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

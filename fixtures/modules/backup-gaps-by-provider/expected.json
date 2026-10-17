@@ -1,0 +1,33 @@
+[
+  {
+    "gap": {
+      "rule": "volume-without-backup",
+      "severity": "advice",
+      "subject": { "kind": "PersistentVolumeClaim", "name": "uploads" },
+      "message": { "key": "gap.volumeWithoutBackup", "params": { "claim": "uploads" } },
+      "fix": { "kind": "snippet", "id": "backups.k8upSchedule" }
+    },
+    "object": {
+      "apiVersion": "k8up.io/v1",
+      "kind": "Schedule",
+      "metadata": { "name": "backups", "namespace": "shop" }
+    }
+  },
+  {
+    "gap": {
+      "rule": "database-without-backup",
+      "severity": "warning",
+      "subject": { "kind": "Cluster", "name": "analytics-pg" },
+      "message": {
+        "key": "gap.databaseWithoutBackup",
+        "params": { "database": "analytics-pg" }
+      },
+      "fix": { "kind": "snippet", "id": "backups.scheduledBackup" }
+    },
+    "object": {
+      "apiVersion": "postgresql.cnpg.io/v1",
+      "kind": "ScheduledBackup",
+      "spec": { "schedule": "0 0 3 * * *", "cluster": { "name": "analytics-pg" } }
+    }
+  }
+]

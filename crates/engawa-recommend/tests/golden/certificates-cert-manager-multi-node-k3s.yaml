@@ -1,0 +1,31 @@
+# Profile: multi-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: cert-manager
+  namespace: kube-system
+spec:
+  chart: oci://quay.io/jetstack/charts/cert-manager
+  version: v1.21.2
+  targetNamespace: cert-manager
+  createNamespace: true
+  valuesContent: |-
+    cainjector:
+      podDisruptionBudget:
+        enabled: true
+      replicaCount: 2
+    config:
+      apiVersion: controller.config.cert-manager.io/v1alpha1
+      enableGatewayAPI: true
+      kind: ControllerConfiguration
+    crds:
+      enabled: true
+      keep: true
+    enableCertificateOwnerRef: true
+    podDisruptionBudget:
+      enabled: true
+    replicaCount: 2
+    webhook:
+      podDisruptionBudget:
+        enabled: true
+      replicaCount: 2

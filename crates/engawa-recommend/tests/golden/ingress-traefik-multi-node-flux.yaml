@@ -1,0 +1,93 @@
+# On k3s, first disable the packaged traefik: add it to `disable` in
+# /etc/rancher/k3s/config.yaml on every server, then restart k3s.
+# That deletes the Traefik CRDs and any IngressRoute or Middleware objects;
+# Ingress traffic stops until this one runs.
+# https://docs.k3s.io/installation/packaged-components
+# Profile: multi-node. Commit to the repository Flux reconciles.
+# gateway-api-crds: apply with `kubectl apply --server-side -f`, or vendor into your repository:
+#   https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: traefik
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: oci://ghcr.io/traefik/helm/traefik
+  ref:
+    tag: 41.7.1
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: traefik
+  targetNamespace: traefik
+  install:
+    createNamespace: true
+  chartRef:
+    kind: OCIRepository
+    name: traefik
+  values:
+    accessLog:
+      enabled: true
+      fields:
+        defaultMode: drop
+        headers:
+          defaultMode: drop
+        names:
+          DownstreamContentSize: keep
+          DownstreamStatus: keep
+          Duration: keep
+          RequestContentSize: keep
+          RequestHost: keep
+          RequestMethod: keep
+          RequestPath: keep
+          RequestProtocol: keep
+          RouterName: keep
+          StartUTC: keep
+        queryParameters:
+          defaultMode: drop
+      format: json
+    api:
+      dashboard: false
+    deployment:
+      kind: DaemonSet
+    gateway:
+      enabled: false
+    gatewayClass:
+      enabled: true
+      name: traefik
+    metrics:
+      prometheus:
+        service:
+          enabled: true
+    providers:
+      kubernetesCRD:
+        allowCrossNamespace: false
+        enabled: true
+      kubernetesGateway:
+        enabled: true
+      kubernetesIngress:
+        enabled: true
+    resources:
+      limits:
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    service:
+      spec:
+        externalTrafficPolicy: Local
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/control-plane
+      operator: Exists
+    - key: CriticalAddonsOnly
+      operator: Exists

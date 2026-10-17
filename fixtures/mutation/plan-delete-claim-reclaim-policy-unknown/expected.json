@@ -1,0 +1,4 @@
+{
+  "objects": [{"write": {"type": "delete", "uid": null, "resourceVersion": "3"}}],
+  "warnings": [{"code": "claimDataMayBeLost", "claim": "cache", "volume": "pv-cache", "reclaimPolicy": null}]
+}

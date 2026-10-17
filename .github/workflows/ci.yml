@@ -1,0 +1,239 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTDOCFLAGS: -D warnings
+
+jobs:
+  check:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-26.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: format
+            run: cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh && actionlint && (cd web && bun ci && bun run fmt:check)
+          - name: clippy
+            run: cargo lint
+          - name: docs
+            run: cargo doc --workspace --no-deps --document-private-items --locked
+          - name: test
+            run: cargo nextest run --workspace --all-features --locked --no-tests=warn
+          - name: cargo-deny
+            run: cargo deny --locked check
+          - name: unsafe-report
+            run: ./scripts/unsafe-report.sh
+          - name: levels
+            run: ./scripts/check-levels.sh
+          # The web interface: banned styles, lint, unused code, build, unit tests, generated API
+          # types up to date, size budget, and a release build that embeds it.
+          - name: ui
+            run: >-
+              ./scripts/check-ui-styles.sh && ./scripts/build-ui.sh && (cd web && bun run lint && bun run knip && bun run test && bun run gen:api) &&
+              git diff --exit-code -- web/src/api/schema.d.ts && ./scripts/ui-budget.sh &&
+              ENGAWA_UI_DIST="$PWD/web/dist" cargo build --release --locked -p engawa -p engawactl &&
+              ENGAWA_UI_DIST="$PWD/web/dist" cargo nextest run --release --locked -p engawa-ui
+          # The API-only build needs no JavaScript toolchain: bun is taken off PATH.
+          - name: no-ui
+            run: ./scripts/build-without-ui.sh
+          # The Helm chart: lint, what every rendering promises, and the values it refuses.
+          - name: chart
+            run: ./scripts/check-chart.sh
+          # The interface's zh-TW wording (.zhtw-mcp.toml), in its own dev shell: zhtw-mcp builds
+          # from source, so it is not in the default shell the other jobs enter.
+          - name: zh-tw
+            shell: zh
+            run: (cd web && bun ci) && ./scripts/check-zh-tw.sh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+        with:
+          # Local runs (scripts/ci-local.sh) also substitute from the runner machine's own store;
+          # on GitHub both lines are empty.
+          extra-conf: |
+            ${{ env.ACT && vars.NIX_LOCAL_SUBSTITUTER && format('extra-substituters = {0}', vars.NIX_LOCAL_SUBSTITUTER) || '' }}
+            ${{ env.ACT && vars.NIX_LOCAL_PUBLIC_KEY && format('extra-trusted-public-keys = {0}', vars.NIX_LOCAL_PUBLIC_KEY) || '' }}
+      # rust-cache keys on `rustc -vV`: put the pinned toolchain from the dev shell on PATH first,
+      # otherwise it fails ("Command failed: rustc -vV") or keys on the image's rustc. A job in
+      # another dev shell builds no Rust.
+      - if: ${{ !matrix.shell }}
+        run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH"
+      - if: ${{ !matrix.shell }}
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: ${{ matrix.name }}
+      - run: nix develop ${{ matrix.shell && format('.#{0}', matrix.shell) || '' }} --command bash -c '${{ matrix.run }}'
+      # act's artifact server (0.2.89) rejects upload-artifact v7 requests ("unknown field mime_type").
+      - if: matrix.name == 'unsafe-report' && always() && !env.ACT
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsafe-report
+          path: target/unsafe-report.md
+
+  kubernetes:
+    name: kubernetes (k3s ${{ matrix.k3s }})
+    runs-on: ubuntu-26.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        k3s: [v1.36.5-k3s1]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+        with:
+          # Local runs (scripts/ci-local.sh) also substitute from the runner machine's own store;
+          # on GitHub both lines are empty.
+          extra-conf: |
+            ${{ env.ACT && vars.NIX_LOCAL_SUBSTITUTER && format('extra-substituters = {0}', vars.NIX_LOCAL_SUBSTITUTER) || '' }}
+            ${{ env.ACT && vars.NIX_LOCAL_PUBLIC_KEY && format('extra-trusted-public-keys = {0}', vars.NIX_LOCAL_PUBLIC_KEY) || '' }}
+      # rust-cache keys on `rustc -vV`: put the pinned toolchain from the dev shell on PATH first,
+      # otherwise it fails ("Command failed: rustc -vV") or keys on the image's rustc.
+      - run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: kubernetes
+      - name: Start k3s
+        run: |
+          nix develop --command k3d cluster create engawa --image "rancher/k3s:${{ matrix.k3s }}" --no-lb --wait --timeout 300s
+          # Docker's containerd store keeps busybox as a multi-platform index, and the k3s node's
+          # import fails on the platforms it lacks while k3d still reports success. Rebuild it as
+          # one plain image (the classic builder writes no index or attestations; the label makes
+          # it a new image rather than the same index), import that, and fail unless the node
+          # really has it.
+          docker pull busybox:1.37
+          printf 'FROM busybox:1.37\nLABEL dev.engawahq.engawa.test=busybox\n' |
+            DOCKER_BUILDKIT=0 docker build -t busybox:1.37 -
+          nix develop --command k3d image import busybox:1.37 --cluster engawa
+          docker exec k3d-engawa-server-0 crictl images | grep -q 'docker.io/library/busybox *1.37'
+      - name: Integration tests (JSON Patch writes, dry run, identity, revocation)
+        run: nix develop --command cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
+      # As k3d's cluster admin, without Genkan: nothing critical and every check runs; the exit
+      # code is the most serious status in the JSON (crates/engawactl/README.md).
+      - name: engawactl doctor (exit code and JSON)
+        run: |
+          nix develop --command cargo build --locked -p engawactl --no-default-features
+          code=0
+          nix develop --command ./target/debug/engawactl doctor --output json > target/doctor.json || code=$?
+          cat target/doctor.json
+          [[ $code -eq 0 || $code -eq 1 ]] || { echo "unexpected exit code $code"; exit 1; }
+          nix develop --command jq -e '
+            def status(name): .checks[] | select(.name == name) | .status;
+            (.checks | map(.name)) == ["cluster-version", "components", "cluster-gaps",
+              "genkan-installed", "genkan-client", "genkan-identity", "genkan-issuer-trust"]
+            and all(.checks[]; (.status | IN("ok", "warning", "critical", "skipped", "error"))
+              and (.findings | type == "array") and (.fix == null or (.fix | type == "string")))
+            and (status("components") | IN("ok", "warning"))
+            and status("genkan-installed") == "warning"
+            and status("genkan-client") == "skipped"
+          ' target/doctor.json
+          expected=$(nix develop --command jq '.checks | map(.status)
+            | if any(. == "critical") then 2 elif any(. == "warning") then 1
+              elif any(. == "error") then 3 else 0 end' target/doctor.json)
+          [[ $code -eq $expected ]] || { echo "exit code $code, expected $expected"; exit 1; }
+      - name: Browser tests (local mode, release engawactl ui with the embedded interface)
+        run: nix develop --command bash -c './scripts/build-ui.sh && ./scripts/e2e-ui.sh'
+      # The run's files go with its container (act) or need a download (GitHub); print what explains
+      # a failed browser test into the log: each test's page snapshot and the pods it looked at.
+      - name: Browser test failure context
+        if: failure()
+        run: |
+          for context in target/e2e-ui/results/*/error-context.md; do
+            [[ -f "$context" ]] || continue
+            echo "::group::$context"
+            cat "$context"
+            echo "::endgroup::"
+          done
+          nix develop --command kubectl get pods,events -A -o wide || true
+      - name: Build the image
+        run: nix develop --command ./scripts/build-image.sh engawa:ci
+      - name: Report sizes
+        if: always()
+        run: |
+          {
+            echo "### Sizes (k3s ${{ matrix.k3s }})"
+            echo "| Measure | Bytes |"
+            echo "|---|---|"
+            echo "| Image \`engawa:ci\` | $(docker image inspect --format '{{.Size}}' engawa:ci 2>/dev/null || echo n/a) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # Engawa in a cluster with Genkan, from their images and Engawa's chart, through a browser
+  # (scripts/e2e-l2.sh). Genkan is built at the commit in GENKAN_PINNED.
+  kubernetes-l2:
+    name: kubernetes-l2 (k3s ${{ matrix.k3s }})
+    runs-on: ubuntu-26.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        k3s: [v1.36.5-k3s1]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+        with:
+          # Local runs (scripts/ci-local.sh) also substitute from the runner machine's own store;
+          # on GitHub both lines are empty.
+          extra-conf: |
+            ${{ env.ACT && vars.NIX_LOCAL_SUBSTITUTER && format('extra-substituters = {0}', vars.NIX_LOCAL_SUBSTITUTER) || '' }}
+            ${{ env.ACT && vars.NIX_LOCAL_PUBLIC_KEY && format('extra-trusted-public-keys = {0}', vars.NIX_LOCAL_PUBLIC_KEY) || '' }}
+      # rust-cache keys on `rustc -vV`: put the pinned toolchain from the dev shell on PATH first,
+      # otherwise it fails ("Command failed: rustc -vV") or keys on the image's rustc.
+      - run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: kubernetes-l2
+      - id: genkan
+        run: echo "rev=$(tr -d '[:space:]' < GENKAN_PINNED)" >> "$GITHUB_OUTPUT"
+      # scripts/ci-local.sh mounts a local Genkan checkout and names it in vars.GENKAN_SRC.
+      - if: ${{ !vars.GENKAN_SRC }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: engawahq/genkan
+          ref: ${{ steps.genkan.outputs.rev }}
+          path: .genkan
+          persist-credentials: false
+      - name: End-to-end test (passkey sign-in, elevation, terminal, rights, memory, removal)
+        env:
+          GENKAN_SRC: ${{ vars.GENKAN_SRC || format('{0}/.genkan', github.workspace) }}
+          K3S_IMAGE: rancher/k3s:${{ matrix.k3s }}
+        run: |
+          # A mounted checkout belongs to another user; git (and Nix's git fetcher) refuse it
+          # unless it is marked safe.
+          git config --global --add safe.directory "$GENKAN_SRC"
+          nix develop --command ./scripts/e2e-l2.sh
+      - name: Report memory
+        if: always()
+        run: |
+          {
+            echo "### Engawa in the cluster (k3s ${{ matrix.k3s }})"
+            echo "| Measure | Bytes |"
+            echo "|---|---|"
+            echo "| Pod working set after 60 s idle | $(jq -r .pod_working_set_bytes target/e2e-l2/measurements.json 2>/dev/null || echo n/a) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  dco:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: ./scripts/check-dco.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"

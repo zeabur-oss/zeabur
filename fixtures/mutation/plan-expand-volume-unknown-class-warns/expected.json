@@ -1,0 +1,48 @@
+{
+  "impact": [
+    {
+      "kind": "StatefulSet",
+      "name": "postgresql"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "20Gi",
+          "before": "10Gi",
+          "path": "spec.resources.requests.storage"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "60",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "name": "data-postgresql-0",
+        "plural": "persistentvolumeclaims"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "60"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/resources/requests/storage",
+            "value": "20Gi"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "claim": "data-postgresql-0",
+      "code": "storageClassUnknown"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+description: Each built-in rule's fix comes with a snippet that fixes it - resources for a container without them (CronJob nests a Job template), an HTTP readiness probe on the Service's target port, and an HTTPRoute with the Ingress's hosts, paths and backends attached to the first Gateway.
+operation: gaps.snippets
+params:
+  gateways:
+    - namespace: kube-system
+      name: traefik

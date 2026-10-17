@@ -1,0 +1,7 @@
+description: A size that is not a Kubernetes quantity is refused.
+operation: mutation.validateStorage
+params:
+  request:
+    name: more
+    size: 20 gigabytes
+    mountPath: /data

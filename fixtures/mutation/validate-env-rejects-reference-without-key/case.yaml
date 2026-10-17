@@ -1,0 +1,8 @@
+description: A reference to a Secret that names no key is refused.
+operation: mutation.validateEnv
+params:
+  changes:
+    - op: set
+      name: DB
+      valueFrom:
+        secretName: postgres

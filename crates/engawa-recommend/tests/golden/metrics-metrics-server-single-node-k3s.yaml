@@ -1,0 +1,25 @@
+# On k3s, first disable the packaged metrics-server: add it to `disable` in
+# /etc/rancher/k3s/config.yaml on every server, then restart k3s.
+# The metrics API is unavailable until this one runs.
+# https://docs.k3s.io/installation/packaged-components
+# Profile: single-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/.
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: metrics-server
+  namespace: kube-system
+spec:
+  chart: metrics-server
+  repo: https://kubernetes-sigs.github.io/metrics-server
+  version: 3.14.0
+  targetNamespace: kube-system
+  createNamespace: true
+  valuesContent: |-
+    args:
+    - --metric-resolution=15s
+    resources:
+      limits:
+        memory: 128Mi
+      requests:
+        cpu: 20m
+        memory: 48Mi

@@ -1,0 +1,10 @@
+description: A value reference naming both a Secret and a ConfigMap is refused.
+operation: mutation.validateEnv
+params:
+  changes:
+    - op: set
+      name: DB
+      valueFrom:
+        secretName: a
+        configMapName: b
+        key: k

@@ -1,0 +1,8 @@
+description: "A workload no Kubernetes Service selects cannot be routed to, so a hostname for it is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: web.example.test

@@ -1,0 +1,7 @@
+description: A new volume mounted at a path no existing mount touches is accepted.
+operation: mutation.validateStorage
+params:
+  request:
+    name: logs
+    size: 5Gi
+    mountPath: /var/log/app

@@ -1,0 +1,13 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "after": null,
+      "before": {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy"},
+      "resourceVersion": "70",
+      "target": {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "name": "engawa-isolate-web", "plural": "networkpolicies"},
+      "write": {"type": "delete", "uid": "np-1", "resourceVersion": "70"}
+    }
+  ],
+  "warnings": []
+}

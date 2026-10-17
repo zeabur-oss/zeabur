@@ -1,0 +1,1103 @@
+# Dependencies that are allowed to contain `unsafe` code or link native (C/asm) code.
+# Policy: CONTRIBUTING.md, "Dependencies". scripts/unsafe-report.sh enforces it.
+#
+# `approved` is the date a maintainer approved the entry. "pending" is a proposal that does not
+# count until a maintainer replaces it with a date. Entries are keyed by crate name, not version: a version
+# bump is reviewed through the lock-file diff and the publish-age delay.
+
+# --- Cryptography: the only crypto backend (C/assembly and unsafe accepted for it).
+[[crate]]
+name = "aws-lc-rs"
+kind = "native"
+reason = "Cryptography"
+approved = "2026-10-12"
+
+[[crate]]
+name = "aws-lc-rs"
+kind = "unsafe"
+reason = "Cryptography"
+approved = "2026-10-12"
+
+[[crate]]
+name = "aws-lc-sys"
+kind = "native"
+reason = "Cryptography"
+approved = "2026-10-12"
+
+[[crate]]
+name = "aws-lc-sys"
+kind = "unsafe"
+reason = "Cryptography"
+approved = "2026-10-12"
+
+[[crate]]
+name = "zeroize"
+kind = "unsafe"
+reason = "Cryptography"
+approved = "2026-10-12"
+
+
+# --- Async runtime and OS I/O: tokio and the system-call layer beneath it. No safe-only alternative exists for an async network service.
+[[crate]]
+name = "tokio"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "mio"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "socket2"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "libc"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "errno"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "signal-hook-registry"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "pin-project-lite"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "bytes"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "slab"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "atomic-waker"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "futures-core"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "futures-task"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "futures-util"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "futures-channel"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "once_cell"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "lazy_static"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+[[crate]]
+name = "sync_wrapper"
+kind = "unsafe"
+reason = "Async runtime and OS I/O"
+approved = "2026-10-12"
+
+
+# --- HTTP server stack under axum.
+[[crate]]
+name = "hyper"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "hyper-util"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "http"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "http-body"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "http-body-util"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "httparse"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "matchit"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "mime"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "percent-encoding"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "itoa"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+[[crate]]
+name = "smallvec"
+kind = "unsafe"
+reason = "HTTP server stack under axum"
+approved = "2026-10-12"
+
+
+# --- Serialization.
+[[crate]]
+name = "serde"
+kind = "unsafe"
+reason = "Serialization"
+approved = "2026-10-12"
+
+[[crate]]
+name = "serde_core"
+kind = "unsafe"
+reason = "Serialization"
+approved = "2026-10-12"
+
+[[crate]]
+name = "serde_json"
+kind = "unsafe"
+reason = "Serialization"
+approved = "2026-10-12"
+
+[[crate]]
+name = "memchr"
+kind = "unsafe"
+reason = "Serialization"
+approved = "2026-10-12"
+
+[[crate]]
+name = "zmij"
+kind = "unsafe"
+reason = "Serialization"
+approved = "2026-10-12"
+
+
+# --- Logging.
+[[crate]]
+name = "tracing"
+kind = "unsafe"
+reason = "Logging"
+approved = "2026-10-12"
+
+[[crate]]
+name = "tracing-core"
+kind = "unsafe"
+reason = "Logging"
+approved = "2026-10-12"
+
+[[crate]]
+name = "tracing-subscriber"
+kind = "unsafe"
+reason = "Logging"
+approved = "2026-10-12"
+
+[[crate]]
+name = "sharded-slab"
+kind = "unsafe"
+reason = "Logging"
+approved = "2026-10-12"
+
+[[crate]]
+name = "thread_local"
+kind = "unsafe"
+reason = "Logging"
+approved = "2026-10-12"
+
+
+# --- Command line.
+[[crate]]
+name = "clap_lex"
+kind = "unsafe"
+reason = "Command line"
+approved = "2026-10-12"
+
+[[crate]]
+name = "anstyle"
+kind = "unsafe"
+reason = "Command line"
+approved = "2026-10-12"
+
+
+# --- Build time only: compiles aws-lc's C code or expands macros; runs on the build machine, not in the binary.
+[[crate]]
+name = "cc"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "cmake"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "jobserver"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "shlex"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "find-msvc-tools"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "proc-macro2"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "syn"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "unicode-ident"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "thiserror-impl"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "tracing-attributes"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+# --- Kubernetes client (kube-rs, k8s-openapi) and its runtime dependencies. k8s-openapi is flagged native only because it declares `links` for version detection; it has no C code
+[[crate]]
+name = "ahash"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "aho-corasick"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "allocator-api2"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "arraydeque"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "async-stream"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "backon"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "bitflags"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "derive_more"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "dyn-clone"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "either"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "encoding_rs"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "enum-ordinalize"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "event-listener"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "event-listener-strategy"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "foldhash"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "form_urlencoded"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "futures-sink"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "getrandom"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "hashbrown"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "hostname"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "jiff"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "jiff-core"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "jsonptr"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "k8s-openapi"
+kind = "native"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "k8s-openapi"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "lock_api"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "log"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "num-traits"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "openssl-probe"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "ordered-float"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "parking_lot"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "parking_lot_core"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "pin-project"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "ref-cast"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "regex"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "regex-automata"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "rustls"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "rustls-pki-types"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "rustls-platform-verifier"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "scopeguard"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "semver"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "serde-saphyr"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "simdutf8"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "subtle"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "tokio-util"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "tower-http"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "try-lock"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+[[crate]]
+name = "zerocopy"
+kind = "unsafe"
+reason = "Kubernetes client"
+approved = "2026-10-12"
+
+
+# --- Build time only: procedural macros and build helpers of the Kubernetes client; they run on the build machine, not in the binary
+[[crate]]
+name = "async-stream-impl"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "core_detect"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "darling_core"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "derive_more-impl"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "educe"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "enum-ordinalize-derive"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "futures-macro"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "pest_meta"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "pin-project-internal"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "ref-cast-impl"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+[[crate]]
+name = "rustversion"
+kind = "unsafe"
+reason = "Build time only"
+approved = "2026-10-12"
+
+# --- WebAuthn relying party (webauthn-rs 0.6) and its RustCrypto, CBOR, URL and time dependencies
+[[crate]]
+name = "aes"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "argon2"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "base16ct"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "base64"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "base64ct"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "blake2"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "block-buffer"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "block-padding"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "cipher"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "cpufeatures"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "crypto-bigint"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "data-encoding"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "deranged"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "flagset"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "generic-array"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "half"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "hybrid-array"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "icu_collections"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "icu_locale_core"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "icu_normalizer"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "icu_provider"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "idna"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "inout"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "libm"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "litemap"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "num-bigint"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "num-bigint-dig"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "pem-rfc7468"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "polyval"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "potential_utf"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "powerfmt"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "ppv-lite86"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "rand"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "rand_chacha"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "rand_core"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "serde_with"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "sha1"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "sha2"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "spin"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "stable_deref_trait"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "time"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "tinystr"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "universal-hash"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "url"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "utf8_iter"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "uuid"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "writeable"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "yoke"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "zerotrie"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+[[crate]]
+name = "zerovec"
+kind = "unsafe"
+reason = "WebAuthn relying party"
+approved = "2026-10-12"
+
+
+# --- Build time only: procedural macros and parsers used while compiling the WebAuthn stack
+[[crate]]
+name = "minimal-lexical"
+kind = "unsafe"
+reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
+approved = "2026-10-12"
+
+[[crate]]
+name = "nom"
+kind = "unsafe"
+reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
+approved = "2026-10-12"
+
+[[crate]]
+name = "synstructure"
+kind = "unsafe"
+reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
+approved = "2026-10-12"
+
+[[crate]]
+name = "time-macros"
+kind = "unsafe"
+reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
+approved = "2026-10-12"
+
+[[crate]]
+name = "yoke-derive"
+kind = "unsafe"
+reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
+approved = "2026-10-12"
+
+[[crate]]
+name = "zerocopy-derive"
+kind = "unsafe"
+reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
+approved = "2026-10-12"
+
+[[crate]]
+name = "zerovec-derive"
+kind = "unsafe"
+reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
+approved = "2026-10-12"
+
+# --- Sign-in page templates (askama).
+[[crate]]
+name = "askama"
+kind = "unsafe"
+reason = "Runtime HTML escaping. 5 sites: transmutes between str and its ASCII-only wrapper type, and from_utf8_unchecked on JSON-filter output built from str (the JSON filter is unused here)"
+approved = "2026-10-12"
+
+[[crate]]
+name = "askama_derive"
+kind = "unsafe"
+reason = "Build time only (inside the template proc macro). Same ASCII-wrapper transmutes; generated-code strings that contain the word unsafe are for filter arguments Genkan does not define"
+approved = "2026-10-12"
+
+[[crate]]
+name = "askama_parser"
+kind = "unsafe"
+reason = "Build time only (template parser in the proc macro). ASCII-wrapper transmutes and one lifetime extension of the parsed source, scoped to its owner"
+approved = "2026-10-12"
+
+[[crate]]
+name = "winnow"
+kind = "unsafe"
+reason = "Build time only (parser combinators under askama_parser). Unchecked slicing at offsets the parser has already validated"
+approved = "2026-10-12"
+
+# --- OpenAPI description (utoipa).
+[[crate]]
+name = "indexmap"
+kind = "unsafe"
+reason = "Insertion-ordered map behind utoipa's OpenAPI types (keeps paths and schemas in source order). 13 lines with `unsafe`, in its slice and raw-entry views; no build script, no native code. Widely used (also by serde_json's preserve_order and many others)."
+approved = "2026-10-14"
+
+# --- WebSocket (tungstenite), under axum's and kube's `ws` features: the browser terminal (pods/exec).
+[[crate]]
+name = "tungstenite"
+kind = "unsafe"
+reason = "WebSocket framing for the browser terminal: str::from_utf8_unchecked after its own UTF-8 validation, and align_to_mut for frame masking"
+approved = "2026-10-16"
+
+# --- Model Context Protocol (rmcp, the official SDK), for `engawactl mcp`.
+[[crate]]
+name = "chrono"
+kind = "unsafe"
+reason = "Timestamps in rmcp's protocol types (features `serde`, `now`). On Linux: one NonZeroI32::new_unchecked of a value it has checked, CStr::from_bytes_with_nul_unchecked and str::from_utf8_unchecked over time-zone data it has validated, an unsafe Send impl for Date; the rest is Windows-only"
+approved = "2026-10-16"
+
+[[crate]]
+name = "futures-executor"
+kind = "unsafe"
+reason = "Enabled by rmcp's default `futures` features (and unified with kube's futures). An UnparkMutex (unsafe Send/Sync and UnsafeCell access guarded by its atomic state) used by its thread pool and local executor; Engawa runs on tokio and calls neither"
+approved = "2026-10-16"

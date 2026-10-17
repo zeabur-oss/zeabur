@@ -1,0 +1,23 @@
+{
+  "impact": [{"kind": "Deployment", "name": "web"}],
+  "objects": [
+    {
+      "after": null,
+      "changes": [],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {"apiVersion": "apps/v1", "kind": "Deployment", "name": "web", "plural": "deployments"},
+      "write": {"type": "delete", "uid": "d-web", "resourceVersion": "41"}
+    }
+  ],
+  "warnings": [
+    {
+      "code": "deletesDependents",
+      "target": {"kind": "Deployment", "name": "web"},
+      "dependents": [
+        {"kind": "ReplicaSet", "name": "web-7d9f"},
+        {"kind": "Pod", "name": "web-7d9f-abcde"}
+      ]
+    }
+  ]
+}

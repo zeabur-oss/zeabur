@@ -1,0 +1,4 @@
+description: A Velero Schedule of every namespace covers the namespace but not its claims' data; a paused file-system schedule does not count.
+operation: modules.backups
+params:
+  namespace: "shop"

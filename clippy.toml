@@ -1,0 +1,11 @@
+# Clippy configuration. Lint levels live in Cargo.toml [workspace.lints].
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-panic-in-tests = true
+allow-dbg-in-tests = true
+allow-print-in-tests = true
+avoid-breaking-exported-api = false
+
+# Proper nouns that doc_markdown would otherwise ask to wrap in backticks.
+doc-valid-idents = ["ClusterIP", "OpenAPI", "GitOps", "ArgoCD", "HelmRelease", "HelmChart", "HTTPRoute", "ConfigMap", "ConfigMaps", "StatefulSet", "DaemonSet", "CronJob", "ReplicaSet", "ControllerRevision", "ServiceAccount", "WebSocket", "TypeScript", "JavaScript", "KubeSolo", "OpenID", "McManus", "StatefulSets", "ReplicaSets", "DaemonSets", "CronJobs", "PersistentVolumeClaim", "PersistentVolumeClaims", "PersistentVolume", "PersistentVolumes", "HTTPRoutes", "CustomResourceDefinition", "CustomResourceDefinitions", "APIService", "APIServices", "IngressClass", "GatewayClass", "SelfSubjectReview", "RoleBinding", "ClusterRole", "NetworkPolicy", "OwnerReferences", "ServiceAccounts", "HelmReleases", "CloudNativePG", "NetworkPolicies", "CodeMirror", "OpenShift", "ClusterRoleBindings", "RoleBindings", "VictoriaMetrics", "PromQL", ".."]

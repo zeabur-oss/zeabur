@@ -1,0 +1,9 @@
+description: "Editing a Deployment Helm manages is refused: the next upgrade would restore it, so the change belongs in the release values."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: env
+        workload: {kind: Deployment, name: web}
+        changes:
+          - {op: set, name: NODE_ENV, value: production}

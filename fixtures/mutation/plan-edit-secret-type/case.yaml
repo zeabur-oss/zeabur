@@ -1,0 +1,3 @@
+description: "A Secret's type edited as YAML is planned as edited, without its values (the person could not read them): kube-apiserver's dry run refuses it, since a Secret's type cannot change."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web-secret", "yaml": "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, labels: {app: web}}\ntype: kubernetes.io/tls\ndata:\n  tls.crt: (hidden)\n  tls.key: (hidden)\n"}]}}

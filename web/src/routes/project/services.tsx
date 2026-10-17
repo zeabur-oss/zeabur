@@ -1,0 +1,301 @@
+// Project › Services: every service in one table to search, filter and compare. A service's name
+// leads to its overview; a pod cell leads to that pod's logs.
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
+import { useState } from "react"
+import CaretDownIcon from "~icons/ph/caret-down"
+import CaretUpIcon from "~icons/ph/caret-up"
+import CaretUpDownIcon from "~icons/ph/caret-up-down"
+import GlobeIcon from "~icons/ph/globe"
+import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
+
+import { ReplicaBar, Segmented } from "@/components/bits"
+import { PodCells } from "@/components/pods"
+import { refusedAmong, RefusedKinds } from "@/components/refused"
+import { ServiceIcon } from "@/components/service-icon"
+import { ServiceStatus, useStatusWord } from "@/components/status"
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { useT } from "@/i18n"
+import { useHistoryIndex, useLocationText } from "@/lib/history"
+import { serviceLink } from "@/lib/place"
+import { cn } from "@/lib/utils"
+import {
+  domainsOf,
+  healthRank,
+  imageTag,
+  isHealthy,
+  needsAttention,
+  restartsOf,
+  serviceId,
+  statusOf,
+  type Project,
+  type Service,
+} from "@/model/service"
+import { ProjectData, refusedPlaces } from "@/routes/project/data"
+import { ProjectHeader } from "@/routes/project/header"
+import { validateServicesSearch, type ServicesSearch, type SortKey } from "@/routes/search"
+
+const route = getRouteApi("/projects/$project/services")
+
+export function ServicesPage() {
+  const { project } = route.useParams()
+  // The search box keeps what is typed and writes it to the URL with `replace`; after Back, Forward
+  // or a link, the table starts again from the URL so the box shows what the URL says.
+  const entry = useHistoryIndex()
+  const typed = useLocationText((search) => validateServicesSearch(search).q ?? "")
+  return (
+    <>
+      <ProjectHeader project={project} entry="services" />
+      <ProjectData project={project}>
+        {(data, unreadable) => (
+          <div className="flex flex-col gap-4 px-4 py-5 pb-16 md:px-8">
+            <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.services)} />
+            <ServicesTable key={entry} project={project} data={data} typed={typed} />
+          </div>
+        )}
+      </ProjectData>
+    </>
+  )
+}
+
+const readyRatio = (s: Service) =>
+  s.replicas ? s.replicas.ready / Math.max(s.replicas.desired, 1) : 2
+
+/** Orders two services by a column's values, smallest first. */
+function compare(key: SortKey, a: Service, b: Service): number {
+  switch (key) {
+    case "status":
+      return healthRank[statusOf(a).health] - healthRank[statusOf(b).health]
+    case "ready": {
+      return readyRatio(a) - readyRatio(b)
+    }
+    case "restarts":
+      return restartsOf(a) - restartsOf(b)
+    case "kind":
+      return a.kind.localeCompare(b.kind)
+    default:
+      return a.name.localeCompare(b.name)
+  }
+}
+
+/** The columns a first click sorts largest first: the most restarts are what a person looks for. */
+const largestFirst: ReadonlySet<SortKey> = new Set(["restarts"])
+
+function ServicesTable({
+  project,
+  data,
+  typed,
+}: {
+  project: string
+  data: Project
+  /** The search box's text in this history entry's URL. */
+  typed: string
+}) {
+  const t = useT()
+  const word = useStatusWord()
+  const search = route.useSearch()
+  const navigate = useNavigate({ from: "/projects/$project/services" })
+  // The box shows what is typed at once; the URL follows without adding history entries.
+  const [query, setQuery] = useState(typed)
+  const set = (patch: Partial<ServicesSearch>) =>
+    void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
+
+  const sort = search.sort ?? "status"
+  // `desc` in the URL turns a column's first order around. `descending` is the order of the
+  // values shown, which is what a header's aria-sort states
+  // (https://www.w3.org/TR/wai-aria-1.2/#aria-sort).
+  const descending = largestFirst.has(sort) !== (search.desc === true)
+  const kinds = [...new Set(data.services.map((s) => s.kind))].toSorted()
+  const needle = query.trim().toLowerCase()
+  const rows = data.services
+    .filter((s) => {
+      const status = statusOf(s)
+      if (search.status === "attention" && !needsAttention(status)) return false
+      if (search.status === "healthy" && !isHealthy(status)) return false
+      if (search.kind && s.kind !== search.kind) return false
+      if (!needle) return true
+      return [s.name, s.kind, s.image ?? "", word(status), ...domainsOf(s).map((d) => d.host)]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle)
+    })
+    .toSorted((a, b) => {
+      const order = compare(sort, a, b)
+      return (descending ? -order : order) || a.name.localeCompare(b.name)
+    })
+  const attention = data.services.filter((s) => needsAttention(statusOf(s))).length
+
+  const head = "px-3 py-2 text-left type-meta font-medium text-muted-foreground whitespace-nowrap"
+  const sortable = (key: SortKey, label: string, className?: string) => {
+    const active = sort === key
+    const SortIcon = active ? (descending ? CaretUpIcon : CaretDownIcon) : CaretUpDownIcon
+    return (
+      <th
+        className={cn(head, className)}
+        aria-sort={active ? (descending ? "descending" : "ascending") : undefined}
+      >
+        <button
+          type="button"
+          onClick={() =>
+            set(active ? { desc: search.desc ? undefined : true } : { sort: key, desc: undefined })
+          }
+          className="inline-flex items-center gap-1 rounded outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {label}
+          <SortIcon className={cn("size-3", !active && "opacity-40")} aria-hidden="true" />
+        </button>
+      </th>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex h-8 w-full items-center gap-2 rounded-lg border bg-background px-2.5 focus-within:ring-3 focus-within:ring-ring sm:w-64">
+          <MagnifyingGlassIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              set({ q: event.target.value || undefined })
+            }}
+            aria-label={t("services.search")}
+            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        <Segmented
+          label={t("table.status")}
+          value={search.status ?? "all"}
+          onChange={(value) => set({ status: value === "all" ? undefined : value })}
+          options={[
+            { value: "all", label: t("common.all") },
+            {
+              value: "attention",
+              label: (
+                <>
+                  {t("services.attention")}
+                  <span className="tabular-nums opacity-60">{attention}</span>
+                </>
+              ),
+            },
+            { value: "healthy", label: t("services.healthy") },
+          ]}
+        />
+        <NativeSelect
+          size="sm"
+          value={search.kind ?? ""}
+          onChange={(event) => set({ kind: event.target.value || undefined })}
+          aria-label={t("table.kind")}
+        >
+          <NativeSelectOption value="">{t("services.allKinds")}</NativeSelectOption>
+          {kinds.map((kind) => (
+            <NativeSelectOption key={kind} value={kind}>
+              {kind}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+        <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+          {t("services.count", rows.length, data.services.length)}
+        </span>
+      </div>
+
+      <div className="overflow-x-auto rounded-xl border bg-card">
+        <table className="w-full min-w-205 text-sm" aria-label={t("project.services")}>
+          <thead className="border-b bg-muted/30">
+            <tr>
+              {sortable("name", t("table.service"), "pl-4")}
+              {sortable("status", t("table.status"))}
+              <th className={head}>{t("pod.pods")}</th>
+              {sortable("ready", t("table.ready"))}
+              {sortable("restarts", t("table.restarts"), "text-right")}
+              <th className={head}>{t("table.domain")}</th>
+              {sortable("kind", t("table.kind"), "pr-4")}
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                  {t("services.noMatch")}
+                </td>
+              </tr>
+            ) : null}
+            {rows.map((service) => {
+              const status = statusOf(service)
+              const restarts = restartsOf(service)
+              const domain = domainsOf(service)[0]
+              return (
+                <tr key={serviceId(service)} className="hover:bg-muted/40">
+                  <td className="py-2 pr-3 pl-4">
+                    <Link
+                      {...serviceLink(project, service)}
+                      className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                    >
+                      <ServiceIcon service={service} size="sm" />
+                      <span className="flex min-w-0 flex-col leading-tight">
+                        <span className="font-medium hover:underline" translate="no">
+                          {service.name}
+                        </span>
+                        {service.image ? (
+                          <span
+                            className="truncate font-mono type-micro leading-tight text-muted-foreground"
+                            translate="no"
+                          >
+                            {imageTag(service.image)}
+                          </span>
+                        ) : null}
+                      </span>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2">
+                    <ServiceStatus status={status} size="sm" />
+                  </td>
+                  <td className="px-3 py-2">
+                    <PodCells service={service} project={project} />
+                  </td>
+                  <td className="px-3 py-2">
+                    {service.replicas ? (
+                      <ReplicaBar
+                        ready={service.replicas.ready}
+                        desired={service.replicas.desired}
+                      />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td
+                    className={cn(
+                      "px-3 py-2 text-right tabular-nums",
+                      restarts === 0 && "text-muted-foreground",
+                      status.health === "fail" && restarts > 0 && "font-medium text-fail",
+                    )}
+                  >
+                    {restarts}
+                  </td>
+                  <td className="max-w-52 px-3 py-2">
+                    {domain ? (
+                      <span className="flex items-center gap-1.5 text-xs">
+                        <GlobeIcon
+                          className="size-3.5 shrink-0 text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate font-mono" translate="no">
+                          {domain.host}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="py-2 pr-4 pl-3 text-xs text-muted-foreground" translate="no">
+                    {service.kind}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}

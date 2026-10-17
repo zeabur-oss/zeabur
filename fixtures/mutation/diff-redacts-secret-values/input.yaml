@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres
+  namespace: demo
+  resourceVersion: "1"
+data:
+  password: b2xk
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres
+  namespace: demo
+  resourceVersion: "2"
+data:
+  password: bmV3

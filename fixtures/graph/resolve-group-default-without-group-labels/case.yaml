@@ -1,0 +1,5 @@
+description: Labels that set neither the group nor the component land in the default group.
+operation: graph.resolveGroup
+params:
+  labels:
+    app: n8n

@@ -1,0 +1,18 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+spec:
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2026-10-01T09:00:00Z"
+    spec:
+      containers:
+        - name: app
+          image: example/web:1.0

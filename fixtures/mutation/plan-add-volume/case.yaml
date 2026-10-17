@@ -1,0 +1,3 @@
+description: "A new volume creates its claim first, then mounts it; several replicas share a ReadWriteOnce claim only on one node."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "uploads", "size": "5Gi", "mountPath": "/srv/uploads"}}]}}

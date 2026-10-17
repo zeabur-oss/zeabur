@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0
+          ports:
+            - name: http
+              containerPort: 8080
+status:
+  replicas: 1
+  unavailableReplicas: 1
+  conditions:
+    - type: Available
+      status: "False"
+      reason: MinimumReplicasUnavailable
+    - type: Progressing
+      status: "True"
+      reason: NewReplicaSetAvailable
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    app: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-1
+  namespace: demo
+  labels:
+    app: api
+spec:
+  containers:
+    - name: api
+      image: example/api:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: api
+      image: example/api:1.0
+      imageID: ""
+      ready: false
+      restartCount: 7
+      state:
+        waiting:
+          reason: CrashLoopBackOff
+      lastState:
+        terminated:
+          reason: Error
+          exitCode: 2
+          finishedAt: "2026-10-15T11:59:00Z"

@@ -1,0 +1,9 @@
+description: "A deletion that names the resourceVersion it expects (an Undo of a creation) is refused once the object has moved past it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: networking.k8s.io, version: v1, resource: networkpolicies}
+        name: engawa-isolate-web
+        resourceVersion: "70"

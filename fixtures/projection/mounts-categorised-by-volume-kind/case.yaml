@@ -1,0 +1,4 @@
+description: Mounts are categorised as persistent, config or ephemeral by volume kind, and a PVC mount shows the claim's size, access modes and storage class.
+operation: projection.mounts
+params:
+  container: postgres

@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {"name": "data", "namespace": "shop"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: daily
+  namespace: velero
+spec:
+  schedule: "0 3 * * *"
+  template:
+    includedNamespaces: ["*"]
+---
+apiVersion: velero.io/v1
+kind: Schedule
+metadata:
+  name: shop-volumes
+  namespace: velero
+spec:
+  schedule: "0 4 * * *"
+  paused: true
+  template:
+    includedNamespaces: [shop]
+    defaultVolumesToFsBackup: true
+---
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: daily-20261014030000
+  namespace: velero
+  labels: {velero.io/schedule-name: daily}
+spec:
+  includedNamespaces: ["*"]
+status:
+  phase: PartiallyFailed
+  errors: 1
+  startTimestamp: "2026-10-14T03:00:00Z"
+  completionTimestamp: "2026-10-14T03:04:00Z"

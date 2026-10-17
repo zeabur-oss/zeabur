@@ -1,0 +1,478 @@
+---
+# Source: vertical-pod-autoscaler/templates/recommender-pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender
+  namespace: vpa-system
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vertical-pod-autoscaler
+      app.kubernetes.io/instance: vpa
+      app.kubernetes.io/component: recommender
+  minAvailable: 1
+---
+# Source: vertical-pod-autoscaler/templates/recommender-serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender
+  namespace: vpa-system
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-metrics-reader
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+rules:
+  - apiGroups:
+      - "metrics.k8s.io"
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-actor
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - nodes
+      - limitranges
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+      - events.k8s.io
+    resources:
+      - events
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - patch
+      - update
+  - apiGroups:
+      - "poc.autoscaling.k8s.io"
+    resources:
+      - verticalpodautoscalers
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "autoscaling.k8s.io"
+    resources:
+      - verticalpodautoscalers
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-status-actor
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+rules:
+  - apiGroups:
+      - "autoscaling.k8s.io"
+    resources:
+      - verticalpodautoscalers/status
+    verbs:
+      - get
+      - patch
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-checkpoint-actor
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+rules:
+  - apiGroups:
+      - "poc.autoscaling.k8s.io"
+    resources:
+      - verticalpodautoscalercheckpoints
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - delete
+  - apiGroups:
+      - "autoscaling.k8s.io"
+    resources:
+      - verticalpodautoscalercheckpoints
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - delete
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-target-reader
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+rules:
+  - apiGroups:
+      - '*'
+    resources:
+      - '*/scale'
+    verbs:
+      - get
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - replicationcontrollers
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - daemonsets
+      - deployments
+      - replicasets
+      - statefulsets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+    verbs:
+      - get
+      - list
+      - watch
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterrolebindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-metrics-reader
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vpa-vertical-pod-autoscaler-recommender-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: vpa-vertical-pod-autoscaler-recommender
+    namespace: vpa-system
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterrolebindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-actor
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vpa-vertical-pod-autoscaler-recommender-actor
+subjects:
+  - kind: ServiceAccount
+    name: vpa-vertical-pod-autoscaler-recommender
+    namespace: vpa-system
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterrolebindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-status-actor
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vpa-vertical-pod-autoscaler-recommender-status-actor
+subjects:
+  - kind: ServiceAccount
+    name: vpa-vertical-pod-autoscaler-recommender
+    namespace: vpa-system
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterrolebindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-checkpoint-actor
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vpa-vertical-pod-autoscaler-recommender-checkpoint-actor
+subjects:
+  - kind: ServiceAccount
+    name: vpa-vertical-pod-autoscaler-recommender
+    namespace: vpa-system
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-clusterrolebindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-target-reader
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vpa-vertical-pod-autoscaler-recommender-target-reader
+subjects:
+  - kind: ServiceAccount
+    name: vpa-vertical-pod-autoscaler-recommender
+    namespace: vpa-system
+---
+# Source: vertical-pod-autoscaler/templates/recommender-leader-election-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-leader-locking
+  namespace: vpa-system
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+rules:
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - create
+  - apiGroups:
+      - "coordination.k8s.io"
+    resourceNames:
+      - vpa-recommender-lease
+    resources:
+      - leases
+    verbs:
+      - get
+      - watch
+      - update
+
+---
+# Source: vertical-pod-autoscaler/templates/recommender-leader-election-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender-leader-locking
+  namespace: vpa-system
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vpa-vertical-pod-autoscaler-recommender-leader-locking
+subjects:
+  - kind: ServiceAccount
+    name: vpa-vertical-pod-autoscaler-recommender
+    namespace: vpa-system
+---
+# Source: vertical-pod-autoscaler/templates/recommender-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vpa-vertical-pod-autoscaler-recommender
+  namespace: vpa-system
+  labels:
+    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    app.kubernetes.io/name: vertical-pod-autoscaler
+    app.kubernetes.io/instance: vpa
+    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: recommender
+    app.kubernetes.io/component-instance: vpa-recommender
+spec:
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vertical-pod-autoscaler
+      app.kubernetes.io/instance: vpa
+      app.kubernetes.io/component: recommender
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vertical-pod-autoscaler
+        app.kubernetes.io/instance: vpa
+        app.kubernetes.io/component: recommender
+    spec:
+      serviceAccountName: vpa-vertical-pod-autoscaler-recommender
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      containers:
+        - name: recommender
+          image: registry.k8s.io/autoscaling/vpa-recommender:1.8.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          args:
+            - --stderrthreshold=info
+            - --leader-elect=true
+            - --leader-elect-resource-namespace=vpa-system
+            - --leader-elect-resource-name=vpa-recommender-lease
+            - --leader-elect-lease-duration=15s
+            - --leader-elect-renew-deadline=10s
+            - --leader-elect-retry-period=2s
+            - --v=4
+          ports:
+            - name: prometheus
+              containerPort: 8942
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health-check
+              port: prometheus
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health-check
+              port: prometheus
+              scheme: HTTP
+            periodSeconds: 10
+            failureThreshold: 3
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - recommender
+              topologyKey: kubernetes.io/hostname
+            weight: 100

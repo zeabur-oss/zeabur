@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: standalone
+  namespace: demo
+spec:
+  template:
+    spec:
+      containers:
+        - name: task
+          image: task:1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nightly-29001
+  namespace: demo
+  ownerReferences:
+    - apiVersion: batch/v1
+      kind: CronJob
+      name: nightly
+      uid: 8a3e5c71-2b9d-4f06-a4e8-1d7b6c0f5e04
+      controller: true
+spec:
+  template:
+    spec:
+      containers:
+        - name: task
+          image: task:1

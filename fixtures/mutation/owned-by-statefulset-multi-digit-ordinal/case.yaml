@@ -1,0 +1,5 @@
+description: A claim whose ordinal has several digits belongs to the StatefulSet.
+operation: mutation.ownedByStatefulSet
+params:
+  claim: data-postgresql-12
+  statefulSet: postgresql

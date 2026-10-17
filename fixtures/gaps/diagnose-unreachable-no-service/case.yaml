@@ -1,0 +1,4 @@
+description: An Ingress and an HTTPRoute send to the Service api, but no Service of that name exists, so the healthy Deployment api cannot be reached.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

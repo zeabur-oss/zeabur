@@ -1,0 +1,13 @@
+description: A raw apply document with no name or namespace is refused rather than aimed at the path's object.
+operation: mutation.reconcileIdentity
+params:
+  resource:
+    group: apps
+    version: v1
+    resource: deployments
+  kind: Deployment
+  namespace: demo
+  name: n8n
+  body:
+    apiVersion: apps/v1
+    kind: Deployment

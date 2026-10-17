@@ -1,0 +1,5 @@
+description: A route name is the workload name followed by the hostname with dots turned into hyphens.
+operation: mutation.routeName
+params:
+  workload: n8n
+  hostname: n8n.example.com

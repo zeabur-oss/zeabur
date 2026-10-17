@@ -1,0 +1,9 @@
+{
+  "group": "backend",
+  "displayName": null,
+  "managedBy": {
+    "kind": "MongoDBCommunity",
+    "name": "mongo",
+    "engine": "MongoDB"
+  }
+}

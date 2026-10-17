@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: example/postgres:16
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: config
+              mountPath: /etc/nginx
+            - name: tls
+              mountPath: /etc/tls
+            - name: cache
+              mountPath: /cache
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-data
+        - name: config
+          configMap:
+            name: nginx-config
+        - name: tls
+          secret:
+            secretName: tls-cert
+        - name: cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: demo
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: linode-block-storage
+  resources:
+    requests:
+      storage: 20Gi

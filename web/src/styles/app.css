@@ -1,0 +1,328 @@
+/* Engawa's web interface: shadcn/ui's theme as its CLI writes it (./shadcn/theme.css; only its
+   chart colours are Engawa's), shadcn/ui's base styles and the Geist font by way of Genkan
+   (./genkan, see ./genkan/VENDORED), and Geist Mono from Vercel's release (./geist-mono, see
+   ./geist-mono/VENDORED). This file only wires them up. */
+@import "tailwindcss";
+@import "./genkan/shadcn.css";
+
+@font-face {
+  font-family: "Geist Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(./genkan/geist-latin-wght-normal.woff2) format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* The whole variable face (all scripts the release covers, 70 KiB), not a subset: copied verbatim so
+   scripts/check-geist-mono.sh can compare it with the release. Only pages that show machine values
+   load it. */
+@font-face {
+  font-family: "Geist Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(./geist-mono/geist-mono-wght.woff2) format("woff2");
+}
+
+@import "./shadcn/theme.css";
+
+/* Respect a request for less motion everywhere, including component animations (spinners,
+   collapsible panels), not only where a class says `motion-reduce:`. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Engawa's own tokens on top of shadcn/ui's theme. ─────────────────────────────────────────────
+   Brand: hinoki wood, low chroma, used only for "you are here" (the rail on the active item), the
+   wordmark and focus; never for status and never as a fill larger than a rail or a ring.
+   Status: a strong colour for glyphs and pod cells, a soft one for pill fills and a dark one for
+   pill text. Warning is yellow ochre, clearly apart from the wood. */
+:root {
+  --brand: oklch(0.519 0.09 49);
+  --brand-foreground: oklch(0.99 0.01 80);
+  /* A warm paper tint for planes (request path), never a selection. */
+  --brand-soft: oklch(0.97 0.012 75);
+  --ok: oklch(0.608 0.145 150);
+  --ok-soft: oklch(0.961 0.017 159);
+  --ok-strong: oklch(0.468 0.11 151);
+  --progress: oklch(0.58 0.17 250);
+  --progress-soft: oklch(0.96 0.02 250);
+  --progress-strong: oklch(0.47 0.14 255);
+  --warn: oklch(0.705 0.144 85);
+  --warn-soft: oklch(0.961 0.046 97);
+  --warn-strong: oklch(0.461 0.094 87);
+  --fail: oklch(0.574 0.198 28);
+  --fail-soft: oklch(0.956 0.019 22);
+  --fail-strong: oklch(0.482 0.167 28);
+  --idle: oklch(0.715 0 0);
+  --idle-soft: oklch(0.958 0.001 106);
+  --idle-strong: oklch(0.45 0 0);
+  /* Hairlines between rows, lighter than --border. */
+  --rule: oklch(0.947 0.003 68);
+  /* The ground of things laid out in space: the pod strip. */
+  --plane: oklch(0.971 0.005 78);
+  --surface: oklch(0.985 0.001 106);
+  --canvas: oklch(0.968 0.004 80);
+  --canvas-dot: oklch(0.83 0.006 80);
+  --ring: oklch(0.519 0.09 49 / 75%);
+  --sidebar: oklch(0.985 0.001 106);
+  --sidebar-border: oklch(0.922 0 0);
+}
+
+.dark {
+  --brand: oklch(0.739 0.09 60);
+  --brand-foreground: oklch(0.2 0.02 60);
+  --brand-soft: oklch(0.22 0.01 70);
+  --ok: oklch(0.725 0.154 152);
+  --ok-soft: oklch(0.257 0.04 156);
+  --ok-strong: oklch(0.813 0.123 153);
+  --progress: oklch(0.7 0.14 250);
+  --progress-soft: oklch(0.26 0.05 255);
+  --progress-strong: oklch(0.8 0.1 250);
+  --warn: oklch(0.82 0.15 92);
+  --warn-soft: oklch(0.271 0.037 92);
+  --warn-strong: oklch(0.861 0.128 94);
+  --fail: oklch(0.657 0.192 27);
+  --fail-soft: oklch(0.235 0.047 23);
+  --fail-strong: oklch(0.769 0.137 25);
+  --idle: oklch(0.542 0 0);
+  --idle-soft: oklch(0.226 0 0);
+  --idle-strong: oklch(0.757 0 0);
+  --rule: oklch(0.239 0 0);
+  --plane: oklch(0.187 0.004 85);
+  --surface: oklch(0.175 0.003 80);
+  --canvas: oklch(0.12 0.003 80);
+  --canvas-dot: oklch(0.3 0.004 80);
+  --ring: oklch(0.739 0.09 60 / 65%);
+  --sidebar: oklch(0.173 0 0);
+  --sidebar-border: oklch(1 0 0 / 8%);
+}
+
+/* Type scale. Hierarchy comes from size and colour first, weight second: Windows' CJK faces have
+   no medium weight, so text that may be Han uses 400 or 600 only. The roles are utilities
+   (`type-title` …), not `text-*` theme sizes, so that `cn` never mistakes them for colours. */
+:root {
+  --type-title: 1.5rem;
+  --type-title-leading: 1.875rem;
+  --type-heading: 0.9375rem;
+  --type-heading-leading: 1.375rem;
+  --type-body: 0.8125rem;
+  --type-body-leading: 1.25rem;
+  --type-meta: 0.75rem;
+  --type-meta-leading: 1rem;
+  --type-micro: 0.6875rem;
+  --type-micro-leading: 0.875rem;
+  --type-nano: 0.625rem;
+  --type-nano-leading: 0.875rem;
+  --type-figure: 1.125rem;
+  --type-figure-leading: 1.5rem;
+  --type-mono: 0.78125rem;
+  --font-stack-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Han text gets one step more size and leading, the system's CJK faces for the locale (Taiwan's
+   glyph forms and centred punctuation for zh-TW, clreq §2.1.2) and the quarter-em gap between
+   Han and Latin or digits from text-autospace instead of hand-typed spaces. Not self-hosted: a
+   CJK face is megabytes per weight. */
+:root:lang(zh-TW) {
+  --font-stack-sans:
+    "Geist Variable", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", ui-sans-serif, sans-serif;
+}
+:root:lang(zh-CN) {
+  --font-stack-sans:
+    "Geist Variable", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", ui-sans-serif, sans-serif;
+}
+:root:lang(zh) {
+  --type-body: 0.875rem;
+  --type-body-leading: 1.375rem;
+  --type-meta-leading: 1.125rem;
+  text-autospace: ideograph-alpha ideograph-numeric;
+}
+
+/* Every figure lines up: tables, the pod strip, counts and times. */
+html {
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-title {
+  font-size: var(--type-title);
+  line-height: var(--type-title-leading);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+@utility type-heading {
+  font-size: var(--type-heading);
+  line-height: var(--type-heading-leading);
+  font-weight: 600;
+}
+@utility type-body {
+  font-size: var(--type-body);
+  line-height: var(--type-body-leading);
+}
+@utility type-meta {
+  font-size: var(--type-meta);
+  line-height: var(--type-meta-leading);
+}
+@utility type-micro {
+  font-size: var(--type-micro);
+  line-height: var(--type-micro-leading);
+}
+/* The smallest text: counts in a tab's bubble, chart axes, key hints. Never a sentence. */
+@utility type-nano {
+  font-size: var(--type-nano);
+  line-height: var(--type-nano-leading);
+}
+@utility type-figure {
+  font-size: var(--type-figure);
+  line-height: var(--type-figure-leading);
+  font-weight: 600;
+}
+/* Machine values only: names, images, hosts, keys. Never labels. */
+@utility type-mono {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono);
+}
+
+@theme inline {
+  --font-sans: var(--font-stack-sans);
+  --font-mono:
+    "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-strong: var(--ok-strong);
+  --color-progress: var(--progress);
+  --color-progress-soft: var(--progress-soft);
+  --color-progress-strong: var(--progress-strong);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-strong: var(--warn-strong);
+  --color-fail: var(--fail);
+  --color-fail-soft: var(--fail-soft);
+  --color-fail-strong: var(--fail-strong);
+  --color-idle: var(--idle);
+  --color-idle-soft: var(--idle-soft);
+  --color-idle-strong: var(--idle-strong);
+  --color-rule: var(--rule);
+  --color-plane: var(--plane);
+  --color-surface: var(--surface);
+  --color-canvas: var(--canvas);
+  --color-canvas-dot: var(--canvas-dot);
+}
+
+/* Named sizes the Tailwind scale lacks, so that markup carries no arbitrary values (`p-[13px]`):
+   shadcn/lint's no-arbitrary-values (https://github.com/shadcn-ui/lint/blob/main/docs/rules/no-arbitrary-values.md).
+   Each is a Tailwind theme variable, so it makes the matching utility (`grid-cols-settings`). */
+@theme {
+  /* A label column and its value: settings rows. */
+  --grid-template-columns-settings: 12rem 1fr;
+  /* A term and its description (`dl`). */
+  --grid-template-columns-pairs: auto 1fr;
+  /* An event: its dot, the text, the time. */
+  --grid-template-columns-event: 0.75rem minmax(0, 1fr) auto;
+  /* A variable's name and value, and its actions. */
+  --grid-template-columns-variable: minmax(10rem, 14rem) 1fr;
+  --grid-template-columns-variable-actions: minmax(10rem, 14rem) 1fr auto;
+  /* The home page's rows: a service needing attention (name, status, counts, actions) and a
+     warning (object, reason and note, time). */
+  --grid-template-columns-attention: minmax(12rem, 1.3fr) minmax(10rem, 1fr) minmax(10rem, 1fr) auto;
+  --grid-template-columns-warning: minmax(10rem, 1fr) minmax(0, 2fr) auto;
+  /* The sidebar opening into a rail and back. */
+  --transition-property-width: width;
+  /* A tooltip above the point it describes (an edge on the Architecture canvas). */
+  --translate-tooltip: calc(100% + 0.5rem);
+  /* The ⌘K palette's list. */
+  --max-height-palette: min(60vh, 420px);
+}
+
+/* The project overview's two columns: the main one takes the room, the side one wraps under it
+   when the two no longer fit side by side. */
+@utility flex-main {
+  flex: 999 1 35rem;
+}
+@utility flex-side {
+  flex: 1 1 18.75rem;
+}
+
+/* A 1.5px ring, between `ring-1` and `ring-2`: the outline of an idle marker (a scheduled job, an
+   unused claim) with `ring-idle ring-inset`. Built like Tailwind's `ring-<n>`, so a focus ring
+   still replaces it. Not called `ring-*`: `cn` would take that for a ring colour. */
+@utility hairline-ring {
+  --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1.5px + var(--tw-ring-offset-width))
+    var(--tw-ring-color, currentcolor);
+  box-shadow:
+    var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow),
+    var(--tw-ring-shadow), var(--tw-shadow);
+}
+
+/* Small-item motion: an active marker that slides to the new item (the rail, the project column,
+   segmented controls, the tabs' underline). The marker moves by `translate` (`translate-y-(--slide-y)`,
+   the offset a custom property on the element), so nothing reflows. Only when the person has not
+   asked for less motion, like Tailwind's `motion-safe:`. */
+@utility slide {
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      translate 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      width 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+/* A panel's entrance: it slides in by a little and fades, from the side it sits on
+   (`enter-from-right`), from `@starting-style` (Tailwind's `starting:`), so it needs no script. Off
+   under reduced motion. */
+@utility enter-from-right {
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      translate 200ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 150ms ease-out;
+    @starting-style {
+      translate: 1rem 0;
+      opacity: 0;
+    }
+  }
+}
+
+@utility bg-dots {
+  background-color: var(--canvas);
+  background-image: radial-gradient(var(--canvas-dot) 1px, transparent 1.2px);
+  background-size: 20px 20px;
+}
+
+/* Diagonal hatching for "no data" areas and starting pods (colour from `currentColor`). */
+@utility bg-hatch {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in oklch, currentColor 35%, transparent) 0 1.5px,
+    transparent 1.5px 5px
+  );
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+}
+
+::selection {
+  background: color-mix(in oklch, var(--brand) 28%, transparent);
+}
+
+/* Toasts in the interface's font, descriptions muted. Sonner inserts its own <style> after this
+   sheet, so these rules carry one more type selector than the ones they override. */
+html [data-sonner-toaster] {
+  font-family: inherit;
+}
+html [data-sonner-toast][data-styled="true"] [data-description] {
+  color: var(--muted-foreground);
+}

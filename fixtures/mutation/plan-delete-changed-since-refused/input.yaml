@@ -1,0 +1,11 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: engawa-isolate-web
+  namespace: demo
+  uid: np-1
+  resourceVersion: "71"
+spec:
+  podSelector:
+    matchLabels: {app: web}
+  policyTypes: [Ingress]

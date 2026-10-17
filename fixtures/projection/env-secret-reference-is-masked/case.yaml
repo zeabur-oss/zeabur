@@ -1,0 +1,4 @@
+description: Each env entry keeps its source, and a Secret-backed variable is masked and carries no value.
+operation: projection.env
+params:
+  container: app

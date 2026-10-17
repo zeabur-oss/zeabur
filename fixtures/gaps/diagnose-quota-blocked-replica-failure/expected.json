@@ -1,0 +1,39 @@
+[
+  {
+    "kind": "quotaBlocked",
+    "container": null,
+    "pods": [],
+    "cause": {
+      "key": "diagnosis.quotaBlocked.cause",
+      "params": {
+        "service": "api",
+        "quota": "compute"
+      }
+    },
+    "why": {
+      "key": "diagnosis.quotaBlocked.why",
+      "params": {
+        "quota": "compute"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.quotaBlocked.fix",
+      "params": {
+        "service": "api",
+        "quota": "compute"
+      }
+    },
+    "evidence": [
+      {
+        "kind": "Deployment",
+        "name": "api",
+        "fieldPath": "status.conditions[type=ReplicaFailure]"
+      },
+      {
+        "kind": "ResourceQuota",
+        "name": "compute"
+      }
+    ],
+    "lastSeen": "2026-10-15T11:55:00Z"
+  }
+]

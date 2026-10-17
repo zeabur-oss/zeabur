@@ -1,0 +1,42 @@
+[
+  {
+    "kind": "configMissing",
+    "container": "api",
+    "pods": [
+      "api-1"
+    ],
+    "cause": {
+      "key": "diagnosis.configMissing.cause.object",
+      "params": {
+        "container": "api",
+        "object": "Secret",
+        "name": "db"
+      }
+    },
+    "why": {
+      "key": "diagnosis.configMissing.why",
+      "params": {
+        "container": "api"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.configMissing.fix.object",
+      "params": {
+        "container": "api",
+        "object": "Secret",
+        "name": "db"
+      }
+    },
+    "evidence": [
+      {
+        "kind": "Pod",
+        "name": "api-1",
+        "fieldPath": "status.containerStatuses[name=api].state.waiting"
+      },
+      {
+        "kind": "Secret",
+        "name": "db"
+      }
+    ]
+  }
+]

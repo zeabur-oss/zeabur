@@ -1,0 +1,4 @@
+description: A hostname containing spaces is refused.
+operation: mutation.validateHostname
+params:
+  hostname: "not a hostname"

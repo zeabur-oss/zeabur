@@ -1,0 +1,45 @@
+{
+  "configMaps": {
+    "app-config": {
+      "ownership": "shared",
+      "owners": [
+        {
+          "kind": "Deployment",
+          "name": "n8n"
+        },
+        {
+          "kind": "Deployment",
+          "name": "worker"
+        }
+      ]
+    }
+  },
+  "secrets": {},
+  "persistentVolumeClaims": {
+    "leftover-data": {
+      "ownership": "orphan",
+      "owners": []
+    }
+  },
+  "services": {
+    "n8n": {
+      "ownership": "owned",
+      "owners": [
+        {
+          "kind": "Deployment",
+          "name": "n8n"
+        }
+      ]
+    }
+  },
+  "workloads": [
+    {
+      "kind": "Deployment",
+      "name": "n8n"
+    },
+    {
+      "kind": "Deployment",
+      "name": "worker"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: app
+          image: example/api:1.0
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+              ephemeral-storage: 1Gi
+        - name: sidecar
+          image: example/proxy:1.0

@@ -1,0 +1,4 @@
+description: A volume from a Secret that does not exist leaves the container in ContainerCreating; only the pod's FailedMount event (as k3s v1.36.5 writes it) names the volume and the Secret, and an older one is not recent.
+operation: gaps.diagnose
+params:
+  now: "2026-10-17T10:10:00Z"

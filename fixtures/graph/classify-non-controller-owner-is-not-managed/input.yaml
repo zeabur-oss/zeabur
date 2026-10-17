@@ -1,0 +1,10 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cache
+  namespace: demo
+  ownerReferences:
+    - apiVersion: psmdb.percona.com/v1
+      kind: PerconaServerMongoDB
+      name: x
+      uid: 4f2d8b19-6e3c-4a7b-b1d5-9c0e2a6f3d03

@@ -1,0 +1,9 @@
+description: "Renaming a hostname replaces it in the rule and in the TLS hosts, tests the old name first, and warns that the certificate must be issued again."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: renameDomain
+        route: {kind: Ingress, name: shop}
+        from: shop.example.test
+        to: store.example.test

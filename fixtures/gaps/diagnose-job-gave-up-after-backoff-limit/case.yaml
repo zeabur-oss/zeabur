@@ -1,0 +1,4 @@
+description: A Job that stopped retrying (Failed, BackoffLimitExceeded) says it gave up after its backoffLimit, read from its spec, with the values as evidence.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

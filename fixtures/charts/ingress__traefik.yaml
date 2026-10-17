@@ -1,0 +1,431 @@
+---
+#
+# config/crd/standard/gateway.networking.k8s.io_vap_safeupgrades.yaml
+#
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  annotations:
+    gateway.networking.k8s.io/bundle-version: v1.6.2
+    gateway.networking.k8s.io/channel: standard
+  name: "safe-upgrades.gateway.networking.k8s.io"
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+    - apiGroups:   ["apiextensions.k8s.io"]
+      apiVersions: ["v1"]
+      operations:  ["CREATE", "UPDATE"]
+      resources:   ["*"]
+  validations:
+    - expression: "object.spec.group != 'gateway.networking.k8s.io' || oldObject == null || (
+        has(object.metadata.annotations) && object.metadata.annotations.exists(k, k == 'gateway.networking.k8s.io/channel') && 
+        object.metadata.annotations['gateway.networking.k8s.io/channel'] == 'standard' ) || (
+        oldObject != null && has(oldObject.metadata.annotations) && oldObject.metadata.annotations.exists(k, k == 'gateway.networking.k8s.io/channel') && 
+        oldObject.metadata.annotations['gateway.networking.k8s.io/channel'] == 'experimental' )"
+      message: "Installing experimental CRDs on top of standard channel CRDs is prohibited by default. Uninstall ValidatingAdmissionPolicy safe-upgrades.gateway.networking.k8s.io to install experimental CRDs on top of standard channel CRDs."
+      reason: Invalid
+    - expression: "object.spec.group != 'gateway.networking.k8s.io' ||
+        (has(object.metadata.annotations) && object.metadata.annotations.exists(k, k == 'gateway.networking.k8s.io/bundle-version') &&
+        (
+          matches(object.metadata.annotations['gateway.networking.k8s.io/bundle-version'], '-(rc)') ||
+          (
+            !matches(object.metadata.annotations['gateway.networking.k8s.io/bundle-version'], 'v1.[0-5].\\\\d+') &&
+            !matches(object.metadata.annotations['gateway.networking.k8s.io/bundle-version'], 'v0')
+          )
+        ))" #TODO Kubernetes 1.37: Migrate to kubernetes semver library
+      message: "Installing CRDs with version before v1.5.0 is prohibited by default. Uninstall ValidatingAdmissionPolicy safe-upgrades.gateway.networking.k8s.io to install older versions."
+      reason: Invalid
+
+---
+
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  annotations:
+    gateway.networking.k8s.io/bundle-version: v1.6.2
+    gateway.networking.k8s.io/channel: standard
+  name: safe-upgrades.gateway.networking.k8s.io
+spec:
+  policyName: safe-upgrades.gateway.networking.k8s.io
+  validationActions: [Deny]
+  matchResources:
+    resourceRules:
+    - apiGroups:   ["apiextensions.k8s.io"]
+      apiVersions: ["v1"]
+      resources:   ["customresourcedefinitions"]
+      operations:  ["CREATE", "UPDATE"]
+
+---
+# Source: traefik/templates/rbac/serviceaccount.yaml
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: traefik
+  namespace: traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+    helm.sh/chart: traefik-41.7.1
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+automountServiceAccountToken: false
+---
+# Source: traefik/templates/rbac/clusterrole.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: traefik-traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+    helm.sh/chart: traefik-41.7.1
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - nodes
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - discovery.k8s.io
+    resources:
+      - endpointslices
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - ingressclasses
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+      - networking.k8s.io
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - traefik.io
+    resources:
+      - ingressroutes
+      - ingressroutetcps
+      - ingressrouteudps
+      - middlewares
+      - middlewaretcps
+      - serverstransports
+      - serverstransporttcps
+      - tlsoptions
+      - tlsstores
+      - traefikservices
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+      - gateway.networking.k8s.io
+    resources:
+      - backendtlspolicies
+      - gatewayclasses
+      - gateways
+      - grpcroutes
+      - httproutes
+      - referencegrants
+      - tcproutes
+      - tlsroutes
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - gateway.networking.k8s.io
+    resources:
+      - backendtlspolicies/status
+      - gatewayclasses/status
+      - gateways/status
+      - grpcroutes/status
+      - httproutes/status
+      - tcproutes/status
+      - tlsroutes/status
+    verbs:
+      - update
+
+---
+# Source: traefik/templates/rbac/clusterrolebinding.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: traefik-traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+    helm.sh/chart: traefik-41.7.1
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: traefik-traefik
+subjects:
+  - kind: ServiceAccount
+    name: traefik
+    namespace: traefik
+---
+# Source: traefik/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: traefik
+  namespace: traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+    helm.sh/chart: traefik-41.7.1
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+spec:
+  externalTrafficPolicy: Local
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+  ports:
+  - port: 80
+    name: web
+    targetPort: web
+    protocol: TCP
+  - port: 443
+    name: websecure
+    targetPort: websecure
+    protocol: TCP
+---
+# Source: traefik/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: traefik
+  namespace: traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+    helm.sh/chart: traefik-41.7.1
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: traefik
+      app.kubernetes.io/instance: traefik-traefik
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  minReadySeconds: 0
+  
+  template: 
+    metadata:
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "9100"
+        prometheus.io/scrape: "true"
+      labels:
+        app.kubernetes.io/instance: traefik-traefik
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: traefik
+        helm.sh/chart: traefik-41.7.1
+    spec:
+      automountServiceAccountToken: true
+      containers:
+      - args:
+        - --entryPoints.metrics.address=:9100/tcp
+        - --entryPoints.traefik.address=:8080/tcp
+        - --entryPoints.web.address=:8000/tcp
+        - --entryPoints.websecure.address=:8443/tcp
+        - --api.dashboard=false
+        - --ping=true
+        - --metrics.prometheus=true
+        - --metrics.prometheus.entrypoint=metrics
+        - --experimental.plugins.crowdsec-bouncer.moduleName=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+        - --experimental.plugins.crowdsec-bouncer.version=v1.7.1
+        - --providers.kubernetescrd
+        - --providers.kubernetescrd.allowEmptyServices=true
+        - --providers.kubernetesingress
+        - --providers.kubernetesingress.allowEmptyServices=true
+        - --providers.kubernetesingress.ingressendpoint.publishedservice=traefik/traefik
+        - --providers.kubernetesgateway
+        - --providers.kubernetesgateway.statusaddress.service.name=traefik
+        - --providers.kubernetesgateway.statusaddress.service.namespace=traefik
+        - --entryPoints.web.http.middlewares=crowdsec-bouncer@kubernetescrd
+        - --entryPoints.websecure.http.middlewares=crowdsec-bouncer@kubernetescrd
+        - --entryPoints.websecure.http.tls=true
+        - --log.level=INFO
+        - --accesslog=true
+        - --accesslog.format=json
+        - --accesslog.fields.defaultmode=drop
+        - --accesslog.fields.names.ClientHost=keep
+        - --accesslog.fields.names.DownstreamContentSize=keep
+        - --accesslog.fields.names.DownstreamStatus=keep
+        - --accesslog.fields.names.Duration=keep
+        - --accesslog.fields.names.RequestContentSize=keep
+        - --accesslog.fields.names.RequestHost=keep
+        - --accesslog.fields.names.RequestMethod=keep
+        - --accesslog.fields.names.RequestPath=keep
+        - --accesslog.fields.names.RequestProtocol=keep
+        - --accesslog.fields.names.RouterName=keep
+        - --accesslog.fields.names.StartUTC=keep
+        - --accesslog.fields.headers.defaultmode=drop
+        - --accesslog.fields.headers.names.User-Agent=keep
+        - --accesslog.fields.queryparameters.defaultmode=drop
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: USER
+          value: traefik
+        - name: GOMEMLIMIT
+          value: 230MiB
+        image: docker.io/traefik:v3.7.14
+        imagePullPolicy: IfNotPresent
+        lifecycle: null
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /ping
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 2
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        name: traefik
+        ports:
+        - containerPort: 9100
+          name: metrics
+          protocol: TCP
+        - containerPort: 8080
+          name: traefik
+          protocol: TCP
+        - containerPort: 8000
+          name: web
+          protocol: TCP
+        - containerPort: 8443
+          name: websecure
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /ping
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 2
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 2
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /data
+          name: data
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /plugins-storage
+          name: plugins
+      hostNetwork: false
+      securityContext:
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: traefik
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - emptyDir: {}
+        name: data
+      - emptyDir: {}
+        name: tmp
+      - emptyDir: {}
+        name: plugins
+---
+# Source: traefik/templates/ingressclass.yaml
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+    helm.sh/chart: traefik-41.7.1
+    app.kubernetes.io/managed-by: Helm
+  name: traefik
+spec:
+  controller: traefik.io/ingress-controller
+---
+# Source: traefik/templates/gatewayclass.yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: traefik
+  labels:
+    app.kubernetes.io/name: traefik
+    app.kubernetes.io/instance: traefik-traefik
+    helm.sh/chart: traefik-41.7.1
+    app.kubernetes.io/managed-by: Helm
+spec:
+  controllerName: traefik.io/gateway-controller

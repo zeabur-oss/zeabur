@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: worker
+  namespace: demo
+spec:
+  serviceName: worker
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: app
+          image: example/worker:1.0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker-0
+  namespace: demo
+  creationTimestamp: "2026-10-14T08:00:00Z"
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: worker
+      uid: "1"
+spec:
+  nodeName: node-a
+  containers:
+    - name: app
+      image: example/worker:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: app
+      image: example/worker:1.0
+      imageID: ""
+      ready: true
+      restartCount: 0
+      state:
+        running:
+          startedAt: "2026-10-14T08:00:05Z"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker-1
+  namespace: demo
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: worker
+      uid: "1"
+spec:
+  containers:
+    - name: app
+      image: example/worker:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: app
+      image: example/worker:1.0
+      imageID: ""
+      ready: false
+      restartCount: 14
+      state:
+        waiting:
+          reason: CrashLoopBackOff
+      lastState:
+        terminated:
+          exitCode: 1
+          reason: Error
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker-2
+  namespace: demo
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: StatefulSet
+      name: worker
+      uid: "1"
+spec:
+  containers:
+    - name: app
+      image: example/worker:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: app
+      image: example/worker:1.0
+      imageID: ""
+      ready: false
+      restartCount: 1
+      state:
+        running:
+          startedAt: "2026-10-14T08:00:05Z"
+      lastState:
+        terminated:
+          exitCode: 137
+          reason: OOMKilled

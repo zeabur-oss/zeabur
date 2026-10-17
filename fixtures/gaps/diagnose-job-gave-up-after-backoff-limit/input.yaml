@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: demo
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: example/migrate:1.0
+status:
+  failed: 4
+  conditions:
+    - type: Failed
+      status: "True"
+      reason: BackoffLimitExceeded
+      message: Job has reached the specified backoff limit
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: migrate-x7k2p
+  namespace: demo
+  ownerReferences:
+    - apiVersion: batch/v1
+      kind: Job
+      name: migrate
+      uid: j1
+      controller: true
+spec:
+  restartPolicy: Never
+  containers:
+    - name: migrate
+      image: example/migrate:1.0
+status:
+  phase: Failed
+  containerStatuses:
+    - name: migrate
+      image: example/migrate:1.0
+      imageID: ""
+      ready: false
+      restartCount: 0
+      state:
+        terminated:
+          reason: Error
+          exitCode: 2
+          finishedAt: "2026-10-15T11:58:00Z"

@@ -1,0 +1,77 @@
+displayName: VictoriaLogs
+homepage: https://docs.victoriametrics.com/victorialogs/
+license: Apache-2.0
+maturity: independent
+rationale: >
+  Log history and search with low memory and disk use; Apache-2.0, unlike
+  Loki. Runs on the VictoriaMetrics operator.
+alternatives:
+  loki: AGPL-3.0; reused if present.
+defaults:
+  single-node: recommended
+  multi-node: recommended
+persistsData: true
+dependsOn: [observability-operator/victoria-metrics-operator]
+
+releases:
+  - name: logs
+    namespace: observability
+    manifests: |
+      # The log store.
+      apiVersion: operator.victoriametrics.com/v1
+      kind: VLSingle
+      metadata:
+        name: victoria-logs
+        namespace: observability
+      spec:
+        # Two weeks, or less when the volume reaches 8GiB of its 10Gi.
+        retentionPeriod: 14d
+        retentionMaxDiskSpaceUsageBytes: 8GiB
+        storage:
+          resources:
+            requests: {storage: 10Gi}
+        resources:
+          requests: {cpu: 50m, memory: 64Mi}
+          limits: {memory: 1Gi}
+      ---
+      # One collector per node, reading container logs.
+      apiVersion: operator.victoriametrics.com/v1
+      kind: VLAgent
+      metadata:
+        name: collector
+        namespace: observability
+      spec:
+        k8sCollector:
+          enabled: true
+          # Namespace, pod and container suffice; labels add cardinality.
+          includePodLabels: false
+        remoteWrite:
+          - url: http://vlsingle-victoria-logs.observability.svc:9428/internal/insert
+        resources:
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {memory: 256Mi}
+
+detection:
+  crds: [vlsingles.operator.victoriametrics.com]
+  helmCharts: [victoria-logs-single, victoria-logs-collector]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: vlsingle}
+    - kind: StatefulSet
+      labels: {app.kubernetes.io/name: victoria-logs-single}
+
+security:
+  summary: The collector reads pod metadata and node log files.
+  clusterWide: true
+  privileged: true
+  risks:
+    - risk: The log store holds every tenant's logs in one place.
+      mitigation: Don't expose it to tenants; query through a layer that filters by namespace.
+
+smoke:
+  - name: operational
+    wait:
+      - "-n observability vlsingle/victoria-logs --for=jsonpath={.status.updateStatus}=operational"
+      - "-n observability vlagent/collector --for=jsonpath={.status.updateStatus}=operational"
+
+leftovers: [persistentvolumeclaims]

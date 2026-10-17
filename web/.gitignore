@@ -1,0 +1,10 @@
+node_modules
+dist
+*.tsbuildinfo
+# Playwright: the session saved by e2e/launch.setup.ts, results and reports.
+e2e/.auth
+test-results
+playwright-report
+e2e/.auth
+test-results
+playwright-report

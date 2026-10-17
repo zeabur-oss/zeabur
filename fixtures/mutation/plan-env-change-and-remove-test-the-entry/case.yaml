@@ -1,0 +1,11 @@
+description: "Changing and removing existing variables tests each entry by name before touching it, so a reordered list makes the patch fail instead of editing the wrong variable."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: env
+        workload: {kind: Deployment, name: web}
+        container: app
+        changes:
+          - {op: set, name: LOG_LEVEL, value: debug}
+          - {op: remove, name: MODE}

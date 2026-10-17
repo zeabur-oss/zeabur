@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      containers:
+        - name: worker
+          image: example/worker:1.0
+          env:
+            - name: QUEUE_URL
+              value: redis://redis:6379/1
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker-1
+  namespace: demo
+  labels:
+    app: worker
+spec:
+  containers:
+    - name: worker
+      image: example/worker:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: worker
+      image: example/worker:1.0
+      imageID: ""
+      ready: true
+      restartCount: 0
+      state:
+        running:
+          startedAt: "2026-10-15T11:00:00Z"

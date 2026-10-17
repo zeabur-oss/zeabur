@@ -1,0 +1,2 @@
+description: An object carrying a Helm release annotation and managed-by label is attributed to Helm and warns before edits.
+operation: projection.provenance

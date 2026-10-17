@@ -1,0 +1,4 @@
+description: Recent Unhealthy events name which probe fails and what it printed; the container comes from the event's field path, and why names the probe's period (set) and failure threshold (the default).
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

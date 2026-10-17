@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: demo
+  resourceVersion: "1"
+  generation: 1
+  managedFields:
+    - manager: helm
+spec:
+  replicas: 1
+status:
+  readyReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: demo
+  resourceVersion: "2"
+  generation: 2
+  managedFields:
+    - manager: engawa
+spec:
+  replicas: 3
+status:
+  readyReplicas: 3

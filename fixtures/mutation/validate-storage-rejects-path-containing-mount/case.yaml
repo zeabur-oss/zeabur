@@ -1,0 +1,7 @@
+description: A new volume mounted at a parent of an existing mount is refused as overlapping.
+operation: mutation.validateStorage
+params:
+  request:
+    name: more
+    size: 5Gi
+    mountPath: /var/lib

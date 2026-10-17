@@ -1,0 +1,22 @@
+[
+  {
+    "kind": "outOfMemory",
+    "container": "api",
+    "pods": ["api-1"],
+    "cause": {
+      "key": "diagnosis.outOfMemory.cause.limit",
+      "params": {"container": "api", "limit": "128Mi"}
+    },
+    "fix": {
+      "key": "diagnosis.outOfMemory.fix.limit",
+      "params": {"container": "api", "limit": "128Mi", "restarts": "2"}
+    },
+    "evidence": [
+      {
+        "kind": "Pod",
+        "name": "api-1",
+        "fieldPath": "status.containerStatuses[name=api].lastState.terminated.reason", "value": "OOMKilled"
+      }
+    ]
+  }
+]

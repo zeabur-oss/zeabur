@@ -1,0 +1,2 @@
+description: When there is no previous object, every field of the new one is reported as added.
+operation: mutation.diff

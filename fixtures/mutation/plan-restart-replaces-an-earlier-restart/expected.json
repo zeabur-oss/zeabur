@@ -1,0 +1,22 @@
+{
+  "objects": [
+    {
+      "write": {
+        "type": "patch",
+        "operations": [
+          { "op": "test", "path": "/metadata/resourceVersion", "value": "41" },
+          {
+            "op": "test",
+            "path": "/spec/template/metadata/annotations/kubectl.kubernetes.io~1restartedAt",
+            "value": "2026-10-01T09:00:00Z"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/metadata/annotations/kubectl.kubernetes.io~1restartedAt",
+            "value": "2026-10-15T08:00:00Z"
+          }
+        ]
+      }
+    }
+  ]
+}

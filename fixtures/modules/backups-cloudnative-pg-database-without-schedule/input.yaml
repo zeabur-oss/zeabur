@@ -1,0 +1,39 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg
+  namespace: shop
+spec:
+  instances: 1
+  storage: {size: 1Gi}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: analytics-pg
+  namespace: shop
+spec:
+  instances: 1
+  storage: {size: 1Gi}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: pg-daily
+  namespace: shop
+spec:
+  schedule: "0 0 2 * * *"
+  cluster: {name: pg}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: pg-daily-20261014020000
+  namespace: shop
+spec:
+  cluster: {name: pg}
+status:
+  phase: failed
+  error: "can't upload: access denied"
+  startedAt: "2026-10-14T02:00:00Z"
+  stoppedAt: "2026-10-14T02:00:30Z"

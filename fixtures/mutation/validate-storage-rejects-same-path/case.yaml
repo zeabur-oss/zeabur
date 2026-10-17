@@ -1,0 +1,7 @@
+description: A new volume mounted at a path that is already mounted is refused.
+operation: mutation.validateStorage
+params:
+  request:
+    name: more
+    size: 5Gi
+    mountPath: /var/lib/postgresql/data

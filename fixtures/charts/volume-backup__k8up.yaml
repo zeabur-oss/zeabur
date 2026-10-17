@@ -1,0 +1,472 @@
+---
+# Source: k8up/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8up
+  namespace: k8up-system
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: k8up/templates/executor-clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: 'k8up-executor'
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - ""
+    resources:
+      - pods/exec
+    verbs:
+      - create
+      - get
+  - apiGroups:
+      - k8up.io
+    resources:
+      - snapshots
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+---
+# Source: k8up/templates/operator-clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: 'k8up-manager'
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+      - persistentvolumes
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - list
+      - update
+  - apiGroups:
+      - k8up.io
+    resources:
+      - archives
+      - backups
+      - checks
+      - effectiveschedules
+      - prebackuppods
+      - prunes
+      - restores
+      - schedules
+      - snapshots
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - k8up.io
+    resources:
+      - archives/finalizers
+      - archives/status
+      - backups/finalizers
+      - backups/status
+      - checks/finalizers
+      - checks/status
+      - prebackuppods/finalizers
+      - prebackuppods/status
+      - prunes/finalizers
+      - prunes/status
+      - restores/finalizers
+      - restores/status
+      - schedules/finalizers
+      - schedules/status
+      - snapshots/finalizers
+      - snapshots/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - k8up.io
+    resources:
+      - effectiveschedules/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - k8up.io
+    resources:
+      - podconfigs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resourceNames:
+      - k8up-executor
+    resources:
+      - clusterroles
+    verbs:
+      - bind
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - rolebindings
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - update
+      - watch
+---
+# Source: k8up/templates/user-clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+  name: k8up-edit
+rules:
+- apiGroups:
+  - k8up.io
+  resources:
+  - '*'
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+---
+# Source: k8up/templates/user-clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+  name: k8up-view
+rules:
+- apiGroups:
+  - k8up.io
+  resources:
+  - '*'
+  verbs:
+  - get
+  - list
+  - watch
+---
+# Source: k8up/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8up
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8up-manager
+subjects:
+- kind: ServiceAccount
+  name: k8up
+  namespace: k8up-system
+
+---
+# Source: k8up/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8up-metrics
+  namespace: k8up-system
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+
+---
+# Source: k8up/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8up
+  namespace: k8up-system
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: k8up
+      app.kubernetes.io/instance: k8up
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k8up
+        app.kubernetes.io/instance: k8up
+    spec:
+      securityContext:
+        {}
+      containers:
+        - name: k8up-operator
+          image: "ghcr.io/k8up-io/k8up:v2.16.0"
+          imagePullPolicy: IfNotPresent
+          args: [ operator ]
+          env:
+            - name: BACKUP_IMAGE
+              value: "ghcr.io/k8up-io/k8up:v2.16.0"
+            - name: BACKUP_ENABLE_LEADER_ELECTION
+              value: "false"
+            - name: BACKUP_SKIP_WITHOUT_ANNOTATION
+              value: "true"
+            - name: BACKUP_GLOBAL_SKIP_SNAPSHOT_SYNC
+              value: "false"
+            - name: BACKUP_OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          ports:
+            - name: http
+              containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /metrics
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          securityContext:
+            {}
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+      serviceAccountName: k8up
+---
+# Source: k8up/templates/cleanup-hook.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cleanup-service-account
+  namespace: k8up-system
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade,post-delete
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+
+
+---
+# Source: k8up/templates/cleanup-hook.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8up-cleanup-roles
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade,post-delete
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - namespaces
+    verbs:
+      - get
+      - list
+  - apiGroups:
+      - "rbac.authorization.k8s.io"
+    resources:
+      - rolebindings
+      - roles
+    verbs:
+      - delete
+
+
+---
+# Source: k8up/templates/cleanup-hook.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cleanup-rolebinding
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade,post-delete
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8up-cleanup-roles
+subjects:
+- kind: ServiceAccount
+  name: cleanup-service-account
+  namespace: k8up-system
+
+
+---
+# Source: k8up/templates/cleanup-hook.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "k8up-cleanup"
+  namespace: k8up-system
+  labels:
+    helm.sh/chart: k8up-4.10.0
+    app.kubernetes.io/name: k8up
+    app.kubernetes.io/instance: k8up
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade,post-delete
+    "helm.sh/hook-weight": "4"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      name: "k8up"
+      labels:
+        app.kubernetes.io/name: k8up
+        app.kubernetes.io/instance: k8up
+    spec:
+      restartPolicy: Never
+      serviceAccountName: cleanup-service-account
+      securityContext:
+        {}
+      containers:
+      - name: "k8up-cleanup"
+        image: "ghcr.io/k8up-io/k8up:v2.16.0"
+        imagePullPolicy: IfNotPresent
+        command:
+          - sh
+          - -c
+        args:
+          - |
+            set -eo pipefail
+
+            NAMESPACES=$(kubectl get namespace -ojson | jq -r '.items[].metadata.name')
+
+            for ns in $NAMESPACES
+            do
+              kubectl -n "$ns" delete rolebinding pod-executor-namespaced --ignore-not-found=true
+              kubectl -n "$ns" delete role pod-executor --ignore-not-found=true
+            done
+        securityContext:
+            {}
+

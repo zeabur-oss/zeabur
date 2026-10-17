@@ -1,0 +1,3 @@
+description: "A mount is moved and made read-only, behind a test of its current path."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "editMount", "workload": {"kind": "Deployment", "name": "web"}, "mountPath": "/cache", "newMountPath": "/tmp/cache", "readOnly": true}]}}

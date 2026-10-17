@@ -1,0 +1,3 @@
+description: "A request above its limit is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "resources", "workload": {"kind": "Deployment", "name": "web"}, "requests": {"memory": "1Gi"}, "limits": {"memory": "512Mi"}}]}}

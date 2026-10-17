@@ -1,0 +1,55 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "(hidden)",
+          "path": "data.api-key"
+        },
+        {
+          "before": "(hidden)",
+          "path": "data.old"
+        },
+        {
+          "after": "(hidden)",
+          "before": "(hidden)",
+          "path": "data.user"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "13",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "name": "web-secret",
+        "plural": "secrets"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "13"
+          },
+          {
+            "op": "add",
+            "path": "/data/user",
+            "value": "YWxpY2U="
+          },
+          {
+            "op": "add",
+            "path": "/data/api-key",
+            "value": "bmV3LWtleQ=="
+          },
+          {
+            "op": "remove",
+            "path": "/data/old"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

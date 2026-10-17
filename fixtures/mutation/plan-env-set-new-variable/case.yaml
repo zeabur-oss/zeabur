@@ -1,0 +1,9 @@
+description: "Setting a variable the container does not have yet appends it, behind a test of the resourceVersion read."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: env
+        workload: {kind: Deployment, name: web}
+        changes:
+          - {op: set, name: NODE_ENV, value: production}

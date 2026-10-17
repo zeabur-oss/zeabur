@@ -1,0 +1,4 @@
+description: A StatefulSet mount backed by a volumeClaimTemplate is a persistent disk named after the template and sized from it while no PVC exists yet.
+operation: projection.mounts
+params:
+  container: postgres

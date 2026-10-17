@@ -1,0 +1,30 @@
+[
+  {
+    "name": "shop",
+    "hostnames": ["shop.example.test", "api.shop.example.test"],
+    "backends": ["api", "web"],
+    "rules": [
+      {
+        "service": "web",
+        "port": "80",
+        "origin": {"kind": "Ingress", "name": "shop", "fieldPath": "spec.defaultBackend.service"}
+      },
+      {
+        "host": "shop.example.test",
+        "path": "/",
+        "pathType": "Prefix",
+        "service": "web",
+        "port": "80",
+        "origin": {"kind": "Ingress", "name": "shop", "fieldPath": "spec.rules[0].http.paths[0].backend.service"}
+      },
+      {
+        "host": "api.shop.example.test",
+        "path": "/v1",
+        "pathType": "Exact",
+        "service": "api",
+        "port": "http",
+        "origin": {"kind": "Ingress", "name": "shop", "fieldPath": "spec.rules[1].http.paths[0].backend.service"}
+      }
+    ]
+  }
+]

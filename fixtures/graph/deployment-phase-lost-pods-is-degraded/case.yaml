@@ -1,0 +1,2 @@
+description: A Deployment whose rollout finished but which has no ready pod is degraded.
+operation: graph.deploymentPhase

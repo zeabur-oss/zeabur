@@ -1,0 +1,6 @@
+description: "An object that names another namespace than the project's is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {"op": "create", "object": {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {"name": "engawa-isolate-web", "namespace": "elsewhere"}, "spec": {"podSelector": {"matchLabels": {"app": "web"}}, "policyTypes": ["Ingress"], "ingress": [{"from": [{"podSelector": {}}]}]}, "status": {"ignored": true}}}

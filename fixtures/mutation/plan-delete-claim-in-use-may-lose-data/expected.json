@@ -1,0 +1,13 @@
+{
+  "impact": [{"kind": "Deployment", "name": "db"}],
+  "objects": [
+    {
+      "target": {"apiVersion": "v1", "kind": "PersistentVolumeClaim", "name": "data", "plural": "persistentvolumeclaims"},
+      "write": {"type": "delete", "uid": "c-data", "resourceVersion": "9"}
+    }
+  ],
+  "warnings": [
+    {"code": "claimDataMayBeLost", "claim": "data", "volume": "pv-data", "reclaimPolicy": "Delete"},
+    {"code": "stillUsed", "target": {"kind": "PersistentVolumeClaim", "name": "data"}, "workloads": [{"kind": "Deployment", "name": "db"}]}
+  ]
+}

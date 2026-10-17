@@ -1,0 +1,7 @@
+description: A mount path that is not absolute is refused.
+operation: mutation.validateStorage
+params:
+  request:
+    name: more
+    size: 5Gi
+    mountPath: data

@@ -1,0 +1,467 @@
+---
+# Source: velero/templates/serviceaccount-server.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: velero-server
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+automountServiceAccountToken: true
+
+---
+# Source: velero/templates/repo-maintenance-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: velero-repo-maintenance
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+data:
+  global: |
+    {
+      "keepLatestMaintenanceJobs": 3
+    }
+---
+# Source: velero/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: velero-server
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+subjects:
+  - kind: ServiceAccount
+    namespace: velero
+    name: velero-server
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: velero/templates/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: velero-server
+  namespace: velero
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+rules:
+- apiGroups:
+    - "*"
+  resources:
+    - "*"
+  verbs:
+    - "*"
+
+---
+# Source: velero/templates/rolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: velero-server
+  namespace: velero
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+subjects:
+  - kind: ServiceAccount
+    namespace: velero
+    name: velero-server
+roleRef:
+  kind: Role
+  name: velero-server
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: velero/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: velero
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 1.18.2
+    helm.sh/chart: velero-12.2.1
+spec:
+  type: ClusterIP
+  ports:
+    - name: http-monitoring
+      port: 8085
+      targetPort: http-monitoring
+  selector:
+    name: velero
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+
+---
+# Source: velero/templates/node-agent-daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: node-agent
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 1.18.2
+    helm.sh/chart: velero-12.2.1
+spec:
+  selector:
+    matchLabels:
+      name: node-agent
+  template:
+    metadata:
+      labels:
+        name: node-agent
+        role: node-agent
+        app.kubernetes.io/name: velero
+        app.kubernetes.io/instance: velero
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: 1.18.2
+        helm.sh/chart: velero-12.2.1
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8085"
+        prometheus.io/scrape: "true"
+    spec:
+      serviceAccountName: velero-server
+      automountServiceAccountToken: true
+      securityContext:
+        runAsUser: 0
+      terminationGracePeriodSeconds: 3600
+      volumes:
+        - name: cloud-credentials
+          secret:
+            secretName: velero-credentials
+        - name: host-pods
+          hostPath:
+            path: /var/lib/kubelet/pods
+        - name: host-plugins
+          hostPath:
+            path: /var/lib/kubelet/plugins
+        - name: scratch
+          emptyDir: {}
+      dnsPolicy: ClusterFirst
+      containers:
+        - name: node-agent
+          image: "docker.io/velero/velero:v1.18.2"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http-monitoring
+              containerPort: 8085
+          command:
+            - /velero
+          args:
+            - node-agent
+            - server
+          volumeMounts:
+            - name: cloud-credentials
+              mountPath: /credentials
+            - name: host-pods
+              mountPath: /host_pods
+              mountPropagation: HostToContainer
+            - name: host-plugins
+              mountPath: /host_plugins
+              mountPropagation: HostToContainer
+            - name: scratch
+              mountPath: /scratch
+          env:
+            - name: VELERO_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: VELERO_SCRATCH_DIR
+              value: /scratch
+            - name: AWS_SHARED_CREDENTIALS_FILE
+              value: /credentials/cloud
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /credentials/cloud
+            - name: AZURE_CREDENTIALS_FILE
+              value: /credentials/cloud
+            - name: ALIBABA_CLOUD_CREDENTIALS_FILE
+              value: /credentials/cloud
+          securityContext:
+
+---
+# Source: velero/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: velero
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 1.18.2
+    helm.sh/chart: velero-12.2.1
+    component: velero
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: velero
+      app.kubernetes.io/name: velero
+  template:
+    metadata:
+      labels:
+        name: velero
+        app.kubernetes.io/name: velero
+        app.kubernetes.io/instance: velero
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/version: 1.18.2
+        helm.sh/chart: velero-12.2.1
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "8085"
+        prometheus.io/scrape: "true"
+    spec:
+      restartPolicy: Always
+      serviceAccountName: velero-server
+      automountServiceAccountToken: true
+      terminationGracePeriodSeconds: 3600
+      containers:
+        - name: velero
+          image: "docker.io/velero/velero:v1.18.2"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http-monitoring
+              containerPort: 8085
+          command:
+            - /velero
+          args:
+            - server
+            ### Flags
+            - --uploader-type=kopia
+            - --default-volumes-to-fs-backup
+            ### Global Flags
+            - --repo-maintenance-job-configmap=velero-repo-maintenance
+          resources:
+            limits:
+              memory: 512Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /metrics
+              port: http-monitoring
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /metrics
+              port: http-monitoring
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: plugins
+              mountPath: /plugins
+            - name: cloud-credentials
+              mountPath: /credentials
+            - name: scratch
+              mountPath: /scratch
+          env:
+            - name: VELERO_SCRATCH_DIR
+              value: /scratch
+            - name: VELERO_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: LD_LIBRARY_PATH
+              value: /plugins
+            - name: AWS_SHARED_CREDENTIALS_FILE
+              value: /credentials/cloud
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /credentials/cloud
+            - name: AZURE_CREDENTIALS_FILE
+              value: /credentials/cloud
+            - name: ALIBABA_CLOUD_CREDENTIALS_FILE
+              value: /credentials/cloud
+      dnsPolicy: ClusterFirst
+      initContainers:
+        - image: velero/velero-plugin-for-aws:v1.14.4
+          name: velero-plugin-for-aws
+          volumeMounts:
+          - mountPath: /target
+            name: plugins
+      volumes:
+        - name: cloud-credentials
+          secret:
+            secretName: velero-credentials
+        - name: plugins
+          emptyDir: {}
+        - name: scratch
+          emptyDir: {}
+
+---
+# Source: velero/templates/backupstoragelocation.yaml
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: default
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: 1.18.2
+    helm.sh/chart: velero-12.2.1
+spec:
+  provider: aws
+  accessMode: ReadWrite
+  default: true
+  objectStorage:
+    bucket: "recs-ci"
+  config:
+    region: "us-east-1"
+    s3ForcePathStyle: "true"
+    s3Url: "http://minio.invalid:9000"
+---
+# Source: velero/templates/upgrade-crds/serviceaccount-upgrade.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: velero-server-upgrade-crds
+  namespace: velero
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,pre-rollback
+    "helm.sh/hook-weight": "-4"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+automountServiceAccountToken: true
+
+---
+# Source: velero/templates/upgrade-crds/clusterrole-upgrade.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: velero-upgrade-crds
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,pre-rollback
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app.kubernetes.io/component: upgrade-crds
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+rules:
+- apiGroups: 
+    - "apiextensions.k8s.io"
+  resources: 
+    - "customresourcedefinitions"
+  verbs: 
+    - create
+    - patch
+    - update
+    - get
+    - list
+
+---
+# Source: velero/templates/upgrade-crds/clusterrolebinding-upgrade.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: velero-upgrade-crds
+  labels:
+    app.kubernetes.io/component: upgrade-crds
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,pre-rollback
+    "helm.sh/hook-weight": "-3"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+subjects:
+  - kind: ServiceAccount
+    namespace: velero
+    name: velero-server-upgrade-crds
+roleRef:
+  kind: ClusterRole
+  name: velero-upgrade-crds
+  apiGroup: rbac.authorization.k8s.io
+
+
+---
+# Source: velero/templates/upgrade-crds/upgrade-crds.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: velero-upgrade-crds
+  namespace: velero
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,pre-rollback
+    "helm.sh/hook-weight": "5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/instance: velero
+    app.kubernetes.io/managed-by: Helm
+    helm.sh/chart: velero-12.2.1
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      name: velero-upgrade-crds
+    spec:
+      serviceAccountName: velero-server-upgrade-crds
+      automountServiceAccountToken: true
+      containers:
+        - name: velero
+          image: "docker.io/velero/velero:v1.18.2"
+          imagePullPolicy: IfNotPresent
+          command:
+            - /velero
+          args:
+            - install
+            - --crds-only
+            - --apply
+      restartPolicy: OnFailure
+

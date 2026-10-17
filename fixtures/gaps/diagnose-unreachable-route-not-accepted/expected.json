@@ -1,0 +1,30 @@
+[
+  {
+    "kind": "unreachable",
+    "container": null,
+    "cause": {
+      "key": "diagnosis.unreachable.cause.routeNotAccepted",
+      "params": {
+        "service": "api",
+        "route": "api",
+        "condition": "ResolvedRefs",
+        "reason": "RefNotPermitted"
+      }
+    },
+    "why": {
+      "key": "diagnosis.unreachable.why.routeNotAccepted"
+    },
+    "fix": {
+      "key": "diagnosis.unreachable.fix.routeNotAccepted"
+    },
+    "evidence": [
+      {
+        "kind": "HTTPRoute",
+        "name": "api",
+        "fieldPath": "status.parents",
+        "value": null
+      }
+    ],
+    "lastSeen": "2026-10-15T11:40:00Z"
+  }
+]

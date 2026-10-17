@@ -1,0 +1,13 @@
+[
+  {
+    "name": "data",
+    "mountPath": "/var/lib/postgresql/data",
+    "kind": "PersistentVolumeClaim",
+    "category": "persistent",
+    "claimName": "data",
+    "size": "1Gi",
+    "accessModes": ["ReadWriteOnce"],
+    "storageClass": null,
+    "status": null
+  }
+]

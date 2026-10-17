@@ -1,0 +1,2 @@
+description: A Deployment with no ready pod whose new ReplicaSet was just created is progressing, not degraded.
+operation: graph.deploymentPhase

@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: app
+          image: example/app:1.0
+          volumeMounts:
+            - name: missing
+              mountPath: /data

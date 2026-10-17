@@ -1,0 +1,4 @@
+description: A service reading the same Secret as a data store connects to the store, not inferred; two ordinary services sharing a ConfigMap are not connected.
+operation: projection.connections
+params:
+  namespace: shop
