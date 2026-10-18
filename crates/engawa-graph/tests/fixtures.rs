@@ -258,7 +258,7 @@ mod tests {
                                 }
                             }]
                         }],
-                        "endpoints": [{"name": "n8n", "attribution": {"ownership": "owned"}}]
+                        "endpoints": [{"name": "n8n"}]
                     },
                     {"kind": "Deployment", "name": "worker", "endpoints": []}
                 ],

@@ -61,12 +61,15 @@ pub fn project(snapshot: &Snapshot) -> Project {
 }
 
 /// What every workload's service looks up, built once for all of them: the objects by name, and
-/// the Services and Ingresses each workload is an owner of, in the snapshot's order, with their
-/// attribution.
+/// the Services and Ingresses each workload is an owner of, in the snapshot's order.
+///
+/// An endpoint or route does not repeat which workloads own its object: that list is the
+/// object's in `resources`, once. Copied into every owner's endpoints, it would grow with the
+/// cube of the workloads when every Service selects every workload.
 struct Index<'a> {
     objects: ByName<'a>,
-    endpoints: BTreeMap<&'a WorkloadRef, Vec<(&'a KubeService, &'a Attribution)>>,
-    routes: BTreeMap<&'a WorkloadRef, Vec<(&'a Ingress, &'a Attribution)>>,
+    endpoints: BTreeMap<&'a WorkloadRef, Vec<&'a KubeService>>,
+    routes: BTreeMap<&'a WorkloadRef, Vec<&'a Ingress>>,
 }
 
 impl<'a> Index<'a> {
@@ -75,7 +78,7 @@ impl<'a> Index<'a> {
         for object in &snapshot.services {
             if let Some(owners) = attribution.services.get(name_of(&object.metadata)) {
                 for owner in &owners.owners {
-                    endpoints.entry(owner).or_default().push((object, owners));
+                    endpoints.entry(owner).or_default().push(object);
                 }
             }
         }
@@ -83,7 +86,7 @@ impl<'a> Index<'a> {
         for object in &snapshot.ingresses {
             if let Some(owners) = attribution.ingresses.get(name_of(&object.metadata)) {
                 for owner in &owners.owners {
-                    routes.entry(owner).or_default().push((object, owners));
+                    routes.entry(owner).or_default().push(object);
                 }
             }
         }
@@ -128,7 +131,7 @@ fn service(
         .get(&me)
         .into_iter()
         .flatten()
-        .map(|&(object, owners)| {
+        .map(|&object| {
             let name = name_of(&object.metadata);
             Endpoint {
                 name: name.to_owned(),
@@ -138,7 +141,6 @@ fn service(
                     .as_ref()
                     .and_then(|spec| spec.cluster_ip.clone()),
                 ports: ports(object),
-                attribution: owners.clone(),
                 provenance: provenance(&object.metadata),
                 origin: Origin::object("Service", name),
             }
@@ -149,7 +151,7 @@ fn service(
         .get(&me)
         .into_iter()
         .flatten()
-        .map(|&(object, owners)| {
+        .map(|&object| {
             let name = name_of(&object.metadata);
             let mut backends: Vec<String> = ingress_backends(object)
                 .into_iter()
@@ -177,7 +179,6 @@ fn service(
                 class: ingress_class(object),
                 rules: route_rules(object),
                 tls_hosts,
-                attribution: owners.clone(),
                 provenance: provenance(&object.metadata),
                 origin: Origin::object("Ingress", name),
             }

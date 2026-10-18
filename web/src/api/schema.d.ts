@@ -1279,8 +1279,6 @@ export interface components {
     ElevationState: "unavailable" | "available" | "active"
     /** @description A Kubernetes Service selecting a workload's pods: how it is reached inside the cluster. */
     Endpoint: {
-      /** @description Which workloads the Service selects. */
-      attribution: components["schemas"]["Attribution"]
       /** @description The cluster IP. */
       clusterIP?: string | null
       /** @description The Service's name. */
@@ -2747,8 +2745,6 @@ export interface components {
     }
     /** @description An Ingress routing to a workload's Services: how it is reached from outside. */
     Route: {
-      /** @description Which workloads the backends select. */
-      attribution: components["schemas"]["Attribution"]
       /** @description The Services it routes to, sorted, without duplicates. */
       backends: string[]
       /**

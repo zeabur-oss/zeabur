@@ -1,15 +1,18 @@
 //! Times the in-memory projection on two fixed, generated distributions.
 //!
-//! Each Deployment has its own ConfigMap, Secret, PVC, Service and Ingress, and imports one
-//! ConfigMap they all share, so a case of `n` Deployments holds `6n + 1` objects. Each Ingress has
-//! one backend, its own Service. In `one-to-one` a Service's selector matches its own Deployment
-//! only; in `overlap` every Service's selector matches every Deployment, so the relations grow
-//! with the square of the Deployments.
+//! The namespaces come from `tests/generated`: each Deployment has its own ConfigMap, Secret, PVC,
+//! Service and Ingress, and imports one ConfigMap they all share, so a case of `n` Deployments
+//! holds `6n + 1` objects. In `one-to-one` a Service's selector matches its own Deployment only;
+//! in `overlap` every Service's selector matches every Deployment, so the relations grow with the
+//! square of the Deployments.
 //!
 //! The snapshot is built before timing; no API request or JSON parsing is timed. `attribution`
 //! times [`engawa_graph::attribution`], `project` times [`engawa_graph::project`], which includes
 //! the attribution. Each is run once to warm up, then in 15 batches of enough runs to last about
 //! 50 ms; the table gives the median, fastest and slowest batch per run.
+//!
+//! `JSON MiB` is the length of the project serialised with `serde_json`; the `services`,
+//! `resources` and `relations` MiB are the lengths of those lists alone.
 //!
 //! ```sh
 //! cargo run --release -p engawa-graph --example projection-bench               # every case
@@ -27,8 +30,12 @@
 
 use std::time::{Duration, Instant};
 
-use engawa_graph::{Snapshot, attribution, project, relations};
-use serde_json::json;
+use engawa_graph::{attribution, project, relations};
+
+#[path = "../tests/generated/mod.rs"]
+mod generated;
+
+use generated::{Distribution, snapshot};
 
 /// The cases run when none is named.
 const CASES: [(Distribution, usize); 5] = [
@@ -41,12 +48,6 @@ const CASES: [(Distribution, usize); 5] = [
 
 const BATCHES: usize = 15;
 const BATCH_TARGET: Duration = Duration::from_millis(50);
-
-#[derive(Debug, Clone, Copy)]
-enum Distribution {
-    OneToOne,
-    Overlap,
-}
 
 impl Distribution {
     const fn name(self) -> &'static str {
@@ -63,85 +64,6 @@ impl Distribution {
             _ => None,
         }
     }
-}
-
-/// The snapshot of `deployments` Deployments in `distribution`.
-fn snapshot(distribution: Distribution, deployments: usize) -> Snapshot {
-    let mut snapshot = Snapshot {
-        namespace: "bench".to_owned(),
-        ..Snapshot::default()
-    };
-    let mut add = |object: serde_json::Value| {
-        assert!(snapshot.insert(object).expect("a valid object"));
-    };
-    add(json!({
-        "apiVersion": "v1", "kind": "ConfigMap",
-        "metadata": {"name": "shared", "namespace": "bench"},
-        "data": {"REGION": "eu"}
-    }));
-    for i in 0..deployments {
-        let name = format!("app-{i:05}");
-        let selector = match distribution {
-            Distribution::OneToOne => json!({"app": name}),
-            Distribution::Overlap => json!({"tier": "web"}),
-        };
-        add(json!({
-            "apiVersion": "apps/v1", "kind": "Deployment",
-            "metadata": {"name": name, "namespace": "bench"},
-            "spec": {
-                "selector": {"matchLabels": {"app": name}},
-                "template": {
-                    "metadata": {"labels": {"app": name, "tier": "web"}},
-                    "spec": {
-                        "containers": [{
-                            "name": "app",
-                            "image": "registry.example/app:1.0",
-                            "env": [
-                                {"name": "MODE", "value": "production"},
-                                {"name": "PASSWORD", "valueFrom": {"secretKeyRef": {"name": format!("{name}-secret"), "key": "password"}}}
-                            ],
-                            "envFrom": [
-                                {"configMapRef": {"name": format!("{name}-config")}},
-                                {"configMapRef": {"name": "shared"}}
-                            ],
-                            "volumeMounts": [{"name": "data", "mountPath": "/data"}]
-                        }],
-                        "volumes": [{"name": "data", "persistentVolumeClaim": {"claimName": format!("{name}-data")}}]
-                    }
-                }
-            }
-        }));
-        add(json!({
-            "apiVersion": "v1", "kind": "ConfigMap",
-            "metadata": {"name": format!("{name}-config"), "namespace": "bench"},
-            "data": {"NAME": name}
-        }));
-        add(json!({
-            "apiVersion": "v1", "kind": "Secret",
-            "metadata": {"name": format!("{name}-secret"), "namespace": "bench"},
-            "type": "Opaque",
-            "data": {"password": "c2VjcmV0"}
-        }));
-        add(json!({
-            "apiVersion": "v1", "kind": "PersistentVolumeClaim",
-            "metadata": {"name": format!("{name}-data"), "namespace": "bench"},
-            "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "1Gi"}}}
-        }));
-        add(json!({
-            "apiVersion": "v1", "kind": "Service",
-            "metadata": {"name": name, "namespace": "bench"},
-            "spec": {"selector": selector, "ports": [{"name": "http", "port": 80}]}
-        }));
-        add(json!({
-            "apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
-            "metadata": {"name": name, "namespace": "bench"},
-            "spec": {"rules": [{"host": format!("{name}.example.com"), "http": {"paths": [{
-                "path": "/", "pathType": "Prefix",
-                "backend": {"service": {"name": name, "port": {"number": 80}}}
-            }]}}]}
-        }));
-    }
-    snapshot
 }
 
 /// Median, fastest and slowest time per run of `run`, over the batches.
@@ -163,6 +85,33 @@ fn time<T>(mut run: impl FnMut() -> T) -> [Duration; 3] {
         .collect();
     batches.sort();
     [batches[BATCHES / 2], batches[0], batches[BATCHES - 1]]
+}
+
+/// Counts the bytes written to it, so a large project is measured without being held in memory.
+#[derive(Default)]
+struct Counter(usize);
+
+impl std::io::Write for Counter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0 += bytes.len();
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// The length of `value` serialised as JSON, in MiB.
+fn mib(value: &impl serde::Serialize) -> String {
+    let mut counter = Counter::default();
+    serde_json::to_writer(&mut counter, value).expect("a serialisable project");
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "a size printed with one decimal place"
+    )]
+    let size = counter.0 as f64 / 1_048_576.0;
+    format!("{size:.1}")
 }
 
 fn ms(duration: Duration) -> String {
@@ -188,22 +137,30 @@ fn main() {
         cases = CASES.to_vec();
     }
     println!(
-        "| distribution | deployments | objects | relations | attribution ms (min-max) | project ms (min-max) |"
+        "| distribution | deployments | objects | relations | attribution ms (min-max) | project ms (min-max) | JSON MiB | services MiB | resources MiB | relations MiB |"
     );
-    println!("|---|---:|---:|---:|---:|---:|");
+    println!("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
     for (distribution, deployments) in cases {
-        let snapshot = snapshot(distribution, deployments);
+        let snapshot = snapshot(distribution, deployments).expect("valid objects");
         let objects = 6 * deployments + 1;
         let relations = relations(&snapshot).len();
+        let projected = project(&snapshot);
+        let sizes = [
+            mib(&projected),
+            mib(&projected.services),
+            mib(&projected.resources),
+            mib(&projected.relations),
+        ];
         if let Some(dir) = &json_dir {
             let path = dir.join(format!("{}-{deployments}.json", distribution.name()));
-            let text = serde_json::to_vec(&project(&snapshot)).expect("a serialisable project");
+            let text = serde_json::to_vec(&projected).expect("a serialisable project");
             std::fs::write(&path, text).expect("a writable --json directory");
         }
+        drop(projected);
         let [a_median, a_min, a_max] = time(|| attribution(&snapshot));
         let [p_median, p_min, p_max] = time(|| project(&snapshot));
         println!(
-            "| {} | {deployments} | {objects} | {relations} | {} ({}-{}) | {} ({}-{}) |",
+            "| {} | {deployments} | {objects} | {relations} | {} ({}-{}) | {} ({}-{}) | {} | {} | {} | {} |",
             distribution.name(),
             ms(a_median),
             ms(a_min),
@@ -211,6 +168,10 @@ fn main() {
             ms(p_median),
             ms(p_min),
             ms(p_max),
+            sizes[0],
+            sizes[1],
+            sizes[2],
+            sizes[3],
         );
     }
 }

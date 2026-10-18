@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::attribution::Attribution;
 use crate::provenance::Provenance;
 use crate::source::Origin;
 
@@ -89,8 +88,6 @@ pub struct Endpoint {
     pub cluster_ip: Option<String>,
     /// The ports.
     pub ports: Vec<Port>,
-    /// Which workloads the Service selects.
-    pub attribution: Attribution,
     /// The tool that manages the Service, if any.
     pub provenance: Provenance,
     /// The Service object.
@@ -121,8 +118,6 @@ pub struct Route {
     /// configured, not that the certificate is valid.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tls_hosts: Vec<String>,
-    /// Which workloads the backends select.
-    pub attribution: Attribution,
     /// The tool that manages the Ingress, if any.
     pub provenance: Provenance,
     /// The Ingress object.

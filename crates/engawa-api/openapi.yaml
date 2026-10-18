@@ -2375,13 +2375,9 @@ components:
       required:
       - name
       - ports
-      - attribution
       - provenance
       - origin
       properties:
-        attribution:
-          $ref: "#/components/schemas/Attribution"
-          description: Which workloads the Service selects.
         clusterIP:
           type:
           - string
@@ -5247,13 +5243,9 @@ components:
       - hostnames
       - backends
       - rules
-      - attribution
       - provenance
       - origin
       properties:
-        attribution:
-          $ref: "#/components/schemas/Attribution"
-          description: Which workloads the backends select.
         backends:
           type: array
           items:
