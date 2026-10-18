@@ -11,6 +11,9 @@
 use std::sync::Mutex;
 
 use engawa_kube::k8s_openapi::api::authentication::v1::{TokenRequest, TokenRequestSpec};
+use engawa_kube::k8s_openapi::api::authorization::v1::{
+    ResourceAttributes, SubjectAccessReview, SubjectAccessReviewSpec,
+};
 use engawa_kube::k8s_openapi::api::core::v1::{Namespace, ServiceAccount};
 use engawa_kube::k8s_openapi::api::rbac::v1::{ClusterRole, ClusterRoleBinding, Role, RoleBinding};
 use engawa_kube::{ClusterEndpoint, UserClient, UserToken};
@@ -37,6 +40,63 @@ impl std::fmt::Debug for Sandbox {
             .field("namespace", &self.namespace)
             .finish_non_exhaustive()
     }
+}
+
+/// Waits until the RBAC authorizer allows the person the first of `rules`. It reads Roles and
+/// RoleBindings from an informer cache, so a binding just created can take a moment to count, and a
+/// test's first request would be refused meanwhile [k8s-rbac].
+///
+/// [k8s-rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
+#[expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "a test cannot go on without its sandbox"
+)]
+async fn bound(admin: &Client, namespace: &str, rules: &Value) {
+    let first = |key: &str| {
+        rules
+            .get(0)
+            .and_then(|rule| rule.get(key))
+            .and_then(|values| values.get(0))
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    };
+    let (Some(verb), Some(group), Some(resource)) =
+        (first("verbs"), first("apiGroups"), first("resources"))
+    else {
+        return;
+    };
+    let (resource, subresource) = match resource.split_once('/') {
+        Some((resource, sub)) => (resource.to_owned(), Some(sub.to_owned())),
+        None => (resource, None),
+    };
+    let review = SubjectAccessReview {
+        spec: SubjectAccessReviewSpec {
+            user: Some(format!("system:serviceaccount:{namespace}:{PERSON}")),
+            resource_attributes: Some(ResourceAttributes {
+                namespace: Some(namespace.to_owned()),
+                verb: Some(verb),
+                group: Some(group),
+                resource: Some(resource),
+                subresource,
+                ..ResourceAttributes::default()
+            }),
+            ..SubjectAccessReviewSpec::default()
+        },
+        ..SubjectAccessReview::default()
+    };
+    let reviews = Api::<SubjectAccessReview>::all(admin.clone());
+    for _ in 0..60 {
+        let answer = reviews
+            .create(&PostParams::default(), &review)
+            .await
+            .expect("subject access review");
+        if answer.status.is_some_and(|s| s.allowed) {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+    panic!("the person's RoleBinding never took effect");
 }
 
 impl Sandbox {
@@ -82,6 +142,7 @@ impl Sandbox {
                    "subjects": [{"kind": "ServiceAccount", "name": PERSON, "namespace": namespace}]}),
         )
         .await;
+        bound(&admin, &namespace, &rules).await;
         let request = TokenRequest {
             spec: TokenRequestSpec {
                 audiences: vec![],
