@@ -30,6 +30,7 @@ utoipa.workspace = true
 utoipa-axum.workspace = true
 
 [dev-dependencies]
+engawa-kube = { workspace = true, features = ["memory"] }
 engawa-test-support = { workspace = true, features = ["sandbox"] }
 engawa-ui.workspace = true
 http-body-util.workspace = true

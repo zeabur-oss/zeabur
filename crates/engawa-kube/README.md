@@ -11,7 +11,8 @@ built from engawa's own service account, so no layer above can act with more rig
 person using it; kube-apiserver makes every authorisation decision.
 
 The port ([`Cluster`](crate::port::Cluster)) has two adapters: kube-rs against a real cluster
-([`UserClient`]), and an in-memory store for tests ([`memory::MemoryCluster`](crate::memory)).
+([`UserClient`]), and an in-memory store for tests (`memory::MemoryCluster`, behind the `memory`
+feature).
 
 ## Design
 

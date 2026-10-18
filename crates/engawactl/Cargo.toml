@@ -30,6 +30,7 @@ tokio.workspace = true
 tower.workspace = true
 
 [dev-dependencies]
+engawa-kube = { workspace = true, features = ["memory"] }
 engawa-test-support = { workspace = true, features = ["sandbox"] }
 # The client side, for the session tests.
 rmcp = { workspace = true, features = ["client"] }

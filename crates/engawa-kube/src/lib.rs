@@ -27,6 +27,7 @@ use std::path::PathBuf;
 
 mod adapter;
 mod logs;
+#[cfg(feature = "memory")]
 pub mod memory;
 mod names;
 pub mod objects;

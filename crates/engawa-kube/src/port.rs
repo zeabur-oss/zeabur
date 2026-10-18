@@ -88,7 +88,7 @@ impl std::fmt::Debug for ExecSession {
 }
 
 /// Reads from one cluster as one person. Implemented by [`crate::UserClient`] (kube-apiserver)
-/// and [`crate::memory::MemoryCluster`] (tests).
+/// and `memory::MemoryCluster` (tests, behind the `memory` feature).
 ///
 /// Every method returns an [`Answer`], so callers hold a `dyn Cluster`; the typed reads built on it
 /// are in [`ClusterExt`].

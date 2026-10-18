@@ -10,6 +10,11 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# The in-memory cluster for tests (`memory`), also used by the tests of the crates above and by
+# `engawa-api`'s demo example; no shipped binary enables it.
+memory = []
+
 [dependencies]
 engawa-core.workspace = true
 futures-util.workspace = true
@@ -24,4 +29,5 @@ thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+engawa-kube = { workspace = true, features = ["memory"] }
 engawa-test-support = { workspace = true, features = ["sandbox"] }

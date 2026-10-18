@@ -174,6 +174,7 @@ impl From<RawPod> for ClusterPod {
 /// # Errors
 ///
 /// When the JSON is not a pod.
+#[cfg(any(test, feature = "memory"))]
 pub(crate) fn slim_pod(value: serde_json::Value) -> Result<ClusterPod, ClusterError> {
     serde_json::from_value::<RawPod>(value)
         .map(ClusterPod::from)

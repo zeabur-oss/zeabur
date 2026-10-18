@@ -584,6 +584,7 @@ name = "engawa-kube"
 version = "0.0.1"
 dependencies = [
  "engawa-core",
+ "engawa-kube",
  "engawa-test-support",
  "futures-util",
  "http",
