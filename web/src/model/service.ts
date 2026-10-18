@@ -14,6 +14,19 @@ const roles: Role[] = ["web", "internal", "worker", "job", "data"]
 export const serviceId = (service: { kind: string; name: string }) =>
   `${service.kind}/${service.name}`
 
+const workloadKinds: Schemas["WorkloadKind"][] = [
+  "CronJob",
+  "DaemonSet",
+  "Deployment",
+  "Job",
+  "StatefulSet",
+]
+
+/** A workload kind as the API spells it (`deployment` is `Deployment`); the API reads any case, so
+ * links people type or copy from kubectl work. An unknown kind is returned as it is. */
+export const canonicalKind = (kind: string): string =>
+  workloadKinds.find((known) => known.toLowerCase() === kind.toLowerCase()) ?? kind
+
 /** The image's tag (`2.1`), the start of its digest, or `latest`. */
 export function imageTag(image?: string | null): string {
   if (!image) return ""

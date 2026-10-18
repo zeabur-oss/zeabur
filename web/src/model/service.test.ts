@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 
 import { layout } from "@/model/layout"
-import { roleOf, type Service } from "@/model/service"
+import { canonicalKind, roleOf, type Service } from "@/model/service"
 
 const service = (name: string, fields: Partial<Service> = {}) =>
   ({
@@ -39,5 +39,18 @@ describe("a service's role", () => {
       "Deployment/api": "workers",
       "Deployment/db": "data",
     })
+  })
+})
+
+describe("a service kind in an address", () => {
+  test("is spelled as the API spells it, whatever its case", () => {
+    expect(canonicalKind("deployment")).toBe("Deployment")
+    expect(canonicalKind("DEPLOYMENT")).toBe("Deployment")
+    expect(canonicalKind("Deployment")).toBe("Deployment")
+    expect(canonicalKind("statefulset")).toBe("StatefulSet")
+  })
+
+  test("stays as it is when no workload has that kind, so the page says not found", () => {
+    expect(canonicalKind("Widget")).toBe("Widget")
   })
 })

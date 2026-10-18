@@ -22,6 +22,7 @@ import {
 import { AppShell } from "@/components/app-shell"
 import { NotFound } from "@/components/not-found"
 import { RouteError, RoutePending } from "@/components/route-states"
+import { canonicalKind } from "@/model/service"
 import {
   validateArchitectureSearch,
   validateComponentsSearch,
@@ -162,6 +163,18 @@ const serviceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/services/$kind/$name",
   validateSearch: validateServiceSearch,
+  // `deployment/worker`, as kubectl prints it, opens `Deployment/worker`.
+  beforeLoad: ({ params, search }) => {
+    const kind = canonicalKind(params.kind)
+    if (kind !== params.kind) {
+      throw redirect({
+        to: "/projects/$project/services/$kind/$name",
+        params: { ...params, kind },
+        search,
+        replace: true,
+      })
+    }
+  },
   loader: ({ params }) => loadProject(params.project),
   remountDeps: ({ params }) => `${params.project}/${params.kind}/${params.name}`,
   component: lazyRouteComponent(() => import("@/routes/service/page"), "ServicePage"),
