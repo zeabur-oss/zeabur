@@ -419,14 +419,17 @@ mod tests {
         let app = app(&person);
         let workload = json!({"kind": "Deployment", "name": "web"});
 
-        // Two releases, once the controller has made the second ReplicaSet.
+        // Two releases, once the controller has made the second ReplicaSet and moved the
+        // Deployment's revision annotation to it; it writes the ReplicaSet first.
         let releases_uri = format!("/api/v1/projects/{ns}/services/deployment/web/releases");
         let mut releases = Value::Null;
         for _ in 0..60 {
             let (status, body) = call(&app, "GET", &releases_uri).await;
             assert_eq!(status, StatusCode::OK, "{body}");
             releases = serde_json::from_str(&body).unwrap();
-            if releases["items"].as_array().is_some_and(|i| i.len() == 2) {
+            if releases["items"].as_array().is_some_and(|i| i.len() == 2)
+                && releases["items"][0]["current"] == true
+            {
                 break;
             }
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -436,7 +439,7 @@ mod tests {
             json!(["busybox:1.36"]),
             "{releases}"
         );
-        assert_eq!(releases["items"][0]["current"], true);
+        assert_eq!(releases["items"][0]["current"], true, "{releases}");
         let old = releases["items"][1]["revision"].as_i64().unwrap();
 
         // Rollback: the template's image goes back.
