@@ -7,8 +7,11 @@
 
 use std::collections::BTreeSet;
 
+use engawa_core::names::GatewayRef;
+use engawa_graph::{Snapshot, ingress_backends};
 use engawa_model::{
-    Citation, Fix, FixKind, Gap, Message, Origin, Project, Service, Severity, WorkloadKind,
+    Citation, Fix, FixKind, Gap, HttpRoute, Message, Origin, Project, Service, Severity,
+    WorkloadKind,
 };
 
 /// What a rule may look at.
@@ -16,6 +19,15 @@ use engawa_model::{
 pub struct Input<'a> {
     /// The project, as projected.
     pub project: &'a Project,
+    /// The namespace's objects as read: what a route names may belong to no service, so it is
+    /// not in the projection.
+    pub snapshot: &'a Snapshot,
+    /// The namespace's `HTTPRoutes`.
+    pub http_routes: &'a [HttpRoute],
+    /// Whether the namespace's Services could be listed. When they could not,
+    /// `snapshot.services` is empty because the read was refused, not because there are none,
+    /// and no rule says a Service is missing.
+    pub services_readable: bool,
     /// Facts about the cluster the project runs in.
     pub cluster: &'a ClusterTraits,
 }
@@ -27,6 +39,9 @@ pub struct ClusterTraits {
     pub gateway_api: bool,
     /// Ingress classes whose controller is retired, such as ingress-nginx's `nginx`.
     pub retired_ingress_classes: BTreeSet<String>,
+    /// The Gateways of every namespace; `None` when they could not be listed, and then no rule
+    /// says a Gateway is missing.
+    pub gateways: Option<Vec<GatewayRef>>,
 }
 
 /// One gap rule.
@@ -40,7 +55,12 @@ pub trait Rule: Sync {
 }
 
 /// The rules engawa always runs.
-pub static BUILTIN: [&dyn Rule; 3] = [&ResourceLimits, &HealthChecks, &IngressToHttpRoute];
+pub static BUILTIN: [&dyn Rule; 4] = [
+    &ResourceLimits,
+    &HealthChecks,
+    &IngressToHttpRoute,
+    &DanglingRoute,
+];
 
 /// Every finding of `rules` in `input`: warnings first, then by rule, subject and service.
 #[must_use]
@@ -302,6 +322,266 @@ impl Rule for IngressToHttpRoute {
     }
 }
 
+// ── Routes that lead nowhere ────────────────────────────────────────────────────────────────────
+
+/// An Ingress or `HTTPRoute` whose traffic cannot arrive anywhere. A project-level finding: such
+/// a route reaches no workload, so it belongs to no service.
+///
+/// - **No Service.** An Ingress sends to the Services of its default backend and its rules' paths
+///   [k8s-ingress]; an `HTTPRoute` to its `backendRefs`, of kind `Service` in the core group and
+///   the route's namespace unless they say otherwise [gateway-backendref]. A backend no Service of
+///   the namespace has, a mistyped name most often, leads nowhere. A backend of weight 0 is left
+///   out: "no traffic should be forwarded for this entry" [gateway-httpbackendref], so a missing
+///   Service there loses no request. One finding per route names every such Service. A service page
+///   may say the same from the workload's side (`noService` when a workload has that name); the
+///   project's list says it from the route's, so it is reported either way. When the Services could
+///   not be listed ([`Input::services_readable`]), whether one exists is unknown and this case is
+///   not checked; the refused read is named in the answer's `unreadable` list.
+/// - **No Gateway.** A `parentRef` names a Gateway (group `gateway.networking.k8s.io` and kind
+///   `Gateway` when absent) in the route's namespace unless it names another
+///   [gateway-parentreference]. One no namespace has is a finding, said only when the Gateways
+///   could be listed ([`ClusterTraits::gateways`]); a parent of another kind, such as a mesh's
+///   Service, is not checked.
+/// - **Not accepted.** A controller adds an entry to `status.parents` for each parent it manages,
+///   and an empty list means the route is attached to no Gateway; a parent that rejects the route
+///   sets `Accepted` to `False` [gateway-routeparentstatus]. With no entry, or every entry refused,
+///   nothing serves the route. A parent with no `Accepted` condition, or one that is `Unknown`, is
+///   not taken as a refusal. When a named Gateway is missing, that finding is the cause and this
+///   one is not added: a controller does not list a parent it cannot resolve. A route just created
+///   has no entry until its controller sees it, so it can show for a moment.
+///
+///   Only the route's Gateway parents are read. A parent may also be a Service, under the Mesh
+///   conformance profile: "There are two kinds of parent resources with 'Core' support: Gateway
+///   (Gateway conformance profile) Service (Mesh conformance profile, ClusterIP Services only)"
+///   [gateway-parentreference]. A mesh route carries no domain, and its parent's acceptance is
+///   the mesh's to report, so a route whose parents are all of another kind has no finding
+///   here, and a Service parent's entry neither raises nor silences one. A route with no
+///   `parentRefs` at all attaches to nothing and receives no traffic, a common omission: it is a
+///   finding of its own (`gap.danglingRoute.noParent`) about `spec.parentRefs`, unless it asks
+///   for default Gateways with `useDefaultGateways: All` (experimental): "if set, it will be
+///   attached to any default Gateway supporting the named scope" [gateway-commonroutespec].
+///   Such a route's Gateways are the ones that claimed it, so every Gateway entry of its
+///   `status.parents` is read: all of them refused is the not-accepted finding, and no entry is
+///   none, since whether a default Gateway exists at all is not known here. `None`, an unset
+///   field or an unknown value attaches to no default Gateway.
+///
+///   Only entries for a Gateway `spec.parentRefs` names now count
+///   ([`HttpRoute::gateway_parent_statuses`]): when a route moves to another Gateway, or from one
+///   listener (`sectionName`) to the whole Gateway, the old entry's `Accepted=True` can stay in
+///   the list until its controller cleans it up, and it says nothing about the new parent. Until
+///   the new parent's controller adds its entry, the route reads as not accepted, as a new route
+///   does.
+///
+///   A condition's `observedGeneration` older than the route's `metadata.generation` means "the
+///   condition is out of date with respect to the current state of the instance"
+///   [k8s-condition]. Such a condition is still read as it stands: it is the controller's last
+///   word about that parent, and a route that was accepted mostly stays accepted after an edit,
+///   so treating it as unknown would warn on every edit until the controller catches up. A stale
+///   refusal is read as a refusal for the same reason.
+///
+/// [k8s-ingress]: https://kubernetes.io/docs/concepts/services-networking/ingress/
+/// [k8s-condition]: https://github.com/kubernetes/apimachinery/blob/v0.34.0/pkg/apis/meta/v1/types.go
+/// [gateway-backendref]: https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#backendref
+/// [gateway-httpbackendref]: https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#httpbackendref
+/// [gateway-parentreference]: https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#parentreference
+/// [gateway-commonroutespec]: https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#commonroutespec
+/// [gateway-routeparentstatus]: https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#routeparentstatus
+#[derive(Debug, Clone, Copy)]
+pub struct DanglingRoute;
+
+impl Rule for DanglingRoute {
+    fn id(&self) -> &'static str {
+        "dangling-route"
+    }
+
+    fn citations(&self) -> Vec<Citation> {
+        vec![
+            cite(
+                "Ingress",
+                "https://kubernetes.io/docs/concepts/services-networking/ingress/",
+            ),
+            cite(
+                "HTTPRoute",
+                "https://gateway-api.sigs.k8s.io/reference/api-types/httproute/",
+            ),
+            cite(
+                "Gateway API reference: RouteParentStatus",
+                "https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#routeparentstatus",
+            ),
+        ]
+    }
+
+    fn check(&self, input: &Input<'_>) -> Vec<Gap> {
+        // `None`: the Services could not be listed, so none is known to be missing.
+        let services: Option<BTreeSet<&str>> = input.services_readable.then(|| {
+            input
+                .snapshot
+                .services
+                .iter()
+                .filter_map(|s| s.metadata.name.as_deref())
+                .collect()
+        });
+        let services = services.as_ref();
+        let mut gaps = Vec::new();
+        for ingress in &input.snapshot.ingresses {
+            let name = ingress.metadata.name.as_deref().unwrap_or_default();
+            let backends = ingress_backends(ingress)
+                .into_iter()
+                .map(|(service, path)| (path, service));
+            gaps.extend(self.no_service("Ingress", name, backends, services));
+        }
+        for route in input.http_routes {
+            let name = route.name();
+            gaps.extend(self.no_service("HTTPRoute", name, route.local_service_refs(), services));
+            let namespace = route
+                .metadata
+                .namespace
+                .as_deref()
+                .unwrap_or(&input.project.namespace);
+            gaps.extend(
+                self.no_gateway(route, namespace, input.cluster.gateways.as_deref())
+                    .or_else(|| self.not_accepted(route)),
+            );
+        }
+        gaps
+    }
+}
+
+impl DanglingRoute {
+    fn gap(self, subject: Origin, message: Message, fix: Fix) -> Gap {
+        Gap {
+            rule: self.id().to_owned(),
+            severity: Severity::Warning,
+            subject,
+            service: None,
+            message,
+            fix,
+            citations: self.citations(),
+        }
+    }
+
+    /// The finding for `backends` (field path, Service name) of the route `kind`/`name` that no
+    /// Service in `services` has; the subject is the first of them. Nothing when the Services are
+    /// unknown (`None`).
+    fn no_service<'a>(
+        self,
+        kind: &str,
+        name: &str,
+        backends: impl Iterator<Item = (String, &'a str)>,
+        services: Option<&BTreeSet<&str>>,
+    ) -> Option<Gap> {
+        let services = services?;
+        let mut first = None;
+        let mut missing: Vec<&str> = Vec::new();
+        for (path, service) in backends.filter(|(_, s)| !services.contains(s)) {
+            first.get_or_insert(path);
+            if !missing.contains(&service) {
+                missing.push(service);
+            }
+        }
+        let path = first?;
+        let existing = services.iter().copied().collect::<Vec<_>>().join(",");
+        let mut params = vec![("kind", kind), ("route", name)];
+        if !existing.is_empty() {
+            params.push(("existing", existing.as_str()));
+        }
+        Some(
+            self.gap(
+                Origin::field(kind, name, path),
+                Message::new("gap.danglingRoute.noService")
+                    .with("kind", kind)
+                    .with("route", name)
+                    .with("services", missing.join(",")),
+                plan("domains.backend", &params),
+            ),
+        )
+    }
+
+    /// The finding for the Gateways `route` names that are not among `gateways`; nothing when
+    /// they could not be listed.
+    fn no_gateway(
+        self,
+        route: &HttpRoute,
+        namespace: &str,
+        gateways: Option<&[GatewayRef]>,
+    ) -> Option<Gap> {
+        let gateways = gateways?;
+        let mut first = None;
+        let mut missing: Vec<String> = Vec::new();
+        for (index, parent) in route.spec.parent_refs.iter().enumerate() {
+            let Some((ns, name)) = parent.gateway(namespace) else {
+                continue;
+            };
+            if gateways.iter().any(|g| g.namespace == ns && g.name == name) {
+                continue;
+            }
+            first.get_or_insert(index);
+            // A Gateway of the route's own namespace by its name, another by `namespace/name`.
+            let shown = if ns == namespace {
+                name.to_owned()
+            } else {
+                format!("{ns}/{name}")
+            };
+            if !missing.contains(&shown) {
+                missing.push(shown);
+            }
+        }
+        let index = first?;
+        Some(
+            self.gap(
+                Origin::field(
+                    "HTTPRoute",
+                    route.name(),
+                    format!("spec.parentRefs[{index}]"),
+                ),
+                Message::new("gap.danglingRoute.noGateway")
+                    .with("route", route.name())
+                    .with("gateways", missing.join(",")),
+                plan("domains.parent", &[("route", route.name())]),
+            ),
+        )
+    }
+
+    /// The finding when the route names no parent at all, or names a Gateway parent and none
+    /// lists it, or every one that does refused it.
+    fn not_accepted(self, route: &HttpRoute) -> Option<Gap> {
+        let parents: Vec<_> = if !route.spec.parent_refs.is_empty() {
+            route.gateway_parents().next()?;
+            route.gateway_parent_statuses().collect()
+        } else if route.uses_default_gateways() {
+            // The default Gateways that claimed it; none may exist, so no entry is no finding.
+            let claimed: Vec<_> = route.default_gateway_statuses().collect();
+            if claimed.is_empty() {
+                return None;
+            }
+            claimed
+        } else {
+            return Some(self.gap(
+                Origin::field("HTTPRoute", route.name(), "spec.parentRefs".to_owned()),
+                Message::new("gap.danglingRoute.noParent").with("route", route.name()),
+                plan("domains.parent", &[("route", route.name())]),
+            ));
+        };
+        let refused: Vec<&str> = parents
+            .iter()
+            .filter_map(|p| p.accepted().filter(|c| c.status == "False"))
+            .map(|c| c.reason.as_str())
+            .collect();
+        if !parents.is_empty() && refused.len() < parents.len() {
+            return None;
+        }
+        let mut message = Message::new("gap.danglingRoute.notAccepted").with("route", route.name());
+        if let Some(reason) = refused.first().filter(|r| !r.is_empty()) {
+            message = message.with("reason", *reason);
+        }
+        Some(self.gap(
+            Origin::field("HTTPRoute", route.name(), "status.parents".to_owned()),
+            message,
+            plan("domains.parent", &[("route", route.name())]),
+        ))
+    }
+}
+
 // ── Cluster ─────────────────────────────────────────────────────────────────────────────────────
 
 /// IngressClass controllers whose project is retired: ingress-nginx, retired in March 2026
@@ -441,6 +721,9 @@ mod tests {
             &rules,
             &Input {
                 project: &project,
+                snapshot: &Snapshot::default(),
+                http_routes: &[],
+                services_readable: true,
                 cluster: &cluster,
             },
         );

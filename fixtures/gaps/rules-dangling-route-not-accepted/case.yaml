@@ -1,0 +1,7 @@
+description: An HTTPRoute that no parent lists in status.parents, or that every listed parent refused (Accepted False), is a warning, a refusal naming its reason; an entry for a parent the spec no longer names does not count, so a route whose old Gateway accepted it and whose new one has not answered is a finding, and so is an entry for one listener (sectionName) when the spec now names the whole Gateway; only Gateway parents count, so a mesh route whose only parent is a Service is not a finding (a route with no parentRefs at all is, as noParent, unless it asks for default Gateways with useDefaultGateways All, and then the Gateways that claimed it decide, and none claiming it is no finding), and a Service parent's acceptance does not stand in for a Gateway's; a route one parent accepted, or whose parent left Accepted Unknown, is not a finding.
+operation: gaps.rules
+params:
+  rules: [dangling-route]
+  gateways:
+    - {namespace: shop, name: edge}
+    - {namespace: shop, name: internal}

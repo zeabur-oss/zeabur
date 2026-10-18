@@ -1,0 +1,7 @@
+description: An HTTPRoute whose parentRefs name a Gateway no namespace has is one warning naming each, in the route's namespace by name and in another as namespace/name, and no separate "not accepted" finding; a Gateway that exists, in another namespace too, and a mesh's Service parent are not findings.
+operation: gaps.rules
+params:
+  rules: [dangling-route]
+  gateways:
+    - {namespace: infra, name: public}
+    - {namespace: shop, name: internal}

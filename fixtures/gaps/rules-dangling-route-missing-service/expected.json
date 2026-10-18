@@ -1,0 +1,32 @@
+[
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "web-route", "fieldPath": "spec.rules[1].backendRefs[0]"},
+    "service": null,
+    "message": {
+      "key": "gap.danglingRoute.noService",
+      "params": {"kind": "HTTPRoute", "route": "web-route", "services": "frontned"}
+    },
+    "fix": {
+      "kind": "plan",
+      "id": "domains.backend",
+      "params": {"kind": "HTTPRoute", "route": "web-route", "existing": "api,web"}
+    }
+  },
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "Ingress", "name": "storefront", "fieldPath": "spec.defaultBackend.service"},
+    "service": null,
+    "message": {
+      "key": "gap.danglingRoute.noService",
+      "params": {"kind": "Ingress", "route": "storefront", "services": "fallback,frontend"}
+    },
+    "fix": {
+      "kind": "plan",
+      "id": "domains.backend",
+      "params": {"kind": "Ingress", "route": "storefront", "existing": "api,web"}
+    }
+  }
+]

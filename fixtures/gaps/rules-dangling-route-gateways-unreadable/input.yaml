@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: shop
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: unlisted
+  namespace: shop
+spec:
+  parentRefs:
+    - name: edge
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: attached
+  namespace: shop
+spec:
+  parentRefs:
+    - name: public
+      namespace: infra
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+status:
+  parents:
+    - parentRef:
+        name: public
+        namespace: infra
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: "True"
+          reason: Accepted

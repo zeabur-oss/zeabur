@@ -23,7 +23,10 @@ pub use details::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, ProjectDetails, ProjectIcon
 pub use diagnosis::{Diagnosis, DiagnosisKind, Message};
 pub use gap::{Citation, Fix, FixKind, Gap, Severity};
 pub use health::{Health, ProjectHealth, ServiceStatus, StatusWord};
-pub use http_route::{BackendRef, HttpRoute, HttpRouteMetadata, HttpRouteRule, HttpRouteSpec};
+pub use http_route::{
+    BackendRef, GATEWAY_GROUP, HttpRoute, HttpRouteMetadata, HttpRouteRule, HttpRouteSpec,
+    ParentReference, RouteCondition, RouteParentStatus, RouteStatus,
+};
 pub use network::{
     Endpoint, InferredFrom, Port, PortProtocol, ProtocolInference, Route, RouteRule,
 };

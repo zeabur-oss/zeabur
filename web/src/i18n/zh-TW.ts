@@ -1301,6 +1301,14 @@ export const zhTW: Messages = {
     `Ingress ${p.ingress} 可以改成 HTTPRoute；叢集已有 Gateway API。`,
   "sentence.gap.retiredIngressController": (p) =>
     `IngressClass ${p.class} 由 ${p.controller} 提供，它已停止維護。`,
+  "sentence.gap.danglingRoute.noService": (p) =>
+    `${p.kind} ${p.route} 指定的 Service ${(p.services ?? "").split(",").join("、")} 不在這個專案裡。`,
+  "sentence.gap.danglingRoute.noGateway": (p) =>
+    `HTTPRoute ${p.route} 指定的 Gateway ${(p.gateways ?? "").split(",").join("、")} 不存在。`,
+  "sentence.gap.danglingRoute.noParent": (p) =>
+    `HTTPRoute ${p.route} 沒有指定 Gateway，所以它收不到任何流量。`,
+  "sentence.gap.danglingRoute.notAccepted": (p) =>
+    `沒有任何 Gateway 接受 HTTPRoute ${p.route}${p.reason ? `（${p.reason}）` : ""}，所以它收不到任何流量。`,
   "sentence.gap.blockedConnection": (p) =>
     p.at === "egress"
       ? `${p.from} 會連到 ${p.to}（依它的變數），但它自己的 NetworkPolicy 不讓它連出去。`

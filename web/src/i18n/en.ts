@@ -1408,6 +1408,20 @@ export const en = {
     `Ingress ${p.ingress} can move to an HTTPRoute; Gateway API is available.`,
   "sentence.gap.retiredIngressController": (p: P) =>
     `IngressClass ${p.class} is served by ${p.controller}, which is retired.`,
+  "sentence.gap.danglingRoute.noService": (p: P) => {
+    const services = (p.services ?? "").split(",")
+    const many = services.length > 1
+    return `${p.kind} ${p.route} sends traffic to ${many ? "Services" : "Service"} ${services.join(", ")}, which ${many ? "don't" : "doesn't"} exist in this project.`
+  },
+  "sentence.gap.danglingRoute.noGateway": (p: P) => {
+    const gateways = (p.gateways ?? "").split(",")
+    const many = gateways.length > 1
+    return `HTTPRoute ${p.route} attaches to ${many ? "Gateways" : "Gateway"} ${gateways.join(", ")}, which ${many ? "don't" : "doesn't"} exist.`
+  },
+  "sentence.gap.danglingRoute.noParent": (p: P) =>
+    `HTTPRoute ${p.route} names no Gateway, so it receives no traffic.`,
+  "sentence.gap.danglingRoute.notAccepted": (p: P) =>
+    `No Gateway has accepted HTTPRoute ${p.route}${p.reason ? ` (${p.reason})` : ""}, so it receives no traffic.`,
   "sentence.gap.blockedConnection": (p: P) =>
     p.at === "egress"
       ? `${p.from} calls ${p.to} (its variables say so), but its NetworkPolicy blocks the way out.`

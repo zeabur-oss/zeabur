@@ -1343,6 +1343,45 @@ mod tests {
         assert_eq!(cluster_gaps["items"], json!([]));
     }
 
+    /// A route to a Service the namespace lacks is a gap, unless the Services could not be
+    /// listed: then their absence from the read proves nothing.
+    #[tokio::test]
+    async fn a_missing_backend_is_a_gap_only_when_the_services_could_be_listed() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.objects.get_mut("shop").unwrap().http_routes.push(json!({
+                "apiVersion": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute",
+                "metadata": {"name": "typo", "namespace": "shop"},
+                "spec": {"rules": [{"backendRefs": [{"name": "frontned", "port": 80}]}]}
+            }));
+        });
+        let no_service = |gaps: &Value| {
+            gaps["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|g| g["message"]["key"] == "gap.danglingRoute.noService")
+                .cloned()
+        };
+        let readable = get(&cluster, "/api/v1/projects/shop/gaps").await;
+        let gap = no_service(&readable).expect("frontned does not exist");
+        assert_eq!(gap["message"]["params"]["services"], "frontned");
+
+        cluster.update(|s| {
+            s.forbidden_in_namespaces.insert("services".to_owned());
+        });
+        let refused = get(&cluster, "/api/v1/projects/shop/gaps").await;
+        assert_eq!(no_service(&refused), None, "{refused}");
+        assert!(
+            refused["unreadable"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|u| u["resource"] == "services"),
+            "{refused}"
+        );
+    }
+
     #[tokio::test]
     async fn a_project_without_network_policy_is_one_gap_rated_by_enforcement() {
         let cluster = cluster();

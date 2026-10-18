@@ -1,0 +1,76 @@
+[
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "default-none", "fieldPath": "spec.parentRefs"},
+    "message": {"key": "gap.danglingRoute.noParent", "params": {"route": "default-none"}}
+  },
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "default-refused", "fieldPath": "status.parents"},
+    "message": {
+      "key": "gap.danglingRoute.notAccepted",
+      "params": {"route": "default-refused", "reason": "NotAllowedByListeners"}
+    }
+  },
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "mesh-accepted", "fieldPath": "status.parents"},
+    "service": null,
+    "message": {
+      "key": "gap.danglingRoute.notAccepted",
+      "params": {"route": "mesh-accepted", "reason": null}
+    }
+  },
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "moved", "fieldPath": "status.parents"},
+    "service": null,
+    "message": {
+      "key": "gap.danglingRoute.notAccepted",
+      "params": {"route": "moved", "reason": null}
+    }
+  },
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "no-parent", "fieldPath": "spec.parentRefs"},
+    "service": null,
+    "message": {"key": "gap.danglingRoute.noParent", "params": {"route": "no-parent"}},
+    "fix": {"kind": "plan", "id": "domains.parent", "params": {"route": "no-parent"}}
+  },
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "refused", "fieldPath": "status.parents"},
+    "service": null,
+    "message": {
+      "key": "gap.danglingRoute.notAccepted",
+      "params": {"route": "refused", "reason": "NotAllowedByListeners"}
+    },
+    "fix": {"kind": "plan", "id": "domains.parent", "params": {"route": "refused"}}
+  },
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "unlisted", "fieldPath": "status.parents"},
+    "service": null,
+    "message": {
+      "key": "gap.danglingRoute.notAccepted",
+      "params": {"route": "unlisted", "reason": null}
+    }
+  },
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "whole-gateway", "fieldPath": "status.parents"},
+    "service": null,
+    "message": {
+      "key": "gap.danglingRoute.notAccepted",
+      "params": {"route": "whole-gateway", "reason": null}
+    }
+  }
+]

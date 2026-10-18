@@ -1,0 +1,257 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: shop
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: unlisted
+  namespace: shop
+spec:
+  parentRefs:
+    - name: edge
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: refused
+  namespace: shop
+spec:
+  parentRefs:
+    - name: edge
+    - name: internal
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+status:
+  parents:
+    - parentRef:
+        name: edge
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: "False"
+          reason: NotAllowedByListeners
+          message: no listener allows routes from namespace shop
+    - parentRef:
+        name: internal
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: "False"
+          reason: NoMatchingListenerHostname
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: partly
+  namespace: shop
+spec:
+  parentRefs:
+    - name: edge
+    - name: internal
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+status:
+  parents:
+    - parentRef:
+        name: edge
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: "False"
+          reason: NotAllowedByListeners
+    - parentRef:
+        name: internal
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: "True"
+          reason: Accepted
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: pending
+  namespace: shop
+spec:
+  parentRefs:
+    - name: edge
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+status:
+  parents:
+    - parentRef:
+        name: edge
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: Unknown
+          reason: Pending
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: moved
+  namespace: shop
+spec:
+  parentRefs:
+    - name: internal
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+status:
+  parents:
+    # The parent it left: its controller has not cleaned the entry up yet.
+    - parentRef:
+        name: edge
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: "True"
+          reason: Accepted
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mesh-only
+  namespace: shop
+spec:
+  parentRefs:
+    # A mesh route: its parent is a Service, and it names no Gateway.
+    - group: ""
+      kind: Service
+      name: web
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mesh-accepted
+  namespace: shop
+spec:
+  parentRefs:
+    - name: edge
+    - group: ""
+      kind: Service
+      name: web
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+status:
+  parents:
+    # Only the mesh answered; the Gateway has not.
+    - parentRef:
+        group: ""
+        kind: Service
+        name: web
+      controllerName: example.test/mesh-controller
+      conditions:
+        - type: Accepted
+          status: "True"
+          reason: Accepted
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: whole-gateway
+  namespace: shop
+spec:
+  parentRefs:
+    # It named the https listener before; now it names the whole Gateway.
+    - name: internal
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+status:
+  parents:
+    - parentRef:
+        name: internal
+        sectionName: https
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: "True"
+          reason: Accepted
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: no-parent
+  namespace: shop
+spec:
+  # No parentRefs: it attaches to nothing.
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: default-unclaimed
+  namespace: shop
+spec:
+  # Asks for default Gateways; none has claimed it, and none may exist.
+  useDefaultGateways: All
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: default-refused
+  namespace: shop
+spec:
+  useDefaultGateways: All
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+status:
+  parents:
+    # The default Gateway that claimed it, refusing it.
+    - parentRef:
+        name: edge
+      controllerName: example.test/gateway-controller
+      conditions:
+        - type: Accepted
+          status: "False"
+          reason: NotAllowedByListeners
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: default-none
+  namespace: shop
+spec:
+  # None asks for no default Gateway, so the route attaches to nothing.
+  useDefaultGateways: None
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80

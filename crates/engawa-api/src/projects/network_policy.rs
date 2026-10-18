@@ -139,7 +139,9 @@ pub(crate) async fn enforcement(cluster: &dyn Cluster) -> Enforcement {
 
 /// Services traffic reaches from outside the project: those an Ingress routes to (from the
 /// projection) or an HTTPRoute names a Kubernetes Service of in `backendRefs` [gateway-backend],
-/// and those behind a `NodePort` or `LoadBalancer` Service.
+/// and those behind a `NodePort` or `LoadBalancer` Service. A backend of weight 0 counts: it
+/// receives nothing now, but a change to the weight alone opens it to outside traffic, so it is
+/// protected as if it did.
 ///
 /// [gateway-backend]: https://gateway-api.sigs.k8s.io/reference/spec/#httpbackendref
 pub(crate) fn exposed(
@@ -152,7 +154,7 @@ pub(crate) fn exposed(
         .collect();
     let backends: Vec<&str> = http_routes
         .iter()
-        .flat_map(HttpRoute::local_services)
+        .flat_map(HttpRoute::named_local_services)
         .collect();
     let routed = project
         .services

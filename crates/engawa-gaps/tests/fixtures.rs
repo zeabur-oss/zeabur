@@ -6,6 +6,7 @@ mod tests {
         BUILTIN, ClusterTraits, Event, GatewayRef, Input, Rule, diagnose, evaluate, snippet,
     };
     use engawa_graph::{Snapshot, project};
+    use engawa_model::HttpRoute;
     use engawa_test_support::fixtures::{Fixture, compare, load};
     use k8s_openapi::jiff::Timestamp;
     use serde_json::{Value, from_value, to_value};
@@ -36,6 +37,34 @@ mod tests {
             }
         }
         (snapshot, events, http_routes)
+    }
+
+    /// The `gateways` parameter: `null` when they could not be listed, none when absent.
+    fn gateways(params: &Value) -> Option<Vec<GatewayRef>> {
+        match params.get("gateways") {
+            None => Some(Vec::new()),
+            Some(Value::Null) => None,
+            Some(listed) => Some(gateway_list(listed)),
+        }
+    }
+
+    fn gateway_list(listed: &Value) -> Vec<GatewayRef> {
+        listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|g| GatewayRef {
+                namespace: g["namespace"].as_str().unwrap().to_owned(),
+                name: g["name"].as_str().unwrap().to_owned(),
+            })
+            .collect()
+    }
+
+    fn parse_routes(http_routes: &[Value]) -> Vec<HttpRoute> {
+        http_routes
+            .iter()
+            .map(|route| from_value(route.clone()).unwrap())
+            .collect()
     }
 
     fn run(fixture: &Fixture) -> Value {
@@ -77,11 +106,16 @@ mod tests {
                         .map_or_else(Default::default, |a| {
                             a.iter().map(|c| c.as_str().unwrap().to_owned()).collect()
                         }),
+                    gateways: gateways(params),
                 };
+                let routes = parse_routes(&http_routes);
                 to_value(evaluate(
                     &rules,
                     &Input {
                         project: &project,
+                        snapshot: &snapshot,
+                        http_routes: &routes,
+                        services_readable: params["servicesReadable"].as_bool().unwrap_or(true),
                         cluster: &cluster,
                     },
                 ))
@@ -89,23 +123,20 @@ mod tests {
             }
             "gaps.snippets" => {
                 let project = project(&snapshot);
+                let gateways = gateways(params).unwrap_or_default();
                 let cluster = ClusterTraits {
                     gateway_api: true,
                     retired_ingress_classes: std::collections::BTreeSet::new(),
+                    gateways: Some(gateways.clone()),
                 };
-                let gateways: Vec<GatewayRef> =
-                    params["gateways"].as_array().map_or_else(Vec::new, |a| {
-                        a.iter()
-                            .map(|g| GatewayRef {
-                                namespace: g["namespace"].as_str().unwrap().to_owned(),
-                                name: g["name"].as_str().unwrap().to_owned(),
-                            })
-                            .collect()
-                    });
+                let routes = parse_routes(&http_routes);
                 let gaps = evaluate(
                     &BUILTIN,
                     &Input {
                         project: &project,
+                        snapshot: &snapshot,
+                        http_routes: &routes,
+                        services_readable: true,
                         cluster: &cluster,
                     },
                 );

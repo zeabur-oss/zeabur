@@ -1,0 +1,13 @@
+[
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "typo", "fieldPath": "spec.parentRefs[1]"},
+    "service": null,
+    "message": {
+      "key": "gap.danglingRoute.noGateway",
+      "params": {"route": "typo", "gateways": "edge,infra-old/public"}
+    },
+    "fix": {"kind": "plan", "id": "domains.parent", "params": {"route": "typo"}}
+  }
+]

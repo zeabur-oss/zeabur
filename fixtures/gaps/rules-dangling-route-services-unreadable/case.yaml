@@ -1,0 +1,7 @@
+description: When the namespace's Services could not be listed, the input holds none, but no backend is said to name a missing Service; the Gateway and acceptance checks still run.
+operation: gaps.rules
+params:
+  rules: [dangling-route]
+  servicesReadable: false
+  gateways:
+    - {namespace: infra, name: public}

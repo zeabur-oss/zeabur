@@ -1,0 +1,11 @@
+[
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "web-route", "fieldPath": "spec.parentRefs[0]"},
+    "message": {
+      "key": "gap.danglingRoute.noGateway",
+      "params": {"route": "web-route", "gateways": "edge"}
+    }
+  }
+]

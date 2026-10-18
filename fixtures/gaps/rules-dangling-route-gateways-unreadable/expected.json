@@ -1,0 +1,10 @@
+[
+  {
+    "rule": "dangling-route",
+    "severity": "warning",
+    "subject": {"kind": "HTTPRoute", "name": "unlisted", "fieldPath": "status.parents"},
+    "service": null,
+    "message": {"key": "gap.danglingRoute.notAccepted", "params": {"route": "unlisted"}},
+    "fix": {"kind": "plan", "id": "domains.parent", "params": {"route": "unlisted"}}
+  }
+]

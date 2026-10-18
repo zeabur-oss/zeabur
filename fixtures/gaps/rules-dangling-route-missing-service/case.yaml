@@ -1,0 +1,6 @@
+description: An Ingress and an HTTPRoute whose backends name a Service the namespace does not have are one warning each, naming every missing Service and the existing ones; a backend in another namespace, of another kind, of weight 0, or a Service that exists is not a finding.
+operation: gaps.rules
+params:
+  rules: [dangling-route]
+  gateways:
+    - {namespace: infra, name: public}

@@ -1,0 +1,5 @@
+description: When the Gateways could not be listed (gateways null), no Gateway is said to be missing; a route no parent lists is still a warning, from its own status.
+operation: gaps.rules
+params:
+  rules: [dangling-route]
+  gateways: null

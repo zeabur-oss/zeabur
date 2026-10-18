@@ -25,7 +25,7 @@ use engawa_gaps::{
 };
 use engawa_graph::manifest;
 use engawa_kube::{Cluster, ClusterExt as _, ResourceRef};
-use engawa_model::{Citation, Gap};
+use engawa_model::{Citation, Gap, HttpRoute};
 use engawa_modules::Finding;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -60,7 +60,8 @@ pub struct GapList {
 /// The cluster-wide facts the rules need, and the refused reads.
 struct Facts {
     classes: Vec<IngressClassFact>,
-    gateways: Vec<GatewayRef>,
+    /// `None` when the person may not list them.
+    gateways: Option<Vec<GatewayRef>>,
     unreadable: Vec<UnreadableView>,
 }
 
@@ -95,13 +96,12 @@ async fn facts(cluster: &dyn Cluster) -> Result<Facts, ApiError> {
             Vec::new()
         }
     };
-    let gateways = match cluster.gateways().await {
-        Ok(Some(gateways)) => gateways,
-        // Refused: the rules run as if no Gateway existed; the plan names the refusal when a
-        // route is written.
-        Ok(None) => Vec::new(),
-        Err(other) => return Err(ApiError::from(other.into_problem("Gateways"))),
-    };
+    // Refused (`None`): the rules run as if no Gateway were served and none says one is
+    // missing; the plan names the refusal when a route is written.
+    let gateways = cluster
+        .gateways()
+        .await
+        .map_err(|other| ApiError::from(other.into_problem("Gateways")))?;
     Ok(Facts {
         classes,
         gateways,
@@ -125,6 +125,8 @@ pub(crate) async fn project(
     let facts = facts?;
     let http_routes = objects.http_routes.clone();
     let (snapshot, mut unreadable) = crate::projects::snapshot(objects);
+    // A refused list leaves `snapshot.services` empty; it says nothing about which exist.
+    let services_readable = !unreadable.iter().any(|u| u.resource == "services");
     let projection = engawa_graph::project(&snapshot);
     let found = module_findings(
         cluster,
@@ -135,9 +137,14 @@ pub(crate) async fn project(
         &mut unreadable,
     )
     .await?;
+    let routes: Vec<HttpRoute> = http_routes
+        .iter()
+        .filter_map(|route| serde_json::from_value(route.clone()).ok())
+        .collect();
     let traits = ClusterTraits {
-        gateway_api: !facts.gateways.is_empty(),
+        gateway_api: facts.gateways.as_ref().is_some_and(|g| !g.is_empty()),
         retired_ingress_classes: retired_classes(&facts.classes),
+        gateways: facts.gateways,
     };
     let modules: Vec<ModuleRule> = ModuleRule::group(&found);
     let mut rules: Vec<&dyn Rule> = BUILTIN.to_vec();
@@ -148,6 +155,9 @@ pub(crate) async fn project(
         &rules,
         &Input {
             project: &projection,
+            snapshot: &snapshot,
+            http_routes: &routes,
+            services_readable,
             cluster: &traits,
         },
     );
@@ -155,7 +165,13 @@ pub(crate) async fn project(
         .into_iter()
         .map(|gap| GapView {
             snippet: found.iter().find(|f| f.gap == gap).map_or_else(
-                || snippet(&gap, &projection, &facts.gateways),
+                || {
+                    snippet(
+                        &gap,
+                        &projection,
+                        traits.gateways.as_deref().unwrap_or_default(),
+                    )
+                },
                 |f| f.object.as_ref().and_then(|o| manifest::to_yaml(o).ok()),
             ),
             gap,
