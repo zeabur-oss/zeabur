@@ -189,6 +189,19 @@ pub fn names_host(value: &str, namespace: &str, name: &str) -> bool {
     !mentioned_services(value, namespace, &BTreeMap::from([(name, name)])).is_empty()
 }
 
+/// The names in `known` that `value` names as a host in `namespace`, as [`names_host`] decides
+/// for one name, reading `value` once.
+#[must_use]
+pub fn named_hosts<'a, V>(
+    value: &str,
+    namespace: &str,
+    known: &BTreeMap<&'a str, V>,
+) -> BTreeSet<&'a str> {
+    mentioned_services(value, namespace, known)
+        .into_keys()
+        .collect()
+}
+
 /// The names in `known` that `value` mentions as a host: a token of letters, digits, dots and
 /// hyphens that is the name itself, or the name followed by `.<namespace>`,
 /// `.<namespace>.svc` or `.<namespace>.svc.cluster.local`.
@@ -241,5 +254,17 @@ mod tests {
         );
         assert_eq!(found("https://api.example.com"), Vec::<&str>::new());
         assert_eq!(found("redis-cache"), Vec::<&str>::new());
+    }
+
+    #[test]
+    fn one_value_names_every_known_host_it_mentions() {
+        let known = BTreeMap::from([("api", "api"), ("db", "db"), ("redis", "redis")]);
+        let value = "http://api:8080,postgres://db.shop.svc:5432/x,other.example.com,cache";
+        assert_eq!(
+            named_hosts(value, "shop", &known)
+                .into_iter()
+                .collect::<Vec<_>>(),
+            ["api", "db"]
+        );
     }
 }

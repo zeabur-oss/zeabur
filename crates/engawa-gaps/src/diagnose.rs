@@ -51,7 +51,7 @@ use engawa_model::{
     Origin, PodSummary, Service, WorkloadKind,
 };
 use k8s_openapi::api::batch::v1::Job;
-use k8s_openapi::api::core::v1::{PodSpec, Probe};
+use k8s_openapi::api::core::v1::{Pod, PodSpec, Probe};
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
 use serde_json::Value;
 
@@ -72,6 +72,9 @@ const OUTPUT_LIMIT: usize = 200;
 /// without it every failure the status still shows counts. `events` are the project's events
 /// and `http_routes` its `HTTPRoutes`, as JSON (any order; those about other objects are
 /// ignored).
+///
+/// Each call reads the whole namespace again. To diagnose more than one service of a namespace,
+/// read it once with [`Namespace::new`] and call [`Namespace::diagnose`] for each.
 #[must_use]
 pub fn diagnose(
     service: &Service,
@@ -79,59 +82,169 @@ pub fn diagnose(
     events: &[Event],
     http_routes: &[Value],
 ) -> Vec<Diagnosis> {
-    let now = snapshot.now;
-    let mut found = Found::default();
-    let runs = matches!(
-        service.workload.kind,
-        WorkloadKind::Job | WorkloadKind::CronJob
-    );
-    let workload = workloads(snapshot)
-        .into_iter()
-        .find(|w| w.kind() == service.workload.kind && w.name() == service.workload.name);
-    for pod in &service.pods {
-        // What a `CreateContainerConfigError` in this pod already names as missing.
-        let mut missing = BTreeSet::new();
-        let pod_events: Vec<&Event> = events
-            .iter()
-            .filter(|e| {
-                e.regarding
-                    .as_ref()
-                    .is_some_and(|r| r.kind == "Pod" && r.name == pod.name)
-            })
-            .collect();
-        for status in &pod.container_statuses {
-            let image = service
-                .containers
-                .iter()
-                .find(|c| c.name == status.name)
-                .and_then(|c| c.image.clone());
-            image_pull(&mut found, pod, status, image.as_deref(), &pod_events);
-            missing.extend(config_missing(&mut found, pod, status));
-            if runs {
-                run_failed(&mut found, pod, status, job_of(snapshot, &pod.name));
-            } else {
-                crash_loop(&mut found, service, pod, status, now);
+    Namespace::new(snapshot, events, http_routes).diagnose(service)
+}
+
+/// A namespace read once for the diagnoses of all its services.
+///
+/// It holds the workloads, pods and Jobs by name, the events by the object they are about, and
+/// what sends to what. Each diagnosis looks up what it needs instead of going through the
+/// namespace again, so diagnosing every service takes time in proportion to the namespace's
+/// size, not to its square. Of several objects with one name the first counts, and what is
+/// listed keeps the order it was given in, so the diagnoses are those of [`diagnose`].
+#[derive(Debug)]
+pub struct Namespace<'a> {
+    snapshot: &'a Snapshot,
+    /// The workloads by kind and name, the first of each in [`workloads`]' order.
+    workloads: BTreeMap<WorkloadKind, BTreeMap<&'a str, Workload<'a>>>,
+    /// The snapshot's pods by name, with their position in it.
+    pods: BTreeMap<&'a str, Vec<(usize, &'a Pod)>>,
+    /// The first Job of each name.
+    jobs: BTreeMap<&'a str, &'a Job>,
+    /// The events by the kind and name of the object they are about, in the order given.
+    events: BTreeMap<&'a str, BTreeMap<&'a str, Vec<&'a Event>>>,
+    traffic: traffic::Traffic<'a>,
+}
+
+impl<'a> Namespace<'a> {
+    /// Reads `snapshot`, `events` and `http_routes` as [`diagnose`] takes them.
+    #[must_use]
+    pub fn new(snapshot: &'a Snapshot, events: &'a [Event], http_routes: &'a [Value]) -> Self {
+        let sorted = workloads(snapshot);
+        let mut by_name: BTreeMap<WorkloadKind, BTreeMap<&str, Workload<'_>>> = BTreeMap::new();
+        for &workload in &sorted {
+            by_name
+                .entry(workload.kind())
+                .or_default()
+                .entry(workload.name())
+                .or_insert(workload);
+        }
+        let mut pods: BTreeMap<&str, Vec<(usize, &Pod)>> = BTreeMap::new();
+        for (position, pod) in snapshot.pods.iter().enumerate() {
+            pods.entry(pod.metadata.name.as_deref().unwrap_or_default())
+                .or_default()
+                .push((position, pod));
+        }
+        let mut jobs = BTreeMap::new();
+        for job in &snapshot.jobs {
+            if let Some(name) = job.metadata.name.as_deref() {
+                jobs.entry(name).or_insert(job);
             }
         }
-        let spec = snapshot
-            .pods
+        let mut by_object: BTreeMap<&str, BTreeMap<&str, Vec<&Event>>> = BTreeMap::new();
+        for event in events {
+            if let Some(regarding) = &event.regarding {
+                by_object
+                    .entry(regarding.kind.as_str())
+                    .or_default()
+                    .entry(regarding.name.as_str())
+                    .or_default()
+                    .push(event);
+            }
+        }
+        Self {
+            snapshot,
+            traffic: traffic::Traffic::new(snapshot, &sorted, http_routes),
+            workloads: by_name,
+            pods,
+            jobs,
+            events: by_object,
+        }
+    }
+
+    /// The diagnoses of `service`, a service of this namespace, as [`diagnose`] gives them.
+    #[must_use]
+    pub fn diagnose(&self, service: &Service) -> Vec<Diagnosis> {
+        let now = self.snapshot.now;
+        let mut found = Found::default();
+        let runs = matches!(
+            service.workload.kind,
+            WorkloadKind::Job | WorkloadKind::CronJob
+        );
+        let workload = self
+            .workloads
+            .get(&service.workload.kind)
+            .and_then(|by_name| by_name.get(service.workload.name.as_str()))
+            .copied();
+        for pod in &service.pods {
+            // What a `CreateContainerConfigError` in this pod already names as missing.
+            let mut missing = BTreeSet::new();
+            let pod_events = self.events_about("Pod", &pod.name);
+            for status in &pod.container_statuses {
+                let image = service
+                    .containers
+                    .iter()
+                    .find(|c| c.name == status.name)
+                    .and_then(|c| c.image.clone());
+                image_pull(&mut found, pod, status, image.as_deref(), pod_events);
+                missing.extend(config_missing(&mut found, pod, status));
+                if runs {
+                    run_failed(&mut found, pod, status, self.job_of(&pod.name));
+                } else {
+                    crash_loop(&mut found, service, pod, status, now);
+                }
+            }
+            let spec = self
+                .pod(&pod.name)
+                .and_then(|p| p.spec.as_ref())
+                .or_else(|| workload.and_then(Workload::pod_spec));
+            probe_failures(&mut found, pod, spec, pod_events, now);
+            volume_missing(&mut found, pod, pod_events, &missing, now);
+        }
+        unschedulable(&mut found, service, self.pods_of(service));
+        if let Some(workload) = workload {
+            let about = self.events_about(workload.kind().as_str(), workload.name());
+            quota_blocked(&mut found, workload, about);
+            traffic::unreachable(&mut found, service, &self.traffic, workload);
+        }
+        let mut diagnoses = found.finish(runs);
+        if diagnoses.is_empty() && service.status.health == Health::Fail {
+            diagnoses.push(unexplained(service));
+        }
+        diagnoses
+    }
+
+    /// The events about object `kind`/`name`, in the order given.
+    fn events_about(&self, kind: &str, name: &str) -> &[&'a Event] {
+        self.events
+            .get(kind)
+            .and_then(|by_name| by_name.get(name))
+            .map_or(&[], Vec::as_slice)
+    }
+
+    /// The first pod called `name`; one without a name has none.
+    fn pod(&self, name: &str) -> Option<&'a Pod> {
+        self.pods
+            .get(name)?
             .iter()
-            .find(|p| p.metadata.name.as_deref() == Some(pod.name.as_str()))
-            .and_then(|p| p.spec.as_ref())
-            .or_else(|| workload.and_then(Workload::pod_spec));
-        probe_failures(&mut found, pod, spec, &pod_events, now);
-        volume_missing(&mut found, pod, &pod_events, &missing, now);
+            .map(|&(_, pod)| pod)
+            .find(|pod| pod.metadata.name.is_some())
     }
-    unschedulable(&mut found, service, snapshot);
-    if let Some(workload) = workload {
-        quota_blocked(&mut found, workload, events);
-        traffic::unreachable(&mut found, service, snapshot, workload, http_routes);
+
+    /// The snapshot's pods that `service` lists, in the snapshot's order.
+    fn pods_of(&self, service: &Service) -> Vec<&'a Pod> {
+        let names: BTreeSet<&str> = service.pods.iter().map(|p| p.name.as_str()).collect();
+        let mut pods: Vec<(usize, &Pod)> = names
+            .into_iter()
+            .filter_map(|name| self.pods.get(name))
+            .flatten()
+            .copied()
+            .collect();
+        pods.sort_by_key(|&(position, _)| position);
+        pods.into_iter().map(|(_, pod)| pod).collect()
     }
-    let mut diagnoses = found.finish(runs);
-    if diagnoses.is_empty() && service.status.health == Health::Fail {
-        diagnoses.push(unexplained(service));
+
+    /// The Job that owns pod `name`: a Job's run, or a CronJob's.
+    fn job_of(&self, name: &str) -> Option<&'a Job> {
+        let owner = self
+            .pod(name)?
+            .metadata
+            .owner_references
+            .iter()
+            .flatten()
+            .find(|o| o.kind == "Job")?;
+        self.jobs.get(owner.name.as_str()).copied()
     }
-    diagnoses
 }
 
 /// What one pod's container shows, gathered across pods by kind, container and sentence.
@@ -487,24 +600,6 @@ fn crash_loop(
         ],
         when,
     );
-}
-
-/// The Job that owns pod `name`: a Job's run, or a CronJob's.
-fn job_of<'s>(snapshot: &'s Snapshot, name: &str) -> Option<&'s Job> {
-    let pod = snapshot
-        .pods
-        .iter()
-        .find(|p| p.metadata.name.as_deref() == Some(name))?;
-    let owner = pod
-        .metadata
-        .owner_references
-        .iter()
-        .flatten()
-        .find(|o| o.kind == "Job")?;
-    snapshot
-        .jobs
-        .iter()
-        .find(|j| j.metadata.name.as_deref() == Some(owner.name.as_str()))
 }
 
 /// Whether `job` stopped retrying: its `Failed` condition with reason `BackoffLimitExceeded`
@@ -866,13 +961,11 @@ fn shortage(message: &str) -> &'static str {
     }
 }
 
-fn unschedulable(found: &mut Found, service: &Service, snapshot: &Snapshot) {
+/// The pods of `service` that wait for a node; `pods` are the snapshot's pods it lists.
+fn unschedulable(found: &mut Found, service: &Service, pods: Vec<&Pod>) {
     let name = &service.workload.name;
-    for pod in &snapshot.pods {
+    for pod in pods {
         let pod_name = pod.metadata.name.as_deref().unwrap_or_default();
-        if !service.pods.iter().any(|p| p.name == pod_name) {
-            continue;
-        }
         let Some(condition) = pod
             .status
             .iter()
@@ -919,7 +1012,8 @@ fn quota_of(message: &str) -> Option<&str> {
     (!name.is_empty()).then_some(name)
 }
 
-fn quota_blocked(found: &mut Found, workload: Workload<'_>, events: &[Event]) {
+/// A quota that refuses the workload's pods; `events` are those about the workload.
+fn quota_blocked(found: &mut Found, workload: Workload<'_>, events: &[&Event]) {
     let (kind, name) = (workload.kind().as_str(), workload.name());
     let mut add = |message: &str, evidence: Origin, when: Option<Timestamp>| {
         let Some(quota) = quota_of(message) else {
@@ -959,12 +1053,7 @@ fn quota_blocked(found: &mut Found, workload: Workload<'_>, events: &[Event]) {
             );
         }
     }
-    for event in events.iter().filter(|e| {
-        e.reason == "FailedCreate"
-            && e.regarding
-                .as_ref()
-                .is_some_and(|r| r.kind == kind && r.name == name)
-    }) {
+    for event in events.iter().filter(|e| e.reason == "FailedCreate") {
         add(&event.note, event.origin.clone(), event.last_seen);
     }
 }

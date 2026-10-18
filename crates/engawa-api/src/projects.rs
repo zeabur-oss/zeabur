@@ -226,8 +226,9 @@ pub(crate) async fn document_of(
         }
         Err(_) => Vec::new(),
     };
+    let namespace = engawa_gaps::Namespace::new(&snapshot, &events, &http_routes);
     for service in &mut projection.services {
-        service.diagnoses = engawa_gaps::diagnose(service, &snapshot, &events, &http_routes);
+        service.diagnoses = namespace.diagnose(service);
     }
     let extensions = ProjectExtensions {
         network_policy: network_policy::extension(cluster, &snapshot, &projection, &mut unreadable)

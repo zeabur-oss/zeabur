@@ -5,7 +5,7 @@ mod event;
 mod rules;
 mod snippet;
 
-pub use diagnose::{RECENT, diagnose};
+pub use diagnose::{Namespace, RECENT, diagnose};
 pub use engawa_core::names::GatewayRef;
 pub use event::Event;
 pub use rules::{

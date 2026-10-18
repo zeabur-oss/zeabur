@@ -25,7 +25,9 @@
 //! [k8s-service-ports]: https://kubernetes.io/docs/concepts/services-networking/service/#field-spec-ports
 //! [gateway-route-status]: https://gateway-api.sigs.k8s.io/reference/spec/#routeconditiontype
 
-use engawa_graph::{Snapshot, Workload, env, ingress_backends, names_host, workloads};
+use std::collections::{BTreeMap, BTreeSet};
+
+use engawa_graph::{Snapshot, Workload, env, ingress_backends, named_hosts};
 use engawa_model::{
     DiagnosisKind, Endpoint, Health, HttpRoute, Message, Origin, Service, WorkloadKind,
 };
@@ -33,38 +35,104 @@ use serde_json::Value;
 
 use super::{Found, parse, truncate};
 
-/// What sends to `workload` by its name while no Service has that name: Ingress and `HTTPRoute`
-/// backends, then other workloads' variables naming it as a host. Each with the name of what
-/// sends and the field that says so.
-fn senders(
-    snapshot: &Snapshot,
-    workload: Workload<'_>,
-    http_routes: &[Value],
-) -> Vec<(String, Origin)> {
-    let name = workload.name();
-    if snapshot
-        .services
-        .iter()
-        .any(|s| s.metadata.name.as_deref() == Some(name))
-    {
-        return Vec::new();
-    }
-    let mut out = Vec::new();
-    for ingress in &snapshot.ingresses {
-        let ingress_name = ingress.metadata.name.as_deref().unwrap_or_default();
-        for (backend, path) in ingress_backends(ingress) {
-            if backend == name {
-                out.push((
+/// What sends to what in a namespace, read once for all its services: the names of its
+/// Services, the Ingress and `HTTPRoute` backends, and the hosts the workloads' variables name.
+#[derive(Debug)]
+pub(super) struct Traffic<'a> {
+    /// The names of the Services.
+    services: BTreeSet<&'a str>,
+    /// By backend name, the Ingresses that send to it and the field that says so, in the order
+    /// of the Ingresses and their backends.
+    ingresses: BTreeMap<&'a str, Vec<(String, Origin)>>,
+    /// The `HTTPRoutes`, as given.
+    routes: &'a [Value],
+    /// By Service name, the positions in `routes` of those that send to it
+    /// ([`HttpRoute::routes_to`]); each is deserialised once. One that is not an `HTTPRoute`
+    /// sends to none.
+    routed: BTreeMap<String, BTreeSet<usize>>,
+    /// By workload name, the workloads whose variables name it as a host
+    /// ([`engawa_graph::names_host`]) and the variable's field, in the order of the workloads,
+    /// their containers and their variables.
+    hosts: BTreeMap<String, Vec<(WorkloadKind, &'a str, Origin)>>,
+}
+
+impl<'a> Traffic<'a> {
+    /// `workloads` are the snapshot's, sorted as [`engawa_graph::workloads`] sorts them.
+    pub(super) fn new(
+        snapshot: &'a Snapshot,
+        workloads: &[Workload<'a>],
+        http_routes: &'a [Value],
+    ) -> Self {
+        let mut ingresses: BTreeMap<&str, Vec<(String, Origin)>> = BTreeMap::new();
+        for ingress in &snapshot.ingresses {
+            let ingress_name = ingress.metadata.name.as_deref().unwrap_or_default();
+            for (backend, path) in ingress_backends(ingress) {
+                ingresses.entry(backend).or_default().push((
                     ingress_name.to_owned(),
                     Origin::field("Ingress", ingress_name, path),
                 ));
             }
         }
+        let mut routed: BTreeMap<String, BTreeSet<usize>> = BTreeMap::new();
+        for (position, route) in http_routes.iter().enumerate() {
+            let Ok(route) = serde_json::from_value::<HttpRoute>(route.clone()) else {
+                continue;
+            };
+            for backend in route.local_services() {
+                routed
+                    .entry(backend.to_owned())
+                    .or_default()
+                    .insert(position);
+            }
+        }
+        // Only a workload's name is ever looked up, so each value is read once against them.
+        let names: BTreeMap<&str, &str> = workloads.iter().map(|w| (w.name(), w.name())).collect();
+        let mut hosts: BTreeMap<String, Vec<(WorkloadKind, &str, Origin)>> = BTreeMap::new();
+        for &other in workloads {
+            let containers = other.pod_spec().into_iter().flat_map(|spec| {
+                spec.init_containers
+                    .iter()
+                    .flatten()
+                    .chain(&spec.containers)
+            });
+            for container in containers {
+                for variable in env(other, &container.name).into_iter().flatten() {
+                    let Some(value) = variable.value.as_deref() else {
+                        continue;
+                    };
+                    for host in named_hosts(value, &snapshot.namespace, &names) {
+                        hosts.entry(host.to_owned()).or_default().push((
+                            other.kind(),
+                            other.name(),
+                            variable.origin.clone(),
+                        ));
+                    }
+                }
+            }
+        }
+        Self {
+            services: snapshot
+                .services
+                .iter()
+                .filter_map(|s| s.metadata.name.as_deref())
+                .collect(),
+            ingresses,
+            routes: http_routes,
+            routed,
+            hosts,
+        }
     }
-    for route in http_routes {
-        let to_it = serde_json::from_value::<HttpRoute>(route.clone())
-            .is_ok_and(|route| route.routes_to(|backend| backend == name));
-        if to_it {
+
+    /// What sends to `workload` by its name while no Service has that name: Ingress and
+    /// `HTTPRoute` backends, then other workloads' variables naming it as a host. Each with the
+    /// name of what sends and the field that says so.
+    fn senders(&self, workload: Workload<'_>) -> Vec<(String, Origin)> {
+        let name = workload.name();
+        if self.services.contains(name) {
+            return Vec::new();
+        }
+        let mut out = self.ingresses.get(name).cloned().unwrap_or_default();
+        for route in self.routes_to([name]) {
             let route_name = route
                 .pointer("/metadata/name")
                 .and_then(Value::as_str)
@@ -74,30 +142,27 @@ fn senders(
                 Origin::field("HTTPRoute", route_name, "spec.rules".to_owned()),
             ));
         }
-    }
-    for other in workloads(snapshot) {
-        if other.kind() == workload.kind() && other.name() == name {
-            continue;
-        }
-        let containers = other.pod_spec().into_iter().flat_map(|spec| {
-            spec.init_containers
-                .iter()
-                .flatten()
-                .chain(&spec.containers)
-        });
-        for container in containers {
-            for variable in env(other, &container.name).into_iter().flatten() {
-                if variable
-                    .value
-                    .as_deref()
-                    .is_some_and(|value| names_host(value, &snapshot.namespace, name))
-                {
-                    out.push((other.name().to_owned(), variable.origin));
-                }
+        for (kind, other, origin) in self.hosts.get(name).into_iter().flatten() {
+            if !(*kind == workload.kind() && *other == name) {
+                out.push(((*other).to_owned(), origin.clone()));
             }
         }
+        out
     }
-    out
+
+    /// The `HTTPRoutes` that send to one of `names`, each once, in the order given.
+    fn routes_to<'n>(&self, names: impl IntoIterator<Item = &'n str>) -> Vec<&'a Value> {
+        let positions: BTreeSet<usize> = names
+            .into_iter()
+            .filter_map(|name| self.routed.get(name))
+            .flatten()
+            .copied()
+            .collect();
+        positions
+            .into_iter()
+            .filter_map(|position| self.routes.get(position))
+            .collect()
+    }
 }
 
 /// The ports a workload's containers declare: name and number, with the container.
@@ -121,9 +186,8 @@ fn declared(workload: Workload<'_>) -> Vec<(String, Option<String>, i32)> {
 pub(super) fn unreachable(
     found: &mut Found,
     service: &Service,
-    snapshot: &Snapshot,
+    traffic: &Traffic<'_>,
     workload: Workload<'_>,
-    http_routes: &[Value],
 ) {
     let kind = workload.kind();
     if matches!(kind, WorkloadKind::Job | WorkloadKind::CronJob) {
@@ -150,7 +214,7 @@ pub(super) fn unreachable(
     };
 
     if service.endpoints.is_empty() {
-        let senders = senders(snapshot, workload, http_routes);
+        let senders = traffic.senders(workload);
         if let Some((from, _)) = senders.first() {
             add(
                 "noService",
@@ -213,8 +277,8 @@ pub(super) fn unreachable(
         );
     }
 
-    for route in http_routes {
-        refused_route(&mut add, route, &service.endpoints);
+    for route in traffic.routes_to(service.endpoints.iter().map(|e| e.name.as_str())) {
+        refused_route(&mut add, route);
     }
 }
 
@@ -226,22 +290,12 @@ fn names(endpoints: &[Endpoint]) -> String {
         .join(", ")
 }
 
-/// Whether `route` sends to one of `endpoints` ([`HttpRoute::local_services`]).
-fn routes_to(route: &Value, endpoints: &[Endpoint]) -> bool {
-    serde_json::from_value::<HttpRoute>(route.clone())
-        .is_ok_and(|route| route.routes_to(|name| endpoints.iter().any(|e| e.name == name)))
-}
-
 /// An `HTTPRoute` to the service that a parent did not accept, or whose backends it did not
 /// resolve.
 fn refused_route(
     add: &mut impl FnMut(&str, &[(&str, String)], Vec<Origin>, Option<k8s_openapi::jiff::Timestamp>),
     route: &Value,
-    endpoints: &[Endpoint],
 ) {
-    if !routes_to(route, endpoints) {
-        return;
-    }
     let route_name = route
         .pointer("/metadata/name")
         .and_then(Value::as_str)
