@@ -129,6 +129,11 @@
         }
       );
 
+      # zhtw-mcp on its own, so CI can key a cache on its derivation (`.#zhtw-mcp.drvPath`).
+      packages = forEachSupportedSystem (
+        { system, ... }: { inherit (inputs.zhtw-mcp.packages.${system}) zhtw-mcp; }
+      );
+
       formatter = forEachSupportedSystem ({ pkgs, ... }: pkgs.nixfmt);
     };
 }
