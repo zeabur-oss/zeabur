@@ -517,7 +517,6 @@ export const zhCN: Messages = {
   "palette.recent": "最近",
   "palette.actions": "操作",
   "palette.openLogs": (name) => `打开 ${name} 的日志`,
-  "palette.copyKubectl": (name) => `复制 ${name} 的 kubectl 命令`,
   "palette.toggleTheme": "切换主题",
   "palette.components": "组件",
   "palette.empty": "没有找到。",

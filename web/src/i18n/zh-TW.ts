@@ -518,7 +518,6 @@ export const zhTW: Messages = {
   "palette.recent": "最近",
   "palette.actions": "動作",
   "palette.openLogs": (name) => `開啟 ${name} 的日誌`,
-  "palette.copyKubectl": (name) => `複製 ${name} 的 kubectl 指令`,
   "palette.toggleTheme": "切換主題",
   "palette.components": "元件",
   "palette.empty": "找不到符合的項目。",

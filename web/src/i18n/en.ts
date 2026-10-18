@@ -564,7 +564,6 @@ export const en = {
   "palette.recent": "Recent",
   "palette.actions": "Actions",
   "palette.openLogs": (name: string) => `Open logs of ${name}`,
-  "palette.copyKubectl": (name: string) => `Copy kubectl for ${name}`,
   "palette.toggleTheme": "Switch theme",
   "palette.components": "Components",
   "palette.empty": "Nothing found.",

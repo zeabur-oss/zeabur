@@ -421,22 +421,3 @@ export function eventsFor(events: Event[], service: Service): Event[] {
 }
 
 export const isWarning = (event: Event) => event.type === "Warning"
-
-/** A kubectl command about a service: its YAML (the default), describe, its logs, or a restart. */
-export function kubectl(
-  service: { kind: string; name: string; namespace: string },
-  verb: "yaml" | "describe" | "logs" | "restart" = "yaml",
-): string {
-  const kind = service.kind.toLowerCase()
-  const ns = `-n ${service.namespace}`
-  switch (verb) {
-    case "yaml":
-      return `kubectl ${ns} get ${kind} ${service.name} -o yaml`
-    case "describe":
-      return `kubectl ${ns} describe ${kind} ${service.name}`
-    case "logs":
-      return `kubectl ${ns} logs -f ${kind}/${service.name}`
-    case "restart":
-      return `kubectl ${ns} rollout restart ${kind}/${service.name}`
-  }
-}

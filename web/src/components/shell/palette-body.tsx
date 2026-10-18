@@ -16,7 +16,6 @@ import GlobeIcon from "~icons/ph/globe"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import MoonIcon from "~icons/ph/moon"
 import PuzzlePieceIcon from "~icons/ph/puzzle-piece"
-import TerminalIcon from "~icons/ph/terminal"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import TranslateIcon from "~icons/ph/translate"
 
@@ -29,7 +28,7 @@ import { addressOf, objectKey } from "@/lib/objects"
 import { serviceLink, usePlace } from "@/lib/place"
 import { palette, recent, remember } from "@/lib/stores"
 import { cn } from "@/lib/utils"
-import { domainsOf, kubectl, serviceId, statusOf } from "@/model/service"
+import { domainsOf, serviceId, statusOf } from "@/model/service"
 import { cycleTheme } from "@/theme"
 
 interface Item {
@@ -97,14 +96,6 @@ export function PaletteBody() {
       label: t("palette.openLogs", current.name),
       icon: TextAlignLeftIcon,
       href: href(place.project, current, { tab: "logs" }),
-    })
-    items.push({
-      id: "action:kubectl",
-      group: g.actions,
-      label: t("palette.copyKubectl", current.name),
-      hint: kubectl(current),
-      icon: TerminalIcon,
-      run: () => void navigator.clipboard.writeText(kubectl(current)).catch(() => {}),
     })
   }
 
@@ -287,12 +278,7 @@ export function PaletteBody() {
                       </>
                     )}
                     {item.hint ? (
-                      <span
-                        className={cn(
-                          "ml-auto truncate pl-3 type-micro leading-4 text-muted-foreground",
-                          item.id === "action:kubectl" && "font-mono",
-                        )}
-                      >
+                      <span className="ml-auto truncate pl-3 type-micro leading-4 text-muted-foreground">
                         {item.hint}
                       </span>
                     ) : null}

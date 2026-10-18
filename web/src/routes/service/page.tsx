@@ -8,10 +8,8 @@ import { getRouteApi, Link } from "@tanstack/react-router"
 import { lazy, Suspense } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
-import CaretDownIcon from "~icons/ph/caret-down"
 import DotsThreeIcon from "~icons/ph/dots-three"
 import GitBranchIcon from "~icons/ph/git-branch"
-import TerminalIcon from "~icons/ph/terminal"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import TrashIcon from "~icons/ph/trash"
 
@@ -37,7 +35,6 @@ import { edgesOf } from "@/model/connections"
 import {
   eventsFor,
   imageTag,
-  kubectl,
   serviceId,
   statusOf,
   volumesOf,
@@ -208,26 +205,6 @@ function ServiceView({
               <TextAlignLeftIcon aria-hidden="true" data-icon="inline-start" />
               {t("tab.logs")}
             </Button>
-            <Menu>
-              <MenuTrigger render={<Button variant="outline" size="sm" />}>
-                <TerminalIcon aria-hidden="true" data-icon="inline-start" />
-                kubectl
-                <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
-              </MenuTrigger>
-              <MenuContent className="w-80">
-                {(["yaml", "describe", "logs", "restart"] as const).map((verb) => (
-                  <MenuItem
-                    key={verb}
-                    onClick={() =>
-                      void navigator.clipboard.writeText(kubectl(service, verb)).catch(() => {})
-                    }
-                  >
-                    <TerminalIcon aria-hidden="true" />
-                    <span className="truncate font-mono text-xs">{kubectl(service, verb)}</span>
-                  </MenuItem>
-                ))}
-              </MenuContent>
-            </Menu>
             <Menu>
               <MenuTrigger
                 render={<Button variant="outline" size="icon-sm" aria-label={t("service.more")} />}
