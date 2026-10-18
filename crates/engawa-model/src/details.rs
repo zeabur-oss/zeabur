@@ -1,6 +1,6 @@
 //! A project's details: the name, description and icon a person gives it, kept as annotations on
 //! its namespace (`engawa.engawahq.dev/display-name`, `…/description`, `…/icon`). Annotations
-//! only: there is no object inside the namespace to fall back to, so removing Engawa leaves
+//! only: there is no object inside the namespace to fall back to, so removing engawa leaves
 //! nothing but three annotations behind.
 
 use std::collections::BTreeMap;

@@ -1,13 +1,13 @@
 ---
 name: engawa-ci
-description: Investigate a failed or flaky CI run of Engawa (GitHub Actions or scripts/ci-local.sh) — read the job's log, find the cause, reproduce it on a machine sized like the runner, and fix the test or the code rather than retrying. Use when a check on a pull request or on main fails, or a test passes and fails without a change.
+description: Investigate a failed or flaky CI run of engawa (GitHub Actions or scripts/ci-local.sh) — read the job's log, find the cause, reproduce it on a machine sized like the runner, and fix the test or the code rather than retrying. Use when a check on a pull request or on main fails, or a test passes and fails without a change.
 ---
 
 # When CI fails
 
 `.github/workflows/ci.yml` has three kinds of jobs: the `check` matrix (format, clippy, docs, test,
 cargo-deny, unsafe-report, levels, ui, no-ui, chart, zh-tw), `kubernetes` (cluster tests,
-`engawactl doctor`, browser tests in local mode, the image) and `kubernetes-l2` (Engawa and Genkan
+`engawactl doctor`, browser tests in local mode, the image) and `kubernetes-l2` (engawa and Genkan
 in a cluster, `scripts/e2e-l2.sh`); `dco` runs on pull requests only. What each cluster job runs
 is in `engawa-cluster-tests`.
 

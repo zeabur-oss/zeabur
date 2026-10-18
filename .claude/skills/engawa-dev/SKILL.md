@@ -1,9 +1,9 @@
 ---
 name: engawa-dev
-description: Day-to-day development loop for the Engawa repository — environment, the checks CI runs, lint conventions, commits. Use before changing any Rust, TypeScript, Nix or CI file in this repo.
+description: Day-to-day development loop for the engawa repository — environment, the checks CI runs, lint conventions, commits. Use before changing any Rust, TypeScript, Nix or CI file in this repo.
 ---
 
-# Engawa development loop
+# engawa development loop
 
 ## Environment
 - Everything runs inside the Nix dev shell: prefix commands with `nix develop -c …` (or enter
@@ -14,7 +14,7 @@ description: Day-to-day development loop for the Engawa repository — environme
   code in the lowest crate that can hold it; never add an upward dependency. Binaries: `engawa`
   (in-cluster server) and `engawactl` (CLI: `ui`, `mcp`, `doctor`).
 - `engawa-kube` is the only crate that talks to kube-apiserver, and only through clients bound to
-  a person's credential. Never build a client from Engawa's service account token, and never
+  a person's credential. Never build a client from engawa's service account token, and never
   impersonate.
 - Workspace dependency versions live in the root `Cargo.toml` `[workspace.dependencies]`;
   crates use `name.workspace = true`.
@@ -54,7 +54,7 @@ environment, not a fresh one; on a VM, snapshot its clean state and restore it a
 - Rationale goes in rustdoc next to the code: state the decision and why, cite the
   specification section, paper or prior art (see `engawa-spec-work`). Each crate's README is its
   crate-level doc (`#![doc = include_str!("../README.md")]`).
-- A claim that Engawa does something better or safer needs a test that proves it.
+- A claim that engawa does something better or safer needs a test that proves it.
 
 ## API
 - Handlers live in `engawa-api`, described with `#[utoipa::path]`, registered with `routes!`.

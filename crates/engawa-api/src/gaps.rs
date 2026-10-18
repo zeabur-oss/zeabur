@@ -7,7 +7,7 @@
 //! facts (whether Gateway API serves a Gateway, and which `IngressClasses` belong to a retired
 //! controller) that change rarely and that a polled document should not pay for every few
 //! seconds. Each gap carries its fix: a plan template id the web interface turns into a plan, an
-//! install from the catalogue, or a YAML `snippet` to copy when Engawa cannot write the fix.
+//! install from the catalogue, or a YAML `snippet` to copy when engawa cannot write the fix.
 //!
 //! The cluster-wide facts are read as the person. Someone who may not list `IngressClasses` or
 //! Gateways gets the rules that do not need them, and the refused reads are named in
@@ -42,7 +42,7 @@ pub struct GapView {
     #[serde(flatten)]
     pub gap: Gap,
     /// YAML that fixes it, to copy into the object's manifest; absent when the fix is an install
-    /// or a plan Engawa writes itself.
+    /// or a plan engawa writes itself.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub snippet: Option<String>,
 }

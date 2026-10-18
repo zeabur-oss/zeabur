@@ -9,7 +9,7 @@
 //! - `HttpOnly`: scripts cannot read it (§4.1.2.6).
 //! - `SameSite=Lax`: other sites' subrequests do not carry it (§5.6.7.1). Not `Strict`: the issuer
 //!   sends the browser back with a cross-site navigation, which must carry the sign-in cookie, and
-//!   a link to Engawa from elsewhere should open it signed in. Cross-site changes are refused by
+//!   a link to engawa from elsewhere should open it signed in. Cross-site changes are refused by
 //!   [`engawa_core::guard`], not by the cookie.
 //!
 //! The session cookie has no `Max-Age`: it ends with the browser, and the server ends the session

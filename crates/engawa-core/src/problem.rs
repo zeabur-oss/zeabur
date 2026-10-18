@@ -1,13 +1,13 @@
 //! Errors as RFC 9457 Problem Details, in plain language, with the Kubernetes error kept.
 //!
-//! Every error Engawa returns tells a newcomer what happened and what to do about it (`detail`
+//! Every error engawa returns tells a newcomer what happened and what to do about it (`detail`
 //! and `fix`), and keeps the response kube-apiserver gave, unchanged, for people who know
 //! Kubernetes (`kubernetes`). The HTTP status and the category come from the Kubernetes
-//! `Status` reason [api-conventions], so the meaning is the cluster's, not Engawa's guess.
+//! `Status` reason [api-conventions], so the meaning is the cluster's, not engawa's guess.
 //!
 //! Problem types are relative URI references under `/problems/` [rfc9457] (§3.1.1): they
-//! identify the category and resolve against whatever origin serves Engawa, so no domain has to
-//! host them. Where Engawa serves its web interface, each resolves to a page of it, the
+//! identify the category and resolve against whatever origin serves engawa, so no domain has to
+//! host them. Where engawa serves its web interface, each resolves to a page of it, the
 //! human-readable documentation the RFC asks a type URI to lead to.
 //!
 //! **The plain-language layers are keyed.** `title`, `detail` and `fix` stay English, as RFC 9457
@@ -69,8 +69,8 @@ pub enum Kind {
     BadRequest,
     /// No valid credential: not signed in, or the sign-in expired.
     Unauthenticated,
-    /// The request carries no Engawa session: the person never signed in here, signed out, or
-    /// the session ended. Engawa's own refinement of [`Kind::Unauthenticated`], with the same
+    /// The request carries no engawa session: the person never signed in here, signed out, or
+    /// the session ended. engawa's own refinement of [`Kind::Unauthenticated`], with the same
     /// `401`, so the web interface can tell "go and sign in" from a credential the cluster
     /// refused.
     SignedOut,
@@ -78,12 +78,12 @@ pub enum Kind {
     Forbidden,
     /// The cluster refused a request (a read, a write, a terminal) to the person's everyday
     /// credential, and they may retry it as an administrator after confirming with their passkey.
-    /// Engawa's own refinement of [`Kind::Forbidden`], with the same `403` and the same
-    /// `denied` member; only where Engawa signs people in and elevation is turned on.
+    /// engawa's own refinement of [`Kind::Forbidden`], with the same `403` and the same
+    /// `denied` member; only where engawa signs people in and elevation is turned on.
     ElevationRequired,
     /// The person may make the change, but it would take the project over one of its limits
     /// (a `ResourceQuota`): kube-apiserver's quota admission refused it with `403` after its
-    /// authorizers allowed it [k8s-quota]. Engawa's own refinement of [`Kind::Forbidden`], with
+    /// authorizers allowed it [k8s-quota]. engawa's own refinement of [`Kind::Forbidden`], with
     /// the same `403`; `why` gives the limit and what is used of it. Admin rights do not
     /// change it, so it never becomes [`Kind::ElevationRequired`].
     ///
@@ -91,7 +91,7 @@ pub enum Kind {
     QuotaExceeded,
     /// The person may make the change, but a policy in the cluster refused it: an admission
     /// webhook, a `LimitRange`, Pod Security admission or another admission plugin
-    /// [k8s-admission]. Engawa's own refinement of [`Kind::Forbidden`], with the same `403`;
+    /// [k8s-admission]. engawa's own refinement of [`Kind::Forbidden`], with the same `403`;
     /// `why` quotes the policy's own words. A webhook's denial arrives as `403`, or as `400` when
     /// the webhook gave no status code of `400` or more [k8s-webhook-errors]; both are this
     /// kind. Admin rights do not change it, so it never becomes [`Kind::ElevationRequired`].
@@ -103,7 +103,7 @@ pub enum Kind {
     NotFound,
     /// The container log asked for cannot be read: the container has not started, has not
     /// restarted (for the previous run), or is gone from the node; which one travels in
-    /// [`Problem::unavailable_log`]. Engawa's own refinement of [`Kind::NotFound`], with the same
+    /// [`Problem::unavailable_log`]. engawa's own refinement of [`Kind::NotFound`], with the same
     /// `404`: the request is well-formed, but the log has no current representation (RFC 9110,
     /// §15.5.5) [rfc9110], although kube-apiserver passes the kubelet's refusal on as
     /// `400 BadRequest`.
@@ -113,7 +113,7 @@ pub enum Kind {
     /// The object changed, or someone else owns the field.
     Conflict,
     /// Helm, Argo CD or Flux manages the object or owns the field, and would undo the change
-    /// (named in [`Problem::managed_by`]). Engawa's own refinement of [`Kind::Conflict`]: the
+    /// (named in [`Problem::managed_by`]). engawa's own refinement of [`Kind::Conflict`]: the
     /// same `409`, since the request conflicts with who manages the object and the person can
     /// resolve that and resubmit (RFC 9110, §15.5.10) [rfc9110]; its content is not at fault,
     /// as `422` would say (§15.5.21). It has a type and title of its own because RFC 9457 keeps
@@ -123,11 +123,11 @@ pub enum Kind {
     /// [rfc9457]: https://www.rfc-editor.org/rfc/rfc9457
     Managed,
     /// The token of a plan was presented after its lifetime: the plan has to be made again.
-    /// Engawa's own refinement of [`Kind::BadRequest`], with the same `400`, so a client can tell
+    /// engawa's own refinement of [`Kind::BadRequest`], with the same `400`, so a client can tell
     /// it from a malformed or altered token by the type instead of the wording of `detail`.
     PlanExpired,
     /// The namespace is one Kubernetes keeps for itself (`kube-` prefix) and cannot be adopted
-    /// as a project. Engawa's own refusal, before kube-apiserver is asked: `422`, since the
+    /// as a project. engawa's own refusal, before kube-apiserver is asked: `422`, since the
     /// request is well-formed but its instructions cannot be carried out (RFC 9110, §15.5.21)
     /// [rfc9110]; with a type of its own so a client can tell it by the type.
     ///
@@ -236,7 +236,7 @@ impl Kind {
             Self::Invalid => "The cluster rejected the change",
             Self::TooManyRequests => "The cluster is busy",
             Self::Unavailable => "The cluster cannot be reached",
-            Self::Internal => "Something went wrong in Engawa",
+            Self::Internal => "Something went wrong in engawa",
         }
     }
 
@@ -396,7 +396,7 @@ impl KubernetesStatus {
     }
 }
 
-/// The request kube-apiserver refused with `403`, as Engawa made it.
+/// The request kube-apiserver refused with `403`, as engawa made it.
 ///
 /// These are the attributes its authorizers decide on [k8s-authz]. kube-apiserver's `Status` names
 /// the object (`details.kind`, `details.group`, `details.name`) but not the verb [api-conventions],
@@ -420,7 +420,7 @@ pub struct Denied {
     pub namespace: Option<String>,
 }
 
-/// An RFC 9457 problem, with Engawa's extension members `kind`, `summary`, `why`, `fix`,
+/// An RFC 9457 problem, with engawa's extension members `kind`, `summary`, `why`, `fix`,
 /// `evidence`, `fields`, `kubernetes`, `managedBy` and `denied`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -436,7 +436,7 @@ pub struct Problem {
     pub detail: String,
     /// The category.
     pub kind: Kind,
-    /// What happened, naming the object where Engawa knows it: `problem.summary.{kind}`, with
+    /// What happened, naming the object where engawa knows it: `problem.summary.{kind}`, with
     /// the values it names (`name`, `namespace`, `resource`, `verb`) as far as they are known.
     pub summary: Message,
     /// Why: the rule that applied, with this occurrence's numbers. Absent when the summary and
@@ -445,7 +445,7 @@ pub struct Problem {
     pub why: Option<Message>,
     /// What to do about it.
     pub fix: String,
-    /// The fix as a sentence a client words in its own language, where Engawa wrote `fix` for
+    /// The fix as a sentence a client words in its own language, where engawa wrote `fix` for
     /// this occasion rather than for the kind (the quota to raise, the rule to ask for); absent
     /// when `fix` is the kind's own, which a client words from `kind`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -464,7 +464,7 @@ pub struct Problem {
     /// not by the wording of `detail`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub managed_by: Option<Tool>,
-    /// The request the cluster refused, on a `403` from kube-apiserver to a request Engawa can
+    /// The request the cluster refused, on a `403` from kube-apiserver to a request engawa can
     /// describe. A client names the missing permission from this member, not from the wording
     /// of `kubernetes.message`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -579,7 +579,7 @@ impl Problem {
         let kind = Kind::from_status(&status.reason, status.code);
         let detail = match kind {
             Kind::Forbidden => format!("The cluster does not let you read or change {what}."),
-            // Nor with Engawa's own sign-in kinds.
+            // Nor with engawa's own sign-in kinds.
             Kind::ElevationRequired | Kind::QuotaExceeded | Kind::PolicyDenied => {
                 format!("The cluster does not let you change {what}.")
             }
@@ -587,13 +587,13 @@ impl Problem {
                 "The cluster did not accept your credentials; they may have expired.".to_owned()
             }
             Kind::NotFound => format!("{what} could not be found."),
-            // kube-apiserver never answers with Engawa's own kind.
+            // kube-apiserver never answers with engawa's own kind.
             Kind::Conflict | Kind::Managed => format!("{what} changed after you loaded it."),
             Kind::Invalid => format!("The cluster rejected the change to {what}."),
-            Kind::TooManyRequests => "The cluster asked Engawa to slow down.".to_owned(),
+            Kind::TooManyRequests => "The cluster asked engawa to slow down.".to_owned(),
             Kind::Unavailable => "The cluster did not answer in time.".to_owned(),
             // Nor with a plan's expiry, a system namespace's refusal or a missing log, which are
-            // Engawa's.
+            // engawa's.
             Kind::BadRequest
             | Kind::PlanExpired
             | Kind::SystemNamespace
@@ -790,7 +790,7 @@ mod tests {
         }
     }
 
-    /// A client that does not know a kind treats it by its status; Engawa's own refinements
+    /// A client that does not know a kind treats it by its status; engawa's own refinements
     /// read back as the kinds they refine.
     #[test]
     fn every_kind_survives_the_round_trip_through_its_status() {

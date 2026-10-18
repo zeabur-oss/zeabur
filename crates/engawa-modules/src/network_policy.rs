@@ -92,7 +92,7 @@ pub struct Workload {
 pub enum Access {
     /// Every port.
     Allowed,
-    /// Some ports, or only when labels Engawa cannot read match.
+    /// Some ports, or only when labels engawa cannot read match.
     Limited,
     /// Nothing.
     Blocked,
@@ -234,7 +234,7 @@ fn selects(policy: &NetworkPolicy, labels: &BTreeMap<String, String>) -> bool {
         .is_some_and(|s| s.pod_selector.as_ref().is_none_or(|p| matches(p, labels)))
 }
 
-/// How far a rule's peers admit `pod`, evaluated in `namespace` (the policy's). A selector Engawa
+/// How far a rule's peers admit `pod`, evaluated in `namespace` (the policy's). A selector engawa
 /// cannot evaluate (unknown labels) gives [`Access::Limited`].
 fn peer_access(peers: Option<&Vec<NetworkPolicyPeer>>, namespace: &str, pod: &Pod<'_>) -> Access {
     let Some(peers) = peers.filter(|p| !p.is_empty()) else {
@@ -271,7 +271,7 @@ fn peer_access(peers: Option<&Vec<NetworkPolicyPeer>>, namespace: &str, pod: &Po
                         .flatten()
                         .all(|e| e.key == NAMESPACE_NAME_LABEL)
                 {
-                    // Decided by the one label Engawa knows: it does not match.
+                    // Decided by the one label engawa knows: it does not match.
                     Access::Blocked
                 } else {
                     Access::Limited
@@ -664,7 +664,7 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
         .collect()
 }
 
-/// Whether the cluster enforces NetworkPolicy, as far as Engawa can tell.
+/// Whether the cluster enforces NetworkPolicy, as far as engawa can tell.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Enforcement {
     /// k3s, with its embedded network policy controller on every server.

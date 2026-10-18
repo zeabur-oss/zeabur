@@ -73,7 +73,7 @@ fn clock() -> Clock {
     Arc::new(|| engawa_kube::k8s_openapi::jiff::Timestamp::now().as_second())
 }
 
-/// A client for kube-apiserver that acts as the holder of the token; never Engawa's own.
+/// A client for kube-apiserver that acts as the holder of the token; never engawa's own.
 fn connect(endpoint: ClusterEndpoint) -> Bind<Connection> {
     Arc::new(move |token| {
         UserClient::with_token(&endpoint, &UserToken::new(token.expose_secret()))

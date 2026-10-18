@@ -3,7 +3,7 @@
 //!
 //! A Plan names a channel (a URL the controller resolves to the newest version) or a fixed
 //! version; the controller writes what that resolved to in `status.latestVersion` and the nodes it
-//! is upgrading now in `status.applying`. Engawa reports those; it makes no outbound request of its
+//! is upgrading now in `status.applying`. engawa reports those; it makes no outbound request of its
 //! own to learn about newer versions.
 //!
 //! [suc-plan]: https://github.com/rancher/system-upgrade-controller/blob/v0.20.2/pkg/apis/upgrade.cattle.io/v1/types.go

@@ -1,6 +1,6 @@
 //! Reading any resource the cluster serves, as the person.
 //!
-//! Discovery, metadata-only lists, whole lists and single objects, for kinds Engawa has no typed
+//! Discovery, metadata-only lists, whole lists and single objects, for kinds engawa has no typed
 //! binding for (custom resources, and the built-in kinds when a page shows an object as it is).
 //!
 //! # Not installed is not forbidden

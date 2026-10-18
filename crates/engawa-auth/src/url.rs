@@ -1,4 +1,4 @@
-//! The two URLs sign-in depends on: where Engawa is (its public URL) and who signs people in
+//! The two URLs sign-in depends on: where engawa is (its public URL) and who signs people in
 //! (the issuer).
 //!
 //! Both must be `https`: the session cookie is `Secure` with the `__Host-` prefix, which browsers
@@ -23,7 +23,7 @@ pub enum UrlError {
     /// User name or password in the URL, a query or a fragment.
     #[error("{0:?} must not carry a user name, a query or a fragment")]
     Extra(String),
-    /// The public URL has a path: Engawa is served at the root of its host.
+    /// The public URL has a path: engawa is served at the root of its host.
     #[error("{0:?} must be the root of a host, like https://engawa.example.com")]
     Path(String),
 }
@@ -92,7 +92,7 @@ impl BaseUrl {
         })
     }
 
-    /// Checks `text` as Engawa's public URL: also refuses a path.
+    /// Checks `text` as engawa's public URL: also refuses a path.
     ///
     /// # Errors
     ///

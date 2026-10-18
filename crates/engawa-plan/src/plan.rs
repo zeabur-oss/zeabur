@@ -14,7 +14,7 @@
 //!   there is one), joining the workload's other edits so one object gets one write.
 //! - **A new object** (an Ingress or HTTPRoute for a new domain, a claim for a new volume) is
 //!   created whole with `POST`, which fails if an object of that name exists by then.
-//! - Both are sent with `fieldManager=engawa` [k8s-field-manager], so `managedFields` names Engawa
+//! - Both are sent with `fieldManager=engawa` [k8s-field-manager], so `managedFields` names engawa
 //!   as the one that changed those fields, after a dry run with `fieldValidation=Strict`.
 //!   Server-side apply is not used: it can only remove a field the applier owns, and Ingress
 //!   `rules` and `HTTPRoute` `hostnames` are atomic lists, so applying one entry would take the
@@ -54,7 +54,7 @@ use crate::rules::{
 
 /// The kinds a plan may create, as `(apiVersion, kind, plural)`.
 ///
-/// Creation is kept to kinds a person asks for through Engawa's own forms (ready-made
+/// Creation is kept to kinds a person asks for through engawa's own forms (ready-made
 /// NetworkPolicy objects); a kind joins the list with the form that needs it.
 pub const CREATABLE: &[(&str, &str, &str)] =
     &[("networking.k8s.io/v1", "NetworkPolicy", "networkpolicies")];
@@ -799,7 +799,7 @@ impl<'a> Planner<'a> {
             .any(|(_, r)| r.spec.hostnames.iter().any(|h| h == hostname))
     }
 
-    /// The project's `HTTPRoutes`, each as read and as the typed view of what Engawa reads.
+    /// The project's `HTTPRoutes`, each as read and as the typed view of what engawa reads.
     fn http_routes(&self) -> impl Iterator<Item = (&'a Value, HttpRoute)> + use<'a, '_> {
         self.input.http_routes.iter().filter_map(|object| {
             serde_json::from_value::<HttpRoute>(object.clone())
@@ -1007,7 +1007,7 @@ impl<'a> Planner<'a> {
             return Err(error(
                 ErrorKind::Invalid,
                 "not_creatable",
-                format!("Engawa does not create {kind} objects ({api_version})."),
+                format!("engawa does not create {kind} objects ({api_version})."),
             ));
         };
         if validate_hostname(name).is_err() || name.contains('.') {

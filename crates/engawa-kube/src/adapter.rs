@@ -719,7 +719,7 @@ impl Cluster for UserClient {
 }
 
 /// The service proxy's path for `path_and_query` of `service`. Refuses a path that does not
-/// start with `/` or that climbs out of the proxy (`..`), so a mistake in Engawa's own paths
+/// start with `/` or that climbs out of the proxy (`..`), so a mistake in engawa's own paths
 /// cannot reach another of kube-apiserver's.
 fn proxy_path(service: &ServicePort, path_and_query: &str) -> Result<String, ClusterError> {
     let path = path_and_query.split('?').next().unwrap_or_default();

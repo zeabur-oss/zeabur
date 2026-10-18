@@ -1,6 +1,6 @@
 ---
 name: engawa-spec-work
-description: Implement or change a security- or protocol-relevant behaviour in Engawa (Kubernetes API semantics, server-side apply, RBAC, OAuth/OIDC with Genkan, MCP, HTTP caching) the way the codebase expects — from the specification text, with citations and adversarial tests. Use for any such feature or fix.
+description: Implement or change a security- or protocol-relevant behaviour in engawa (Kubernetes API semantics, server-side apply, RBAC, OAuth/OIDC with Genkan, MCP, HTTP caching) the way the codebase expects — from the specification text, with citations and adversarial tests. Use for any such feature or fix.
 ---
 
 # Specification-driven work
@@ -19,7 +19,7 @@ description: Implement or change a security- or protocol-relevant behaviour in E
    from; anything changed in between is refused.
 4. **Test the attack, not just the happy path.** Tampered plan tokens, replays, concurrent
    applies (64 tasks behind a barrier, exactly one wins), cross-site requests, expired tokens,
-   revoked permissions, privilege boundaries (Engawa's own service account must never gain a
+   revoked permissions, privilege boundaries (engawa's own service account must never gain a
    right its users lack; no `impersonate`). Use the real kube-apiserver for anything RBAC or
    admission related (`engawa-cluster-tests`).
 5. **Never leak a Secret's value.** Values are read only on an explicit "show" request, never

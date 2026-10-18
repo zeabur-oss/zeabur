@@ -37,7 +37,7 @@
 //!   would otherwise run on with a credential that is no longer valid.
 //! - **`4001` "idle, reconnect"** after [`IDLE`] without a byte either way. The kubelet has the
 //!   same kind of limit (`--streaming-connection-idle-timeout`, four hours by default [kubelet]); a
-//!   browser tab is left open more easily than a shell, so Engawa's is shorter.
+//!   browser tab is left open more easily than a shell, so engawa's is shorter.
 //!
 //! Codes 4000–4999 are for private use [rfc6455] (§7.4.2).
 //!
@@ -286,7 +286,7 @@ where
         } else {
             Err(ApiError::from(Problem::new(
                 Kind::Forbidden,
-                "A terminal can be opened only from the Engawa page itself.",
+                "A terminal can be opened only from the engawa page itself.",
             )))
         };
         std::future::ready(terminal)

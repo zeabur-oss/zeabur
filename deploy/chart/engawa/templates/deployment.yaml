@@ -30,7 +30,7 @@ spec:
     spec:
       serviceAccountName: {{ include "engawa.fullname" . }}
       automountServiceAccountToken: false
-      # No Service environment variables: Engawa reads none, and they grow with the namespace.
+      # No Service environment variables: engawa reads none, and they grow with the namespace.
       enableServiceLinks: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

@@ -1,6 +1,6 @@
 [package]
 name = "engawa-plan"
-description = "Engawa: change plans, guarded JSON Patches and impact"
+description = "engawa: change plans, guarded JSON Patches and impact"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Engawa in a cluster, end to end: a k3d cluster whose kube-apiserver trusts Genkan, Genkan and
-# Engawa installed from their images (Engawa with its Helm chart), both behind the cluster's
+# engawa in a cluster, end to end: a k3d cluster whose kube-apiserver trusts Genkan, Genkan and
+# engawa installed from their images (engawa with its Helm chart), both behind the cluster's
 # Traefik over HTTPS, and a browser (web/e2e/l2) that enrols a passkey, signs in, confirms a
 # terminal with the passkey again, runs a command, then reads and changes with admin rights. Then,
-# from the outside: Engawa's service account can do nothing a fresh one cannot, the idle pod
+# from the outside: engawa's service account can do nothing a fresh one cannot, the idle pod
 # stays within its memory budget, and `helm uninstall` leaves the cluster as it was.
 #
 # Run inside `nix develop` on Linux with Docker; it uses this machine's port 443. It creates the
@@ -24,7 +24,7 @@ authn_volume="$cluster-authn"
 out="$root/target/e2e-l2"
 genkan_host=genkan.localhost
 engawa_host=engawa.localhost
-namespace=engawa             # Engawa's release
+namespace=engawa             # engawa's release
 project=engawa-e2e           # the project the browser opens (web/e2e/manifests/talker.yaml)
 genkan_image=docker.io/library/genkan:e2e-l2
 engawa_image=docker.io/library/engawa:e2e-l2
@@ -133,7 +133,7 @@ done
 retry 300 "Traefik to be installed" kubectl -n kube-system get deployment/traefik
 kubectl -n kube-system rollout status deployment/traefik --timeout=300s
 
-# Both host names resolve to Traefik inside the cluster too, so Engawa reaches Genkan at its
+# Both host names resolve to Traefik inside the cluster too, so engawa reaches Genkan at its
 # public URL. k3s's CoreDNS imports `*.override` from the `coredns-custom` ConfigMap into its
 # main server block (https://docs.k3s.io/networking/networking-services#coredns);
 # `answer auto` names the answer as asked (https://coredns.io/plugins/rewrite/).
@@ -165,10 +165,10 @@ tls="$out/tls"
 rm -rf "$tls"
 mkdir -p "$tls"
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 2 \
-  -subj "/CN=Engawa e2e CA" -keyout "$tls/ca.key" -out "$tls/ca.crt" \
+  -subj "/CN=engawa e2e CA" -keyout "$tls/ca.key" -out "$tls/ca.crt" \
   -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign" 2>/dev/null
 openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
-  -subj "/CN=Engawa e2e" -keyout "$tls/tls.key" -out "$tls/tls.csr" 2>/dev/null
+  -subj "/CN=engawa e2e" -keyout "$tls/tls.key" -out "$tls/tls.csr" 2>/dev/null
 printf 'subjectAltName=DNS:%s,DNS:%s\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n' \
   "$genkan_host" "$engawa_host" >"$tls/ext.cnf"
 openssl x509 -req -in "$tls/tls.csr" -CA "$tls/ca.crt" -CAkey "$tls/ca.key" -days 2 \
@@ -215,7 +215,7 @@ docker exec -i "$node" sh -c 'cat >/etc/rancher/k3s/genkan/.authn.yaml.tmp &&
 reloaded() { (($(reloads) > before)); }
 retry 180 "kube-apiserver to load Genkan's configuration" reloaded
 
-# Engawa's client: confidential, may ask for elevation, gets tokens kube-apiserver accepts.
+# engawa's client: confidential, may ask for elevation, gets tokens kube-apiserver accepts.
 "$genkanctl" client create engawa --type confidential --allow-elevation --audience kubernetes \
   --redirect-uri "https://$engawa_host/auth/callback" 2>"$out/client.err" | kubectl apply -f -
 client_secret=$(tail -n 1 "$out/client.err")
@@ -226,7 +226,7 @@ setup_link=$("$genkanctl" setup-link --username admin)
 kubectl apply -f "$root/web/e2e/manifests/talker.yaml" >/dev/null
 kubectl -n "$project" rollout status deployment/talker --timeout=180s
 
-# --- What the cluster looks like before Engawa ----------------------------------------------------
+# --- What the cluster looks like before engawa ----------------------------------------------------
 # Every cluster-scoped object by kind and name, and every namespace's labels and annotations.
 # Sorted within each kind: not every list comes in a fixed order (componentstatuses have come back
 # in another order between two reads).
@@ -240,7 +240,7 @@ snapshot() {
 }
 snapshot >"$out/before.txt"
 
-# --- Engawa, from the chart ---------------------------------------------------------------------
+# --- engawa, from the chart ---------------------------------------------------------------------
 kubectl create namespace "$namespace"
 printf %s "$client_secret" |
   kubectl -n "$namespace" create secret generic engawa-oidc --from-file=client-secret=/dev/stdin
@@ -258,7 +258,7 @@ helm install engawa "$root/deploy/chart/engawa" --namespace "$namespace" --wait 
 engawa_up() {
   curl -sf --cacert "$tls/ca.crt" --resolve "$engawa_host:443:127.0.0.1" "https://$engawa_host/api/healthz"
 }
-retry 120 "Engawa over HTTPS" engawa_up
+retry 120 "engawa over HTTPS" engawa_up
 
 # --- The browser ----------------------------------------------------------------------------------
 rm -rf "$out/results"
@@ -273,7 +273,7 @@ restarted=$(kubectl -n "$project" get deployment/talker \
   -o jsonpath='{.spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt}')
 [[ -n "$restarted" ]] || { echo "error: deployment/talker was not restarted" >&2; exit 1; }
 
-# --- Engawa's own rights: none beyond what any service account has -----------------------------------
+# --- engawa's own rights: none beyond what any service account has -----------------------------------
 # kubectl adds no groups to --as; these are the ones a service account's token carries. A name
 # no object has stands for a fresh service account, to which only the cluster's defaults apply.
 groups=(--as-group=system:serviceaccounts "--as-group=system:serviceaccounts:$namespace"
@@ -282,13 +282,13 @@ as_engawa=("--as=system:serviceaccount:$namespace:engawa" "${groups[@]}")
 as_fresh=("--as=system:serviceaccount:$namespace:engawa-e2e-fresh" "${groups[@]}")
 impersonate=$(kubectl auth can-i impersonate users "${as_engawa[@]}" || true)
 if [[ "$impersonate" != no ]]; then
-  echo "error: Engawa's service account may impersonate users ($impersonate)" >&2
+  echo "error: engawa's service account may impersonate users ($impersonate)" >&2
   exit 1
 fi
 for scope in "$namespace" default "$project" kube-system; do
   if ! diff <(kubectl auth can-i --list -n "$scope" "${as_engawa[@]}") \
     <(kubectl auth can-i --list -n "$scope" "${as_fresh[@]}"); then
-    echo "error: Engawa's service account has rights a fresh one lacks (namespace $scope)" >&2
+    echo "error: engawa's service account has rights a fresh one lacks (namespace $scope)" >&2
     exit 1
   fi
 done

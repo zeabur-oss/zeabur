@@ -2,7 +2,7 @@
 //! setup (`crates/*/tests/kubernetes.rs`), written once.
 //!
 //! The person is a ServiceAccount, [`PERSON`], with a Role of the test's rules bound to it and a
-//! token from the `TokenRequest` API [k8s-token-request]; Engawa reads as them through a
+//! token from the `TokenRequest` API [k8s-token-request]; engawa reads as them through a
 //! [`UserClient`]. The cluster admin (the current kubeconfig context) only prepares objects and
 //! reads them back.
 //!
@@ -155,7 +155,7 @@ impl Sandbox {
         Api::namespaced(self.admin.clone(), &self.namespace)
     }
 
-    /// The person's handle on the namespace's objects of `K`, past Engawa's port.
+    /// The person's handle on the namespace's objects of `K`, past engawa's port.
     #[must_use]
     pub fn user_api<K>(&self) -> Api<K>
     where

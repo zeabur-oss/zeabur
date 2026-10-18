@@ -1,6 +1,6 @@
 openapi: 3.1.0
 info:
-  title: Engawa API
+  title: engawa API
   description: |-
     Kubernetes made simple and secure by default. Every request acts as the person making it; errors are RFC 9457 problems that keep kube-apiserver's own answer.
     
@@ -8,7 +8,7 @@ info:
     
     **Caching.** Every answer carries `Cache-Control: no-store`.
     
-    **Consistency.** A project is read with one consistent LIST per kind, issued concurrently. Kinds are not read at one shared resourceVersion, which Kubernetes does not offer across kinds, so a response can briefly show, for example, a pod that a just-deleted workload owned; the next read corrects it. Engawa promises freshness (nothing older than the request), not a single-revision snapshot.
+    **Consistency.** A project is read with one consistent LIST per kind, issued concurrently. Kinds are not read at one shared resourceVersion, which Kubernetes does not offer across kinds, so a response can briefly show, for example, a pod that a just-deleted workload owned; the next read corrects it. engawa promises freshness (nothing older than the request), not a single-revision snapshot.
     
     **Errors.** The problem `kind` and `reason` are open enumerations: expect new values, treat an unknown `kind` by its HTTP status and ignore an unknown `reason`. `429` and `503` carry kube-apiserver's `Retry-After` when it gave one. Where admin rights are offered and not in use (`/api/v1/session`), a `403` from kube-apiserver comes as `elevation-required`, with the same `denied` and `kubernetes`; while they are in use, every request goes with them.
     
@@ -67,7 +67,7 @@ paths:
       - cluster
       summary: |-
         How to install a catalogue component yourself: Helm commands, a k3s `HelmChart`, Flux objects
-        or an Argo CD `Application`, with the catalogue's pinned versions and values. Engawa runs none
+        or an Argo CD `Application`, with the catalogue's pinned versions and values. engawa runs none
         of them.
       operationId: guide_for
       parameters:
@@ -215,7 +215,7 @@ paths:
         skew between kube-apiserver and the kubelets, and newer patches and minors from
         system-upgrade-controller's Plans.
       description: |-
-        Engawa makes no outbound request: without Plans, newer versions are not reported (see
+        engawa makes no outbound request: without Plans, newer versions are not reported (see
         [`engawa_recommend::versions`]). Readable by everyone signed in; nodes and Plans the person
         may not list are named in `unreadable`, so the interface can say which permission is missing.
       operationId: getUpgrades
@@ -331,7 +331,7 @@ paths:
       summary: |-
         Backups of a project: which claims, databases and the namespace a schedule covers, and how
         the latest backups went, from every backup provider this build has (K8up, Velero,
-        CloudNativePG), read as the person. Outcomes are as each provider reports them; Engawa does
+        CloudNativePG), read as the person. Outcomes are as each provider reports them; engawa does
         not test restores.
       operationId: getProjectBackups
       parameters:
@@ -854,7 +854,7 @@ paths:
       - resources
       summary: |-
         A Secret's values. A `POST`, so that it is always a deliberate action and never prefetched;
-        the response is never cached, and nothing in Engawa logs or keeps it.
+        the response is never cached, and nothing in engawa logs or keeps it.
       operationId: reveal_secret
       parameters:
       - name: project
@@ -1030,7 +1030,7 @@ paths:
     get:
       tags:
       - identity
-      summary: "How you are signed in to Engawa: whether you can sign out, and admin rights in use."
+      summary: "How you are signed in to engawa: whether you can sign out, and admin rights in use."
       operationId: getSession
       responses:
         "200":
@@ -1069,7 +1069,7 @@ paths:
       summary: |-
         Changes the metrics store, or goes back to the default with `null`, by writing the
         settings ConfigMap as you (created the first time). Who may: whoever may update (and
-        create) the ConfigMap `engawa-settings` in Engawa's namespace. Answers the setting as it
+        create) the ConfigMap `engawa-settings` in engawa's namespace. Answers the setting as it
         now is, with the new store's probe.
       operationId: setMetricsStore
       requestBody:
@@ -1878,7 +1878,7 @@ components:
         partial:
           type: boolean
           description: |-
-            `true` when the cluster holds more events than Engawa read (5,000): older ones may be
+            `true` when the cluster holds more events than engawa read (5,000): older ones may be
             missing.
         totalSize:
           type: integer
@@ -2252,7 +2252,7 @@ components:
           type:
           - string
           - "null"
-          description: The value, for `set`; for a Secret, the plain value (Engawa encodes it).
+          description: The value, for `set`; for a Secret, the plain value (engawa encodes it).
     DataKind:
       type: string
       description: A ConfigMap or a Secret.
@@ -2273,7 +2273,7 @@ components:
     Denied:
       type: object
       description: |-
-        The request kube-apiserver refused with `403`, as Engawa made it.
+        The request kube-apiserver refused with `403`, as engawa made it.
         
         These are the attributes its authorizers decide on [k8s-authz]. kube-apiserver's `Status` names
         the object (`details.kind`, `details.group`, `details.name`) but not the verb [api-conventions],
@@ -2347,7 +2347,7 @@ components:
           description: The pods it was seen in, sorted.
         why:
           $ref: "#/components/schemas/Message"
-          description: "Why: the rule that applies, with this occurrence's numbers where Engawa knows them."
+          description: "Why: the rule that applies, with this occurrence's numbers where engawa knows them."
     DiagnosisKind:
       type: string
       description: What kind of failure a diagnosis explains.
@@ -2685,7 +2685,7 @@ components:
             - "null"
             description: |-
               YAML that fixes it, to copy into the object's manifest; absent when the fix is an install
-              or a plan Engawa writes itself.
+              or a plan engawa writes itself.
       description: One gap and, when its fix is a YAML fragment to copy, that fragment.
     Health:
       type: string
@@ -3002,7 +3002,7 @@ components:
       description: |-
         A sentence a client words in its own language: a stable key and the values it names.
         
-        Engawa never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
+        engawa never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
         every interface translates them the same way and a key's meaning is part of the contract.
       required:
       - key
@@ -3076,7 +3076,7 @@ components:
           oneOf:
           - $ref: "#/components/schemas/Origin"
             description: |-
-              The ConfigMap a change is kept in; absent where Engawa keeps no settings (on a
+              The ConfigMap a change is kept in; absent where engawa keeps no settings (on a
               person's computer).
           - type: "null"
         unreadable:
@@ -4503,7 +4503,7 @@ components:
     Problem:
       type: object
       description: |-
-        An RFC 9457 problem, with Engawa's extension members `kind`, `summary`, `why`, `fix`,
+        An RFC 9457 problem, with engawa's extension members `kind`, `summary`, `why`, `fix`,
         `evidence`, `fields`, `kubernetes`, `managedBy` and `denied`.
       required:
       - type
@@ -4518,7 +4518,7 @@ components:
           oneOf:
           - $ref: "#/components/schemas/Denied"
             description: |-
-              The request the cluster refused, on a `403` from kube-apiserver to a request Engawa can
+              The request the cluster refused, on a `403` from kube-apiserver to a request engawa can
               describe. A client names the missing permission from this member, not from the wording
               of `kubernetes.message`.
           - type: "null"
@@ -4542,7 +4542,7 @@ components:
           oneOf:
           - $ref: "#/components/schemas/Message"
             description: |-
-              The fix as a sentence a client words in its own language, where Engawa wrote `fix` for
+              The fix as a sentence a client words in its own language, where engawa wrote `fix` for
               this occasion rather than for the kind (the quota to raise, the rule to ask for); absent
               when `fix` is the kind's own, which a client words from `kind`.
           - type: "null"
@@ -4570,7 +4570,7 @@ components:
         summary:
           $ref: "#/components/schemas/Message"
           description: |-
-            What happened, naming the object where Engawa knows it: `problem.summary.{kind}`, with
+            What happened, naming the object where engawa knows it: `problem.summary.{kind}`, with
             the values it names (`name`, `namespace`, `resource`, `verb`) as far as they are known.
         title:
           type: string
@@ -4807,7 +4807,7 @@ components:
         properties:
           adopted:
             type: boolean
-            description: It carries Engawa's project label.
+            description: It carries engawa's project label.
           canChange:
             $ref: "#/components/schemas/Permission"
             description: "Whether the person may patch the Namespace: adopt it, let it go, change its details."
@@ -4836,7 +4836,7 @@ components:
           adopted:
             type: boolean
             description: |-
-              Whether the namespace carries Engawa's project label. Any namespace can be opened; adopting
+              Whether the namespace carries engawa's project label. Any namespace can be opened; adopting
               it only adds the label.
           health:
             oneOf:
@@ -5667,7 +5667,7 @@ components:
           description: Restarts, summed over its pods.
     SessionView:
       type: object
-      description: How the person is signed in to Engawa.
+      description: How the person is signed in to engawa.
       required:
       - signsIn
       - elevation
@@ -5685,7 +5685,7 @@ components:
           - string
           - "null"
           description: |-
-            When the credential in use expires, RFC 3339: the everyday one, which Engawa renews
+            When the credential in use expires, RFC 3339: the everyday one, which engawa renews
             before then while the session lasts, or while admin rights are in use theirs, which is
             `elevatedUntil` and is not renewed.
         signsIn:
@@ -5920,7 +5920,7 @@ components:
         release:
           oneOf:
           - $ref: "#/components/schemas/Release"
-            description: That minor's support window, from Engawa's bundled table.
+            description: That minor's support window, from engawa's bundled table.
           - type: "null"
         severity:
           $ref: "#/components/schemas/Severity"
@@ -6025,7 +6025,7 @@ components:
     WorkloadKind:
       type: string
       description: |-
-        The workload kinds Engawa projects.
+        The workload kinds engawa projects.
         
         Declared in alphabetical order, so the derived [`Ord`] sorts as the kind names do.
       enum:
@@ -6179,4 +6179,4 @@ tags:
 - name: resources
   description: A project's resources and objects of any kind, as YAML
 - name: settings
-  description: Engawa's own settings
+  description: engawa's own settings

@@ -1,6 +1,6 @@
 //! How to install a catalogue component yourself ([`engawa_recommend::install`]).
 //!
-//! Engawa recommends and never installs: the answer is texts to copy (Helm commands, a k3s
+//! engawa recommends and never installs: the answer is texts to copy (Helm commands, a k3s
 //! `HelmChart`, Flux objects, an Argo CD `Application`), rendered from the catalogue embedded in
 //! the binary. The only cluster read is the node count, which picks the default profile: more
 //! than one node means `multi-node`. Someone who may not list nodes gets `single-node` and can
@@ -32,7 +32,7 @@ pub struct InstallAnswer {
 }
 
 /// How to install a catalogue component yourself: Helm commands, a k3s `HelmChart`, Flux objects
-/// or an Argo CD `Application`, with the catalogue's pinned versions and values. Engawa runs none
+/// or an Argo CD `Application`, with the catalogue's pinned versions and values. engawa runs none
 /// of them.
 #[utoipa::path(get, path = "/api/v1/cluster/components/{capability}/{component}/install", tag = "cluster",
     params(("capability" = String, Path), ("component" = String, Path), ProfileParams),

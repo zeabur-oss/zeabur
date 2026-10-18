@@ -1,4 +1,4 @@
-//! Engawa as a confidential OAuth 2.0 client of Genkan [rfc6749].
+//! engawa as a confidential OAuth 2.0 client of Genkan [rfc6749].
 //!
 //! - **Configuration from the issuer.** The endpoints come from
 //!   `<issuer>/.well-known/openid-configuration` [oidc-discovery] (§4), read once and kept. The
@@ -59,11 +59,11 @@ use crate::url::BaseUrl;
 /// Where the issuer sends the browser back: one path for signing in and for elevation.
 pub const CALLBACK_PATH: &str = "/auth/callback";
 
-/// How Engawa is registered with the issuer.
+/// How engawa is registered with the issuer.
 pub struct ClientConfig {
     /// The issuer's URL.
     pub issuer: BaseUrl,
-    /// Engawa's public URL; the redirect URI is this followed by [`CALLBACK_PATH`].
+    /// engawa's public URL; the redirect URI is this followed by [`CALLBACK_PATH`].
     pub public_url: BaseUrl,
     /// The `client_id`.
     pub client_id: String,
@@ -101,7 +101,7 @@ pub enum AuthError {
         /// The issuer's description, for logs.
         description: Option<String>,
     },
-    /// The issuer answered something Engawa cannot use.
+    /// The issuer answered something engawa cannot use.
     #[error("the issuer's answer is not usable: {0}")]
     Invalid(String),
 }

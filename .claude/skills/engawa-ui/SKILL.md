@@ -1,6 +1,6 @@
 ---
 name: engawa-ui
-description: Change Engawa's web interface (web/: React, TanStack, shadcn/ui on Base UI, Phosphor) and its embedding (crates/engawa-ui) while keeping the strict CSP, size budgets and Genkan's tokens. Use for any change under web/ or crates/engawa-ui.
+description: Change engawa's web interface (web/: React, TanStack, shadcn/ui on Base UI, Phosphor) and its embedding (crates/engawa-ui) while keeping the strict CSP, size budgets and Genkan's tokens. Use for any change under web/ or crates/engawa-ui.
 ---
 
 # Web interface
@@ -30,7 +30,7 @@ description: Change Engawa's web interface (web/: React, TanStack, shadcn/ui on 
 - **Icons.** Phosphor only, one import per icon: `import XIcon from "~icons/ph/x"` (a weight is
   its own name, `~icons/ph/warning-fill`), built at build time from `@iconify-json/ph` by
   unplugin-icons (its JSX compiler, through svgr); decorative ones with `aria-hidden`.
-- **Design.** Components, radii and neutrals are shadcn/ui's: build from its components and their variants rather than look-alikes. Engawa's tokens (hinoki, status tones, type scale, motion) and banned styles are in `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans.
+- **Design.** Components, radii and neutrals are shadcn/ui's: build from its components and their variants rather than look-alikes. engawa's tokens (hinoki, status tones, type scale, motion) and banned styles are in `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans.
 - **Lint.** `bun run lint` includes [shadcn/lint](https://github.com/shadcn-ui/lint) (rules in
   `web/.oxlintrc.json`, off for `components/ui`; conventions in `web/DESIGN.md`, "Lint"). Pages
   pass only layout classes to a component: a repeated treatment becomes a cva variant or size in

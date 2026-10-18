@@ -1,4 +1,4 @@
-//! What Engawa's writes rely on kube-apiserver for, as one suite of behaviours run against both
+//! What engawa's writes rely on kube-apiserver for, as one suite of behaviours run against both
 //! the in-memory cluster (`tests/memory.rs`, always) and k3s (`tests/kubernetes.rs`, with a
 //! cluster). The API tests trust the in-memory cluster to answer as kube-apiserver does; this
 //! suite is what makes that trust checked rather than assumed [swe-doubles].
@@ -280,7 +280,7 @@ pub(crate) async fn a_taken_name_is_refused_and_a_missing_object_is_not_found(
     assert_eq!(read(cluster, &missing).await, Ok(None));
 }
 
-/// Given `fieldValidation=Strict`, which every Engawa write asks for, when a write names a
+/// Given `fieldValidation=Strict`, which every engawa write asks for, when a write names a
 /// field the kind's schema does not know, then it is refused, dry run or not: `400 BadRequest`
 /// for a creation, `422 Invalid` naming the field for a patch. A dry run that passes stores
 /// nothing.

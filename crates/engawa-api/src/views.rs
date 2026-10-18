@@ -82,7 +82,7 @@ pub struct ProjectSummary {
     pub origin: Origin,
     /// The project's name: its namespace's name.
     pub name: String,
-    /// Whether the namespace carries Engawa's project label. Any namespace can be opened; adopting
+    /// Whether the namespace carries engawa's project label. Any namespace can be opened; adopting
     /// it only adds the label.
     pub adopted: bool,
     /// The namespace is one Kubernetes keeps for itself (`kube-` prefix), which cannot be
@@ -445,7 +445,7 @@ pub struct Upgrades {
     /// `1.34`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub minor: Option<String>,
-    /// That minor's support window, from Engawa's bundled table.
+    /// That minor's support window, from engawa's bundled table.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release: Option<engawa_recommend::versions::Release>,
     /// When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`).
@@ -489,7 +489,7 @@ pub struct ClusterEventList {
     pub items: Vec<EventView>,
     /// How many events matched, also those past `limit`.
     pub total_size: usize,
-    /// `true` when the cluster holds more events than Engawa read (5,000): older ones may be
+    /// `true` when the cluster holds more events than engawa read (5,000): older ones may be
     /// missing.
     pub partial: bool,
 }

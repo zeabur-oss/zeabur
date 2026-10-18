@@ -1,4 +1,4 @@
-Engawa is starting in {{ .Release.Namespace }}:
+engawa is starting in {{ .Release.Namespace }}:
 
   kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "engawa.fullname" . }}
 

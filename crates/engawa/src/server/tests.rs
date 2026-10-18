@@ -560,7 +560,7 @@ async fn elevation_ends_plainly_when_not_allowed_or_for_someone_else() {
     let page = rig.elevate(&session, "alice").await;
     assert!(page.contains(r#"data-result="not-allowed""#), "{page}");
 
-    // Only Engawa's own page opens the window.
+    // Only engawa's own page opens the window.
     let response = rig
         .send(
             Method::GET,
@@ -616,7 +616,7 @@ async fn signing_out_ends_the_session_and_revokes_its_refresh_token() {
 }
 
 /// The terminal's handshake must come from the public URL's origin: `Host` alone matching is not
-/// enough (here the scheme differs). The refusal is Engawa's own, so it stays `forbidden` although
+/// enough (here the scheme differs). The refusal is engawa's own, so it stays `forbidden` although
 /// elevation is offered: admin rights would not change it.
 #[tokio::test]
 async fn a_terminal_opens_only_from_the_public_origin() {

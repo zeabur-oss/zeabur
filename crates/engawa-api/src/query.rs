@@ -1,6 +1,6 @@
 //! The query string of the event lists: `limit` and each list's own filters.
 //!
-//! Lists other than events return every item: Engawa reads the kind whole from kube-apiserver to
+//! Lists other than events return every item: engawa reads the kind whole from kube-apiserver to
 //! sort and filter it, so a page would save bytes, not reads, and the lists are short. Events are
 //! long-lived only for an hour by default and can be many, so their lists return the newest
 //! `limit` (100 unless asked, at most 500) and say in `totalSize` how many matched. There is no

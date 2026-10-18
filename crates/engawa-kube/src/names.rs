@@ -6,8 +6,8 @@
 //! is therefore refused before it is sent when its namespace is not a DNS-1123 label (the
 //! rule for a Namespace's name), or when its object name is one no object can have: empty, `.`
 //! or `..`, or holding `/` or `%`, which kube-apiserver refuses in every name
-//! ([k8s-path-segment]). Engawa also refuses characters that a URL path cannot carry unencoded
-//! (anything outside RFC 3986's `pchar`, [rfc3986-path]); no object Engawa shows has one, as
+//! ([k8s-path-segment]). engawa also refuses characters that a URL path cannot carry unencoded
+//! (anything outside RFC 3986's `pchar`, [rfc3986-path]); no object engawa shows has one, as
 //! most kinds' names are DNS-1123 subdomains ([k8s-names]).
 //!
 //! A refused name is answered as kube-apiserver answers a read of a name that does not exist:

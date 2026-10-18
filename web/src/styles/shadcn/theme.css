@@ -65,7 +65,7 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  /* Engawa: the chart colours, one per series (a replica), in this order, never cycled; the
+  /* engawa: the chart colours, one per series (a replica), in this order, never cycled; the
      preset's are greys too close to tell five lines apart. Blue, orange, violet and magenta, away
      from the status colours, checked for colour-blind separation; 5 is the grey of replaced
      pods. Charts read them as classes, so shadcn/ui's ChartStyle writes no <style> element,

@@ -11,7 +11,7 @@
 //!   ReplicaSets and their Pods) afterwards [k8s-gc]; and `preconditions` on its `uid` and
 //!   `resourceVersion`, so an object changed or replaced since it was read is refused with `409
 //!   Conflict` instead of deleted.
-//! - Creations and patches name `fieldManager=engawa`, so `managedFields` records Engawa as the one
+//! - Creations and patches name `fieldManager=engawa`, so `managedFields` records engawa as the one
 //!   who changed those fields [k8s-field-manager], and ask for `fieldValidation=Strict`: a field
 //!   the object's schema does not know fails the request instead of being dropped silently
 //!   [k8s-validation]. A dry run adds `dryRun=All`, which runs validation and admission without

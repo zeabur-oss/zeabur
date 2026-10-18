@@ -1,4 +1,4 @@
-//! Which requests a server of Engawa answers, before it looks at a session.
+//! Which requests a server of engawa answers, before it looks at a session.
 //!
 //! The in-cluster server (whose public URL is configured) and `engawactl ui` (which answers on
 //! `127.0.0.1` and `localhost` at its port) apply the same rules, each with its own [`Origins`].
@@ -9,18 +9,18 @@
 //!
 //! 1. **Fetch Metadata.** `Sec-Fetch-Site`, which browsers set and pages cannot, must be
 //!    `same-origin`; OWASP calls it the primary signal [owasp-csrf] ("Fetch Metadata headers").
-//!    `same-site` is refused too: a sibling host of the same site is not Engawa, and every port of
+//!    `same-site` is refused too: a sibling host of the same site is not engawa, and every port of
 //!    `127.0.0.1` is the same site.
 //! 2. **`Origin`, when Fetch Metadata is absent** (older browsers), must name one of the server's
 //!    origins exactly; OWASP makes this fallback mandatory, and a missing or `null` `Origin` is not
 //!    evidence of a same-origin request ("Using Standard Headers to Verify Origin").
 //! 3. **A custom header** ([`REQUEST_HEADER`]) the web interface sends with every API request.
-//!    Another origin cannot add it without a CORS preflight, which Engawa never grants ("Employing
+//!    Another origin cannot add it without a CORS preflight, which engawa never grants ("Employing
 //!    Custom Request Headers for AJAX/API"). This also covers a browser that sends neither header
 //!    above.
 //!
-//! **`Host` must name Engawa** on every request, safe ones included: a page that points a DNS
-//! name of its own at Engawa (DNS rebinding) reaches it with another `Host`, and is refused
+//! **`Host` must name engawa** on every request, safe ones included: a page that points a DNS
+//! name of its own at engawa (DNS rebinding) reaches it with another `Host`, and is refused
 //! [jackson2007] (§5.3). Health checks from the kubelet carry the pod's address as `Host`, so
 //! the in-cluster server mounts `/api/healthz` outside this guard.
 //!

@@ -1,6 +1,6 @@
-// End-to-end tests of Engawa in a cluster with Genkan (e2e/l2/), run by scripts/e2e-l2.sh:
+// End-to-end tests of engawa in a cluster with Genkan (e2e/l2/), run by scripts/e2e-l2.sh:
 //
-//   ENGAWA_L2_URL   Engawa's public URL, https://engawa.localhost
+//   ENGAWA_L2_URL   engawa's public URL, https://engawa.localhost
 //   ENGAWA_L2_SPKI  base64 SHA-256 of the test certificate's public key (SubjectPublicKeyInfo)
 //
 // Both host names end in `.localhost` and reach the cluster's ingress on this machine's port 443

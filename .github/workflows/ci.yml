@@ -125,7 +125,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "### Engawa in the cluster (k3s ${{ matrix.k3s }})"
+            echo "### engawa in the cluster (k3s ${{ matrix.k3s }})"
             echo "| Measure | Bytes |"
             echo "|---|---|"
             echo "| Pod working set after 60 s idle | $(jq -r .pod_working_set_bytes target/e2e-l2/measurements.json 2>/dev/null || echo n/a) |"

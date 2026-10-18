@@ -1,6 +1,6 @@
 # engawa-test-support
 
-Helpers shared by Engawa's tests. Only ever a dev-dependency: nothing here reaches a binary.
+Helpers shared by engawa's tests. Only ever a dev-dependency: nothing here reaches a binary.
 
 - [`fixtures`](crate::fixtures): loads the language-neutral cases in `fixtures/` (see
   `fixtures/README.md` for the format).

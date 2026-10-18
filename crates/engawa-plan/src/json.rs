@@ -1,4 +1,4 @@
-//! JSON helpers: RFC 6901 pointers, the subset of RFC 6902 JSON Patch Engawa sends, and the
+//! JSON helpers: RFC 6901 pointers, the subset of RFC 6902 JSON Patch engawa sends, and the
 //! key fields of the lists Kubernetes keys by a field.
 //!
 //! The patch is applied locally to show the object as it will be after the write and to

@@ -1,4 +1,4 @@
-//! The subset of RFC 6902 JSON Patch Engawa sends (`test`, `add`, `replace`, `remove`), applied
+//! The subset of RFC 6902 JSON Patch engawa sends (`test`, `add`, `replace`, `remove`), applied
 //! locally [rfc6902].
 //!
 //! A plan applies it to show the object as it will be after the write; the in-memory cluster

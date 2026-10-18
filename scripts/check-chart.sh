@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks the Helm chart without a cluster: `helm lint`, then what the chart promises in every
-# rendering (no rights for Engawa itself, no service account token, one replica, a locked-down container),
-# and that values.schema.json refuses values that would install a broken Engawa.
+# rendering (no rights for engawa itself, no service account token, one replica, a locked-down container),
+# and that values.schema.json refuses values that would install a broken engawa.
 # Run inside `nix develop`.
 #   scripts/check-chart.sh
 set -euo pipefail
@@ -35,8 +35,8 @@ for values in "$chart"/ci/*-values.yaml; do
   helm lint --strict --quiet "$chart" -f "$values" >/dev/null || fail "$name: helm lint failed"
   out=$(render -f "$values")
 
-  # Engawa has no rights of its own: no ClusterRole, no binding to a ServiceAccount, and no token
-  # in the pod. The one Role the chart may render lets people read Engawa's settings: `get` on
+  # engawa has no rights of its own: no ClusterRole, no binding to a ServiceAccount, and no token
+  # in the pod. The one Role the chart may render lets people read engawa's settings: `get` on
   # the ConfigMap engawa-settings, nothing else.
   expect "$name" "$out" '[select(.kind == "ClusterRole" or .kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "RoleBinding") | .subjects[] | select(.kind == "ServiceAccount")] | length' 0

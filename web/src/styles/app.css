@@ -1,5 +1,5 @@
-/* Engawa's web interface: shadcn/ui's theme as its CLI writes it (./shadcn/theme.css; only its
-   chart colours are Engawa's), shadcn/ui's base styles and the Geist font by way of Genkan
+/* engawa's web interface: shadcn/ui's theme as its CLI writes it (./shadcn/theme.css; only its
+   chart colours are engawa's), shadcn/ui's base styles and the Geist font by way of Genkan
    (./genkan, see ./genkan/VENDORED), and Geist Mono from Vercel's release (./geist-mono, see
    ./geist-mono/VENDORED). This file only wires them up. */
 @import "tailwindcss";
@@ -42,7 +42,7 @@
   }
 }
 
-/* ── Engawa's own tokens on top of shadcn/ui's theme. ─────────────────────────────────────────────
+/* ── engawa's own tokens on top of shadcn/ui's theme. ─────────────────────────────────────────────
    Brand: hinoki wood, low chroma, used only for "you are here" (the rail on the active item), the
    wordmark and focus; never for status and never as a fill larger than a rail or a ring.
    Status: a strong colour for glyphs and pod cells, a soft one for pill fills and a dark one for

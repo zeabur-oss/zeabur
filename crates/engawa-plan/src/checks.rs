@@ -291,7 +291,7 @@ pub fn probe_config(request: &ProbeRequest, ports: &[i32]) -> Result<Value, Refu
 
 // ── Compute ──────────────────────────────────────────────────────────────────────────────────
 
-/// The resources Engawa sets on a container; others (GPUs, hugepages, …) are kept as they are.
+/// The resources engawa sets on a container; others (GPUs, hugepages, …) are kept as they are.
 pub const COMPUTE: [&str; 3] = ["cpu", "memory", "ephemeral-storage"];
 
 /// Parses a quantity in one unit.

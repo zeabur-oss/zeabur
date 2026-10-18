@@ -24,7 +24,7 @@ pub(crate) struct McpArgs {
     #[arg(long)]
     context: Option<String>,
     /// The metrics store history is read from: a Service port serving the Prometheus HTTP API,
-    /// as `namespace/name:port` (default: where Engawa's recommendation installs
+    /// as `namespace/name:port` (default: where engawa's recommendation installs
     /// VictoriaMetrics).
     #[arg(long, env = "ENGAWA_METRICS_SERVICE")]
     metrics_service: Option<String>,
@@ -266,7 +266,7 @@ mod tests {
         assert_eq!(logs["lines"][1], "fatal: no database", "{logs}");
     }
 
-    /// A refusal reaches the model as kube-apiserver and Engawa gave it: the missing right and
+    /// A refusal reaches the model as kube-apiserver and engawa gave it: the missing right and
     /// what to do.
     #[tokio::test]
     async fn a_refusal_is_an_error_result_with_the_api_problem() {

@@ -1,12 +1,12 @@
 //! A Prometheus-compatible metrics store: what a service used over time.
 //!
 //! History comes from the Prometheus HTTP API's range queries [prom-api]. Prometheus and
-//! VictoriaMetrics serve the same API [vm-single]; Engawa's recommendation installs
+//! VictoriaMetrics serve the same API [vm-single]; engawa's recommendation installs
 //! VictoriaMetrics.
 //!
 //! # Fixed queries
 //!
-//! The queries are Engawa's, never a person's: one project's namespace and one service's pods,
+//! The queries are engawa's, never a person's: one project's namespace and one service's pods,
 //! by name. They read the series the kubelet's cAdvisor endpoint exports, which every
 //! Prometheus-compatible stack scrapes ([kps-values], [vmks-values]), so they need no recording
 //! rule:

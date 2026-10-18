@@ -8,7 +8,7 @@ pub mod operators;
 pub mod provenance;
 pub mod selector;
 
-/// The field manager (`fieldManager`) Engawa's writes are recorded under in `managedFields`.
+/// The field manager (`fieldManager`) engawa's writes are recorded under in `managedFields`.
 pub use engawa_core::names::FIELD_MANAGER;
 
 /// The object's controller: the owner reference with `controller: true`, of which there is at

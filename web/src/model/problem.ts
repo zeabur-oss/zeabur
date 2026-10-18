@@ -37,7 +37,7 @@ const known = new Set<string>(kinds)
 /**
  * Kinds whose `detail` says what no key does yet: which request was malformed, which values the
  * cluster rejected, what was already written before a conflict, which tool manages the object,
- * what failed inside Engawa. A refusal is said by `denied` when it is there, and by its `detail`
+ * what failed inside engawa. A refusal is said by `denied` when it is there, and by its `detail`
  * only without it.
  */
 const detailExplains = new Set<string>([
@@ -120,7 +120,7 @@ export function refusedField(
 
 /**
  * Whether a problem is the cluster's refusal (a missing permission, a normal state) rather than an
- * error. Engawa's own 403s ("only from the Engawa page", "a plan made by someone else") name no
+ * error. engawa's own 403s ("only from the engawa page", "a plan made by someone else") name no
  * refused request and carry no answer from kube-apiserver; they stay errors. A quota's or a
  * policy's refusal is not about rights: admin rights would not change it.
  */

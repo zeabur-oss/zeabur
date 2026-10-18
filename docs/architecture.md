@@ -1,21 +1,21 @@
 # Architecture
 
-Engawa shows a Kubernetes cluster as projects and services, and lets people change them, without
+engawa shows a Kubernetes cluster as projects and services, and lets people change them, without
 holding any power of its own. It is a projection: Kubernetes objects are the only state.
 
 ## Principles
 
 - **No power of its own.** Every read and write is made with the person's credential: a token
   issued by Genkan in the cluster, or their kubeconfig context on their machine. kube-apiserver
-  decides. Engawa does not impersonate, and its service account can do nothing a person cannot.
+  decides. engawa does not impersonate, and its service account can do nothing a person cannot.
 - **Kubernetes objects are the only state.** No database, no cache of Secret values, and no
   custom resources for layers L0 to L2. A project is a namespace; adopting one only adds a label.
-  Removing Engawa leaves the cluster as it was.
+  Removing engawa leaves the cluster as it was.
 - **Project, not own.** Services are inferred from owner references, selectors, env and volume
   references, backendRefs, operator conventions and the labels of Helm, Argo CD and Flux. For
-  objects a GitOps tool or Helm manages, Engawa exports a patch or warns, and never fights over
+  objects a GitOps tool or Helm manages, engawa exports a patch or warns, and never fights over
   fields.
-- **Suggest, not install.** Engawa detects missing capabilities and writes the `helm` command, Flux
+- **Suggest, not install.** engawa detects missing capabilities and writes the `helm` command, Flux
   `HelmRelease`, Argo CD `Application` or k3s `HelmChart`; people install them.
 
 ## Product layers
@@ -89,7 +89,7 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 1 | [`engawa-ui`](../crates/engawa-ui) | embedding and serving the web interface |
 | 1 | [`engawa-auth`](../crates/engawa-auth) | signing in through Genkan (OAuth client), sessions, cross-site checks |
 | 2 | [`engawa-graph`](../crates/engawa-graph) | the projection rules (pure functions, tested with `fixtures/`) |
-| 2 | [`engawa-modules`](../crates/engawa-modules) | each installed component's resources and what Engawa makes of them (one module per provider) |
+| 2 | [`engawa-modules`](../crates/engawa-modules) | each installed component's resources and what engawa makes of them (one module per provider) |
 | 3 | [`engawa-gaps`](../crates/engawa-gaps) | gap rules and plain-language diagnostics |
 | 3 | [`engawa-plan`](../crates/engawa-plan) | change plans, minimal apply bodies, impact |
 | 3 | [`engawa-recommend`](../crates/engawa-recommend) | the recommendations bundle and install suggestions |

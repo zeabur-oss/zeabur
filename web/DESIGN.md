@@ -1,9 +1,9 @@
-# Engawa interface design
+# engawa interface design
 
-Engawa's own rules for the web interface. Components, radii and neutrals are shadcn/ui's (preset
+engawa's own rules for the web interface. Components, radii and neutrals are shadcn/ui's (preset
 brrM on Base UI, `src/styles/shadcn/theme.css`); build from those components (Badge, Card, Table,
-ToggleGroup, Tooltip…) and compose Engawa's own visuals on top rather than hand-rolling
-look-alikes. `src/styles/app.css` adds Engawa's tokens:
+ToggleGroup, Tooltip…) and compose engawa's own visuals on top rather than hand-rolling
+look-alikes. `src/styles/app.css` adds engawa's tokens:
 
 - **Hinoki** (`--brand`, low chroma) marks only "you are here" (the 3px rail on the project
   column's highlight), the logo and focus. Never a status, never a fill bigger than a rail.
@@ -100,7 +100,7 @@ A write's confirmation is the one place for whole sentences: what will happen, i
 first-time user follows (see Operations); its toast is a word or two and the thing it names.
 Kubernetes terms stay as Kubernetes spells them in every language.
 
-Engawa is for people who know Kubernetes, so the technical detail stays one step away, never in
+engawa is for people who know Kubernetes, so the technical detail stays one step away, never in
 the way ([progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)):
 
 - **Headings are plain words**: "Public", "Private", "Storage", not "Public · Ingress". The
@@ -143,7 +143,7 @@ Next to an operation (Restart), the target and the environment are spelled out:
 `Cluster k3s  Namespace shop  Deployment/worker`, each value after its label (the version is the
 cluster page's, not repeated here).
 
-Every write is planned first: a page describes the change (`usePlanner`), Engawa answers with what
+Every write is planned first: a page describes the change (`usePlanner`), engawa answers with what
 it will write, and a confirmation shows it in three layers
 ([progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)):
 
@@ -208,7 +208,7 @@ so both load as their authors ship them, without build-time patches. shadcn/ui's
 the theme's `--chart-*` in their marks instead, so it writes none (Trusted Types would refuse it). Inline styles can change how
 the page looks, not run code. Our own markup still keeps styles in classes: `index.html` has no
 `<style>` or `style=""` (`scripts/postbuild.ts`), and `style` props carry only custom properties.
-Sonner inserts its sheet after `app.css`, so Engawa's overrides of it (`app.css`, end) carry one
+Sonner inserts its sheet after `app.css`, so engawa's overrides of it (`app.css`, end) carry one
 more selector.
 
 ## States

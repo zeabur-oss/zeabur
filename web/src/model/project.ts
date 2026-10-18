@@ -1,7 +1,7 @@
 // A project as the shell names it: its display name when it has one, else its namespace's name,
 // and its icon. Both come with the project list (the namespace's annotations), so naming a
 // project reads no project document. Also the help for someone who may not patch a namespace:
-// the RBAC to ask for and the kubectl command that does the same as Engawa.
+// the RBAC to ask for and the kubectl command that does the same as engawa.
 import type { Schemas } from "@/api/client"
 import { roleYaml } from "@/model/rbac"
 
@@ -57,7 +57,7 @@ export const mayChange = (namespace: Pick<Schemas["ProjectNamespace"], "canChang
 /** The changes that write the project's Namespace, not objects in it. */
 export const namespaceOps = new Set<Schemas["Change"]["op"]>(["adopt", "unadopt", "details"])
 
-/** The kubectl commands that adopt `namespace` and let it go, as Engawa's plan does. */
+/** The kubectl commands that adopt `namespace` and let it go, as engawa's plan does. */
 export function kubectlLabel(namespace: string): { adopt: string; unadopt: string } {
   return {
     adopt: `kubectl label namespace ${namespace} ${PROJECT_LABEL}=true`,

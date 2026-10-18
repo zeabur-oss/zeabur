@@ -5,7 +5,7 @@ own page's requests from other sites'.
 
 ## Hides
 
-- **The OAuth client** ([`client`]): Engawa is a confidential client of Genkan (authorization
+- **The OAuth client** ([`client`]): engawa is a confidential client of Genkan (authorization
   code with PKCE S256, a client secret, `state`, an exact redirect URI), configured from
   `<issuer>/.well-known/openid-configuration`. It is written on the HTTP client stack kube-rs
   already ships (hyper, rustls with aws-lc-rs); there is no OpenID Connect or JOSE library, and

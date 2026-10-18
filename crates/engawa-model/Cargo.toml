@@ -1,6 +1,6 @@
 [package]
 name = "engawa-model"
-description = "Engawa: the projected view (project, service, relation, source) shared by the API, MCP and UI"
+description = "engawa: the projected view (project, service, relation, source) shared by the API, MCP and UI"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

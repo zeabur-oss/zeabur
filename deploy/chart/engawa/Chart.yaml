@@ -1,7 +1,7 @@
 apiVersion: v2
 name: engawa
 description: >-
-  Engawa's in-cluster server: the web interface and API, signing people in through Genkan and
+  engawa's in-cluster server: the web interface and API, signing people in through Genkan and
   acting with their own credentials.
 type: application
 version: 0.0.1

@@ -25,7 +25,7 @@ enum Lang {
 }
 
 impl Lang {
-    /// The first language of `Accept-Language` Engawa speaks; weights are ignored, as browsers
+    /// The first language of `Accept-Language` engawa speaks; weights are ignored, as browsers
     /// list languages in order of preference.
     fn of(headers: &HeaderMap) -> Self {
         let accept = headers
@@ -155,7 +155,7 @@ fn html(status: StatusCode, lang: Lang, attributes: &str, script: bool, body: &s
     };
     let page = format!(
         "<!doctype html><html lang=\"{}\"{attributes}><head><meta charset=\"utf-8\">\
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Engawa</title>\
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>engawa</title>\
 {script}</head><body>{body}</body></html>",
         lang.code()
     );
@@ -209,7 +209,7 @@ pub(crate) fn sign_in_problem(request: &HeaderMap, problem: SignInProblem) -> Re
     )
 }
 
-/// The end of "Retry as admin": tells Engawa's page and closes the window.
+/// The end of "Retry as admin": tells engawa's page and closes the window.
 pub(crate) fn elevated(request: &HeaderMap, outcome: &Elevated) -> Response {
     let lang = Lang::of(request);
     let until = match outcome {

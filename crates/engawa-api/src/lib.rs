@@ -7,7 +7,7 @@
 //! | Method and path | Returns |
 //! |---|---|
 //! | `GET /api/v1/whoami` | who the cluster says you are |
-//! | `GET /api/v1/session` | how you are signed in to Engawa: signing out, admin rights in use |
+//! | `GET /api/v1/session` | how you are signed in to engawa: signing out, admin rights in use |
 //! | `GET /api/v1/cluster` | the cluster: its Kubernetes version and distribution |
 //! | `GET /api/v1/cluster/upgrades` | end of life, version skew and newer versions from Plans |
 //! | `GET /api/v1/cluster/nodes` | nodes, with requests against allocatable |
@@ -43,7 +43,7 @@
 //! the plan token is the precondition of an apply, so writes need no `If-Match`, `412` or `428`. A
 //! rollback is a plan too (the `rollback` change), as are storage, probes, compute and YAML
 //! edits, adopting a namespace, letting it go and a project's details, so there is one write
-//! path. Engawa's own settings are not a project's: a `PUT` writes their ConfigMap directly, as
+//! path. engawa's own settings are not a project's: a `PUT` writes their ConfigMap directly, as
 //! the person (see the `settings` module).
 //!
 //! # Compatibility
@@ -97,7 +97,7 @@ use crate::access::ClusterAccess;
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "Engawa API",
+        title = "engawa API",
         description = "Kubernetes made simple and secure by default. Every request acts as the \
 person making it; errors are RFC 9457 problems that keep kube-apiserver's own answer.
 
@@ -112,7 +112,7 @@ from (`origin`), every top-level node has an `id` in the shape of its path, and 
 **Consistency.** A project is read with one consistent LIST per kind, issued concurrently. Kinds \
 are not read at one shared resourceVersion, which Kubernetes does not offer across kinds, so a \
 response can briefly show, for example, a pod that a just-deleted workload owned; the next read \
-corrects it. Engawa promises freshness (nothing older than the request), not a single-revision \
+corrects it. engawa promises freshness (nothing older than the request), not a single-revision \
 snapshot.
 
 **Errors.** The problem `kind` and `reason` are open enumerations: expect new values, treat an \
@@ -132,7 +132,7 @@ promised a stable `/api/v1`.",
         (name = "services", description = "A project's services (workloads): releases and usage history"),
         (name = "pods", description = "A pod's containers: logs, and a terminal over a WebSocket"),
         (name = "resources", description = "A project's resources and objects of any kind, as YAML"),
-        (name = "settings", description = "Engawa's own settings"),
+        (name = "settings", description = "engawa's own settings"),
     ),
     components(schemas(pods::exec::ClientFrame, pods::exec::ServerFrame))
 )]

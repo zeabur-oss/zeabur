@@ -1,7 +1,7 @@
 //! What a container image's name says about the software in it.
 //!
 //! Image names are a convention, not a contract: `postgres:16` and `bitnami/postgresql` are
-//! PostgreSQL by name only. Engawa uses the name for hints, never for a decision a person cannot
+//! PostgreSQL by name only. engawa uses the name for hints, never for a decision a person cannot
 //! see and correct.
 
 pub use engawa_core::data_store::DataStore;

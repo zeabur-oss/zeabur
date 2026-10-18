@@ -1,4 +1,4 @@
-// End-to-end tests of the web interface against a running Engawa (see e2e/ui.spec.ts).
+// End-to-end tests of the web interface against a running engawa (see e2e/ui.spec.ts).
 //
 //   ENGAWA_E2E_URL        the one-time launch link `engawactl ui` prints:
 //                         http://127.0.0.1:<port>/?engawa-launch=<token>
@@ -14,7 +14,7 @@ if (!launch) throw new Error("ENGAWA_E2E_URL is not set")
 
 export default defineConfig({
   testDir: "e2e",
-  // e2e/l2 runs against Engawa in a cluster, with its own configuration (playwright.l2.config.ts).
+  // e2e/l2 runs against engawa in a cluster, with its own configuration (playwright.l2.config.ts).
   testIgnore: "**/e2e/l2/**",
   fullyParallel: false,
   workers: 1,

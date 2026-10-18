@@ -168,7 +168,7 @@ pub fn validate_hostname(hostname: &str) -> Result<(), Refusal> {
     }
 }
 
-/// The name of the route Engawa creates for `hostname` on `workload` (`mutation.routeName`).
+/// The name of the route engawa creates for `hostname` on `workload` (`mutation.routeName`).
 ///
 /// The workload, then the hostname in lower case with dots as hyphens, so asking again for the
 /// same hostname finds the same route.

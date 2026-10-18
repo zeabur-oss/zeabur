@@ -1,17 +1,17 @@
 # engawa-modules
 
-Integrations with components a cluster may have installed: what Engawa reads from each and what
+Integrations with components a cluster may have installed: what engawa reads from each and what
 it makes of it. One module per provider (metrics-server, system-upgrade-controller, …).
 
 ## Hides
 
-Each component's resources and their shapes. The rest of Engawa sees what a module declares
+Each component's resources and their shapes. The rest of engawa sees what a module declares
 (its id, the capability it provides, the resources it reads) and the typed views it produces.
 
 ## Place in the workspace
 
 Level 2: may depend on `engawa-core`, `engawa-model`, `engawa-kube` (for the object types it
-reads) and `engawa-adapters` (for label selectors). Only the crates that compose Engawa
+reads) and `engawa-adapters` (for label selectors). Only the crates that compose engawa
 (`engawa-api`, `engawa-mcp` and the binaries) may depend on it, never the core crates;
 `scripts/check-levels.sh` checks both (`[workspace.metadata.modules]` in the root `Cargo.toml`).
 
@@ -22,7 +22,7 @@ reads) and `engawa-adapters` (for label selectors). Only the crates that compose
   (`Reading::NotInstalled`), not a build option. There is no registration through linker
   sections (`inventory`, `linkme`): they rely on the linker keeping otherwise unreferenced
   statics and register nothing, silently, on platforms they do not support [inventory]. There is
-  no loading at run time either: Engawa is one static binary. Bevy composes plugins the same way,
+  no loading at run time either: engawa is one static binary. Bevy composes plugins the same way,
   by a list in code [bevy-plugins].
 - **Modules do not read.** A module declares the resources it needs ([`Module::reads`]), or the
   HTTP API it reads from a Service ([`Module::http`]: the metrics store); the composer reads them

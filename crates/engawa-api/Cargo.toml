@@ -1,6 +1,6 @@
 [package]
 name = "engawa-api"
-description = "Engawa: the HTTP API and its OpenAPI description"
+description = "engawa: the HTTP API and its OpenAPI description"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

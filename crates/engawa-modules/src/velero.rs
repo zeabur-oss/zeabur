@@ -10,7 +10,7 @@
 //!
 //! A Velero backup covers the namespace's objects. Whether it also copies a claim's data depends
 //! on volume snapshots (a snapshot location and a CSI driver or provider plugin) or on file-system
-//! backup [velero-fsb]. Engawa counts the project's claims as covered only when the schedule asks
+//! backup [velero-fsb]. engawa counts the project's claims as covered only when the schedule asks
 //! for file-system backup of every volume (`defaultVolumesToFsBackup: true`); otherwise the
 //! schedule covers the namespace and says that volume data depends on snapshots.
 //!

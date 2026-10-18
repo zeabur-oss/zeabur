@@ -13,7 +13,7 @@ use crate::snapshot::name_of;
 /// of the port's name (`http`, `https`, `grpc`, alone or followed by `-…`), then its transport
 /// protocol.
 ///
-/// Engawa keeps no record of its own for this: the Service says it, or it is inferred.
+/// engawa keeps no record of its own for this: the Service says it, or it is inferred.
 #[must_use]
 pub fn port_protocol(port: &ServicePort) -> ProtocolInference {
     let declared = port.app_protocol.as_deref().and_then(|protocol| {

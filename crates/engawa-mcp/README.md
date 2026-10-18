@@ -5,7 +5,7 @@ restarting, and why?". `engawactl mcp` runs it.
 
 ## Hides
 
-The tool set and what each tool reads. Tools read the Engawa API through a
+The tool set and what each tool reads. Tools read the engawa API through a
 [`Reader`](crate::Reader), which `engawactl` implements with the API in its own process and the
 person's kubeconfig. The answers are the web interface's, under the same RBAC, and a Secret's
 values are hidden in one place: the API.
@@ -52,7 +52,7 @@ and the server exits when standard input closes [mcp-stdio].
 The protocol is rmcp's, the official Rust SDK [rmcp]: its server handler, tool macros, JSON
 Schemas of the arguments (schemars) and stdio transport. It answers clients of the stateless
 revision 2026-07-28 (`server/discover`, the version in each request's `_meta`) and clients still
-on 2025-11-25 (`initialize`, `ping`) [mcp-versioning]. Engawa writes no JSON-RPC or version
+on 2025-11-25 (`initialize`, `ping`) [mcp-versioning]. engawa writes no JSON-RPC or version
 handling of its own.
 
 ## Place in the workspace

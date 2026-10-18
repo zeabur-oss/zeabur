@@ -8,11 +8,11 @@ use std::future::Future;
 pub use reads::ALLOWLIST;
 pub use server::Server;
 
-/// A problem as the API answers it (RFC 9457 Problem Details, with Engawa's `kind`, `fix`,
+/// A problem as the API answers it (RFC 9457 Problem Details, with engawa's `kind`, `fix`,
 /// `denied` and `kubernetes` members), passed through to the client unchanged.
 pub type Problem = serde_json::Value;
 
-/// Reads the Engawa API as the person running the server.
+/// Reads the engawa API as the person running the server.
 ///
 /// The only operation is a `GET`: there is nothing here a tool could use to write, reveal a
 /// Secret's values or open a terminal. Every path a tool asks for is one of [`ALLOWLIST`].

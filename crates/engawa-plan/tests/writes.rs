@@ -6,7 +6,7 @@
 //!   tool that reapplies what it owns, and names any other owner.
 //! - **The write is the change the person approves.** The JSON Patch [rfc6902], applied to the
 //!   object as it is stored, gives exactly the object the plan shows as the result. No other RFC
-//!   6902 implementation is in the dependency tree, so the patch is applied with Engawa's; what the
+//!   6902 implementation is in the dependency tree, so the patch is applied with engawa's; what the
 //!   property adds is that the whole write (its precondition, and the operations of several changes
 //!   to one object in order) holds on the stored object, not on the planner's working copy.
 //!   kube-apiserver's own answer is checked by the cluster tests. The Secret's values are readable
@@ -52,7 +52,7 @@ mod tests {
         ("helm-controller", Tool::Flux),
     ];
 
-    /// Managers whose fields a person may change: Engawa, kubectl's verbs and controllers.
+    /// Managers whose fields a person may change: engawa, kubectl's verbs and controllers.
     const OTHERS: [&str; 6] = [
         "engawa",
         "kubectl",

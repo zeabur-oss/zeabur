@@ -75,7 +75,7 @@ pub trait ClusterAccess: Send + Sync + 'static {
 
     /// When the credential of [`ClusterAccess::for_request`] stops being valid, if it does: the
     /// administrator's while the person is elevated. kube-apiserver checks a token when a stream
-    /// opens, not while it stays open, so a terminal is closed at this time by Engawa itself.
+    /// opens, not while it stays open, so a terminal is closed at this time by engawa itself.
     fn credential_expiry(&self, _parts: &Parts) -> Option<Timestamp> {
         None
     }

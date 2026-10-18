@@ -1,6 +1,6 @@
 [package]
 name = "engawa-recommend"
-description = "Engawa: capability detection and install suggestions from the recommendations bundle"
+description = "engawa: capability detection and install suggestions from the recommendations bundle"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

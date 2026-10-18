@@ -1,20 +1,20 @@
-# Install Engawa in a cluster
+# Install engawa in a cluster
 
-Engawa runs as one pod in its own namespace. People sign in through
-[Genkan](https://github.com/engawahq/genkan) with their passkey, and every request Engawa makes
-to kube-apiserver carries that person's token: Engawa's service account has no Role, no
-ClusterRole and no token of its own. What someone can see and change in Engawa is exactly what
-their Kubernetes RBAC allows. The chart's one Role lets everyone signed in read Engawa's settings
+engawa runs as one pod in its own namespace. People sign in through
+[Genkan](https://github.com/engawahq/genkan) with their passkey, and every request engawa makes
+to kube-apiserver carries that person's token: engawa's service account has no Role, no
+ClusterRole and no token of its own. What someone can see and change in engawa is exactly what
+their Kubernetes RBAC allows. The chart's one Role lets everyone signed in read engawa's settings
 (`get` on the ConfigMap `engawa-settings`); turn it off with `metricsStore.everyoneReads=false`.
 
-This guide installs Engawa with its Helm chart (`deploy/chart/engawa`). The examples use these
+This guide installs engawa with its Helm chart (`deploy/chart/engawa`). The examples use these
 names; replace them with yours:
 
 | Name | In the examples |
 |---|---|
-| Engawa's public URL | `https://engawa.example.com` |
+| engawa's public URL | `https://engawa.example.com` |
 | Genkan's issuer URL | `https://genkan.example.com` |
-| Engawa's namespace | `engawa` |
+| engawa's namespace | `engawa` |
 
 ## What you need
 
@@ -22,13 +22,13 @@ names; replace them with yours:
   over HTTPS: Genkan's [Get started](https://github.com/engawahq/genkan/blob/main/docs/get-started.md)
   sets this up on k3s. Run `genkanctl` and `kubectl` below with the cluster admin's kubeconfig.
 - An ingress controller (an `Ingress` or a Gateway API `Gateway`) and a TLS certificate for
-  Engawa's host name, for example from cert-manager. Browsers offer passkeys only on pages they
+  engawa's host name, for example from cert-manager. Browsers offer passkeys only on pages they
   trust.
 - `helm`, and this repository checked out (`nix develop` provides `helm`).
 
 ## 1. Build the image
 
-Engawa has no published image yet. Build it on a Linux machine with Docker (it embeds the web
+engawa has no published image yet. Build it on a Linux machine with Docker (it embeds the web
 interface) and load it into the cluster's nodes; on k3s:
 
 ```sh
@@ -36,9 +36,9 @@ interface) and load it into the cluster's nodes; on k3s:
 docker save engawa:dev | sudo k3s ctr images import -
 ```
 
-## 2. Register Engawa at Genkan
+## 2. Register engawa at Genkan
 
-Engawa is a confidential client: it has a server side that keeps a secret. It needs tokens that
+engawa is a confidential client: it has a server side that keeps a secret. It needs tokens that
 kube-apiserver accepts (`--audience kubernetes`), and it asks for admin rights when the cluster
 refuses something to the everyday ones (`--allow-elevation`):
 
@@ -47,7 +47,7 @@ genkanctl client create engawa --type confidential --allow-elevation --audience 
   --redirect-uri https://engawa.example.com/auth/callback | kubectl apply -f -
 ```
 
-`genkanctl` prints the client secret once, on stderr. Store it as a Secret in Engawa's namespace
+`genkanctl` prints the client secret once, on stderr. Store it as a Secret in engawa's namespace
 right away, pasting it rather than passing it as an argument (other users on the machine can see
 arguments in the process list):
 
@@ -94,7 +94,7 @@ likely to set:
 
 ### The plan key
 
-Every change in Engawa is first shown as a plan, and the plan is carried out by a token signed
+Every change in engawa is first shown as a plan, and the plan is carried out by a token signed
 with a key. The chart creates that key on install as a Secret (`engawa-plan-key`), reads it back
 on upgrades with Helm's `lookup`, and keeps it. Tools that render charts without a cluster
 (`helm template`, Argo CD) see no existing Secret and would make a new key on each render: name
@@ -114,9 +114,9 @@ in the process's memory, because their refresh tokens must not rest in etcd: a s
 would not know them. A restart therefore signs everyone out; signing in again takes one passkey
 touch.
 
-## Check what Engawa may do
+## Check what engawa may do
 
-Engawa's service account may do nothing a new service account cannot:
+engawa's service account may do nothing a new service account cannot:
 
 ```sh
 kubectl auth can-i impersonate users --as=system:serviceaccount:engawa:engawa    # no
@@ -131,7 +131,7 @@ kubectl delete namespace engawa
 kubectl -n genkan-system delete oauthclient engawa
 ```
 
-Engawa keeps no state outside its namespace: no custom resources, nothing cluster-wide. After
+engawa keeps no state outside its namespace: no custom resources, nothing cluster-wide. After
 these commands the cluster is as it was before step 2. `scripts/e2e-l2.sh` checks this: it
 records every cluster-scoped object and every namespace's labels and annotations before the
 install and compares them after the removal.

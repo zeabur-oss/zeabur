@@ -68,7 +68,7 @@ pub struct ProjectNamespace {
     pub origin: Origin,
     /// Its name.
     pub name: String,
-    /// It carries Engawa's project label.
+    /// It carries engawa's project label.
     pub adopted: bool,
     /// Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted.
     pub system: bool,

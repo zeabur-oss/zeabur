@@ -38,7 +38,7 @@ function Failure({ problem: body, action }: { problem: ProblemBody; action?: Rea
   const { locale } = useI18n()
   const text = problemText(t, locale, body)
   const status = body.kubernetes ?? undefined
-  // Engawa's sentence is often kube-apiserver's own message; it is said once.
+  // engawa's sentence is often kube-apiserver's own message; it is said once.
   const folded = text.folded.filter((sentence) => sentence !== status?.message)
   const rows: RawRow[] = [
     ...(body.denied

@@ -1,5 +1,5 @@
 //! Randomness, authenticated encryption and constant-time comparison, through aws-lc-rs, the one
-//! cryptographic library Engawa ships (it is already rustls's provider).
+//! cryptographic library engawa ships (it is already rustls's provider).
 //!
 //! # References
 //!

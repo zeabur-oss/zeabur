@@ -100,7 +100,7 @@ pub struct ContainerTermination {
     pub message: Option<String>,
 }
 
-/// The workload kinds Engawa projects.
+/// The workload kinds engawa projects.
 ///
 /// Declared in alphabetical order, so the derived [`Ord`] sorts as the kind names do.
 #[derive(

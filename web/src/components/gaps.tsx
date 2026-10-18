@@ -1,5 +1,5 @@
 // What a project or the cluster is missing: each gap with its sentence, the object it is about,
-// the guidance it rests on, and its fix. A fix Engawa can write opens a plan; an install links to
+// the guidance it rests on, and its fix. A fix engawa can write opens a plan; an install links to
 // the component's install texts; otherwise the server's YAML snippet is there to copy.
 import { Link } from "@tanstack/react-router"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"

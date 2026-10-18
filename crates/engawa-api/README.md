@@ -13,7 +13,7 @@ the in-cluster server a client per request, tests an in-memory cluster.
 
 - **Every item names its origin.** Each value in a response carries the Kubernetes object (and,
   where it is one field, the field path) it was read from, so a person can always go from
-  Engawa's view to the object behind it. One type, `Origin`, for all of them.
+  engawa's view to the object behind it. One type, `Origin`, for all of them.
 - **One shape for gets, one for lists.** A get returns the resource itself; a list returns
   `{items}` with every item. Event lists return the newest `limit` and count every match in
   `totalSize` (`views`, `query`).

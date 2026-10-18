@@ -81,7 +81,7 @@ pub struct Claims {
 /// Why a token is refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 pub enum TokenError {
-    /// It is not a token Engawa made.
+    /// It is not a token engawa made.
     #[error("the plan token is malformed")]
     Malformed,
     /// It does not open: it was altered, or made under another key.

@@ -49,7 +49,7 @@ pub(crate) async fn config_maps(
 }
 
 /// A Secret's values. A `POST`, so that it is always a deliberate action and never prefetched;
-/// the response is never cached, and nothing in Engawa logs or keeps it.
+/// the response is never cached, and nothing in engawa logs or keeps it.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/secrets/{name}/reveal", tag = "resources",
     params(("project" = String, Path), ("name" = String, Path)),
     responses((status = 200, body = RevealedSecret), (status = 403, body = Problem, content_type = PROBLEM)))]

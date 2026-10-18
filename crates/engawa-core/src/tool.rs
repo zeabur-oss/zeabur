@@ -1,4 +1,4 @@
-//! The deployment tools whose objects Engawa does not edit.
+//! The deployment tools whose objects engawa does not edit.
 //!
 //! One type for every layer: the adapters detect a tool, the model shows it, and a refused
 //! write names it in its problem.

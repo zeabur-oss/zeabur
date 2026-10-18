@@ -1,7 +1,7 @@
 // A service's networking as two tables. Public: one row per Ingress backend that reaches the
 // service, its columns in request order (host and path → Ingress → Service:port → pods), so the
 // row is the request path. Private: one row per Kubernetes Service, with its cluster DNS names.
-// Domains are added, changed and removed here; Engawa picks the route object (the one that
+// Domains are added, changed and removed here; engawa picks the route object (the one that
 // already reaches the service, else an HTTPRoute when a Gateway exists, else an Ingress), and
 // every change opens a plan to read before applying.
 import { useForm } from "@tanstack/react-form"

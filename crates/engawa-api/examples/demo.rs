@@ -891,7 +891,7 @@ fn state() -> State {
         .into_iter()
         .chain(live)
         .collect(),
-        // The metrics store where Engawa's recommendation installs it.
+        // The metrics store where engawa's recommendation installs it.
         proxied: BTreeMap::from([(
             engawa_api::settings::default_metrics_store().to_string(),
             answer,
@@ -964,7 +964,7 @@ fn usage(node: &str, cpu: &str, memory: &str) -> DynamicObject {
 // ── Usage and history ────────────────────────────────────────────────────────────────────────
 //
 // Sample numbers, the same on every run: metrics-server's `PodMetrics` for every running pod, and
-// a metrics store behind the service proxy that answers Engawa's range queries. The worker runs
+// a metrics store behind the service proxy that answers engawa's range queries. The worker runs
 // close to its memory limit and, over a day, leaks memory until it is killed for it every nine
 // hours; a Deployment rolled out 30 hours ago, so a week shows the pods it replaced.
 
@@ -1120,7 +1120,7 @@ struct Run {
     pod: DemoPod,
 }
 
-/// What the sample store answers: Engawa's probe, and its range queries for the demo's pods.
+/// What the sample store answers: engawa's probe, and its range queries for the demo's pods.
 /// `ENGAWA_DEMO_FORBID=services/proxy` refuses it, as kube-apiserver does without the right.
 #[expect(
     clippy::cast_precision_loss,

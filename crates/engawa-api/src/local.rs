@@ -11,7 +11,7 @@
 //!    127.0.0.1 and make the browser send it requests (DNS rebinding); the defence is to "reject
 //!    incoming HTTP requests with unexpected Host headers" [jackson2007] (§5.3), as local servers
 //!    do: webpack-dev-server's `allowedHosts` [webpack], Jupyter's `local_hostnames`
-//!    [jupyter-config] and `kubectl proxy --accept-hosts` [kubectl-proxy]. Engawa is stricter than
+//!    [jupyter-config] and `kubectl proxy --accept-hosts` [kubectl-proxy]. engawa is stricter than
 //!    these: only `127.0.0.1:<port>` and `localhost:<port>`, with this server's port.
 //! 3. **A one-time link, then a cookie.** The URL `engawactl` opens carries a random 256-bit token,
 //!    exchanged for a session cookie and then spent. Jupyter turns a URL token into a cookie the same
@@ -160,7 +160,7 @@ pub async fn guard(State(access): State<Arc<Access>>, request: Request, next: Ne
         Err(Refusal::Host) => not_this_address(),
         Err(Refusal::CrossSite | Refusal::NotFromEngawa) => problem(
             Kind::Forbidden,
-            "Changes are accepted only from the Engawa page itself.",
+            "Changes are accepted only from the engawa page itself.",
         ),
     }
 }
@@ -168,7 +168,7 @@ pub async fn guard(State(access): State<Arc<Access>>, request: Request, next: Ne
 fn not_this_address() -> Response {
     problem(
         Kind::Forbidden,
-        "This address does not belong to the Engawa running on this machine.",
+        "This address does not belong to the engawa running on this machine.",
     )
 }
 

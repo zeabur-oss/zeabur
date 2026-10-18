@@ -110,7 +110,7 @@ pub struct WorkloadMatch {
     pub labels: BTreeMap<String, String>,
 }
 
-/// The parts of a catalogue file Engawa reads; the rest is ignored.
+/// The parts of a catalogue file engawa reads; the rest is ignored.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct File {
@@ -244,7 +244,7 @@ fn suggestion(components: &[Component], facts: &ClusterFacts) -> Suggestion {
 
 /// Each capability of the catalogue: existing (with the evidence) or not.
 ///
-/// Engawa does not judge an existing installation against the catalogue's settings; it reports
+/// engawa does not judge an existing installation against the catalogue's settings; it reports
 /// that one is there. A missing capability lists what could be installed, and whether the
 /// catalogue recommends it for a cluster of this shape (profile and distribution) or keeps it
 /// optional, so a small cluster is not told to install everything. A probe the

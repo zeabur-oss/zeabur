@@ -7,8 +7,8 @@
 //! decides is `get` on `services/proxy` for the store's Service. kube-apiserver does not tell the
 //! store who is asking (it removes `Authorization` and the impersonation headers before
 //! proxying) [k8s-authn-filter], and the store has no notion of projects: whoever may reach it
-//! may ask it anything, about every namespace. Engawa's queries name only this project's pods,
-//! but that limits what Engawa shows, not what the person could read. So the rule is: being
+//! may ask it anything, about every namespace. engawa's queries name only this project's pods,
+//! but that limits what engawa shows, not what the person could read. So the rule is: being
 //! allowed history is being allowed every project's metrics, and only people who may see the
 //! whole cluster should be. Kubernetes' `edit` and `admin` roles include `services/proxy` only in
 //! their own namespace, and `view` not at all [k8s-bootstrap-policy], so a tenant does not get it

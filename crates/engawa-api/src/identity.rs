@@ -1,4 +1,4 @@
-//! `GET /api/v1/session`: how the person is signed in to Engawa itself, as opposed to who the
+//! `GET /api/v1/session`: how the person is signed in to engawa itself, as opposed to who the
 //! cluster says they are (`whoami`).
 //!
 //! The web interface reads it to know whether it may offer signing out (only where people sign
@@ -30,14 +30,14 @@ pub enum ElevationState {
     Active,
 }
 
-/// How the person is signed in to Engawa.
+/// How the person is signed in to engawa.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionView {
     /// Whether people sign in to this server, and so can sign out. `false` on this machine
     /// (`engawactl ui`), which acts with the kubeconfig of whoever started it.
     pub signs_in: bool,
-    /// When the credential in use expires, RFC 3339: the everyday one, which Engawa renews
+    /// When the credential in use expires, RFC 3339: the everyday one, which engawa renews
     /// before then while the session lasts, or while admin rights are in use theirs, which is
     /// `elevatedUntil` and is not renewed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -81,7 +81,7 @@ where
     }
 }
 
-/// How you are signed in to Engawa: whether you can sign out, and admin rights in use.
+/// How you are signed in to engawa: whether you can sign out, and admin rights in use.
 #[utoipa::path(get, path = "/api/v1/session", tag = "identity", operation_id = "getSession",
     responses((status = 200, body = SessionView),
               (status = 401, body = Problem, content_type = PROBLEM)))]

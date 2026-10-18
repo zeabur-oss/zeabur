@@ -42,7 +42,7 @@ The first public release, pre-alpha.
 
 ### Security
 
-- Every request to kube-apiserver carries the person's own credential; Engawa's service
+- Every request to kube-apiserver carries the person's own credential; engawa's service
   account has no rights and no token, and nothing is impersonated.
 - Secret values never appear in listings, YAML, `last-applied-configuration`, plans, MCP
   answers or logs; they are shown only on an explicit reveal, and a masked value is never

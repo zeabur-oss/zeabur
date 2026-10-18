@@ -13,7 +13,7 @@ use secrecy::SecretString;
 
 /// Kubernetes made simple and secure by default: the in-cluster server.
 ///
-/// People sign in through Genkan; register Engawa there as a confidential client with the
+/// People sign in through Genkan; register engawa there as a confidential client with the
 /// redirect URI `<public URL>/auth/callback` and the audience kube-apiserver accepts.
 #[derive(Debug, clap::Parser)]
 #[command(version)]
@@ -22,7 +22,7 @@ pub(crate) struct Args {
     /// (see `listen` in `main.rs`).
     #[arg(long, env = "ENGAWA_LISTEN", default_value = "[::]:8080")]
     pub(crate) listen: SocketAddr,
-    /// The URL people open Engawa at, such as `https://engawa.example.com`.
+    /// The URL people open engawa at, such as `https://engawa.example.com`.
     #[arg(long, env = "ENGAWA_PUBLIC_URL")]
     pub(crate) public_url: String,
     /// Genkan's issuer URL, such as `https://genkan.example.com`.
@@ -32,7 +32,7 @@ pub(crate) struct Args {
     /// bundle: for an issuer whose certificate a private CA signed.
     #[arg(long, env = "ENGAWA_ISSUER_CA_FILE")]
     pub(crate) issuer_ca_file: Option<PathBuf>,
-    /// The `client_id` Engawa is registered with.
+    /// The `client_id` engawa is registered with.
     #[arg(long, env = "ENGAWA_CLIENT_ID", default_value = "engawa")]
     pub(crate) client_id: String,
     /// A file holding the client secret (a mounted Secret).
@@ -55,10 +55,10 @@ pub(crate) struct Args {
     pub(crate) session_max_hours: u32,
     /// The metrics store history is read from, until someone chooses another in the settings: a
     /// Service port serving the Prometheus HTTP API, as `namespace/name:port`. Empty: where
-    /// Engawa's recommendation installs VictoriaMetrics.
+    /// engawa's recommendation installs VictoriaMetrics.
     #[arg(long, env = "ENGAWA_METRICS_SERVICE", default_value = "")]
     pub(crate) metrics_service: String,
-    /// The namespace Engawa runs in, where the ConfigMap `engawa-settings` keeps the settings
+    /// The namespace engawa runs in, where the ConfigMap `engawa-settings` keeps the settings
     /// people choose. Empty: settings cannot be changed.
     #[arg(long, env = "ENGAWA_NAMESPACE", default_value = "")]
     pub(crate) namespace: String,
@@ -257,7 +257,7 @@ mod tests {
         assert!(error.contains("at least 1"), "{error}");
         let error = args(&files, &["--metrics-service", "prometheus:9090"]).unwrap_err();
         assert!(error.starts_with("--metrics-service:"), "{error}");
-        let error = args(&files, &["--namespace", "Engawa"]).unwrap_err();
+        let error = args(&files, &["--namespace", "Default"]).unwrap_err();
         assert!(error.starts_with("--namespace:"), "{error}");
     }
 

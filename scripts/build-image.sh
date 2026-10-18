@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Engawa's container image for this machine's architecture: a static musl binary in an
+# Builds engawa's container image for this machine's architecture: a static musl binary in an
 # otherwise empty image (Containerfile). Run on Linux inside `nix develop`; needs docker.
 #   scripts/build-image.sh engawa:dev
 set -euo pipefail

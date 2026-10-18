@@ -211,7 +211,7 @@ describe("typed confirmation", () => {
     expect(typedName([remove])).toBe("engawa-isolate-api")
     expect(awaitsName([remove], "")).toBe(true)
     expect(awaitsName([remove], "engawa-isolate")).toBe(true)
-    expect(awaitsName([remove], "Engawa-Isolate-API")).toBe(true)
+    expect(awaitsName([remove], "ENGAWA-ISOLATE-API")).toBe(true)
     expect(awaitsName([remove], " engawa-isolate-api ")).toBe(false)
     expect(awaitsName([{ op: "restart", workload: api }], "")).toBe(false)
     expect(typedName([{ op: "restart", workload: api }])).toBe(undefined)

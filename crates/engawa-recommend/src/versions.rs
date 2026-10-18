@@ -16,10 +16,10 @@
 //!
 //! # Newer versions come from the cluster
 //!
-//! Which patch or minor is newest is not in the table: it changes weekly. Engawa makes no
+//! Which patch or minor is newest is not in the table: it changes weekly. engawa makes no
 //! outbound request for it. When system-upgrade-controller is installed, its `Plan` objects
 //! carry `status.latestVersion`, which the controller resolved from the channel the cluster
-//! administrator chose, and that is the newer version Engawa reports. Without Plans, newer
+//! administrator chose, and that is the newer version engawa reports. Without Plans, newer
 //! versions are not known and nothing is said about them; end of life and version skew are facts
 //! about what runs and are always reported.
 //!
@@ -175,7 +175,7 @@ pub enum UpgradeState {
     SkewMixed,
     /// system-upgrade-controller is upgrading nodes now.
     Upgrading,
-    /// The minor is newer than Engawa's table.
+    /// The minor is newer than engawa's table.
     NewerThanData,
 }
 

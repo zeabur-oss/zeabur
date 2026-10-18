@@ -40,7 +40,7 @@ const DEFAULT_EVENTS: u32 = 50;
 
 /// What the server tells a client about itself, for the model.
 const INSTRUCTIONS: &str = "Read-only view of a Kubernetes cluster as the user's kubeconfig \
-sees it, through Engawa. A project is a namespace; a service is a workload (Deployment, \
+sees it, through engawa. A project is a namespace; a service is a workload (Deployment, \
 StatefulSet, DaemonSet, Job, CronJob). Start with list_projects, then get_project. To explain a \
 failing service: get_service, project_events, then pod_logs with previous=true for the run that \
 crashed. Diagnoses are message keys with parameters. Nothing here can change the cluster or show \

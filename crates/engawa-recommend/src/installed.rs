@@ -46,7 +46,7 @@ pub enum InstallSource {
     HelmChart,
     /// A Helm release (found by its workloads' `helm.sh/chart` label).
     Helm,
-    /// Anything else: plain manifests, an operator, a tool Engawa does not read.
+    /// Anything else: plain manifests, an operator, a tool engawa does not read.
     Other,
 }
 

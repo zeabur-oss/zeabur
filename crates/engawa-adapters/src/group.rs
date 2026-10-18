@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-/// Engawa's label naming a workload's group explicitly. It always wins.
+/// engawa's label naming a workload's group explicitly. It always wins.
 pub use engawa_core::names::LABEL_GROUP as GROUP_LABEL;
 
 use crate::label;
@@ -25,7 +25,7 @@ pub const OPERATORS_GROUP: &str = "operators";
 /// The group the labels name: the explicit [`GROUP_LABEL`] wins, the [`COMPONENT_LABEL`] is the
 /// fallback, and anything else is in the [`DEFAULT_GROUP`].
 ///
-/// Engawa only reads the component label: it belongs to whichever chart wrote the workload.
+/// engawa only reads the component label: it belongs to whichever chart wrote the workload.
 #[must_use]
 pub fn resolve_group(labels: Option<&BTreeMap<String, String>>) -> &str {
     explicit_group(labels)

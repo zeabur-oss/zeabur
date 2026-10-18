@@ -215,7 +215,7 @@ mod tests {
             history["restarts"],
             json!([{"pod": "web-7c9d8-abcde", "at": times[3], "oomKilled": true}])
         );
-        // Engawa's own queries, naming the project and the service's pods; the person's words
+        // engawa's own queries, naming the project and the service's pods; the person's words
         // never reach the store.
         let asked = cluster.inspect(|s| s.proxy_requests.clone()).unwrap();
         let cpu = asked

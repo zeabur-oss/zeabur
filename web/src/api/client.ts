@@ -1,4 +1,4 @@
-// The only way the interface talks to Engawa's API: typed by the committed OpenAPI description
+// The only way the interface talks to engawa's API: typed by the committed OpenAPI description
 // (`bun run gen:api` writes ./schema.d.ts from crates/engawa-api/openapi.yaml), same origin, the
 // session cookie sent by the browser, and the header that marks a request as the interface's own.
 import createClient from "openapi-fetch"
@@ -42,7 +42,7 @@ export function localProblem(status: number, detail: string): Problem {
     title: status === 0 ? "No answer" : `HTTP ${status}`,
     status,
     detail,
-    fix: "Check that Engawa is still running, then reload the page.",
+    fix: "Check that engawa is still running, then reload the page.",
     kind,
     summary: { key: `problem.summary.${kind}` },
   }

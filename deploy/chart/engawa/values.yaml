@@ -1,8 +1,8 @@
-# Engawa's in-cluster server. docs/install.md walks through an installation; values.schema.json
+# engawa's in-cluster server. docs/install.md walks through an installation; values.schema.json
 # checks these values.
 
 image:
-  # Engawa has no published image yet: build one with scripts/build-image.sh and load it into
+  # engawa has no published image yet: build one with scripts/build-image.sh and load it into
   # the cluster's nodes.
   repository: engawa
   # Defaults to the chart's appVersion.
@@ -47,7 +47,7 @@ planKey:
 
 # The metrics store usage history is read from, until someone chooses another in Settings (kept
 # in the ConfigMap engawa-settings of this namespace, by whoever may change it): a Service port
-# serving the Prometheus HTTP API, namespace/name:port. Empty: where Engawa's recommendation
+# serving the Prometheus HTTP API, namespace/name:port. Empty: where engawa's recommendation
 # installs VictoriaMetrics (observability/vmsingle-vm-victoria-metrics-k8s-stack:8428).
 metricsStore:
   service: ""

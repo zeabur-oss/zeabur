@@ -7,7 +7,7 @@
 //! backup is restored differs too much between them (file-level restic snapshots, whole-namespace
 //! resource backups, PostgreSQL base backups with WAL) to share, and stays with each provider.
 //!
-//! Outcomes are reported as each provider states them; Engawa does not test that a backup can be
+//! Outcomes are reported as each provider states them; engawa does not test that a backup can be
 //! restored.
 
 use std::collections::BTreeMap;
@@ -54,7 +54,7 @@ pub enum Outcome {
     Failed,
     /// It is running or waiting to run.
     Running,
-    /// The provider's object says nothing Engawa can read.
+    /// The provider's object says nothing engawa can read.
     Unknown,
 }
 

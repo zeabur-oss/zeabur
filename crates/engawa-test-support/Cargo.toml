@@ -1,6 +1,6 @@
 [package]
 name = "engawa-test-support"
-description = "Engawa: test helpers (fixture loading, the cluster tests' sandbox)"
+description = "engawa: test helpers (fixture loading, the cluster tests' sandbox)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

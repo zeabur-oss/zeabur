@@ -3,7 +3,7 @@
 //
 // Every request the interface makes carries `engawa-request: 1`. The server refuses a change
 // without it: another site cannot add a custom header to a cross-origin request without a CORS
-// preflight, which Engawa never grants (OWASP Cross-Site Request Forgery Prevention Cheat Sheet,
+// preflight, which engawa never grants (OWASP Cross-Site Request Forgery Prevention Cheat Sheet,
 // "Employing Custom Request Headers for AJAX/API").
 
 /** The header that marks a request as the interface's own. */

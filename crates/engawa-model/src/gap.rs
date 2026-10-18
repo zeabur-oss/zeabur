@@ -56,7 +56,7 @@ pub struct Citation {
 )]
 #[serde(rename_all = "camelCase")]
 pub enum FixKind {
-    /// A change Engawa plans and applies (`id` names the plan template).
+    /// A change engawa plans and applies (`id` names the plan template).
     Plan,
     /// A component to install (`id` names the catalogue component).
     Install,

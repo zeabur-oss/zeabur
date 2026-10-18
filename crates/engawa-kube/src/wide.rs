@@ -2,7 +2,7 @@
 //!
 //! # Pods are read in pages and decoded slim
 //!
-//! A cluster-wide pod list is the most expensive read Engawa makes. It is read the way
+//! A cluster-wide pod list is the most expensive read engawa makes. It is read the way
 //! `kubectl describe node` reads it [kubectl-describe]: with the field selector
 //! `status.phase!=Succeeded,status.phase!=Failed` (finished pods hold no resources) and in
 //! chunks of 500 with `limit`/`continue` [k8s-chunking], so kube-apiserver never builds one huge

@@ -15,7 +15,7 @@ use tower::ServiceExt as _;
 /// The largest answer read: a project document of a large namespace, with room to spare.
 const MAX_BODY: usize = 64 * 1024 * 1024;
 
-/// The settings of Engawa on this machine: the metrics store `--metrics-service` names, or the
+/// The settings of engawa on this machine: the metrics store `--metrics-service` names, or the
 /// default. It keeps no settings of its own (no namespace), so they cannot be changed in it.
 pub(crate) fn settings(metrics_service: Option<&str>) -> Result<engawa_api::Settings, String> {
     let mut settings = engawa_api::Settings::default();

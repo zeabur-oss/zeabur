@@ -437,7 +437,7 @@ fn day(now: Timestamp) -> String {
 /// skew between kube-apiserver and the kubelets, and newer patches and minors from
 /// system-upgrade-controller's Plans.
 ///
-/// Engawa makes no outbound request: without Plans, newer versions are not reported (see
+/// engawa makes no outbound request: without Plans, newer versions are not reported (see
 /// [`engawa_recommend::versions`]). Readable by everyone signed in; nodes and Plans the person
 /// may not list are named in `unreadable`, so the interface can say which permission is missing.
 #[utoipa::path(get, path = "/api/v1/cluster/upgrades", tag = "cluster", operation_id = "getUpgrades",

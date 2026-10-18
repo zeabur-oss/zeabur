@@ -1,7 +1,7 @@
 //! metrics-server: what each node and pod uses now, from the `metrics.k8s.io` API
 //! [metrics-server].
 //!
-//! Usage is approximate, "meant only for autoscaling purposes" [metrics-server]; Engawa shows it
+//! Usage is approximate, "meant only for autoscaling purposes" [metrics-server]; engawa shows it
 //! beside requests, never instead of them. Any other provider of `metrics.k8s.io` (a Prometheus
 //! adapter) serves the same API and is read the same way: upstream's "resource metrics pipeline"
 //! [k8s-resource-metrics], the API both nodes and pods come from.

@@ -1,4 +1,4 @@
-# Engawa's image: one static binary (API and embedded web interface) and Mozilla's CA bundle (for
+# engawa's image: one static binary (API and embedded web interface) and Mozilla's CA bundle (for
 # Genkan's endpoints); no shell, no package manager. kube-apiserver is trusted through the service
 # account's CA only. Runs as a non-root user.
 # Built by scripts/build-image.sh.

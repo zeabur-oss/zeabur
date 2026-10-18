@@ -1,15 +1,15 @@
-//! Names Engawa and Kubernetes must agree on.
+//! Names engawa and Kubernetes must agree on.
 
-/// The domain every Engawa label and annotation key lives under. `engawahq.dev` is the
+/// The domain every engawa label and annotation key lives under. `engawahq.dev` is the
 /// project's domain; `engawa.dev` belongs to someone else and is never used.
 pub const DOMAIN: &str = "engawa.engawahq.dev";
 
-/// The field manager (`fieldManager`) every write Engawa makes names, so `managedFields`
-/// records Engawa as the one that changed those fields.
+/// The field manager (`fieldManager`) every write engawa makes names, so `managedFields`
+/// records engawa as the one that changed those fields.
 pub const FIELD_MANAGER: &str = "engawa";
 
-/// Label on a namespace that makes it an Engawa project. Adopting a namespace adds only this
-/// label; removing it (or Engawa) leaves the namespace as it was.
+/// Label on a namespace that makes it an engawa project. Adopting a namespace adds only this
+/// label; removing it (or engawa) leaves the namespace as it was.
 pub const LABEL_PROJECT: &str = "engawa.engawahq.dev/project";
 
 /// Label on a workload that names its group within a project.
@@ -25,7 +25,7 @@ pub const ANNOTATION_DISPLAY_NAME: &str = "engawa.engawahq.dev/display-name";
 /// `openshift.io/description`).
 pub const ANNOTATION_DESCRIPTION: &str = "engawa.engawahq.dev/description";
 
-/// Annotation on a project's namespace: its icon, by name, one of Engawa's built-in set.
+/// Annotation on a project's namespace: its icon, by name, one of engawa's built-in set.
 pub const ANNOTATION_ICON: &str = "engawa.engawahq.dev/icon";
 
 /// Whether `namespace` is one Kubernetes keeps for itself, which is never adopted.

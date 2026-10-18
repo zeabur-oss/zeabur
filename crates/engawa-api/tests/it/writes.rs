@@ -284,7 +284,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{applied}");
     }
 
-    /// The refusal is Engawa's own, so it stays `forbidden` although admin rights are offered:
+    /// The refusal is engawa's own, so it stays `forbidden` although admin rights are offered:
     /// they would not change who made the plan.
     #[tokio::test]
     async fn a_plan_is_applied_only_by_the_person_who_made_it() {
@@ -435,7 +435,7 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
         assert_eq!(problem["kubernetes"]["code"], 403);
-        // The refused request, from what Engawa sent (`failureOf` names the permission from it).
+        // The refused request, from what engawa sent (`failureOf` names the permission from it).
         assert_eq!(
             problem["denied"],
             json!({"verb": "patch", "group": "apps", "resource": "deployments",

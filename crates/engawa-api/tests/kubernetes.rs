@@ -154,7 +154,7 @@ mod tests {
             .await
             .unwrap();
         // kube-apiserver's RBAC authorizer reads bindings from a watch cache, so a deletion takes
-        // effect within moments rather than on the very next request. Engawa adds no cache of its
+        // effect within moments rather than on the very next request. engawa adds no cache of its
         // own: the first request after the cache catches up is refused.
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         let (status, body) = loop {
@@ -313,7 +313,7 @@ mod tests {
         );
         // A loser is told the object moved on (409, whether kube-apiserver answered 409 or a
         // failed JSON Patch test, 422). 429 is allowed too: kube-apiserver's API Priority and
-        // Fairness may turn some of 64 simultaneous requests from one person away, and Engawa
+        // Fairness may turn some of 64 simultaneous requests from one person away, and engawa
         // passes that answer on with its Retry-After rather than guessing an outcome.
         assert!(
             statuses.iter().all(|s| matches!(
@@ -529,7 +529,7 @@ mod tests {
             Some(&json!("64Mi"))
         );
 
-        // A YAML edit of a kind Engawa does not model.
+        // A YAML edit of a kind engawa does not model.
         let yaml = "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: web\nspec:\n  podSelector:\n    matchLabels: {app: web}\n  policyTypes: [Ingress, Egress]\n";
         let (status, body) = plan_and_apply(&app, &ns, json!([{"op": "edit",
             "resource": {"group": "networking.k8s.io", "version": "v1", "resource": "networkpolicies"},
@@ -624,10 +624,10 @@ mod tests {
     /// their values; so does editing one key of a ConfigMap. Losing them was a bug once: without
     /// the values, the plan must add the key alone, never the whole `data` map. The Secret's
     /// labels edited as YAML need no values either, and a change of its type is refused by
-    /// kube-apiserver, not by Engawa.
+    /// kube-apiserver, not by engawa.
     ///
     /// Kubernetes has no right to see a Secret's keys without its values: `list` and `watch`
-    /// return the values as `get` does [k8s-rbac-secrets]. Engawa reads values only with `get`
+    /// return the values as `get` does [k8s-rbac-secrets]. engawa reads values only with `get`
     /// (when a person reveals them or plans a Secret edit) and lists Secrets as a table without
     /// them, so a Role with `list` and `patch` but not `get` is the person who plans such an edit
     /// without the values.

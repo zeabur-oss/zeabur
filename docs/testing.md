@@ -1,6 +1,6 @@
 # Testing
 
-A test is worth keeping when it fails because a promise Engawa makes broke, and only then. It
+A test is worth keeping when it fails because a promise engawa makes broke, and only then. It
 calls the code the way a caller does (the HTTP API, a crate's public functions, the rendered
 page), so a refactor that keeps the behaviour keeps the test green [swe-unit].
 

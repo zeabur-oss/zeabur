@@ -1,6 +1,6 @@
 // The plain layer of a write confirmation: one sentence of what will happen, the consequence of a
 // high-risk change, who else it touches, and the name of the button that does it. Built from the
-// change a page asked for, the plan Engawa answered with, and the pods the project reports.
+// change a page asked for, the plan engawa answered with, and the pods the project reports.
 // The dialog's title already names the action, so a sentence says its effect, with the values
 // that decide it (a probe's port and interval, a container's requests), and never repeats the
 // title. Pure: the same inputs give the same words, so each case is tested (describe.test.ts).

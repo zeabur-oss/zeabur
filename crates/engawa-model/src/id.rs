@@ -4,7 +4,7 @@
 //! prefix: `projects/shop/services/deployment/api`, `projects/shop/resources/configmap/api-env`,
 //! `projects/shop/pods/api-5f6b7-k2m4p`, `projects/shop/events/api.17f3a`. It is the client's
 //! cache key and link target, and the suffix of the matching API path, so it can be resolved
-//! without knowing how Engawa models the node [aip-122].
+//! without knowing how engawa models the node [aip-122].
 //!
 //! - **Kinds are lower case** (`deployment`, `statefulset`, `configmap`): AIP-122 asks that
 //!   "resource IDs should not use upper-case letters". The API accepts a kind in any case and
@@ -13,7 +13,7 @@
 //! - **Kind and name are two segments**, not `kind.name`: Kubernetes names are DNS subdomains and
 //!   may contain dots.
 //! - **The kind is part of the name** because a Deployment and a StatefulSet may share a name.
-//! - **`name` stays the Kubernetes name.** AIP-122 reserves `name` for the resource name; Engawa
+//! - **`name` stays the Kubernetes name.** AIP-122 reserves `name` for the resource name; engawa
 //!   keeps `name` as the Kubernetes field people know, and puts the path into `id`.
 //!
 //! Names are not escaped: every segment is a Kubernetes name (DNS label or subdomain), which

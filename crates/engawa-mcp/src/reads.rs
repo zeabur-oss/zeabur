@@ -129,7 +129,7 @@ fn segment<'a>(name: &str, value: &'a str) -> Result<&'a str, Value> {
     }
 }
 
-/// A problem of Engawa's own, in the shape the API answers with.
+/// A problem of engawa's own, in the shape the API answers with.
 pub(crate) fn problem(kind: Kind, detail: String) -> Value {
     serde_json::to_value(Problem::new(kind, detail)).unwrap_or(Value::Null)
 }

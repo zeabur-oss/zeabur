@@ -39,7 +39,7 @@ pub trait Rule: Sync {
     fn check(&self, input: &Input<'_>) -> Vec<Gap>;
 }
 
-/// The rules Engawa always runs.
+/// The rules engawa always runs.
 pub static BUILTIN: [&dyn Rule; 3] = [&ResourceLimits, &HealthChecks, &IngressToHttpRoute];
 
 /// Every finding of `rules` in `input`: warnings first, then by rule, subject and service.

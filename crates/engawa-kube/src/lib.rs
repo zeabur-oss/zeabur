@@ -6,8 +6,8 @@
 //! type has no field for a credential, and [`ClusterEndpoint::in_cluster`] reads only the
 //! address and the CA bundle of the pod's service account, never its token. So the only identity
 //! a request from this crate can carry is the one the person brought, and kube-apiserver
-//! authorises it with that person's own RBAC rights [k8s-authn] [k8s-authz]. Engawa does not
-//! impersonate: impersonation would need `impersonate` rights on Engawa's service account, which
+//! authorises it with that person's own RBAC rights [k8s-authn] [k8s-authz]. engawa does not
+//! impersonate: impersonation would need `impersonate` rights on engawa's service account, which
 //! would then be able to do anything any user can [k8s-impersonation].
 //!
 //! # References
@@ -34,7 +34,7 @@ pub mod port;
 mod wide;
 mod write;
 
-/// The Kubernetes object types, for the Kubernetes version Engawa supports at minimum (1.34).
+/// The Kubernetes object types, for the Kubernetes version engawa supports at minimum (1.34).
 pub use k8s_openapi;
 pub use kube::api::DynamicObject;
 pub use logs::unavailable_log;

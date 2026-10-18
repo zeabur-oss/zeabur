@@ -894,7 +894,7 @@ impl Cluster for MemoryCluster {
 
     // ── Writes ───────────────────────────────────────────────────────────────────────────────
 
-    /// Writes as kube-apiserver does, as far as Engawa's writes reach (checked against k3s by
+    /// Writes as kube-apiserver does, as far as engawa's writes reach (checked against k3s by
     /// the write contract, `tests/contract/`):
     ///
     /// - A creation is refused with `409 AlreadyExists` when the name is taken, and stored with
@@ -1051,7 +1051,7 @@ impl Cluster for MemoryCluster {
     }
 }
 
-/// The kinds kube-apiserver keeps a `metadata.generation` for, of those Engawa writes: the
+/// The kinds kube-apiserver keeps a `metadata.generation` for, of those engawa writes: the
 /// workloads and Ingresses, not ConfigMaps, Services or PersistentVolumeClaims.
 const GENERATION_KINDS: [&str; 6] = [
     "Deployment",

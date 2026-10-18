@@ -185,7 +185,7 @@ async fn gather(
 
 /// Backups of a project: which claims, databases and the namespace a schedule covers, and how
 /// the latest backups went, from every backup provider this build has (K8up, Velero,
-/// CloudNativePG), read as the person. Outcomes are as each provider reports them; Engawa does
+/// CloudNativePG), read as the person. Outcomes are as each provider reports them; engawa does
 /// not test restores.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/backups", tag = "projects",
     operation_id = "getProjectBackups",

@@ -6,7 +6,7 @@
 //! K8up backs up the claims of the namespace the `Schedule` or `Backup` lives in [k8up-rwo]:
 //!
 //! - a claim annotated `k8up.io/backup: "false"` is skipped; without the annotation it is backed
-//!   up, unless the operator runs with `BACKUP_SKIP_WITHOUT_ANNOTATION=true`, which Engawa cannot
+//!   up, unless the operator runs with `BACKUP_SKIP_WITHOUT_ANNOTATION=true`, which engawa cannot
 //!   see [k8up-annotations];
 //! - with `labelSelectors`, only claims matching one of them [k8up-api].
 //!

@@ -143,10 +143,11 @@ case "$job" in
   no-ui) ./scripts/build-without-ui.sh ;;
   # The Helm chart: lint, what every rendering promises, and the values it refuses.
   chart) ./scripts/check-chart.sh ;;
-  # The interface's zh-TW wording (.zhtw-mcp.toml).
+  # The interface's zh-TW wording (.zhtw-mcp.toml), and the brand in lowercase everywhere.
   zh-tw)
     (cd web; bun ci)
     ./scripts/check-zh-tw.sh
+    ./scripts/check-brand.sh
     ;;
   # Integration tests (JSON Patch writes, dry run, identity, revocation), `engawactl doctor`,
   # browser tests in local mode with the embedded interface, and the image.
@@ -160,7 +161,7 @@ case "$job" in
     fi
     ./scripts/build-image.sh engawa:ci
     ;;
-  # Engawa in a cluster with Genkan, from their images and Engawa's chart, through a browser:
+  # engawa in a cluster with Genkan, from their images and engawa's chart, through a browser:
   # passkey sign-in, elevation, terminal, rights, memory, removal.
   kubernetes-l2) K3S_IMAGE="$k3s_image" ./scripts/e2e-l2.sh ;;
 esac

@@ -1,6 +1,6 @@
 [package]
 name = "engawa-core"
-description = "Engawa: shared primitives (names, label keys, errors as Problem Details); no I/O"
+description = "engawa: shared primitives (names, label keys, errors as Problem Details); no I/O"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

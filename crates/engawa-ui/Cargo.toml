@@ -1,6 +1,6 @@
 [package]
 name = "engawa-ui"
-description = "Engawa: the embedded web interface and the handler that serves it"
+description = "engawa: the embedded web interface and the handler that serves it"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

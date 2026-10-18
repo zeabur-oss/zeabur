@@ -1,6 +1,6 @@
 ---
 name: engawa-cluster-tests
-description: Run Engawa's Kubernetes integration and end-to-end tests on a disposable k3s cluster. Use when changing engawa-kube, anything that reads or writes cluster objects, the server, its manifests or the container image.
+description: Run engawa's Kubernetes integration and end-to-end tests on a disposable k3s cluster. Use when changing engawa-kube, anything that reads or writes cluster objects, the server, its manifests or the container image.
 ---
 
 # Cluster tests
@@ -62,7 +62,7 @@ in every one of these states, not only the first:
   (`previous=true`) is readable.
 - **From the second restart on**, for most of each back-off: `state.terminated.reason: Error`,
   and `lastState` names the run before, which the kubelet has already removed: `previous=true`
-  answers `unable to retrieve container logs for containerd://…` (with status 200; Engawa reports
+  answers `unable to retrieve container logs for containerd://…` (with status 200; engawa reports
   it as a `log-unavailable` problem). The current log (`previous=false`) holds the crashed run's
   output.
 - **For a moment after each restart**: `state.running`, with the last exit in `lastState`; the

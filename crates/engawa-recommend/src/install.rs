@@ -1,7 +1,7 @@
 //! How to install a catalogue component yourself, in four forms: Helm commands, a k3s
 //! `HelmChart`, Flux objects and an Argo CD `Application`.
 //!
-//! Engawa recommends and never installs: these are texts to copy and run, or to commit to a Git
+//! engawa recommends and never installs: these are texts to copy and run, or to commit to a Git
 //! repository a GitOps tool watches. Each renders the component's releases in order, with the
 //! catalogue's pinned versions and its values for the chosen profile (`single-node` or
 //! `multi-node`): the release's values, with the profile's merged over them as Helm merges values

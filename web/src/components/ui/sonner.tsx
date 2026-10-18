@@ -7,7 +7,7 @@ import XCircleFillIcon from "~icons/ph/x-circle-fill"
 
 import { useTheme } from "@/theme"
 
-// shadcn/ui's Sonner, with Engawa's theme store in place of next-themes. Sonner adds its own styles
+// shadcn/ui's Sonner, with engawa's theme store in place of next-themes. Sonner adds its own styles
 // with a <style> element when this chunk loads, which the page's Content Security Policy allows
 // (`style-src 'unsafe-inline'`; web/DESIGN.md, "Content Security Policy"). The custom properties
 // below override its colours and radius with the theme's.

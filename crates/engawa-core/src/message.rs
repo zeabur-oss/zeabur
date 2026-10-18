@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 /// A sentence a client words in its own language: a stable key and the values it names.
 ///
-/// Engawa never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
+/// engawa never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
 /// every interface translates them the same way and a key's meaning is part of the contract.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]

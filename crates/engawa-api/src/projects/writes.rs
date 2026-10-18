@@ -123,7 +123,7 @@ fn key(state: &AppState) -> Result<Arc<PlanKey>, ApiError> {
     state.plan_key.clone().ok_or_else(|| {
         ApiError::from(Problem::new(
             Kind::Internal,
-            "Engawa could not make a token key when it started, so it cannot plan changes.",
+            "engawa could not make a token key when it started, so it cannot plan changes.",
         ))
     })
 }

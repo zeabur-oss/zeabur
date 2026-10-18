@@ -1,6 +1,6 @@
 ---
 name: engawa-dependencies
-description: Add or upgrade a Rust or web dependency in Engawa under its supply-chain policy (OSI licences, aws-lc-rs only, seven-day publish age, unsafe/native review, bun.lock). Use whenever Cargo.toml, Cargo.lock, web/package.json, web/bun.lock or flake.nix changes.
+description: Add or upgrade a Rust or web dependency in engawa under its supply-chain policy (OSI licences, aws-lc-rs only, seven-day publish age, unsafe/native review, bun.lock). Use whenever Cargo.toml, Cargo.lock, web/package.json, web/bun.lock or flake.nix changes.
 ---
 
 # Dependencies
@@ -22,7 +22,7 @@ description: Add or upgrade a Rust or web dependency in Engawa under its supply-
   enabled only in dev-dependencies does not ship; moving it to a normal dependency needs the
   review (as kube's and axum's `ws`, for the terminal, brought in `tungstenite`).
 - **Advisories** that do not apply need an `ignore` entry in `deny.toml` with the reason.
-- `k8s-openapi` is built for Kubernetes 1.34 (`v1_34`), the oldest version Engawa supports.
+- `k8s-openapi` is built for Kubernetes 1.34 (`v1_34`), the oldest version engawa supports.
 
 ## Web (`web/`)
 - Add with `bun add <pkg>` (or `bun add -d`) inside `nix develop`, from `web/`. `bunfig.toml`

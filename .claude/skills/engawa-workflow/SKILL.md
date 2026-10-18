@@ -1,6 +1,6 @@
 ---
 name: engawa-workflow
-description: How work moves through the Engawa repository — branches, commits, pull requests, merging, and issues (types, labels, which engawahq repository an issue belongs in) — and the rules for text that lands in the repository or on GitHub. Use when opening a branch, committing, opening or merging a pull request, or filing an issue.
+description: How work moves through the engawa repository — branches, commits, pull requests, merging, and issues (types, labels, which engawahq repository an issue belongs in) — and the rules for text that lands in the repository or on GitHub. Use when opening a branch, committing, opening or merging a pull request, or filing an issue.
 ---
 
 # Workflow
@@ -27,8 +27,8 @@ A change to the plan or HTTP API shape (a field added, renamed or removed) needs
 agreement on the shape before it is built; propose it in an issue first.
 
 ## Issues
-- **Where.** Engawa itself: `engawahq/engawa`. A component in the catalogue (a chart, its
-  version, values, detection, security notes, its e2e): `engawahq/recommendations`; Engawa
+- **Where.** engawa itself: `engawahq/engawa`. A component in the catalogue (a chart, its
+  version, values, detection, security notes, its e2e): `engawahq/recommendations`; engawa
   vendors its signed bundle (`crates/engawa-recommend/bundle`, pin in `PINNED`) and moves the pin
   after a release. Sign-in, tokens, passkeys: `engawahq/genkan`. When work spans repositories,
   open one issue in each and link them both ways.
@@ -47,4 +47,4 @@ agreement on the shape before it is built; propose it in an issue first.
 - English, plain words, decisions stated as facts about the design, not as history.
 - Cite public sources only, and only what you have read; otherwise write "not verified".
 - No private notes, internal plans or names of people's decisions; no milestone code names.
-- A claim that Engawa does something better or safer has a test behind it.
+- A claim that engawa does something better or safer has a test behind it.

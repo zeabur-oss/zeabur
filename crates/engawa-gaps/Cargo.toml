@@ -1,6 +1,6 @@
 [package]
 name = "engawa-gaps"
-description = "Engawa: gap rules and plain-language diagnostics"
+description = "engawa: gap rules and plain-language diagnostics"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

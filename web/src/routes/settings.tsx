@@ -123,7 +123,7 @@ const storeHealth = {
   unavailable: "fail",
 } as const satisfies Record<StoreSetting["state"], "ok" | "warn" | "idle" | "fail">
 
-/** The metrics store: which Service history comes from, whether it answers, and, where Engawa
+/** The metrics store: which Service history comes from, whether it answers, and, where engawa
  * keeps settings, a change of it written as the person (so who may is the cluster's decision). */
 function MetricsStorePanel() {
   const t = useT()

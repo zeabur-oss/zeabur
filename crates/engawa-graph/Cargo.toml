@@ -1,6 +1,6 @@
 [package]
 name = "engawa-graph"
-description = "Engawa: projection of Kubernetes objects into projects, services and relations (pure functions)"
+description = "engawa: projection of Kubernetes objects into projects, services and relations (pure functions)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

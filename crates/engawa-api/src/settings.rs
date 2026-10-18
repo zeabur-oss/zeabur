@@ -1,24 +1,24 @@
-//! Engawa's own settings: the metrics store, the one setting so far.
+//! engawa's own settings: the metrics store, the one setting so far.
 //!
 //! # Where a setting is kept
 //!
 //! A setting has a default the server is started with (`ENGAWA_METRICS_SERVICE`), and a
-//! person's choice, kept in the ConfigMap `engawa-settings` in the namespace Engawa runs in. The
+//! person's choice, kept in the ConfigMap `engawa-settings` in the namespace engawa runs in. The
 //! ConfigMap is read and written as the person, like everything else, so RBAC decides who may
 //! change a setting: whoever may update that ConfigMap (and create it, the first time), in
-//! practice the administrators of Engawa's namespace. Reading it needs `get` on it, which
-//! Engawa's chart grants to everyone signed in (`metricsStore.everyoneReads`; Engawa itself still
+//! practice the administrators of engawa's namespace. Reading it needs `get` on it, which
+//! engawa's chart grants to everyone signed in (`metricsStore.everyoneReads`; engawa itself still
 //! has no rights of its own). Where it cannot be read, the default applies and the answer names
 //! the refusal, so the interface can say which store it asked and why.
 //!
-//! Engawa on a person's own computer (`engawactl ui`) runs in no namespace and keeps no
+//! engawa on a person's own computer (`engawactl ui`) runs in no namespace and keeps no
 //! settings: the default is all there is, and a change is refused with the way to set it.
 //!
 //! # The metrics store
 //!
 //! A Service port that serves the Prometheus HTTP API, as `namespace/name:port`, read through
 //! kube-apiserver's service proxy (see `engawa_kube::Cluster::proxy_get`). The default is where
-//! Engawa's recommendation installs VictoriaMetrics: the operator names a `VMSingle`'s Service
+//! engawa's recommendation installs VictoriaMetrics: the operator names a `VMSingle`'s Service
 //! `vmsingle-<name>`, and the k8s-stack chart names its `VMSingle` after the release
 //! (`vm-victoria-metrics-k8s-stack`), on port 8428, as the chart's own rendering shows
 //! (`fixtures/charts/metrics__victoria-metrics.yaml`).
@@ -28,20 +28,20 @@
 
 use engawa_kube::ServicePort;
 
-/// The ConfigMap people's settings are kept in, in Engawa's namespace.
+/// The ConfigMap people's settings are kept in, in engawa's namespace.
 pub const CONFIG_MAP: &str = "engawa-settings";
 
 /// The ConfigMap's key for the metrics store.
 pub const METRICS_STORE_KEY: &str = "metrics-store";
 
-/// Engawa's settings as the server was started: the defaults, and where people's choices are
+/// engawa's settings as the server was started: the defaults, and where people's choices are
 /// kept.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Settings {
     /// The metrics store when no one has chosen another.
     pub metrics_store: ServicePort,
     /// The namespace whose `engawa-settings` ConfigMap keeps people's choices; `None` when
-    /// Engawa runs on a person's computer, where they cannot be changed.
+    /// engawa runs on a person's computer, where they cannot be changed.
     pub namespace: Option<String>,
 }
 
@@ -54,7 +54,7 @@ impl Default for Settings {
     }
 }
 
-/// Where Engawa's recommendation installs VictoriaMetrics (see the module documentation).
+/// Where engawa's recommendation installs VictoriaMetrics (see the module documentation).
 #[must_use]
 pub fn default_metrics_store() -> ServicePort {
     ServicePort {
@@ -317,7 +317,7 @@ pub(crate) mod store {
         pub default: String,
         /// Where `service` comes from.
         pub source: SettingSource,
-        /// The ConfigMap a change is kept in; absent where Engawa keeps no settings (on a
+        /// The ConfigMap a change is kept in; absent where engawa keeps no settings (on a
         /// person's computer).
         #[serde(skip_serializing_if = "Option::is_none")]
         pub stored_in: Option<Origin>,
@@ -393,7 +393,7 @@ pub(crate) mod store {
 
     /// Changes the metrics store, or goes back to the default with `null`, by writing the
     /// settings ConfigMap as you (created the first time). Who may: whoever may update (and
-    /// create) the ConfigMap `engawa-settings` in Engawa's namespace. Answers the setting as it
+    /// create) the ConfigMap `engawa-settings` in engawa's namespace. Answers the setting as it
     /// now is, with the new store's probe.
     #[utoipa::path(put, path = "/api/v1/settings/metrics-store", tag = "settings",
         operation_id = "setMetricsStore",
@@ -410,7 +410,7 @@ pub(crate) mod store {
         let Some(namespace) = state.settings.namespace.clone() else {
             return Err(ApiError::from(Problem::new(
                 Kind::BadRequest,
-                "Engawa runs on this computer and keeps no settings here. Start it with \
+                "engawa runs on this computer and keeps no settings here. Start it with \
                  ENGAWA_METRICS_SERVICE=namespace/name:port to read history from another store.",
             )));
         };

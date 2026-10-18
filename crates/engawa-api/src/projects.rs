@@ -14,7 +14,7 @@
 //! is handled. The kinds are not read at one shared `resourceVersion`, which Kubernetes does not
 //! offer across kinds: resource versions "can be compared" only within one resource type
 //! [k8s-concepts]. A response can therefore briefly show, for example, a pod that a
-//! just-deleted workload owned; the next read corrects it. Engawa promises freshness (nothing
+//! just-deleted workload owned; the next read corrects it. engawa promises freshness (nothing
 //! older than the request), not a single-revision snapshot.
 //!
 //! # Diagnoses
@@ -74,7 +74,7 @@ pub(crate) async fn list(Person(cluster): Person) -> Result<Json<ProjectList>, A
         if problem.kind == Kind::Forbidden {
             problem.deny(list_read("", "namespaces", None));
             // Many people may use some namespaces without listing all of them: say how to go on.
-            "You may not list the cluster's namespaces, so Engawa cannot show your projects."
+            "You may not list the cluster's namespaces, so engawa cannot show your projects."
                 .clone_into(&mut problem.detail);
             problem.fix_for_occasion(
                 "Ask a cluster administrator for `list` on `namespaces`, for example with a \

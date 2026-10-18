@@ -1,6 +1,6 @@
 [package]
 name = "engawa-kube"
-description = "Engawa: the only crate that talks to kube-apiserver, always as the requesting user"
+description = "engawa: the only crate that talks to kube-apiserver, always as the requesting user"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

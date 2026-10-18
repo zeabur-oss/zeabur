@@ -25,7 +25,7 @@ pub struct AppState {
     pub clock: fn() -> engawa_kube::k8s_openapi::jiff::Timestamp,
     /// How long a terminal may idle before the server closes it ([`crate::pods::exec::IDLE`]).
     pub terminal_idle: std::time::Duration,
-    /// Engawa's settings as the server was started (see [`crate::settings`]).
+    /// engawa's settings as the server was started (see [`crate::settings`]).
     pub settings: Arc<crate::settings::Settings>,
 }
 

@@ -13,7 +13,7 @@
 //! | anything else | the web interface |
 //!
 //! Every request but the health check passes [`engawa_core::guard`] first: its `Host` must be
-//! the public URL's, and a request that changes something must come from Engawa's own page.
+//! the public URL's, and a request that changes something must come from engawa's own page.
 //!
 //! **Elevation**, as `sudo`: while the session holds an elevated token, every request to the API
 //! goes with it (reads, writes, the terminal, revealing a Secret), and a terminal ends when it
@@ -124,11 +124,11 @@ async fn check(State(auth): State<Arc<Auth>>, request: Request, next: Next) -> R
         Ok(()) => next.run(request).await,
         Err(Refusal::Host) => problem(
             Kind::Forbidden,
-            "This address does not belong to this Engawa; open it at its own address.",
+            "This address does not belong to this engawa; open it at its own address.",
         ),
         Err(Refusal::CrossSite | Refusal::NotFromEngawa) => problem(
             Kind::Forbidden,
-            "Changes are accepted only from the Engawa page itself.",
+            "Changes are accepted only from the engawa page itself.",
         ),
     }
 }
@@ -161,7 +161,7 @@ struct SessionAccess {
 fn signed_out() -> Box<Problem> {
     Box::new(Problem::new(
         Kind::SignedOut,
-        "Sign in to use Engawa; your session ended or you signed out.",
+        "Sign in to use engawa; your session ended or you signed out.",
     ))
 }
 
@@ -306,7 +306,7 @@ async fn elevate(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Response 
     if !auth.elevation {
         return problem(Kind::NotFound, "Admin rights are not offered here.");
     }
-    // Only Engawa's own page opens this window; a navigation from another site could start an
+    // Only engawa's own page opens this window; a navigation from another site could start an
     // elevation the person did not ask for.
     if headers
         .get("sec-fetch-site")
@@ -314,7 +314,7 @@ async fn elevate(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Response 
     {
         return problem(
             Kind::Forbidden,
-            "Admin rights are asked for only from the Engawa page itself.",
+            "Admin rights are asked for only from the engawa page itself.",
         );
     }
     let signed_in = match cookie::get(&headers, cookie::SESSION) {
@@ -434,7 +434,7 @@ async fn sign_in(
         }
         Err(error) => {
             tracing::error!(event = "auth.sign_in", outcome = "failure", %error, "cannot start a session");
-            problem(Kind::Internal, "Engawa could not start a session.")
+            problem(Kind::Internal, "engawa could not start a session.")
         }
     }
 }

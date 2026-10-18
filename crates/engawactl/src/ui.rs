@@ -21,7 +21,7 @@ pub(crate) struct UiArgs {
     #[arg(long)]
     no_browser: bool,
     /// The metrics store history is read from: a Service port serving the Prometheus HTTP API,
-    /// as `namespace/name:port` (default: where Engawa's recommendation installs
+    /// as `namespace/name:port` (default: where engawa's recommendation installs
     /// VictoriaMetrics).
     #[arg(long, env = "ENGAWA_METRICS_SERVICE")]
     metrics_service: Option<String>,
@@ -67,7 +67,7 @@ async fn serve(args: &UiArgs) -> Result<(), String> {
 
     let app = app(cluster, settings).layer(axum::middleware::from_fn_with_state(access, guard));
     output::info(&format!(
-        "Engawa is running on this machine as {}.\nOpen {url}\nPress Ctrl-C to stop.",
+        "engawa is running on this machine as {}.\nOpen {url}\nPress Ctrl-C to stop.",
         identity.username
     ));
     if !args.no_browser {

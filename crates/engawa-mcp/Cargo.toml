@@ -1,6 +1,6 @@
 [package]
 name = "engawa-mcp"
-description = "Engawa: a read-only Model Context Protocol server over stdio"
+description = "engawa: a read-only Model Context Protocol server over stdio"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

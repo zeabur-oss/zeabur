@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(busy.denied, None);
     }
 
-    /// The refused request comes from what Engawa sent, whatever kube-apiserver's message says.
+    /// The refused request comes from what engawa sent, whatever kube-apiserver's message says.
     #[test]
     fn a_403_names_the_request_that_was_refused() {
         let forbidden = || answer(403, "Forbidden", "no");

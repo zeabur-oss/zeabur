@@ -1,6 +1,6 @@
 [package]
 name = "engawa-adapters"
-description = "Engawa: conventions of third-party tools (Helm, Argo CD, Flux, operators, Gateway API)"
+description = "engawa: conventions of third-party tools (Helm, Argo CD, Flux, operators, Gateway API)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

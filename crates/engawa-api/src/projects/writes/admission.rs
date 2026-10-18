@@ -3,7 +3,7 @@
 //! kube-apiserver answers `403 Forbidden` both when its authorizers refuse a request and when an
 //! admission plugin refuses it after they allowed it: a `ResourceQuota` [k8s-quota], a
 //! `LimitRange` [k8s-limitrange], Pod Security admission, a webhook. Only the first is about the
-//! person's rights; admin rights do not lift a quota. So on a `403` to a write, Engawa asks one
+//! person's rights; admin rights do not lift a quota. So on a `403` to a write, engawa asks one
 //! `SelfSubjectAccessReview` for the same request, with the same credential
 //! ([`engawa_kube::Cluster::review_access`]): allowed means admission refused it.
 //!

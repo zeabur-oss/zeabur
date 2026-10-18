@@ -2,12 +2,12 @@ import type { CDPSession, Page } from "@playwright/test"
 
 import { expect, test } from "../fixtures.ts"
 
-// Engawa in the cluster, signing in through Genkan, as one person would use it the first time:
+// engawa in the cluster, signing in through Genkan, as one person would use it the first time:
 // enrol a passkey from Genkan's setup link, sign in, find that the terminal and the cluster's
 // nodes need the passkey again, confirm it from the terminal and run a command, see the nodes,
 // and restart a service with the same admin rights. scripts/e2e-l2.sh installs both and sets:
 //
-//   ENGAWA_L2_URL          Engawa's public URL (https://engawa.localhost)
+//   ENGAWA_L2_URL          engawa's public URL (https://engawa.localhost)
 //   ENGAWA_L2_SETUP_LINK   the one-time link `genkanctl setup-link` printed for user `admin`
 //   ENGAWA_L2_NAMESPACE    a project with a running Deployment whose image has a shell
 //   ENGAWA_L2_SERVICE      that Deployment (default talker)
@@ -55,7 +55,7 @@ async function authenticator(page: Page, passkeys: Passkey[] = []) {
   return { passkeys: () => stored(cdp, authenticatorId) }
 }
 
-/** Genkan's sign-in page, until it leaves for Engawa. The page also offers the passkey through
+/** Genkan's sign-in page, until it leaves for engawa. The page also offers the passkey through
  * autofill (conditional mediation), which the virtual authenticator, presence simulated, may
  * answer by itself before the button is clicked; either way counts. */
 async function signInAtGenkan(page: Page) {
@@ -89,7 +89,7 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     expect(await device.passkeys()).toHaveLength(1)
   })
 
-  await test.step("signing in to Engawa goes through Genkan and shows who you are", async () => {
+  await test.step("signing in to engawa goes through Genkan and shows who you are", async () => {
     await page.goto("/")
     await signInAtGenkan(page)
     await expect(page).toHaveURL(
@@ -119,7 +119,7 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
   await test.step("the terminal asks for the passkey, then runs a command in the pod", async () => {
     // Exec takes `get` on pods/exec, which `view` lacks: the terminal's error frame offers
     // "Retry as admin", which opens /auth/elevate in a window of its own, which goes to Genkan for
-    // the passkey. Engawa's page sets Cross-Origin-Opener-Policy: same-origin, so that trip
+    // the passkey. engawa's page sets Cross-Origin-Opener-Policy: same-origin, so that trip
     // severs window.opener: the window's last page (/auth/callback) posts the outcome on
     // BroadcastChannel("engawa-elevation") and tries to close itself, and this page reconnects
     // on that message, whether or not the window could close.

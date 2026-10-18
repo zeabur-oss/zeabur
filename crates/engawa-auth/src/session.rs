@@ -24,8 +24,8 @@
 //! **One replica.** Sessions live in one process, so the server runs as a single replica; a
 //! restart signs everyone out, which with passkeys costs one touch. Sharing sessions between
 //! replicas would mean storing refresh tokens somewhere every replica reads: Kubernetes objects
-//! are Engawa's only state, so that would be a Secret in etcd, where refresh tokens for every
-//! person would rest in a place readable by whoever can read Secrets in Engawa's namespace,
+//! are engawa's only state, so that would be a Secret in etcd, where refresh tokens for every
+//! person would rest in a place readable by whoever can read Secrets in engawa's namespace,
 //! and would outlive the process. Keeping them in memory keeps them as short-lived as the
 //! process.
 //!

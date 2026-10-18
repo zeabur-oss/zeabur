@@ -5,7 +5,7 @@
 //! answer in `kubernetes`) leaves as `elevation-required`: the same status, `denied` and
 //! `kubernetes`, so the interface can offer "Retry as admin" next to any of them. This happens
 //! once, in [`offer_elevation_on_refusal`] around every route, and for the terminal, whose
-//! refusal travels in a frame after the upgrade, in [`offer_elevation`] itself. Engawa's own
+//! refusal travels in a frame after the upgrade, in [`offer_elevation`] itself. engawa's own
 //! `403`s (a handshake from another origin, a plan made by someone else) carry no answer from
 //! the cluster and stay `forbidden`: admin rights would not change them. Neither does a refusal
 //! while the rights are in use, nor where they are not offered (local mode).
@@ -103,7 +103,7 @@ pub(crate) async fn offer_elevation_on_refusal(
 /// The problem for a read of `what` that failed; on a `403` it also names the read that was
 /// refused (`denied`), as a refused write does.
 ///
-/// `read` is the request as Engawa made it, built with [`list_read`] or [`get_read`]:
+/// `read` is the request as engawa made it, built with [`list_read`] or [`get_read`]:
 /// kube-apiserver's answer does not name the verb, and its message is not an interface (see
 /// [`Denied`]).
 pub(crate) fn read_problem(error: ClusterError, what: &str, read: Denied) -> ApiError {

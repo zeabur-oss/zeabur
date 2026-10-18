@@ -5,7 +5,7 @@ use engawa_adapters::provenance::Tool;
 pub use engawa_graph::fields::{Step, owners};
 
 /// The tool behind a manager that reapplies what it owns: a field it owns changed by hand comes
-/// back on its next sync or upgrade, so Engawa never takes one over.
+/// back on its next sync or upgrade, so engawa never takes one over.
 ///
 /// - Helm 3 writes as `helm` [helm-manager]; Flux's helm-controller and kustomize-controller as
 ///   `helm-controller` and `kustomize-controller` [flux-ssa]; Argo CD as `argocd-controller`

@@ -1,8 +1,8 @@
-//! A YAML snippet for each gap fix, for when Engawa cannot write the fix itself: the person copies
+//! A YAML snippet for each gap fix, for when engawa cannot write the fix itself: the person copies
 //! it into their manifests (or into the object's YAML editor) and adjusts the values.
 //!
 //! Each snippet is the smallest fragment that fixes the gap, in the shape `kubectl apply` and a
-//! Helm chart's templates use, with a comment naming the object it belongs to. Values Engawa
+//! Helm chart's templates use, with a comment naming the object it belongs to. Values engawa
 //! cannot know (how much memory a container needs, which path answers health checks) are
 //! starting points marked as such.
 

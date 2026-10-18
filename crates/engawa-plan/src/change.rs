@@ -261,7 +261,7 @@ pub struct DataEdit {
     pub op: String,
     /// The key.
     pub key: String,
-    /// The value, for `set`; for a Secret, the plain value (Engawa encodes it).
+    /// The value, for `set`; for a Secret, the plain value (engawa encodes it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
 }

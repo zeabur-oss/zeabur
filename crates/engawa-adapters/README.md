@@ -19,7 +19,7 @@ Level 1: may depend on `engawa-core`. Pure functions; no I/O.
   references (k8s-openapi's `ObjectMeta`) and returns an answer; nothing reads a cluster.
 - **Third-party keys live here only.** Helm, Argo CD and Flux marks (`provenance`), database
   operators and their controllers (`operators`), and the recommended `app.kubernetes.io/*`
-  labels (`group`). Engawa's own label, `engawa.engawahq.dev/group`, is here too; its field
+  labels (`group`). engawa's own label, `engawa.engawahq.dev/group`, is here too; its field
   manager `engawa` is re-exported from `engawa-core`, which holds the names every crate shares.
 - **One label-selector matcher** (`selector`). Kubernetes' set-based selector semantics, shared
   by the projection (a Deployment's pods) and the modules (NetworkPolicy, K8up) so the two cannot

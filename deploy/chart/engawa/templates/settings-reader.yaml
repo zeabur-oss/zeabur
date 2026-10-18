@@ -1,8 +1,8 @@
 {{- if .Values.metricsStore.everyoneReads }}
-# Everyone signed in may read Engawa's settings (the ConfigMap engawa-settings, which names the
+# Everyone signed in may read engawa's settings (the ConfigMap engawa-settings, which names the
 # metrics store), so each person's page asks the store the administrators chose rather than the
 # default. Only `get` on that one ConfigMap; changing it stays with whoever may update ConfigMaps
-# in this namespace. Engawa's own ServiceAccount is bound to nothing.
+# in this namespace. engawa's own ServiceAccount is bound to nothing.
 # https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
 # https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-subjects (system:authenticated)
 apiVersion: rbac.authorization.k8s.io/v1

@@ -1,6 +1,6 @@
 # engawa-model
 
-The data Engawa shows: projects, services, the relations between them, and for every value the
+The data engawa shows: projects, services, the relations between them, and for every value the
 Kubernetes object it came from (its *origin*). Each top-level node has an `id` in the shape of
 its API path (`projects/shop/services/deployment/api`).
 

@@ -17,7 +17,7 @@ rule that applies), a fix and the evidence (status fields and events) it rests o
 ## Gap rules
 
 A rule implements `Rule`: an id, the guidance it cites, and a check over the project and a few
-facts about the cluster (`ClusterTraits`). `BUILTIN` holds the rules Engawa always runs; a
+facts about the cluster (`ClusterTraits`). `BUILTIN` holds the rules engawa always runs; a
 module passes its own rules to `evaluate` next to them, so registration stays explicit and this
 crate never depends on a module.
 

@@ -33,7 +33,7 @@ use crate::output;
 const GENKAN_GROUP: &str = "genkan.engawahq.dev";
 /// The namespace Genkan installs into by default.
 const GENKAN_NAMESPACE: &str = "genkan-system";
-/// The `OAuthClient` Engawa's in-cluster server signs in with (`--client-id`).
+/// The `OAuthClient` engawa's in-cluster server signs in with (`--client-id`).
 const ENGAWA_CLIENT: &str = "engawa";
 /// The audience kube-apiserver accepts Genkan's tokens for.
 const KUBERNETES_AUDIENCE: &str = "kubernetes";
@@ -375,7 +375,7 @@ fn cluster_version(answer: &Result<Value, Value>) -> Check {
                 .findings
                 .push(format!("{} is available", text(upgrades, "nextMinor"))),
             "newer-than-data" => check.findings.push(format!(
-                "{minor} is newer than Engawa's release table ({})",
+                "{minor} is newer than engawa's release table ({})",
                 text(upgrades, "dataAsOf")
             )),
             other => check.findings.push(other.to_owned()),
@@ -542,7 +542,7 @@ fn genkan_installed(kinds: &Result<Value, Value>, namespace: &Result<Value, Valu
         (false, Some(false) | None) => {
             check.raise(Status::Warning);
             check.findings.push(
-                "Genkan is not installed; Engawa's in-cluster server signs people in through it"
+                "Genkan is not installed; engawa's in-cluster server signs people in through it"
                     .to_owned(),
             );
             check.add_fix(&format!("install Genkan: {GENKAN_GET_STARTED}"));
@@ -570,7 +570,7 @@ fn genkan_client(answer: Option<&Result<Value, Value>>) -> Check {
             ));
             check.add_fix(&format!(
                 "genkanctl client create {ENGAWA_CLIENT} --type confidential --allow-elevation \
-                 --audience {KUBERNETES_AUDIENCE} --redirect-uri https://<Engawa's host>/auth/callback \
+                 --audience {KUBERNETES_AUDIENCE} --redirect-uri https://<engawa's host>/auth/callback \
                  | kubectl apply -f -"
             ));
             return check;
@@ -616,7 +616,7 @@ fn genkan_client(answer: Option<&Result<Value, Value>>) -> Check {
             .findings
             .push(format!("{where_} may not ask for elevation"));
         check.add_fix(&format!(
-            "set spec.allowElevation: true on {where_}, or install Engawa with \
+            "set spec.allowElevation: true on {where_}, or install engawa with \
              elevation.enabled=false"
         ));
     }
@@ -624,7 +624,7 @@ fn genkan_client(answer: Option<&Result<Value, Value>>) -> Check {
 }
 
 /// Signed in with a Genkan token: the cluster names the person with Genkan's prefix. With Genkan
-/// installed, another identity is a warning: Engawa's in-cluster server signs people in only
+/// installed, another identity is a warning: engawa's in-cluster server signs people in only
 /// through Genkan, so what this kubeconfig may do is not what the browser gets. Without Genkan,
 /// `genkan-installed` already warns and this check is skipped.
 fn genkan_identity(whoami: &Value, genkan_installed: bool) -> Check {
@@ -753,7 +753,7 @@ mod tests {
         }))
     }
 
-    /// A cluster at `version`, with Genkan installed and Engawa registered at it, as
+    /// A cluster at `version`, with Genkan installed and engawa registered at it, as
     /// `genkan:alice`.
     fn cluster(version: &str) -> MemoryCluster {
         let namespace: Namespace =

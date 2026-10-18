@@ -1,4 +1,4 @@
-//! What Engawa needs from kube-rs, checked against a real kube-apiserver: JSON Patch writes with
+//! What engawa needs from kube-rs, checked against a real kube-apiserver: JSON Patch writes with
 //! the `engawa` field manager and their `test` preconditions, creations, dry runs, and that a
 //! [`UserClient`] acts as the person whose token it carries, with that person's rights and no
 //! others. Revoking a right is checked through the API (`engawa-api`'s cluster tests).
@@ -188,7 +188,7 @@ mod tests {
         };
         sandbox.user().write(&patch).await.expect("patch");
 
-        // Only the patched key changed, and `managedFields` names Engawa for it.
+        // Only the patched key changed, and `managedFields` names engawa for it.
         let written = configmaps.get("app").await.expect("read again");
         let data = written.data.clone().unwrap_or_default();
         assert_eq!(data.get("a").map(String::as_str), Some("10"));

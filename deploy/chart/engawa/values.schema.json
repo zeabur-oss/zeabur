@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Engawa chart values",
+  "title": "engawa chart values",
   "type": "object",
   "additionalProperties": false,
   "required": ["image", "publicUrl", "issuer", "elevation", "planKey", "service", "ingress", "httpRoute", "resources"],

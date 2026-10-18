@@ -7,7 +7,7 @@ The only crate that talks to kube-apiserver.
 How a request reaches the cluster. The port it exports reads and writes *as a given user*: the
 caller hands over the user's credential (a bearer token issued by Genkan, or the local
 kubeconfig context) and gets back a client bound to it. No exported function returns a client
-built from Engawa's own service account, so no layer above can act with more rights than the
+built from engawa's own service account, so no layer above can act with more rights than the
 person using it; kube-apiserver makes every authorisation decision.
 
 The port ([`Cluster`](crate::port::Cluster)) has two adapters: kube-rs against a real cluster
@@ -50,7 +50,7 @@ only a test person's token:
   patch of nothing, strict field validation [field-validation] in dry runs [dry-run] (which store
   nothing) and real writes, and one winner among concurrent patches of one version.
 - **Identity**: `SelfSubjectReview` reports the person, and a namespace outside their rights
-  answers `403`. That the first request after their `RoleBinding` is deleted answers `403` (Engawa
+  answers `403`. That the first request after their `RoleBinding` is deleted answers `403` (engawa
   holds no cache of permissions that could outlive them) is checked through the API, in
   `engawa-api`'s cluster tests.
 

@@ -1,4 +1,4 @@
-//! The fields of a Gateway API `HTTPRoute` that Engawa reads.
+//! The fields of a Gateway API `HTTPRoute` that engawa reads.
 //!
 //! k8s-openapi has no Gateway API types and the `gateway-api` crate builds on another kube and
 //! k8s-openapi release, so this view declares only what is read and ignores everything else.
@@ -6,7 +6,7 @@
 
 use serde::Deserialize;
 
-/// An `HTTPRoute`, as far as Engawa reads one.
+/// An `HTTPRoute`, as far as engawa reads one.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default)]
 pub struct HttpRoute {

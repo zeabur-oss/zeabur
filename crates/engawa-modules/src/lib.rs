@@ -12,7 +12,7 @@ pub mod prometheus_api;
 pub mod system_upgrade_controller;
 pub mod velero;
 
-/// One gap a module finds, with the object that closes it when Engawa cannot write the fix
+/// One gap a module finds, with the object that closes it when engawa cannot write the fix
 /// itself.
 ///
 /// Modules cannot implement `engawa-gaps`' rule trait (the core never depends on a module, and a

@@ -1,4 +1,4 @@
-//! What Engawa reads from a cluster, as one person: the port and its value types.
+//! What engawa reads from a cluster, as one person: the port and its value types.
 //!
 //! Everything here is read fresh on every call. Nothing is cached between requests: a cache
 //! shared between people could show one person what only another may see, and a cache per person
@@ -99,7 +99,7 @@ pub trait Cluster: Send + Sync {
     /// The namespaces this person may list.
     fn namespaces(&self) -> Answer<'_, Vec<Namespace>>;
 
-    /// Every object Engawa projects in `namespace`. Kinds this person may not list are reported
+    /// Every object engawa projects in `namespace`. Kinds this person may not list are reported
     /// in [`NamespaceObjects::unreadable`]; if none can be listed, the call fails.
     fn namespace_objects<'a>(&'a self, namespace: &'a str) -> Answer<'a, NamespaceObjects>;
 
@@ -244,7 +244,7 @@ pub trait Cluster: Send + Sync {
     ///
     /// kube-apiserver does not pass the person's identity on: it removes `Authorization` and the
     /// impersonation headers before proxying [k8s-authn-filter], so the Service sees a request
-    /// without a user and cannot tell people apart. `path_and_query` is Engawa's own (it starts
+    /// without a user and cannot tell people apart. `path_and_query` is engawa's own (it starts
     /// with `/` and is already encoded), never a person's.
     ///
     /// [k8s-proxy]: https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster-services/#manually-constructing-apiserver-proxy-urls
@@ -400,7 +400,7 @@ pub struct ClusterEvents {
 
 // ── Writes ───────────────────────────────────────────────────────────────────────────────────
 
-/// The field manager every Engawa write names (`fieldManager`), so `managedFields` tells its
+/// The field manager every engawa write names (`fieldManager`), so `managedFields` tells its
 /// edits apart [k8s-field-manager].
 ///
 /// [k8s-field-manager]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
@@ -583,7 +583,7 @@ pub struct ClusterFacts {
     pub gateway_controllers: BTreeSet<String>,
     /// Helm releases as `namespace/release`, from the `name` label of release Secrets
     /// (`owner=helm`). That label is the *release* name; the chart's name is only inside the
-    /// encoded release record, which Engawa never decodes, so it is not known here [helm-secrets].
+    /// encoded release record, which engawa never decodes, so it is not known here [helm-secrets].
     ///
     /// [helm-secrets]: https://github.com/helm/helm/blob/main/pkg/storage/driver/secrets.go
     pub helm_releases: BTreeSet<String>,
@@ -626,7 +626,7 @@ impl ClusterError {
             Self::Status(status) => Problem::from_kubernetes(status, what),
             Self::Transport(message) => Problem::new(
                 engawa_core::problem::Kind::Unavailable,
-                format!("Engawa cannot reach the cluster's API server ({message})."),
+                format!("engawa cannot reach the cluster's API server ({message})."),
             ),
             Self::Decode(message) => Problem::new(
                 engawa_core::problem::Kind::Internal,

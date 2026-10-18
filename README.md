@@ -1,8 +1,8 @@
-# Engawa
+# engawa
 
 **Kubernetes made simple and secure by default.**
 
-Engawa (縁側, the veranda of a Japanese house: open to the garden, under the same roof) shows a
+engawa (縁側, the veranda of a Japanese house: open to the garden, under the same roof) shows a
 cluster as projects and services, explains what is wrong in plain words, and lets you change
 things safely. It works with the objects you already have, never acts with more rights than you
 have, and keeps no state of its own.
@@ -26,13 +26,13 @@ have, and keeps no state of its own.
 
 ## Principles
 
-- **Your rights, not Engawa's.** Every request is made with your own credential (a token from
+- **Your rights, not engawa's.** Every request is made with your own credential (a token from
   [Genkan](https://github.com/engawahq/genkan), or your kubeconfig on your machine);
   kube-apiserver decides. In a cluster, admin rights are asked for only when your everyday ones
   are refused; they need your passkey again and last a few minutes.
 - **Kubernetes objects are the only state.** No database and no custom resources: a project is
-  a namespace. Remove Engawa and the cluster is as it was.
-- **Works with Helm, Argo CD and Flux.** Objects they manage are shown as such; Engawa does not
+  a namespace. Remove engawa and the cluster is as it was.
+- **Works with Helm, Argo CD and Flux.** Objects they manage are shown as such; engawa does not
   fight them for fields.
 - **Suggests, does not install.** Missing pieces come with a `helm` command, a Flux
   `HelmRelease`, an Argo CD `Application` or a k3s `HelmChart`.

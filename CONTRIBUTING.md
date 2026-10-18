@@ -59,7 +59,7 @@ and prints one result line per job; use a disposable machine or VM for the clust
 
 Design rationale lives next to the code, in rustdoc: state the decision and its reason, and
 cite the specification section, paper or prior art it rests on (the crates show the style).
-Never cite something you have not read; write "not verified" instead. Every claim that Engawa
+Never cite something you have not read; write "not verified" instead. Every claim that engawa
 does something better or safer is backed by a test, not only by documentation. Documentation is
 written in English.
 
@@ -150,7 +150,7 @@ What to test, at which level, and what not to test: [docs/testing.md](docs/testi
 
 ### Disposable k3d cluster
 
-Run from the Engawa checkout on a Linux machine or VM with Docker running, Nix with flakes, and
+Run from the engawa checkout on a Linux machine or VM with Docker running, Nix with flakes, and
 permission to use Docker. Enter `nix develop` for the tools, including k3d and kubectl. Do not use
 a production cluster: the tests create and delete namespaces, service accounts and RBAC.
 
@@ -172,10 +172,10 @@ k3d from changing your normal cluster context. When finished:
 k3d cluster delete engawa
 ```
 
-### Engawa in a cluster with Genkan
+### engawa in a cluster with Genkan
 
 `scripts/e2e-l2.sh` (the `kubernetes-l2` job) creates a cluster of its own, `engawa-l2`, installs
-Genkan and Engawa from their images (Engawa with its chart) behind Traefik over HTTPS, and drives
+Genkan and engawa from their images (engawa with its chart) behind Traefik over HTTPS, and drives
 a browser through passkey sign-in, a terminal confirmed with the passkey again, and reads and
 changes with admin rights. It builds Genkan from a checkout next to this one (`GENKAN_SRC`,
 default `../genkan`) at the commit in `GENKAN_PINNED`, refusing a checkout at another commit, and

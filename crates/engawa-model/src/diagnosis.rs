@@ -61,7 +61,7 @@ pub struct Diagnosis {
     pub pods: Vec<String>,
     /// The cause, in one sentence.
     pub cause: Message,
-    /// Why: the rule that applies, with this occurrence's numbers where Engawa knows them.
+    /// Why: the rule that applies, with this occurrence's numbers where engawa knows them.
     pub why: Message,
     /// What to do about it, in one sentence.
     pub fix: Message,

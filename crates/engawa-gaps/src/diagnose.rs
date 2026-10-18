@@ -7,7 +7,7 @@
 //!
 //! **Recent.** Restart counts never go down, so a container that crashed last week and has run
 //! since is not diagnosed. The kubelet resets a container's back-off once it "has executed for
-//! 10 minutes without any problems" [k8s-restart-policy]; Engawa uses the same window
+//! 10 minutes without any problems" [k8s-restart-policy]; engawa uses the same window
 //! ([`RECENT`]): a failure counts while the container is not ready, waits in
 //! `CrashLoopBackOff`, or ended within the window.
 //!
