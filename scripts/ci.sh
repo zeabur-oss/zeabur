@@ -92,6 +92,7 @@ check_doctor() {
     and (status("components") | IN("ok", "warning"))
     and status("genkan-installed") == "warning"
     and status("genkan-client") == "skipped"
+    and status("genkan-identity") == "skipped"
   ' target/doctor.json
   expected=$(jq '.checks | map(.status)
     | if any(. == "critical") then 2 elif any(. == "warning") then 1

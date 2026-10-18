@@ -268,14 +268,16 @@ async fn examine(api: &InProcess) -> Result<Report, Value> {
         ),
         None => None,
     };
+    let installed = genkan_installed(&kinds, &namespace);
+    let identity = genkan_identity(&whoami, installed.status == Status::Ok);
     Ok(Report {
         checks: vec![
             cluster_version(&upgrades),
             components(&capabilities),
             cluster_gaps(&gaps),
-            genkan_installed(&kinds, &namespace),
+            installed,
             genkan_client(client.as_ref()),
-            genkan_identity(&whoami),
+            identity,
             genkan_issuer_trust(),
         ],
     })
@@ -621,14 +623,23 @@ fn genkan_client(answer: Option<&Result<Value, Value>>) -> Check {
     check
 }
 
-/// Signed in with a Genkan token: the cluster names the person with Genkan's prefix.
-fn genkan_identity(whoami: &Value) -> Check {
+/// Signed in with a Genkan token: the cluster names the person with Genkan's prefix. With Genkan
+/// installed, another identity is a warning: Engawa's in-cluster server signs people in only
+/// through Genkan, so what this kubeconfig may do is not what the browser gets. Without Genkan,
+/// `genkan-installed` already warns and this check is skipped.
+fn genkan_identity(whoami: &Value, genkan_installed: bool) -> Check {
     let mut check = Check::new("genkan-identity");
     let username = text(whoami, "username");
     if username.starts_with(GENKAN_USER_PREFIX) {
         check
             .findings
             .push(format!("signed in through Genkan as {username}"));
+    } else if genkan_installed {
+        check.status = Status::Warning;
+        check
+            .findings
+            .push(format!("you are \"{username}\", not a Genkan user"));
+        check.add_fix("switch to a context that signs in through Genkan, then run doctor again");
     } else {
         check.status = Status::Skipped;
         check.findings.push(format!(
@@ -981,14 +992,43 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_identity_without_genkans_prefix_is_skipped() {
+    async fn an_identity_without_genkans_prefix_is_a_warning_when_genkan_is_installed() {
         let cluster = cluster("v1.36.5+k3s1");
         cluster.update(|s| s.identity.username = "kubernetes-admin".to_owned());
         let report = report(&cluster).await;
+        assert_eq!(status(&report, "genkan-installed"), Status::Ok);
+        let identity = check(&report, "genkan-identity");
+        assert_eq!(identity.status, Status::Warning);
         assert_eq!(
-            check(&report, "genkan-identity").findings,
+            identity.findings,
+            [r#"you are "kubernetes-admin", not a Genkan user"#]
+        );
+        assert_eq!(
+            identity.fix.as_deref(),
+            Some("switch to a context that signs in through Genkan, then run doctor again")
+        );
+        assert_eq!(report.exit_code(), 1);
+    }
+
+    /// Without Genkan, `genkan-installed` already warns: the identity is not a second warning.
+    #[tokio::test]
+    async fn an_identity_without_genkans_prefix_is_skipped_without_genkan() {
+        let cluster = cluster("v1.36.5+k3s1");
+        cluster.update(|s| {
+            s.identity.username = "kubernetes-admin".to_owned();
+            s.served.clear();
+            s.dynamic.clear();
+            s.namespaces.clear();
+        });
+        let report = report(&cluster).await;
+        assert_eq!(status(&report, "genkan-installed"), Status::Warning);
+        let identity = check(&report, "genkan-identity");
+        assert_eq!(identity.status, Status::Skipped);
+        assert_eq!(
+            identity.findings,
             ["skipped: you are kubernetes-admin, not signed in with a Genkan token"]
         );
+        assert_eq!(identity.fix, None);
     }
 
     #[tokio::test]
