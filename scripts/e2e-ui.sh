@@ -30,8 +30,9 @@ wait_for kubectl -n "$namespace" rollout status deployment/talker --timeout=180s
 wait_for kubectl -n "$namespace" rollout status deployment/editor --timeout=180s
 pod=$(kubectl -n "$namespace" get pods -l app=talker -o jsonpath='{.items[0].metadata.name}')
 # The crashing Deployment must have crashed a few times before the Overview test looks for it.
-# Between restarts the kubelet reports the container as either `waiting: CrashLoopBackOff` or
-# `terminated: Error` (observed on k3s v1.36.5), so wait on the restart count, not the reason.
+# Between restarts the kubelet reports the container as `waiting: CrashLoopBackOff`,
+# `terminated: Error`, or, for a moment after each restart, `running` (observed on k3s v1.36.5),
+# so wait on the restart count, not the reason.
 restarts=0
 for _ in $(seq 1 90); do
   restarts=$(kubectl -n "$namespace" get pods -l app=crasher \

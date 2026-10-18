@@ -48,11 +48,12 @@ test("Home names the failing service across projects and lists the project", asy
 
   const attention = page.getByRole("region", { name: "Needs attention" })
   const row = attention.getByRole("listitem").filter({ hasText: `${namespace}/${failing}` })
-  // The pill says it in plain words, whichever the kubelet reports: `CrashLoopBackOff` (waiting)
-  // or `Error` (terminated; in the moment after each restart the container runs, and its recent
-  // crash still fails it). The kubelet's word is read with it, from the tooltip's text.
+  // The pill says it in plain words, whichever the kubelet reports: `CrashLoopBackOff` (waiting),
+  // `Error` (terminated), or, in the moment after a restart while the container runs again,
+  // "Running" with its last exit (its recent crash still fails it). The facts are read with the
+  // word, from the tooltip's text.
   await expect(row).toContainText("Keeps crashing")
-  await expect(row).toContainText(/CrashLoopBackOff|Error/)
+  await expect(row).toContainText(/CrashLoopBackOff|Error|last exit 1/)
   await expect(row).toContainText("Deployment")
   if (!namespace.startsWith("kube-")) {
     const projects = page.getByRole("table", { name: "Projects" })
@@ -192,7 +193,7 @@ test("Overview puts the failing service first, with a link to its failing pod's 
   // Plain words, whichever the kubelet reports (see the Home test); its own word is in the
   // tooltip.
   await expect(row).toContainText("Keeps crashing")
-  await expect(row).toContainText(/CrashLoopBackOff|Error/)
+  await expect(row).toContainText(/CrashLoopBackOff|Error|last exit 1/)
   await expect(row).toContainText(/restart/)
   const logs = row.getByRole("link", { name: /^Logs of / })
   const label = (await logs.getAttribute("aria-label")) ?? ""
