@@ -19,7 +19,7 @@ import { Tooltip } from "@/components/ui/tooltip"
 import { YamlDiff } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
-import { imageTag, type Service } from "@/model/service"
+import { imageTag, isTask, type Service } from "@/model/service"
 
 type Release = Schemas["WorkloadRelease"]
 
@@ -34,7 +34,11 @@ export function ReleasesTab({ project, service }: { project: string; service: Se
   if (releases.isError) return <Problem error={releases.error} />
   const items = releases.data.items
   if (items.length === 0)
-    return <p className="text-sm text-muted-foreground">{t("releases.none")}</p>
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t(isTask(service.kind) ? "releases.noneTask" : "releases.none")}
+      </p>
+    )
 
   const current = items.find((r) => r.current) ?? items[0]
   const others = items.filter((r) => r !== current)

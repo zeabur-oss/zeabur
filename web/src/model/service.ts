@@ -159,7 +159,7 @@ export function reasonWord(reason: string | undefined, task: boolean): ReasonWor
   return reasonWords[reason]
 }
 
-const isTask = (kind: string) => kind === "Job" || kind === "CronJob"
+export const isTask = (kind: string) => kind === "Job" || kind === "CronJob"
 
 /** The facts of the pod a failing or waiting status is about. */
 export function podFacts(pod: Pod): PodFacts {
