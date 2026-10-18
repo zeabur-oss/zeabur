@@ -1,6 +1,6 @@
 ---
 name: engawa-ci
-description: Investigate a failed or flaky CI run of engawa (GitHub Actions or scripts/ci-local.sh) — read the job's log, find the cause, reproduce it on a machine sized like the runner, and fix the test or the code rather than retrying. Use when a check on a pull request or on main fails, or a test passes and fails without a change.
+description: Investigate a failed or flaky CI or release run of engawa (GitHub Actions or scripts/ci-local.sh) — read the job's log, find the cause, reproduce it on a machine sized like the runner, and fix the test or the code rather than retrying. Use when a check on a pull request or on main fails, or a test passes and fails without a change.
 ---
 
 # When CI fails
@@ -10,6 +10,13 @@ cargo-deny, unsafe-report, levels, ui, no-ui, chart, wording), `kubernetes` (clu
 `engawactl doctor`, browser tests in local mode, the image) and `kubernetes-l2` (engawa and Genkan
 in a cluster, `scripts/e2e-l2.sh`); `dco` runs on pull requests only. What each cluster job runs
 is in `engawa-cluster-tests`.
+
+`.github/workflows/release.yml` runs on a `v*` tag: all of `ci.yml` (`workflow_call`), then
+`build` (Linux amd64/arm64, macOS arm64: `scripts/release-build.sh`, then
+`scripts/release-smoke.sh` on Linux), `publish` (`scripts/release-publish.sh`, attestations, the
+draft release) and `verify` (`scripts/release-verify.sh` on the draft's assets). For a failed
+release run, read [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md) before changing permissions,
+packages or artifacts.
 
 ## 1. Read the failure
 ```sh

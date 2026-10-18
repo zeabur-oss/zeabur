@@ -81,6 +81,15 @@ expect full "$out" '[select(.kind == "Secret")] | length' 0
 expect full "$out" 'select(.kind == "Deployment") | .spec.template.spec.volumes[] | select(.name == "plan-key") | .secret.secretName' \
   engawa-plan-key
 
+# The image: the published one at the chart's appVersion, or exactly the digest a release pins
+# (scripts/release-publish.sh).
+image='select(.kind == "Deployment") | .spec.template.spec.containers[0].image'
+app_version=$(yq '.appVersion' "$chart/Chart.yaml")
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/engawahq/engawa:$app_version"
+digest="sha256:$(printf '%064d' 0)"
+expect digest "$(render -f "$chart/ci/minimal-values.yaml" --set image.tag=ignored --set image.digest="$digest")" \
+  "$image" "ghcr.io/engawahq/engawa@$digest"
+
 # Everyone signed in reads the settings unless that is turned off.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
   'select(.kind == "RoleBinding") | .subjects[] | .kind + "/" + .name' Group/system:authenticated
@@ -102,6 +111,7 @@ refuse "no client secret" --set issuer.clientSecret.existingSecret=
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm
 refuse "an unknown value" --set replicas=2
+refuse "an image digest without its algorithm" --set image.digest="$(printf '%064d' 0)"
 if render >/dev/null 2>&1; then fail "accepted no values at all"; fi
 
 if ((failures > 0)); then

@@ -2,11 +2,13 @@
 # checks these values.
 
 image:
-  # engawa has no published image yet: build one with scripts/build-image.sh and load it into
-  # the cluster's nodes.
-  repository: engawa
-  # Defaults to the chart's appVersion.
+  # Published for linux/amd64 and linux/arm64 by the release workflow, signed (docs/releases.md).
+  repository: ghcr.io/engawahq/engawa
+  # Defaults to the chart's appVersion. Ignored when digest is set.
   tag: ""
+  # The image by content: sha256:<64 hex digits>. A released chart sets it to the image index
+  # published with it, so the chart installs exactly the image that was signed.
+  digest: ""
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []

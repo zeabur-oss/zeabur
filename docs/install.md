@@ -7,8 +7,8 @@ ClusterRole and no token of its own. What someone can see and change in engawa i
 their Kubernetes RBAC allows. The chart's one Role lets everyone signed in read engawa's settings
 (`get` on the ConfigMap `engawa-settings`); turn it off with `metricsStore.everyoneReads=false`.
 
-This guide installs engawa with its Helm chart (`deploy/chart/engawa`). The examples use these
-names; replace them with yours:
+This guide installs a release of engawa with its Helm chart (source in `deploy/chart/engawa`).
+The examples use these names; replace them with yours:
 
 | Name | In the examples |
 |---|---|
@@ -24,17 +24,40 @@ names; replace them with yours:
 - An ingress controller (an `Ingress` or a Gateway API `Gateway`) and a TLS certificate for
   engawa's host name, for example from cert-manager. Browsers offer passkeys only on pages they
   trust.
-- `helm`, and this repository checked out (`nix develop` provides `helm`).
+- Helm 4, [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) 3 and the
+  [GitHub CLI](https://cli.github.com) (`gh`, signed in). This repository's `nix develop` shell
+  provides all three.
 
-## 1. Build the image
+## 1. Choose a release and verify it
 
-engawa has no published image yet. Build it on a Linux machine with Docker (it embeds the web
-interface) and load it into the cluster's nodes; on k3s:
+There is nothing to build. Each [release](https://github.com/engawahq/engawa/releases) publishes
+the image `ghcr.io/engawahq/engawa` (linux/amd64 and linux/arm64) and the chart
+`oci://ghcr.io/engawahq/charts/engawa`, whose default image is that image's digest. Both are
+signed by the release workflow at the release's tag (keyless, with
+[Sigstore](https://docs.sigstore.dev/)) and carry a
+[build provenance attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds).
+The release lists their digests in `digests.txt`, covered by the signed `SHA256SUMS`:
 
 ```sh
-./scripts/build-image.sh engawa:dev
-docker save engawa:dev | sudo k3s ctr images import -
+version=0.0.2
+identity="https://github.com/engawahq/engawa/.github/workflows/release.yml@refs/tags/v$version"
+issuer=https://token.actions.githubusercontent.com
+gh release download "v$version" --repo engawahq/engawa --dir "engawa-$version" \
+  --pattern digests.txt --pattern SHA256SUMS --pattern SHA256SUMS.sigstore.json
+cd "engawa-$version"
+cosign verify-blob --bundle SHA256SUMS.sigstore.json --certificate-identity "$identity" \
+  --certificate-oidc-issuer "$issuer" SHA256SUMS
+sha256sum --check --ignore-missing SHA256SUMS                    # digests.txt: OK
+image=$(awk '$1 == "index" { print $2 }' digests.txt)
+chart=$(awk '$1 == "chart" { print $2 }' digests.txt)
+for ref in "$image" "$chart"; do
+  cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$ref" >/dev/null
+  gh attestation verify "oci://$ref" --repo engawahq/engawa --cert-identity "$identity"
+done
+helm show values "oci://$chart" | grep -A6 '^image:'              # digest: the image above
 ```
+
+Install the chart by `$chart`, its digest, as below: a tag can be moved, a digest cannot.
 
 ## 2. Register engawa at Genkan
 
@@ -67,8 +90,7 @@ options.
 ## 3. Install the chart
 
 ```sh
-helm install engawa deploy/chart/engawa --namespace engawa \
-  --set image.repository=docker.io/library/engawa --set image.tag=dev \
+helm install engawa "oci://$chart" --namespace engawa \
   --set publicUrl=https://engawa.example.com \
   --set issuer.url=https://genkan.example.com \
   --set issuer.clientSecret.existingSecret=engawa-oidc \
@@ -113,6 +135,14 @@ The chart runs exactly one pod, replaced rather than rolled on upgrades. Sign-in
 in the process's memory, because their refresh tokens must not rest in etcd: a second replica
 would not know them. A restart therefore signs everyone out; signing in again takes one passkey
 touch.
+
+### An image of your own
+
+To run a build of your own instead, build the image on a Linux machine with Docker
+(`./scripts/build-image.sh engawa:dev`), load it into the cluster's nodes (on k3s:
+`docker save engawa:dev | sudo k3s ctr images import -`) and install the chart from this
+repository, `deploy/chart/engawa`, with `--set image.repository=docker.io/library/engawa
+--set image.tag=dev`.
 
 ## Check what engawa may do
 

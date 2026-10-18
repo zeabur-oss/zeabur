@@ -82,6 +82,12 @@
               yq-go
               openssl
 
+              # Releases (.github/workflows/release.yml, scripts/release-*.sh): keyless signing,
+              # copying image candidates to the registry, the draft release.
+              cosign
+              skopeo
+              gh
+
               self.formatter.${system}
             ];
 

@@ -46,7 +46,11 @@ spec:
           type: RuntimeDefault
       containers:
         - name: engawa
+          {{- if .Values.image.digest }}
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          {{- else }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- end }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             # IPv4 and IPv6, so the pod answers in single-stack and dual-stack clusters alike.

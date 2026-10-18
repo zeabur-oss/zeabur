@@ -1,0 +1,192 @@
+name: Release
+
+# A tag v* builds, smokes, publishes by digest, signs and attests, then leaves a draft release
+# that a maintainer checks and publishes (docs/releases.md); this workflow never publishes it.
+# Run by hand, it rehearses: CI, the builds and their smoke tests, nothing published. With
+# verify_only it checks an existing draft again with this commit's scripts (docs/releases.md,
+# "When a release run fails").
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to rehearse or verify, as in Cargo.toml (v0.0.2); a rehearsal never publishes'
+        required: true
+      verify_only:
+        description: 'Verify the existing draft release of this version; build and publish nothing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The whole of CI on this commit, the cluster jobs included.
+  checks:
+    if: ${{ !inputs.verify_only }}
+    uses: ./.github/workflows/ci.yml
+
+  prepare:
+    runs-on: ubuntu-26.04-arm
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.verify_only && format('refs/tags/{0}', inputs.version) || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - id: version
+        name: The version is the workspace's and the chart's, with a changelog section, on main
+        env:
+          VERSION: ${{ inputs.version || github.ref_name }}
+          VERIFY_ONLY: ${{ inputs.verify_only }}
+        run: |
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          plain="${VERSION#v}"
+          crate=$(nix develop -c cargo metadata --locked --no-deps --format-version 1 |
+            jq -r '.packages[] | select(.name == "engawactl") | .version')
+          chart=$(nix develop -c yq '.version + " " + .appVersion' deploy/chart/engawa/Chart.yaml)
+          test "$crate" = "$plain"
+          test "$chart" = "$plain $plain"
+          grep -q "^## \[$plain\]" CHANGELOG.md
+          if [[ "$GITHUB_EVENT_NAME" == push || "$VERIFY_ONLY" == true ]]; then
+            git merge-base --is-ancestor HEAD origin/main
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build (${{ matrix.os }}-${{ matrix.arch }})
+    needs: [prepare, checks]
+    if: ${{ !inputs.verify_only }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, arch: amd64, runner: ubuntu-26.04 }
+          - { os: linux, arch: arm64, runner: ubuntu-26.04-arm }
+          - { os: darwin, arch: arm64, runner: macos-26 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - name: Build the candidates
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: nix develop -c ./scripts/release-build.sh "$VERSION" "$ARCH" dist
+      - name: Smoke the archive, the chart and the image as built
+        if: matrix.os == 'linux'
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: >-
+          nix develop -c ./scripts/release-smoke.sh "dist/engawactl-$VERSION-linux-$ARCH.tar.gz"
+          deploy/chart/engawa "engawa:release-$ARCH"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    if: github.event_name == 'push'
+    needs: [prepare, build]
+    runs-on: ubuntu-26.04-arm
+    permissions:
+      contents: write # the draft release
+      packages: write # the image and the chart on ghcr.io
+      id-token: write # keyless signatures and attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          path: candidates
+      - id: publish
+        name: Publish the image and the chart by digest, sign them and the checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: nix develop -c ./scripts/release-publish.sh "$VERSION" candidates release
+      - name: Attest the image's provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.publish.outputs.image }}
+          subject-digest: ${{ steps.publish.outputs.image-digest }}
+      - name: Attest the chart's provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ steps.publish.outputs.chart }}
+          subject-digest: ${{ steps.publish.outputs.chart-digest }}
+      - name: Attest the release assets' provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: release/assets/SHA256SUMS
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: >-
+          nix develop -c gh release create "$VERSION" release/assets/* --repo "$GITHUB_REPOSITORY"
+          --verify-tag --target "$GITHUB_SHA" --draft --prerelease --title "engawa $VERSION"
+          --notes-file release/notes.md
+
+  verify:
+    name: verify (${{ matrix.platform }})
+    if: >-
+      ${{ !cancelled() && needs.prepare.result == 'success' &&
+          (needs.publish.result == 'success' || inputs.verify_only) }}
+    needs: [prepare, publish]
+    permissions:
+      # GitHub shows a draft release only to a token that can push.
+      contents: write
+      attestations: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { platform: linux-amd64, runner: ubuntu-26.04 }
+          - { platform: linux-arm64, runner: ubuntu-26.04-arm }
+          - { platform: darwin-arm64, runner: macos-26 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      # The tag's checkout gives the Nix shell the release was built with.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.verify_only && format('refs/tags/{0}', inputs.version) || github.ref }}
+          persist-credentials: false
+      # verify_only: the scripts of the commit this run was started from, which may fix the check.
+      - if: inputs.verify_only
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: verification
+          sparse-checkout: scripts
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - name: Download the draft's assets, verify them and install them
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          SCRIPTS: ${{ inputs.verify_only && 'verification/scripts' || 'scripts' }}
+        run: |
+          nix develop -c gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir downloaded
+          nix develop -c "./$SCRIPTS/release-verify.sh" "$VERSION" downloaded \
+            "https://github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml@refs/tags/$VERSION"

@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0.0, a
 minor or patch release may break the API.
 
+## [Unreleased]
+
+### Added
+
+- Releases from CI only: the image `ghcr.io/engawahq/engawa` (linux/amd64, linux/arm64), the
+  chart `oci://ghcr.io/engawahq/charts/engawa` pinned to the image's digest, and `engawactl`
+  for Linux (amd64, arm64) and macOS (arm64), all signed with Sigstore and attested
+  ([docs/releases.md](docs/releases.md)). The chart's new `image.digest` value pins any image
+  by content.
+
 ## [0.0.1] - 2026-10-18
 
 The first public release, pre-alpha.

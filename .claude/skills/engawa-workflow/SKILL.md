@@ -26,6 +26,15 @@ description: How work moves through the engawa repository — branches, commits,
 A change to the plan or HTTP API shape (a field added, renamed or removed) needs the maintainers'
 agreement on the shape before it is built; propose it in an issue first.
 
+## Releases
+A maintainer releases: they bump the version (`Cargo.toml`, `Chart.yaml`, a `CHANGELOG.md`
+section), merge it, push the tag `v<version>`, check the draft release the workflow leaves and
+publish it by hand (`docs/releases.md`). Never push a tag, create, edit or publish a release,
+dispatch `release.yml` or change a repository or package setting yourself; prepare the pull
+request and name the step that is theirs. A change to a `scripts/release-*.sh` is checked with
+`shellcheck` and `actionlint`, and on Linux by running `release-build.sh` and
+`release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `engawa-ci`.
+
 ## Issues
 - **Where.** engawa itself: `engawahq/engawa`. A component in the catalogue (a chart, its
   version, values, detection, security notes, its e2e): `engawahq/recommendations`; engawa

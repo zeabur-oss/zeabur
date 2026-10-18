@@ -69,14 +69,15 @@ have, and keeps no state of its own.
 - **`engawactl doctor`**: checks the cluster version, the Genkan setup and the recommended
   components, as text or JSON, with an exit code for scripts.
 
-Not yet: published container images and release binaries, creating new workloads, editing or
-deleting objects that Helm, Argo CD or Flux manage (they can be restarted), more than one
-replica in a cluster, and signing in without Genkan.
+Not yet: creating new workloads, editing or deleting objects that Helm, Argo CD or Flux manage
+(they can be restarted), more than one replica in a cluster, and signing in without Genkan.
 
 ## Quick start
 
-On your machine, with your kubeconfig. Build from source in the [Nix](https://nixos.org) dev
-shell, which provides every tool:
+On your machine, with your kubeconfig. Download `engawactl` for Linux or macOS (Apple silicon)
+from a [release](https://github.com/engawahq/engawa/releases) and verify it
+([Releases](docs/releases.md#download-and-verify-engawactl)), or build it from source in the
+[Nix](https://nixos.org) dev shell, which provides every tool:
 
 ```sh
 git clone https://github.com/engawahq/engawa && cd engawa
@@ -94,6 +95,7 @@ In a cluster, for everyone who signs in through Genkan: [Install in a cluster](d
 ## Learn more
 
 - [Install in a cluster](docs/install.md): the Helm chart, signing in through Genkan.
+- [Releases](docs/releases.md): what a release contains, verifying it, publishing one.
 - [Architecture](docs/architecture.md): principles, layers, crates.
 - [Contributing](CONTRIBUTING.md): environment, checks, dependency policy, tests.
 - [Testing](docs/testing.md): what is tested at which level, and what is not.
