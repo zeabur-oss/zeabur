@@ -35,7 +35,8 @@ Iterate per crate with `-p <crate>` to keep builds short. Cluster tests: see
 `engawa-cluster-tests`. Web interface: see `engawa-ui`. The full CI runs locally on a
 Linux machine with Docker and act: `nix develop -c scripts/ci-local.sh [job…]` (one act process
 per job, a local Nix cache, a stall watchdog; results in `target/ci-local/*.result`). Do not use a
-plain `act push`: it marks every matrix entry failed when one fails.
+plain `act push`: it marks every matrix entry failed when one fails. When a check fails on
+GitHub, see `engawa-ci`.
 
 ## Lint conventions
 - `unsafe` is forbidden. No panics on input: no `unwrap`/`expect`/indexing outside tests.
@@ -76,3 +77,4 @@ plain `act push`: it marks every matrix entry failed when one fails.
 - Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore(scope):`, `!` for breaking
   changes with a `BREAKING CHANGE:` footer).
 - Sign off every commit (`git commit -s`, DCO). Do not add tool- or session-specific trailers.
+- Branches, pull requests, merging and issues: see `engawa-workflow`.
