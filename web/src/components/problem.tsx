@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 import WarningCircleIcon from "~icons/ph/warning-circle"
 
-import { toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import { ApiError, toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { Ago } from "@/components/bits"
 import { isRefusal, permission, Refused } from "@/components/refused"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -30,13 +30,25 @@ export function Problem({
 }) {
   const body = problem ?? toProblem(error)
   if (isRefusal(body)) return <Refused refusal={body} what={what} retry={retry} />
-  return <Failure problem={body} action={action} />
+  const retryAfter = error instanceof ApiError ? error.retryAfter : undefined
+  return <Failure problem={body} retryAfter={retryAfter} action={action} />
 }
 
-function Failure({ problem: body, action }: { problem: ProblemBody; action?: ReactNode }) {
+/** `retryAfter`: the wait a 429 or 503 asked for. A read's error is shown only once its retries
+ * are spent, so the wait is said as the cluster's request, not as a promise to try again. */
+function Failure({
+  problem: body,
+  retryAfter,
+  action,
+}: {
+  problem: ProblemBody
+  retryAfter?: number
+  action?: ReactNode
+}) {
   const t = useT()
   const { locale } = useI18n()
   const text = problemText(t, locale, body)
+  const fix = !retryAfter ? text.fix : `${text.fix} ${t("problem.retryAfter", retryAfter)}`
   const status = body.kubernetes ?? undefined
   // engawa's sentence is often kube-apiserver's own message; it is said once.
   const folded = text.folded.filter((sentence) => sentence !== status?.message)
@@ -69,7 +81,7 @@ function Failure({ problem: body, action }: { problem: ProblemBody; action?: Rea
           why={text.why}
           whyLang={text.whyInEnglish ? "en" : undefined}
           quote={text.quote}
-          fix={text.fix}
+          fix={fix}
           action={action}
           evidence={body.evidence}
           fields={body.fields}

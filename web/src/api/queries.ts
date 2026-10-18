@@ -2,12 +2,34 @@ import { QueryClient, queryOptions } from "@tanstack/react-query"
 
 import { api, ApiError, unwrap, type Schemas } from "@/api/client"
 
+/** The longest delay `setTimeout` keeps (2^31 - 1 ms, about 24.8 days); a longer one fires at
+ * once, so a server's longer ask waits this long instead. */
+const MAX_TIMEOUT = 2 ** 31 - 1
+
+/** Whether a read that failed `failures` times is tried again. A 4xx answer is the cluster's
+ * decision (forbidden, not found): asking again changes nothing, except after a 429, which asks
+ * to come back later. */
+export function retryRead(failures: number, error: unknown): boolean {
+  const refused =
+    error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429
+  return !refused && failures < 2
+}
+
+/** How long to wait before trying a read again: all that a 429 or 503 asked for, since an earlier
+ * try only spends a retry while the server still refuses; else TanStack Query's own backoff,
+ * capped at 30 s (`defaultRetryDelay` in its `retryer.ts`, not exported). */
+export function retryDelay(failures: number, error: unknown): number {
+  if (error instanceof ApiError && error.retryAfter !== undefined)
+    return Math.min(error.retryAfter * 1000, MAX_TIMEOUT)
+  return Math.min(1000 * 2 ** failures, 30_000)
+}
+
+// Mutations keep the library's default of no retry: a change is never sent twice on its own.
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // A 4xx answer is the cluster's decision (forbidden, not found): asking again changes nothing.
-      retry: (failures, error) =>
-        !(error instanceof ApiError && error.status >= 400 && error.status < 500) && failures < 2,
+      retry: retryRead,
+      retryDelay,
       staleTime: 10_000,
       refetchOnWindowFocus: false,
     },

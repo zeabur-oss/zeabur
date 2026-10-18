@@ -15,13 +15,30 @@ export const api = createClient<paths>({ credentials: "same-origin", headers: RE
 export class ApiError extends Error {
   readonly status: number
   readonly problem: Problem
+  /** How many seconds the server asked to wait before trying again; set on a 429 or 503 only. */
+  readonly retryAfter: number | undefined
 
-  constructor(status: number, problem: Problem) {
+  constructor(status: number, problem: Problem, retryAfter?: number) {
     super(problem.detail)
     this.name = "ApiError"
     this.status = status
     this.problem = problem
+    this.retryAfter = retryAfter
   }
+}
+
+/** The seconds a `Retry-After` value asks to wait: a number of seconds or an HTTP-date (RFC 9110,
+ * section 10.2.3), a date already past being 0. Anything else is no answer. */
+export function retryAfterSeconds(value: string | null, now = Date.now()): number | undefined {
+  const text = value?.trim()
+  if (!text) return undefined
+  if (/^\d+$/.test(text)) return Number(text)
+  // Every HTTP-date format starts with the day's name (section 5.6.7); `Date.parse` alone would
+  // read `-5` as a year.
+  if (!/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/.test(text)) return undefined
+  const date = Date.parse(text)
+  if (Number.isNaN(date)) return undefined
+  return Math.max(0, Math.ceil((date - now) / 1000))
 }
 
 function isProblem(value: unknown): value is Problem {
@@ -57,7 +74,15 @@ export function unwrap<T>(result: { data?: T; error?: unknown; response: Respons
     ? result.error
     : localProblem(status, `The server answered ${status} ${result.response.statusText}.`)
   if (problem.kind === "signed-out") goToSignIn()
-  throw new ApiError(status, problem)
+  // Too many requests or unavailable for now (RFC 6585, section 4; RFC 9110, section 15.6.4): the
+  // wait the header asks for, else the one kube-apiserver put in its Status.
+  const retryAfter =
+    status === 429 || status === 503
+      ? (retryAfterSeconds(result.response.headers.get("retry-after")) ??
+        problem.kubernetes?.retryAfterSeconds ??
+        undefined)
+      : undefined
+  throw new ApiError(status, problem, retryAfter)
 }
 
 export function toProblem(error: unknown): Problem {

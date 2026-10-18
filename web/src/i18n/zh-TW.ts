@@ -25,6 +25,10 @@ const mountedZhTW = (p: P) => p.container ?? `副本 ${p.pod}`
 /** Seconds in words, whole minutes as minutes. */
 const secondsZh = (s: number) => (s >= 60 && s % 60 === 0 ? `${s / 60} 分鐘` : `${s} 秒`)
 
+/** A wait in its largest unit, rounded up: 90 s is 2 minutes. */
+const waitZh = (s: number) =>
+  s < 60 ? `${s} 秒` : s < 3600 ? `${Math.ceil(s / 60)} 分鐘` : `${Math.ceil(s / 3600)} 小時`
+
 /** The sentence, led by "by default" when both values are the defaults, else followed by which one is. */
 const timingZhTW = (t: ProbeTiming, sentence: string) =>
   t.defaults
@@ -133,6 +137,7 @@ export const zhTW: Messages = {
   "problem.fix.internal": "請再試一次；如果一直發生，請附上細節回報。",
   "problem.detail": "engawa 的訊息",
   "problem.about": "這類問題的說明",
+  "problem.retryAfter": (s) => `叢集要求等 ${waitZh(s)}。`,
   "problemPage.label": "問題類型",
   "problemPage.rule": "規則",
   "problemPage.kubernetes": "Kubernetes 文件",

@@ -25,6 +25,10 @@ const mountedZhCN = (p: P) => p.container ?? `副本 ${p.pod}`
 /** Seconds in words, whole minutes as minutes. */
 const secondsZhCN = (s: number) => (s >= 60 && s % 60 === 0 ? `${s / 60} 分钟` : `${s} 秒`)
 
+/** A wait in its largest unit, rounded up: 90 s is 2 minutes. */
+const waitZhCN = (s: number) =>
+  s < 60 ? `${s} 秒` : s < 3600 ? `${Math.ceil(s / 60)} 分钟` : `${Math.ceil(s / 3600)} 小时`
+
 /** The sentence, led by "by default" when both values are the defaults, else followed by which one is. */
 const timingZhCN = (t: ProbeTiming, sentence: string) =>
   t.defaults
@@ -133,6 +137,7 @@ export const zhCN: Messages = {
   "problem.fix.internal": "请重试；如果一直出现，请附上详细信息报告。",
   "problem.detail": "engawa 的消息",
   "problem.about": "这类问题的说明",
+  "problem.retryAfter": (s) => `集群要求等待 ${waitZhCN(s)}。`,
   "problemPage.label": "问题类型",
   "problemPage.rule": "规则",
   "problemPage.kubernetes": "Kubernetes 文档",

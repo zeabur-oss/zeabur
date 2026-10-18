@@ -32,6 +32,14 @@ const secondsEn = (s: number) =>
     ? `${s / 60} minute${s === 60 ? "" : "s"}`
     : `${s} second${s === 1 ? "" : "s"}`
 
+/** A wait in its largest unit, rounded up: 90 s is 2 minutes. */
+const waitEn = (s: number) =>
+  s < 60
+    ? plural(s, "second", "seconds")
+    : s < 3600
+      ? plural(Math.ceil(s / 60), "minute", "minutes")
+      : plural(Math.ceil(s / 3600), "hour", "hours")
+
 /** The sentence, led by "by default" when both values are the defaults, else followed by which one is. */
 const timingEn = (t: ProbeTiming, sentence: string) =>
   t.defaults
@@ -147,6 +155,7 @@ export const en = {
   "problem.fix.internal": "Try again; if it keeps happening, report it with the details.",
   "problem.detail": "engawa's message",
   "problem.about": "What this kind of problem means",
+  "problem.retryAfter": (s: number) => `The cluster asked to wait ${waitEn(s)}.`,
   // A problem type's page (/problems/{kind}): the rule behind it
   "problemPage.label": "Problem type",
   "problemPage.rule": "The rule",
