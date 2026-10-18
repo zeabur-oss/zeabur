@@ -119,7 +119,10 @@ k3d kubeconfig get "$cluster" >"$KUBECONFIG"
 for image in "$genkan_image" "$engawa_image" busybox:1.37; do
   k3d image import "$image" --cluster "$cluster"
   name="${image%:*}"
-  if ! docker exec "$node" crictl images | grep -q "${name#docker.io/} *${image##*:}"; then
+  # Read the whole list before matching: `grep -q` exits at the first match, and under pipefail
+  # the SIGPIPE that crictl then gets would fail the check.
+  images=$(docker exec "$node" crictl images)
+  if ! grep -q "${name#docker.io/} *${image##*:}" <<<"$images"; then
     echo "error: the node does not have $image after the import" >&2
     exit 1
   fi

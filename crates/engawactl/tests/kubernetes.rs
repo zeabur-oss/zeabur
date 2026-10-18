@@ -195,32 +195,35 @@ mod tests {
             assert_eq!(last["exitCode"], 3, "{era:?}: {service}");
             assert_eq!(last["reason"], "Error", "{era:?}: {service}");
 
-            // Right after a restart the kubelet may not have the previous container's log yet
-            // ("unable to retrieve container logs"): a `log-unavailable` problem, never a log
-            // line; ask again until it does.
-            loop {
-                let result = session
-                    .call(
-                        "pod_logs",
-                        json!({"project": ns, "pod": pod, "previous": true}),
-                    )
-                    .await;
-                let logs = &result["structuredContent"];
-                if result["isError"] == true {
-                    assert_eq!(logs["kind"], "log-unavailable", "{era:?}: {result}");
-                } else if logs["lines"].as_array().unwrap().contains(&json!(line)) {
-                    break;
-                } else {
-                    let first = &logs["lines"][0];
-                    assert!(
-                        !first
-                            .as_str()
-                            .unwrap_or_default()
-                            .starts_with("unable to retrieve"),
-                        "{era:?}: {logs}"
-                    );
+            // The run that printed `line` is the previous one while the container waits to restart,
+            // and the current one while it stays terminated during a back-off; then the kubelet
+            // has already removed the run before it ("unable to retrieve container logs"). Either
+            // answer is a `log-unavailable` problem, never a log line; ask both until one has it.
+            'found: loop {
+                for previous in [true, false] {
+                    let result = session
+                        .call(
+                            "pod_logs",
+                            json!({"project": ns, "pod": pod, "previous": previous}),
+                        )
+                        .await;
+                    let logs = &result["structuredContent"];
+                    if result["isError"] == true {
+                        assert_eq!(logs["kind"], "log-unavailable", "{era:?}: {result}");
+                    } else if logs["lines"].as_array().unwrap().contains(&json!(line)) {
+                        break 'found;
+                    } else {
+                        let first = &logs["lines"][0];
+                        assert!(
+                            !first
+                                .as_str()
+                                .unwrap_or_default()
+                                .starts_with("unable to retrieve"),
+                            "{era:?}: {logs}"
+                        );
+                    }
+                    assert!(Instant::now() < deadline, "{era:?}: {logs}");
                 }
-                assert!(Instant::now() < deadline, "{era:?}: {logs}");
                 tokio::time::sleep(Duration::from_secs(2)).await;
             }
             session.finish().await;
