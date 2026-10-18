@@ -991,9 +991,9 @@ impl<'a> Planner<'a> {
         Ok(())
     }
 
-    /// A new object of a [`CREATABLE`] kind, in the project's namespace, written by server-side
-    /// apply without taking over fields (`force: false`), so an object that appeared since the
-    /// plan keeps its owner's fields.
+    /// A new object of a [`CREATABLE`] kind, in the project's namespace, created with a `POST` to
+    /// its collection. kube-apiserver refuses it with `409 AlreadyExists` when an object of that
+    /// name appeared since the plan, so nothing is overwritten.
     fn create(&mut self, object: &Value) -> Result<(), PlanError> {
         let text = |path: &str| {
             object
