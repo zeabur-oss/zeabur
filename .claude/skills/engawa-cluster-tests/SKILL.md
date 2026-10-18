@@ -10,6 +10,14 @@ Run Docker/k3d on a Linux machine or VM, not on a workstation you care about; sy
 tree there with `rsync -a --delete --exclude target --exclude node_modules --exclude web/dist
 ./ host:engawa/` and run the commands below inside `nix develop` on that machine.
 
+**On a VM, snapshot its clean state and restore it after every run.** The tests run in the VM's
+own environment, not a fresh container: what one run leaves (clusters, images, volumes, build
+output, `node_modules`, tools installed by hand) can make the next pass where a fresh GitHub
+runner fails. Take the snapshot once Nix and Docker are installed (after one `nix develop`, so
+the store is warm, if you like), and restore it before the next run (`virsh snapshot-revert`,
+`prlctl snapshot-switch`, or your hypervisor's equivalent). A pull request's GitHub checks
+remain the answer.
+
 ## Cluster
 ```sh
 export KUBECONFIG=$(mktemp)   # keep k3d away from your normal context

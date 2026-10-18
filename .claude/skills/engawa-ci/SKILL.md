@@ -49,15 +49,18 @@ state that makes it happen. Do not fix what you have not explained.
   stops scheduling pods.
 
 ## 3. Reproduce
-Run the job as CI does, on a Linux machine or VM with Docker and act, never on a workstation you
-care about (the jobs create clusters, images and volumes):
+Every job is `scripts/ci.sh <job>`, which GitHub runs too, so run the same script on a Linux
+machine or VM with Nix (and Docker for the cluster jobs), never on a workstation you care about
+(the cluster jobs create clusters, images and volumes):
 ```sh
 rsync -a --delete --exclude target --exclude node_modules --exclude web/dist ./ host:engawa/
-ssh host 'cd engawa && rm -f target/ci-local/*.result && nix develop -c scripts/ci-local.sh kubernetes'
+ssh host 'cd engawa && scripts/ci.sh kubernetes'           # one job
+ssh host 'cd engawa && scripts/ci-local.sh'                # every job, a result line each
 ```
-- `scripts/ci-local.sh [job…]` takes the matrix names (`clippy`, `ui`, …), `kubernetes` and
-  `kubernetes-l2`; one act process per job, results in `target/ci-local/<job>.result`, logs next
-  to them. Its header documents the settings.
+- `scripts/ci-local.sh [job…]` runs each job in its own copy of the checkout, three at a time
+  (`CI_LOCAL_PARALLEL`), the cluster jobs alone at the end; results in
+  `target/ci-local/<job>.result`, logs next to them, a failed job's copy kept under `work/`. Its
+  header documents the settings.
 - To match GitHub, give the VM 4 vCPU and 16 GB. Use a bigger one to rule size out.
 - **Snapshot the VM's clean state and restore it after every run.** GitHub starts each job on a
   fresh machine; a VM keeps what the last run left (clusters, images, volumes, build output,
@@ -65,8 +68,8 @@ ssh host 'cd engawa && rm -f target/ci-local/*.result && nix develop -c scripts/
   the snapshot once Nix and Docker are installed, and restore it before the next run
   (`virsh snapshot-revert`, `prlctl snapshot-switch`, or your hypervisor's equivalent). The pull
   request's GitHub checks remain the answer.
-- One run at a time per machine: check `pgrep -af 'ci-local.sh|act push'` first.
-- It refuses to start with less than 20 GB free (`CI_LOCAL_MIN_FREE_GB`). Reclaim space with
+- One run at a time per machine: check `pgrep -af 'ci-local.sh|ci.sh'` first.
+- It refuses to start with less than 25 GB free (`CI_LOCAL_MIN_FREE_GB`). Reclaim space with
   `docker builder prune -f` and `docker volume prune -f`.
 - `kubernetes-l2` needs a Genkan checkout at the commit in `GENKAN_PINNED` (`GENKAN_SRC`, default
   `../genkan`); sync it too.

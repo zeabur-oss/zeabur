@@ -69,10 +69,11 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "k3s image used by the cluster tests (ci.yml, CONTRIBUTING.md).",
+      "description": "k3s image used by the cluster tests (ci.yml, CONTRIBUTING.md, the scripts' defaults).",
       "managerFilePatterns": [
         "/^\\.github/workflows/ci\\.yml$/",
-        "/^CONTRIBUTING\\.md$/"
+        "/^CONTRIBUTING\\.md$/",
+        "/^scripts/.+\\.sh$/"
       ],
       "matchStrings": [
         "k3s: \\[(?<currentValue>v[0-9.]+-k3s[0-9]+)\\]",

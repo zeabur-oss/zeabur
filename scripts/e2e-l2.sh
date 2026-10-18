@@ -100,7 +100,7 @@ printf 'FROM busybox:1.37\nLABEL dev.engawahq.engawa.test=busybox\n' |
 # --- Cluster ------------------------------------------------------------------------------------
 # kube-apiserver reads its AuthenticationConfiguration from a file it re-reads by path, starting
 # with no issuer (as Genkan's CI does). The file lives in a Docker volume rather than a host
-# directory so that this also works where the script itself runs in a container (act).
+# directory so that this also works where the script itself runs in a container.
 k3d cluster delete "$cluster" >/dev/null 2>&1 || true
 docker volume rm -f "$authn_volume" >/dev/null
 docker volume create "$authn_volume" >/dev/null

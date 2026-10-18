@@ -32,11 +32,12 @@ nix develop -c bash -c 'shellcheck scripts/*.sh && actionlint && nixfmt --check 
 nix develop -c cargo build --release --locked --no-default-features -p engawa -p engawactl
 ```
 Iterate per crate with `-p <crate>` to keep builds short. Cluster tests: see
-`engawa-cluster-tests`. Web interface: see `engawa-ui`. The full CI runs locally on a
-Linux machine with Docker and act: `nix develop -c scripts/ci-local.sh [job…]` (one act process
-per job, a local Nix cache, a stall watchdog; results in `target/ci-local/*.result`). Do not use a
-plain `act push`: it marks every matrix entry failed when one fails. When a check fails on
-GitHub, see `engawa-ci`.
+`engawa-cluster-tests`. Web interface: see `engawa-ui`. Each CI job is `scripts/ci.sh <job>`
+(`--list` names them), the same on GitHub and on any Linux machine with Nix;
+`scripts/ci-local.sh [job…]` runs several and prints a result line per job (in
+`target/ci-local/*.result`), each in its own copy of the checkout but in the machine's own
+environment, not a fresh one; on a VM, snapshot its clean state and restore it after every run
+(see `engawa-cluster-tests`). When a check fails on GitHub, see `engawa-ci`.
 
 ## Lint conventions
 - `unsafe` is forbidden. No panics on input: no `unwrap`/`expect`/indexing outside tests.

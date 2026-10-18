@@ -51,11 +51,11 @@ upstream (they download it; `.github/workflows/vendored.yml` runs them only for 
 ./scripts/check-recommendations.sh && ./scripts/check-genkan-files.sh && ./scripts/check-geist-mono.sh
 ```
 
-To run the whole CI workflow locally, use a Linux machine or VM with Docker and
-[act](https://github.com/nektos/act): `nix develop -c scripts/ci-local.sh` runs each job in its own
-act process (act otherwise reports every matrix entry as failed once one fails), serves this
-machine's Nix store to the jobs as a binary cache, retries a job once if its log stalls, and
-prints one result line per job. `scripts/ci-local.sh clippy kubernetes` runs only those jobs.
+Every CI job is a call to `scripts/ci.sh <job>` (`scripts/ci.sh --list` names them), which enters
+its dev shell itself; the workflow only checks out, installs Nix and restores caches. So a job runs
+the same on any Linux machine with Nix, and Docker for the cluster jobs: `scripts/ci.sh clippy`.
+`scripts/ci-local.sh [job…]` runs several (all by default), each in its own copy of the checkout,
+and prints one result line per job; use a disposable machine or VM for the cluster jobs.
 
 Design rationale lives next to the code, in rustdoc: state the decision and its reason, and
 cite the specification section, paper or prior art it rests on (the crates show the style).
