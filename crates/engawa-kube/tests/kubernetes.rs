@@ -237,7 +237,9 @@ mod tests {
             )
             .await
             .expect("quota");
-        // Quota admission refuses everything until the quota controller has filled the status.
+        // Quota admission refuses everything until the quota controller has filled the status, and
+        // counts `kube-root-ca.crt` only once its publisher has written it into the new namespace:
+        // wait until the one ConfigMap is counted.
         let deadline = Instant::now() + Duration::from_secs(60);
         while quotas
             .get("objects")
@@ -245,11 +247,13 @@ mod tests {
             .expect("read the quota")
             .status
             .and_then(|s| s.used)
-            .is_none()
+            .and_then(|used| used.get("count/configmaps").map(|q| q.0.clone()))
+            .as_deref()
+            != Some("1")
         {
             assert!(
                 Instant::now() < deadline,
-                "the quota's status was never set"
+                "the quota never counted kube-root-ca.crt"
             );
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
