@@ -40,7 +40,7 @@ interface's unit tests with `bun test`.
 
 The interface's zh-TW wording is checked with [zhtw-mcp](https://github.com/sysprog21/zhtw-mcp) in
 a dev shell of its own (it builds from source; the pin and how to bump it are in `flake.nix`), as
-CI's `zh-tw` job does: `nix develop .#zh -c ./scripts/check-zh-tw.sh`. `web/scripts/zh-tw-strings.ts` prints every zh-TW
+CI's `wording` job does: `nix develop .#zh -c ./scripts/check-zh-tw.sh`. `web/scripts/zh-tw-strings.ts` prints every zh-TW
 string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen terms and the reason
 for each rule or term it relaxes. Any warning fails the check.
 

@@ -37,7 +37,7 @@ jobs:
           - name: no-ui
           - name: chart
           # zhtw-mcp builds from source in a dev shell of its own and needs no Rust cache.
-          - name: zh-tw
+          - name: wording
             no-rust: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

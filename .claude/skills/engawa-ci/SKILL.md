@@ -6,7 +6,7 @@ description: Investigate a failed or flaky CI run of engawa (GitHub Actions or s
 # When CI fails
 
 `.github/workflows/ci.yml` has three kinds of jobs: the `check` matrix (format, clippy, docs, test,
-cargo-deny, unsafe-report, levels, ui, no-ui, chart, zh-tw), `kubernetes` (cluster tests,
+cargo-deny, unsafe-report, levels, ui, no-ui, chart, wording), `kubernetes` (cluster tests,
 `engawactl doctor`, browser tests in local mode, the image) and `kubernetes-l2` (engawa and Genkan
 in a cluster, `scripts/e2e-l2.sh`); `dco` runs on pull requests only. What each cluster job runs
 is in `engawa-cluster-tests`.

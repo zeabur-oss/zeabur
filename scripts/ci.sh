@@ -15,7 +15,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-check_jobs=(format clippy docs test cargo-deny unsafe-report levels ui no-ui chart zh-tw)
+check_jobs=(format clippy docs test cargo-deny unsafe-report levels ui no-ui chart wording)
 cluster_jobs=(kubernetes kubernetes-l2)
 
 if [[ "${1:-}" == --list ]]; then
@@ -26,10 +26,10 @@ job="${1:?usage: scripts/ci.sh <job> | --list}"
 printf '%s\n' "${check_jobs[@]}" "${cluster_jobs[@]}" | grep -qx -- "$job" ||
   { echo "error: no job named $job (scripts/ci.sh --list)" >&2; exit 1; }
 
-# Each job runs in its dev shell: zh-tw in `.#zh` (zhtw-mcp builds from source), the rest in the
+# Each job runs in its dev shell: wording in `.#zh` (zhtw-mcp builds from source), the rest in the
 # default one. The marker tells a re-run inside the shell apart from a call outside it.
 shell=default
-[[ "$job" == zh-tw ]] && shell=zh
+[[ "$job" == wording ]] && shell=zh
 if [[ "${ENGAWA_CI_SHELL:-}" != "$shell" ]]; then
   export ENGAWA_CI_SHELL="$shell"
   exec nix develop "$root#$shell" --command "$0" "$@"
@@ -144,7 +144,7 @@ case "$job" in
   # The Helm chart: lint, what every rendering promises, and the values it refuses.
   chart) ./scripts/check-chart.sh ;;
   # The interface's zh-TW wording (.zhtw-mcp.toml), and the brand in lowercase everywhere.
-  zh-tw)
+  wording)
     (cd web; bun ci)
     ./scripts/check-zh-tw.sh
     ./scripts/check-brand.sh
