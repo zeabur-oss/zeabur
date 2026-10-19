@@ -5,9 +5,9 @@ import ShieldCheckFillIcon from "~icons/ph/shield-check-fill"
 
 import { sessionQuery } from "@/api/queries"
 import { dropElevation } from "@/auth/elevation"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Badge } from "@engawahq/design-system/components/badge"
+import { Button } from "@engawahq/design-system/components/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@engawahq/design-system/components/popover"
 import { useI18n, useT } from "@/i18n"
 
 export function AdminBadge() {

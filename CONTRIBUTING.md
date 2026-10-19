@@ -44,11 +44,13 @@ CI's `wording` job does: `nix develop .#zh -c ./scripts/check-zh-tw.sh`. `web/sc
 string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen terms and the reason
 for each rule or term it relaxes. Any warning fails the check.
 
-When you change a vendored file or its pin, also run the checks that compare them with their
-upstream (they download it; `.github/workflows/vendored.yml` runs them only for such changes):
+When you change the vendored recommendations or their pin, also run the check that compares them
+with their upstream (it downloads it; `.github/workflows/vendored.yml` runs it only for such
+changes). The files vendored for the interface's styles are checked in
+[engawahq/design-system](https://github.com/engawahq/design-system).
 
 ```sh
-./scripts/check-recommendations.sh && ./scripts/check-genkan-files.sh && ./scripts/check-geist-mono.sh
+./scripts/check-recommendations.sh
 ```
 
 Every CI job is a call to `scripts/ci.sh <job>` (`scripts/ci.sh --list` names them), which enters
@@ -199,5 +201,17 @@ cargo run -p engawa-api --example demo
 
 The example's documentation (`crates/engawa-api/examples/demo.rs`) lists the variables that
 refuse reads or offer admin rights, to see those states.
+
+Components, tokens and fonts come from
+[engawahq/design-system](https://github.com/engawahq/design-system), a Git dependency pinned to a
+commit in `web/package.json`. It ships its sources, which Vite compiles like the interface's own
+(`web/vite.config.ts`). To change a component, change it there, then move the pin:
+
+```sh
+(cd web && bun add 'github:engawahq/design-system#<commit>')
+```
+
+To try a design-system change here before it is pushed, link a checkout next to this one with
+`bun link` (see its README), and run `bun install` afterwards to return to the pin.
 
 A release binary embeds the built interface; see the `engawa-ui` crate documentation.

@@ -1,28 +1,29 @@
-// The top bar: the phone menu button, a breadcrumb (Cluster / shop ▾ / worker ▾: each crumb a link,
-// each ▾ a separate switcher) and "Jump to…".
+// The panel's top bar (the design system's PanelHeader): the sidebar's toggle (the phone menu below
+// `md`) and a breadcrumb (Cluster / shop ▾ / worker ▾: each crumb a link, each ▾ a separate
+// switcher). Search is beside the sidebar's logo.
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
-import ListIcon from "~icons/ph/list"
-import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 
 import { AdminBadge } from "@/components/shell/admin-badge"
 import { ProjectSwitcher, ServiceSwitcher } from "@/components/shell/switchers"
 import { useT } from "@/i18n"
 import { serviceLink, usePlace } from "@/lib/place"
 import { useProjectSummary } from "@/lib/project-name"
-import { mobileNav, palette } from "@/lib/stores"
+import { mobileNav, setSidebarCollapsed, sidebarCollapsed } from "@/lib/stores"
 import { cn } from "@/lib/utils"
 import { projectTitle } from "@/model/project"
+import { Button } from "@engawahq/design-system/components/button"
+import { PanelHeader } from "@engawahq/design-system/components/frame"
+import { SidebarToggleIcon } from "@engawahq/design-system/components/sidebar"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 
-const iconButton =
-  "flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
-
-const crumbLink =
-  "min-w-0 truncate rounded-md px-1 outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
+const crumbLink = "min-w-0 truncate rounded-md px-1 outline-none hover:text-foreground"
 
 export function TopBar() {
   const t = useT()
   const place = usePlace()
+  const collapsed = sidebarCollapsed.useValue()
+  const toggleLabel = collapsed ? t("shell.expandSidebar") : t("shell.collapseSidebar")
   // The service crumb belongs to the service page; the Architecture quick look keeps the project's.
   const serviceKey = place.entry ? undefined : place.service
   const [kind, name] = serviceKey?.split("/") ?? []
@@ -32,13 +33,18 @@ export function TopBar() {
   if (place.project) {
     crumbs = (
       <>
-        <Link to="/cluster" className={cn(crumbLink, "hidden sm:inline")}>
+        <Link
+          to="/cluster"
+          activeOptions={{ exact: true, includeSearch: false }}
+          className={cn(crumbLink, "hidden sm:inline")}
+        >
           {t("shell.cluster")}
         </Link>
         <Slash className="hidden sm:inline" />
         <Link
           to="/projects/$project"
           params={{ project: place.project }}
+          activeOptions={{ exact: true, includeSearch: false }}
           className={cn(crumbLink, !serviceKey && "font-medium text-foreground")}
           translate="no"
         >
@@ -67,7 +73,11 @@ export function TopBar() {
   } else if (place.route === "/cluster/components") {
     crumbs = (
       <>
-        <Link to="/cluster" className={crumbLink}>
+        <Link
+          to="/cluster"
+          activeOptions={{ exact: true, includeSearch: false }}
+          className={crumbLink}
+        >
           {t("shell.cluster")}
         </Link>
         <Slash />
@@ -81,40 +91,36 @@ export function TopBar() {
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3 md:px-6">
-      <button
-        type="button"
-        className={cn(iconButton, "md:hidden")}
+    <PanelHeader>
+      <Button
+        variant="muted"
+        size="icon-sm"
+        className="md:hidden"
         onClick={() => mobileNav.set(true)}
         aria-label={t("shell.menu")}
       >
-        <ListIcon className="size-5" aria-hidden="true" />
-      </button>
+        <SidebarToggleIcon collapsed />
+      </Button>
+      <Tooltip content={`${toggleLabel} ⌘\\`}>
+        <Button
+          variant="muted"
+          size="icon-sm"
+          className="hidden md:inline-flex"
+          onClick={() => setSidebarCollapsed(!collapsed)}
+          aria-label={toggleLabel}
+          aria-pressed={!collapsed}
+        >
+          <SidebarToggleIcon collapsed={collapsed} />
+        </Button>
+      </Tooltip>
       <nav
         aria-label={t("shell.breadcrumb")}
-        className="flex min-w-0 flex-1 items-center gap-1 text-sm text-muted-foreground"
+        className="flex min-w-0 flex-1 items-center gap-1 text-muted-foreground"
       >
         {crumbs}
       </nav>
       <AdminBadge />
-      <button
-        type="button"
-        onClick={() => palette.set(true)}
-        className="hidden h-8 w-55 items-center gap-2 rounded-lg border bg-background px-2.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring lg:flex"
-      >
-        <MagnifyingGlassIcon className="size-4" aria-hidden="true" />
-        <span className="flex-1 text-left">{t("shell.jumpTo")}</span>
-        <kbd className="font-sans type-micro">⌘K</kbd>
-      </button>
-      <button
-        type="button"
-        onClick={() => palette.set(true)}
-        className={cn(iconButton, "lg:hidden")}
-        aria-label={t("shell.search")}
-      >
-        <MagnifyingGlassIcon className="size-4" aria-hidden="true" />
-      </button>
-    </header>
+    </PanelHeader>
   )
 }
 

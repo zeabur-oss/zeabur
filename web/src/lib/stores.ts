@@ -1,6 +1,7 @@
-// Small external stores for shell state: the command palette, the sidebar's width (remembered in
-// localStorage, which may be unavailable), the phone menu, recent palette items, and each project's
-// Architecture viewport (kept for this visit, so going back to the canvas finds it as it was).
+// Small external stores for shell state: the command palette, whether the sidebar is folded
+// (remembered in localStorage, which may be unavailable), the phone menu, recent palette items, and
+// each project's Architecture viewport (kept for this visit, so going back to the canvas finds it
+// as it was).
 import { useSyncExternalStore } from "react"
 
 export function store<T>(initial: T) {
@@ -41,22 +42,32 @@ function save(key: string, value: string) {
 export const palette = store(false)
 export const mobileNav = store(false)
 
-// Two remembered widths: one outside projects, one inside a project, where the sidebar starts as
-// an icon rail so the service column has room.
+// The sidebar folds away and stays so (remembered); the project's own column is in the panel, so
+// one setting serves every page. Values saved by the earlier icon rail ("rail", "full") read as open.
 const sidebarKey = "engawa.sidebar"
-const projectSidebarKey = "engawa.sidebar.project"
-export const sidebarRail = store(load(sidebarKey) === "rail")
-export const projectSidebarRail = store(load(projectSidebarKey) !== "full")
+export const sidebarCollapsed = store(load(sidebarKey) === "collapsed")
 
-export function setSidebarRail(inProject: boolean, rail: boolean) {
-  if (inProject) {
-    projectSidebarRail.set(rail)
-    save(projectSidebarKey, rail ? "rail" : "full")
-  } else {
-    sidebarRail.set(rail)
-    save(sidebarKey, rail ? "rail" : "full")
+export function setSidebarCollapsed(collapsed: boolean) {
+  sidebarCollapsed.set(collapsed)
+  save(sidebarKey, collapsed ? "collapsed" : "open")
+}
+
+/** Whether a folding group (an advanced section) is open, remembered per key; `initial` until the
+ * person opens or closes it. Advanced groups start closed: the everyday path comes first. */
+export function remembered(key: string, initial: boolean) {
+  const value = store(load(key) === null ? initial : load(key) === "open")
+  return {
+    ...value,
+    set: (open: boolean) => {
+      value.set(open)
+      save(key, open ? "open" : "closed")
+    },
   }
 }
+
+/** A service's Health checks in Settings: folded until opened, and opened by a diagnosis that
+ * leads there ("Check the health checks"). */
+export const healthChecksSection = remembered("engawa.service.health", false)
 
 export interface Recent {
   id: string

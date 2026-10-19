@@ -8,8 +8,8 @@ import type { Schemas } from "@/api/client"
 import { ProjectIcon } from "@/components/project-icon"
 import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot } from "@/components/status"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { isWarning, serviceId, statusOf, type Event, type ProjectSummary } from "@/model/service"
@@ -34,7 +34,7 @@ export function ProjectCard({
     <Link
       to="/projects/$project"
       params={{ project: name }}
-      className="flex w-full flex-col gap-4 rounded-xl border bg-card p-4 outline-none transition-colors hover:border-foreground/20 focus-visible:ring-3 focus-visible:ring-ring"
+      className="flex w-full flex-col gap-4 rounded-lg border bg-card shadow-xs p-4 outline-none transition-colors hover:border-foreground/20"
     >
       <div className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">

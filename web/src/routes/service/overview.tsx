@@ -15,7 +15,7 @@ import { Diagnoses } from "@/components/diagnoses"
 import { EventList } from "@/components/events"
 import { ServiceIcon } from "@/components/service-icon"
 import { FactsPill, plainReason, StatusDot, useStatusFacts } from "@/components/status"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
@@ -88,7 +88,7 @@ function TabLink({ onClick, children }: { onClick: () => void; children: string 
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1 rounded text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex items-center gap-1 rounded text-xs text-muted-foreground outline-none hover:text-foreground"
     >
       {children}
     </button>

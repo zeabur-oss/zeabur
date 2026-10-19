@@ -8,10 +8,11 @@ import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
 import type { Schemas } from "@/api/client"
 import { Layers, Raw, type RawRow } from "@/components/problem"
-import { Button } from "@/components/ui/button"
+import { Button } from "@engawahq/design-system/components/button"
 import { useSentence, useT, type Translate } from "@/i18n"
 import type { Service } from "@/model/service"
 import type { ServiceTab } from "@/routes/search"
+import { healthChecksSection } from "@/lib/stores"
 
 export type Diagnosis = Schemas["Diagnosis"]
 
@@ -29,6 +30,8 @@ export interface DiagnosisAction {
     | "diagnosis.action.variables"
     | "diagnosis.action.storage"
   pod?: string
+  /** A folded section of the tab the action leads to, opened on the way. */
+  opens?: "healthChecks"
 }
 
 /** The one action beside a diagnosis's fix, by its kind and the key of its cause. */
@@ -42,7 +45,7 @@ export function diagnosisAction(d: Diagnosis): DiagnosisAction {
     case "outOfMemory":
       return { tab: "settings", label: "diagnosis.action.memory" }
     case "probeFailure":
-      return { tab: "settings", label: "diagnosis.action.healthChecks" }
+      return { tab: "settings", label: "diagnosis.action.healthChecks", opens: "healthChecks" }
     case "unreachable":
       return cause.endsWith(".noReadyEndpoints")
         ? { tab: "events", label: "diagnosis.action.events" }
@@ -110,7 +113,7 @@ export function Diagnoses({
   return (
     <section
       aria-labelledby="diagnoses-title"
-      className="rounded-xl border border-fail/30 bg-fail-soft/40"
+      className="rounded-lg border border-fail/30 bg-fail-soft/40"
     >
       <h2 id="diagnoses-title" className="sr-only">
         {t("diagnosis.title")}
@@ -138,7 +141,10 @@ export function Diagnoses({
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => onAction(action.tab, action.pod)}
+                        onClick={() => {
+                          if (action.opens === "healthChecks") healthChecksSection.set(true)
+                          onAction(action.tab, action.pod)
+                        }}
                       >
                         {t(action.label)}
                       </Button>

@@ -23,15 +23,23 @@ import { followUrl, logsQuery, type LogOptions } from "@/api/queries"
 import { Histogram } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
-import { Button } from "@/components/ui/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Toggle } from "@/components/ui/toggle"
+import { Button } from "@engawahq/design-system/components/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@engawahq/design-system/components/popover"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
+import { Toggle } from "@engawahq/design-system/components/toggle"
 import { useI18n, useT } from "@/i18n"
 import { parseAnsi } from "@/lib/ansi"
 import { cn } from "@/lib/utils"
 import { podHealth, podReason, worstPod, type Service } from "@/model/service"
 import { useLogStream } from "@/routes/service/log-stream"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+} from "@engawahq/design-system/components/empty"
+import { Illustration } from "@engawahq/design-system/components/illustration"
+import { Select } from "@engawahq/design-system/components/select"
 
 type Severity = "error" | "warn" | "info" | "debug"
 
@@ -163,22 +171,20 @@ export function LogsTab({
         </PopoverContent>
       </Popover>
       {containerNames.length > 1 ? (
-        <select
+        <Select
+          size="sm"
           value={chosen}
-          onChange={(event) => setContainer(event.target.value)}
+          onValueChange={setContainer}
           aria-label={t("logs.container")}
-          className="h-7 rounded-lg border bg-background px-2 font-mono text-xs"
-        >
-          {containerNames.map((name) => (
-            <option key={name}>{name}</option>
-          ))}
-        </select>
+          translate="no"
+          items={containerNames.map((name) => ({ value: name, label: name }))}
+        />
       ) : null}
       <Toggle variant="outline" size="sm" pressed={previous} onPressedChange={setPrevious}>
         <ClockCounterClockwiseIcon aria-hidden="true" />
         {t("logs.previous")}
       </Toggle>
-      <label className="flex h-7 min-w-40 flex-1 items-center gap-1.5 rounded-lg border bg-background px-2 focus-within:ring-3 focus-within:ring-ring">
+      <label className="flex h-7 min-w-40 flex-1 items-center gap-1.5 rounded-lg border bg-background px-2 focus-within:border-ring">
         <FunnelIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
         <input
           value={filter}
@@ -428,20 +434,20 @@ function LogView({
       aria-pressed={severity === value}
       onClick={() => onSeverity(value)}
       className={cn(
-        "inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring",
+        "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-xs outline-none",
         severity === value
           ? "border-foreground/30 bg-muted font-medium"
           : "text-muted-foreground hover:text-foreground",
       )}
     >
-      {dot ? <span className={cn("size-1.5 rounded-full", dot)} aria-hidden="true" /> : null}
+      {dot ? <span className={cn("size-1.5", dot)} aria-hidden="true" /> : null}
       {label}
       <span className="tabular-nums opacity-70">{count}</span>
     </button>
   )
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card shadow-xs">
       <div className="flex flex-col gap-2 border-b px-3 pt-2.5 pb-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {chip("all", t("common.all"), matching.length)}
@@ -482,12 +488,23 @@ function LogView({
         // A scrollable region must take focus so it can be scrolled with the keyboard (WCAG 2.1.1).
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
-        className="relative min-h-0 flex-1 overflow-auto bg-muted/30 py-1 font-mono text-xs leading-5 outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
+        className="relative min-h-0 flex-1 overflow-auto bg-muted/30 py-1 font-mono text-xs leading-5 outline-none"
       >
         {shown.length === 0 ? (
-          <p className="p-4 font-sans text-sm text-muted-foreground">
-            {rawLines.length === 0 ? t("logs.empty") : t("logs.noMatch")}
-          </p>
+          <Empty size="sm">
+            <EmptyHeader>
+              <EmptyMedia>
+                <Illustration
+                  kind={rawLines.length === 0 ? "empty" : "no-results"}
+                  seed="logs"
+                  className="w-24"
+                />
+              </EmptyMedia>
+              <EmptyDescription>
+                {rawLines.length === 0 ? t("logs.empty") : t("logs.noMatch")}
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           <div
             className={cn("relative h-(--total)", wrap ? "w-full" : "w-max min-w-full")}
@@ -502,7 +519,7 @@ function LogView({
                   data-index={item.index}
                   ref={virtualizer.measureElement}
                   className={cn(
-                    "absolute top-0 left-0 flex min-w-full translate-y-(--start) gap-3 pr-4 hover:bg-muted/60",
+                    "absolute top-0 left-0 flex min-w-full translate-y-(--start) gap-3 pr-4 hover:bg-hover",
                     wrap ? "w-full whitespace-pre-wrap break-all" : "w-max whitespace-pre",
                     line.severity === "error" && "bg-fail/[0.04]",
                   )}

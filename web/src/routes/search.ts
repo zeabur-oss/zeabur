@@ -2,7 +2,7 @@
 // sort, selected service or pod — is in the URL, so a link shows the same view and Back works.
 import { ranges, splits, type Range, type Split } from "@/model/usage"
 
-export const serviceTabs = [
+const serviceTabs = [
   "overview",
   "logs",
   "terminal",

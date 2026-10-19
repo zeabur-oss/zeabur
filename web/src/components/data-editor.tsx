@@ -18,13 +18,18 @@ import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Spinner } from "@/components/ui/spinner"
-import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@engawahq/design-system/components/badge"
+import { Button } from "@engawahq/design-system/components/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@engawahq/design-system/components/dialog"
+import { Input } from "@engawahq/design-system/components/input"
+import { Spinner } from "@engawahq/design-system/components/spinner"
+import { Switch } from "@engawahq/design-system/components/switch"
+import { Textarea } from "@engawahq/design-system/components/textarea"
 import { useT } from "@/i18n"
 import { useScrollOnce } from "@/lib/in-view"
 import { addressOf } from "@/lib/objects"
@@ -209,7 +214,7 @@ export function DataEditor({
           ) : error ? (
             <Problem error={error} />
           ) : (
-            <ul className="flex flex-col divide-y rounded-xl border" aria-label={`${kind} ${name}`}>
+            <ul className="flex flex-col divide-y rounded-lg border" aria-label={`${kind} ${name}`}>
               <form.Field name="edits">
                 {(f) =>
                   keys.map((key) => {

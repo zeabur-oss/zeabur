@@ -9,9 +9,9 @@ import TrashIcon from "~icons/ph/trash"
 
 import type { ObjectAddress } from "@/api/queries"
 import { usePlanner } from "@/components/plan/planner"
-import { Button } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Button } from "@engawahq/design-system/components/button"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 

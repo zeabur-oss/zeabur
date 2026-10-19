@@ -5,8 +5,12 @@ import WarningCircleIcon from "~icons/ph/warning-circle"
 import { ApiError, toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { Ago } from "@/components/bits"
 import { isRefusal, permission, Refused } from "@/components/refused"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Alert, AlertDescription, AlertTitle } from "@engawahq/design-system/components/alert"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@engawahq/design-system/components/collapsible"
 import { useI18n, useT } from "@/i18n"
 import { isKind, problemText } from "@/model/problem"
 

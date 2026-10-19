@@ -1,20 +1,20 @@
 // Nodes and capacity: what the pods request against what each node can give them (allocatable),
 // limits as a tick, and usage as a second, thinner bar when metrics-server is installed.
 import { useQuery } from "@tanstack/react-query"
-import type { CSSProperties } from "react"
 
 import { isStatus, type Schemas } from "@/api/client"
 import { nodesQuery, upgradesQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT, type Translate } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import type { Health } from "@/model/service"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { Section } from "@/routes/cluster/section"
+import { Meter } from "@engawahq/design-system/components/meter"
 
 type Resources = Schemas["Resources"]
 type NodeView = Schemas["NodeView"]
@@ -38,56 +38,27 @@ export function nodeState(node: NodeView, t: Translate): { health: Health; word:
   return { health: "ok", word: t("status.ready") }
 }
 
-/** Where a share falls on the bar, as a CSS length (0–100%). */
-const at = (ratio: number | undefined) => `${Math.min(Math.max(ratio ?? 0, 0), 1) * 100}%`
-
-/** Requests as the bar, limits as a tick (may pass the end: overcommitted), usage as a thin bar
- * below. Positions are custom properties the classes read. */
+/** One bar as on a service's usage (the design system's Meter): what is requested of the node as
+ * the fill, ochre once it is tight, and what is used as the mark. Shares of allocatable. */
 function CapacityBar({
   requested,
-  limit,
   used,
   label,
   size = "md",
 }: {
   requested?: number
-  limit?: number
   used?: number
   label: string
   size?: "sm" | "md"
 }) {
-  const tight = (requested ?? 0) >= TIGHT
-  const style = {
-    "--requested": at(requested),
-    "--limit": at(limit),
-    "--used": at(used),
-  } as CSSProperties
   return (
-    <div role="img" aria-label={label} className="flex flex-col gap-0.5" style={style}>
-      <div
-        className={cn(
-          "relative overflow-hidden rounded-full bg-foreground/10",
-          size === "md" ? "h-2" : "h-1.5",
-        )}
-      >
-        {requested !== undefined ? (
-          <div
-            className={cn(
-              "absolute inset-y-0 left-0 w-(--requested) rounded-full",
-              tight ? "bg-warn" : "bg-foreground/50",
-            )}
-          />
-        ) : null}
-        {limit !== undefined && limit > 0 && limit < 1 ? (
-          <div className="absolute inset-y-0 left-(--limit) w-px bg-foreground" />
-        ) : null}
-      </div>
-      {used !== undefined ? (
-        <div className="relative h-1 overflow-hidden rounded-full bg-foreground/10">
-          <div className="absolute inset-y-0 left-0 w-(--used) rounded-full bg-progress" />
-        </div>
-      ) : null}
-    </div>
+    <Meter
+      value={requested}
+      mark={used}
+      tone={(requested ?? 0) >= TIGHT ? "warn" : "ok"}
+      size={size}
+      label={label}
+    />
   )
 }
 
@@ -118,6 +89,7 @@ function Total({
     title,
     requests !== undefined ? say(format(requests), format(allocatable)) : "",
     used !== undefined && usage !== undefined ? t("cluster.used", format(usage)) : "",
+    limits ? t("cluster.limits", format(limits)) : "",
   ]
     .filter(Boolean)
     .join(", ")
@@ -131,12 +103,7 @@ function Total({
           </span>
         ) : null}
       </div>
-      <CapacityBar
-        requested={requested}
-        limit={share(limits, allocatable)}
-        used={used}
-        label={label}
-      />
+      <CapacityBar requested={requested} used={used} label={label} />
       <span className="type-meta text-muted-foreground">
         {requests !== undefined
           ? say(format(requests), format(allocatable))
@@ -277,12 +244,14 @@ function NodeRow({
         <CapacityBar
           size="sm"
           requested={requested}
-          limit={share(node.limits ? pick(node.limits) : undefined, whole)}
           used={share(used, whole)}
           label={[
             title,
             requests !== undefined ? t("cluster.requestedOf", format(requests), format(whole)) : "",
             used !== undefined ? t("cluster.used", format(used)) : "",
+            node.limits && pick(node.limits) > 0
+              ? t("cluster.limits", format(pick(node.limits)))
+              : "",
           ]
             .filter(Boolean)
             .join(", ")}

@@ -21,12 +21,21 @@ import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@engawahq/design-system/components/alert"
+import { Button } from "@engawahq/design-system/components/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@engawahq/design-system/components/collapsible"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@engawahq/design-system/components/dialog"
+import { Input } from "@engawahq/design-system/components/input"
+import { Label } from "@engawahq/design-system/components/label"
 import { YamlDiff } from "@/components/yaml"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { awaitsName, destinationOf, typedName, undoOf, weigh, type PodsOf } from "@/model/risk"

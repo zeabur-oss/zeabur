@@ -16,12 +16,12 @@ import { Ago, Segmented } from "@/components/bits"
 import { DiagnosisLine } from "@/components/diagnoses"
 import { EventList } from "@/components/events"
 import { GapList } from "@/components/gaps"
-import { cellBox, cellColour, PodCells } from "@/components/pods"
+import { PodCells } from "@/components/pods"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { ServiceIcon } from "@/components/service-icon"
-import { ServiceStatus, StatusDot, StatusPill, useStatusWord } from "@/components/status"
-import { buttonVariants } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { ServiceStatus, StatusDot, StatusPill } from "@/components/status"
+import { buttonVariants } from "@engawahq/design-system/components/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@engawahq/design-system/components/card"
 import {
   Table,
   TableBody,
@@ -29,8 +29,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Tooltip } from "@/components/ui/tooltip"
+} from "@engawahq/design-system/components/table"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import {
   BackupDetails,
   CoverageRow,
@@ -50,8 +50,6 @@ import {
   hostUrl,
   isWarning,
   needsAttention,
-  outsideIn,
-  podHealth,
   restartsOf,
   serviceId,
   statusOf,
@@ -65,6 +63,9 @@ import {
 import { serviceUsage } from "@/model/usage"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import { ProjectHeader } from "@/routes/project/header"
+import { PageHeader } from "@engawahq/design-system/components/page-header"
+import { Stat, StatGroup } from "@engawahq/design-system/components/stat"
+import { MeterStack, meterPartTone } from "@engawahq/design-system/components/meter"
 
 const route = getRouteApi("/projects/$project")
 
@@ -186,100 +187,51 @@ function Health({ project, data }: { project: string; data: Project }) {
       pill = <StatusPill health="progress">{t("status.rollingOut")}</StatusPill>
     else pill = <StatusPill health="ok">{t("overview.healthy")}</StatusPill>
   }
+  // A console's overview: the header and the key figures from the left under it; each service's
+  // replicas are in the services table below.
   return (
-    <section aria-label={t("overview.health")} className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="type-title" translate="no">
-          {projectTitle(details, project)}
-        </h1>
-        {details?.displayName ? (
-          <span className="type-meta text-muted-foreground" translate="no">
-            {project}
-          </span>
-        ) : null}
-        {pill}
-        {view.dataUpdatedAt ? (
-          <span className="ml-auto type-meta text-muted-foreground">
-            {t("overview.updated")} <Ago iso={new Date(view.dataUpdatedAt).toISOString()} />
-          </span>
-        ) : null}
-      </div>
-      {details?.description ? (
-        <p className="max-w-prose text-sm whitespace-pre-line text-muted-foreground">
-          {details.description}
-        </p>
-      ) : null}
+    <section aria-label={t("overview.health")} className="flex flex-col gap-5">
+      <PageHeader
+        title={<span translate="no">{projectTitle(details, project)}</span>}
+        badges={
+          <>
+            {details?.displayName ? (
+              <span className="type-meta text-muted-foreground" translate="no">
+                {project}
+              </span>
+            ) : null}
+            {pill}
+          </>
+        }
+        actions={
+          view.dataUpdatedAt ? (
+            <span className="type-meta text-muted-foreground">
+              {t("overview.updated")} <Ago iso={new Date(view.dataUpdatedAt).toISOString()} />
+            </span>
+          ) : undefined
+        }
+        description={
+          details?.description ? (
+            <span className="whitespace-pre-line">{details.description}</span>
+          ) : undefined
+        }
+      />
       {summary.services > 0 ? (
-        <div className="flex flex-wrap items-start gap-x-8 gap-y-4 rounded-lg bg-plane px-4.5 py-4">
-          <PodStrip project={project} services={data.services} />
-          <dl className="flex gap-7 lg:ml-auto">
-            <Figure label={t("metric.services")} value={`${summary.healthy}/${summary.services}`} />
-            <Figure label={t("metric.podsReady")} value={`${summary.podsReady}/${summary.pods}`} />
-            <Figure label={t("metric.restarts")} value={summary.restarts} />
-          </dl>
-        </div>
+        <>
+          <StatGroup>
+            <Stat
+              label={t("metric.services")}
+              value={`${summary.healthy}/${summary.services}`}
+              tone={summary.health}
+            />
+            <Stat label={t("metric.podsReady")} value={`${summary.podsReady}/${summary.pods}`} />
+            <Stat label={t("metric.restarts")} value={summary.restarts} />
+          </StatGroup>
+        </>
       ) : (
         <p className="text-muted-foreground">{t("project.noServices")}</p>
       )}
     </section>
-  )
-}
-
-function Figure({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <dt className="type-meta text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 type-figure">{value}</dd>
-    </div>
-  )
-}
-
-/** Every service as a run of pod cells with its name below, outside (web) to inside (data). */
-function PodStrip({ project, services }: { project: string; services: Service[] }) {
-  const t = useT()
-  const word = useStatusWord()
-  return (
-    <ul aria-label={t("overview.podStrip")} className="flex flex-wrap gap-x-5.5 gap-y-3">
-      {services.toSorted(outsideIn).map((service) => {
-        const status = statusOf(service)
-        const ready = service.pods.filter((p) => p.ready).length
-        const label =
-          service.pods.length > 0
-            ? `${t("overview.podsOf", service.name, ready, service.pods.length)}, ${word(status)}`
-            : `${service.name}: ${word(status)}`
-        return (
-          <li key={serviceId(service)}>
-            <Link
-              {...serviceLink(project, service)}
-              title={label}
-              aria-label={label}
-              className="flex flex-col gap-1.75 rounded-sm outline-none focus-visible:ring-3 focus-visible:ring-ring"
-            >
-              <span className="flex h-3 gap-0.75" aria-hidden="true">
-                {service.pods.length > 0 ? (
-                  service.pods
-                    .slice(0, 24)
-                    .map((pod) => (
-                      <span key={pod.name} className={cn(cellBox.md, cellColour[podHealth(pod)])} />
-                    ))
-                ) : (
-                  <span className={cn(cellBox.md, cellColour.idle)} />
-                )}
-              </span>
-              <span
-                className={cn(
-                  "type-meta text-muted-foreground",
-                  status.health === "fail" && "text-fail-strong",
-                )}
-                translate="no"
-              >
-                {service.name}
-              </span>
-            </Link>
-          </li>
-        )
-      })}
-    </ul>
   )
 }
 
@@ -446,10 +398,6 @@ function ServicesSummary({
               const status = statusOf(service)
               const restarts = restartsOf(service)
               const used = serviceUsage(service, usage)
-              const ready =
-                service.replicas !== undefined && service.replicas !== null
-                  ? `${service.replicas.ready}/${service.replicas.desired}`
-                  : undefined
               return (
                 <TableRow key={serviceId(service)}>
                   <TableCell>
@@ -468,12 +416,7 @@ function ServicesSummary({
                     <ServiceStatus status={status} size="sm" />
                   </TableCell>
                   <TableCell>
-                    <span className="flex items-center gap-2">
-                      <PodCells service={service} project={project} />
-                      {ready ? (
-                        <span className="type-meta text-muted-foreground">{ready}</span>
-                      ) : null}
-                    </span>
+                    <PodCells service={service} project={project} />
                   </TableCell>
                   <TableCell className="text-right">
                     <span
@@ -679,8 +622,6 @@ function Storage({
   const sized = claims.map((claim) => ({ claim, bytes: claim.sizeBytes ?? undefined }))
   const total = sized.reduce((sum, c) => sum + (c.bytes ?? 0), 0)
   const anyKnown = sized.some((c) => c.bytes !== undefined)
-  const shades = ["opacity-55", "opacity-30", "opacity-40", "opacity-20"]
-  const shade = (i: number) => shades[i % shades.length]
   const [totalValue, totalUnit] = memoryParts(total)
   return (
     <section aria-labelledby="overview-storage" className="flex flex-col gap-1">
@@ -697,16 +638,9 @@ function Storage({
       ) : (
         <>
           {total > 0 ? (
-            <div className="my-1.5 flex h-2 gap-0.5 overflow-hidden rounded" aria-hidden="true">
-              {sized.map((c, i) =>
-                c.bytes ? (
-                  <span
-                    key={c.claim.name}
-                    className={cn("basis-0 grow-(--grow) bg-muted-foreground", shade(i))}
-                    style={{ "--grow": c.bytes }}
-                  />
-                ) : null,
-              )}
+            // The volumes by size, in the design system's bar; each one's square below has its tone.
+            <div className="my-1.5">
+              <MeterStack parts={sized.map((c) => c.bytes ?? 0)} />
             </div>
           ) : null}
           <ul className="flex flex-col">
@@ -718,10 +652,8 @@ function Storage({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "size-2 shrink-0 rounded-xs",
-                      bytes
-                        ? cn("bg-muted-foreground", shade(i))
-                        : "hairline-ring ring-idle ring-inset",
+                      "size-2 shrink-0",
+                      bytes ? meterPartTone(i) : "hairline-ring ring-idle ring-inset",
                     )}
                   />
                   <div className="flex min-w-0 flex-1 flex-col">

@@ -106,15 +106,6 @@ Apache-2.0. Contributions are accepted under the [Developer Certificate of Origi
 
 Third-party content in this repository:
 
-- [shadcn/ui](https://ui.shadcn.com) components (`web/src/components/ui`), theme
-  (`web/src/styles/shadcn/theme.css`) and base styles (MIT, notice in
-  `web/src/styles/genkan/shadcn.css`).
-- The [Geist](https://github.com/vercel/geist-font) font (SIL Open Font License 1.1,
-  `web/src/styles/genkan/LICENSE-Geist.txt`). It and the base styles are copied from
-  [Genkan](https://github.com/engawahq/genkan) (Apache-2.0) at the commit in
-  `web/src/styles/genkan/VENDORED`.
-- Geist Mono from Vercel's release (SIL Open Font License 1.1,
-  `web/src/styles/geist-mono/LICENSE-GeistMono.txt`).
 - The [recommendations](https://github.com/engawahq/recommendations) catalogue in
   `crates/engawa-recommend/bundle` (Apache-2.0, `bundle/LICENSE`).
 - Kubernetes' release schedule in `crates/engawa-recommend/src/versions.rs`, from
@@ -122,5 +113,11 @@ Third-party content in this repository:
   Kubernetes Authors).
 - Rendered manifests of upstream Helm charts in `fixtures/charts`, test input only, each under
   its chart's licence (Apache-2.0 or MIT; listed in `fixtures/charts/README.md`).
+
+The web interface is built with [@engawahq/design-system](https://github.com/engawahq/design-system)
+(Apache-2.0), which contains shadcn/ui's components, theme and base styles (MIT), the Inter and
+JetBrains Mono fonts (SIL Open Font License 1.1) and the engawa logo; its README lists their
+notices. The built interface, embedded in the binary and the image, includes those fonts and
+the logo.
 
 The container image includes Mozilla's CA certificate bundle as packaged by nixpkgs (MPL-2.0).

@@ -42,8 +42,9 @@ test("Home names the failing service across projects and lists the project", asy
   const nav = page.getByRole("navigation", { name: "Main" })
   await expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page")
   const status = page.getByRole("region", { name: "Status" })
-  await expect(status).toContainText(/\d+ failing/)
-  await expect(status).toContainText(/\d+\/\d+ services healthy in \d+ projects?/)
+  // Key figures: each label, then its figure.
+  await expect(status).toContainText(/Failing\s*[1-9]\d*/)
+  await expect(status).toContainText(/Services\s*\d+\/\d+/)
   await expect(status.getByRole("link")).toHaveAttribute("href", "/cluster")
 
   const attention = page.getByRole("region", { name: "Needs attention" })
@@ -84,7 +85,7 @@ test("Home names the failing service across projects and lists the project", asy
 test("a popup pressed before its code arrives opens when it does, by click and by key", async ({
   page,
 }) => {
-  // Holds back the popups' code (src/components/ui/popup.tsx) until `release`.
+  // Holds back the popups' code (@engawahq/design-system's popup.tsx) until `release`.
   const hold = async () => {
     let release = () => {}
     const held = new Promise<void>((resolve) => (release = resolve))
@@ -272,18 +273,23 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
   await page.goto(`${project}/services/Deployment/${healthy}`)
   await expect(page.getByRole("heading", { level: 1, name: healthy })).toBeVisible()
   const tabs = page.getByRole("tablist", { name: "Service sections" })
+  // The everyday tabs; the rest are under More (web/DESIGN.md, "Depth").
   await expect(tabs.getByRole("tab")).toHaveText([
     /^Overview/,
     /^Logs/,
-    /^Terminal/,
     /^Variables/,
     /^Networking/,
-    /^Storage/,
     /^Settings/,
+  ])
+  await page.getByRole("button", { name: "More", exact: true }).click()
+  await expect(page.getByRole("menuitem")).toHaveText([
     /^Events/,
     /^Releases/,
+    /^Storage/,
+    /^Terminal/,
     /^YAML/,
   ])
+  await page.keyboard.press("Escape")
   await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true")
   await expect(page.getByRole("tabpanel", { name: "Overview" })).toContainText(pod)
   await expect(page.getByRole("button", { name: "Restart" })).toBeEnabled()
@@ -308,8 +314,11 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
     timeout: 30_000,
   })
 
-  await tabs.getByRole("tab", { name: /^Events/ }).click()
+  // A tab from More shows as a tab of its own while it is open.
+  await page.getByRole("button", { name: "More", exact: true }).click()
+  await page.getByRole("menuitem", { name: /^Events/ }).click()
   await expect(page).toHaveURL(/tab=events/)
+  await expect(tabs.getByRole("tab", { name: /^Events/ })).toHaveAttribute("aria-selected", "true")
   await tabs.getByRole("tab", { name: /^Networking/ }).click()
   await expect(page).toHaveURL(/tab=networking/)
   await page.goBack()
@@ -614,7 +623,12 @@ test("a readiness probe is set through a plan", async ({ page }) => {
     .getByRole("tabpanel", { name: "Settings" })
     .locator("form")
     .filter({ has: page.getByRole("heading", { name: "Traffic check" }) })
-  await form.getByRole("combobox", { name: "Check" }).selectOption("Exec")
+  // Health checks are folded until opened (web/DESIGN.md, "Depth").
+  const health = page.getByRole("button", { name: "Health checks" })
+  if ((await health.getAttribute("aria-expanded")) !== "true") await health.click()
+  // The design system's Select: the list opens in a popup at the page's root, not in the form.
+  await form.getByRole("combobox", { name: "Check" }).click()
+  await page.getByRole("option", { name: "Command" }).click()
   await form.getByRole("textbox", { name: "Command" }).fill("true")
   await form.getByRole("button", { name: "Review" }).click()
   await confirmPlan(

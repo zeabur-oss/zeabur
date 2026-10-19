@@ -6,20 +6,27 @@
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
+import CaretDownIcon from "~icons/ph/caret-down"
 
 import type { Schemas } from "@/api/client"
 import { nodesQuery, releasesQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
 import { usePlanner } from "@/components/plan/planner"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { Button } from "@engawahq/design-system/components/button"
+import { Input } from "@engawahq/design-system/components/input"
+import { Select } from "@engawahq/design-system/components/select"
 import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { FormField, quantity } from "@/components/form-field"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@engawahq/design-system/components/collapsible"
+import { healthChecksSection } from "@/lib/stores"
 
 const probeKinds = ["readiness", "liveness", "startup"] as const
 type ProbeKind = (typeof probeKinds)[number]
@@ -39,6 +46,7 @@ export function SettingsTab({
   const managed = service.provenance.tool
   const sections = serviceSettingsSections.filter((s) => s.applies(service))
   const editable = service.kind !== "Job"
+  const healthOpen = healthChecksSection.useValue()
 
   return (
     <div className="flex max-w-3xl flex-col gap-8">
@@ -60,17 +68,26 @@ export function SettingsTab({
               refused={planner.fields}
             />
           </Section>
-          <Section title={t("form.health")}>
-            <Probes
-              project={project}
-              service={service}
-              endpoints={endpointsOf(network, service)}
-              disabled={!!managed}
-              onPlan={(change) =>
-                planner.plan({ title: t("title.probe", service.name), changes: [change] })
-              }
-            />
-          </Section>
+          {/* Adjusting, not everyday (web/DESIGN.md, "Depth"): folded until opened. */}
+          <Collapsible open={healthOpen} onOpenChange={(open) => healthChecksSection.set(open)}>
+            <CollapsibleTrigger variant="section">
+              {t("form.health")}
+              <CaretDownIcon aria-hidden="true" />
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="pt-3">
+                <Probes
+                  project={project}
+                  service={service}
+                  endpoints={endpointsOf(network, service)}
+                  disabled={!!managed}
+                  onPlan={(change) =>
+                    planner.plan({ title: t("title.probe", service.name), changes: [change] })
+                  }
+                />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </>
       ) : (
         <p className="text-sm text-muted-foreground">{t("form.jobs")}</p>
@@ -168,7 +185,7 @@ function Compute({
 
   return (
     <form
-      className="flex flex-col gap-4 rounded-xl border bg-card p-4"
+      className="flex flex-col gap-4 rounded-lg border bg-card shadow-xs p-4"
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()
@@ -384,7 +401,7 @@ function ProbeForm({
     value.trim() === "" || /^[1-9]\d*$/.test(value.trim()) ? undefined : t("form.badNumber")
   return (
     <form
-      className="flex flex-col gap-3 rounded-xl border bg-card p-4"
+      className="flex flex-col gap-3 rounded-lg border bg-card shadow-xs p-4"
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()
@@ -400,20 +417,22 @@ function ProbeForm({
             <form.Field name="handler">
               {(f) => (
                 <FormField label={t("form.probeCheck")}>
-                  <NativeSelect
+                  <Select<ProbeValues["handler"]>
                     size="sm"
                     value={f.state.value}
                     disabled={disabled}
-                    onChange={(e) => f.handleChange(e.target.value as ProbeValues["handler"])}
-                  >
-                    <NativeSelectOption value="none">{t("form.probeNone")}</NativeSelectOption>
-                    <NativeSelectOption value="HTTPGet">HTTP GET</NativeSelectOption>
-                    <NativeSelectOption value="TCPSocket">TCP</NativeSelectOption>
-                    <NativeSelectOption value="Exec">{t("form.probeExec")}</NativeSelectOption>
-                    {current.handler === "GRPC" ? (
-                      <NativeSelectOption value="GRPC">gRPC</NativeSelectOption>
-                    ) : null}
-                  </NativeSelect>
+                    onValueChange={(handler) => f.handleChange(handler)}
+                    items={[
+                      { value: "none", label: t("form.probeNone") },
+                      { value: "HTTPGet", label: "HTTP GET" },
+                      { value: "TCPSocket", label: "TCP" },
+                      { value: "Exec", label: t("form.probeExec") },
+                      // gRPC only for a probe that has it already; the form does not offer it.
+                      ...(current.handler === "GRPC"
+                        ? [{ value: "GRPC" as const, label: "gRPC" }]
+                        : []),
+                    ]}
+                  />
                 </FormField>
               )}
             </form.Field>

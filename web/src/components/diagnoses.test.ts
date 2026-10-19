@@ -24,9 +24,12 @@ describe("a diagnosis's action", () => {
       pod: "web-1",
     })
     expect(diagnosisAction(diagnosis("outOfMemory", "x")).tab).toBe("settings")
-    expect(diagnosisAction(diagnosis("probeFailure", "x")).label).toBe(
-      "diagnosis.action.healthChecks",
-    )
+    // Health checks are folded in Settings: the action opens them on the way.
+    expect(diagnosisAction(diagnosis("probeFailure", "x"))).toStrictEqual({
+      tab: "settings",
+      label: "diagnosis.action.healthChecks",
+      opens: "healthChecks",
+    })
     expect(diagnosisAction(diagnosis("configMissing", "x")).tab).toBe("variables")
     expect(diagnosisAction(diagnosis("quotaBlocked", "x")).label).toBe("diagnosis.action.replicas")
   })

@@ -9,8 +9,8 @@ import { lazy, Suspense, type ReactNode } from "react"
 import { historyQuery, usageQuery } from "@/api/queries"
 import { Hint, Panel, Segmented } from "@/components/bits"
 import { Refused } from "@/components/refused"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { useQuantityFormat as useFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
@@ -33,6 +33,7 @@ import {
   type ServiceHistory,
 } from "@/model/usage"
 import type { Guide } from "@/routes/service/history-chart"
+import { Meter } from "@engawahq/design-system/components/meter"
 
 const HistoryChart = lazy(() => import("@/routes/service/history-chart"))
 
@@ -146,9 +147,6 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
   )
 }
 
-/** Where a share falls on a bar, as a CSS length (0–100%). */
-const at = (ratio: number) => `${Math.min(Math.max(ratio, 0), 1) * 100}%`
-
 /** Usage as the fill, the reserved amount as a tick, the maximum as the bar's end (hatched when
  * there is none: the end is then only room, not a wall). */
 function UsageBar({
@@ -173,31 +171,14 @@ function UsageBar({
         ? "over"
         : "ok"
   return (
-    <div
-      role="img"
-      aria-label={label}
-      style={{
-        "--used": at(share ?? 0),
-        "--request": at(request !== undefined && room > 0 ? request / room : 0),
-      }}
-      className={cn(
-        "relative w-full overflow-hidden rounded-full bg-foreground/10",
-        size === "md" ? "h-2" : "h-1.5",
-        !limit && "bg-hatch text-foreground/40",
-      )}
-    >
-      {share !== undefined ? (
-        <div
-          className={cn(
-            "absolute inset-y-0 left-0 w-(--used) rounded-full",
-            tone === "warn" ? "bg-warn" : tone === "over" ? "bg-progress" : "bg-progress/70",
-          )}
-        />
-      ) : null}
-      {request !== undefined && request > 0 ? (
-        <div className="absolute -inset-y-px left-(--request) w-0.5 bg-foreground" />
-      ) : null}
-    </div>
+    <Meter
+      value={share}
+      mark={request !== undefined && room > 0 ? request / room : undefined}
+      tone={tone}
+      size={size}
+      unbounded={!limit}
+      label={label}
+    />
   )
 }
 
@@ -397,7 +378,7 @@ function NotePill({ note }: { note: Note }) {
       <span
         tabIndex={0}
         className={cn(
-          "rounded px-1.5 py-px font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "rounded px-1.5 py-px font-medium whitespace-nowrap outline-none",
           tone === "warn" && "bg-warn-soft text-warn-strong",
           tone === "fail" && "bg-fail-soft text-fail-strong",
           tone === "plain" && "bg-muted text-muted-foreground",
@@ -626,9 +607,10 @@ function HistoryBody({
         </ul>
       </div>
       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-3 type-meta text-muted-foreground">
-        <span>
+        <span className="flex max-w-full min-w-0 items-baseline gap-1">
+          {/* The space keeps "From <store>" one phrase in the text, which flex alone would not. */}
           {t("usage.source")}{" "}
-          <span className="font-mono text-foreground" translate="no">
+          <span className="min-w-0 truncate font-mono text-foreground" translate="no" title={store}>
             {store}
           </span>
         </span>

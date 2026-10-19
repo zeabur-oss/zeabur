@@ -17,8 +17,8 @@ import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import { sessionQuery, whoamiQuery } from "@/api/queries"
 import { Problem } from "@/components/problem"
 import { Refused } from "@/components/refused"
-import { Button } from "@/components/ui/button"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { Button } from "@engawahq/design-system/components/button"
+import { Select } from "@engawahq/design-system/components/select"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
@@ -65,32 +65,22 @@ export function TerminalTab({
   return (
     <div className="flex min-h-105 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <NativeSelect
+        <Select
           size="sm"
           value={pod.name}
-          onChange={(event) => onPodChange(event.target.value)}
+          onValueChange={onPodChange}
           aria-label={t("terminal.pod")}
           className="max-w-full"
-        >
-          {pods.map((p) => (
-            <NativeSelectOption key={p.name} value={p.name}>
-              {p.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+          items={pods.map((p) => ({ value: p.name, label: p.name }))}
+        />
         {containerNames.length > 1 ? (
-          <NativeSelect
+          <Select
             size="sm"
             value={chosen}
-            onChange={(event) => setContainer(event.target.value)}
+            onValueChange={setContainer}
             aria-label={t("logs.container")}
-          >
-            {containerNames.map((name) => (
-              <NativeSelectOption key={name} value={name}>
-                {name}
-              </NativeSelectOption>
-            ))}
-          </NativeSelect>
+            items={containerNames.map((name) => ({ value: name, label: name }))}
+          />
         ) : null}
       </div>
       <Session
@@ -145,7 +135,7 @@ function Session({
     let teardown = () => {}
     const fontSize = 13
     const fontFamily = getComputedStyle(element).fontFamily
-    // xterm.js measures a cell once; wait for Geist Mono so the grid fits the glyphs.
+    // xterm.js measures a cell once; wait for JetBrains Mono so the grid fits the glyphs.
     void document.fonts
       .load(`${fontSize}px ${fontFamily}`)
       .catch(() => [])
@@ -173,7 +163,10 @@ function Session({
         onReconnect={onReconnect}
       />
       <div
-        className={cn("min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card", screen)}
+        className={cn(
+          "min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card shadow-xs",
+          screen,
+        )}
       >
         <div className="flex items-center gap-2 border-b px-3 py-1.5 text-xs text-muted-foreground">
           <output className="inline-flex items-center gap-1.5">

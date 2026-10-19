@@ -8,9 +8,14 @@ import XIcon from "~icons/ph/x"
 import { objectQuery, type ObjectAddress } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Badge } from "@engawahq/design-system/components/badge"
+import { Button } from "@engawahq/design-system/components/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@engawahq/design-system/components/dialog"
 import { YamlView } from "@/components/yaml-view"
 import { useT } from "@/i18n"
 

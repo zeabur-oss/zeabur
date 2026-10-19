@@ -265,7 +265,7 @@ export function PaletteBody() {
                     key={item.id}
                     value={item}
                     onClick={() => choose(item)}
-                    className="group flex h-9 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-sm outline-none data-highlighted:bg-muted"
+                    className="group flex h-9 cursor-default items-center gap-2.5 rounded-lg px-2.5 text-sm outline-none data-highlighted:bg-selected"
                   >
                     {item.node ?? (
                       <>

@@ -12,8 +12,13 @@ import { namespaceQuery, queryClient } from "@/api/queries"
 import { NamespaceAccess } from "@/components/namespace-access"
 import { usePlanner } from "@/components/plan/planner"
 import { permission, RefusedHint } from "@/components/refused"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import { Button } from "@engawahq/design-system/components/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@engawahq/design-system/components/dialog"
 import { useT } from "@/i18n"
 import { mayChange } from "@/model/project"
 

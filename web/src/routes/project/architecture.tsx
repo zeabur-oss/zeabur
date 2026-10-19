@@ -207,7 +207,7 @@ function Graph({
   const related = (edge: LaidEdge) => !active || edge.from === active || edge.to === active
   const hovered = graph.edges.find((e) => e.id === hoverEdge)
   const control =
-    "flex size-8 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
+    "flex size-8 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
 
   return (
     <div
@@ -338,7 +338,7 @@ function Graph({
 
         {hovered ? (
           <div
-            className="pointer-events-none absolute top-(--y) left-(--x) z-10 -translate-x-1/2 -translate-y-tooltip rounded-lg bg-foreground px-2.5 py-1.5 text-xs whitespace-nowrap text-background shadow-lg"
+            className="pointer-events-none absolute top-(--y) left-(--x) z-10 -translate-x-1/2 -translate-y-tooltip rounded-lg border border-border-popover bg-popover px-2 py-1 type-micro font-medium whitespace-nowrap text-popover-foreground shadow-xs"
             style={{ "--x": px(hovered.mid.x), "--y": px(hovered.mid.y) }}
           >
             <span className="mr-1.5 opacity-60">
@@ -466,7 +466,7 @@ function ServiceCard({
         onClick={onOpen}
         aria-pressed={selected}
         className={cn(
-          "relative z-1 flex h-28 w-full flex-col gap-2 rounded-xl border bg-card p-3 text-left shadow-sm outline-none transition-colors hover:border-foreground/25 focus-visible:ring-3 focus-visible:ring-ring",
+          "relative z-1 flex h-28 w-full flex-col gap-2 rounded-lg border bg-card p-3 text-left shadow-xs outline-none transition-colors hover:border-foreground/25",
           selected && "border-brand ring-3 ring-brand/25",
           status.health === "fail" && !selected && "border-fail/40",
         )}
@@ -525,7 +525,7 @@ function ServiceCard({
 function DomainCard({ node }: { node: LaidNode }) {
   return (
     <div
-      className="absolute top-(--y) left-(--x) flex h-(--h) w-(--w) items-center gap-2 rounded-full border bg-background px-3 text-xs shadow-xs"
+      className="absolute top-(--y) left-(--x) flex h-(--h) w-(--w) items-center gap-2 rounded-md border bg-background px-3 text-xs shadow-xs"
       style={{ "--x": px(node.x), "--y": px(node.y), "--w": px(node.w), "--h": px(node.h) }}
     >
       <GlobeIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />

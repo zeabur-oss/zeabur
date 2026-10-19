@@ -32,9 +32,9 @@ import { Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { buttonVariants } from "@/components/ui/button"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tooltip } from "@/components/ui/tooltip"
+import { buttonVariants } from "@engawahq/design-system/components/button"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { cn } from "@/lib/utils"
@@ -246,7 +246,7 @@ function ComponentCard({
   return (
     <article
       className={cn(
-        "flex w-full flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-foreground/20",
+        "flex w-full flex-col gap-3 rounded-lg border bg-card shadow-xs p-4 transition-colors hover:border-foreground/20",
         installed && "border-ok/30",
       )}
     >

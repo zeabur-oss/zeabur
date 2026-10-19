@@ -1,18 +1,18 @@
 ---
 name: engawa-ui
-description: Change engawa's web interface (web/: React, TanStack, shadcn/ui on Base UI, Phosphor) and its embedding (crates/engawa-ui) while keeping the strict CSP, size budgets and Genkan's tokens. Use for any change under web/ or crates/engawa-ui.
+description: Change engawa's web interface (web/: React, TanStack, shadcn/ui on Base UI, Phosphor) and its embedding (crates/engawa-ui) while keeping the strict CSP, size budgets and the design system's tokens (@engawahq/design-system). Use for any change under web/ or crates/engawa-ui.
 ---
 
 # Web interface
 
-- **Where things are.** Sources: `web/src` (routes in `router.tsx`, shadcn components in
-  `components/ui`). Styles: `web/src/styles/app.css` wires up shadcn/ui's theme
-  (`styles/shadcn/theme.css`, as the shadcn CLI writes it for preset brrM) and the base styles and
-  Geist font vendored from Genkan in `styles/genkan` (pinned commit in `VENDORED`; change only by
-  moving the pin, then `./scripts/check-genkan-files.sh`), and Geist Mono copied from Vercel's
-  release in `styles/geist-mono` (release and SHA-256 in `VENDORED`; check with
-  `./scripts/check-geist-mono.sh`). Dark mode follows the operating system
-  (`src/theme.ts` sets shadcn's `.dark` class). Embedding and serving: `crates/engawa-ui`.
+- **Where things are.** Sources: `web/src` (routes in `router.tsx`). Components (shadcn/ui on
+  Base UI with engawa's variants), theme, tokens and fonts come from `@engawahq/design-system`
+  (github.com/engawahq/design-system, a Git dependency pinned to a commit in `web/package.json`;
+  import `@engawahq/design-system/components/<name>`; preview in its Storybook). Change a
+  component or token there, then move the pin (`bun add 'github:engawahq/design-system#<commit>'`).
+  `web/src/styles/app.css` imports it and adds only this interface's layout tokens. Dark mode
+  follows the operating system (`src/theme.ts` sets shadcn's `.dark` class; pass its `useTheme()`
+  to the design system's `Toaster`). Embedding and serving: `crates/engawa-ui`.
 - **Build and check** (inside `nix develop`):
   ```sh
   (cd web && bun ci && bun run fmt:check && bun run lint && bun run knip && bun run test)
@@ -30,14 +30,19 @@ description: Change engawa's web interface (web/: React, TanStack, shadcn/ui on 
 - **Icons.** Phosphor only, one import per icon: `import XIcon from "~icons/ph/x"` (a weight is
   its own name, `~icons/ph/warning-fill`), built at build time from `@iconify-json/ph` by
   unplugin-icons (its JSX compiler, through svgr); decorative ones with `aria-hidden`.
-- **Design.** Components, radii and neutrals are shadcn/ui's: build from its components and their variants rather than look-alikes. engawa's tokens (hinoki, status tones, type scale, motion) and banned styles are in `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans.
+- **Design.** agent-playground's and lymeno's language (Linear's: near-hueless greys, 0.5px
+  hairlines, faint shadows, Inter 13px at 450, controls rounded 8 and popups 12, no focus rings)
+  with engawa's lime and ink as the accent, in agent-playground's frame (the design
+  system's `AppFrame`, `Sidebar`, `PanelHeader`). Build from the design system's components and
+  their variants rather than look-alikes. Tokens, button and frame rules and banned styles are in
+  `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including focus rings).
 - **Lint.** `bun run lint` includes [shadcn/lint](https://github.com/shadcn-ui/lint) (rules in
-  `web/.oxlintrc.json`, off for `components/ui`; conventions in `web/DESIGN.md`, "Lint"). Pages
-  pass only layout classes to a component: a repeated treatment becomes a cva variant or size in
-  `components/ui`, not a className at each call site. No arbitrary values (`type-*` roles, the
-  spacing scale, or a named token added to `app.css`); `style` carries only CSS custom properties,
-  read by classes such as `left-(--x)`.
+  `web/.oxlintrc.json`, which recognises the design system's components by `componentImports`;
+  conventions in `web/DESIGN.md`, "Lint"). Pages pass only layout classes to a component: a
+  repeated treatment becomes a cva variant or size in the design system, not a className at each
+  call site. No arbitrary values (`type-*` roles, the spacing scale, or a named token); `style`
+  carries only CSS custom properties, read by classes such as `left-(--x)`.
 - **Budgets.** `scripts/ui-budget.sh` checks the brotli size of what the first page load needs;
   raise a budget only with a reason in the commit. Menus, popovers, tooltips and dialogs load
-  after the first page (`components/ui/popup.tsx`): use them through `components/ui`, never
+  after the first page (the design system's `popup.tsx`): use them through the design system, never
   `@base-ui/react/{menu,popover,tooltip,dialog}` directly, which would put them back on it.

@@ -1,6 +1,0 @@
-# Files copied verbatim from Genkan (https://github.com/engawahq/genkan) at one commit.
-# scripts/check-genkan-files.sh compares them with that commit; change them only by moving the pin.
-commit = d933aa984a7e4fda006c4df042b4714ece2fc50a
-shadcn.css = ui/styles/shadcn.css
-geist-latin-wght-normal.woff2 = crates/genkan-ui/assets/geist-latin-wght-normal.woff2
-LICENSE-Geist.txt = crates/genkan-ui/assets/LICENSE-Geist.txt

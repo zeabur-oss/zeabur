@@ -10,7 +10,11 @@ import type { Schemas } from "@/api/client"
 import { backupsQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { StatusPill } from "@/components/status"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@engawahq/design-system/components/collapsible"
 import { useT } from "@/i18n"
 import type { Health } from "@/model/service"
 

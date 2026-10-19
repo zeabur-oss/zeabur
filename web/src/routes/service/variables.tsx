@@ -26,11 +26,11 @@ import { FormField } from "@/components/form-field"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { RefusedKinds } from "@/components/refused"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { Spinner } from "@/components/ui/spinner"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Button } from "@engawahq/design-system/components/button"
+import { Input } from "@engawahq/design-system/components/input"
+import { Select } from "@engawahq/design-system/components/select"
+import { Spinner } from "@engawahq/design-system/components/spinner"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import type { Edge } from "@/model/connections"
 import { configObjectsOf, type Service } from "@/model/service"
@@ -240,7 +240,7 @@ export function VariablesTab({
       )}
 
       {raw ? (
-        <div className="relative rounded-xl border bg-muted/30">
+        <div className="relative rounded-lg border bg-muted/30">
           <CopyButton value={dotenv} className="absolute top-2 right-2" />
           <pre className="overflow-x-auto p-4 font-mono text-xs leading-6" translate="no">
             {dotenv || "# —"}
@@ -535,18 +535,13 @@ function DraftRow({
         <form.Field name="container">
           {(f) => (
             <FormField label={t("vars.container")} hideLabel className="sm:w-32">
-              <NativeSelect
+              <Select
                 size="sm"
                 value={f.state.value}
-                onChange={(event) => f.handleChange(event.target.value)}
+                onValueChange={(name) => f.handleChange(name)}
                 className="w-full"
-              >
-                {containers.map((name) => (
-                  <NativeSelectOption key={name} value={name}>
-                    {name}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                items={containers.map((name) => ({ value: name, label: name }))}
+              />
             </FormField>
           )}
         </form.Field>

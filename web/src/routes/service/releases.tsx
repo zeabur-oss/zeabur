@@ -13,13 +13,20 @@ import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Badge } from "@engawahq/design-system/components/badge"
+import { Button } from "@engawahq/design-system/components/button"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { YamlDiff } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { imageTag, isTask, type Service } from "@/model/service"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+} from "@engawahq/design-system/components/empty"
+import { Illustration } from "@engawahq/design-system/components/illustration"
 
 type Release = Schemas["WorkloadRelease"]
 
@@ -35,9 +42,16 @@ export function ReleasesTab({ project, service }: { project: string; service: Se
   const items = releases.data.items
   if (items.length === 0)
     return (
-      <p className="text-sm text-muted-foreground">
-        {t(isTask(service.kind) ? "releases.noneTask" : "releases.none")}
-      </p>
+      <Empty size="sm">
+        <EmptyHeader>
+          <EmptyMedia>
+            <Illustration kind="empty" seed="releases" />
+          </EmptyMedia>
+          <EmptyDescription>
+            {t(isTask(service.kind) ? "releases.noneTask" : "releases.none")}
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
 
   const current = items.find((r) => r.current) ?? items[0]
@@ -47,7 +61,10 @@ export function ReleasesTab({ project, service }: { project: string; service: Se
 
   return (
     <div className="flex flex-col gap-6">
-      <ol className="flex flex-col rounded-xl border bg-card" aria-label={t("tab.releases")}>
+      <ol
+        className="flex flex-col rounded-lg border bg-card shadow-xs"
+        aria-label={t("tab.releases")}
+      >
         {items.map((release) => (
           <li
             key={release.name}

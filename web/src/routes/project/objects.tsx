@@ -28,12 +28,19 @@ import {
   RefusedSome,
   useHintOffersElevation,
 } from "@/components/refused"
-import { Button } from "@/components/ui/button"
+import { Button } from "@engawahq/design-system/components/button"
 import { useT } from "@/i18n"
 import { parseObjectKey } from "@/lib/objects"
 import { pinnedKinds, togglePinnedKind } from "@/lib/stores"
 import { cn } from "@/lib/utils"
 import { ProjectHeader } from "@/routes/project/header"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+} from "@engawahq/design-system/components/empty"
+import { Illustration } from "@engawahq/design-system/components/illustration"
 
 const ObjectSheet = lazy(() =>
   import("@/components/object-sheet").then((m) => ({ default: m.ObjectSheet })),
@@ -257,7 +264,7 @@ function ObjectList({
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex h-8 w-full items-center gap-2 rounded-lg border bg-background px-2.5 focus-within:ring-3 focus-within:ring-ring sm:w-64">
+        <label className="flex h-8 w-full items-center gap-2 rounded-lg border bg-background px-2.5 focus-within:border-ring sm:w-64">
           <MagnifyingGlassIcon className="size-4 text-muted-foreground" aria-hidden="true" />
           <input
             type="search"
@@ -304,11 +311,18 @@ function ObjectList({
       </div>
       <RefusedSome unreadable={unreadable.filter((u) => !placed.has(u.resource))} />
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t("objects.none")}</p>
+        <Empty size="sm">
+          <EmptyHeader>
+            <EmptyMedia>
+              <Illustration kind={needle ? "no-results" : "empty"} seed="objects" />
+            </EmptyMedia>
+            <EmptyDescription>{t("objects.none")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <div
           ref={scroller}
-          className="min-h-96 flex-1 overflow-y-auto rounded-xl border bg-card"
+          className="min-h-96 flex-1 overflow-y-auto rounded-lg border bg-card shadow-xs"
           role="list"
           aria-label={t("project.entry.objects")}
         >
@@ -362,7 +376,7 @@ function ObjectList({
                       onClick={() =>
                         onOpen(row.object.id.replace(/^projects\/[^/]+\/objects\//, ""))
                       }
-                      className="flex h-8.5 w-full items-center gap-3 px-4 text-left text-sm outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
+                      className="flex h-8.5 w-full items-center gap-3 px-4 text-left text-sm outline-none hover:bg-hover"
                     >
                       <CaretRightIcon
                         className="size-3 shrink-0 text-muted-foreground"
@@ -407,7 +421,7 @@ function Toggle({
       aria-pressed={pressed}
       onClick={() => onChange(!pressed)}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs outline-none focus-visible:ring-3 focus-visible:ring-ring",
+        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs outline-none",
         pressed ? "bg-muted font-medium" : "text-muted-foreground hover:text-foreground",
       )}
     >
@@ -452,7 +466,7 @@ function KindRow({
           onClick={onLoad}
           disabled={row.loading}
           aria-label={t("objects.load", kind.kind)}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none hover:underline"
         >
           {label}
         </button>
@@ -477,7 +491,7 @@ function KindRow({
         title={pinned ? t("objects.unpin", kind.kind) : t("objects.pin", kind.kind)}
         onClick={() => togglePinnedKind(row.key)}
         className={cn(
-          "rounded p-1 outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring",
+          "rounded p-1 outline-none hover:bg-muted",
           pinned ? "text-foreground" : "text-muted-foreground/60",
         )}
       >

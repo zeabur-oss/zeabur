@@ -19,11 +19,12 @@ import { Hint, Panel, Segmented } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { StatusPill } from "@/components/status"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { localeNames, locales, useI18n, useT, type Locale } from "@/i18n"
+import { Button } from "@engawahq/design-system/components/button"
+import { Input } from "@engawahq/design-system/components/input"
+import { Select } from "@engawahq/design-system/components/select"
+import { localeNames, locales, useI18n, useT } from "@/i18n"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
+import { PageHeader } from "@engawahq/design-system/components/page-header"
 
 export function SettingsPage() {
   const t = useT()
@@ -40,7 +41,7 @@ export function SettingsPage() {
   ]
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">{t("settings.title")}</h1>
+      <PageHeader title={t("settings.title")} />
 
       <Panel title={t("settings.preferences")}>
         <div className="flex flex-col gap-5">
@@ -49,18 +50,17 @@ export function SettingsPage() {
               {t("settings.language")}
             </label>
             <div className="flex items-center gap-1.5">
-              <NativeSelect
+              <Select
                 id={languageId}
                 value={locale}
-                onChange={(event) => setLocale(event.target.value as Locale)}
+                onValueChange={setLocale}
                 className="w-64"
-              >
-                {locales.map((value) => (
-                  <NativeSelectOption key={value} value={value} lang={value}>
-                    {localeNames[value]}
-                  </NativeSelectOption>
-                ))}
-              </NativeSelect>
+                items={locales.map((value) => ({
+                  value,
+                  label: localeNames[value],
+                  lang: value,
+                }))}
+              />
               <Hint label={t("settings.language")}>{t("settings.languageHint")}</Hint>
             </div>
           </div>
@@ -253,7 +253,7 @@ function StoreForm({ setting }: { setting: StoreSetting }) {
           ) : null}
         </dd>
         <dt className="text-muted-foreground">{t("settings.storeDefault")}</dt>
-        <dd className="font-mono text-xs" translate="no">
+        <dd className="min-w-0 truncate font-mono text-xs" translate="no" title={setting.default}>
           {setting.default}
         </dd>
       </dl>

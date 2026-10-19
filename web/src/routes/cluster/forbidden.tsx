@@ -11,7 +11,7 @@ import WarningIcon from "~icons/ph/warning"
 import { toProblem } from "@/api/client"
 import { whoamiQuery } from "@/api/queries"
 import { permission, Refused } from "@/components/refused"
-import { Button } from "@/components/ui/button"
+import { Button } from "@engawahq/design-system/components/button"
 import { useT } from "@/i18n"
 import { roleYaml } from "@/model/rbac"
 

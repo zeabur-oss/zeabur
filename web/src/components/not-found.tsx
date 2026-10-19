@@ -1,18 +1,23 @@
 import { Link } from "@tanstack/react-router"
-import MapTrifoldIcon from "~icons/ph/map-trifold"
-
-import { buttonVariants } from "@/components/ui/button"
-import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
+import { buttonVariants } from "@engawahq/design-system/components/button"
+import {
+  Empty,
+  EmptyContent,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@engawahq/design-system/components/empty"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
+import { Illustration } from "@engawahq/design-system/components/illustration"
 
 export function NotFound() {
   const t = useT()
   return (
     <Empty>
       <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <MapTrifoldIcon aria-hidden="true" />
+        <EmptyMedia>
+          <Illustration kind="not-found" className="w-48" />
         </EmptyMedia>
         <EmptyTitle>{t("common.notFound")}</EmptyTitle>
       </EmptyHeader>

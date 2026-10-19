@@ -6,10 +6,11 @@ import type { ReactNode } from "react"
 
 import { clusterQuery, upgradesQuery } from "@/api/queries"
 import { StatusPill } from "@/components/status"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@engawahq/design-system/components/tabs"
 import { useT } from "@/i18n"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
+import { PageHeader } from "@engawahq/design-system/components/page-header"
 
 const paths = { overview: "/cluster", components: "/cluster/components" } as const
 
@@ -50,29 +51,32 @@ function Heading() {
   const plansRefused = data?.unreadable?.some((u) => u.resource === "plans.upgrade.cattle.io")
   const version = cluster.data?.kubernetesVersion
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="type-title">{t("cluster.title")}</h1>
-        {version ? (
-          // The version usually names the distribution (`v1.36.5+k3s1`); otherwise it goes first.
-          <span className="type-mono text-muted-foreground" translate="no">
-            {cluster.data?.distribution && !version.includes(cluster.data.distribution)
-              ? `${cluster.data.distribution} ${version}`
-              : version}
-          </span>
-        ) : null}
-        {badge ? <StatusPill health={badge.health}>{badge.text}</StatusPill> : null}
-      </div>
-      {data && (data.patch || data.nextMinor) ? (
-        <p className="type-meta text-muted-foreground">
-          {[
-            data.patch ? t("cluster.patch", data.patch) : "",
-            data.nextMinor ? t("cluster.nextMinor", data.nextMinor) : "",
-          ]
-            .filter(Boolean)
-            .join(t("common.sep"))}
-        </p>
-      ) : null}
+    <PageHeader
+      title={t("cluster.title")}
+      badges={
+        <>
+          {version ? (
+            // The version usually names the distribution (`v1.36.5+k3s1`); otherwise it goes first.
+            <span className="type-mono text-muted-foreground" translate="no">
+              {cluster.data?.distribution && !version.includes(cluster.data.distribution)
+                ? `${cluster.data.distribution} ${version}`
+                : version}
+            </span>
+          ) : null}
+          {badge ? <StatusPill health={badge.health}>{badge.text}</StatusPill> : null}
+        </>
+      }
+      description={
+        data && (data.patch || data.nextMinor)
+          ? [
+              data.patch ? t("cluster.patch", data.patch) : "",
+              data.nextMinor ? t("cluster.nextMinor", data.nextMinor) : "",
+            ]
+              .filter(Boolean)
+              .join(t("common.sep"))
+          : undefined
+      }
+    >
       {plansRefused ? (
         <Forbidden
           what={t("cluster.whatUpgrades")}
@@ -80,6 +84,6 @@ function Heading() {
           role={overviewRole}
         />
       ) : null}
-    </div>
+    </PageHeader>
   )
 }

@@ -9,8 +9,8 @@ import ShieldPlusIcon from "~icons/ph/shield-plus"
 import type { Schemas } from "@/api/client"
 import { networkPresetsQuery, queryClient } from "@/api/queries"
 import { StatusPill } from "@/components/status"
-import { Button } from "@/components/ui/button"
-import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu"
+import { Button } from "@engawahq/design-system/components/button"
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@engawahq/design-system/components/menu"
 import { useT } from "@/i18n"
 import type { Health } from "@/model/service"
 import type { Service } from "@/model/service"
@@ -99,7 +99,7 @@ export function Reachability({
         </Menu>
       }
     >
-      <div className="rounded-xl border bg-card px-4 py-1 text-sm">
+      <div className="rounded-lg border bg-card shadow-xs px-4 py-1 text-sm">
         <div className={row}>
           <span className="w-28 shrink-0 text-muted-foreground">{t("reach.policies")}</span>
           {reach.selectedBy.length === 0 ? (

@@ -19,12 +19,11 @@ import {
 import { Ago } from "@/components/bits"
 import { DiagnosisLine } from "@/components/diagnoses"
 import { LoadingRows } from "@/components/page"
-import { cellBox, cellColour } from "@/components/pods"
 import { Problem } from "@/components/problem"
 import { FactsPill, plainReason, StatusDot, StatusPill } from "@/components/status"
-import { buttonVariants } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Skeleton } from "@/components/ui/skeleton"
+import { buttonVariants } from "@engawahq/design-system/components/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@engawahq/design-system/components/card"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
 import {
   Table,
   TableBody,
@@ -32,8 +31,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Tooltip } from "@/components/ui/tooltip"
+} from "@engawahq/design-system/components/table"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT, type Translate } from "@/i18n"
 import { useSeen } from "@/lib/in-view"
 import { serviceLink } from "@/lib/place"
@@ -43,8 +42,6 @@ import {
   domainsOf,
   healthRank,
   hostUrl,
-  outsideIn,
-  serviceId,
   type Domain,
   type Event,
   type Health,
@@ -52,6 +49,15 @@ import {
 } from "@/model/service"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+} from "@engawahq/design-system/components/empty"
+import { Illustration } from "@engawahq/design-system/components/illustration"
+import { PageHeader } from "@engawahq/design-system/components/page-header"
+import { Stat, StatGroup } from "@engawahq/design-system/components/stat"
 
 type ProjectItem = Schemas["ProjectSummary"]
 type Brief = Schemas["ServiceSummary"]
@@ -68,7 +74,7 @@ export function HomePage() {
   const attention = needingAttention(adopted)
   return (
     <div className="flex w-full max-w-310 flex-col gap-8 px-4 pt-6 pb-12 type-body md:px-8 md:pt-7">
-      <h1 className="sr-only">{t("home.title")}</h1>
+      <PageHeader title={t("home.title")} />
       <StatusLine
         adopted={adopted}
         loaded={projects.isSuccess}
@@ -85,8 +91,9 @@ export function HomePage() {
   )
 }
 
-// ── Status line ──────────────────────────────────────────────────────────────────────────────────
+// ── Key figures ─────────────────────────────────────────────────────────────────────────────────
 
+/** The services of every adopted project by state, then the cluster: a console's row of figures. */
 function StatusLine({
   adopted,
   loaded,
@@ -107,43 +114,39 @@ function StatusLine({
     totals.warning += h.warning
     totals.progressing += h.progressing
   }
+  const figure = (value: number | string) =>
+    loaded ? value : <Skeleton className="my-1 h-4 w-10" />
   return (
-    <section
-      aria-label={t("home.status")}
-      className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg bg-plane px-4.5 py-3.5"
-    >
-      {loaded ? (
-        <div className="flex flex-wrap items-center gap-2.5">
-          {totals.failing > 0 ? (
-            <StatusPill health="fail">{t("overview.failingCount", totals.failing)}</StatusPill>
-          ) : null}
-          {totals.warning > 0 ? (
-            <StatusPill health="warn">{t("overview.degradedCount", totals.warning)}</StatusPill>
-          ) : null}
-          {totals.progressing > 0 ? (
-            <StatusPill health="progress">{t("home.rollingOut", totals.progressing)}</StatusPill>
-          ) : null}
-          {allHealthy && totals.services > 0 ? (
-            <StatusPill health="ok">{t("home.allHealthy")}</StatusPill>
-          ) : null}
-          {totals.services > 0 ? (
-            <span>
-              <span className="font-semibold">
-                {totals.healthy}/{totals.services}
-              </span>{" "}
-              <span className="text-muted-foreground">{t("home.healthyIn", adopted.length)}</span>
-            </span>
-          ) : null}
-        </div>
-      ) : (
-        <Skeleton className="h-5.5 w-64" />
-      )}
-      <ClusterFacts />
+    <section aria-label={t("home.status")}>
+      <StatGroup>
+        <Stat
+          label={t("metric.services")}
+          value={figure(`${totals.healthy}/${totals.services}`)}
+          tone={loaded && totals.services > 0 && allHealthy ? "ok" : undefined}
+        />
+        <Stat
+          label={t("status.failing")}
+          value={figure(totals.failing)}
+          tone={totals.failing > 0 ? "fail" : undefined}
+        />
+        <Stat
+          label={t("status.degraded")}
+          value={figure(totals.warning)}
+          tone={totals.warning > 0 ? "warn" : undefined}
+        />
+        <Stat
+          label={t("status.rollingOut")}
+          value={figure(totals.progressing)}
+          tone={totals.progressing > 0 ? "progress" : undefined}
+        />
+        <ClusterFacts />
+      </StatGroup>
     </section>
   )
 }
 
-/** Distribution and version, nodes ready, and the upgrade pill; each part only when readable. */
+/** The cluster: distribution and version (a link to it), nodes ready and the upgrade pill; each
+ * part only when readable. */
 function ClusterFacts() {
   const t = useT()
   const cluster = useQuery(clusterQuery)
@@ -155,28 +158,33 @@ function ClusterFacts() {
   const ready = items?.filter((node) => node.ready === "True").length
   if (!version && !items && !badge) return null
   return (
-    <Link
-      to="/cluster"
-      className="flex flex-wrap items-center gap-2.5 rounded-sm outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring sm:ml-auto"
-    >
-      <span className="type-meta text-muted-foreground">{t("shell.cluster")}</span>
-      {version ? (
-        <span className="type-mono" translate="no">
-          {cluster.data?.distribution ? `${cluster.data.distribution} ` : ""}
-          {version}
-        </span>
-      ) : null}
-      {items && items.length > 0 ? (
-        <span className="type-meta text-muted-foreground">
-          {t("home.nodesReady", ready ?? 0, items.length)}
-        </span>
-      ) : null}
-      {badge ? (
-        <StatusPill health={badge.health} size="sm">
-          {badge.text}
-        </StatusPill>
-      ) : null}
-    </Link>
+    <Stat
+      label={t("shell.cluster")}
+      value={
+        <Link
+          to="/cluster"
+          className="rounded-md type-mono outline-none hover:underline"
+          translate="no"
+        >
+          {version
+            ? `${cluster.data?.distribution ? `${cluster.data.distribution} ` : ""}${version}`
+            : t("shell.cluster")}
+        </Link>
+      }
+      // Nodes ready and the upgrade pill, each when it is readable: one does not wait for the other.
+      hint={
+        (items && items.length > 0) || badge ? (
+          <span className="flex items-center gap-2">
+            {items && items.length > 0 ? t("home.nodesReady", ready ?? 0, items.length) : null}
+            {badge ? (
+              <StatusPill health={badge.health} size="sm">
+                {badge.text}
+              </StatusPill>
+            ) : null}
+          </span>
+        ) : undefined
+      }
+    />
   )
 }
 
@@ -400,14 +408,20 @@ function ProjectsSection({
           <Problem error={error} />
         )
       ) : shown.length === 0 ? (
-        <p className="text-muted-foreground">{t("cluster.noProjects")}</p>
+        <Empty size="sm">
+          <EmptyHeader>
+            <EmptyMedia>
+              <Illustration kind="empty" seed="projects" />
+            </EmptyMedia>
+            <EmptyDescription>{t("cluster.noProjects")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <Table aria-labelledby="home-projects" variant="ruled" className="min-w-180">
           <TableHeader>
             <TableRow>
               <TableHead>{t("table.name")}</TableHead>
-              <TableHead>{t("overview.podStrip")}</TableHead>
-              <TableHead>{t("home.healthy")}</TableHead>
+              <TableHead>{t("metric.services")}</TableHead>
               <TableHead>{t("home.warningsHour")}</TableHead>
               <TableHead>{t("table.domain")}</TableHead>
             </TableRow>
@@ -434,24 +448,6 @@ function ProjectsSection({
       )}
     </section>
   )
-}
-
-/** The order of kinds before the project's document says each service's role: what usually
- * faces outward first, data last. */
-const kindOrder = ["Deployment", "DaemonSet", "CronJob", "Job", "StatefulSet"]
-
-/** The project's services outside to inside, by their roles in `document` when it is there. */
-function ordered(services: Brief[], document?: Project): Brief[] {
-  if (!document)
-    return services.toSorted(
-      (a, b) =>
-        kindOrder.indexOf(a.kind) - kindOrder.indexOf(b.kind) || a.name.localeCompare(b.name),
-    )
-  const rank = new Map(
-    document.services.toSorted(outsideIn).map((service, i) => [serviceId(service), i]),
-  )
-  const at = (s: Brief) => rank.get(serviceId(s)) ?? Number.MAX_SAFE_INTEGER
-  return services.toSorted((a, b) => at(a) - at(b) || a.name.localeCompare(b.name))
 }
 
 /** The domain a project is known by: the one with the fewest labels (`shop.example.com` before
@@ -502,18 +498,7 @@ function ProjectRow({
         </span>
       </TableCell>
       <TableCell>
-        {project.services ? (
-          project.services.length > 0 ? (
-            <ServiceCells project={project.name} services={ordered(project.services, document)} />
-          ) : (
-            <span className="text-muted-foreground">{t("home.noServices")}</span>
-          )
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
-      </TableCell>
-      <TableCell>
-        {project.health ? `${project.health.healthy}/${project.health.services}` : "—"}
+        <ServicesCell project={project} />
       </TableCell>
       <TableCell>
         {warnings === null ? (
@@ -555,55 +540,33 @@ function ProjectRow({
   )
 }
 
-/** Most cells drawn for one service; the rest are counted. */
-const CELLS_MAX = 12
-
-/** One cell per replica: ready ones green, the rest in the service's state (failing, not ready,
- * rolling out). A CronJob, or a workload scaled to zero, is one cell in its state. */
-function cellsOf(service: Brief): Health[] {
-  const desired = service.desired ?? 0
-  if (desired === 0) return [service.health === "ok" ? "idle" : service.health]
-  const ready = Math.min(Math.max(service.ready ?? 0, 0), desired)
-  const rest: Health =
-    service.health === "fail" ? "fail" : service.health === "progress" ? "progress" : "warn"
-  return [
-    ...Array.from({ length: ready }, (): Health => "ok"),
-    ...Array.from({ length: desired - ready }, () => rest),
-  ]
-}
-
-function ServiceCells({ project, services }: { project: string; services: Brief[] }) {
+/** A project's services in words: healthy out of all, then what needs attention, worst first
+ * (the replicas of each service are on the project's own pages). */
+function ServicesCell({ project }: { project: ProjectItem }) {
   const t = useT()
+  const h = project.health
+  if (!project.services) return <span className="text-muted-foreground">—</span>
+  if (project.services.length === 0 || !h || h.services === 0)
+    return <span className="text-muted-foreground">{t("home.noServices")}</span>
   return (
-    <ul aria-label={t("overview.podStrip")} className="flex flex-wrap items-center gap-x-2 gap-y-1">
-      {services.map((service) => {
-        const cells = cellsOf(service)
-        const label =
-          service.desired !== undefined && service.desired !== null
-            ? `${t("home.servicePods", service.name, service.ready ?? 0, service.desired)}, ${briefWord(t, service)}`
-            : `${service.name}: ${briefWord(t, service)}`
-        return (
-          <li key={service.id} className="flex">
-            <Link
-              {...serviceLink(project, service)}
-              title={label}
-              aria-label={label}
-              className="flex items-center gap-0.5 rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {cells.slice(0, CELLS_MAX).map((health, i) => (
-                // oxlint-disable-next-line react/no-array-index-key -- cells have no identity
-                <span key={i} aria-hidden="true" className={cn(cellBox.sm, cellColour[health])} />
-              ))}
-              {cells.length > CELLS_MAX ? (
-                <span aria-hidden="true" className="type-nano text-muted-foreground">
-                  +{cells.length - CELLS_MAX}
-                </span>
-              ) : null}
-            </Link>
-          </li>
-        )
-      })}
-    </ul>
+    <span className="flex items-center gap-2.5">
+      <span className="tabular-nums">
+        {h.healthy}/{h.services}
+      </span>
+      {h.failing > 0 ? (
+        <StatusPill health="fail" size="sm">
+          {t("overview.failingCount", h.failing)}
+        </StatusPill>
+      ) : h.warning > 0 ? (
+        <StatusPill health="warn" size="sm">
+          {t("overview.degradedCount", h.warning)}
+        </StatusPill>
+      ) : h.progressing > 0 ? (
+        <StatusPill health="progress" size="sm">
+          {t("home.rollingOut", h.progressing)}
+        </StatusPill>
+      ) : null}
+    </span>
   )
 }
 
@@ -671,19 +634,20 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
                 className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 border-t border-rule py-2.5 md:grid md:grid-cols-warning"
               >
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <StatusDot health="warn" />
+                  <StatusDot health="warn" className="shrink-0" />
                   {row.namespace ? (
                     <>
                       <Link
                         to="/projects/$project"
                         params={{ project: row.namespace }}
                         search={{ events: "all" }}
-                        className="type-meta text-muted-foreground hover:text-foreground hover:underline"
+                        className="max-w-1/2 min-w-0 truncate type-meta text-muted-foreground hover:text-foreground hover:underline"
                         translate="no"
+                        title={row.namespace}
                       >
                         {row.namespace}
                       </Link>
-                      <span aria-hidden="true" className="type-meta text-muted-foreground">
+                      <span aria-hidden="true" className="shrink-0 type-meta text-muted-foreground">
                         /
                       </span>
                     </>
@@ -691,18 +655,26 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
                   {service && row.namespace ? (
                     <Link
                       {...serviceLink(row.namespace, service, { tab: "events" })}
-                      className="truncate font-medium hover:underline"
+                      className="min-w-0 truncate font-medium hover:underline"
                       translate="no"
+                      title={regarding?.name}
                     >
                       {regarding?.name}
                     </Link>
                   ) : (
-                    <span className="truncate font-medium" translate="no">
+                    <span
+                      className="min-w-0 truncate font-medium"
+                      translate="no"
+                      title={regarding?.name}
+                    >
                       {regarding?.name}
                     </span>
                   )}
                   {regarding ? (
-                    <span className="type-meta text-muted-foreground" translate="no">
+                    <span
+                      className="shrink-0 whitespace-nowrap type-meta text-muted-foreground"
+                      translate="no"
+                    >
                       {regarding.kind}
                     </span>
                   ) : null}

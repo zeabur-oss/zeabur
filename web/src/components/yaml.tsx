@@ -42,7 +42,7 @@ export function YamlBlock({
   return (
     <figure
       aria-label={label}
-      className={cn("relative min-w-0 rounded-xl border bg-muted/30", className)}
+      className={cn("relative min-w-0 rounded-lg border bg-muted/30", className)}
     >
       <CopyButton value={yaml} className="absolute top-2 right-2 z-10" />
       <pre className="overflow-x-auto py-3 font-mono text-xs leading-5" translate="no">

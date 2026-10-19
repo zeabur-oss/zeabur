@@ -1,8 +1,0 @@
-# Files copied verbatim from Vercel's Geist font release (https://github.com/vercel/geist-font).
-# scripts/check-geist-mono.sh downloads the release, checks its SHA-256 and compares these files with it;
-# change them only by moving the release below.
-release = v1.7.2
-url = https://github.com/vercel/geist-font/releases/download/v1.7.2/geist-font-v1.7.2.zip
-sha256 = 7fc800d2ac6b92844895196e5041aca55d814c15db70c44f79b3b83ab82b04e2
-geist-mono-wght.woff2 = geist-font/GeistMono/webfonts/GeistMono[wght].woff2
-LICENSE-GeistMono.txt = geist-font/OFL.txt

@@ -125,10 +125,14 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     // on that message, whether or not the window could close.
     await page.goto(servicePage)
     await expect(page.getByRole("heading", { level: 1, name: service })).toBeVisible()
-    await page
-      .getByRole("tablist", { name: "Service sections" })
-      .getByRole("tab", { name: "Terminal" })
-      .click()
+    // The terminal is under More (web/DESIGN.md, "Depth"); once open it is a tab of its own.
+    await page.getByRole("button", { name: "More", exact: true }).click()
+    await page.getByRole("menuitem", { name: "Terminal" }).click()
+    await expect(
+      page
+        .getByRole("tablist", { name: "Service sections" })
+        .getByRole("tab", { name: "Terminal" }),
+    ).toHaveAttribute("aria-selected", "true")
     // The terminal's own refusal, not another one on the page (Secrets the `view` role cannot
     // list also offer admin rights): wait for it inside the Terminal tab, then use its button.
     // The terminal reconnects on its own once the rights are active, whichever button granted them.

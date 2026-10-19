@@ -5,9 +5,9 @@ import CheckIcon from "~icons/ph/check"
 import CopyIcon from "~icons/ph/copy"
 import InfoIcon from "~icons/ph/info"
 
-import { Button } from "@/components/ui/button"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Button } from "@engawahq/design-system/components/button"
+import { ToggleGroup, ToggleGroupItem } from "@engawahq/design-system/components/toggle-group"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo, formatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -34,7 +34,7 @@ export function Panel({
   return (
     <section
       aria-labelledby={id}
-      className={cn("flex min-w-0 flex-col rounded-xl border bg-card", className)}
+      className={cn("flex min-w-0 flex-col rounded-lg border bg-card shadow-xs", className)}
     >
       <header className="flex min-h-11 items-center gap-2 border-b px-4 py-2">
         <h2 id={id} className="min-w-0 truncate text-sm font-medium">
@@ -97,7 +97,7 @@ export function Hint({ children, label }: { children: ReactNode; label: string }
       <button
         type="button"
         aria-label={label}
-        className="inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-full text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground"
       >
         <InfoIcon className="size-3.5" aria-hidden="true" />
       </button>
@@ -159,39 +159,6 @@ export function Histogram({
   )
 }
 
-/** Ready out of desired, as segments and a count. */
-export function ReplicaBar({ ready, desired }: { ready: number; desired: number }) {
-  const segments = Math.min(Math.max(desired, ready, 1), 12)
-  const filled = desired > 12 ? Math.round((ready / desired) * 12) : ready
-  return (
-    <span className="flex items-center gap-2">
-      <span
-        className="flex h-1.5 w-14 gap-px overflow-hidden rounded-full bg-muted"
-        aria-hidden="true"
-      >
-        {Array.from({ length: segments }, (_, i) => (
-          <span
-            // oxlint-disable-next-line react/no-array-index-key -- segments are positional
-            key={i}
-            className={cn(
-              "h-full flex-1",
-              i < filled ? (ready < desired ? "bg-warn" : "bg-foreground/60") : "bg-transparent",
-            )}
-          />
-        ))}
-      </span>
-      <span
-        className={cn(
-          "text-xs tabular-nums",
-          ready < desired ? "font-medium" : "text-muted-foreground",
-        )}
-      >
-        {ready}/{desired}
-      </span>
-    </span>
-  )
-}
-
 /**
  * A segmented two- or three-way switch: shadcn/ui's ToggleGroup with equal segments and a thumb
  * that slides to the choice. The segments share the width, so the thumb is one segment wide and
@@ -227,7 +194,7 @@ export function Segmented<T extends string>({
     >
       <span
         aria-hidden="true"
-        className="slide absolute inset-y-0.5 left-0.5 w-(--thumb) translate-x-(--slide-x) rounded-md bg-background ring-1 ring-border"
+        className="slide absolute inset-y-0.5 left-0.5 w-(--thumb) translate-x-(--slide-x) rounded-md bg-card shadow-xs ring ring-foreground/8 dark:bg-foreground/12"
         style={{
           "--thumb": `calc((100% - 0.25rem) / ${options.length})`,
           "--slide-x": `${index * 100}%`,

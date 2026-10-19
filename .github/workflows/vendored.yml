@@ -10,20 +10,12 @@ on:
     branches: [main]
     paths:
       - crates/engawa-recommend/bundle/**
-      - web/src/styles/genkan/**
-      - web/src/styles/geist-mono/**
       - scripts/check-recommendations.sh
-      - scripts/check-genkan-files.sh
-      - scripts/check-geist-mono.sh
       - .github/workflows/vendored.yml
   pull_request:
     paths:
       - crates/engawa-recommend/bundle/**
-      - web/src/styles/genkan/**
-      - web/src/styles/geist-mono/**
       - scripts/check-recommendations.sh
-      - scripts/check-genkan-files.sh
-      - scripts/check-geist-mono.sh
       - .github/workflows/vendored.yml
   workflow_dispatch:
 
@@ -42,4 +34,4 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
-      - run: nix develop --command bash -c './scripts/check-recommendations.sh && ./scripts/check-genkan-files.sh && ./scripts/check-geist-mono.sh'
+      - run: nix develop --command ./scripts/check-recommendations.sh

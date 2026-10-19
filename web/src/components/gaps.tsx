@@ -9,8 +9,12 @@ import WrenchIcon from "~icons/ph/wrench"
 import type { Schemas } from "@/api/client"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
-import { Button, buttonVariants } from "@/components/ui/button"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Button, buttonVariants } from "@engawahq/design-system/components/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@engawahq/design-system/components/collapsible"
 import { YamlBlock } from "@/components/yaml"
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
@@ -80,7 +84,11 @@ function GapRow({ gap, onPlan }: { gap: Gap; onPlan?: () => void }) {
         ) : null}
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 type-meta text-muted-foreground">
-        <span className="type-mono" translate="no">
+        <span
+          className="max-w-full min-w-0 truncate type-mono"
+          translate="no"
+          title={`${gap.subject.kind}/${gap.subject.name}`}
+        >
           {gap.subject.kind}/{gap.subject.name}
         </span>
         {gap.citations.map((c) => (

@@ -11,7 +11,7 @@ import XIcon from "~icons/ph/x"
 import { EventList } from "@/components/events"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus, StatusDot } from "@/components/status"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@engawahq/design-system/components/button"
 import { useT } from "@/i18n"
 import { podLogsLink, serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
@@ -67,7 +67,7 @@ export function QuickLook({
           <button
             type="button"
             onClick={() => onSelect(otherId)}
-            className="flex min-w-0 items-center gap-1.5 rounded font-medium outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex min-w-0 items-center gap-1.5 rounded font-medium outline-none hover:underline"
             translate="no"
           >
             <StatusDot health={statusOf(other).health} />

@@ -8,12 +8,12 @@ import CaretUpDownIcon from "~icons/ph/caret-up-down"
 import GlobeIcon from "~icons/ph/globe"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 
-import { ReplicaBar, Segmented } from "@/components/bits"
-import { PodCells } from "@/components/pods"
+import { Segmented } from "@/components/bits"
+import { PodCells, replicaCounts } from "@/components/pods"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus, useStatusWord } from "@/components/status"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
+import { Select } from "@engawahq/design-system/components/select"
 import { useT } from "@/i18n"
 import { useHistoryIndex, useLocationText } from "@/lib/history"
 import { serviceLink } from "@/lib/place"
@@ -57,8 +57,14 @@ export function ServicesPage() {
   )
 }
 
-const readyRatio = (s: Service) =>
-  s.replicas ? s.replicas.ready / Math.max(s.replicas.desired, 1) : 2
+/** The kind filter's "All kinds": an explicit value, since a select's empty value means none. */
+const ALL_KINDS = "*"
+
+/** The share of replicas ready, as the column shows it; nothing desired sorts last. */
+const readyRatio = (s: Service) => {
+  const { ready, desired } = replicaCounts(s)
+  return desired > 0 ? ready / desired : 2
+}
 
 /** Orders two services by a column's values, smallest first. */
 function compare(key: SortKey, a: Service, b: Service): number {
@@ -138,7 +144,7 @@ function ServicesTable({
           onClick={() =>
             set(active ? { desc: search.desc ? undefined : true } : { sort: key, desc: undefined })
           }
-          className="inline-flex items-center gap-1 rounded outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex items-center gap-1 rounded outline-none hover:text-foreground"
         >
           {label}
           <SortIcon className={cn("size-3", !active && "opacity-40")} aria-hidden="true" />
@@ -150,7 +156,7 @@ function ServicesTable({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex h-8 w-full items-center gap-2 rounded-lg border bg-background px-2.5 focus-within:ring-3 focus-within:ring-ring sm:w-64">
+        <label className="flex h-8 w-full items-center gap-2 rounded-lg border bg-background px-2.5 focus-within:border-ring sm:w-64">
           <MagnifyingGlassIcon className="size-4 text-muted-foreground" aria-hidden="true" />
           <input
             type="search"
@@ -181,32 +187,28 @@ function ServicesTable({
             { value: "healthy", label: t("services.healthy") },
           ]}
         />
-        <NativeSelect
+        <Select
           size="sm"
-          value={search.kind ?? ""}
-          onChange={(event) => set({ kind: event.target.value || undefined })}
+          value={search.kind ?? ALL_KINDS}
+          onValueChange={(kind) => set({ kind: kind === ALL_KINDS ? undefined : kind })}
           aria-label={t("table.kind")}
-        >
-          <NativeSelectOption value="">{t("services.allKinds")}</NativeSelectOption>
-          {kinds.map((kind) => (
-            <NativeSelectOption key={kind} value={kind}>
-              {kind}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+          items={[
+            { value: ALL_KINDS, label: t("services.allKinds") },
+            ...kinds.map((kind) => ({ value: kind, label: kind })),
+          ]}
+        />
         <span className="ml-auto text-xs text-muted-foreground tabular-nums">
           {t("services.count", rows.length, data.services.length)}
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border bg-card">
+      <div className="overflow-x-auto rounded-lg border bg-card shadow-xs">
         <table className="w-full min-w-205 text-sm" aria-label={t("project.services")}>
           <thead className="border-b bg-muted/30">
             <tr>
               {sortable("name", t("table.service"), "pl-4")}
               {sortable("status", t("table.status"))}
-              <th className={head}>{t("pod.pods")}</th>
-              {sortable("ready", t("table.ready"))}
+              {sortable("ready", t("table.pods"))}
               {sortable("restarts", t("table.restarts"), "text-right")}
               <th className={head}>{t("table.domain")}</th>
               {sortable("kind", t("table.kind"), "pr-4")}
@@ -215,7 +217,7 @@ function ServicesTable({
           <tbody className="divide-y">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
                   {t("services.noMatch")}
                 </td>
               </tr>
@@ -225,11 +227,11 @@ function ServicesTable({
               const restarts = restartsOf(service)
               const domain = domainsOf(data, service)[0]
               return (
-                <tr key={serviceId(service)} className="hover:bg-muted/40">
+                <tr key={serviceId(service)} className="hover:bg-hover">
                   <td className="py-2 pr-3 pl-4">
                     <Link
                       {...serviceLink(project, service)}
-                      className="flex items-center gap-2.5 rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring"
+                      className="flex items-center gap-2.5 rounded-md outline-none"
                     >
                       <ServiceIcon service={service} size="sm" />
                       <span className="flex min-w-0 flex-col leading-tight">
@@ -252,16 +254,6 @@ function ServicesTable({
                   </td>
                   <td className="px-3 py-2">
                     <PodCells service={service} project={project} />
-                  </td>
-                  <td className="px-3 py-2">
-                    {service.replicas ? (
-                      <ReplicaBar
-                        ready={service.replicas.ready}
-                        desired={service.replicas.desired}
-                      />
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
                   </td>
                   <td
                     className={cn(

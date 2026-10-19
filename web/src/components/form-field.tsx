@@ -4,7 +4,12 @@
 // in the last plan). The checks in the forms are instant hints; the server's plan decides.
 import type { ReactNode } from "react"
 
-import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@engawahq/design-system/components/field"
 
 /** The first message among a field's errors (TanStack Form's, and `refusedField`'s). */
 const firstMessage = (errors: unknown[]) =>

@@ -1,5 +1,5 @@
 // Loading states shared by every page (web/DESIGN.md); refusals are in components/refused.tsx.
-import { Skeleton } from "@/components/ui/skeleton"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
 
 export function LoadingRows({ rows = 3, label }: { rows?: number; label: string }) {
   return (

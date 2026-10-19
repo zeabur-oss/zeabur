@@ -23,11 +23,11 @@ import { Problem } from "@/components/problem"
 import { refusedAmong, refusedElsewhere, RefusedKinds, RefusedSome } from "@/components/refused"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus } from "@/components/status"
-import { Button } from "@/components/ui/button"
-import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Button } from "@engawahq/design-system/components/button"
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@engawahq/design-system/components/menu"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@engawahq/design-system/components/tabs"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { useProjectSummary } from "@/lib/project-name"
 import { cn } from "@/lib/utils"
@@ -42,7 +42,7 @@ import {
   type Service,
 } from "@/model/service"
 import { inServiceTabs, refusedPlaces, useProjectEvents } from "@/routes/project/data"
-import { serviceTabs, type ServiceTab } from "@/routes/search"
+import type { ServiceTab } from "@/routes/search"
 import { EventsTab } from "@/routes/service/events"
 import { NetworkingTab } from "@/routes/service/networking"
 import { OverviewTab } from "@/routes/service/overview"
@@ -50,6 +50,20 @@ import { ReleasesTab } from "@/routes/service/releases"
 import { StorageTab } from "@/routes/service/storage"
 import { VariablesTab } from "@/routes/service/variables"
 import { YamlTab } from "@/routes/service/yaml"
+import { TabsMore } from "@engawahq/design-system/components/tabs-more"
+
+// The everyday tabs (web/DESIGN.md, "Depth"): what most people need of a service. The rest, which
+// take knowing Kubernetes or are for digging in, are under More; any of them opens from a link too.
+const everydayTabs: readonly ServiceTab[] = [
+  "overview",
+  "logs",
+  "variables",
+  "networking",
+  "settings",
+]
+const moreTabs = ["events", "releases", "storage", "terminal", "yaml"] as const
+const isMoreTab = (tab: ServiceTab): tab is (typeof moreTabs)[number] =>
+  (moreTabs as readonly ServiceTab[]).includes(tab)
 
 // The log viewer (virtual list, ANSI parsing, streaming) loads when the Logs tab first opens.
 const LogsTab = lazy(() => import("@/routes/service/logs").then((m) => ({ default: m.LogsTab })))
@@ -162,7 +176,8 @@ function ServiceView({
         <Link
           to="/projects/$project"
           params={{ project }}
-          className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring"
+          activeOptions={{ exact: true, includeSearch: false }}
+          className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground"
           aria-label={t("service.backTo", projectName)}
         >
           <ArrowLeftIcon aria-hidden="true" className="size-3.5" />
@@ -172,7 +187,7 @@ function ServiceView({
           <ServiceIcon service={service} size="lg" />
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-              <h1 className="truncate text-xl font-semibold tracking-tight" translate="no">
+              <h1 className="truncate type-title" translate="no">
                 {service.displayName ?? service.name}
               </h1>
               <ServiceStatus status={status} counts />
@@ -252,9 +267,10 @@ function ServiceView({
           </div>
         ) : null}
         <RefusedSome unreadable={refusedElsewhere(unreadable, inServiceTabs)} />
-        <div className="-mx-1 overflow-x-auto scrollbar-none">
+        <div className="-mx-1 flex items-center gap-1 overflow-x-auto scrollbar-none">
           <TabsList variant="line" aria-label={t("service.tabs")} className="h-9">
-            {serviceTabs.map((value) => (
+            {/* The everyday tabs, then one from More while it is open. */}
+            {(isMoreTab(tab) ? [...everydayTabs, tab] : everydayTabs).map((value) => (
               <TabsTrigger key={value} value={value}>
                 {t(`tab.${value}`)}
                 {counts[value] ? (
@@ -265,6 +281,15 @@ function ServiceView({
               </TabsTrigger>
             ))}
           </TabsList>
+          <TabsMore
+            label={t("tab.more")}
+            items={moreTabs.map((value) => ({
+              value,
+              label: t(`tab.${value}`),
+              count: counts[value],
+            }))}
+            onSelect={(value) => setTab(value)}
+          />
         </div>
       </header>
       <div

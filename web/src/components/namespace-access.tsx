@@ -8,7 +8,7 @@ import { useQuery } from "@tanstack/react-query"
 import WarningFillIcon from "~icons/ph/warning-fill"
 
 import { whoamiQuery } from "@/api/queries"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert, AlertDescription } from "@engawahq/design-system/components/alert"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { kubectlLabel, patchRole } from "@/model/project"

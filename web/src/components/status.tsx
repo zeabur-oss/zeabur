@@ -4,8 +4,8 @@
 // (`CrashLoopBackOff`) is in the pill's tooltip, with the restarts and the last failed exit.
 import type { ReactNode } from "react"
 
-import { Badge } from "@/components/ui/badge"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Badge } from "@engawahq/design-system/components/badge"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -19,7 +19,7 @@ const healthBg: Record<Health, string> = {
   idle: "bg-idle",
 }
 
-/** A 7px dot; idle (scheduled, paused, completed) is a ring rather than a grey disc. */
+/** A 7px round dot; idle (scheduled, paused, completed) is a ring rather than a grey disc. */
 export function StatusDot({ health, className }: { health: Health; className?: string }) {
   return (
     <span

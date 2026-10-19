@@ -4,11 +4,15 @@ import { useForm } from "@tanstack/react-form"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import type { Schemas } from "@/api/client"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
-import { Switch } from "@/components/ui/switch"
+import { Button } from "@engawahq/design-system/components/button"
+import { Input } from "@engawahq/design-system/components/input"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@engawahq/design-system/components/collapsible"
+import { Select } from "@engawahq/design-system/components/select"
+import { Switch } from "@engawahq/design-system/components/switch"
 import { useT } from "@/i18n"
 import { FormField, quantity } from "@/components/form-field"
 import {
@@ -282,19 +286,14 @@ export function AddVolume({
             <form.Field name="accessMode">
               {(f) => (
                 <FormField label={t("form.accessMode")} hint={t("form.accessModeHint")}>
-                  <NativeSelect
+                  <Select
                     size="sm"
                     value={f.state.value}
                     disabled={disabled}
-                    onChange={(e) => f.handleChange(e.target.value as VolumeValues["accessMode"])}
+                    onValueChange={(mode) => f.handleChange(mode)}
                     translate="no"
-                  >
-                    {accessModes.map((mode) => (
-                      <NativeSelectOption key={mode} value={mode}>
-                        {mode}
-                      </NativeSelectOption>
-                    ))}
-                  </NativeSelect>
+                    items={accessModes.map((mode) => ({ value: mode, label: mode }))}
+                  />
                 </FormField>
               )}
             </form.Field>

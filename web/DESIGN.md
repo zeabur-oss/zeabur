@@ -1,49 +1,125 @@
 # engawa interface design
 
-engawa's own rules for the web interface. Components, radii and neutrals are shadcn/ui's (preset
-brrM on Base UI, `src/styles/shadcn/theme.css`); build from those components (Badge, Card, Table,
-ToggleGroup, Tooltip…) and compose engawa's own visuals on top rather than hand-rolling
-look-alikes. `src/styles/app.css` adds engawa's tokens:
+engawa's own rules for the web interface. Components, tokens and fonts come from
+[@engawahq/design-system](https://github.com/engawahq/design-system) (preview them in its
+Storybook): shadcn/ui's components on Base UI with engawa's variants, shadcn/ui's theme (preset
+brrM) and engawa's tokens. Build from those components (Badge, Card, Table, ToggleGroup,
+Tooltip…) and compose engawa's own visuals on top rather than hand-rolling look-alikes.
+`src/styles/app.css` imports the design system and adds only this interface's layout tokens. The
+design system's tokens:
 
-- **Hinoki** (`--brand`, low chroma) marks only "you are here" (the 3px rail on the project
-  column's highlight), the logo and focus. Never a status, never a fill bigger than a rail.
-- **Status**: `--ok`, `--progress`, `--warn` (yellow ochre, apart from the wood), `--fail`,
-  `--idle`, each with `-soft` (pill fill) and `-strong` (pill text). Status is a pill (Badge, dot and
-  one word) where there is room and a bare dot in dense places, with its word in a tooltip.
-- **Surfaces**: `--plane` (the pod strip), `--rule` (hairlines between rows), the sidebar tint.
-- **Type**: `type-title` 24/30, `type-heading` 15/22, `type-body` 13/20 (14/22 in Chinese),
-  `type-meta` 12/16, `type-micro` 11/14, `type-nano` 10/14 (counts, axes, key hints), `type-figure` 18/24, `type-mono` for machine values only, in Geist Mono (self-hosted, `styles/geist-mono`).
-  Weights 400 and 600 where text may be Han. Figures are tabular everywhere. Chinese gets its own
-  system font stack per locale and `text-autospace`.
-- **Motion**: active markers slide (`slide`: the rail, the project column, segmented controls,
-  the tabs' underline); panels come in from their edge (the quick look `enter-from-right`, a
-  `panel` or `sheet` dialog); toasts slide in; `prefers-reduced-motion` turns it off.
-- **Not used** (`scripts/check-ui-styles.sh` fails on them): all caps, wide tracking, gradients,
-  backdrop blur, Phosphor `duotone`, a kind after a heading, middle-dot strings, bordered pills
-  for facts; also no hover lifts, no icon tiles, no `→` after link text (see Copy).
+- **agent-playground's and lymeno's language** (Linear's, measured from its desktop app): two
+  grounds, the window `--chrome` under the sidebar and one rounded panel (`--background`) on it,
+  with white cards, fields and popups in the panel; near-hueless greys; 0.5px hairlines (`border`
+  is 0.5px); faint layered shadows (`shadow-xs` on what sits on the panel, `shadow-md` on what
+  floats, `shadow-xl` on dialogs). **Lime and ink** are engawa's accent: lime with ink text on solid
+  buttons and switches, ink for the logo (lime on dark), lime under ink for the selection;
+  `brand-strong` (lime deepened to 4.5:1) for a check, a link and a focused field's edge. Never a
+  status.
+- **Status**: `--ok` (green), `--progress` (blue), `--warn` (orange), `--fail` (red), `--idle`
+  (grey), each with `-soft` (pill fill) and `-strong` (pill text). Status is a pill (Badge, dot
+  and one word) where there is room and a bare round dot in dense places, with its word in a
+  tooltip.
+- **Surfaces and fills**: the window ground `--chrome` around the panel, `--plane` (a ground for
+  things laid out in space, a segmented control's groove), `--rule` (hairlines between rows);
+  hover, a selected row and a press are translucent fills over any ground (`bg-hover` 3.5%,
+  `bg-selected` 6%, `bg-press` 8%) that show at once and fade when the pointer leaves.
+- **Shape**: controls 28 / 32 / 40px tall and rounded 8 (`rounded-lg`); cards rounded 8 with a
+  hairline and `shadow-xs`; small parts (chips, inline links, a count) rounded 6 (`rounded-md`);
+  the panel, menus, popovers, dialogs and dashed state blocks rounded 12 (`rounded-xl`); icon
+  buttons, avatars, status dots and counts round (`rounded-full`).
+- **Type**: Inter, 13px at 450 for text: `type-title` 24/32, `type-heading` 15/22,
+  `type-body` 13/20, `type-meta` 12/18, `type-micro` 11/16, `type-nano` 10/14 (counts, axes, key
+  hints), `type-figure` 18/24, all in every language; `type-mono` for machine values only, in
+  JetBrains Mono 12 (both self-hosted by the design system). Han text falls back to the system's
+  CJK face for the locale; `text-autospace` spaces it from Latin and digits. 500 for emphasis
+  (labels, buttons, sidebar rows), 600 for titles. Figures are tabular everywhere.
+- **Motion**: the sidebar folds with Linear's easing; active markers slide (`slide`: segmented
+  controls, the tabs' underline); popups fade and grow a little from their trigger; panels come in
+  from their edge (the quick look `enter-from-right`, a `panel` or `sheet` dialog); toasts slide in;
+  `prefers-reduced-motion` turns it off.
+- **Buttons** are the design system's: 13px at 500, sentence case. Default is lime with ink text,
+  outline is white with a hairline, ghost and muted are for toolbars and rows, icon buttons are
+  round.
+- **Replicas** are said in words first, "2/3" (ready out of desired), then one small square per
+  replica in its state, at most 10 and the rest counted; only in tables, where each square opens
+  that pod's logs. No field of dots without words.
+- **Bars** are the design system's `Meter` (a value on a track, a request as a mark) or
+  `MeterStack` (parts of a whole), so every bar is the same: a 6px round-ended track at 8% of the
+  text colour, filled in blue at 70%, orange near a limit, grey for what is reserved. No bar of
+  its own.
+- **Segmented** switches show the choice on a white thumb in a grey groove (a lighter grey in
+  dark mode).
+- **Pages** follow cloud consoles (GCP, Volcengine): every page starts with the design system's
+  `PageHeader` (one title size; a pill or version beside the title, actions or meta such as
+  "Updated" at the end of its row). An overview puts its key figures right under it in a
+  `StatGroup`, from the left, before anything drawn; lists are tables in a bordered card with
+  Table `ruled` (the heading row on a light fill). A name, a namespace or an object never breaks
+  onto a second line: it truncates, with the whole of it in `title`.
+- **Illustrations** are the landing site's mosaic tiles (the design system's `Illustration`): a
+  state that fills a page or a section (no projects yet, no releases, no objects, an empty or
+  unmatched log, not found, refused, a route that failed) is an `Empty` with its illustration and
+  one line. A "None." inside a card stays text, and "nothing needs attention" stays a dot and a
+  line: a picture there would draw the eye to nothing. No other illustration style, no icons as
+  pictures.
+- **Choices** are the design system's `Select`, whose list is the menu; never a native `<select>`,
+  whose list the browser draws.
+- **Focus**: no focus rings, as in agent-playground and Linear (a product decision). A field
+  shows where typing goes by its edge (`focus-within:border-ring` on a field-like wrapper); a list
+  or menu by its highlighted row. Keyboard use itself stays: Tab order, Esc, arrow keys.
+- **Not used** (`scripts/check-ui-styles.sh` fails on them): all caps and wide tracking,
+  gradients, backdrop blur, Phosphor `duotone`, focus rings (`focus-visible:ring-*`,
+  `focus-visible:outline-*`), a kind after a heading, middle-dot strings, bordered pills for facts;
+  also no hover lifts, no icon tiles, no `→` after link text (see Copy).
 
 Icons: Phosphor only (`import XIcon from "~icons/ph/x"`, `src/lib/icon.ts`), regular weight, bare,
-`aria-hidden` when decorative.
+`aria-hidden` when decorative, 14px in rows and buttons; the design system draws their lines at
+about 1.2px, as agent-playground's.
 
 ## Lint
 
-`bun run lint` runs [shadcn/lint](https://github.com/shadcn-ui/lint) on app code (not on
-`src/components/ui`, which stays as the shadcn CLI writes it, plus the variants below):
+`bun run lint` runs [shadcn/lint](https://github.com/shadcn-ui/lint) on app code; it recognises
+the design system's components by their import (`componentImports` in `.oxlintrc.json`):
 
 - **Variant over restyle** (`no-restyle`, layout allowed): a page may place and size a component
   (`flex`, `w-24`, `mt-2`, `relative`) but not change its colour, type, spacing or shape. A
-  treatment used more than once becomes a variant or size in `src/components/ui` in shadcn/ui's
+  treatment used more than once becomes a variant or size in the design system in shadcn/ui's
   style (cva): Badge's status tones, Table `ruled`, Card `list`, Tabs `page`, ToggleGroup
   `segmented`, PopoverTrigger `ghost`/`plain`, Skeleton `card`. A one-off goes on a wrapper
   element.
 - **Tokens, not arbitrary values** (`no-arbitrary-values`, `no-raw-colors`, `no-unknown-classes`):
   the `type-*` roles (plus `type-nano` 10/14 for counts, axes and key hints), the spacing scale
-  (`gap-0.75`, not `gap-[3px]`), or a named token in `app.css` (`grid-cols-settings`,
-  `max-h-palette`, `hairline-ring`). Add the token there when the scale has nothing.
+  (`gap-0.75`, not `gap-[3px]`), or a named token (`hairline-ring` from the design system; `grid-cols-settings`,
+  `max-h-palette` in `app.css`). Add the token when the scale has nothing: to the design system if
+  another app could use it, to `app.css` if it is a layout of this interface.
 - **Dynamic values are custom properties** (`no-inline-styles`): `style` sets only `--*`
   properties, read by classes (`left-(--x)`, `translate-y-(--slide-y)`, `h-(--bar)`).
 - **Static classes** (`require-static-classes`): a component's `className` is literal strings or
   `cn` of literals; pick a variant rather than indexing a lookup table.
+
+## Depth
+
+engawa has depth. A person new to it does most of what they came for (is it running, read its
+logs, change a variable, scale it, give it a domain) on a few plain pages; what takes knowing
+Kubernetes is one deliberate step further. Decide a feature's layer before its place:
+
+| Layer         | For                        | Global         | Project                      | Service                                                           |
+| ------------- | -------------------------- | -------------- | ---------------------------- | ----------------------------------------------------------------- |
+| **Everyday**  | everyone                   | Home, Projects | Overview, Services, Settings | Overview, Logs, Variables, Networking, Settings' Compute          |
+| **Adjusting** | digging in, tuning         |                | Architecture                 | Events, Releases (and rollback), Storage, Settings' Health checks |
+| **Expert**    | people who know Kubernetes | Cluster        | Objects                      | Terminal, YAML                                                    |
+
+- **Everyday comes first and alone.** The sidebar leads with Home and Projects; Cluster and
+  Settings are in a Manage group at its end. The project column lists Overview, Services,
+  Architecture and Settings, with Objects under Advanced. A service shows five tabs; the rest
+  are under More (the design system's `TabsMore`). In a form, an adjusting part is a folding
+  section (Collapsible `section`).
+- **Fold, never hide.** Every deeper page stays one press away: a folded group remembers being
+  opened (`remembered` in `lib/stores.ts`), a group that holds the page shown opens itself, and
+  a link straight to a deeper page (`?tab=yaml`, a toast's View) shows it in place, as a tab of
+  its own while it is open.
+- **One current row.** The deepest place the page is has the selected fill; the rows it is under are
+  ancestors (label in the text colour). Navigation links match their path exactly.
 
 ## Information architecture
 
@@ -52,15 +128,15 @@ project fits together. Workflow, comparison and relationships each have their ow
 
 | URL                                 | Page                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                                 | **Home**: one status line (failing, not ready and rolling-out counts, services healthy in projects; the cluster's version, nodes ready and upgrade pill, linking to `/cluster`), needs attention (every unhealthy service across projects with its Logs and Events), projects failing first (pod cells per service, healthy, warnings of the last hour, domain; 20 shown), recent warnings (5).         |
+| `/`                                 | **Home**: key figures (services healthy, failing, not ready, rolling out; the cluster's version, nodes ready and upgrade pill, linking to `/cluster`), needs attention (every unhealthy service across projects with its Logs and Events), projects failing first (services healthy out of all with what needs attention in a pill, warnings of the last hour, domain; 20 shown), recent warnings (5).  |
 | `/cluster`                          | **Cluster**, tab Overview: version with an upgrade pill, needs attention, nodes with requests against allocatable (usage when metrics-server is there), the last hour's warnings about the cluster itself (no namespace, a Node, or a `kube-` namespace). Projects are Home's. Each section loads alone; a section the person may not read names the missing rule and copies a ClusterRole.             |
 | `/cluster/components`               | **Cluster**, tab Components: installed components with their versions against the tested ones, then the catalogue. Reading it takes an administrator's rights; anyone else sees the missing rules and a ClusterRole to copy.                                                                                                                                                                            |
 | `/projects`                         | Projects and other namespaces.                                                                                                                                                                                                                                                                                                                                                                          |
-| `/projects/:p`                      | **Overview** (default): name and health, pod strip, Failing (failing pod → its Logs and Events), services table (failures first; live CPU and memory when metrics-server answers), events (`?events=all`), domains, storage.                                                                                                                                                                            |
+| `/projects/:p`                      | **Overview** (default): name and health, key figures, Failing (failing pod → its Logs and Events), services table (failures first; live CPU and memory when metrics-server answers), events (`?events=all`), domains, storage.                                                                                                                                                                          |
 | `/projects/:p/architecture`         | **Architecture**: layered canvas, declared (solid) and inferred (dashed) edges, PVCs under cards; a card opens a quick look (`?service=Kind/name`).                                                                                                                                                                                                                                                     |
-| `/projects/:p/services`             | **Services**: full table; `?q`, `?status=attention\|healthy`, `?kind`, `?sort`, `?desc`. A name opens the service; a pod cell opens that pod's logs.                                                                                                                                                                                                                                                    |
+| `/projects/:p/services`             | **Services**: full table; `?q`, `?status=attention\|healthy`, `?kind`, `?sort`, `?desc`. A name opens the service; a replica's square opens that pod's logs.                                                                                                                                                                                                                                            |
 | `/projects/:p/objects`              | **Objects**: kinds first. The usual kinds and pinned kinds are read on open; every other served kind (custom resources too) is a row read on click; Scan all kinds reads the rest; kinds without access are marked; answers kept 45 s, Refresh re-reads, never polled; generated (`?generated`) and empty (`?empty`) kinds folded; `?q`; a name opens its YAML (`?object=group/version/resource/name`). |
-| `/projects/:p/services/:kind/:name` | **Service**: tabs Overview, Logs, Terminal, Variables, Networking, Storage, Settings, Events, Releases, YAML (`?tab`, `?pod`). Overview's Usage (live, per replica) and History (`?range`, `?split`).                                                                                                                                                                                                   |
+| `/projects/:p/services/:kind/:name` | **Service**: tabs Overview, Logs, Variables, Networking, Settings; under More, Events, Releases, Storage, Terminal, YAML (`?tab`, `?pod`). Overview's Usage (live, per replica) and History (`?range`, `?split`).                                                                                                                                                                                       |
 | `/settings`                         | Preferences, the metrics store usage history is read from, the signed-in person and About. `/settings/components` redirects to `/cluster/components`.                                                                                                                                                                                                                                                   |
 
 Everything a person picks (tab, filter, sort, selected service, pod) is in the URL: links are
@@ -69,18 +145,23 @@ back from a service page finds the canvas as it was.
 
 ## Shell
 
-- **Rail** (sidebar, an icon rail or full width, remembered; inside a project it starts as a rail):
-  the sill logo, then Home, Cluster, Projects, Settings under one sliding highlight; adopted
-  projects with their health when full; language, theme and the person at the bottom.
-- **Project column** inside a project: the project's name (a link to its Overview) with a switcher,
-  then Overview, Architecture, Services and Objects, then the services grouped by `part-of` or by role
-  (Web, Internal, Workers, Jobs, Data) with a status dot each, then the other objects folded. One
-  highlight with the hinoki rail slides to where you are. It stays in place on every project and
-  service page.
-- **Top bar**: breadcrumb `Cluster / shop ▾ / worker ▾`: each crumb a link, each ▾ a separate
-  switcher; "Jump to…" (⌘K).
-- **Phones** (< 768 px): rail and project column move into a sheet behind the menu button; the
-  project's four entries also show as tabs under the top bar.
+The frame is agent-playground's, from the design system (`AppFrame`, `Sidebar`): the sidebar sits
+on the window ground and the page is one panel inset by 8px, rounded 12.
+
+- **Sidebar** (folds to the panel's gap from the top bar's toggle or ⌘\, remembered): the logo
+  with search beside it (the ⌘K palette), then Home, Cluster, Projects and Settings; the adopted
+  projects with their health in a section that folds; the person (a menu, where people sign in),
+  language and theme at the bottom. Rows are 28px, a 14px icon and a 13px label at 500 in every
+  language; the current one has the selected fill.
+- **Project column**, a pane at the left of the panel inside a project: the project's name (a link
+  to its Overview) with a switcher, then Overview, Architecture, Services, Objects and Settings,
+  then the services grouped by `part-of` or by role (Web, Internal, Workers, Jobs, Data) in
+  sections with a status dot each, then the other objects folded. It stays in place on every
+  project and service page.
+- **Top bar**, the panel's header: the sidebar's toggle; breadcrumb `Cluster / shop ▾ / worker ▾`:
+  each crumb a link, each ▾ a separate switcher.
+- **Phones** (< 768 px): the sidebar and the project column move into a sheet behind the top bar's
+  toggle; the project's four entries also show as tabs under the top bar.
 - **⌘K palette**: projects, services, pods (their logs), domains, a few actions, recent items.
   Enter while an IME is composing does nothing.
 
@@ -250,11 +331,11 @@ Forward or a link.
 
 ## Motion and focus
 
-Transitions are short and decorative only; `prefers-reduced-motion` turns them off. Focus is always
-visible. Scrollable regions (the log) take focus.
+Transitions are short and decorative only; `prefers-reduced-motion` turns them off. No focus
+rings (see the design system's tokens above); scrollable regions (the log) still take focus.
 
 Movement is written so that it happens only without that preference: the `slide` and
-`enter-from-right` utilities (`app.css`) inside `prefers-reduced-motion: no-preference`, and
+`enter-from-right` utilities (the design system's) inside `prefers-reduced-motion: no-preference`, and
 `motion-safe:` on the dialogs' slide. A marker that has a place to slide to is one element moved
 by `translate`, never a highlight per item: Base UI's tab indicator (`--active-tab-*`) under Tabs,
 and the thumb of `Segmented` (equal segments, so it moves by whole widths of itself and nothing

@@ -10,11 +10,16 @@ import { installQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@engawahq/design-system/components/alert"
+import { Badge } from "@engawahq/design-system/components/badge"
+import { Button } from "@engawahq/design-system/components/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+} from "@engawahq/design-system/components/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@engawahq/design-system/components/tabs"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { k3sPackagedNotes } from "@/routes/cluster/k3s-packaged"

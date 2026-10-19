@@ -18,10 +18,10 @@ import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { projectGlyphs } from "@/components/project-icon"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Button } from "@engawahq/design-system/components/button"
+import { Input } from "@engawahq/design-system/components/input"
+import { Textarea } from "@engawahq/design-system/components/textarea"
+import { ToggleGroup, ToggleGroupItem } from "@engawahq/design-system/components/toggle-group"
 import { useT } from "@/i18n"
 import { mayChange, projectIcons, type ProjectIconName } from "@/model/project"
 import { ProjectHeader } from "@/routes/project/header"
@@ -88,7 +88,7 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
         {namespace.system ? (
           <p className="text-sm text-muted-foreground">{t("projectSettings.system")}</p>
         ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
             <div className="flex min-w-0 flex-col gap-0.5 text-sm">
               <span>
                 {namespace.adopted

@@ -93,10 +93,6 @@ export const endpointsOf = (network: Network, service: Service): Endpoint[] =>
 export const routesOf = (network: Network, service: Service): Route[] =>
   named(network.routes, service.routeNames)
 
-/** Outside (web) to inside (data), then by name: the order of the pod strip and the canvas. */
-export const outsideIn = (a: Service, b: Service) =>
-  roles.indexOf(roleOf(a)) - roles.indexOf(roleOf(b)) || a.name.localeCompare(b.name)
-
 // ── Pods ─────────────────────────────────────────────────────────────────────────────────────────
 
 /** Why a pod is not running or ready. */

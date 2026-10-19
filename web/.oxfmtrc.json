@@ -2,5 +2,5 @@
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
   "semi": false,
   "printWidth": 100,
-  "ignorePatterns": ["dist", "node_modules", "bun.lock", "src/styles/genkan/**"]
+  "ignorePatterns": ["dist", "node_modules", "bun.lock"]
 }

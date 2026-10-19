@@ -20,9 +20,9 @@ import { usePlanner } from "@/components/plan/planner"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusPill } from "@/components/status"
 import { FormField } from "@/components/form-field"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tooltip } from "@/components/ui/tooltip"
+import { Button } from "@engawahq/design-system/components/button"
+import { Input } from "@engawahq/design-system/components/input"
+import { Tooltip } from "@engawahq/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import {
   endpointsOf,
@@ -412,7 +412,7 @@ function Table({
   children: ReactNode
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card">
+    <div className="overflow-x-auto rounded-lg border bg-card shadow-xs">
       <table className={`w-full text-sm max-sm:block ${minWidth}`} aria-label={label}>
         {children}
       </table>

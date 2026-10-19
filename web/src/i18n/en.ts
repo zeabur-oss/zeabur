@@ -64,6 +64,7 @@ export const en = {
   "shell.findService": "Find a service",
   "shell.expandSidebar": "Expand sidebar",
   "shell.collapseSidebar": "Collapse sidebar",
+  "shell.manage": "Manage",
   "shell.whoamiUnknown": "Unknown user",
   "shell.account": "Account",
   "shell.signOut": "Sign out",
@@ -84,6 +85,7 @@ export const en = {
   "shell.switchService": "Switch service",
   "column.label": "Services",
   "column.other": "Other objects",
+  "column.advanced": "Advanced",
 
   "theme.system": "System theme",
   "theme.light": "Light",
@@ -261,16 +263,10 @@ export const en = {
   "home.title": "Home",
   "home.status": "Status",
   "home.rollingOut": (n: number) => `${n} rolling out`,
-  "home.allHealthy": "All healthy",
-  "home.healthyIn": (projects: number) =>
-    `services healthy in ${plural(projects, "project", "projects")}`,
   "home.nodesReady": (ready: number, total: number) => `${ready}/${total} nodes ready`,
   "home.allProjects": "All projects",
-  "home.healthy": "Healthy",
   "home.warningsHour": "Warnings, 1 h",
   "home.noEventsPermission": "You cannot list the cluster's events.",
-  "home.servicePods": (name: string, ready: number, desired: number) =>
-    `${name}: ${ready}/${desired} ready`,
   "home.noServices": "No services yet",
 
   // Cluster
@@ -309,6 +305,7 @@ export const en = {
     `${requested} of ${allocatable} requested`,
   "cluster.allocatable": (allocatable: string) => `${allocatable} allocatable`,
   "cluster.used": (used: string) => `${used} used`,
+  "cluster.limits": (limits: string) => `limits ${limits}`,
   "cluster.podsOf": (placed: string, room: string) => `${placed} of ${room} pods`,
   "cluster.notReady": "Not ready",
   "cluster.cordoned": "Cordoned",
@@ -375,9 +372,6 @@ export const en = {
   "overview.healthy": "Healthy",
   "overview.failingCount": (n: number) => `${n} failing`,
   "overview.degradedCount": (n: number) => `${n} not ready`,
-  "overview.podStrip": "Replicas by service",
-  "overview.podsOf": (name: string, ready: number, total: number) =>
-    `${name}: ${ready}/${total} ready`,
   "overview.viewAll": "View all",
   "events.show": "Show events",
   "events.warnings": "Warnings",
@@ -400,7 +394,6 @@ export const en = {
   // Services table
   "table.service": "Service",
   "table.status": "Status",
-  "table.ready": "Ready",
   "table.restarts": "Restarts",
   "table.domain": "Domain",
   "table.actions": "Actions",
@@ -451,6 +444,7 @@ export const en = {
   "tab.networking": "Networking",
   "tab.storage": "Storage",
   "tab.events": "Events",
+  "tab.more": "More",
   "ops.restart": "Restart",
   "ops.later": "Arrives in a later version.",
   "cond.available": "Available",

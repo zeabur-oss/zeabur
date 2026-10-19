@@ -1,21 +1,28 @@
 import { useQueries, useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useId, useState } from "react"
-import LockSimpleIcon from "~icons/ph/lock-simple"
 
 import { isStatus, toProblem } from "@/api/client"
 import { eventsQuery, projectQuery, projectsQuery } from "@/api/queries"
 import { AdoptButton } from "@/components/adopt"
 import { Problem } from "@/components/problem"
 import { ProjectIcon } from "@/components/project-icon"
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty"
-import { Label } from "@/components/ui/label"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Switch } from "@/components/ui/switch"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@engawahq/design-system/components/empty"
+import { Label } from "@engawahq/design-system/components/label"
+import { Skeleton } from "@engawahq/design-system/components/skeleton"
+import { Switch } from "@engawahq/design-system/components/switch"
 import { useT } from "@/i18n"
 import { otherNamespaces } from "@/model/project"
 import { summarise } from "@/model/service"
 import { ProjectCard } from "@/components/project-card"
+import { Illustration } from "@engawahq/design-system/components/illustration"
+import { PageHeader } from "@engawahq/design-system/components/page-header"
 
 export function ProjectsPage() {
   const t = useT()
@@ -36,7 +43,7 @@ export function ProjectsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-      <h1 className="text-2xl font-semibold tracking-tight">{t("projects.title")}</h1>
+      <PageHeader title={t("projects.title")} />
       {projects.isPending ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 3 }, (_, i) => (
@@ -47,8 +54,8 @@ export function ProjectsPage() {
         isStatus(projects.error, 403) ? (
           <Empty variant="outline">
             <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <LockSimpleIcon aria-hidden="true" />
+              <EmptyMedia>
+                <Illustration kind="forbidden" />
               </EmptyMedia>
               <EmptyTitle>{t("projects.forbiddenTitle")}</EmptyTitle>
               <EmptyDescription>{toProblem(projects.error).detail}</EmptyDescription>
@@ -83,13 +90,13 @@ export function ProjectsPage() {
                 <Label htmlFor={switchId}>{t("projects.showSystem")}</Label>
               </div>
             </div>
-            <ul className="divide-y overflow-hidden rounded-xl border bg-card">
+            <ul className="divide-y overflow-hidden rounded-lg border bg-card shadow-xs">
               {other.map((p) => (
                 <li key={p.name} className="flex items-center gap-3 pr-3">
                   <Link
                     to="/projects/$project"
                     params={{ project: p.name }}
-                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-sm outline-none hover:bg-muted/60 focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
+                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-sm outline-none hover:bg-hover"
                   >
                     <ProjectIcon icon={p.icon} />
                     <span className="truncate font-medium" translate="no">
