@@ -112,7 +112,7 @@ function Graph({
 }) {
   const t = useT()
   const word = useStatusWord()
-  const graph = layout(data.services, edgesOf(data))
+  const graph = layout(data, data.services, edgesOf(data))
   const box = bounds(graph)
   const viewport = useRef<HTMLDivElement>(null)
   const [view, setViewState] = useState<Viewport>(
@@ -316,6 +316,7 @@ function Graph({
               key={node.id}
               node={node}
               service={node.service}
+              host={domainsOf(data, node.service)[0]?.host}
               selected={selected === node.id}
               faded={
                 !!active &&
@@ -435,9 +436,12 @@ function ServiceCard({
   onOpen,
   onHover,
   word,
+  host,
 }: {
   node: LaidNode
   service: Service
+  /** The first domain that reaches it, shown in place of its kind. */
+  host?: string
   selected: boolean
   faded: boolean
   onOpen: () => void
@@ -445,7 +449,6 @@ function ServiceCard({
   word: ReturnType<typeof useStatusWord>
 }) {
   const status = statusOf(service)
-  const domain = domainsOf(service)[0]
   const volumes = volumesOf(service)
   return (
     <div
@@ -477,11 +480,11 @@ function ServiceCard({
             <span
               className={cn(
                 "truncate type-micro leading-tight text-muted-foreground",
-                domain && "font-mono",
+                host && "font-mono",
               )}
               translate="no"
             >
-              {domain?.host ?? service.kind}
+              {host ?? service.kind}
             </span>
           </span>
           {service.provenance.tool ? (

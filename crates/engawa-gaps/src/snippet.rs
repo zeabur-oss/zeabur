@@ -23,7 +23,7 @@ pub fn snippet(gap: &Gap, project: &Project, gateways: &[GatewayRef]) -> Option<
         }
         "probes.readiness" => {
             let service = find_service(project, param("service")?)?;
-            readiness(service, param("container")?)
+            readiness(project, service, param("container")?)
         }
         "domains.httpRoute" => http_route(project, param("ingress")?, gateways.first()),
         _ => None,
@@ -160,9 +160,9 @@ fn resources(service: &Service, container: &str) -> Option<String> {
 /// when that port speaks HTTP, else a TCP connect [k8s-probes].
 ///
 /// [k8s-probes]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-fn readiness(service: &Service, container: &str) -> Option<String> {
+fn readiness(project: &Project, service: &Service, container: &str) -> Option<String> {
     service.containers.iter().find(|c| c.name == container)?;
-    let port = service.endpoints.iter().flat_map(|e| &e.ports).next();
+    let port = project.endpoints_of(service).flat_map(|e| &e.ports).next();
     let target = port.map_or_else(
         || "8080".to_owned(),
         |p| p.target_port.clone().unwrap_or_else(|| p.port.to_string()),
@@ -206,11 +206,7 @@ fn readiness(service: &Service, container: &str) -> Option<String> {
 ///
 /// [gw-migrate]: https://gateway-api.sigs.k8s.io/guides/getting-started/migrating-from-ingress/
 fn http_route(project: &Project, ingress: &str, gateway: Option<&GatewayRef>) -> Option<String> {
-    let route = project
-        .services
-        .iter()
-        .flat_map(|s| &s.routes)
-        .find(|r| r.name == ingress)?;
+    let route = project.route(ingress)?;
     let mut lines = Lines::new();
     lines.line(0, &format!("# Replaces Ingress/{ingress}"));
     lines.line(0, "apiVersion: gateway.networking.k8s.io/v1");
@@ -261,10 +257,8 @@ fn http_route(project: &Project, ingress: &str, gateway: Option<&GatewayRef>) ->
             // HTTPRoute takes a port number; an Ingress may name the Service's port instead.
             let number = port.parse::<u16>().ok().map(|n| n.to_string()).or_else(|| {
                 project
-                    .services
-                    .iter()
-                    .flat_map(|s| &s.endpoints)
-                    .filter(|e| e.name == rule.service)
+                    .endpoint(&rule.service)
+                    .into_iter()
                     .flat_map(|e| &e.ports)
                     .find(|p| p.name.as_deref() == Some(port))
                     .map(|p| p.port.to_string())

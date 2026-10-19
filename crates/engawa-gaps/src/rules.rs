@@ -213,7 +213,7 @@ impl Rule for HealthChecks {
             .project
             .services
             .iter()
-            .filter(|s| long_running(s) && !s.endpoints.is_empty())
+            .filter(|s| long_running(s) && !s.endpoint_names.is_empty())
         {
             for container in service.containers.iter().filter(|c| !c.init) {
                 let probes = container.probes.clone().unwrap_or_default();
@@ -284,7 +284,7 @@ impl Rule for IngressToHttpRoute {
         let mut seen = BTreeSet::new();
         let mut gaps = Vec::new();
         for service in &input.project.services {
-            for route in &service.routes {
+            for route in input.project.routes_of(service) {
                 // An Ingress shared by services is one finding.
                 if !seen.insert(route.name.clone()) {
                     continue;
@@ -709,8 +709,9 @@ mod tests {
         let project = Project {
             namespace: "demo".to_owned(),
             services: Vec::new(),
+            endpoints: Vec::new(),
+            routes: Vec::new(),
             resources: Vec::new(),
-            relations: Vec::new(),
             connections: Vec::new(),
         };
         let cluster = ClusterTraits::default();

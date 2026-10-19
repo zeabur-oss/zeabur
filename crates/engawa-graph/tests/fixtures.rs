@@ -108,7 +108,11 @@ mod tests {
                     .unwrap();
                 to_value(container.resources).unwrap()
             }
-            "projection.routes" => to_value(project(&snapshot).services.remove(0).routes).unwrap(),
+            "projection.routes" => {
+                let projected = project(&snapshot);
+                let routes: Vec<_> = projected.routes_of(&projected.services[0]).collect();
+                to_value(routes).unwrap()
+            }
             "projection.provenance" => {
                 let meta: ObjectMeta = from_value(fixture.input[0]["metadata"].clone()).unwrap();
                 to_value(provenance(&meta)).unwrap()
@@ -228,7 +232,7 @@ mod tests {
     }
 
     /// The project of the attribution fixture: one service per workload, the shared ConfigMap
-    /// under both, and the Service as the n8n Deployment's endpoint.
+    /// under both, and the Service as the n8n Deployment's endpoint, listed once in the project.
     #[test]
     fn project_groups_resources_under_workloads() {
         let fixture = load("graph")
@@ -258,10 +262,11 @@ mod tests {
                                 }
                             }]
                         }],
-                        "endpoints": [{"name": "n8n"}]
+                        "endpointNames": ["n8n"]
                     },
-                    {"kind": "Deployment", "name": "worker", "endpoints": []}
+                    {"kind": "Deployment", "name": "worker", "endpointNames": []}
                 ],
+                "endpoints": [{"name": "n8n", "origin": {"kind": "Service", "name": "n8n"}}],
                 "resources": [
                     {"kind": "ConfigMap", "name": "app-config", "attribution": {"ownership": "shared"}},
                     {"kind": "PersistentVolumeClaim", "name": "leftover-data", "attribution": {"ownership": "orphan"}},

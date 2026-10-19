@@ -28,14 +28,18 @@ pub(crate) async fn service(
     let Some(workload_kind) = WorkloadKind::parse(&kind) else {
         return Err(not_found(&project, &kind, &name));
     };
-    let document = document_of(cluster.as_ref(), &project).await?;
-    let service = document
+    let mut document = document_of(cluster.as_ref(), &project).await?;
+    let position = document
         .project
         .services
-        .into_iter()
-        .find(|s| s.workload.kind == workload_kind && s.workload.name == name)
+        .iter()
+        .position(|s| s.workload.kind == workload_kind && s.workload.name == name)
         .ok_or_else(|| not_found(&project, workload_kind.as_str(), &name))?;
+    let service = document.project.services.swap_remove(position);
+    let projection = &document.project;
     Ok(Json(ServiceDocument {
+        endpoints: projection.endpoints_of(&service).cloned().collect(),
+        routes: projection.routes_of(&service).cloned().collect(),
         service,
         unreadable: document.unreadable,
     }))

@@ -40,7 +40,7 @@ export function edgesOf(project: Document): Edge[] {
   )
   const edges: Edge[] = []
   for (const service of project.services)
-    for (const domain of domainsOf(service))
+    for (const domain of domainsOf(project, service))
       edges.push({
         id: `${domainNode(domain.host)}->${serviceId(service)}`,
         from: domainNode(domain.host),

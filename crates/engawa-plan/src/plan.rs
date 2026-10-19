@@ -813,7 +813,7 @@ impl<'a> Planner<'a> {
         self.project
             .services
             .iter()
-            .filter(|s| s.endpoints.iter().any(|e| services.contains(&e.name)))
+            .filter(|s| s.endpoint_names.iter().any(|e| services.contains(e)))
             .map(|s| WorkloadRef {
                 kind: s.workload.kind,
                 name: s.workload.name.clone(),
@@ -838,8 +838,8 @@ impl<'a> Planner<'a> {
             .iter()
             .find(|s| s.workload.kind == reference.kind && s.workload.name == reference.name)
             .map_or_else(Vec::new, |s| {
-                s.endpoints
-                    .iter()
+                self.project
+                    .endpoints_of(s)
                     .map(|e| (e.name.clone(), e.ports.first().map(|p| p.port)))
                     .collect()
             });

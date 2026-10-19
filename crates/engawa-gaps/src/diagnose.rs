@@ -159,7 +159,7 @@ impl<'a> Namespace<'a> {
     /// there are none, so with `false` no service is diagnosed as reached by name with no
     /// Service (`noService`). Every other diagnosis stays.
     #[must_use]
-    pub fn services_readable(mut self, readable: bool) -> Self {
+    pub const fn services_readable(mut self, readable: bool) -> Self {
         if !readable {
             self.traffic.services_unreadable();
         }

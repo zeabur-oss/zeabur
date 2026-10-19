@@ -23,9 +23,12 @@ const project = (
         kind: "Deployment",
         name: "api",
         containers: [{ name: "app", ...container }],
-        endpoints: [{ ports }],
+        endpointNames: ["api"],
+        routeNames: [],
       },
     ],
+    endpoints: [{ name: "api", ports }],
+    routes: [],
   }) as unknown as Project
 
 const target = { service: "Deployment/api", container: "app" }

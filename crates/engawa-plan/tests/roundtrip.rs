@@ -245,9 +245,8 @@ mod tests {
     }
 
     fn hosts(project: &Project, name: &str) -> BTreeSet<String> {
-        service(project, name)
-            .routes
-            .iter()
+        project
+            .routes_of(service(project, name))
             .flat_map(|r| r.rules.iter())
             .filter_map(|r| r.host.clone())
             .collect()
@@ -261,7 +260,16 @@ mod tests {
         target: &str,
     ) -> Result<(), TestCaseError> {
         for b in before.services.iter().filter(|s| s.workload.name != target) {
-            prop_assert_eq!(b, service(projected, &b.workload.name));
+            let p = service(projected, &b.workload.name);
+            prop_assert_eq!(b, p);
+            prop_assert_eq!(
+                before.endpoints_of(b).collect::<Vec<_>>(),
+                projected.endpoints_of(p).collect::<Vec<_>>()
+            );
+            prop_assert_eq!(
+                before.routes_of(b).collect::<Vec<_>>(),
+                projected.routes_of(p).collect::<Vec<_>>()
+            );
         }
         let others = |project: &Project| -> Vec<Resource> {
             project

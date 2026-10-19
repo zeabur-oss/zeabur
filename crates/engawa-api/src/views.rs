@@ -24,7 +24,9 @@ use std::collections::BTreeMap;
 
 use engawa_core::problem::KubernetesStatus;
 use engawa_kube::Unreadable;
-use engawa_model::{Health, Origin, Project, ProjectDetails, ProjectHealth, Service, WorkloadKind};
+use engawa_model::{
+    Endpoint, Health, Origin, Project, ProjectDetails, ProjectHealth, Route, Service, WorkloadKind,
+};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -165,13 +167,22 @@ pub struct ProjectExtensions {
     pub network_policy: Option<engawa_modules::network_policy::Reachability>,
 }
 
-/// One service of a project, as the project document holds it.
+/// One service of a project, as the project document holds it, with the details of its own
+/// endpoints and routes.
+///
+/// In both documents `endpoints` and `routes` hold the details and a service's
+/// `endpointNames` and `routeNames` name its own; here they are only the service's, so the
+/// document stays the size of one workload.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceDocument {
     /// The service.
     #[serde(flatten)]
     pub service: Service,
+    /// The Kubernetes Services selecting its pods, in the order of `endpointNames`.
+    pub endpoints: Vec<Endpoint>,
+    /// The Ingresses routing to them, in the order of `routeNames`.
+    pub routes: Vec<Route>,
     /// Kinds the person could not list.
     pub unreadable: Vec<UnreadableView>,
 }

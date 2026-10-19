@@ -74,7 +74,7 @@ pub struct Port {
     pub origin: Origin,
 }
 
-/// A Kubernetes Service selecting a workload's pods: how it is reached inside the cluster.
+/// A Kubernetes Service selecting workloads' pods: how they are reached inside the cluster.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Endpoint {
@@ -94,7 +94,7 @@ pub struct Endpoint {
     pub origin: Origin,
 }
 
-/// An Ingress routing to a workload's Services: how it is reached from outside.
+/// An Ingress routing to workloads' Services: how they are reached from outside.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Route {

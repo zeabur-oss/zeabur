@@ -24,7 +24,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tooltip } from "@/components/ui/tooltip"
 import { useT } from "@/i18n"
-import { hostUrl, publicRoutesOf, type PublicRoute, type Service } from "@/model/service"
+import {
+  endpointsOf,
+  hostUrl,
+  publicRoutesOf,
+  routesOf,
+  type Network,
+  type PublicRoute,
+  type Service,
+} from "@/model/service"
 import { refusedPlaces } from "@/routes/project/data"
 import { Reachability } from "@/routes/service/reachability"
 import { Section } from "@/routes/service/section"
@@ -49,19 +57,23 @@ export function NetworkingTab({
   project,
   service,
   services,
+  network,
   reachability,
   unreadable,
 }: {
   project: string
   service: Service
   services: Service[]
+  /** Where its endpoints and routes are looked up. */
+  network: Network
   /** The project's NetworkPolicy reachability; absent when it was not read. */
   reachability?: Schemas["NetworkPolicyReachability"]
   /** Kinds the person may not list; routes, Services and NetworkPolicies show in place. */
   unreadable: Schemas["UnreadableView"][]
 }) {
   const t = useT()
-  const routes = publicRoutesOf(service)
+  const routes = publicRoutesOf(network, service)
+  const endpoints = endpointsOf(network, service)
   const ready = service.pods.filter((p) => p.ready).length
   const podsOk = ready === service.pods.length && ready > 0
   const planner = usePlanner(project)
@@ -70,11 +82,11 @@ export function NetworkingTab({
   const managed = service.provenance.tool ?? undefined
   const workload = { kind: service.kind, name: service.name }
   const routeOf = (route: PublicRoute): Schemas["RouteRef"] => ({
-    kind: (service.routes.find((r) => r.name === route.ingress)?.origin.kind ??
+    kind: (routesOf(network, service).find((r) => r.name === route.ingress)?.origin.kind ??
       "Ingress") as Schemas["RouteKind"],
     name: route.ingress,
   })
-  const canWrite = service.endpoints.length > 0 && !managed
+  const canWrite = endpoints.length > 0 && !managed
   const refusedRoutes = refusedAmong(unreadable, refusedPlaces.routes)
   const refusedEndpoints = refusedAmong(unreadable, refusedPlaces.endpoints)
 
@@ -241,7 +253,7 @@ export function NetworkingTab({
 
       <Section title={t("net.private")}>
         <RefusedKinds unreadable={refusedEndpoints} />
-        {service.endpoints.length === 0 ? (
+        {endpoints.length === 0 ? (
           refusedEndpoints.length > 0 ? null : (
             <Empty>{t("net.noService")}</Empty>
           )
@@ -255,7 +267,7 @@ export function NetworkingTab({
               </tr>
             </thead>
             <tbody className="divide-y max-sm:block">
-              {service.endpoints.map((e) => {
+              {endpoints.map((e) => {
                 const dns = `${e.name}.${service.namespace}.svc.cluster.local`
                 return (
                   <tr key={e.name} className={row}>

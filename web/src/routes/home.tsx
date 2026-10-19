@@ -459,7 +459,7 @@ function ordered(services: Brief[], document?: Project): Brief[] {
 function primaryDomain(document: Project): Domain | undefined {
   const labels = (host: string) => host.split(".").length
   return document.services
-    .flatMap(domainsOf)
+    .flatMap((service) => domainsOf(document, service))
     .toSorted(
       (a, b) =>
         labels(a.host) - labels(b.host) ||

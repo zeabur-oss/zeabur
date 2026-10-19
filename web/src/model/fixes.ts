@@ -6,6 +6,7 @@
 import type { Schemas } from "@/api/client"
 import type { PlanAsk } from "@/components/plan/planner"
 import type { Translate } from "@/i18n"
+import { endpointsOf } from "@/model/service"
 
 type Gap = Schemas["GapView"]
 type Project = Schemas["Project"]
@@ -28,8 +29,8 @@ function target(gap: Gap, project: Project) {
 const workloadOf = (service: Service) => ({ kind: service.kind, name: service.name })
 
 /** The container's first numeric port, from the Service in front of it. */
-function portOf(service: Service): number | undefined {
-  for (const endpoint of service.endpoints)
+function portOf(project: Project, service: Service): number | undefined {
+  for (const endpoint of endpointsOf(project, service))
     for (const port of endpoint.ports) {
       const target = port.targetPort ?? String(port.port)
       if (/^\d+$/.test(target)) return Number(target)
@@ -93,7 +94,7 @@ export const fixTemplates: Record<string, FixTemplate> = {
   // process listens, without guessing an HTTP path. No numeric port: a person must choose.
   "probes.readiness": (gap, project, t) => {
     const found = target(gap, project)
-    const port = found && portOf(found.service)
+    const port = found && portOf(project, found.service)
     if (!found || port === undefined) return undefined
     return {
       title: t("fix.readiness", found.container.name),

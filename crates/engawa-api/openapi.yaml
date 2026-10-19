@@ -2371,7 +2371,7 @@ components:
       - active
     Endpoint:
       type: object
-      description: "A Kubernetes Service selecting a workload's pods: how it is reached inside the cluster."
+      description: "A Kubernetes Service selecting workloads' pods: how they are reached inside the cluster."
       required:
       - name
       - ports
@@ -4596,8 +4596,9 @@ components:
       required:
       - namespace
       - services
+      - endpoints
+      - routes
       - resources
-      - relations
       - connections
       properties:
         connections:
@@ -4605,19 +4606,28 @@ components:
           items:
             $ref: "#/components/schemas/Connection"
           description: Which services appear to call which, sorted by source then target.
+        endpoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/Endpoint"
+          description: |-
+            Every Kubernetes Service that selects a service's pods, once, sorted by name; a service
+            names its own in `endpointNames`.
         namespace:
           type: string
           description: The namespace.
-        relations:
-          type: array
-          items:
-            $ref: "#/components/schemas/Relation"
-          description: Every reference from a workload to a resource, sorted.
         resources:
           type: array
           items:
             $ref: "#/components/schemas/Resource"
           description: The ConfigMaps, Secrets, PVCs, Services and Ingresses, sorted by kind then name.
+        routes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Route"
+          description: |-
+            Every Ingress that routes to one of those Services, once, sorted by name; a service names
+            its own in `routeNames`.
         services:
           type: array
           items:
@@ -5049,40 +5059,6 @@ components:
       description: |-
         Why an `envFrom` entry is read-only. Either way the way out is the same: override one
         variable with a same-named `env` entry, which takes precedence and leaves the import alone.
-    Relation:
-      type: object
-      description: One reference between a workload and a resource.
-      required:
-      - workload
-      - object
-      - kind
-      - origin
-      properties:
-        kind:
-          $ref: "#/components/schemas/RelationKind"
-          description: How the workload uses it.
-        object:
-          $ref: "#/components/schemas/ObjectRef"
-          description: The resource.
-        origin:
-          $ref: "#/components/schemas/Origin"
-          description: |-
-            Where the reference is written: in the workload, or for `Selector` and `Route` in the
-            Service or Ingress.
-        workload:
-          $ref: "#/components/schemas/WorkloadRef"
-          description: The workload.
-    RelationKind:
-      type: string
-      description: How a workload uses a resource.
-      enum:
-      - envReference
-      - envImport
-      - volume
-      - claimTemplate
-      - imagePullSecret
-      - selector
-      - route
     Release:
       type: object
       description: One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`.
@@ -5237,7 +5213,7 @@ components:
           description: The risk.
     Route:
       type: object
-      description: "An Ingress routing to a workload's Services: how it is reached from outside."
+      description: "An Ingress routing to workloads' Services: how they are reached from outside."
       required:
       - name
       - hostnames
@@ -5460,8 +5436,8 @@ components:
         - status
         - pods
         - containers
-        - endpoints
-        - routes
+        - endpointNames
+        - routeNames
         properties:
           containers:
             type: array
@@ -5484,11 +5460,13 @@ components:
               What is going wrong with it, in plain words, sorted by kind then container. The
               projection leaves this empty: diagnoses need the namespace's events and the time of the
               read, so the API fills it in when it serves the project document.
-          endpoints:
+          endpointNames:
             type: array
             items:
-              $ref: "#/components/schemas/Endpoint"
-            description: The Kubernetes Services selecting its pods, sorted by name.
+              type: string
+            description: |-
+              The names of the Kubernetes Services selecting its pods, sorted by name; each is in
+              the document's `endpoints`.
           id:
             type: string
             description: >-
@@ -5499,11 +5477,13 @@ components:
             items:
               $ref: "#/components/schemas/PodSummary"
             description: Its pods, sorted by name.
-          routes:
+          routeNames:
             type: array
             items:
-              $ref: "#/components/schemas/Route"
-            description: The Ingresses routing to those Services, sorted by name.
+              type: string
+            description: |-
+              The names of the Ingresses routing to those Services, sorted by name; each is in the
+              document's `routes`.
           status:
             $ref: "#/components/schemas/ServiceStatus"
             description: Its health and the word for it, from the workload and its pods.
@@ -5514,14 +5494,32 @@ components:
         description: The service.
       - type: object
         required:
+        - endpoints
+        - routes
         - unreadable
         properties:
+          endpoints:
+            type: array
+            items:
+              $ref: "#/components/schemas/Endpoint"
+            description: The Kubernetes Services selecting its pods, in the order of `endpointNames`.
+          routes:
+            type: array
+            items:
+              $ref: "#/components/schemas/Route"
+            description: The Ingresses routing to them, in the order of `routeNames`.
           unreadable:
             type: array
             items:
               $ref: "#/components/schemas/UnreadableView"
             description: Kinds the person could not list.
-      description: One service of a project, as the project document holds it.
+      description: |-
+        One service of a project, as the project document holds it, with the details of its own
+        endpoints and routes.
+        
+        In both documents `endpoints` and `routes` hold the details and a service's
+        `endpointNames` and `routeNames` name its own; here they are only the service's, so the
+        document stays the size of one workload.
     ServiceHistory:
       type: object
       description: A service's CPU, memory and restarts over a range, one value per pod and time.

@@ -1277,7 +1277,7 @@ export interface components {
      * @enum {string}
      */
     ElevationState: "unavailable" | "available" | "active"
-    /** @description A Kubernetes Service selecting a workload's pods: how it is reached inside the cluster. */
+    /** @description A Kubernetes Service selecting workloads' pods: how they are reached inside the cluster. */
     Endpoint: {
       /** @description The cluster IP. */
       clusterIP?: string | null
@@ -2400,12 +2400,20 @@ export interface components {
     Project: {
       /** @description Which services appear to call which, sorted by source then target. */
       connections: components["schemas"]["Connection"][]
+      /**
+       * @description Every Kubernetes Service that selects a service's pods, once, sorted by name; a service
+       *     names its own in `endpointNames`.
+       */
+      endpoints: components["schemas"]["Endpoint"][]
       /** @description The namespace. */
       namespace: string
-      /** @description Every reference from a workload to a resource, sorted. */
-      relations: components["schemas"]["Relation"][]
       /** @description The ConfigMaps, Secrets, PVCs, Services and Ingresses, sorted by kind then name. */
       resources: components["schemas"]["Resource"][]
+      /**
+       * @description Every Ingress that routes to one of those Services, once, sorted by name; a service names
+       *     its own in `routeNames`.
+       */
+      routes: components["schemas"]["Route"][]
       /** @description One service per workload, sorted by kind then name. */
       services: components["schemas"]["Service"][]
     }
@@ -2628,32 +2636,6 @@ export interface components {
           /** @description The tool. */
           tool: components["schemas"]["Tool"]
         }
-    /** @description One reference between a workload and a resource. */
-    Relation: {
-      /** @description How the workload uses it. */
-      kind: components["schemas"]["RelationKind"]
-      /** @description The resource. */
-      object: components["schemas"]["ObjectRef"]
-      /**
-       * @description Where the reference is written: in the workload, or for `Selector` and `Route` in the
-       *     Service or Ingress.
-       */
-      origin: components["schemas"]["Origin"]
-      /** @description The workload. */
-      workload: components["schemas"]["WorkloadRef"]
-    }
-    /**
-     * @description How a workload uses a resource.
-     * @enum {string}
-     */
-    RelationKind:
-      | "envReference"
-      | "envImport"
-      | "volume"
-      | "claimTemplate"
-      | "imagePullSecret"
-      | "selector"
-      | "route"
     /** @description One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`. */
     Release: {
       /** @description The last day it gets patches. */
@@ -2743,7 +2725,7 @@ export interface components {
       /** @description The risk. */
       risk: string
     }
-    /** @description An Ingress routing to a workload's Services: how it is reached from outside. */
+    /** @description An Ingress routing to workloads' Services: how they are reached from outside. */
     Route: {
       /** @description The Services it routes to, sorted, without duplicates. */
       backends: string[]
@@ -2867,19 +2849,36 @@ export interface components {
        *     read, so the API fills it in when it serves the project document.
        */
       diagnoses?: components["schemas"]["Diagnosis"][]
-      /** @description The Kubernetes Services selecting its pods, sorted by name. */
-      endpoints: components["schemas"]["Endpoint"][]
+      /**
+       * @description The names of the Kubernetes Services selecting its pods, sorted by name; each is in
+       *     the document's `endpoints`.
+       */
+      endpointNames: string[]
       /** @description Its resource name, `projects/<project>/services/<kind>/<name>`; see [`crate::id`]. */
       id: string
       /** @description Its pods, sorted by name. */
       pods: components["schemas"]["PodSummary"][]
-      /** @description The Ingresses routing to those Services, sorted by name. */
-      routes: components["schemas"]["Route"][]
+      /**
+       * @description The names of the Ingresses routing to those Services, sorted by name; each is in the
+       *     document's `routes`.
+       */
+      routeNames: string[]
       /** @description Its health and the word for it, from the workload and its pods. */
       status: components["schemas"]["ServiceStatus"]
     }
-    /** @description One service of a project, as the project document holds it. */
+    /**
+     * @description One service of a project, as the project document holds it, with the details of its own
+     *     endpoints and routes.
+     *
+     *     In both documents `endpoints` and `routes` hold the details and a service's
+     *     `endpointNames` and `routeNames` name its own; here they are only the service's, so the
+     *     document stays the size of one workload.
+     */
     ServiceDocument: components["schemas"]["Service"] & {
+      /** @description The Kubernetes Services selecting its pods, in the order of `endpointNames`. */
+      endpoints: components["schemas"]["Endpoint"][]
+      /** @description The Ingresses routing to them, in the order of `routeNames`. */
+      routes: components["schemas"]["Route"][]
       /** @description Kinds the person could not list. */
       unreadable: components["schemas"]["UnreadableView"][]
     }

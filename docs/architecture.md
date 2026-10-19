@@ -83,7 +83,7 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | Level | Crate | What it hides |
 |---|---|---|
 | 0 | [`engawa-core`](../crates/engawa-core) | names shared with Kubernetes: label keys, the field manager, error categories |
-| 1 | [`engawa-model`](../crates/engawa-model) | the projected view clients see: projects, services, relations, sources |
+| 1 | [`engawa-model`](../crates/engawa-model) | the projected view clients see: projects, services, their endpoints and routes, sources |
 | 1 | [`engawa-kube`](../crates/engawa-kube) | how a request reaches kube-apiserver, always as the person |
 | 1 | [`engawa-adapters`](../crates/engawa-adapters) | conventions of Helm, Argo CD, Flux, operators, Gateway API; label selectors |
 | 1 | [`engawa-ui`](../crates/engawa-ui) | embedding and serving the web interface |

@@ -10,6 +10,7 @@ import {
   serviceId,
   statusOf,
   volumesOf,
+  type Network,
   type Role,
   type Service,
 } from "@/model/service"
@@ -77,7 +78,7 @@ function spread(list: string[], id: string): number {
   return (i - (list.length - 1) / 2) * 12
 }
 
-export function layout(services: Service[], allEdges: Edge[]): Layout {
+export function layout(network: Network, services: Service[], allEdges: Edge[]): Layout {
   const nodes = new Map<string, LaidNode>()
   for (const service of services) {
     const id = serviceId(service)
@@ -90,7 +91,7 @@ export function layout(services: Service[], allEdges: Edge[]): Layout {
       h: CARD_H + volumesOf(service).length * DRAWER_H,
       service,
     })
-    for (const { host, https } of domainsOf(service)) {
+    for (const { host, https } of domainsOf(network, service)) {
       const domainId = `domain:${host}`
       if (!nodes.has(domainId))
         nodes.set(domainId, {

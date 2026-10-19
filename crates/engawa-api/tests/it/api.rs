@@ -288,10 +288,38 @@ mod tests {
         );
     }
 
+    /// The project document lists each Kubernetes Service and Ingress once and a service names
+    /// its own; the service document carries the details of those it names.
     #[tokio::test]
     async fn a_service_is_cut_from_the_document_with_its_kind_in_any_case() {
         let cluster = cluster();
+        cluster.update(|s| {
+            let shop = s.objects.get_mut("shop").unwrap();
+            shop.services.push(
+                serde_json::from_value(json!({
+                    "metadata": {"name": "web", "namespace": "shop"},
+                    "spec": {"selector": {"app": "web"}, "ports": [{"port": 80, "targetPort": "http"}]}
+                }))
+                .unwrap(),
+            );
+            shop.ingresses.push(
+                serde_json::from_value(json!({
+                    "metadata": {"name": "public", "namespace": "shop"},
+                    "spec": {"rules": [{"host": "shop.example", "http": {"paths": [{
+                        "path": "/", "pathType": "Prefix",
+                        "backend": {"service": {"name": "web", "port": {"number": 80}}}
+                    }]}}]}
+                }))
+                .unwrap(),
+            );
+        });
         let document = get(&cluster, "/api/v1/projects/shop").await;
+        assert_eq!(document["services"][0]["endpointNames"], json!(["web"]));
+        assert_eq!(document["services"][0]["routeNames"], json!(["public"]));
+        assert_eq!(document["endpoints"][0]["name"], "web");
+        assert_eq!(document["endpoints"][0]["ports"][0]["targetPort"], "http");
+        assert_eq!(document["routes"][0]["hostnames"], json!(["shop.example"]));
+        assert_eq!(document.get("relations"), None);
         for kind in ["deployment", "Deployment", "DEPLOYMENT"] {
             let service = get(
                 &cluster,
@@ -302,6 +330,8 @@ mod tests {
             assert_eq!(service["unreadable"], json!([]));
             let mut expected = document["services"][0].clone();
             expected["unreadable"] = json!([]);
+            expected["endpoints"] = document["endpoints"].clone();
+            expected["routes"] = document["routes"].clone();
             assert_eq!(service, expected);
         }
         for uri in [
@@ -328,29 +358,17 @@ mod tests {
                 .cloned()
                 .unwrap()
         };
-        let uses = |kind: &str, name: &str| -> Vec<Value> {
-            document["relations"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .filter(|r| r["object"]["kind"] == kind && r["object"]["name"] == name)
-                .cloned()
-                .collect()
-        };
         let secret = resource("projects/shop/resources/secret/db");
         assert_eq!(secret["kind"], "Secret");
         assert_eq!(secret["keyCount"], 1);
-        let relations = uses("Secret", "db");
-        assert_eq!(relations.len(), 1);
         assert_eq!(
-            relations[0]["workload"],
-            json!({"kind": "Deployment", "name": "web"})
+            secret["attribution"]["owners"],
+            json!([{"kind": "Deployment", "name": "web"}])
         );
-        assert_eq!(relations[0]["kind"], "envReference");
 
         let orphan = resource("projects/shop/resources/configmap/aaa-unused");
         assert_eq!(orphan["attribution"]["ownership"], "orphan");
-        assert_eq!(uses("ConfigMap", "aaa-unused"), Vec::<Value>::new());
+        assert_eq!(orphan["attribution"]["owners"], json!([]));
     }
 
     #[tokio::test]

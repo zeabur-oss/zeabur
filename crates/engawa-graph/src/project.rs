@@ -38,55 +38,80 @@ pub fn provenance(meta: &ObjectMeta) -> Provenance {
 
 /// One namespace as a project.
 ///
-/// A service per workload with its containers, Services and Ingresses; every ConfigMap,
-/// Secret, PVC, Service and Ingress with the workloads it belongs to; and every reference
-/// between them.
+/// A service per workload with its containers; every Kubernetes Service and Ingress that reaches
+/// a workload, once, which the services name; and every ConfigMap, Secret, PVC, Service and
+/// Ingress with the workloads it belongs to.
+///
+/// The references between workloads and resources ([`crate::relations`]) decide who owns what,
+/// but are not part of the project: the same edges are in the services' endpoint and route
+/// names, their containers' variables and mounts, and each resource's owners.
 #[must_use]
 pub fn project(snapshot: &Snapshot) -> Project {
     let all = workloads(snapshot);
-    let relations = relations_of(snapshot, &all);
-    let attribution = attribution_of(snapshot, &all, &relations);
+    let attribution = attribution_of(snapshot, &all, &relations_of(snapshot, &all));
     let index = Index::new(snapshot, &attribution);
     let services: Vec<Service> = all
         .into_iter()
         .map(|workload| service(snapshot, &attribution, &index, workload))
         .collect();
+    let owned = |owners: Option<&Attribution>| owners.is_some_and(|a| !a.owners.is_empty());
+    let endpoints = snapshot
+        .services
+        .iter()
+        .filter(|o| owned(attribution.services.get(name_of(&o.metadata))))
+        .map(endpoint);
+    let routes = snapshot
+        .ingresses
+        .iter()
+        .filter(|o| owned(attribution.ingresses.get(name_of(&o.metadata))))
+        .map(route);
     Project {
         namespace: snapshot.namespace.clone(),
         connections: connections(&snapshot.namespace, &services),
         services,
+        endpoints: by_name(endpoints, |e| &e.name),
+        routes: by_name(routes, |r| &r.name),
         resources: resources(snapshot, &attribution),
-        relations,
     }
 }
 
+/// `items` sorted by name, the first of each name kept.
+fn by_name<T>(items: impl Iterator<Item = T>, name: impl Fn(&T) -> &String) -> Vec<T> {
+    let mut out: Vec<T> = items.collect();
+    out.sort_by(|a, b| name(a).cmp(name(b)));
+    out.dedup_by(|a, b| name(a) == name(b));
+    out
+}
+
 /// What every workload's service looks up, built once for all of them: the objects by name, and
-/// the Services and Ingresses each workload is an owner of, in the snapshot's order.
+/// the Services and Ingresses each workload is an owner of.
 ///
-/// An endpoint or route does not repeat which workloads own its object: that list is the
-/// object's in `resources`, once. Copied into every owner's endpoints, it would grow with the
-/// cube of the workloads when every Service selects every workload.
+/// A service names its Services and Ingresses; their details are in the project once. Copied
+/// into every owner's service, they would grow with the square of the workloads when every
+/// Service selects every workload.
 struct Index<'a> {
     objects: ByName<'a>,
-    endpoints: BTreeMap<&'a WorkloadRef, Vec<&'a KubeService>>,
-    routes: BTreeMap<&'a WorkloadRef, Vec<&'a Ingress>>,
+    endpoints: BTreeMap<&'a WorkloadRef, Vec<&'a str>>,
+    routes: BTreeMap<&'a WorkloadRef, Vec<&'a str>>,
 }
 
 impl<'a> Index<'a> {
     fn new(snapshot: &'a Snapshot, attribution: &'a NamespaceAttribution) -> Self {
         let mut endpoints: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for object in &snapshot.services {
-            if let Some(owners) = attribution.services.get(name_of(&object.metadata)) {
+            let name = name_of(&object.metadata);
+            if let Some(owners) = attribution.services.get(name) {
                 for owner in &owners.owners {
-                    endpoints.entry(owner).or_default().push(object);
+                    endpoints.entry(owner).or_default().push(name);
                 }
             }
         }
         let mut routes: BTreeMap<_, Vec<_>> = BTreeMap::new();
         for object in &snapshot.ingresses {
-            if let Some(owners) = attribution.ingresses.get(name_of(&object.metadata)) {
+            let name = name_of(&object.metadata);
+            if let Some(owners) = attribution.ingresses.get(name) {
                 for owner in &owners.owners {
-                    routes.entry(owner).or_default().push(object);
+                    routes.entry(owner).or_default().push(name);
                 }
             }
         }
@@ -95,6 +120,73 @@ impl<'a> Index<'a> {
             endpoints,
             routes,
         }
+    }
+
+    /// The names of the Services or Ingresses in `by_owner` that `owner` is an owner of, sorted,
+    /// each once.
+    fn names(by_owner: &BTreeMap<&WorkloadRef, Vec<&str>>, owner: &WorkloadRef) -> Vec<String> {
+        let mut out: Vec<String> = by_owner
+            .get(owner)
+            .into_iter()
+            .flatten()
+            .map(|&name| name.to_owned())
+            .collect();
+        out.sort();
+        out.dedup();
+        out
+    }
+}
+
+/// A Kubernetes Service as an endpoint, as [`project`] lists it. It reads the Service alone, so
+/// one endpoint serves every workload the Service selects.
+#[must_use]
+pub fn endpoint(object: &KubeService) -> Endpoint {
+    let name = name_of(&object.metadata);
+    Endpoint {
+        name: name.to_owned(),
+        type_: object.spec.as_ref().and_then(|spec| spec.type_.clone()),
+        cluster_ip: object
+            .spec
+            .as_ref()
+            .and_then(|spec| spec.cluster_ip.clone()),
+        ports: ports(object),
+        provenance: provenance(&object.metadata),
+        origin: Origin::object("Service", name),
+    }
+}
+
+/// An Ingress as a route, with every one of its rules. It reads the Ingress alone, so one route
+/// serves every workload it reaches.
+fn route(object: &Ingress) -> Route {
+    let name = name_of(&object.metadata);
+    let mut backends: Vec<String> = ingress_backends(object)
+        .into_iter()
+        .map(|(service, _path)| service.to_owned())
+        .collect();
+    backends.sort();
+    backends.dedup();
+    let mut tls_hosts: Vec<String> = object
+        .spec
+        .iter()
+        .flat_map(|spec| spec.tls.iter().flatten())
+        .flat_map(|tls| tls.hosts.iter().flatten().cloned())
+        .collect();
+    tls_hosts.sort();
+    tls_hosts.dedup();
+    Route {
+        name: name.to_owned(),
+        hostnames: object
+            .spec
+            .iter()
+            .flat_map(|spec| spec.rules.iter().flatten())
+            .filter_map(|rule| rule.host.clone())
+            .collect(),
+        backends,
+        class: ingress_class(object),
+        rules: route_rules(object),
+        tls_hosts,
+        provenance: provenance(&object.metadata),
+        origin: Origin::object("Ingress", name),
     }
 }
 
@@ -126,64 +218,6 @@ fn service(
         })
         .collect();
     let me = workload.reference();
-    let endpoints = index
-        .endpoints
-        .get(&me)
-        .into_iter()
-        .flatten()
-        .map(|&object| {
-            let name = name_of(&object.metadata);
-            Endpoint {
-                name: name.to_owned(),
-                type_: object.spec.as_ref().and_then(|spec| spec.type_.clone()),
-                cluster_ip: object
-                    .spec
-                    .as_ref()
-                    .and_then(|spec| spec.cluster_ip.clone()),
-                ports: ports(object),
-                provenance: provenance(&object.metadata),
-                origin: Origin::object("Service", name),
-            }
-        })
-        .collect();
-    let routes = index
-        .routes
-        .get(&me)
-        .into_iter()
-        .flatten()
-        .map(|&object| {
-            let name = name_of(&object.metadata);
-            let mut backends: Vec<String> = ingress_backends(object)
-                .into_iter()
-                .map(|(service, _path)| service.to_owned())
-                .collect();
-            backends.sort();
-            backends.dedup();
-            let mut tls_hosts: Vec<String> = object
-                .spec
-                .iter()
-                .flat_map(|spec| spec.tls.iter().flatten())
-                .flat_map(|tls| tls.hosts.iter().flatten().cloned())
-                .collect();
-            tls_hosts.sort();
-            tls_hosts.dedup();
-            Route {
-                name: name.to_owned(),
-                hostnames: object
-                    .spec
-                    .iter()
-                    .flat_map(|spec| spec.rules.iter().flatten())
-                    .filter_map(|rule| rule.host.clone())
-                    .collect(),
-                backends,
-                class: ingress_class(object),
-                rules: route_rules(object),
-                tls_hosts,
-                provenance: provenance(&object.metadata),
-                origin: Origin::object("Ingress", name),
-            }
-        })
-        .collect();
     let summary = summarise(snapshot, workload);
     let pods = crate::pods::pods_of(snapshot, workload);
     let mut service = Service {
@@ -192,8 +226,8 @@ fn service(
         workload: summary,
         pods,
         containers: projected,
-        endpoints,
-        routes,
+        endpoint_names: Index::names(&index.endpoints, &me),
+        route_names: Index::names(&index.routes, &me),
         data_store: None,
         diagnoses: Vec::new(),
     };

@@ -8,11 +8,12 @@
 //!
 //! The snapshot is built before timing; no API request or JSON parsing is timed. `attribution`
 //! times [`engawa_graph::attribution`], `project` times [`engawa_graph::project`], which includes
-//! the attribution. Each is run once to warm up, then in 15 batches of enough runs to last about
+//! the attribution, and `project + JSON` adds serialising it with `serde_json` to a byte counter.
+//! Each is run once to warm up, then in 15 batches of enough runs to last about
 //! 50 ms; the table gives the median, fastest and slowest batch per run.
 //!
 //! `JSON MiB` is the length of the project serialised with `serde_json`; the `services`,
-//! `resources` and `relations` MiB are the lengths of those lists alone.
+//! `endpoints`, `routes` and `resources` MiB are the lengths of those lists alone.
 //!
 //! ```sh
 //! cargo run --release -p engawa-graph --example projection-bench               # every case
@@ -137,9 +138,9 @@ fn main() {
         cases = CASES.to_vec();
     }
     println!(
-        "| distribution | deployments | objects | relations | attribution ms (min-max) | project ms (min-max) | JSON MiB | services MiB | resources MiB | relations MiB |"
+        "| distribution | deployments | objects | relations | attribution ms (min-max) | project ms (min-max) | project + JSON ms | JSON MiB | services MiB | endpoints MiB | routes MiB | resources MiB |"
     );
-    println!("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+    println!("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
     for (distribution, deployments) in cases {
         let snapshot = snapshot(distribution, deployments).expect("valid objects");
         let objects = 6 * deployments + 1;
@@ -148,8 +149,9 @@ fn main() {
         let sizes = [
             mib(&projected),
             mib(&projected.services),
+            mib(&projected.endpoints),
+            mib(&projected.routes),
             mib(&projected.resources),
-            mib(&projected.relations),
         ];
         if let Some(dir) = &json_dir {
             let path = dir.join(format!("{}-{deployments}.json", distribution.name()));
@@ -159,8 +161,14 @@ fn main() {
         drop(projected);
         let [a_median, a_min, a_max] = time(|| attribution(&snapshot));
         let [p_median, p_min, p_max] = time(|| project(&snapshot));
+        let [j_median, _, _] = time(|| {
+            let mut counter = Counter::default();
+            serde_json::to_writer(&mut counter, &project(&snapshot))
+                .expect("a serialisable project");
+            counter.0
+        });
         println!(
-            "| {} | {deployments} | {objects} | {relations} | {} ({}-{}) | {} ({}-{}) | {} | {} | {} | {} |",
+            "| {} | {deployments} | {objects} | {relations} | {} ({}-{}) | {} ({}-{}) | {} | {} | {} | {} | {} | {} |",
             distribution.name(),
             ms(a_median),
             ms(a_min),
@@ -168,10 +176,12 @@ fn main() {
             ms(p_median),
             ms(p_min),
             ms(p_max),
+            ms(j_median),
             sizes[0],
             sizes[1],
             sizes[2],
             sizes[3],
+            sizes[4],
         );
     }
 }

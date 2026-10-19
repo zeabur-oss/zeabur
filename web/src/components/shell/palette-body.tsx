@@ -137,7 +137,7 @@ export function PaletteBody() {
           icon: CubeIcon,
           href: href(data.namespace, s, { tab: "logs", pod: pod.name }),
         })
-      for (const { host } of domainsOf(s))
+      for (const { host } of domainsOf(data, s))
         items.push({
           id: `domain:${host}`,
           group: g.domains,

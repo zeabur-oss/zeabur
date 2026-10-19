@@ -66,9 +66,9 @@ pub fn connections(namespace: &str, services: &[Service]) -> Vec<Connection> {
     // Kubernetes Service name → the workloads it selects.
     let mut selected: BTreeMap<&str, Vec<WorkloadRef>> = BTreeMap::new();
     for service in services {
-        for endpoint in &service.endpoints {
+        for name in &service.endpoint_names {
             selected
-                .entry(endpoint.name.as_str())
+                .entry(name.as_str())
                 .or_default()
                 .push(reference(service));
         }

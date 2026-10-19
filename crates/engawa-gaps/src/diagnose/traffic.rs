@@ -27,7 +27,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use engawa_graph::{Snapshot, Workload, env, ingress_backends, named_hosts};
+use engawa_graph::{Snapshot, Workload, endpoint, env, ingress_backends, named_hosts};
 use engawa_model::{
     DiagnosisKind, Endpoint, Health, HttpRoute, Message, Origin, Service, WorkloadKind,
 };
@@ -35,13 +35,17 @@ use serde_json::Value;
 
 use super::{Found, parse, truncate};
 
-/// What sends to what in a namespace, read once for all its services: the names of its
-/// Services, the Ingress and `HTTPRoute` backends, and the hosts the workloads' variables name.
+/// What sends to what in a namespace, read once for all its services: its Services, the Ingress and
+/// `HTTPRoute` backends, and the hosts the workloads' variables name.
 #[derive(Debug)]
 pub(super) struct Traffic<'a> {
-    /// The names of the Services; `None` when they could not be listed
-    /// ([`Namespace::services_readable`](super::Namespace::services_readable)).
-    services: Option<BTreeSet<&'a str>>,
+    /// The Services by name as endpoints, the first of each name. A service names its own
+    /// ([`Service::endpoint_names`]); they are looked up here.
+    endpoints: BTreeMap<&'a str, Endpoint>,
+    /// Whether the Services could be listed
+    /// ([`Namespace::services_readable`](super::Namespace::services_readable)); when not,
+    /// `endpoints` is empty and none is known to be missing.
+    services_readable: bool,
     /// By backend name, the Ingresses that send to it and the field that says so, in the order
     /// of the Ingresses and their backends.
     ingresses: BTreeMap<&'a str, Vec<(String, Origin)>>,
@@ -111,14 +115,15 @@ impl<'a> Traffic<'a> {
                 }
             }
         }
+        let mut endpoints = BTreeMap::new();
+        for object in &snapshot.services {
+            if let Some(name) = object.metadata.name.as_deref() {
+                endpoints.entry(name).or_insert_with(|| endpoint(object));
+            }
+        }
         Self {
-            services: Some(
-                snapshot
-                    .services
-                    .iter()
-                    .filter_map(|s| s.metadata.name.as_deref())
-                    .collect(),
-            ),
+            endpoints,
+            services_readable: true,
             ingresses,
             routes: http_routes,
             routed,
@@ -127,8 +132,8 @@ impl<'a> Traffic<'a> {
     }
 
     /// Forgets the Services read: they could not be listed, so none is known to be missing.
-    pub(super) fn services_unreadable(&mut self) {
-        self.services = None;
+    pub(super) const fn services_unreadable(&mut self) {
+        self.services_readable = false;
     }
 
     /// What sends to `workload` by its name while no Service has that name: Ingress and
@@ -137,7 +142,7 @@ impl<'a> Traffic<'a> {
     /// listed.
     fn senders(&self, workload: Workload<'_>) -> Vec<(String, Origin)> {
         let name = workload.name();
-        if self.services.as_ref().is_none_or(|s| s.contains(name)) {
+        if !self.services_readable || self.endpoints.contains_key(name) {
             return Vec::new();
         }
         let mut out = self.ingresses.get(name).cloned().unwrap_or_default();
@@ -222,7 +227,12 @@ pub(super) fn unreachable(
         );
     };
 
-    if service.endpoints.is_empty() {
+    let endpoints: Vec<&Endpoint> = service
+        .endpoint_names
+        .iter()
+        .filter_map(|name| traffic.endpoints.get(name.as_str()))
+        .collect();
+    if endpoints.is_empty() {
         let senders = traffic.senders(workload);
         if let Some((from, _)) = senders.first() {
             add(
@@ -235,7 +245,7 @@ pub(super) fn unreachable(
         return;
     }
 
-    for endpoint in &service.endpoints {
+    for endpoint in &endpoints {
         for port in &endpoint.ports {
             let target = port
                 .target_port
@@ -280,23 +290,15 @@ pub(super) fn unreachable(
     {
         add(
             "noReadyEndpoints",
-            &[("endpoint", names(&service.endpoints))],
-            service.endpoints.iter().map(|e| e.origin.clone()).collect(),
+            &[("endpoint", service.endpoint_names.join(", "))],
+            endpoints.iter().map(|e| e.origin.clone()).collect(),
             None,
         );
     }
 
-    for route in traffic.routes_to(service.endpoints.iter().map(|e| e.name.as_str())) {
+    for route in traffic.routes_to(service.endpoint_names.iter().map(String::as_str)) {
         refused_route(&mut add, route);
     }
-}
-
-fn names(endpoints: &[Endpoint]) -> String {
-    endpoints
-        .iter()
-        .map(|e| e.name.as_str())
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 /// An `HTTPRoute` to the service that a parent did not accept, or whose backends it did not

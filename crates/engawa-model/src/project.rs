@@ -18,10 +18,14 @@ pub struct Project {
     pub namespace: String,
     /// One service per workload, sorted by kind then name.
     pub services: Vec<Service>,
+    /// Every Kubernetes Service that selects a service's pods, once, sorted by name; a service
+    /// names its own in `endpointNames`.
+    pub endpoints: Vec<Endpoint>,
+    /// Every Ingress that routes to one of those Services, once, sorted by name; a service names
+    /// its own in `routeNames`.
+    pub routes: Vec<Route>,
     /// The ConfigMaps, Secrets, PVCs, Services and Ingresses, sorted by kind then name.
     pub resources: Vec<Resource>,
-    /// Every reference from a workload to a resource, sorted.
-    pub relations: Vec<Relation>,
     /// Which services appear to call which, sorted by source then target.
     pub connections: Vec<Connection>,
 }
@@ -70,6 +74,52 @@ pub enum ConnectionEvidence {
     },
 }
 
+/// A service's endpoints and routes, looked up by name.
+///
+/// A project lists each Kubernetes Service and Ingress once, and a service names its own
+/// ([`Service::endpoint_names`], [`Service::route_names`]). Copied under every workload they
+/// reach, they would grow with the square of the workloads when every Service selects every
+/// workload. Nothing is lost by sharing them: an [`Endpoint`] and a [`Route`] are read from their
+/// object alone. A named `targetPort` stays a name, resolved against a workload's container
+/// ports only by the reader that needs it, and a route lists every rule of its Ingress, also
+/// those for other workloads' Services.
+impl Project {
+    /// The endpoint named `name`.
+    #[must_use]
+    pub fn endpoint(&self, name: &str) -> Option<&Endpoint> {
+        by_name(&self.endpoints, name, |e| &e.name)
+    }
+
+    /// The route named `name`.
+    #[must_use]
+    pub fn route(&self, name: &str) -> Option<&Route> {
+        by_name(&self.routes, name, |r| &r.name)
+    }
+
+    /// The endpoints `service` names, in its order.
+    pub fn endpoints_of<'a>(&'a self, service: &'a Service) -> impl Iterator<Item = &'a Endpoint> {
+        service
+            .endpoint_names
+            .iter()
+            .filter_map(|name| self.endpoint(name))
+    }
+
+    /// The routes `service` names, in its order.
+    pub fn routes_of<'a>(&'a self, service: &'a Service) -> impl Iterator<Item = &'a Route> {
+        service
+            .route_names
+            .iter()
+            .filter_map(|name| self.route(name))
+    }
+}
+
+/// The entry of `list`, sorted by `key`, whose key is `name`.
+fn by_name<'a, T>(list: &'a [T], name: &str, key: impl Fn(&T) -> &String) -> Option<&'a T> {
+    list.binary_search_by(|entry| key(entry).as_str().cmp(name))
+        .ok()
+        .and_then(|index| list.get(index))
+}
+
 /// A workload and what it uses: what people think of as "a service".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -85,10 +135,12 @@ pub struct Service {
     pub pods: Vec<crate::PodSummary>,
     /// Its init and regular containers, in that order.
     pub containers: Vec<Container>,
-    /// The Kubernetes Services selecting its pods, sorted by name.
-    pub endpoints: Vec<Endpoint>,
-    /// The Ingresses routing to those Services, sorted by name.
-    pub routes: Vec<Route>,
+    /// The names of the Kubernetes Services selecting its pods, sorted by name; each is in
+    /// the document's `endpoints`.
+    pub endpoint_names: Vec<String>,
+    /// The names of the Ingresses routing to those Services, sorted by name; each is in the
+    /// document's `routes`.
+    pub route_names: Vec<String>,
     /// What kind of data store it is, when it is one: named like a well-known data store
     /// image, in the `databases` group, or a StatefulSet with persistent storage. Image names
     /// are a convention, so this is a hint for how to show the service, not a fact about it.

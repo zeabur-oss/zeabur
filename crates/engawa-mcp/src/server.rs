@@ -348,7 +348,7 @@ fn answer(read: Result<Value, Value>) -> CallToolResult {
 
 /// The parts of a project document that say how its services are doing.
 ///
-/// The document also holds every resource, relation and connection, which a question about
+/// The document also holds every endpoint, route, resource and connection, which a question about
 /// health does not need; `get_service` has a service in full.
 fn project(document: &Value) -> Value {
     let mut project = Map::new();

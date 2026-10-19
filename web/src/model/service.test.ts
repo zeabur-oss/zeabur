@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 
 import { layout } from "@/model/layout"
-import { canonicalKind, roleOf, type Service } from "@/model/service"
+import { canonicalKind, domainsOf, roleOf, type Network, type Service } from "@/model/service"
 
 const service = (name: string, fields: Partial<Service> = {}) =>
   ({
@@ -10,8 +10,8 @@ const service = (name: string, fields: Partial<Service> = {}) =>
     name,
     pods: [],
     containers: [],
-    endpoints: [],
-    routes: [],
+    endpointNames: [],
+    routeNames: [],
     status: { health: "ok", word: "running" },
     ...fields,
   }) as unknown as Service
@@ -26,19 +26,43 @@ describe("a service's role", () => {
   test("is web before data when an Ingress exposes it", () => {
     const exposed = service("search", {
       dataStore: "search",
-      endpoints: [{ name: "search" }],
-      routes: [{ name: "public", rules: [{ service: "search", host: "example.com" }] }],
-    } as unknown as Partial<Service>)
+      endpointNames: ["search"],
+      routeNames: ["public"],
+    })
     expect(roleOf(exposed)).toBe("web")
   })
 
   test("places a data store in the canvas's data lane", () => {
-    const laid = layout([service("api"), service("db", { dataStore: "postgres" })], [])
+    const network = { endpoints: [], routes: [] }
+    const laid = layout(network, [service("api"), service("db", { dataStore: "postgres" })], [])
     const lanes = Object.fromEntries(laid.nodes.map((node) => [node.id, node.lane]))
     expect(lanes).toStrictEqual({
       "Deployment/api": "workers",
       "Deployment/db": "data",
     })
+  })
+})
+
+describe("a service's domains", () => {
+  test("come from the routes it names, and only from rules to its own Services", () => {
+    const network = {
+      endpoints: [],
+      routes: [
+        {
+          name: "public",
+          rules: [
+            { service: "api", host: "api.example.com" },
+            { service: "web", host: "example.com" },
+          ],
+          tlsHosts: ["api.example.com"],
+        },
+        { name: "other", rules: [{ service: "api", host: "other.example.com" }] },
+      ],
+    } as unknown as Network
+    const api = service("api", { endpointNames: ["api"], routeNames: ["public"] })
+    expect(domainsOf(network, api).map((d) => [d.host, d.https])).toStrictEqual([
+      ["api.example.com", true],
+    ])
   })
 })
 

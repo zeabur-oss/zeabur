@@ -160,10 +160,10 @@ pub(crate) fn exposed(
         .services
         .iter()
         .filter(|s| {
-            !s.routes.is_empty()
-                || s.endpoints
+            !s.route_names.is_empty()
+                || s.endpoint_names
                     .iter()
-                    .any(|e| backends.contains(&e.name.as_str()))
+                    .any(|e| backends.contains(&e.as_str()))
         })
         .map(|s| s.id.clone())
         .collect();
@@ -171,8 +171,8 @@ pub(crate) fn exposed(
         .services
         .iter()
         .filter(|s| {
-            s.endpoints
-                .iter()
+            project
+                .endpoints_of(s)
                 .any(|e| matches!(e.type_.as_deref(), Some("NodePort" | "LoadBalancer")))
         })
         .map(|s| s.id.clone())

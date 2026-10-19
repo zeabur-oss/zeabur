@@ -81,7 +81,7 @@ mod tests {
                         .filter_map(Workload::pod_spec)
                         .flat_map(|spec| &spec.containers)
                         .any(|c| c.ports.as_ref().is_some_and(|p| !p.is_empty()));
-                    if !runs && service.endpoints.is_empty() && declares_ports {
+                    if !runs && service.endpoint_names.is_empty() && declares_ports {
                         ports_without_service += 1;
                     }
                     if diagnose(service, &snapshot, &[], &http_routes)

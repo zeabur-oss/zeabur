@@ -29,6 +29,7 @@ import {
   podReason,
   serviceId,
   type Event,
+  type Network,
   type Service,
 } from "@/model/service"
 import { hasUsage } from "@/model/usage"
@@ -39,6 +40,7 @@ export function OverviewTab({
   project,
   service,
   services,
+  network,
   edges,
   events,
   onTab,
@@ -46,6 +48,7 @@ export function OverviewTab({
   project: string
   service: Service
   services: Service[]
+  network: Network
   edges: Edge[]
   events: Event[]
   onTab: (tab: ServiceTab, pod?: string) => void
@@ -69,7 +72,7 @@ export function OverviewTab({
         <ResourcesCard service={service} />
       )}
       <ConnectionsCard project={project} service={service} services={services} edges={edges} />
-      <DomainsCard service={service} onTab={onTab} />
+      <DomainsCard network={network} service={service} onTab={onTab} />
       <Panel
         title={t("project.events")}
         action={<TabLink onClick={() => onTab("events")}>{t("common.all")}</TabLink>}
@@ -268,9 +271,17 @@ function ResourcesCard({ service }: { service: Service }) {
   )
 }
 
-function DomainsCard({ service, onTab }: { service: Service; onTab: (tab: ServiceTab) => void }) {
+function DomainsCard({
+  network,
+  service,
+  onTab,
+}: {
+  network: Network
+  service: Service
+  onTab: (tab: ServiceTab) => void
+}) {
   const t = useT()
-  const domains = domainsOf(service)
+  const domains = domainsOf(network, service)
   return (
     <Panel
       title={t("common.domains")}
@@ -278,7 +289,7 @@ function DomainsCard({ service, onTab }: { service: Service; onTab: (tab: Servic
     >
       {domains.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          {service.endpoints.length > 0 ? t("domains.privateOnly") : t("domains.none")}
+          {service.endpointNames.length > 0 ? t("domains.privateOnly") : t("domains.none")}
         </p>
       ) : (
         <ul className="flex flex-col gap-2">

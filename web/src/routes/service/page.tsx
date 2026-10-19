@@ -133,7 +133,7 @@ function ServiceView({
     void navigate({ search: (previous) => ({ ...previous, pod: pod || undefined }), replace: true })
   const counts: Partial<Record<ServiceTab, number>> = {
     variables: service.containers.reduce((n, c) => n + c.env.length, 0),
-    networking: service.routes.length + service.endpoints.length,
+    networking: service.routeNames.length + service.endpointNames.length,
     storage: volumesOf(service).length,
     events: mine.length,
   }
@@ -278,6 +278,7 @@ function ServiceView({
             project={project}
             service={service}
             services={data.services}
+            network={data}
             edges={edges}
             events={mine}
             onTab={setTab}
@@ -315,6 +316,7 @@ function ServiceView({
             project={project}
             service={service}
             services={data.services}
+            network={data}
             reachability={data.extensions?.networkPolicy ?? undefined}
             unreadable={unreadable}
           />
@@ -328,7 +330,7 @@ function ServiceView({
         <TabsContent value="settings">
           {tab === "settings" ? (
             <Suspense fallback={<LoadingRows label={t("common.loading")} rows={6} />}>
-              <SettingsTab project={project} service={service} />
+              <SettingsTab project={project} service={service} network={data} />
             </Suspense>
           ) : null}
         </TabsContent>

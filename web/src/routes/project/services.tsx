@@ -113,7 +113,7 @@ function ServicesTable({
       if (search.status === "healthy" && !isHealthy(status)) return false
       if (search.kind && s.kind !== search.kind) return false
       if (!needle) return true
-      return [s.name, s.kind, s.image ?? "", word(status), ...domainsOf(s).map((d) => d.host)]
+      return [s.name, s.kind, s.image ?? "", word(status), ...domainsOf(data, s).map((d) => d.host)]
         .join(" ")
         .toLowerCase()
         .includes(needle)
@@ -223,7 +223,7 @@ function ServicesTable({
             {rows.map((service) => {
               const status = statusOf(service)
               const restarts = restartsOf(service)
-              const domain = domainsOf(service)[0]
+              const domain = domainsOf(data, service)[0]
               return (
                 <tr key={serviceId(service)} className="hover:bg-muted/40">
                   <td className="py-2 pr-3 pl-4">

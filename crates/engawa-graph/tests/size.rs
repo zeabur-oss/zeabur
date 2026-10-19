@@ -16,13 +16,13 @@ mod tests {
         serde_json::to_vec(&project(&snapshot)).unwrap().len()
     }
 
-    /// When every Service selects every Deployment, an endpoint or route does not repeat the
-    /// owners of its object for each workload it is listed under. With that copy, 100
-    /// Deployments made a document of about 90 MiB.
+    /// When every Service selects every Deployment, each Service and Ingress is written once and
+    /// the services name theirs. With a copy under every Deployment it selects, 100 Deployments
+    /// made a document of about 11 MiB; now it is about 1.4 MiB.
     #[test]
     fn overlapping_selectors_keep_the_document_small() {
         let overlap = size(Distribution::Overlap, 100);
-        assert!(overlap < 16 * MIB, "{overlap} bytes");
+        assert!(overlap < 2 * MIB, "{overlap} bytes");
         let one_to_one = size(Distribution::OneToOne, 100);
         assert!(one_to_one < MIB, "{one_to_one} bytes");
     }

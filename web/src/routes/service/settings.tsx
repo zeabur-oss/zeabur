@@ -18,13 +18,21 @@ import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
-import type { Service } from "@/model/service"
+import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { FormField, quantity } from "@/components/form-field"
 
 const probeKinds = ["readiness", "liveness", "startup"] as const
 type ProbeKind = (typeof probeKinds)[number]
 
-export function SettingsTab({ project, service }: { project: string; service: Service }) {
+export function SettingsTab({
+  project,
+  service,
+  network,
+}: {
+  project: string
+  service: Service
+  network: Network
+}) {
   const t = useT()
   const planner = usePlanner(project)
   const workload = { kind: service.kind, name: service.name }
@@ -56,6 +64,7 @@ export function SettingsTab({ project, service }: { project: string; service: Se
             <Probes
               project={project}
               service={service}
+              endpoints={endpointsOf(network, service)}
               disabled={!!managed}
               onPlan={(change) =>
                 planner.plan({ title: t("title.probe", service.name), changes: [change] })
@@ -295,11 +304,14 @@ function currentProbe(template: unknown, container: string, kind: ProbeKind): Pr
 function Probes({
   project,
   service,
+  endpoints,
   disabled,
   onPlan,
 }: {
   project: string
   service: Service
+  /** The Kubernetes Services selecting its pods. */
+  endpoints: Endpoint[]
   disabled: boolean
   onPlan: (change: Change) => void
 }) {
@@ -311,7 +323,7 @@ function Probes({
   if (releases.isPending)
     return <p className="type-meta text-muted-foreground">{t("common.loading")}</p>
   // The first port the Services reach this workload on, for the HTTP and TCP presets.
-  const port = service.endpoints[0]?.ports[0]?.targetPort ?? service.endpoints[0]?.ports[0]?.port
+  const port = endpoints[0]?.ports[0]?.targetPort ?? endpoints[0]?.ports[0]?.port
   return (
     <div className="flex flex-col gap-3">
       {probeKinds.map((kind) => (

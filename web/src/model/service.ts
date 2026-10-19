@@ -5,6 +5,12 @@ import type { Schemas } from "@/api/client"
 
 export type Pod = Schemas["PodSummary"]
 export type Service = Schemas["Service"]
+export type Endpoint = Schemas["Endpoint"]
+export type Route = Schemas["Route"]
+/** Where a service's endpoints and routes are looked up: the project document lists each
+ * Kubernetes Service and Ingress once, and a service names its own (`endpointNames`,
+ * `routeNames`). */
+export type Network = Pick<Schemas["Project"], "endpoints" | "routes">
 export type Event = Schemas["EventView"]
 export type Health = Schemas["Health"]
 export type Role = "web" | "internal" | "worker" | "job" | "data"
@@ -56,15 +62,36 @@ export function volumesOf(service: Service): Schemas["Mount"][] {
 export const claimOf = (mount: Schemas["Mount"]) =>
   mount.object?.name ?? mount.claimName ?? mount.name
 
-/** Web: exposed by an Ingress. Data: a data store, as the server judges it (`dataStore`). Job: a
- * CronJob or Job. Internal: behind a Kubernetes Service. Worker: everything else. */
+/** Web: exposed by an Ingress (the server names an Ingress only when it routes to one of the
+ * service's Kubernetes Services). Data: a data store, as the server judges it (`dataStore`). Job:
+ * a CronJob or Job. Internal: behind a Kubernetes Service. Worker: everything else. */
 export function roleOf(service: Service): Role {
-  if (publicRoutesOf(service).length > 0) return "web"
+  if (service.routeNames.length > 0) return "web"
   if (service.dataStore) return "data"
   if (service.kind === "CronJob" || service.kind === "Job") return "job"
-  if (service.endpoints.length > 0) return "internal"
+  if (service.endpointNames.length > 0) return "internal"
   return "worker"
 }
+
+/** Each list's entries by name, built once per list the document holds. */
+const byName = new WeakMap<readonly { name: string }[], Map<string, { name: string }>>()
+
+function named<T extends { name: string }>(list: readonly T[], names: readonly string[]): T[] {
+  let index = byName.get(list) as Map<string, T> | undefined
+  if (!index) {
+    index = new Map(list.map((item) => [item.name, item]))
+    byName.set(list, index)
+  }
+  return names.flatMap((name) => index.get(name) ?? [])
+}
+
+/** The Kubernetes Services selecting the service's pods, in the order it names them. */
+export const endpointsOf = (network: Network, service: Service): Endpoint[] =>
+  named(network.endpoints, service.endpointNames)
+
+/** The Ingresses routing to those Services, in the order the service names them. */
+export const routesOf = (network: Network, service: Service): Route[] =>
+  named(network.routes, service.routeNames)
 
 /** Outside (web) to inside (data), then by name: the order of the pod strip and the canvas. */
 export const outsideIn = (a: Service, b: Service) =>
@@ -250,9 +277,9 @@ export interface PublicRoute {
 
 /** The Ingress backends that reach the service, in Ingress order. An Ingress lists rules for
  * other services too; only those whose backend is one of this service's Services count. */
-export function publicRoutesOf(service: Service): PublicRoute[] {
-  const mine = new Set(service.endpoints.map((e) => e.name))
-  return service.routes.flatMap((route) =>
+export function publicRoutesOf(network: Network, service: Service): PublicRoute[] {
+  const mine = new Set(service.endpointNames)
+  return routesOf(network, service).flatMap((route) =>
     route.rules
       .filter((rule) => mine.has(rule.service))
       .map((rule) => ({
@@ -268,9 +295,9 @@ export function publicRoutesOf(service: Service): PublicRoute[] {
 }
 
 /** The hosts that reach the service, each once. */
-export function domainsOf(service: Service): Domain[] {
+export function domainsOf(network: Network, service: Service): Domain[] {
   const seen = new Map<string, Domain>()
-  for (const route of publicRoutesOf(service))
+  for (const route of publicRoutesOf(network, service))
     if (route.host && !seen.has(route.host))
       seen.set(route.host, {
         host: route.host,
@@ -361,7 +388,7 @@ export function summarise(project: Project): ProjectSummary {
     podsReady: pods.filter((p) => p.ready).length,
     pods: pods.length,
     restarts: pods.reduce((sum, p) => sum + p.restarts, 0),
-    domains: project.services.flatMap(domainsOf),
+    domains: project.services.flatMap((service) => domainsOf(project, service)),
     health: worstHealth(statuses),
   }
 }
