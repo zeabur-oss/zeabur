@@ -226,7 +226,10 @@ pub(crate) async fn document_of(
         }
         Err(_) => Vec::new(),
     };
-    let namespace = engawa_gaps::Namespace::new(&snapshot, &events, &http_routes);
+    // A refused list leaves `snapshot.services` empty; it says nothing about which exist.
+    let services_readable = !unreadable.iter().any(|u| u.resource == "services");
+    let namespace = engawa_gaps::Namespace::new(&snapshot, &events, &http_routes)
+        .services_readable(services_readable);
     for service in &mut projection.services {
         service.diagnoses = namespace.diagnose(service);
     }

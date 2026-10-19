@@ -1,0 +1,5 @@
+description: An Ingress and an HTTPRoute send to api, but the namespace's Services could not be listed, so the input holds none and api is not said to have no Service; its crash loop is still diagnosed.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"
+  servicesReadable: false

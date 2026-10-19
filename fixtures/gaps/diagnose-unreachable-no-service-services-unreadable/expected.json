@@ -1,0 +1,18 @@
+[
+  {
+    "kind": "crashLoop",
+    "container": "api",
+    "pods": [
+      "api-1"
+    ],
+    "cause": {
+      "key": "diagnosis.crashLoop.cause.exitCode",
+      "params": {
+        "container": "api",
+        "restarts": "7",
+        "exitCode": "2",
+        "reason": "Error"
+      }
+    }
+  }
+]

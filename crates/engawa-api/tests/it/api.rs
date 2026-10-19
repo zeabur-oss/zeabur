@@ -1382,6 +1382,53 @@ mod tests {
         );
     }
 
+    /// A workload a route sends to by name is diagnosed as having no Service, unless the
+    /// Services could not be listed: then their absence from the read proves nothing. The other
+    /// diagnoses stay.
+    #[tokio::test]
+    async fn no_service_is_diagnosed_only_when_the_services_could_be_listed() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.objects.get_mut("shop").unwrap().http_routes.push(json!({
+                "apiVersion": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute",
+                "metadata": {"name": "web", "namespace": "shop"},
+                "spec": {"rules": [{"backendRefs": [{"name": "web", "port": 80}]}]}
+            }));
+        });
+        let causes = |document: &Value| -> Vec<String> {
+            document["services"][0]["diagnoses"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|d| d["cause"]["key"].as_str().unwrap().to_owned())
+                .collect()
+        };
+        let no_service = "diagnosis.unreachable.cause.noService".to_owned();
+        let readable = get(&cluster, "/api/v1/projects/shop").await;
+        assert!(causes(&readable).contains(&no_service), "{readable}");
+
+        cluster.update(|s| {
+            s.forbidden_in_namespaces.insert("services".to_owned());
+        });
+        let refused = get(&cluster, "/api/v1/projects/shop").await;
+        let refused_causes = causes(&refused);
+        assert!(!refused_causes.contains(&no_service), "{refused}");
+        assert!(
+            refused_causes
+                .iter()
+                .any(|c| c.starts_with("diagnosis.crashLoop.")),
+            "{refused}"
+        );
+        assert!(
+            refused["unreadable"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|u| u["resource"] == "services"),
+            "{refused}"
+        );
+    }
+
     #[tokio::test]
     async fn a_project_without_network_policy_is_one_gap_rated_by_enforcement() {
         let cluster = cluster();

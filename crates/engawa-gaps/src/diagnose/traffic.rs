@@ -39,8 +39,9 @@ use super::{Found, parse, truncate};
 /// Services, the Ingress and `HTTPRoute` backends, and the hosts the workloads' variables name.
 #[derive(Debug)]
 pub(super) struct Traffic<'a> {
-    /// The names of the Services.
-    services: BTreeSet<&'a str>,
+    /// The names of the Services; `None` when they could not be listed
+    /// ([`Namespace::services_readable`](super::Namespace::services_readable)).
+    services: Option<BTreeSet<&'a str>>,
     /// By backend name, the Ingresses that send to it and the field that says so, in the order
     /// of the Ingresses and their backends.
     ingresses: BTreeMap<&'a str, Vec<(String, Origin)>>,
@@ -111,11 +112,13 @@ impl<'a> Traffic<'a> {
             }
         }
         Self {
-            services: snapshot
-                .services
-                .iter()
-                .filter_map(|s| s.metadata.name.as_deref())
-                .collect(),
+            services: Some(
+                snapshot
+                    .services
+                    .iter()
+                    .filter_map(|s| s.metadata.name.as_deref())
+                    .collect(),
+            ),
             ingresses,
             routes: http_routes,
             routed,
@@ -123,12 +126,18 @@ impl<'a> Traffic<'a> {
         }
     }
 
+    /// Forgets the Services read: they could not be listed, so none is known to be missing.
+    pub(super) fn services_unreadable(&mut self) {
+        self.services = None;
+    }
+
     /// What sends to `workload` by its name while no Service has that name: Ingress and
     /// `HTTPRoute` backends, then other workloads' variables naming it as a host. Each with the
-    /// name of what sends and the field that says so.
+    /// name of what sends and the field that says so. None when the Services could not be
+    /// listed.
     fn senders(&self, workload: Workload<'_>) -> Vec<(String, Origin)> {
         let name = workload.name();
-        if self.services.contains(name) {
+        if self.services.as_ref().is_none_or(|s| s.contains(name)) {
             return Vec::new();
         }
         let mut out = self.ingresses.get(name).cloned().unwrap_or_default();

@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests {
     use engawa_gaps::{
-        BUILTIN, ClusterTraits, Event, GatewayRef, Input, Rule, diagnose, evaluate, snippet,
+        BUILTIN, ClusterTraits, Event, GatewayRef, Input, Namespace, Rule, evaluate, snippet,
     };
     use engawa_graph::{Snapshot, project};
     use engawa_model::HttpRoute;
@@ -83,7 +83,9 @@ mod tests {
                     .iter()
                     .find(|s| name.is_none_or(|name| s.workload.name == name))
                     .unwrap_or_else(|| panic!("{}: no workload {name:?}", fixture.name));
-                to_value(diagnose(service, &snapshot, &events, &http_routes)).unwrap()
+                let namespace = Namespace::new(&snapshot, &events, &http_routes)
+                    .services_readable(params["servicesReadable"].as_bool().unwrap_or(true));
+                to_value(namespace.diagnose(service)).unwrap()
             }
             "gaps.rules" => {
                 let project = project(&snapshot);

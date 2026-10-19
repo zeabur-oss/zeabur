@@ -152,6 +152,20 @@ impl<'a> Namespace<'a> {
         }
     }
 
+    /// Says whether the namespace's Services could be listed; [`Namespace::new`] assumes they
+    /// could.
+    ///
+    /// A refused list leaves `snapshot.services` empty because the read was refused, not because
+    /// there are none, so with `false` no service is diagnosed as reached by name with no
+    /// Service (`noService`). Every other diagnosis stays.
+    #[must_use]
+    pub fn services_readable(mut self, readable: bool) -> Self {
+        if !readable {
+            self.traffic.services_unreadable();
+        }
+        self
+    }
+
     /// The diagnoses of `service`, a service of this namespace, as [`diagnose`] gives them.
     #[must_use]
     pub fn diagnose(&self, service: &Service) -> Vec<Diagnosis> {
