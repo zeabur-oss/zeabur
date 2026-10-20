@@ -10,6 +10,7 @@ import { usePlanner } from "@/components/plan/planner"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
+import { Term } from "@zeabur/design-system/components/term"
 import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { serviceSettingsSections } from "@/modules/service-settings"
@@ -209,12 +210,13 @@ function Compute({
           )}
         </form.Field>
       ) : null}
+      <p className="max-w-prose type-meta text-muted-foreground">{t("form.computeHint")}</p>
       {containers.map((container, index) => (
         <fieldset key={container.name} className="flex flex-col gap-2">
           <legend className="mb-1 font-mono text-xs" translate="no">
             {container.name}
           </legend>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
             {(
               [
                 ["cpuRequest", t("form.cpuRequest")],
@@ -230,7 +232,7 @@ function Compute({
               >
                 {(f) => (
                   <FormField
-                    label={label}
+                    label={<Term detail={paths[key]}>{label}</Term>}
                     errors={[
                       ...f.state.meta.errors,
                       refusedField(

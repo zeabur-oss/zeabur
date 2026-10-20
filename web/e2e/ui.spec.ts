@@ -717,7 +717,7 @@ test("Overview lists what the project misses, and a fix is planned and applied",
     page,
     `Set CPU and memory for ${editor}`,
     "Save resources",
-    /CPU request \S+, Memory request \S+, Memory limit \S+\./,
+    /Reserved CPU \S+, Reserved memory \S+, Maximum memory \S+\./,
   )
   await expect(limits).toHaveCount(0, { timeout: 15_000 })
 })

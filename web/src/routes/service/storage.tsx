@@ -6,8 +6,17 @@ import { Panel } from "@/components/bits"
 import { VolumeBackups } from "@/components/backups"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@zeabur/design-system/components/empty"
+import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { Term } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
-import { useT } from "@/i18n"
+import { useT, type Translate } from "@/i18n"
 import { claimOf, volumesOf, type Service } from "@/model/service"
 
 const ClaimForm = lazy(() =>
@@ -38,11 +47,27 @@ export function StorageTab({ project, service }: { project: string; service: Ser
           {t("common.managedByDetail", managed)}
         </p>
       ) : null}
+      <SectionHeader
+        title={<Term detail="PersistentVolumeClaim">{t("storage.title")}</Term>}
+        count={volumes.length > 0 ? volumes.length : undefined}
+        description={t("storage.about")}
+      />
       {volumes.length === 0 ? (
-        <div className="flex items-center gap-2 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          <HardDriveIcon className="size-4" aria-hidden="true" />
-          {t("storage.noClaims")}
-        </div>
+        <Empty variant="outline" size="inline">
+          <EmptyMedia variant="glyph">
+            <HardDriveIcon aria-hidden="true" />
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle>{t("storage.emptyTitle", service.name)}</EmptyTitle>
+            <EmptyDescription>
+              {service.kind === "StatefulSet"
+                ? t("form.statefulVolumes")
+                : editable
+                  ? t("storage.emptyBody")
+                  : t("storage.emptyJob")}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {volumes.map((m) => {
@@ -62,9 +87,11 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                 }
                 action={
                   m.status ? (
-                    <StatusPill health={m.status === "Bound" ? "ok" : "warn"} size="sm">
-                      {m.status}
-                    </StatusPill>
+                    <Tooltip content={`PersistentVolumeClaim ${m.status}`}>
+                      <StatusPill health={m.status === "Bound" ? "ok" : "warn"} size="sm">
+                        {phaseWord(m.status, t)}
+                      </StatusPill>
+                    </Tooltip>
                   ) : undefined
                 }
               >
@@ -123,7 +150,9 @@ export function StorageTab({ project, service }: { project: string; service: Ser
         </div>
       )}
       {!editable ? null : service.kind === "StatefulSet" ? (
-        <p className="type-meta text-muted-foreground">{t("form.statefulVolumes")}</p>
+        volumes.length === 0 ? null : (
+          <p className="type-meta text-muted-foreground">{t("form.statefulVolumes")}</p>
+        )
       ) : (
         <Suspense fallback={null}>
           <AddVolume
@@ -161,4 +190,11 @@ export function StorageTab({ project, service }: { project: string; service: Ser
       {planner.dialog}
     </div>
   )
+}
+
+function phaseWord(phase: string, t: Translate): string {
+  if (phase === "Bound") return t("storage.bound")
+  if (phase === "Pending") return t("storage.pending")
+  if (phase === "Lost") return t("storage.lost")
+  return phase
 }

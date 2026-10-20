@@ -464,12 +464,13 @@ export const en = {
   "pod.restarts": (n: number) => plural(n, "restart", "restarts"),
   "pod.logsOf": (pod: string) => `Logs of ${pod}`,
   "resources.title": "Resources",
-  "resources.hint": "Requests and limits from the pod template. Usage needs metrics-server.",
+  "resources.hint":
+    "Reserved amounts and maximums from the pod template. Usage needs metrics-server.",
   "resources.container": "Container",
   "resources.cpu": "CPU",
   "resources.memory": "Memory",
-  "resources.requests": "Request",
-  "resources.limits": "Limit",
+  "resources.requests": "Reserved",
+  "resources.limits": "Maximum",
   "connections.title": "Connections",
 
   // Logs
@@ -573,8 +574,16 @@ export const en = {
   "net.defaultBackend": "Default backend",
 
   // Storage
-  "storage.noClaims": "No volumes.",
   "storage.requested": "requested",
+  "storage.title": "Volumes",
+  "storage.about":
+    "Files written to a volume stay when a replica restarts or moves to another node. Files anywhere else in the container are lost on restart.",
+  "storage.emptyTitle": (name: string) => `${name} has no volume`,
+  "storage.emptyBody": "Add one if the app must keep files, such as uploads or a database's data.",
+  "storage.emptyJob": "To add one to a Job, edit its YAML.",
+  "storage.bound": "Ready",
+  "storage.pending": "Waiting for storage",
+  "storage.lost": "Storage lost",
   "storage.mountPath": "Mount path",
   "storage.accessMode": "Access mode",
   "storage.class": "Storage class",
@@ -918,10 +927,12 @@ export const en = {
   "form.health": "Health checks",
   "form.jobs": "Jobs run once. Change their template in YAML.",
   "form.replicas": "Replicas",
-  "form.cpuRequest": "CPU request",
-  "form.memoryRequest": "Memory request",
-  "form.cpuLimit": "CPU limit",
-  "form.memoryLimit": "Memory limit",
+  "form.cpuRequest": "Reserved CPU",
+  "form.memoryRequest": "Reserved memory",
+  "form.cpuLimit": "Maximum CPU",
+  "form.memoryLimit": "Maximum memory",
+  "form.computeHint":
+    "The node sets the reserved amount aside for each replica. When a replica uses more memory than its maximum, its container restarts; CPU above the maximum is slowed down.",
   "form.largestNode": (cores: string, memory: string) => `Largest node: ${cores} cores, ${memory}`,
   "form.badQuantity": "Use a quantity such as 250m, 1 or 512Mi.",
   "form.badReplicas": "Enter a whole number from 0 to 1000.",
