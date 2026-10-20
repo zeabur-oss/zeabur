@@ -1,4 +1,4 @@
-// Prepares dist/ for embedding in the Rust binary (crates/engawa-ui/build.rs):
+// Prepares dist/ for embedding in the Rust binary (crates/zeabur-ui/build.rs):
 //   - fails if index.html carries an inline script or style (the CSP allows neither);
 //   - writes a brotli (.br) encoding of every compressible file, when smaller;
 //   - writes manifest.tsv: path, MIME type, SHA-256, cache class, encodings.

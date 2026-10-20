@@ -1,6 +1,6 @@
 // How to install a catalogue component yourself, in a panel along the right edge: what it needs
 // first, what access it gets, the values to fill in, and the texts in four forms (Helm, k3s,
-// Flux, Argo CD). A component k3s also packages carries a warning to disable k3s's copy first. The server renders them from the catalogue; engawa runs none of them.
+// Flux, Argo CD). A component k3s also packages carries a warning to disable k3s's copy first. The server renders them from the catalogue; Zeabur runs none of them.
 import { keepPreviousData as keep, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import WarningFillIcon from "~icons/ph/warning-fill"
@@ -10,16 +10,16 @@ import { installQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { Alert, AlertDescription } from "@engawahq/design-system/components/alert"
-import { Badge } from "@engawahq/design-system/components/badge"
-import { Button } from "@engawahq/design-system/components/button"
+import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
+import { Badge } from "@zeabur/design-system/components/badge"
+import { Button } from "@zeabur/design-system/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-} from "@engawahq/design-system/components/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@engawahq/design-system/components/tabs"
+} from "@zeabur/design-system/components/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { k3sPackagedNotes } from "@/routes/cluster/k3s-packaged"

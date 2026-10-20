@@ -1,0 +1,27 @@
+# Every optional part switched on (scripts/check-chart.sh).
+image:
+  repository: registry.example.test/zeabur
+  tag: v0.0.0-test
+publicUrl: https://zeabur.example.test
+issuer:
+  url: https://identity.example.test:8443
+  clientId: zeabur-test
+  clientSecret:
+    existingSecret: zeabur-oidc
+    key: secret
+  caBundle:
+    configMap: zeabur-identity-ca
+elevation:
+  enabled: false
+planKey:
+  existingSecret: zeabur-plan-key
+ingress:
+  enabled: true
+  className: traefik
+  tls:
+    secretName: zeabur-tls
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: public
+      namespace: gateway

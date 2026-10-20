@@ -1,0 +1,36 @@
+{{- if .Values.metricsStore.everyoneReads }}
+# Everyone signed in may read zeabur's settings (the ConfigMap zeabur-settings, which names the
+# metrics store), so each person's page asks the store the administrators chose rather than the
+# default. Only `get` on that one ConfigMap; changing it stays with whoever may update ConfigMaps
+# in this namespace. zeabur's own ServiceAccount is bound to nothing.
+# https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
+# https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-subjects (system:authenticated)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "zeabur.fullname" . }}-settings-reader
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["zeabur-settings"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "zeabur.fullname" . }}-settings-reader
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "zeabur.fullname" . }}-settings-reader
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated
+{{- end }}

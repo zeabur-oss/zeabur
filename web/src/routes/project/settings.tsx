@@ -18,17 +18,17 @@ import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { projectGlyphs } from "@/components/project-icon"
-import { Button } from "@engawahq/design-system/components/button"
-import { Input } from "@engawahq/design-system/components/input"
-import { Textarea } from "@engawahq/design-system/components/textarea"
-import { ToggleGroup, ToggleGroupItem } from "@engawahq/design-system/components/toggle-group"
+import { Button } from "@zeabur/design-system/components/button"
+import { Input } from "@zeabur/design-system/components/input"
+import { Textarea } from "@zeabur/design-system/components/textarea"
+import { ToggleGroup, ToggleGroupItem } from "@zeabur/design-system/components/toggle-group"
 import { useT } from "@/i18n"
 import { mayChange, projectIcons, type ProjectIconName } from "@/model/project"
 import { ProjectHeader } from "@/routes/project/header"
 
 const route = getRouteApi("/projects/$project/settings")
 
-/** The longest display name and description (engawa-model `DISPLAY_NAME_MAX`, `DESCRIPTION_MAX`). */
+/** The longest display name and description (zeabur-model `DISPLAY_NAME_MAX`, `DESCRIPTION_MAX`). */
 export const DISPLAY_NAME_MAX = 64
 export const DESCRIPTION_MAX = 500
 

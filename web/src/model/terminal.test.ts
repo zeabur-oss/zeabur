@@ -104,8 +104,8 @@ describe("terminal states", () => {
 describe("terminal address and access", () => {
   test("the address is the page's origin, ws or wss by its scheme", () => {
     expect(
-      terminalUrl({ protocol: "https:", host: "engawa.example" }, "shop", "web-1", "web"),
-    ).toBe("wss://engawa.example/api/v1/projects/shop/pods/web-1/exec?container=web")
+      terminalUrl({ protocol: "https:", host: "zeabur.example" }, "shop", "web-1", "web"),
+    ).toBe("wss://zeabur.example/api/v1/projects/shop/pods/web-1/exec?container=web")
     expect(
       terminalUrl({ protocol: "http:", host: "127.0.0.1:8080" }, "a b", "p/1", undefined),
     ).toBe("ws://127.0.0.1:8080/api/v1/projects/a%20b/pods/p%2F1/exec")

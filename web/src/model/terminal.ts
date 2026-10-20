@@ -1,5 +1,5 @@
 // The terminal's connection, apart from the screen: the WebSocket address, the control frames the
-// server sends (crates/engawa-api/src/pods/exec.rs documents the protocol) and the states the tab shows.
+// server sends (crates/zeabur-api/src/pods/exec.rs documents the protocol) and the states the tab shows.
 import type { Problem, Schemas } from "@/api/client"
 import { isRefusal } from "@/model/problem"
 import { roleYaml } from "@/model/rbac"
@@ -100,7 +100,7 @@ export function terminalUrl(
  * (https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb). */
 export function execRole(namespace: string, user: string): string {
   return roleYaml({
-    name: "engawa-terminal",
+    name: "zeabur-terminal",
     namespace,
     rules: [
       { apiGroup: "", resources: ["pods"], verbs: ["get"] },

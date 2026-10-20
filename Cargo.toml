@@ -16,46 +16,46 @@ publish = false
 # dependencies) only on workspace crates of a lower level. Test crates are dev-dependencies only.
 # (Levels order crates; the product layers L0-L4 in docs/architecture.md are a different thing.)
 [workspace.metadata.levels]
-engawa-core = 0
-engawa-model = 1
-engawa-kube = 1
-engawa-adapters = 1
-engawa-ui = 1
-engawa-auth = 1
-engawa-graph = 2
-engawa-modules = 2
-engawa-gaps = 3
-engawa-plan = 3
-engawa-recommend = 3
-engawa-api = 4
-engawa-mcp = 4
-engawa = 5
-engawactl = 5
-engawa-test-support = 6
+zeabur-core = 0
+zeabur-model = 1
+zeabur-kube = 1
+zeabur-adapters = 1
+zeabur-ui = 1
+zeabur-auth = 1
+zeabur-graph = 2
+zeabur-modules = 2
+zeabur-gaps = 3
+zeabur-plan = 3
+zeabur-catalog = 3
+zeabur-api = 4
+zeabur-mcp = 4
+zeabur = 5
+zeaburctl = 5
+zeabur-test-support = 6
 
-# Integrations with installed components (see engawa-modules' README), also checked by
+# Integrations with installed components (see zeabur-modules' README), also checked by
 # scripts/check-levels.sh: only the composers may depend on a module crate, so the core crates
 # never know which modules a build has.
 [workspace.metadata.modules]
-crates = ["engawa-modules"]
-composers = ["engawa-api", "engawa-mcp", "engawa", "engawactl"]
+crates = ["zeabur-modules"]
+composers = ["zeabur-api", "zeabur-mcp", "zeabur", "zeaburctl"]
 
 [workspace.dependencies]
 # Workspace crates, levelled from the bottom up.
-engawa-core = { path = "crates/engawa-core" }
-engawa-model = { path = "crates/engawa-model" }
-engawa-kube = { path = "crates/engawa-kube" }
-engawa-adapters = { path = "crates/engawa-adapters" }
-engawa-graph = { path = "crates/engawa-graph" }
-engawa-gaps = { path = "crates/engawa-gaps" }
-engawa-recommend = { path = "crates/engawa-recommend" }
-engawa-modules = { path = "crates/engawa-modules" }
-engawa-plan = { path = "crates/engawa-plan" }
-engawa-api = { path = "crates/engawa-api" }
-engawa-mcp = { path = "crates/engawa-mcp" }
-engawa-ui = { path = "crates/engawa-ui" }
-engawa-auth = { path = "crates/engawa-auth" }
-engawa-test-support = { path = "crates/engawa-test-support" }
+zeabur-core = { path = "crates/zeabur-core" }
+zeabur-model = { path = "crates/zeabur-model" }
+zeabur-kube = { path = "crates/zeabur-kube" }
+zeabur-adapters = { path = "crates/zeabur-adapters" }
+zeabur-graph = { path = "crates/zeabur-graph" }
+zeabur-gaps = { path = "crates/zeabur-gaps" }
+zeabur-catalog = { path = "crates/zeabur-catalog" }
+zeabur-modules = { path = "crates/zeabur-modules" }
+zeabur-plan = { path = "crates/zeabur-plan" }
+zeabur-api = { path = "crates/zeabur-api" }
+zeabur-mcp = { path = "crates/zeabur-mcp" }
+zeabur-ui = { path = "crates/zeabur-ui" }
+zeabur-auth = { path = "crates/zeabur-auth" }
+zeabur-test-support = { path = "crates/zeabur-test-support" }
 
 # Third-party crates.
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }
@@ -67,7 +67,7 @@ form_urlencoded = "1"
 futures-util = { version = "0.3", default-features = false, features = ["std", "io", "async-await-macro"] }
 http = "1"
 http-body-util = "0.1"
-# The HTTP client stack kube-rs already ships, used directly for the OAuth client (engawa-auth).
+# The HTTP client stack kube-rs already ships, used directly for the OAuth client (zeabur-auth).
 bytes = "1"
 hyper = { version = "1", default-features = false }
 hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "tls12", "aws-lc-rs"] }
@@ -77,11 +77,11 @@ rustls-platform-verifier = "0.7"
 k8s-openapi = { version = "0.28", default-features = false, features = ["v1_34"] }
 kube = { version = "4.2", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs", "ws"] }
 proptest = { version = "1", default-features = false, features = ["std"] }
-# The official Model Context Protocol SDK (modelcontextprotocol/rust-sdk), for `engawactl mcp`:
+# The official Model Context Protocol SDK (modelcontextprotocol/rust-sdk), for `zeaburctl mcp`:
 # the server, its tool macros and the stdio transport. Its JSON Schemas come from the schemars it
 # re-exports.
 rmcp = { version = "3.5", default-features = false, features = ["server", "macros", "transport-io"] }
-# The schemars rmcp re-exports, named directly so that engawa-modules can derive the schema of a
+# The schemars rmcp re-exports, named directly so that zeabur-modules can derive the schema of a
 # tool argument it shares with the API. Keep the version rmcp uses.
 schemars = { version = "1.2", default-features = false, features = ["derive"] }
 secrecy = "0.10"
@@ -94,7 +94,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect"] }
 tower = { version = "0.5", default-features = false, features = ["util"] }
 tracing = "0.1"
-# OpenAPI from the code. Reviewed 2026-10-14 (engawa-api README): no `yaml` feature (it pulls a
+# OpenAPI from the code. Reviewed 2026-10-14 (zeabur-api README): no `yaml` feature (it pulls a
 # c2rust libyaml); the spec is written with serde-saphyr. Never enable `config`.
 utoipa = { version = "=6.0.0", default-features = false, features = ["macros"] }
 utoipa-axum = "=0.3.0"

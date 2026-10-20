@@ -28,7 +28,7 @@ import {
   RefusedSome,
   useHintOffersElevation,
 } from "@/components/refused"
-import { Button } from "@engawahq/design-system/components/button"
+import { Button } from "@zeabur/design-system/components/button"
 import { useT } from "@/i18n"
 import { parseObjectKey } from "@/lib/objects"
 import { pinnedKinds, togglePinnedKind } from "@/lib/stores"
@@ -39,8 +39,8 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
-} from "@engawahq/design-system/components/empty"
-import { Illustration } from "@engawahq/design-system/components/illustration"
+} from "@zeabur/design-system/components/empty"
+import { Illustration } from "@zeabur/design-system/components/illustration"
 
 const ObjectSheet = lazy(() =>
   import("@/components/object-sheet").then((m) => ({ default: m.ObjectSheet })),

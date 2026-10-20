@@ -5,12 +5,12 @@ import WarningCircleIcon from "~icons/ph/warning-circle"
 import { ApiError, toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { Ago } from "@/components/bits"
 import { isRefusal, permission, Refused } from "@/components/refused"
-import { Alert, AlertDescription, AlertTitle } from "@engawahq/design-system/components/alert"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@engawahq/design-system/components/collapsible"
+} from "@zeabur/design-system/components/collapsible"
 import { useI18n, useT } from "@/i18n"
 import { isKind, problemText } from "@/model/problem"
 
@@ -54,7 +54,7 @@ function Failure({
   const text = problemText(t, locale, body)
   const fix = !retryAfter ? text.fix : `${text.fix} ${t("problem.retryAfter", retryAfter)}`
   const status = body.kubernetes ?? undefined
-  // engawa's sentence is often kube-apiserver's own message; it is said once.
+  // Zeabur's sentence is often kube-apiserver's own message; it is said once.
   const folded = text.folded.filter((sentence) => sentence !== status?.message)
   const rows: RawRow[] = [
     ...(body.denied

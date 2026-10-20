@@ -5,11 +5,11 @@ import { expect, test } from "./fixtures.ts"
 // Usage, history and the metrics store setting in each state the API reports. The answers of
 // /usage, /history and /settings/metrics-store are stubbed (page.route), so every state shows on
 // any server: a cluster without metrics-server or a store, or the demo. Everything else is the
-// server's. ENGAWA_E2E_NAMESPACE, ENGAWA_E2E_SERVICE and ENGAWA_E2E_POD as in ui.spec.ts.
+// server's. ZEABUR_E2E_NAMESPACE, ZEABUR_E2E_SERVICE and ZEABUR_E2E_POD as in ui.spec.ts.
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const namespace = env("ENGAWA_E2E_NAMESPACE")
-const service = env("ENGAWA_E2E_SERVICE", "talker")
-const pod = env("ENGAWA_E2E_POD")
+const namespace = env("ZEABUR_E2E_NAMESPACE")
+const service = env("ZEABUR_E2E_SERVICE", "talker")
+const pod = env("ZEABUR_E2E_POD")
 const page_ = `/projects/${encodeURIComponent(namespace)}/services/Deployment/${service}`
 const STORE = "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428"
 const MiB = 2 ** 20
@@ -65,7 +65,7 @@ const usagePath = /\/api\/v1\/projects\/[^/]+\/usage$/
 const historyPath = /\/api\/v1\/projects\/[^/]+\/services\/[^/]+\/[^/]+\/history(\?.*)?$/
 
 test.beforeAll(() => {
-  if (!namespace || !pod) throw new Error("ENGAWA_E2E_NAMESPACE and ENGAWA_E2E_POD are not set")
+  if (!namespace || !pod) throw new Error("ZEABUR_E2E_NAMESPACE and ZEABUR_E2E_POD are not set")
 })
 
 test("live usage per replica against what it reserves, and a replica without a sample", async ({
@@ -197,7 +197,7 @@ test("the metrics store setting says where it is kept, who may change it, and sa
     service: STORE,
     default: STORE,
     source: "default",
-    storedIn: { apiVersion: "v1", kind: "ConfigMap", namespace: "engawa", name: "engawa-settings" },
+    storedIn: { apiVersion: "v1", kind: "ConfigMap", namespace: "zeabur", name: "zeabur-settings" },
     canChange: "allowed",
     state: "not-configured",
     unreadable: [],
@@ -225,7 +225,7 @@ test("the metrics store setting says where it is kept, who may change it, and sa
   await expect(panel).toContainText("Usually only cluster administrators can change this.")
   await panel.getByRole("button", { name: "Where this is kept" }).hover()
   // Base UI's tooltip popup carries no tooltip role.
-  await expect(page.getByText("ConfigMap engawa-settings in namespace engawa")).toBeVisible()
+  await expect(page.getByText("ConfigMap zeabur-settings in namespace zeabur")).toBeVisible()
   const input = panel.getByRole("textbox", { name: "History source" })
   await input.fill("monitoring/prometheus-operated:9090")
   await panel.getByRole("button", { name: "Save" }).click()

@@ -1,0 +1,19 @@
+[package]
+name = "zeabur-catalog"
+description = "zeabur: capability detection and install suggestions from the recommendations bundle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zeabur-kube.workspace = true
+serde.workspace = true
+serde-saphyr = { workspace = true, features = ["serialize"] }
+serde_json.workspace = true
+thiserror.workspace = true
+utoipa.workspace = true

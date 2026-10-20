@@ -18,7 +18,7 @@ describe("signing in again", () => {
         type: "/problems/signed-out",
         title: "You are signed out",
         status: 401,
-        detail: "Sign in to use engawa.",
+        detail: "Sign in to use Zeabur.",
         fix: "Sign in again.",
         kind: "signed-out",
       },

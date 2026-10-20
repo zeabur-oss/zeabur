@@ -20,8 +20,8 @@ import { PodCells } from "@/components/pods"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus, StatusDot, StatusPill } from "@/components/status"
-import { buttonVariants } from "@engawahq/design-system/components/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@engawahq/design-system/components/card"
+import { buttonVariants } from "@zeabur/design-system/components/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
 import {
   Table,
   TableBody,
@@ -29,8 +29,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@engawahq/design-system/components/table"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+} from "@zeabur/design-system/components/table"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import {
   BackupDetails,
   CoverageRow,
@@ -63,9 +63,9 @@ import {
 import { serviceUsage } from "@/model/usage"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import { ProjectHeader } from "@/routes/project/header"
-import { PageHeader } from "@engawahq/design-system/components/page-header"
-import { Stat, StatGroup } from "@engawahq/design-system/components/stat"
-import { MeterStack, meterPartTone } from "@engawahq/design-system/components/meter"
+import { PageHeader } from "@zeabur/design-system/components/page-header"
+import { Stat, StatGroup } from "@zeabur/design-system/components/stat"
+import { MeterStack, meterPartTone } from "@zeabur/design-system/components/meter"
 
 const route = getRouteApi("/projects/$project")
 

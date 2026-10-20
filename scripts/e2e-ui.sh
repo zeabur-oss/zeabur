@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Browser tests of the web interface in local mode: the release `engawactl ui`, with the
+# Browser tests of the web interface in local mode: the release `zeaburctl ui`, with the
 # interface embedded, against the current kubeconfig context (a disposable cluster), driven by
 # Playwright. Run inside `nix develop` on Linux after scripts/build-ui.sh.
 #   scripts/e2e-ui.sh
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-namespace=engawa-e2e
+namespace=zeabur-e2e
 out="$root/target/e2e-ui"
 mkdir -p "$out"
 
@@ -46,23 +46,23 @@ if [[ "${restarts:-0}" -lt 2 ]]; then
   exit 1
 fi
 
-ENGAWA_UI_DIST="$root/web/dist" cargo build --release --locked -p engawactl
-"$root/target/release/engawactl" ui --no-browser >"$out/engawactl.log" 2>&1 &
+ZEABUR_UI_DIST="$root/web/dist" cargo build --release --locked -p zeaburctl
+"$root/target/release/zeaburctl" ui --no-browser >"$out/zeaburctl.log" 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null || true' EXIT
 url=""
 for _ in $(seq 1 100); do
-  url=$(grep -o 'http://127.0.0.1:[0-9]*/?engawa-launch=[0-9a-f]*' "$out/engawactl.log" || true)
+  url=$(grep -o 'http://127.0.0.1:[0-9]*/?zeabur-launch=[0-9a-f]*' "$out/zeaburctl.log" || true)
   [[ -n "$url" ]] && break
   sleep 0.2
 done
 if [[ -z "$url" ]]; then
-  echo "error: engawactl ui printed no link:" >&2
-  cat "$out/engawactl.log" >&2
+  echo "error: zeaburctl ui printed no link:" >&2
+  cat "$out/zeaburctl.log" >&2
   exit 1
 fi
 
 cd "$root/web"
-ENGAWA_E2E_URL="$url" ENGAWA_E2E_NAMESPACE="$namespace" ENGAWA_E2E_POD="$pod" \
-  ENGAWA_E2E_ADOPT="$namespace-adopt" \
+ZEABUR_E2E_URL="$url" ZEABUR_E2E_NAMESPACE="$namespace" ZEABUR_E2E_POD="$pod" \
+  ZEABUR_E2E_ADOPT="$namespace-adopt" \
   bunx playwright test --reporter=line --output="$out/results"

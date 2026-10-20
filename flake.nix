@@ -1,5 +1,5 @@
 {
-  description = "engawa development environment";
+  description = "zeabur development environment";
 
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1"; # unstable Nixpkgs
@@ -76,7 +76,7 @@
               k3d
               kubectl
 
-              # The Helm chart (deploy/chart/engawa, scripts/check-chart.sh) and the in-cluster
+              # The Helm chart (deploy/chart/zeabur, scripts/check-chart.sh) and the in-cluster
               # end-to-end test (scripts/e2e-l2.sh: a CA and certificates for its host names)
               kubernetes-helm
               yq-go
@@ -94,9 +94,9 @@
             env = {
               # Required by rust-analyzer
               RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
-              # Mozilla's CA bundle (MPL-2.0), copied into the image for outgoing TLS (Genkan's
+              # Mozilla's CA bundle (MPL-2.0), copied into the image for outgoing TLS (Zeabur Identity's
               # discovery and token endpoints); pinned with nixpkgs.
-              ENGAWA_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+              ZEABUR_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
             }
             // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (
               # Static musl builds of the host architecture: aws-lc-sys must be compiled against musl

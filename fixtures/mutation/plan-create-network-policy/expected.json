@@ -5,7 +5,7 @@
         "apiVersion": "networking.k8s.io/v1",
         "kind": "NetworkPolicy",
         "plural": "networkpolicies",
-        "name": "engawa-isolate-web"
+        "name": "zeabur-isolate-web"
       },
       "resourceVersion": null,
       "before": null,
@@ -15,10 +15,10 @@
           "apiVersion": "networking.k8s.io/v1",
           "kind": "NetworkPolicy",
           "metadata": {
-            "name": "engawa-isolate-web",
+            "name": "zeabur-isolate-web",
             "namespace": "demo",
             "labels": {
-              "app.kubernetes.io/managed-by": "engawa"
+              "app.kubernetes.io/managed-by": "zeabur"
             }
           },
           "spec": {

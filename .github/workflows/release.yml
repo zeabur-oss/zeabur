@@ -54,8 +54,8 @@ jobs:
           [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           plain="${VERSION#v}"
           crate=$(nix develop -c cargo metadata --locked --no-deps --format-version 1 |
-            jq -r '.packages[] | select(.name == "engawactl") | .version')
-          chart=$(nix develop -c yq '.version + " " + .appVersion' deploy/chart/engawa/Chart.yaml)
+            jq -r '.packages[] | select(.name == "zeaburctl") | .version')
+          chart=$(nix develop -c yq '.version + " " + .appVersion' deploy/chart/zeabur/Chart.yaml)
           test "$crate" = "$plain"
           test "$chart" = "$plain $plain"
           grep -q "^## \[$plain\]" CHANGELOG.md
@@ -92,8 +92,8 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
           ARCH: ${{ matrix.arch }}
         run: >-
-          nix develop -c ./scripts/release-smoke.sh "dist/engawactl-$VERSION-linux-$ARCH.tar.gz"
-          deploy/chart/engawa "engawa:release-$ARCH"
+          nix develop -c ./scripts/release-smoke.sh "dist/zeaburctl-$VERSION-linux-$ARCH.tar.gz"
+          deploy/chart/zeabur "zeabur:release-$ARCH"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-${{ matrix.os }}-${{ matrix.arch }}
@@ -145,7 +145,7 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
         run: >-
           nix develop -c gh release create "$VERSION" release/assets/* --repo "$GITHUB_REPOSITORY"
-          --verify-tag --target "$GITHUB_SHA" --draft --prerelease --title "engawa $VERSION"
+          --verify-tag --target "$GITHUB_SHA" --draft --prerelease --title "zeabur $VERSION"
           --notes-file release/notes.md
 
   verify:

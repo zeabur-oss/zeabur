@@ -13,9 +13,9 @@ import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { Badge } from "@engawahq/design-system/components/badge"
-import { Button } from "@engawahq/design-system/components/button"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+import { Badge } from "@zeabur/design-system/components/badge"
+import { Button } from "@zeabur/design-system/components/button"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { YamlDiff } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
@@ -25,8 +25,8 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
-} from "@engawahq/design-system/components/empty"
-import { Illustration } from "@engawahq/design-system/components/illustration"
+} from "@zeabur/design-system/components/empty"
+import { Illustration } from "@zeabur/design-system/components/illustration"
 
 type Release = Schemas["WorkloadRelease"]
 

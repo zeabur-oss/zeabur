@@ -1,4 +1,0 @@
-# The recommendations catalogue (https://github.com/engawahq/recommendations), vendored at one commit.
-# scripts/check-recommendations.sh compares bundle/ with it; change it only by moving the pin.
-release = v0.1.0
-commit = a0e1cb1d0f5e857459351133d7922cd057a2d19d

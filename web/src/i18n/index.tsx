@@ -74,7 +74,7 @@ export function prepareI18n(): Promise<Catalogue> {
   return catalogues.load(initialLocale())
 }
 
-const storageKey = "engawa.locale"
+const storageKey = "zeabur.locale"
 
 function isLocale(value: unknown): value is Locale {
   return typeof value === "string" && (locales as readonly string[]).includes(value)

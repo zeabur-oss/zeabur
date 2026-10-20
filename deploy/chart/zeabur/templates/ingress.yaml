@@ -1,0 +1,33 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "zeabur.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls.secretName }}
+  tls:
+    - hosts: [{{ include "zeabur.host" $ | quote }}]
+      secretName: {{ . }}
+  {{- end }}
+  rules:
+    - host: {{ include "zeabur.host" . | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "zeabur.fullname" . }}
+                port:
+                  name: http
+{{- end }}

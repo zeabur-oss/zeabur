@@ -1,0 +1,19 @@
+[package]
+name = "zeabur-mcp"
+description = "zeabur: a read-only Model Context Protocol server over stdio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zeabur-core.workspace = true
+zeabur-modules = { workspace = true, features = ["schemars"] }
+form_urlencoded.workspace = true
+rmcp.workspace = true
+serde.workspace = true
+serde_json.workspace = true

@@ -1,0 +1,29 @@
+[package]
+name = "zeabur-plan"
+description = "zeabur: change plans, guarded JSON Patches and impact"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zeabur-adapters.workspace = true
+zeabur-core.workspace = true
+zeabur-graph.workspace = true
+zeabur-model.workspace = true
+base64.workspace = true
+k8s-openapi.workspace = true
+serde.workspace = true
+# YAML edits; already in the binary through zeabur-catalog.
+serde-saphyr.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+utoipa.workspace = true
+
+[dev-dependencies]
+zeabur-test-support.workspace = true
+proptest.workspace = true

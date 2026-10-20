@@ -21,9 +21,9 @@ import { DiagnosisLine } from "@/components/diagnoses"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { FactsPill, plainReason, StatusDot, StatusPill } from "@/components/status"
-import { buttonVariants } from "@engawahq/design-system/components/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@engawahq/design-system/components/card"
-import { Skeleton } from "@engawahq/design-system/components/skeleton"
+import { buttonVariants } from "@zeabur/design-system/components/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
+import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import {
   Table,
   TableBody,
@@ -31,8 +31,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@engawahq/design-system/components/table"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+} from "@zeabur/design-system/components/table"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT, type Translate } from "@/i18n"
 import { useSeen } from "@/lib/in-view"
 import { serviceLink } from "@/lib/place"
@@ -54,10 +54,10 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
-} from "@engawahq/design-system/components/empty"
-import { Illustration } from "@engawahq/design-system/components/illustration"
-import { PageHeader } from "@engawahq/design-system/components/page-header"
-import { Stat, StatGroup } from "@engawahq/design-system/components/stat"
+} from "@zeabur/design-system/components/empty"
+import { Illustration } from "@zeabur/design-system/components/illustration"
+import { PageHeader } from "@zeabur/design-system/components/page-header"
+import { Stat, StatGroup } from "@zeabur/design-system/components/stat"
 
 type ProjectItem = Schemas["ProjectSummary"]
 type Brief = Schemas["ServiceSummary"]

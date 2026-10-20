@@ -4,7 +4,7 @@
 // pod's logs, so the entry is as fine-grained as where it leads.
 import { Link } from "@tanstack/react-router"
 
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { podLogsLink } from "@/lib/place"
 import { cn } from "@/lib/utils"

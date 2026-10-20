@@ -9,7 +9,7 @@ import {
   FieldDescription,
   FieldError,
   FieldLabel,
-} from "@engawahq/design-system/components/field"
+} from "@zeabur/design-system/components/field"
 
 /** The first message among a field's errors (TanStack Form's, and `refusedField`'s). */
 const firstMessage = (errors: unknown[]) =>

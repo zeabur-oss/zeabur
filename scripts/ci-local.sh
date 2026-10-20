@@ -20,7 +20,7 @@
 # A full disk fails jobs with no error of their own (a log cut off mid-line, a k3s node that
 # stops scheduling pods), so the run refuses to start with less than CI_LOCAL_MIN_FREE_GB
 # (default 25) free; each running job's build directory takes several GB. kubernetes-l2 needs a
-# Genkan checkout (GENKAN_SRC, default ../genkan) at the commit in GENKAN_PINNED.
+# Zeabur Identity checkout (ZEABUR_IDENTITY_SRC, default ../identity) at the commit in ZEABUR_IDENTITY_PINNED.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -54,9 +54,9 @@ for dir in "${dirs[@]}"; do
   fi
 done
 
-# A copy is relative to nothing next to it, so Genkan's checkout is named outright.
-GENKAN_SRC="$(cd "${GENKAN_SRC:-$root/../genkan}" 2>/dev/null && pwd || true)"
-export GENKAN_SRC
+# A copy is relative to nothing next to it, so Zeabur Identity's checkout is named outright.
+ZEABUR_IDENTITY_SRC="$(cd "${ZEABUR_IDENTITY_SRC:-$root/../identity}" 2>/dev/null && pwd || true)"
+export ZEABUR_IDENTITY_SRC
 
 run_job() { # $1 = job name
   local name="$1" work="$out/work/$1" started result=PASS

@@ -3,7 +3,7 @@
 // was refused is asked again with the short-lived admin token, which every request then carries.
 //
 // The window cannot report back through `window.opener`: this page sets
-// Cross-Origin-Opener-Policy: same-origin, so the trip through Genkan severs it. The server's last
+// Cross-Origin-Opener-Policy: same-origin, so the trip through Zeabur Identity severs it. The server's last
 // page in the window posts its outcome on a BroadcastChannel, which reaches every page of this
 // origin and no other; the page that asked listens before it opens the window, and takes the first
 // message that reads as an outcome. The window is opened in the click's handler, or the browser
@@ -43,10 +43,10 @@ export interface Ports {
   listen: (onMessage: (data: unknown) => void) => () => void
 }
 
-const CHANNEL = "engawa-elevation"
+const CHANNEL = "zeabur-elevation"
 
 const browserPorts: Ports = {
-  open: (url) => window.open(url, "engawa-elevate", "popup,width=520,height=700") !== null,
+  open: (url) => window.open(url, "zeabur-elevate", "popup,width=520,height=700") !== null,
   listen: (onMessage) => {
     const channel = new BroadcastChannel(CHANNEL)
     channel.onmessage = (event: MessageEvent) => onMessage(event.data)

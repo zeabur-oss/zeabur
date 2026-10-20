@@ -57,7 +57,7 @@ export interface paths {
     }
     /**
      * How to install a catalogue component yourself: Helm commands, a k3s `HelmChart`, Flux objects
-     *     or an Argo CD `Application`, with the catalogue's pinned versions and values. engawa runs none
+     *     or an Argo CD `Application`, with the catalogue's pinned versions and values. Zeabur runs none
      *     of them.
      */
     get: operations["guide_for"]
@@ -149,8 +149,8 @@ export interface paths {
      * The cluster's version and what it calls for: end of life from the bundled table, version
      *     skew between kube-apiserver and the kubelets, and newer patches and minors from
      *     system-upgrade-controller's Plans.
-     * @description engawa makes no outbound request: without Plans, newer versions are not reported (see
-     *     [`engawa_recommend::versions`]). Readable by everyone signed in; nodes and Plans the person
+     * @description Zeabur makes no outbound request: without Plans, newer versions are not reported (see
+     *     [`zeabur_catalog::versions`]). Readable by everyone signed in; nodes and Plans the person
      *     may not list are named in `unreadable`, so the interface can say which permission is missing.
      */
     get: operations["getUpgrades"]
@@ -232,7 +232,7 @@ export interface paths {
     /**
      * Backups of a project: which claims, databases and the namespace a schedule covers, and how
      *     the latest backups went, from every backup provider this build has (K8up, Velero,
-     *     CloudNativePG), read as the person. Outcomes are as each provider reports them; engawa does
+     *     CloudNativePG), read as the person. Outcomes are as each provider reports them; Zeabur does
      *     not test restores.
      */
     get: operations["getProjectBackups"]
@@ -476,7 +476,7 @@ export interface paths {
     put?: never
     /**
      * A Secret's values. A `POST`, so that it is always a deliberate action and never prefetched;
-     *     the response is never cached, and nothing in engawa logs or keeps it.
+     *     the response is never cached, and nothing in Zeabur logs or keeps it.
      */
     post: operations["reveal_secret"]
     delete?: never
@@ -579,7 +579,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** How you are signed in to engawa: whether you can sign out, and admin rights in use. */
+    /** How you are signed in to zeabur: whether you can sign out, and admin rights in use. */
     get: operations["getSession"]
     put?: never
     post?: never
@@ -605,7 +605,7 @@ export interface paths {
     /**
      * Changes the metrics store, or goes back to the default with `null`, by writing the
      *     settings ConfigMap as you (created the first time). Who may: whoever may update (and
-     *     create) the ConfigMap `engawa-settings` in engawa's namespace. Answers the setting as it
+     *     create) the ConfigMap `zeabur-settings` in Zeabur's namespace. Answers the setting as it
      *     now is, with the new store's probe.
      */
     put: operations["setMetricsStore"]
@@ -995,7 +995,7 @@ export interface components {
       /** @description Newest first (by `lastSeen`, events without one last), then by namespace and name. */
       items: components["schemas"]["EventView"][]
       /**
-       * @description `true` when the cluster holds more events than engawa read (5,000): older ones may be
+       * @description `true` when the cluster holds more events than Zeabur read (5,000): older ones may be
        *     missing.
        */
       partial: boolean
@@ -1200,7 +1200,7 @@ export interface components {
       key: string
       /** @description `set` or `remove`. */
       op: string
-      /** @description The value, for `set`; for a Secret, the plain value (engawa encodes it). */
+      /** @description The value, for `set`; for a Secret, the plain value (Zeabur encodes it). */
       value?: string | null
     }
     /**
@@ -1214,7 +1214,7 @@ export interface components {
      */
     DataStore: "postgres" | "mysql" | "redis" | "mongo" | "queue" | "search" | "other"
     /**
-     * @description The request kube-apiserver refused with `403`, as engawa made it.
+     * @description The request kube-apiserver refused with `403`, as Zeabur made it.
      *
      *     These are the attributes its authorizers decide on [k8s-authz]. kube-apiserver's `Status` names
      *     the object (`details.kind`, `details.group`, `details.name`) but not the verb [api-conventions],
@@ -1254,7 +1254,7 @@ export interface components {
       lastSeen?: string | null
       /** @description The pods it was seen in, sorted. */
       pods: string[]
-      /** @description Why: the rule that applies, with this occurrence's numbers where engawa knows them. */
+      /** @description Why: the rule that applies, with this occurrence's numbers where Zeabur knows them. */
       why: components["schemas"]["Message"]
     }
     /**
@@ -1439,7 +1439,7 @@ export interface components {
     GapView: components["schemas"]["Gap"] & {
       /**
        * @description YAML that fixes it, to copy into the object's manifest; absent when the fix is an install
-       *     or a plan engawa writes itself.
+       *     or a plan Zeabur writes itself.
        */
       snippet?: string | null
     }
@@ -1621,7 +1621,7 @@ export interface components {
     /**
      * @description A sentence a client words in its own language: a stable key and the values it names.
      *
-     *     engawa never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
+     *     Zeabur never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
      *     every interface translates them the same way and a key's meaning is part of the contract.
      */
     Message: {
@@ -1646,7 +1646,7 @@ export interface components {
     MetricsStoreSetting: {
       /** @description Whether the person may change it, as far as their RBAC rules in that namespace tell. */
       canChange: components["schemas"]["Permission"]
-      /** @description What the server was started with (`ENGAWA_METRICS_SERVICE`). */
+      /** @description What the server was started with (`ZEABUR_METRICS_SERVICE`). */
       default: string
       /** @description `settings/metrics-store`. */
       id: string
@@ -2177,7 +2177,7 @@ export interface components {
     }
     /**
      * @description How a planned write changes its object: a new object is created whole, an existing one is
-     *     patched or deleted. Creations and patches go as the field manager `engawa`.
+     *     patched or deleted. Creations and patches go as the field manager `zeabur`.
      */
     PlannedWrite:
       | {
@@ -2361,7 +2361,7 @@ export interface components {
       startup?: components["schemas"]["ProbeSummary"] | null
     }
     /**
-     * @description An RFC 9457 problem, with engawa's extension members `kind`, `summary`, `why`, `fix`,
+     * @description An RFC 9457 problem, with Zeabur's extension members `kind`, `summary`, `why`, `fix`,
      *     `evidence`, `fields`, `kubernetes`, `managedBy` and `denied`.
      */
     Problem: {
@@ -2385,7 +2385,7 @@ export interface components {
        */
       status: number
       /**
-       * @description What happened, naming the object where engawa knows it: `problem.summary.{kind}`, with
+       * @description What happened, naming the object where Zeabur knows it: `problem.summary.{kind}`, with
        *     the values it names (`name`, `namespace`, `resource`, `verb`) as far as they are known.
        */
       summary: components["schemas"]["Message"]
@@ -2506,7 +2506,7 @@ export interface components {
     }
     /** @description A project's Namespace. */
     ProjectNamespace: components["schemas"]["ProjectDetails"] & {
-      /** @description It carries engawa's project label. */
+      /** @description It carries Zeabur's project label. */
       adopted: boolean
       /** @description Whether the person may patch the Namespace: adopt it, let it go, change its details. */
       canChange: components["schemas"]["Permission"]
@@ -2520,7 +2520,7 @@ export interface components {
     /** @description A project in the list. */
     ProjectSummary: components["schemas"]["ProjectDetails"] & {
       /**
-       * @description Whether the namespace carries engawa's project label. Any namespace can be opened; adopting
+       * @description Whether the namespace carries Zeabur's project label. Any namespace can be opened; adopting
        *     it only adds the label.
        */
       adopted: boolean
@@ -2963,21 +2963,21 @@ export interface components {
        */
       restarts: number
     }
-    /** @description How the person is signed in to engawa. */
+    /** @description How the person is signed in to Zeabur. */
     SessionView: {
       /** @description When the administrator rights end, RFC 3339, while they are in use. */
       elevatedUntil?: string | null
       /** @description Whether administrator rights are offered and in use. */
       elevation: components["schemas"]["ElevationState"]
       /**
-       * @description When the credential in use expires, RFC 3339: the everyday one, which engawa renews
+       * @description When the credential in use expires, RFC 3339: the everyday one, which Zeabur renews
        *     before then while the session lasts, or while admin rights are in use theirs, which is
        *     `elevatedUntil` and is not renewed.
        */
       expiresAt?: string | null
       /**
        * @description Whether people sign in to this server, and so can sign out. `false` on this machine
-       *     (`engawactl ui`), which acts with the kubeconfig of whoever started it.
+       *     (`zeaburctl ui`), which acts with the kubeconfig of whoever started it.
        */
       signsIn: boolean
     }
@@ -3163,7 +3163,7 @@ export interface components {
       username: string
     }
     /**
-     * @description The workload kinds engawa projects.
+     * @description The workload kinds Zeabur projects.
      *
      *     Declared in alphabetical order, so the derived [`Ord`] sorts as the kind names do.
      * @enum {string}

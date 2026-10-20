@@ -60,7 +60,7 @@ export const zhCN: Messages = {
   "elevate.retry": "以管理员身份重试",
   "elevate.title": "管理员权限",
   "elevate.waiting": "请在新窗口用通行密钥确认。",
-  "elevate.notAllowed": "这个 engawa 不能请求管理员权限，请联系集群管理员。",
+  "elevate.notAllowed": "这个 Zeabur 不能请求管理员权限，请联系集群管理员。",
   "elevate.blocked": "浏览器拦截了窗口。请允许此网站的弹出窗口，然后重试。",
   "elevate.failed": "没有获得管理员权限。",
   "elevate.signedOut": "会话已结束，请重新登录。",
@@ -118,7 +118,7 @@ export const zhCN: Messages = {
   "problem.title.invalid": "集群拒绝了这项变更",
   "problem.title.too-many-requests": "集群繁忙",
   "problem.title.unavailable": "无法连接集群",
-  "problem.title.internal": "engawa 出错了",
+  "problem.title.internal": "Zeabur 出错了",
   "problem.fix.bad-request": "检查请求后重试。",
   "problem.fix.unauthenticated": "请重新登录。",
   "problem.fix.signed-out": "请重新登录。",
@@ -137,22 +137,22 @@ export const zhCN: Messages = {
   "problem.fix.too-many-requests": "稍等片刻再重试。",
   "problem.fix.unavailable": "确认集群正在运行，并且这台机器能连接到它。",
   "problem.fix.internal": "请重试；如果一直出现，请附上详细信息报告。",
-  "problem.detail": "engawa 的消息",
+  "problem.detail": "Zeabur 的消息",
   "problem.about": "这类问题的说明",
   "problem.retryAfter": (s) => `集群要求等待 ${waitZhCN(s)}。`,
   "problemPage.label": "问题类型",
   "problemPage.rule": "规则",
   "problemPage.kubernetes": "Kubernetes 文档",
   "problemPage.rule.bad-request":
-    "每个请求发到集群之前，engawa 会先检查：要更改的内容必须完整、格式正确。不符合的请求会被拒绝，什么都不会写入。",
+    "每个请求发到集群之前，Zeabur 会先检查：要更改的内容必须完整、格式正确。不符合的请求会被拒绝，什么都不会写入。",
   "problemPage.rule.unauthenticated":
     "每个请求都以你自己的登录身份发到集群。集群不再接受这个登录时（过期或被撤销），在你重新登录之前，什么都无法读取或更改。",
   "problemPage.rule.signed-out":
-    "你的 engawa 会话已结束，engawa 手上没有可以代你使用的登录。在你重新登录之前，什么都不会读取或更改。",
+    "你的 Zeabur 会话已结束，Zeabur 手上没有可以代你使用的登录。在你重新登录之前，什么都不会读取或更改。",
   "problemPage.rule.forbidden":
-    "集群用规则（RBAC）决定每个人能做什么：谁可以读取或更改哪些类型的对象、在哪些项目里。engawa 只用你自己的权限行事，你的权限不允许的事，它也无法代你做。",
+    "集群用规则（RBAC）决定每个人能做什么：谁可以读取或更改哪些类型的对象、在哪些项目里。Zeabur 只用你自己的权限行事，你的权限不允许的事，它也无法代你做。",
   "problemPage.rule.elevation-required":
-    "你平常的权限不允许这件事，但这个 engawa 可以在你用通行密钥确认后，短时间给你管理员权限。在权限到期或你放弃之前，你的所有操作都会使用它。",
+    "你平常的权限不允许这件事，但这个 Zeabur 可以在你用通行密钥确认后，短时间给你管理员权限。在权限到期或你放弃之前，你的所有操作都会使用它。",
   "problemPage.rule.quota-exceeded":
     "项目可以设置所有服务加起来能预留的上限：CPU、内存、副本或对象的数量。会超过上限的更改会被集群拒绝，与你的权限无关。",
   "problemPage.rule.policy-denied":
@@ -161,11 +161,11 @@ export const zhCN: Messages = {
   "problemPage.rule.log-unavailable":
     "集群只保留容器这一次与上一次运行的日志，而且只在副本还存在时保留。从未写出的日志，或副本已经不在的日志，都无法读取。",
   "problemPage.rule.conflict":
-    "engawa 只会把更改写到你预览的那个版本上。如果之后有人或其他程序（例如部署工具、自动扩缩）改了这个对象，就什么都不会写入，谁的更改都不会丢失。",
+    "Zeabur 只会把更改写到你预览的那个版本上。如果之后有人或其他程序（例如部署工具、自动扩缩）改了这个对象，就什么都不会写入，谁的更改都不会丢失。",
   "problemPage.rule.managed":
-    "这个对象由其他工具（Helm、Argo CD、Flux）管理，下一次同步或升级时会换回它自己的版本。在这里做的更改会被覆盖，所以 engawa 不接受。",
+    "这个对象由其他工具（Helm、Argo CD、Flux）管理，下一次同步或升级时会换回它自己的版本。在这里做的更改会被覆盖，所以 Zeabur 不接受。",
   "problemPage.rule.plan-expired":
-    "计划就是你预览过、engawa 将要写入的内容。它只在几分钟内有效，让应用的内容仍然符合集群当前的状态。",
+    "计划就是你预览过、Zeabur 将要写入的内容。它只在几分钟内有效，让应用的内容仍然符合集群当前的状态。",
   "problemPage.rule.system-namespace":
     "Kubernetes 保留了几个命名空间给自己的组件使用（kube-system、kube-public、kube-node-lease），它们不能成为项目。",
   "problemPage.rule.invalid":
@@ -173,8 +173,8 @@ export const zhCN: Messages = {
   "problemPage.rule.too-many-requests":
     "集群会限制同时处理的请求数，以保持响应速度。这个请求暂时被拒绝，没有任何更改。",
   "problemPage.rule.unavailable":
-    "engawa 连不上集群的 API 服务器：它可能停机或正在重启，或从 engawa 运行的地方连不上。",
-  "problemPage.rule.internal": "出错的是 engawa 本身，不是集群。详细信息里有 engawa 知道的情况。",
+    "Zeabur 连不上集群的 API 服务器：它可能停机或正在重启，或从 Zeabur 运行的地方连不上。",
+  "problemPage.rule.internal": "出错的是 Zeabur 本身，不是集群。详细信息里有 Zeabur 知道的情况。",
   "refused.admin": "这需要管理员权限。",
   "refused.adminFor": (what) => `${what}${latinEnd(what)}需要管理员权限。`,
   "refused.rights": "这需要更多权限。",
@@ -884,7 +884,7 @@ export const zhCN: Messages = {
   "fix.isolateProject": (project: string) => `隔离 ${project} 的服务`,
   "gap.unreadable": "部分检查需要你没有的权限。",
   "install.title": "安装",
-  "install.note": "engawa 不会执行这些命令。请自行执行，或提交到你的 GitOps 仓库。",
+  "install.note": "Zeabur 不会执行这些命令。请自行执行，或提交到你的 GitOps 仓库。",
   "install.profile": "配置",
   "install.singleNode": "单节点",
   "install.multiNode": "多节点",
@@ -1010,10 +1010,10 @@ export const zhCN: Messages = {
   "usage.installVm": "安装 VictoriaMetrics",
   "usage.chooseStore": "改用其他存储服务",
   "usage.needsStoreHint": (service) =>
-    `engawa 找的是 ${service}。任何兼容 Prometheus 的存储服务都可以（Prometheus、VictoriaMetrics），在设置里指定它的 Service。`,
+    `Zeabur 找的是 ${service}。任何兼容 Prometheus 的存储服务都可以（Prometheus、VictoriaMetrics），在设置里指定它的 Service。`,
   "usage.whatHistory": "查看使用量历史",
   "usage.proxyHint":
-    "engawa 以你的身份通过 Kubernetes API 读取 metrics 存储服务。能这样读的人可以看到所有项目的 metrics，所以通常只开放给管理员。",
+    "Zeabur 以你的身份通过 Kubernetes API 读取 metrics 存储服务。能这样读的人可以看到所有项目的 metrics，所以通常只开放给管理员。",
   "usage.storeUnavailable": "Metrics 存储服务没有响应。",
   "usage.noSeries": (name, range) => `最近 ${range} 没有 ${name} 的数据。`,
   "usage.noSeriesHint":
@@ -1023,16 +1023,16 @@ export const zhCN: Messages = {
   "usage.stepMinutes": (n) => `每 ${n} 分钟一点`,
   "usage.tenancy": "谁看得到",
   "usage.tenancyHint":
-    "engawa 只查询这个项目的副本。但存储服务本身不分项目：能打开它的人可以读到所有项目的 metrics。",
+    "Zeabur 只查询这个项目的副本。但存储服务本身不分项目：能打开它的人可以读到所有项目的 metrics。",
   "usage.loadingChart": "正在加载图表",
 
   // 设置：metrics 存储服务
   "settings.metricsStore": "使用量历史",
   "settings.store": "历史数据来源",
   "settings.storeHint":
-    "读取历史的 Service，格式为 namespace/name:port。任何提供 Prometheus HTTP API 的存储服务都可以。engawa 以每个人自己的身份通过 Kubernetes API 读取它。",
+    "读取历史的 Service，格式为 namespace/name:port。任何提供 Prometheus HTTP API 的存储服务都可以。Zeabur 以每个人自己的身份通过 Kubernetes API 读取它。",
   "settings.storeDefault": "默认",
-  "settings.storeChosen": "在 engawa 中选定",
+  "settings.storeChosen": "在 Zeabur 中选定",
   "settings.storeState": "状态",
   "settings.storeState.available": "有响应",
   "settings.storeState.not-configured": "找不到",
@@ -1044,11 +1044,11 @@ export const zhCN: Messages = {
   "settings.storeWho": "通常只有集群管理员能修改。",
   "settings.storeWhereLabel": "设置存放位置",
   "settings.storeWhere": (namespace) =>
-    `保存在命名空间 ${namespace} 的 ConfigMap engawa-settings：能修改这个 ConfigMap 的人就能修改此设置。`,
+    `保存在命名空间 ${namespace} 的 ConfigMap zeabur-settings：能修改这个 ConfigMap 的人就能修改此设置。`,
   "settings.storeDenied": "你不能修改此设置。",
   "settings.storeChange": "更改历史数据来源",
   "settings.storeLocal":
-    "engawa 在这台电脑上运行，不保存设置。要改用其他存储服务，请以 --metrics-service namespace/name:port 启动。",
+    "Zeabur 在这台电脑上运行，不保存设置。要改用其他存储服务，请以 --metrics-service namespace/name:port 启动。",
   "settings.storeTenancy":
     "能读取存储服务的人可以看到所有项目的 metrics。只开放给可以查看整个集群的人。",
   "sentence.problem.forbidden.fix.askForRule": (p) =>
@@ -1183,7 +1183,7 @@ export const zhCN: Messages = {
   "sentence.diagnosis.unexplained.cause": (p) =>
     p.reason ? `${p.service} 运行失败（${p.reason}）。` : `${p.service} 运行失败。`,
   "sentence.diagnosis.unexplained.why": (p) =>
-    p.reason ? `engawa 无法解释集群报告的状态 ${p.reason}。` : "engawa 无法解释集群报告的状态。",
+    p.reason ? `Zeabur 无法解释集群报告的状态 ${p.reason}。` : "Zeabur 无法解释集群报告的状态。",
   "sentence.diagnosis.unexplained.fix": () => "它的事件和日志可能有更多信息。",
   "sentence.problem.summary.bad-request": () => "这个请求无效。",
   "sentence.problem.summary.unauthenticated": () => "集群不接受你的登录。",
@@ -1209,7 +1209,7 @@ export const zhCN: Messages = {
     p.name ? `集群拒绝了对 ${p.name} 的更改。` : "集群拒绝了这项更改。",
   "sentence.problem.summary.too-many-requests": () => "集群正忙。",
   "sentence.problem.summary.unavailable": () => "连不上集群。",
-  "sentence.problem.summary.internal": () => "engawa 内部发生错误。",
+  "sentence.problem.summary.internal": () => "Zeabur 内部发生错误。",
   "sentence.problem.summary.quota-exceeded": (p) =>
     p.name ? `更改 ${p.name} 会超过项目的用量上限。` : "这会超过项目的用量上限。",
   "sentence.problem.summary.policy-denied": (p) =>

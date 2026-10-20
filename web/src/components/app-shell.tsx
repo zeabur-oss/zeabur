@@ -17,15 +17,15 @@ import { useT } from "@/i18n"
 import { usePlace } from "@/lib/place"
 import { mobileNav, setSidebarCollapsed, sidebarCollapsed } from "@/lib/stores"
 import { useTheme } from "@/theme"
-import { Button } from "@engawahq/design-system/components/button"
-import { Dialog, DialogContent, DialogTitle } from "@engawahq/design-system/components/dialog"
-import { AppFrame, FramePanel, FrameSidebar } from "@engawahq/design-system/components/frame"
-import { TooltipProvider } from "@engawahq/design-system/components/tooltip"
+import { Button } from "@zeabur/design-system/components/button"
+import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
+import { AppFrame, FramePanel, FrameSidebar } from "@zeabur/design-system/components/frame"
+import { TooltipProvider } from "@zeabur/design-system/components/tooltip"
 
 // Toasts report writes, which start from a lazily loaded dialog: the toaster (and Sonner) load after
 // the first page rather than with it.
 const Toaster = lazy(() =>
-  import("@engawahq/design-system/components/sonner").then((m) => ({ default: m.Toaster })),
+  import("@zeabur/design-system/components/sonner").then((m) => ({ default: m.Toaster })),
 )
 // "Retry as admin" starts from a failure toast, so its dialog loads only then.
 const ElevationDialog = lazy(() =>

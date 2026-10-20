@@ -11,7 +11,7 @@ import WarningIcon from "~icons/ph/warning"
 import { toProblem } from "@/api/client"
 import { whoamiQuery } from "@/api/queries"
 import { permission, Refused } from "@/components/refused"
-import { Button } from "@engawahq/design-system/components/button"
+import { Button } from "@zeabur/design-system/components/button"
 import { useT } from "@/i18n"
 import { roleYaml } from "@/model/rbac"
 
@@ -22,7 +22,7 @@ export interface Rule {
 
 /** Every section of the page but Components: one role, so an administrator grants it once. */
 export const overviewRole: Role = {
-  name: "engawa-cluster-overview",
+  name: "zeabur-cluster-overview",
   rules: [
     { group: "", resources: ["nodes", "namespaces", "pods"] },
     { group: "events.k8s.io", resources: ["events"] },
@@ -42,7 +42,7 @@ export interface Role {
 /** What reading the installed components takes: every probe the detection runs. Listing Helm's
  * release Secrets cluster-wide is close to reading every Secret, so this is an administrator's. */
 export const componentsRole: Role = {
-  name: "engawa-cluster-components",
+  name: "zeabur-cluster-components",
   readsSecrets: true,
   rules: [
     { group: "", resources: ["nodes", "secrets"] },

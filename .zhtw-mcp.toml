@@ -38,4 +38,4 @@ preferred = [
 ]
 # Never flagged: product names, and catalogue terms the linter would replace (日誌 → 記錄檔,
 # 回滾 → 回溯).
-proper_nouns = ["engawa", "Genkan", "日誌", "回滾"]
+proper_nouns = ["zeabur", "Zeabur Identity", "日誌", "回滾"]

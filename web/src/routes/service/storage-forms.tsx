@@ -4,15 +4,15 @@ import { useForm } from "@tanstack/react-form"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import type { Schemas } from "@/api/client"
-import { Button } from "@engawahq/design-system/components/button"
-import { Input } from "@engawahq/design-system/components/input"
+import { Button } from "@zeabur/design-system/components/button"
+import { Input } from "@zeabur/design-system/components/input"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@engawahq/design-system/components/collapsible"
-import { Select } from "@engawahq/design-system/components/select"
-import { Switch } from "@engawahq/design-system/components/switch"
+} from "@zeabur/design-system/components/collapsible"
+import { Select } from "@zeabur/design-system/components/select"
+import { Switch } from "@zeabur/design-system/components/switch"
 import { useT } from "@/i18n"
 import { FormField, quantity } from "@/components/form-field"
 import {

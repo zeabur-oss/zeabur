@@ -1,0 +1,6 @@
+# The fewest values an installation needs (scripts/check-chart.sh).
+publicUrl: https://zeabur.example.test
+issuer:
+  url: https://identity.example.test
+  clientSecret:
+    existingSecret: zeabur-oidc

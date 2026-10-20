@@ -1,13 +1,13 @@
 // "Admin until 14:05" in the top bar while requests use admin rights, with a way to drop them
-// early. Nothing shows otherwise, and nothing at all on this machine (`engawactl ui`).
+// early. Nothing shows otherwise, and nothing at all on this machine (`zeaburctl ui`).
 import { useQuery } from "@tanstack/react-query"
 import ShieldCheckFillIcon from "~icons/ph/shield-check-fill"
 
 import { sessionQuery } from "@/api/queries"
 import { dropElevation } from "@/auth/elevation"
-import { Badge } from "@engawahq/design-system/components/badge"
-import { Button } from "@engawahq/design-system/components/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@engawahq/design-system/components/popover"
+import { Badge } from "@zeabur/design-system/components/badge"
+import { Button } from "@zeabur/design-system/components/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
 import { useI18n, useT } from "@/i18n"
 
 export function AdminBadge() {

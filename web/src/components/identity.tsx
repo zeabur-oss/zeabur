@@ -8,13 +8,13 @@ import { clusterQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 
-/** `k3d-engawa`, or undefined until the cluster's answer is in. */
+/** `k3d-zeabur`, or undefined until the cluster's answer is in. */
 function useClusterLabel(): string | undefined {
   return useQuery(clusterQuery).data?.name || undefined
 }
 
 /**
- * "Cluster k3d-engawa  Namespace shop  Deployment/worker": labelled pairs set apart by space, not joined
+ * "Cluster k3d-zeabur  Namespace shop  Deployment/worker": labelled pairs set apart by space, not joined
  * with dots, so each value reads with its own label. A page that already names the namespace and
  * the object (a service's header) leaves them out.
  */

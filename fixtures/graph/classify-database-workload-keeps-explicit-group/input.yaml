@@ -4,7 +4,7 @@ metadata:
   name: mongo
   namespace: demo
   labels:
-    engawa.engawahq.dev/group: backend
+    zeabur.com/group: backend
   ownerReferences:
     - apiVersion: mongodbcommunity.mongodb.com/v1
       kind: MongoDBCommunity

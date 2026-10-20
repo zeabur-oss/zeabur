@@ -1,10 +1,10 @@
-# engawa interface design
+# Zeabur interface design
 
-engawa's own rules for the web interface. Components, tokens and fonts come from
-[@engawahq/design-system](https://github.com/engawahq/design-system) (preview them in its
-Storybook): shadcn/ui's components on Base UI with engawa's variants, shadcn/ui's theme (preset
-brrM) and engawa's tokens. Build from those components (Badge, Card, Table, ToggleGroup,
-Tooltip…) and compose engawa's own visuals on top rather than hand-rolling look-alikes.
+Zeabur's own rules for the web interface. Components, tokens and fonts come from
+[@zeabur/design-system](https://github.com/zeabur/design-system) (preview them in its
+Storybook): shadcn/ui's components on Base UI with Zeabur's variants, shadcn/ui's theme (preset
+brrM) and Zeabur's tokens. Build from those components (Badge, Card, Table, ToggleGroup,
+Tooltip…) and compose Zeabur's own visuals on top rather than hand-rolling look-alikes.
 `src/styles/app.css` imports the design system and adds only this interface's layout tokens. The
 design system's tokens:
 
@@ -12,7 +12,7 @@ design system's tokens:
   grounds, the window `--chrome` under the sidebar and one rounded panel (`--background`) on it,
   with white cards, fields and popups in the panel; near-hueless greys; 0.5px hairlines (`border`
   is 0.5px); faint layered shadows (`shadow-xs` on what sits on the panel, `shadow-md` on what
-  floats, `shadow-xl` on dialogs). **Lime and ink** are engawa's accent: lime with ink text on solid
+  floats, `shadow-xl` on dialogs). **Lime and ink** are Zeabur's accent: lime with ink text on solid
   buttons and switches, ink for the logo (lime on dark), lime under ink for the selection;
   `brand-strong` (lime deepened to 4.5:1) for a check, a link and a focused field's edge. Never a
   status.
@@ -99,7 +99,7 @@ the design system's components by their import (`componentImports` in `.oxlintrc
 
 ## Depth
 
-engawa has depth. A person new to it does most of what they came for (is it running, read its
+Zeabur has depth. A person new to it does most of what they came for (is it running, read its
 logs, change a variable, scale it, give it a domain) on a few plain pages; what takes knowing
 Kubernetes is one deliberate step further. Decide a feature's layer before its place:
 
@@ -181,7 +181,7 @@ A write's confirmation is the one place for whole sentences: what will happen, i
 first-time user follows (see Operations); its toast is a word or two and the thing it names.
 Kubernetes terms stay as Kubernetes spells them in every language.
 
-engawa is for people who know Kubernetes, so the technical detail stays one step away, never in
+Zeabur is for people who know Kubernetes, so the technical detail stays one step away, never in
 the way ([progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)):
 
 - **Headings are plain words**: "Public", "Private", "Storage", not "Public · Ingress". The
@@ -224,7 +224,7 @@ Next to an operation (Restart), the target and the environment are spelled out:
 `Cluster k3s  Namespace shop  Deployment/worker`, each value after its label (the version is the
 cluster page's, not repeated here).
 
-Every write is planned first: a page describes the change (`usePlanner`), engawa answers with what
+Every write is planned first: a page describes the change (`usePlanner`), Zeabur answers with what
 it will write, and a confirmation shows it in three layers
 ([progressive disclosure](https://www.nngroup.com/articles/progressive-disclosure/)):
 
@@ -279,7 +279,7 @@ ControllerRevisions) stay read-only.
 ## Content Security Policy
 
 The server sends `script-src 'self'` with Trusted Types and no inline script
-(`crates/engawa-ui`, `CSP`). Styles are `style-src 'self' 'unsafe-inline'`: Sonner inserts its
+(`crates/zeabur-ui`, `CSP`). Styles are `style-src 'self' 'unsafe-inline'`: Sonner inserts its
 style sheet in a `<style>` element when the toaster loads and offers no nonce
 ([sonner#449](https://github.com/emilkowalski/sonner/issues/449)), and CodeMirror inserts its
 theme the same way. `style-src` decides whether such elements apply
@@ -289,7 +289,7 @@ so both load as their authors ship them, without build-time patches. shadcn/ui's
 the theme's `--chart-*` in their marks instead, so it writes none (Trusted Types would refuse it). Inline styles can change how
 the page looks, not run code. Our own markup still keeps styles in classes: `index.html` has no
 `<style>` or `style=""` (`scripts/postbuild.ts`), and `style` props carry only custom properties.
-Sonner inserts its sheet after `app.css`, so engawa's overrides of it (`app.css`, end) carry one
+Sonner inserts its sheet after `app.css`, so Zeabur's overrides of it (`app.css`, end) carry one
 more selector.
 
 ## States

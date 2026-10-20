@@ -1,0 +1,18 @@
+[package]
+name = "zeabur-adapters"
+description = "zeabur: conventions of third-party tools (Helm, Argo CD, Flux, operators, Gateway API)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zeabur-core.workspace = true
+k8s-openapi.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

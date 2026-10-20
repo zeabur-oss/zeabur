@@ -1,6 +1,0 @@
-# The fewest values an installation needs (scripts/check-chart.sh).
-publicUrl: https://engawa.example.test
-issuer:
-  url: https://genkan.example.test
-  clientSecret:
-    existingSecret: engawa-oidc

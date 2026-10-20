@@ -9,13 +9,13 @@ on:
   push:
     branches: [main]
     paths:
-      - crates/engawa-recommend/bundle/**
-      - scripts/check-recommendations.sh
+      - crates/zeabur-catalog/bundle/**
+      - scripts/check-catalog.sh
       - .github/workflows/vendored.yml
   pull_request:
     paths:
-      - crates/engawa-recommend/bundle/**
-      - scripts/check-recommendations.sh
+      - crates/zeabur-catalog/bundle/**
+      - scripts/check-catalog.sh
       - .github/workflows/vendored.yml
   workflow_dispatch:
 
@@ -34,4 +34,4 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
-      - run: nix develop --command ./scripts/check-recommendations.sh
+      - run: nix develop --command ./scripts/check-catalog.sh

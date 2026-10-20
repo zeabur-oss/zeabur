@@ -60,7 +60,7 @@ export const zhTW: Messages = {
   "elevate.retry": "以管理員身分重試",
   "elevate.title": "管理員權限",
   "elevate.waiting": "請在新視窗用通行密鑰確認。",
-  "elevate.notAllowed": "這個 engawa 不能要求管理員權限，請洽叢集管理員。",
+  "elevate.notAllowed": "這個 Zeabur 不能要求管理員權限，請洽叢集管理員。",
   "elevate.blocked": "瀏覽器擋下了視窗。請允許這個網站的彈出式視窗，再試一次。",
   "elevate.failed": "沒有取得管理員權限。",
   "elevate.signedOut": "工作階段已結束，請重新登入。",
@@ -118,7 +118,7 @@ export const zhTW: Messages = {
   "problem.title.invalid": "叢集拒絕了這項變更",
   "problem.title.too-many-requests": "叢集忙碌中",
   "problem.title.unavailable": "無法連上叢集",
-  "problem.title.internal": "engawa 發生錯誤",
+  "problem.title.internal": "Zeabur 發生錯誤",
   "problem.fix.bad-request": "檢查請求後再試一次。",
   "problem.fix.unauthenticated": "請重新登入。",
   "problem.fix.signed-out": "請重新登入。",
@@ -137,22 +137,22 @@ export const zhTW: Messages = {
   "problem.fix.too-many-requests": "稍等一下再試一次。",
   "problem.fix.unavailable": "確認叢集正在運作，而且這台機器連得到它。",
   "problem.fix.internal": "請再試一次；如果一直發生，請附上細節回報。",
-  "problem.detail": "engawa 的訊息",
+  "problem.detail": "Zeabur 的訊息",
   "problem.about": "這類問題的說明",
   "problem.retryAfter": (s) => `叢集要求等 ${waitZh(s)}。`,
   "problemPage.label": "問題類型",
   "problemPage.rule": "規則",
   "problemPage.kubernetes": "Kubernetes 文件",
   "problemPage.rule.bad-request":
-    "每個請求送到叢集之前，engawa 會先檢查：要變更的內容必須完整、格式正確。不符合的請求會被拒絕，什麼都不會寫入。",
+    "每個請求送到叢集之前，Zeabur 會先檢查：要變更的內容必須完整、格式正確。不符合的請求會被拒絕，什麼都不會寫入。",
   "problemPage.rule.unauthenticated":
     "每個請求都以你自己的登入身分送到叢集。叢集不再接受這個登入時（過期或被撤銷），在你重新登入之前，什麼都無法讀取或變更。",
   "problemPage.rule.signed-out":
-    "你的 engawa 工作階段已結束，engawa 手上沒有可以代你使用的登入。在你重新登入之前，什麼都不會讀取或變更。",
+    "你的 Zeabur 工作階段已結束，Zeabur 手上沒有可以代你使用的登入。在你重新登入之前，什麼都不會讀取或變更。",
   "problemPage.rule.forbidden":
-    "叢集用規則（RBAC）決定每個人能做什麼：誰可以讀取或變更哪些種類的物件、在哪些專案裡。engawa 只用你自己的權限行事，你的權限不允許的事，它也無法代你做。",
+    "叢集用規則（RBAC）決定每個人能做什麼：誰可以讀取或變更哪些種類的物件、在哪些專案裡。Zeabur 只用你自己的權限行事，你的權限不允許的事，它也無法代你做。",
   "problemPage.rule.elevation-required":
-    "你平常的權限不允許這件事，但這個 engawa 可以在你用通行密鑰確認後，短時間給你管理員權限。在權限到期或你放棄之前，你的所有操作都會使用它。",
+    "你平常的權限不允許這件事，但這個 Zeabur 可以在你用通行密鑰確認後，短時間給你管理員權限。在權限到期或你放棄之前，你的所有操作都會使用它。",
   "problemPage.rule.quota-exceeded":
     "專案可以設定所有服務加起來能保留的上限：CPU、記憶體、副本或物件的數量。會超過上限的變更會被叢集拒絕，與你的權限無關。",
   "problemPage.rule.policy-denied":
@@ -161,11 +161,11 @@ export const zhTW: Messages = {
   "problemPage.rule.log-unavailable":
     "叢集只保留容器這一次與上一次執行的日誌，而且只在副本還存在時保留。從未寫出的日誌，或副本已經不在的日誌，都無法讀取。",
   "problemPage.rule.conflict":
-    "engawa 只會把變更寫到你預覽的那個版本上。如果之後有人或其他程式（例如部署工具、自動擴縮）改了這個物件，就什麼都不會寫入，誰的變更都不會遺失。",
+    "Zeabur 只會把變更寫到你預覽的那個版本上。如果之後有人或其他程式（例如部署工具、自動擴縮）改了這個物件，就什麼都不會寫入，誰的變更都不會遺失。",
   "problemPage.rule.managed":
-    "這個物件由其他工具（Helm、Argo CD、Flux）管理，下一次同步或升級時會換回它自己的版本。在這裡做的變更會被蓋掉，所以 engawa 不接受。",
+    "這個物件由其他工具（Helm、Argo CD、Flux）管理，下一次同步或升級時會換回它自己的版本。在這裡做的變更會被蓋掉，所以 Zeabur 不接受。",
   "problemPage.rule.plan-expired":
-    "計畫就是你預覽過、engawa 將要寫入的內容。它只在幾分鐘內有效，這樣套用時，內容仍符合叢集現況。",
+    "計畫就是你預覽過、Zeabur 將要寫入的內容。它只在幾分鐘內有效，這樣套用時，內容仍符合叢集現況。",
   "problemPage.rule.system-namespace":
     "Kubernetes 保留了幾個命名空間給自己的元件使用（kube-system、kube-public、kube-node-lease），它們不能成為專案。",
   "problemPage.rule.invalid":
@@ -173,8 +173,8 @@ export const zhTW: Messages = {
   "problemPage.rule.too-many-requests":
     "叢集會限制同時處理的請求數，以維持回應速度。這個請求暫時被拒絕，沒有任何變更。",
   "problemPage.rule.unavailable":
-    "engawa 連不到叢集的 API 伺服器：它可能停機或正在重新啟動，或從 engawa 執行的地方連不到。",
-  "problemPage.rule.internal": "出錯的是 engawa 本身，不是叢集。詳細資料裡有 engawa 知道的資訊。",
+    "Zeabur 連不到叢集的 API 伺服器：它可能停機或正在重新啟動，或從 Zeabur 執行的地方連不到。",
+  "problemPage.rule.internal": "出錯的是 Zeabur 本身，不是叢集。詳細資料裡有 Zeabur 知道的資訊。",
   "refused.admin": "這需要管理員權限。",
   "refused.adminFor": (what) => `${what}${latinEnd(what)}需要管理員權限。`,
   "refused.rights": "這需要更多權限。",
@@ -885,7 +885,7 @@ export const zhTW: Messages = {
   "fix.isolateProject": (project: string) => `隔離 ${project} 的服務`,
   "gap.unreadable": "部分檢查需要你沒有的權限。",
   "install.title": "安裝",
-  "install.note": "engawa 不會執行這些指令。請自行執行，或提交到你的 GitOps repository。",
+  "install.note": "Zeabur 不會執行這些指令。請自行執行，或提交到你的 GitOps repository。",
   "install.profile": "設定檔",
   "install.singleNode": "單一節點",
   "install.multiNode": "多個節點",
@@ -1011,10 +1011,10 @@ export const zhTW: Messages = {
   "usage.installVm": "安裝 VictoriaMetrics",
   "usage.chooseStore": "改用其他儲存服務",
   "usage.needsStoreHint": (service) =>
-    `engawa 找的是 ${service}。任何相容 Prometheus 的儲存服務都可以（Prometheus、VictoriaMetrics），在設定裡指定它的 Service。`,
+    `Zeabur 找的是 ${service}。任何相容 Prometheus 的儲存服務都可以（Prometheus、VictoriaMetrics），在設定裡指定它的 Service。`,
   "usage.whatHistory": "檢視使用量歷史",
   "usage.proxyHint":
-    "engawa 以你的身分透過 Kubernetes API 讀取 metrics 儲存服務。能這樣讀的人可以看到所有專案的 metrics，所以通常只開放給管理員。",
+    "Zeabur 以你的身分透過 Kubernetes API 讀取 metrics 儲存服務。能這樣讀的人可以看到所有專案的 metrics，所以通常只開放給管理員。",
   "usage.storeUnavailable": "Metrics 儲存服務沒有回應。",
   "usage.noSeries": (name, range) => `最近 ${range} 沒有 ${name} 的資料。`,
   "usage.noSeriesHint":
@@ -1024,16 +1024,16 @@ export const zhTW: Messages = {
   "usage.stepMinutes": (n) => `每 ${n} 分鐘一點`,
   "usage.tenancy": "誰看得到",
   "usage.tenancyHint":
-    "engawa 只查詢這個專案的副本。但儲存服務本身不分專案：能開啟它的人可以讀到所有專案的 metrics。",
+    "Zeabur 只查詢這個專案的副本。但儲存服務本身不分專案：能開啟它的人可以讀到所有專案的 metrics。",
   "usage.loadingChart": "正在載入圖表",
 
   // 設定：metrics 儲存服務
   "settings.metricsStore": "使用量歷史",
   "settings.store": "歷史資料來源",
   "settings.storeHint":
-    "讀取歷史的 Service，格式為 namespace/name:port。任何提供 Prometheus HTTP API 的儲存服務都可以。engawa 以每個人自己的身分透過 Kubernetes API 讀取它。",
+    "讀取歷史的 Service，格式為 namespace/name:port。任何提供 Prometheus HTTP API 的儲存服務都可以。Zeabur 以每個人自己的身分透過 Kubernetes API 讀取它。",
   "settings.storeDefault": "預設",
-  "settings.storeChosen": "在 engawa 中選定",
+  "settings.storeChosen": "在 Zeabur 中選定",
   "settings.storeState": "狀態",
   "settings.storeState.available": "有回應",
   "settings.storeState.not-configured": "找不到",
@@ -1045,11 +1045,11 @@ export const zhTW: Messages = {
   "settings.storeWho": "通常只有叢集管理員能修改。",
   "settings.storeWhereLabel": "設定存放位置",
   "settings.storeWhere": (namespace) =>
-    `存放在命名空間 ${namespace} 的 ConfigMap engawa-settings：能修改這個 ConfigMap 的人就能修改此設定。`,
+    `存放在命名空間 ${namespace} 的 ConfigMap zeabur-settings：能修改這個 ConfigMap 的人就能修改此設定。`,
   "settings.storeDenied": "你不能修改此設定。",
   "settings.storeChange": "變更歷史資料來源",
   "settings.storeLocal":
-    "engawa 在這台電腦上執行，不保存設定。要改用其他儲存服務，請以 --metrics-service namespace/name:port 啟動。",
+    "Zeabur 在這台電腦上執行，不保存設定。要改用其他儲存服務，請以 --metrics-service namespace/name:port 啟動。",
   "settings.storeTenancy":
     "能讀取儲存服務的人可以看到所有專案的 metrics。只開放給可以檢視整個叢集的人。",
   "sentence.problem.forbidden.fix.askForRule": (p) =>
@@ -1185,7 +1185,7 @@ export const zhTW: Messages = {
   "sentence.diagnosis.unexplained.cause": (p) =>
     p.reason ? `${p.service} 執行失敗（${p.reason}）。` : `${p.service} 執行失敗。`,
   "sentence.diagnosis.unexplained.why": (p) =>
-    p.reason ? `engawa 無法解釋叢集回報的狀態 ${p.reason}。` : "engawa 無法解釋叢集回報的狀態。",
+    p.reason ? `Zeabur 無法解釋叢集回報的狀態 ${p.reason}。` : "Zeabur 無法解釋叢集回報的狀態。",
   "sentence.diagnosis.unexplained.fix": () => "它的事件和日誌可能有更多資訊。",
   "sentence.problem.summary.bad-request": () => "這個請求無效。",
   "sentence.problem.summary.unauthenticated": () => "叢集不接受你的登入。",
@@ -1211,7 +1211,7 @@ export const zhTW: Messages = {
     p.name ? `叢集拒絕了對 ${p.name} 的變更。` : "叢集拒絕了這項變更。",
   "sentence.problem.summary.too-many-requests": () => "叢集正忙。",
   "sentence.problem.summary.unavailable": () => "連不到叢集。",
-  "sentence.problem.summary.internal": () => "engawa 內部發生錯誤。",
+  "sentence.problem.summary.internal": () => "Zeabur 內部發生錯誤。",
   "sentence.problem.summary.quota-exceeded": (p) =>
     p.name ? `變更 ${p.name} 會超過專案的用量上限。` : "這會超過專案的用量上限。",
   "sentence.problem.summary.policy-denied": (p) =>

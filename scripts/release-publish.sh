@@ -21,7 +21,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 plain="${version#v}"
 owner="${GITHUB_REPOSITORY%%/*}"
 owner="${owner,,}"
-image="ghcr.io/$owner/engawa"
+image="ghcr.io/$owner/zeabur"
 charts="ghcr.io/$owner/charts"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
@@ -49,14 +49,14 @@ if gh release view "$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
 fi
 printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
 printf '%s' "$GH_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-for ref in "$image:$plain" "$charts/engawa:$plain"; do
+for ref in "$image:$plain" "$charts/zeabur:$plain"; do
   if skopeo inspect --raw "${auth[@]}" "docker://$ref" >/dev/null 2>&1; then
     echo "$ref already exists; inspect it before trying again" >&2
     exit 1
   fi
 done
 for build in linux-amd64 linux-arm64 darwin-arm64; do
-  [[ -f "$candidates/release-$build/engawactl-$version-$build.tar.gz" ]] ||
+  [[ -f "$candidates/release-$build/zeaburctl-$version-$build.tar.gz" ]] ||
     { echo "missing the $build build" >&2; exit 1; }
 done
 
@@ -71,7 +71,7 @@ for arch in amd64 arm64; do
   refs+=("$image@$digest")
   cosign sign --yes "$image@$digest"
   printf '%s  %s\n' "linux/$arch" "$image@$digest" >>"$assets/digests.txt"
-  cp "$dir/engawactl-$version-linux-$arch.tar.gz" "$dir/engawa-$version-linux-$arch.tar.gz" "$assets/"
+  cp "$dir/zeaburctl-$version-linux-$arch.tar.gz" "$dir/zeabur-$version-linux-$arch.tar.gz" "$assets/"
 done
 docker manifest create "$image:$plain" "${refs[@]}"
 docker manifest push "$image:$plain"
@@ -79,22 +79,22 @@ index="sha256:$(skopeo inspect --raw "${auth[@]}" "docker://$image:$plain" | sha
 cosign sign --yes "$image@$index"
 printf 'index  %s\n' "$image@$index" >>"$assets/digests.txt"
 
-cp "$candidates/release-darwin-arm64/engawactl-$version-darwin-arm64.tar.gz" "$assets/"
+cp "$candidates/release-darwin-arm64/zeaburctl-$version-darwin-arm64.tar.gz" "$assets/"
 
 # The chart: the image pinned to the index above, at the version of Chart.yaml (checked equal to
 # the release's by the workflow).
-cp -R "$root/deploy/chart/engawa" "$work/chart"
+cp -R "$root/deploy/chart/zeabur" "$work/chart"
 # sed rather than `yq -i`, which would drop the blank lines between the documented values.
 sed -i "s|^  digest: \"\"\$|  digest: \"$index\"|" "$work/chart/values.yaml"
 INDEX="$index" yq -e '.image.digest == strenv(INDEX)' "$work/chart/values.yaml" >/dev/null ||
   { echo "could not pin image.digest in values.yaml" >&2; exit 1; }
-helm lint --strict "$work/chart" --set publicUrl=https://engawa.example.com \
-  --set issuer.url=https://genkan.example.com --set issuer.clientSecret.existingSecret=engawa-oidc
+helm lint --strict "$work/chart" --set publicUrl=https://zeabur.example.com \
+  --set issuer.url=https://identity.example.com --set issuer.clientSecret.existingSecret=zeabur-oidc
 helm package "$work/chart" --destination "$assets"
-helm push "$assets/engawa-$plain.tgz" "oci://$charts"
-chart_digest="sha256:$(skopeo inspect --raw "${auth[@]}" "docker://$charts/engawa:$plain" | sha256sum | cut -d ' ' -f 1)"
-cosign sign --yes "$charts/engawa@$chart_digest"
-printf 'chart  %s\n' "$charts/engawa@$chart_digest" >>"$assets/digests.txt"
+helm push "$assets/zeabur-$plain.tgz" "oci://$charts"
+chart_digest="sha256:$(skopeo inspect --raw "${auth[@]}" "docker://$charts/zeabur:$plain" | sha256sum | cut -d ' ' -f 1)"
+cosign sign --yes "$charts/zeabur@$chart_digest"
+printf 'chart  %s\n' "$charts/zeabur@$chart_digest" >>"$assets/digests.txt"
 
 (
   cd "$assets"
@@ -112,7 +112,7 @@ The chart, pinned to the image below; [Install in a cluster](https://github.com/
 shows how to verify both first and which values to set.
 
 \`\`\`sh
-helm install engawa oci://$charts/engawa --version $plain --namespace engawa ...
+helm install zeabur oci://$charts/zeabur --version $plain --namespace zeabur ...
 \`\`\`
 
 ## Digests
@@ -121,14 +121,14 @@ helm install engawa oci://$charts/engawa --version $plain --namespace engawa ...
 $(cat "$assets/digests.txt")
 \`\`\`
 
-The macOS build of engawactl (Apple silicon) is signed with Sigstore but not notarized by
-Apple: a browser download is quarantined (\`xattr -d com.apple.quarantine engawactl\`);
+The macOS build of zeaburctl (Apple silicon) is signed with Sigstore but not notarized by
+Apple: a browser download is quarantined (\`xattr -d com.apple.quarantine zeaburctl\`);
 \`gh release download\` and \`curl\` are not.
 EOF
 
 {
   echo "image=$image"
   echo "image-digest=$index"
-  echo "chart=$charts/engawa"
+  echo "chart=$charts/zeabur"
   echo "chart-digest=$chart_digest"
 } >>"${GITHUB_OUTPUT:?}"

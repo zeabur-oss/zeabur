@@ -20,7 +20,7 @@ metadata:
   resourceVersion: "2"
   generation: 2
   managedFields:
-    - manager: engawa
+    - manager: zeabur
 spec:
   replicas: 3
 status:

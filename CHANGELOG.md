@@ -10,8 +10,8 @@ minor or patch release may break the API.
 
 ### Added
 
-- Releases from CI only: the image `ghcr.io/engawahq/engawa` (linux/amd64, linux/arm64), the
-  chart `oci://ghcr.io/engawahq/charts/engawa` pinned to the image's digest, and `engawactl`
+- Releases from CI only: the image `ghcr.io/zeabur/zeabur` (linux/amd64, linux/arm64), the
+  chart `oci://ghcr.io/zeabur/charts/zeabur` pinned to the image's digest, and `zeaburctl`
   for Linux (amd64, arm64) and macOS (arm64), all signed with Sigstore and attested
   ([docs/releases.md](docs/releases.md)). The chart's new `image.digest` value pins any image
   by content.
@@ -33,26 +33,26 @@ The first public release, pre-alpha.
 - Changes as plan, confirm, apply: environment variables, ConfigMap and Secret keys, hostnames,
   restarts, rollback to an earlier release, scaling, probes, resources, volumes and mounts, edits
   of an object's YAML, ready-made NetworkPolicies, deletes, adopting a namespace and a project's
-  details. Applies are JSON Patches as the field manager `engawa`, guarded by `test` operations
+  details. Applies are JSON Patches as the field manager `zeabur`, guarded by `test` operations
   and a signed plan token.
 - Logs (followed live), a terminal in a container, events, CPU and memory now and over time,
   backups (K8up, Velero, CloudNativePG), NetworkPolicy reachability, and the cluster's nodes,
   Kubernetes version support and upgrades.
 - Install suggestions for missing components from the
-  [recommendations](https://github.com/engawahq/recommendations) catalogue, as a `helm`
+  [Zeabur Catalog](https://github.com/zeabur/catalog), as a `helm`
   command, a Flux `HelmRelease`, an Argo CD `Application` or a k3s `HelmChart`.
 - The web interface in English and Traditional Chinese (zh-TW), embedded in the binaries.
-- `engawactl ui` (local mode with the kubeconfig), `engawactl mcp` (a read-only Model Context
-  Protocol server over stdio) and `engawactl doctor` (cluster, Genkan and component checks as
+- `zeaburctl ui` (local mode with the kubeconfig), `zeaburctl mcp` (a read-only Model Context
+  Protocol server over stdio) and `zeaburctl doctor` (cluster, Zeabur Identity and component checks as
   text or JSON).
-- `engawa`, the in-cluster server, with its Helm chart (`deploy/chart/engawa`) and container
-  image build: sign-in through Genkan as a confidential OAuth client, and admin rights on demand
+- `zeabur`, the in-cluster server, with its Helm chart (`deploy/chart/zeabur`) and container
+  image build: sign-in through Zeabur Identity as a confidential OAuth client, and admin rights on demand
   confirmed with the passkey again.
 - The HTTP API under `/api/v1`, described by a generated OpenAPI 3.1 document.
 
 ### Security
 
-- Every request to kube-apiserver carries the person's own credential; engawa's service
+- Every request to kube-apiserver carries the person's own credential; Zeabur's service
   account has no rights and no token, and nothing is impersonated.
 - Secret values never appear in listings, YAML, `last-applied-configuration`, plans, MCP
   answers or logs; they are shown only on an explicit reveal, and a masked value is never
@@ -64,4 +64,4 @@ The first public release, pre-alpha.
   seven-day minimum age for new crate and package releases, and a reviewed allowlist for
   shipped `unsafe` and native code.
 
-[0.0.1]: https://github.com/engawahq/engawa/releases/tag/v0.0.1
+[0.0.1]: https://github.com/zeabur/zeabur/releases/tag/v0.0.1

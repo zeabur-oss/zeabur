@@ -18,7 +18,7 @@ export interface ServiceSettingsProps {
 }
 
 export interface ServiceSettingsSection {
-  /** The module's id, as `engawa-modules` names it (`network-policy`). */
+  /** The module's id, as `zeabur-modules` names it (`network-policy`). */
   module: string
   /** The section's heading key in the module's own strings. */
   title: string

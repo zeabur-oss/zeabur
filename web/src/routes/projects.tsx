@@ -13,16 +13,16 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@engawahq/design-system/components/empty"
-import { Label } from "@engawahq/design-system/components/label"
-import { Skeleton } from "@engawahq/design-system/components/skeleton"
-import { Switch } from "@engawahq/design-system/components/switch"
+} from "@zeabur/design-system/components/empty"
+import { Label } from "@zeabur/design-system/components/label"
+import { Skeleton } from "@zeabur/design-system/components/skeleton"
+import { Switch } from "@zeabur/design-system/components/switch"
 import { useT } from "@/i18n"
 import { otherNamespaces } from "@/model/project"
 import { summarise } from "@/model/service"
 import { ProjectCard } from "@/components/project-card"
-import { Illustration } from "@engawahq/design-system/components/illustration"
-import { PageHeader } from "@engawahq/design-system/components/page-header"
+import { Illustration } from "@zeabur/design-system/components/illustration"
+import { PageHeader } from "@zeabur/design-system/components/page-header"
 
 export function ProjectsPage() {
   const t = useT()

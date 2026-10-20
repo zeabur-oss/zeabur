@@ -12,9 +12,9 @@ import type { Schemas } from "@/api/client"
 import { nodesQuery, releasesQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
 import { usePlanner } from "@/components/plan/planner"
-import { Button } from "@engawahq/design-system/components/button"
-import { Input } from "@engawahq/design-system/components/input"
-import { Select } from "@engawahq/design-system/components/select"
+import { Button } from "@zeabur/design-system/components/button"
+import { Input } from "@zeabur/design-system/components/input"
+import { Select } from "@zeabur/design-system/components/select"
 import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { serviceSettingsSections } from "@/modules/service-settings"
@@ -25,7 +25,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@engawahq/design-system/components/collapsible"
+} from "@zeabur/design-system/components/collapsible"
 import { healthChecksSection } from "@/lib/stores"
 
 const probeKinds = ["readiness", "liveness", "startup"] as const

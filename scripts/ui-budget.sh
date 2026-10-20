@@ -5,7 +5,7 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-dist="${ENGAWA_UI_DIST:-$root/web/dist}"
+dist="${ZEABUR_UI_DIST:-$root/web/dist}"
 index="$dist/index.html"
 
 # The files the first page load needs: index.html, its entry script, every chunk it asks the

@@ -32,9 +32,9 @@ import {
   SidebarGroup,
   SidebarItem,
   SidebarSection,
-} from "@engawahq/design-system/components/sidebar"
-import { Skeleton } from "@engawahq/design-system/components/skeleton"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+} from "@zeabur/design-system/components/sidebar"
+import { Skeleton } from "@zeabur/design-system/components/skeleton"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
 /** The Kubernetes objects behind each role, for the group heading's tooltip. */
 const roleKube: Record<string, string> = {
@@ -56,7 +56,7 @@ const everyday: Entry[] = [
 ]
 const advanced: Entry[] = [{ entry: "objects", to: "/projects/$project/objects", icon: CubeIcon }]
 
-const advancedSection = remembered("engawa.column.advanced", false)
+const advancedSection = remembered("zeabur.column.advanced", false)
 
 export function ProjectColumn({ project, className }: { project: string; className?: string }) {
   const t = useT()

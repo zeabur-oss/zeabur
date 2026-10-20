@@ -1060,7 +1060,7 @@ approved = "2026-10-12"
 [[crate]]
 name = "askama_derive"
 kind = "unsafe"
-reason = "Build time only (inside the template proc macro). Same ASCII-wrapper transmutes; generated-code strings that contain the word unsafe are for filter arguments Genkan does not define"
+reason = "Build time only (inside the template proc macro). Same ASCII-wrapper transmutes; generated-code strings that contain the word unsafe are for filter arguments Zeabur Identity does not define"
 approved = "2026-10-12"
 
 [[crate]]
@@ -1089,7 +1089,7 @@ kind = "unsafe"
 reason = "WebSocket framing for the browser terminal: str::from_utf8_unchecked after its own UTF-8 validation, and align_to_mut for frame masking"
 approved = "2026-10-16"
 
-# --- Model Context Protocol (rmcp, the official SDK), for `engawactl mcp`.
+# --- Model Context Protocol (rmcp, the official SDK), for `zeaburctl mcp`.
 [[crate]]
 name = "chrono"
 kind = "unsafe"
@@ -1099,5 +1099,5 @@ approved = "2026-10-16"
 [[crate]]
 name = "futures-executor"
 kind = "unsafe"
-reason = "Enabled by rmcp's default `futures` features (and unified with kube's futures). An UnparkMutex (unsafe Send/Sync and UnsafeCell access guarded by its atomic state) used by its thread pool and local executor; engawa runs on tokio and calls neither"
+reason = "Enabled by rmcp's default `futures` features (and unified with kube's futures). An UnparkMutex (unsafe Send/Sync and UnsafeCell access guarded by its atomic state) used by its thread pool and local executor; zeabur runs on tokio and calls neither"
 approved = "2026-10-16"

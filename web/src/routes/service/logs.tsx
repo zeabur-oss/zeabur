@@ -23,10 +23,10 @@ import { followUrl, logsQuery, type LogOptions } from "@/api/queries"
 import { Histogram } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
-import { Button } from "@engawahq/design-system/components/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@engawahq/design-system/components/popover"
-import { Skeleton } from "@engawahq/design-system/components/skeleton"
-import { Toggle } from "@engawahq/design-system/components/toggle"
+import { Button } from "@zeabur/design-system/components/button"
+import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
+import { Skeleton } from "@zeabur/design-system/components/skeleton"
+import { Toggle } from "@zeabur/design-system/components/toggle"
 import { useI18n, useT } from "@/i18n"
 import { parseAnsi } from "@/lib/ansi"
 import { cn } from "@/lib/utils"
@@ -37,9 +37,9 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
-} from "@engawahq/design-system/components/empty"
-import { Illustration } from "@engawahq/design-system/components/illustration"
-import { Select } from "@engawahq/design-system/components/select"
+} from "@zeabur/design-system/components/empty"
+import { Illustration } from "@zeabur/design-system/components/illustration"
+import { Select } from "@zeabur/design-system/components/select"
 
 type Severity = "error" | "warn" | "info" | "debug"
 

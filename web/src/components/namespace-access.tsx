@@ -3,12 +3,12 @@
 // patch to one label, so it covers the Pod Security Admission labels too:
 // https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces),
 // a ClusterRole and binding an administrator can apply, and the kubectl command that does what
-// engawa's plan would.
+// Zeabur's plan would.
 import { useQuery } from "@tanstack/react-query"
 import WarningFillIcon from "~icons/ph/warning-fill"
 
 import { whoamiQuery } from "@/api/queries"
-import { Alert, AlertDescription } from "@engawahq/design-system/components/alert"
+import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { kubectlLabel, patchRole } from "@/model/project"

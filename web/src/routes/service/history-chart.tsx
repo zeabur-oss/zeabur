@@ -3,7 +3,7 @@
 // crosshair with every value at that time on hover or with the arrow keys (`accessibilityLayer`).
 // Loaded on its own, after the page: Recharts is not part of the first load (scripts/ui-budget.sh).
 //
-// Colours are the theme's `--chart-1…5` (@engawahq/design-system, src/theme.css), named in the marks themselves.
+// Colours are the theme's `--chart-1…5` (@zeabur/design-system, src/theme.css), named in the marks themselves.
 // The ChartConfig carries labels only, so shadcn's ChartStyle writes no <style> element: it would
 // need `dangerouslySetInnerHTML`, which the Trusted Types policy (`trusted-types 'none'`) refuses.
 import { CartesianGrid, Line, LineChart, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts"
@@ -13,7 +13,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@engawahq/design-system/components/chart"
+} from "@zeabur/design-system/components/chart"
 import { useI18n, useT } from "@/i18n"
 import { colours, type Restart, type Series } from "@/model/usage"
 

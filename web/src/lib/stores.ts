@@ -44,7 +44,7 @@ export const mobileNav = store(false)
 
 // The sidebar folds away and stays so (remembered); the project's own column is in the panel, so
 // one setting serves every page. Values saved by the earlier icon rail ("rail", "full") read as open.
-const sidebarKey = "engawa.sidebar"
+const sidebarKey = "zeabur.sidebar"
 export const sidebarCollapsed = store(load(sidebarKey) === "collapsed")
 
 export function setSidebarCollapsed(collapsed: boolean) {
@@ -67,7 +67,7 @@ export function remembered(key: string, initial: boolean) {
 
 /** A service's Health checks in Settings: folded until opened, and opened by a diagnosis that
  * leads there ("Check the health checks"). */
-export const healthChecksSection = remembered("engawa.service.health", false)
+export const healthChecksSection = remembered("zeabur.service.health", false)
 
 export interface Recent {
   id: string
@@ -76,7 +76,7 @@ export interface Recent {
   href: string
 }
 
-const recentKey = "engawa.recent"
+const recentKey = "zeabur.recent"
 
 function loadRecent(): Recent[] {
   try {
@@ -97,7 +97,7 @@ export function remember(item: Recent) {
 
 // Kinds pinned on the Objects page (`<group>/<resource>`), read at once in every project. A
 // convenience: without storage the pins last this visit.
-const pinnedKey = "engawa.objects.pinned"
+const pinnedKey = "zeabur.objects.pinned"
 
 function loadPinned(): string[] {
   try {

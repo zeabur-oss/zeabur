@@ -1,11 +1,11 @@
-# engawa
+# Zeabur
 
-**Kubernetes made simple and secure by default.**
+**Deploy and run your services on your own Kubernetes, simply and securely.**
 
-engawa (縁側, the veranda of a Japanese house: open to the garden, under the same roof) shows a
-cluster as projects and services, explains what is wrong in plain words, and lets you change
-things safely. It works with the objects you already have, never acts with more rights than you
-have, and keeps no state of its own.
+Zeabur is an open-source platform you host yourself. It runs in your cluster (or on your
+machine), shows the cluster as projects and services, explains what is wrong in plain words, and lets you
+change things safely. It works with the objects you already have, never acts with more rights
+than you have, and keeps no state of its own: no database, no custom resources.
 
 > **Status: pre-alpha (0.0.1).** It works end to end, on your machine and in a cluster, but
 > there are no published images or binaries yet, the API may still change, and it has been tried
@@ -22,17 +22,17 @@ have, and keeps no state of its own.
 | ![The confirmation before a restart, in one plain sentence](docs/images/plan.png) | |
 | **Every change is a plan** you confirm; the details are one click away. | |
 
-<sub>Screenshots of the built-in demo data (`cargo run -p engawa-api --example demo`).</sub>
+<sub>Screenshots of the built-in demo data (`cargo run -p zeabur-api --example demo`).</sub>
 
 ## Principles
 
-- **Your rights, not engawa's.** Every request is made with your own credential (a token from
-  [Genkan](https://github.com/engawahq/genkan), or your kubeconfig on your machine);
+- **Your rights, not Zeabur's.** Every request is made with your own credential (a token from
+  [Zeabur Identity](https://github.com/zeabur/identity), or your kubeconfig on your machine);
   kube-apiserver decides. In a cluster, admin rights are asked for only when your everyday ones
   are refused; they need your passkey again and last a few minutes.
 - **Kubernetes objects are the only state.** No database and no custom resources: a project is
-  a namespace. Remove engawa and the cluster is as it was.
-- **Works with Helm, Argo CD and Flux.** Objects they manage are shown as such; engawa does not
+  a namespace. Remove Zeabur and the cluster is as it was.
+- **Works with Helm, Argo CD and Flux.** Objects they manage are shown as such; Zeabur does not
   fight them for fields.
 - **Suggests, does not install.** Missing pieces come with a `helm` command, a Flux
   `HelmRelease`, an Argo CD `Application` or a k3s `HelmChart`.
@@ -59,42 +59,42 @@ have, and keeps no state of its own.
 - **Usage**: CPU and memory now (metrics-server) and their history (a Prometheus-compatible
   store such as VictoriaMetrics).
 - **Suggested installs** for missing components, as a `helm` command, a Flux `HelmRelease`, an
-  Argo CD `Application` or a k3s `HelmChart`, from the
-  [recommendations](https://github.com/engawahq/recommendations) catalogue.
-- **In a cluster**, with its Helm chart: sign-in through Genkan with a passkey, admin rights
+  Argo CD `Application` or a k3s `HelmChart`, from
+  [Zeabur Catalog](https://github.com/zeabur/catalog).
+- **In a cluster**, with its Helm chart: sign-in through Zeabur Identity with a passkey, admin rights
   confirmed with the passkey again, and nothing left behind after uninstalling.
-- **`engawactl mcp`**: a read-only [Model Context Protocol](https://modelcontextprotocol.io)
+- **`zeaburctl mcp`**: a read-only [Model Context Protocol](https://modelcontextprotocol.io)
   server over stdio, so an AI assistant can ask what is failing and why, with your rights and
   never a Secret's value.
-- **`engawactl doctor`**: checks the cluster version, the Genkan setup and the recommended
+- **`zeaburctl doctor`**: checks the cluster version, the Zeabur Identity setup and the recommended
   components, as text or JSON, with an exit code for scripts.
 
 Not yet: creating new workloads, editing or deleting objects that Helm, Argo CD or Flux manage
-(they can be restarted), more than one replica in a cluster, and signing in without Genkan.
+(they can be restarted), more than one replica in a cluster, and signing in without Zeabur Identity.
 
 ## Quick start
 
-On your machine, with your kubeconfig. Download `engawactl` for Linux or macOS (Apple silicon)
-from a [release](https://github.com/engawahq/engawa/releases) and verify it
-([Releases](docs/releases.md#download-and-verify-engawactl)), or build it from source in the
+On your machine, with your kubeconfig. Download `zeaburctl` for Linux or macOS (Apple silicon)
+from a [release](https://github.com/zeabur/zeabur/releases) and verify it
+([Releases](docs/releases.md#download-and-verify-zeaburctl)), or build it from source in the
 [Nix](https://nixos.org) dev shell, which provides every tool:
 
 ```sh
-git clone https://github.com/engawahq/engawa && cd engawa
+git clone https://github.com/zeabur/zeabur && cd zeabur
 nix develop
 ./scripts/build-ui.sh
-ENGAWA_UI_DIST="$PWD/web/dist" cargo build --release --locked -p engawactl
-./target/release/engawactl ui                  # --context <name> for another context
+ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeaburctl
+./target/release/zeaburctl ui                  # --context <name> for another context
 ```
 
-`engawactl ui` listens on a random loopback port, opens the browser, and makes every request
-with your current kubeconfig context. `engawactl doctor` and `engawactl mcp` use it the same way.
+`zeaburctl ui` listens on a random loopback port, opens the browser, and makes every request
+with your current kubeconfig context. `zeaburctl doctor` and `zeaburctl mcp` use it the same way.
 
-In a cluster, for everyone who signs in through Genkan: [Install in a cluster](docs/install.md).
+In a cluster, for everyone who signs in through Zeabur Identity: [Install in a cluster](docs/install.md).
 
 ## Learn more
 
-- [Install in a cluster](docs/install.md): the Helm chart, signing in through Genkan.
+- [Install in a cluster](docs/install.md): the Helm chart, signing in through Zeabur Identity.
 - [Releases](docs/releases.md): what a release contains, verifying it, publishing one.
 - [Architecture](docs/architecture.md): principles, layers, crates.
 - [Contributing](CONTRIBUTING.md): environment, checks, dependency policy, tests.
@@ -106,17 +106,17 @@ Apache-2.0. Contributions are accepted under the [Developer Certificate of Origi
 
 Third-party content in this repository:
 
-- The [recommendations](https://github.com/engawahq/recommendations) catalogue in
-  `crates/engawa-recommend/bundle` (Apache-2.0, `bundle/LICENSE`).
-- Kubernetes' release schedule in `crates/engawa-recommend/src/versions.rs`, from
+- [Zeabur Catalog](https://github.com/zeabur/catalog) in
+  `crates/zeabur-catalog/bundle` (Apache-2.0, `bundle/LICENSE`).
+- Kubernetes' release schedule in `crates/zeabur-catalog/src/versions.rs`, from
   [kubernetes/website](https://github.com/kubernetes/website) `data/releases` (CC BY 4.0, The
   Kubernetes Authors).
 - Rendered manifests of upstream Helm charts in `fixtures/charts`, test input only, each under
   its chart's licence (Apache-2.0 or MIT; listed in `fixtures/charts/README.md`).
 
-The web interface is built with [@engawahq/design-system](https://github.com/engawahq/design-system)
+The web interface is built with [@zeabur/design-system](https://github.com/zeabur/design-system)
 (Apache-2.0), which contains shadcn/ui's components, theme and base styles (MIT), the Inter and
-JetBrains Mono fonts (SIL Open Font License 1.1) and the engawa logo; its README lists their
+JetBrains Mono fonts (SIL Open Font License 1.1) and the Zeabur logo; its README lists their
 notices. The built interface, embedded in the binary and the image, includes those fonts and
 the logo.
 

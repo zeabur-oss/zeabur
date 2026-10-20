@@ -1,5 +1,5 @@
 // Edges between a project's parts, with the evidence for each. Service-to-service edges come from
-// the server (`Project.connections`, computed in engawa-graph from Kubernetes objects and variable
+// the server (`Project.connections`, computed in zeabur-graph from Kubernetes objects and variable
 // values); domain-to-service edges are read here from each service's Ingress routes. When the
 // project document carries NetworkPolicy reachability, each edge says whether the policies let it
 // through (whether they are enforced depends on the cluster's network plugin).

@@ -1,14 +1,14 @@
 // What is going wrong with a service, in plain words and in the layers a problem has: what
 // happened, why (the rule, with this occurrence's numbers), what to do with one action that opens
 // the tab where it is done, then the status fields and events it rests on and the kubelet's own
-// words, folded. The server names the sentences by key (crate engawa-gaps); `useSentence` writes
+// words, folded. The server names the sentences by key (crate zeabur-gaps); `useSentence` writes
 // them in the reader's language. The action is the interface's: it maps the diagnosis's kind and
 // keys to its own tabs.
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
 import type { Schemas } from "@/api/client"
 import { Layers, Raw, type RawRow } from "@/components/problem"
-import { Button } from "@engawahq/design-system/components/button"
+import { Button } from "@zeabur/design-system/components/button"
 import { useSentence, useT, type Translate } from "@/i18n"
 import type { Service } from "@/model/service"
 import type { ServiceTab } from "@/routes/search"

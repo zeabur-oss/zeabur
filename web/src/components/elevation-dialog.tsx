@@ -1,9 +1,9 @@
 // While "Retry as admin" waits for the passkey confirmation in its own window, and when it ends
 // without admin rights: one small dialog with the state in one sentence. A granted elevation
 // closes it at once and what was refused is asked again (auth/elevation.ts).
-import { Button } from "@engawahq/design-system/components/button"
-import { Dialog, DialogContent, DialogTitle } from "@engawahq/design-system/components/dialog"
-import { Spinner } from "@engawahq/design-system/components/spinner"
+import { Button } from "@zeabur/design-system/components/button"
+import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
+import { Spinner } from "@zeabur/design-system/components/spinner"
 import { elevation, type ElevationState, type Outcome } from "@/auth/elevation"
 import { goToSignIn } from "@/auth/session"
 import { useT, type Translate } from "@/i18n"

@@ -4,32 +4,32 @@ import { expect, test } from "./fixtures.ts"
 
 // The read-only interface on a real cluster (scripts/e2e-ui.sh applies
 // e2e/manifests/talker.yaml) or on the demo server. See playwright.config.ts for
-// ENGAWA_E2E_URL; the rest describe the project:
+// ZEABUR_E2E_URL; the rest describe the project:
 //
-//   ENGAWA_E2E_NAMESPACE     the project
-//   ENGAWA_E2E_POD           a pod of the healthy Deployment, logging ENGAWA_E2E_LOG_LINE
-//   ENGAWA_E2E_SERVICE       that Deployment                       (default talker)
-//   ENGAWA_E2E_LOG_LINE      text its log contains                 (default engawa-e2e-line)
-//   ENGAWA_E2E_FAILING       a crash-looping Deployment            (default crasher)
-//   ENGAWA_E2E_SECRET        a Secret the healthy Deployment reads (default talker-secret)
-//   ENGAWA_E2E_SECRET_VALUE  one of its values                     (default engawa-e2e-secret)
+//   ZEABUR_E2E_NAMESPACE     the project
+//   ZEABUR_E2E_POD           a pod of the healthy Deployment, logging ZEABUR_E2E_LOG_LINE
+//   ZEABUR_E2E_SERVICE       that Deployment                       (default talker)
+//   ZEABUR_E2E_LOG_LINE      text its log contains                 (default zeabur-e2e-line)
+//   ZEABUR_E2E_FAILING       a crash-looping Deployment            (default crasher)
+//   ZEABUR_E2E_SECRET        a Secret the healthy Deployment reads (default talker-secret)
+//   ZEABUR_E2E_SECRET_VALUE  one of its values                     (default zeabur-e2e-secret)
 //
-// The demo server: ENGAWA_E2E_NAMESPACE=shop ENGAWA_E2E_SERVICE=api
-// ENGAWA_E2E_POD=api-5f6b7-k2m4p ENGAWA_E2E_LOG_LINE="GET /products" ENGAWA_E2E_FAILING=worker
-// ENGAWA_E2E_SECRET=db-credentials ENGAWA_E2E_SECRET_VALUE=correct-horse-battery-staple
+// The demo server: ZEABUR_E2E_NAMESPACE=shop ZEABUR_E2E_SERVICE=api
+// ZEABUR_E2E_POD=api-5f6b7-k2m4p ZEABUR_E2E_LOG_LINE="GET /products" ZEABUR_E2E_FAILING=worker
+// ZEABUR_E2E_SECRET=db-credentials ZEABUR_E2E_SECRET_VALUE=correct-horse-battery-staple
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const namespace = env("ENGAWA_E2E_NAMESPACE")
-const pod = env("ENGAWA_E2E_POD")
-const healthy = env("ENGAWA_E2E_SERVICE", "talker")
-const logLine = env("ENGAWA_E2E_LOG_LINE", "engawa-e2e-line")
-const failing = env("ENGAWA_E2E_FAILING", "crasher")
-const secret = env("ENGAWA_E2E_SECRET", "talker-secret")
-const secretValue = env("ENGAWA_E2E_SECRET_VALUE", "engawa-e2e-secret")
+const namespace = env("ZEABUR_E2E_NAMESPACE")
+const pod = env("ZEABUR_E2E_POD")
+const healthy = env("ZEABUR_E2E_SERVICE", "talker")
+const logLine = env("ZEABUR_E2E_LOG_LINE", "zeabur-e2e-line")
+const failing = env("ZEABUR_E2E_FAILING", "crasher")
+const secret = env("ZEABUR_E2E_SECRET", "talker-secret")
+const secretValue = env("ZEABUR_E2E_SECRET_VALUE", "zeabur-e2e-secret")
 const project = `/projects/${encodeURIComponent(namespace)}`
 
 test.beforeAll(() => {
-  if (!namespace) throw new Error("ENGAWA_E2E_NAMESPACE is not set")
-  if (!pod) throw new Error("ENGAWA_E2E_POD is not set")
+  if (!namespace) throw new Error("ZEABUR_E2E_NAMESPACE is not set")
+  if (!pod) throw new Error("ZEABUR_E2E_POD is not set")
 })
 
 /** The replica the Logs tab shows: its picker is labelled "Replica <name>". */
@@ -85,7 +85,7 @@ test("Home names the failing service across projects and lists the project", asy
 test("a popup pressed before its code arrives opens when it does, by click and by key", async ({
   page,
 }) => {
-  // Holds back the popups' code (@engawahq/design-system's popup.tsx) until `release`.
+  // Holds back the popups' code (@zeabur/design-system's popup.tsx) until `release`.
   const hold = async () => {
     let release = () => {}
     const held = new Promise<void>((resolve) => (release = resolve))
@@ -364,7 +364,7 @@ test("a Secret's values appear only when revealed; they and the log filter stay 
 }) => {
   await page.goto(`${project}/services/Deployment/${healthy}?tab=logs`)
   const column = page.getByRole("complementary", { name: "Services" })
-  await page.getByRole("textbox", { name: "Filter lines" }).fill("engawa-e2e-nothing-matches")
+  await page.getByRole("textbox", { name: "Filter lines" }).fill("zeabur-e2e-nothing-matches")
   await column.getByRole("link", { name: new RegExp(`^${failing}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=logs`))
   await expect(page.getByRole("textbox", { name: "Filter lines" })).toHaveValue("")
@@ -507,7 +507,7 @@ async function editorReplicas(page: Page): Promise<number | undefined> {
 /** Plans and applies one change through the API, as another person or tab would. */
 async function applyNow(page: Page, change: Record<string, unknown>) {
   // What the interface sends with every change (src/auth/session.ts).
-  const headers = { Origin: new URL(page.url()).origin, "engawa-request": "1" }
+  const headers = { Origin: new URL(page.url()).origin, "zeabur-request": "1" }
   const plan = await page.request.post(`/api/v1/projects/${namespace}/plan`, {
     headers,
     data: { changes: [change] },
@@ -751,7 +751,7 @@ test("Overview lists what the project misses, and a fix is planned and applied",
 test("install texts come in four forms for a catalogue component", async ({ page }) => {
   await page.goto("/cluster/components?component=certificates/cert-manager")
   const sheet = page.getByRole("dialog", { name: /cert-manager/ })
-  // The texts themselves are the server's (crates/engawa-recommend/tests/golden); here, that each
+  // The texts themselves are the server's (crates/zeabur-catalog/tests/golden); here, that each
   // form's tab shows its own, and the profile follows the URL.
   const text = (form: string) => sheet.getByRole("figure", { name: new RegExp(` ${form}$`) })
   await expect(text("Helm")).toContainText("cert-manager")
@@ -779,14 +779,14 @@ test("Networking shows who may reach a service, and a ready-made policy isolates
     "Isolate",
     `${editor} then accepts and sends only what this and other policies allow`,
   )
-  await expect(panel).toContainText(`engawa-isolate-${editor}`, { timeout: 15_000 })
+  await expect(panel).toContainText(`zeabur-isolate-${editor}`, { timeout: 15_000 })
   await expect(panel).toContainText("Blocked")
 })
 
 test("a ready-made policy is undone from its toast, and deleted from Objects once its name is typed", async ({
   page,
 }) => {
-  const policy = `engawa-allow-ingress-${editor}`
+  const policy = `zeabur-allow-ingress-${editor}`
   const allowIngress = async () => {
     await page.goto(`${project}/services/Deployment/${editor}?tab=networking`)
     const panel = page.getByRole("tabpanel", { name: /^Networking/ })
@@ -823,8 +823,8 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
 
 test("a namespace is adopted, named, and let go, through plans", async ({ page }) => {
   // A namespace that is not a project (scripts/e2e-ui.sh); the demo server has none.
-  const other = env("ENGAWA_E2E_ADOPT")
-  test.skip(!other, "ENGAWA_E2E_ADOPT is not set")
+  const other = env("ZEABUR_E2E_ADOPT")
+  test.skip(!other, "ZEABUR_E2E_ADOPT is not set")
   await page.goto("/projects")
   const row = page.getByRole("listitem").filter({ hasText: other })
   await row.getByRole("button", { name: "Adopt" }).click()

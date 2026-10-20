@@ -197,7 +197,7 @@ export function podFacts(pod: Pod): PodFacts {
   }
 }
 
-/** A service's status as the server judges it (`crates/engawa-graph/src/health.rs`), with its
+/** A service's status as the server judges it (`crates/zeabur-graph/src/health.rs`), with its
  * replica counts; a CronJob between runs has none. */
 export function statusOf(service: Service): Status {
   const { health, word, reason } = service.status

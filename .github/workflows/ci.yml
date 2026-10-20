@@ -102,7 +102,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: kubernetes
-      - name: Integration tests, engawactl doctor, browser tests, image
+      - name: Integration tests, zeaburctl doctor, browser tests, image
         env:
           K3S_IMAGE: rancher/k3s:${{ matrix.k3s }}
         run: ./scripts/ci.sh kubernetes
@@ -113,7 +113,7 @@ jobs:
             echo "### Sizes (k3s ${{ matrix.k3s }})"
             echo "| Measure | Bytes |"
             echo "|---|---|"
-            echo "| Image \`engawa:ci\` | $(docker image inspect --format '{{.Size}}' engawa:ci 2>/dev/null || echo n/a) |"
+            echo "| Image \`zeabur:ci\` | $(docker image inspect --format '{{.Size}}' zeabur:ci 2>/dev/null || echo n/a) |"
           } >> "$GITHUB_STEP_SUMMARY"
 
   kubernetes-l2:
@@ -132,27 +132,27 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           key: kubernetes-l2
-      - id: genkan
-        run: echo "rev=$(tr -d '[:space:]' < GENKAN_PINNED)" >> "$GITHUB_OUTPUT"
+      - id: zeabur-identity
+        run: echo "rev=$(tr -d '[:space:]' < ZEABUR_IDENTITY_PINNED)" >> "$GITHUB_OUTPUT"
       # Full history: scripts/e2e-l2.sh reads it as `git+file://…?rev=`, and Nix's git fetcher
       # refuses a shallow clone.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: engawahq/genkan
-          ref: ${{ steps.genkan.outputs.rev }}
-          path: .genkan
+          repository: zeabur/identity
+          ref: ${{ steps.zeabur-identity.outputs.rev }}
+          path: .zeabur-identity
           fetch-depth: 0
           persist-credentials: false
       - name: End-to-end test (passkey sign-in, elevation, terminal, rights, memory, removal)
         env:
-          GENKAN_SRC: ${{ github.workspace }}/.genkan
+          ZEABUR_IDENTITY_SRC: ${{ github.workspace }}/.zeabur-identity
           K3S_IMAGE: rancher/k3s:${{ matrix.k3s }}
         run: ./scripts/ci.sh kubernetes-l2
       - name: Report memory
         if: always()
         run: |
           {
-            echo "### engawa in the cluster (k3s ${{ matrix.k3s }})"
+            echo "### zeabur in the cluster (k3s ${{ matrix.k3s }})"
             echo "| Measure | Bytes |"
             echo "|---|---|"
             echo "| Pod working set after 60 s idle | $(jq -r .pod_working_set_bytes target/e2e-l2/measurements.json 2>/dev/null || echo n/a) |"

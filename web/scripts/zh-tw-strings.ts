@@ -1,6 +1,6 @@
 // Prints every zh-TW user string after its key, for scripts/check-zh-tw.sh: the catalogue in
 // src/i18n/zh-TW.ts (with the server's sentences, `sentence.*`) and the zh-TW texts of the
-// server's sign-in pages (crates/engawa/src/pages.rs). zh-CN is never printed.
+// server's sign-in pages (crates/zeabur/src/pages.rs). zh-CN is never printed.
 //
 // Each string is one line and a paragraph of its own (a blank line between them), so the linter
 // reads no sentence across two strings; the key is in brackets, which it does not read as a word.
@@ -58,7 +58,7 @@ for (const [key, value] of Object.entries(zhTW)) {
 
 // The sign-in pages: the string on a `Lang::ZhTw` arm, on its line or the next.
 const pages = readFileSync(
-  resolve(import.meta.dirname, "../../crates/engawa/src/pages.rs"),
+  resolve(import.meta.dirname, "../../crates/zeabur/src/pages.rs"),
   "utf8",
 ).split("\n")
 pages.forEach((line, index) => {

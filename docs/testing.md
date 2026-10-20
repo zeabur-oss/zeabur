@@ -1,6 +1,6 @@
 # Testing
 
-A test is worth keeping when it fails because a promise engawa makes broke, and only then. It
+A test is worth keeping when it fails because a promise Zeabur makes broke, and only then. It
 calls the code the way a caller does (the HTTP API, a crate's public functions, the rendered
 page), so a refactor that keeps the behaviour keeps the test green [swe-unit].
 
@@ -11,10 +11,10 @@ that level cannot see: wiring, a real kube-apiserver, a real browser [pyramid].
 
 | Level | Where | For |
 |---|---|---|
-| Unit, property and fixture tests | the pure crates (`engawa-graph`, `-plan`, `-gaps`, `-modules`, `-recommend`, …) and [`fixtures/`](../fixtures/README.md) | the rules: projection, plans, diagnoses, gaps. Properties where an invariant exists (a planned change projects back to exactly what was asked) [quickcheck]; examples for known edges and past bugs, which random inputs rarely reach [proptest-limits] |
-| API tests over the in-memory cluster | `crates/engawa-api/tests/it`, one test binary (helpers shared with the cluster tests in `tests/common`) | the HTTP API end to end: routes, status codes, problems, what leaves the server |
-| Cluster tests on k3s | `crates/*/tests/kubernetes.rs`, `#[ignore]`d ([CONTRIBUTING](../CONTRIBUTING.md#tests)); each test's namespace and person come from `engawa-test-support`'s `sandbox` | what only kube-apiserver decides: acting as the person, RBAC refusals, `test` preconditions, field managers, concurrent writes. The in-memory cluster is a fake; what it claims about kube-apiserver is checked here, by one suite of write behaviours run against both (`crates/engawa-kube/tests/contract`) [swe-doubles] |
-| Browser tests (Playwright) | `web/e2e` (local mode, `scripts/e2e-ui.sh`) and `web/e2e/l2` (in a cluster with Genkan, `scripts/e2e-l2.sh`) | user journeys and what only a browser shows: the CSP, masked values on screen, keyboard use, passkey sign-in. Logic in the interface is tested with `bun test` [e2e-good] |
+| Unit, property and fixture tests | the pure crates (`zeabur-graph`, `-plan`, `-gaps`, `-modules`, `-recommend`, …) and [`fixtures/`](../fixtures/README.md) | the rules: projection, plans, diagnoses, gaps. Properties where an invariant exists (a planned change projects back to exactly what was asked) [quickcheck]; examples for known edges and past bugs, which random inputs rarely reach [proptest-limits] |
+| API tests over the in-memory cluster | `crates/zeabur-api/tests/it`, one test binary (helpers shared with the cluster tests in `tests/common`) | the HTTP API end to end: routes, status codes, problems, what leaves the server |
+| Cluster tests on k3s | `crates/*/tests/kubernetes.rs`, `#[ignore]`d ([CONTRIBUTING](../CONTRIBUTING.md#tests)); each test's namespace and person come from `zeabur-test-support`'s `sandbox` | what only kube-apiserver decides: acting as the person, RBAC refusals, `test` preconditions, field managers, concurrent writes. The in-memory cluster is a fake; what it claims about kube-apiserver is checked here, by one suite of write behaviours run against both (`crates/zeabur-kube/tests/contract`) [swe-doubles] |
+| Browser tests (Playwright) | `web/e2e` (local mode, `scripts/e2e-ui.sh`) and `web/e2e/l2` (in a cluster with Zeabur Identity, `scripts/e2e-l2.sh`) | user journeys and what only a browser shows: the CSP, masked values on screen, keyboard use, passkey sign-in. Logic in the interface is tested with `bun test` [e2e-good] |
 
 ## What we do not test
 
@@ -50,7 +50,7 @@ Removing or weakening one of these tests needs another test of the same promise 
 - **No shared state.** Each API test builds its own in-memory cluster. Each cluster test works in
   a namespace of its own with a random name and deletes it, and any cluster-scoped object, from a
   drop guard, so a failed run leaves nothing behind; tests assume they share the cluster [sig-e2e].
-- **No real clock where the answer depends on the date**: tests fix it (`engawa_api::router_at`).
+- **No real clock where the answer depends on the date**: tests fix it (`zeabur_api::router_at`).
 - **A flaky test is broken.** It is fixed or removed, not retried until green [nondeterminism].
 
 ## Mutation testing

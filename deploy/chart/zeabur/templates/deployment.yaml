@@ -1,0 +1,174 @@
+{{- $issuer := .Values.issuer }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zeabur.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  # One replica, replaced rather than rolled: sign-in sessions live in the process's memory (their
+  # refresh tokens must not rest in etcd), so a second replica would not know them, and two
+  # versions side by side would split people's sessions between them.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "zeabur.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "zeabur.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "zeabur.fullname" . }}
+      automountServiceAccountToken: false
+      # No Service environment variables: zeabur reads none, and they grow with the namespace.
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        # Secret volume files belong to root with mode 0440; the kubelet gives them this group.
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: zeabur
+          {{- if .Values.image.digest }}
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            # IPv4 and IPv6, so the pod answers in single-stack and dual-stack clusters alike.
+            - name: ZEABUR_LISTEN
+              value: "[::]:8080"
+            - name: ZEABUR_PUBLIC_URL
+              value: {{ required "publicUrl is required" .Values.publicUrl | quote }}
+            - name: ZEABUR_ISSUER_URL
+              value: {{ required "issuer.url is required" $issuer.url | quote }}
+            - name: ZEABUR_CLIENT_ID
+              value: {{ $issuer.clientId | quote }}
+            - name: ZEABUR_CLIENT_SECRET_FILE
+              value: /etc/zeabur/client/{{ $issuer.clientSecret.key }}
+            - name: ZEABUR_PLAN_KEY_FILE
+              value: /etc/zeabur/plan-key/{{ .Values.planKey.key }}
+            - name: ZEABUR_ELEVATION
+              value: {{ .Values.elevation.enabled | quote }}
+            # Where the settings people choose are kept: the ConfigMap zeabur-settings here.
+            - name: ZEABUR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- with .Values.metricsStore.service }}
+            - name: ZEABUR_METRICS_SERVICE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if $issuer.caBundle.configMap }}
+            - name: ZEABUR_ISSUER_CA_FILE
+              value: /etc/zeabur/issuer-ca/{{ $issuer.caBundle.key }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: http
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: kube-api
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            - name: client-secret
+              mountPath: /etc/zeabur/client
+              readOnly: true
+            - name: plan-key
+              mountPath: /etc/zeabur/plan-key
+              readOnly: true
+            {{- if $issuer.caBundle.configMap }}
+            - name: issuer-ca
+              mountPath: /etc/zeabur/issuer-ca
+              readOnly: true
+            {{- end }}
+      volumes:
+        # What a client needs to find kube-apiserver and trust it, at the path in-cluster clients
+        # read (the CA and the namespace), without the token automounting would add: every request
+        # carries the signed-in person's token instead. `kube-root-ca.crt` is published into every
+        # namespace by kube-controller-manager
+        # (https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#root-ca-certificate-configmap).
+        - name: kube-api
+          projected:
+            defaultMode: 0444
+            sources:
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace
+        - name: client-secret
+          secret:
+            secretName: {{ required "issuer.clientSecret.existingSecret is required" $issuer.clientSecret.existingSecret }}
+            defaultMode: 0440
+            items:
+              - key: {{ $issuer.clientSecret.key }}
+                path: {{ $issuer.clientSecret.key }}
+        - name: plan-key
+          secret:
+            secretName: {{ include "zeabur.planKeySecret" . }}
+            defaultMode: 0440
+            items:
+              - key: {{ .Values.planKey.key }}
+                path: {{ .Values.planKey.key }}
+        {{- if $issuer.caBundle.configMap }}
+        - name: issuer-ca
+          configMap:
+            name: {{ $issuer.caBundle.configMap }}
+            items:
+              - key: {{ $issuer.caBundle.key }}
+                path: {{ $issuer.caBundle.key }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

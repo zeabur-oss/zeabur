@@ -9,8 +9,8 @@ import { lazy, Suspense, type ReactNode } from "react"
 import { historyQuery, usageQuery } from "@/api/queries"
 import { Hint, Panel, Segmented } from "@/components/bits"
 import { Refused } from "@/components/refused"
-import { Skeleton } from "@engawahq/design-system/components/skeleton"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+import { Skeleton } from "@zeabur/design-system/components/skeleton"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { useQuantityFormat as useFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
@@ -33,7 +33,7 @@ import {
   type ServiceHistory,
 } from "@/model/usage"
 import type { Guide } from "@/routes/service/history-chart"
-import { Meter } from "@engawahq/design-system/components/meter"
+import { Meter } from "@zeabur/design-system/components/meter"
 
 const HistoryChart = lazy(() => import("@/routes/service/history-chart"))
 

@@ -4,8 +4,8 @@
 // (`CrashLoopBackOff`) is in the pill's tooltip, with the restarts and the last failed exit.
 import type { ReactNode } from "react"
 
-import { Badge } from "@engawahq/design-system/components/badge"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+import { Badge } from "@zeabur/design-system/components/badge"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"

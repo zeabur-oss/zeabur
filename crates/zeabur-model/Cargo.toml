@@ -1,0 +1,16 @@
+[package]
+name = "zeabur-model"
+description = "zeabur: the projected view (project, service, relation, source) shared by the API, MCP and UI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zeabur-core.workspace = true
+utoipa.workspace = true
+serde.workspace = true

@@ -7,9 +7,9 @@
 #   scripts/ci.sh <job>      # run one job; it enters its Nix dev shell itself
 #   scripts/ci.sh --list     # the job names, `check` matrix first
 #
-# The cluster jobs create k3d clusters (`engawa`, `engawa-l2`) and delete them when they end; set
-# ENGAWA_CI_KEEP=1 to keep `engawa` for a look afterwards. K3S_IMAGE picks the k3s release.
-# kubernetes-l2 builds Genkan from GENKAN_SRC (default ../genkan) at the commit in GENKAN_PINNED.
+# The cluster jobs create k3d clusters (`zeabur`, `zeabur-l2`) and delete them when they end; set
+# ZEABUR_CI_KEEP=1 to keep `zeabur` for a look afterwards. K3S_IMAGE picks the k3s release.
+# kubernetes-l2 builds Zeabur Identity from ZEABUR_IDENTITY_SRC (default ../identity) at the commit in ZEABUR_IDENTITY_PINNED.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -30,8 +30,8 @@ printf '%s\n' "${check_jobs[@]}" "${cluster_jobs[@]}" | grep -qx -- "$job" ||
 # default one. The marker tells a re-run inside the shell apart from a call outside it.
 shell=default
 [[ "$job" == wording ]] && shell=zh
-if [[ "${ENGAWA_CI_SHELL:-}" != "$shell" ]]; then
-  export ENGAWA_CI_SHELL="$shell"
+if [[ "${ZEABUR_CI_SHELL:-}" != "$shell" ]]; then
+  export ZEABUR_CI_SHELL="$shell"
   exec nix develop "$root#$shell" --command "$0" "$@"
 fi
 
@@ -55,11 +55,11 @@ check_matrix() {
 start_cluster() {
   export KUBECONFIG="$root/target/ci/kubeconfig"
   mkdir -p "$(dirname "$KUBECONFIG")"
-  k3d cluster delete engawa >/dev/null 2>&1 || true
-  if [[ -z "${ENGAWA_CI_KEEP:-}" ]]; then
-    trap 'k3d cluster delete engawa >/dev/null 2>&1 || true' EXIT
+  k3d cluster delete zeabur >/dev/null 2>&1 || true
+  if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
+    trap 'k3d cluster delete zeabur >/dev/null 2>&1 || true' EXIT
   fi
-  k3d cluster create engawa --image "$k3s_image" --no-lb --wait --timeout 300s
+  k3d cluster create zeabur --image "$k3s_image" --no-lb --wait --timeout 300s
   # Docker's containerd store keeps busybox as a multi-platform index, and the k3s node's import
   # fails on the platforms it lacks while k3d still reports success. Rebuild it as one plain image
   # (the classic builder writes no index or attestations; the label makes it a new image rather
@@ -67,32 +67,32 @@ start_cluster() {
   # list before matching: `grep -q` exits at the first match, and under pipefail the SIGPIPE
   # crictl then gets would fail the check.
   docker pull busybox:1.37
-  printf 'FROM busybox:1.37\nLABEL dev.engawahq.engawa.test=busybox\n' |
+  printf 'FROM busybox:1.37\nLABEL com.zeabur.test=busybox\n' |
     DOCKER_BUILDKIT=0 docker build -t busybox:1.37 -
-  k3d image import busybox:1.37 --cluster engawa
+  k3d image import busybox:1.37 --cluster zeabur
   local images
-  images=$(docker exec k3d-engawa-server-0 crictl images)
+  images=$(docker exec k3d-zeabur-server-0 crictl images)
   grep -q 'docker.io/library/busybox *1.37' <<<"$images"
 }
 
-# As k3d's cluster admin, without Genkan: nothing critical and every check runs; the exit code is
-# the most serious status in the JSON (crates/engawactl/README.md).
+# As k3d's cluster admin, without Zeabur Identity: nothing critical and every check runs; the exit code is
+# the most serious status in the JSON (crates/zeaburctl/README.md).
 check_doctor() {
-  cargo build --locked -p engawactl --no-default-features
+  cargo build --locked -p zeaburctl --no-default-features
   local code=0 expected
-  ./target/debug/engawactl doctor --output json >target/doctor.json || code=$?
+  ./target/debug/zeaburctl doctor --output json >target/doctor.json || code=$?
   cat target/doctor.json
   [[ $code -eq 0 || $code -eq 1 ]] || { echo "unexpected exit code $code"; return 1; }
   jq -e '
     def status(name): .checks[] | select(.name == name) | .status;
     (.checks | map(.name)) == ["cluster-version", "components", "cluster-gaps",
-      "genkan-installed", "genkan-client", "genkan-identity", "genkan-issuer-trust"]
+      "zeabur-identity-installed", "zeabur-identity-client", "zeabur-identity-user", "zeabur-identity-issuer-trust"]
     and all(.checks[]; (.status | IN("ok", "warning", "critical", "skipped", "error"))
       and (.findings | type == "array") and (.fix == null or (.fix | type == "string")))
     and (status("components") | IN("ok", "warning"))
-    and status("genkan-installed") == "warning"
-    and status("genkan-client") == "skipped"
-    and status("genkan-identity") == "skipped"
+    and status("zeabur-identity-installed") == "warning"
+    and status("zeabur-identity-client") == "skipped"
+    and status("zeabur-identity-user") == "skipped"
   ' target/doctor.json
   expected=$(jq '.checks | map(.status)
     | if any(. == "critical") then 2 elif any(. == "warning") then 1
@@ -136,20 +136,20 @@ case "$job" in
     (cd web; bun run lint; bun run knip; bun run test; bun run gen:api)
     git diff --exit-code -- web/src/api/schema.d.ts
     ./scripts/ui-budget.sh
-    ENGAWA_UI_DIST="$root/web/dist" cargo build --release --locked -p engawa -p engawactl
-    ENGAWA_UI_DIST="$root/web/dist" cargo nextest run --release --locked -p engawa-ui
+    ZEABUR_UI_DIST="$root/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
+    ZEABUR_UI_DIST="$root/web/dist" cargo nextest run --release --locked -p zeabur-ui
     ;;
   # The API-only build needs no JavaScript toolchain: bun is taken off PATH.
   no-ui) ./scripts/build-without-ui.sh ;;
   # The Helm chart: lint, what every rendering promises, and the values it refuses.
   chart) ./scripts/check-chart.sh ;;
-  # The interface's zh-TW wording (.zhtw-mcp.toml), and the brand in lowercase everywhere.
+  # The interface's zh-TW wording (.zhtw-mcp.toml), and no file naming the project by an old name.
   wording)
     (cd web; bun ci)
     ./scripts/check-zh-tw.sh
     ./scripts/check-brand.sh
     ;;
-  # Integration tests (JSON Patch writes, dry run, identity, revocation), `engawactl doctor`,
+  # Integration tests (JSON Patch writes, dry run, identity, revocation), `zeaburctl doctor`,
   # browser tests in local mode with the embedded interface, and the image.
   kubernetes)
     start_cluster
@@ -159,9 +159,9 @@ case "$job" in
       browser_failure_context
       exit 1
     fi
-    ./scripts/build-image.sh engawa:ci
+    ./scripts/build-image.sh zeabur:ci
     ;;
-  # engawa in a cluster with Genkan, from their images and engawa's chart, through a browser:
+  # zeabur in a cluster with Zeabur Identity, from their images and zeabur's chart, through a browser:
   # passkey sign-in, elevation, terminal, rights, memory, removal.
   kubernetes-l2) K3S_IMAGE="$k3s_image" ./scripts/e2e-l2.sh ;;
 esac

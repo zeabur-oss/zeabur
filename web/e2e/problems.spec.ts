@@ -5,16 +5,16 @@ import { expect, test } from "./fixtures.ts"
 // Problems in their layers, the plain status words and the ways to admin rights, in states a test
 // cluster does not reach on its own: a project's limit or a policy refusing a plan, a pod that runs
 // again after a recent crash, and a session that offers admin rights. Those answers are stubbed
-// (page.route), as in usage.spec.ts; everything else is the server's. ENGAWA_E2E_NAMESPACE and
-// ENGAWA_E2E_SERVICE as in ui.spec.ts.
+// (page.route), as in usage.spec.ts; everything else is the server's. ZEABUR_E2E_NAMESPACE and
+// ZEABUR_E2E_SERVICE as in ui.spec.ts.
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const namespace = env("ENGAWA_E2E_NAMESPACE")
-const service = env("ENGAWA_E2E_SERVICE", "talker")
+const namespace = env("ZEABUR_E2E_NAMESPACE")
+const service = env("ZEABUR_E2E_SERVICE", "talker")
 const project = `/projects/${encodeURIComponent(namespace)}`
 const servicePage = `${project}/services/Deployment/${service}`
 
 test.beforeAll(() => {
-  if (!namespace) throw new Error("ENGAWA_E2E_NAMESPACE is not set")
+  if (!namespace) throw new Error("ZEABUR_E2E_NAMESPACE is not set")
 })
 
 async function stub(page: Page, path: RegExp, body: object, status = 200) {

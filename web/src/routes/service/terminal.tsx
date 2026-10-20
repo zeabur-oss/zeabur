@@ -1,6 +1,6 @@
 // A terminal in one of the service's containers, filling the remaining height: pod and container
 // pickers (the pod in the URL, else a ready one), the connection's state and Reconnect. The
-// server runs `/bin/sh` as the person (crates/engawa-api/src/pods/exec.rs); when the person may not,
+// server runs `/bin/sh` as the person (crates/zeabur-api/src/pods/exec.rs); when the person may not,
 // the tab says so in one quiet line with "Retry as admin" where admin rights are offered, the
 // Role to ask for folded under "Details". A refused terminal reconnects on its own once admin
 // rights become active, whatever granted them; Reconnect starts again after they expire. An image
@@ -17,8 +17,8 @@ import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import { sessionQuery, whoamiQuery } from "@/api/queries"
 import { Problem } from "@/components/problem"
 import { Refused } from "@/components/refused"
-import { Button } from "@engawahq/design-system/components/button"
-import { Select } from "@engawahq/design-system/components/select"
+import { Button } from "@zeabur/design-system/components/button"
+import { Select } from "@zeabur/design-system/components/select"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"

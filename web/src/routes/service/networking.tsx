@@ -1,7 +1,7 @@
 // A service's networking as two tables. Public: one row per Ingress backend that reaches the
 // service, its columns in request order (host and path → Ingress → Service:port → pods), so the
 // row is the request path. Private: one row per Kubernetes Service, with its cluster DNS names.
-// Domains are added, changed and removed here; engawa picks the route object (the one that
+// Domains are added, changed and removed here; Zeabur picks the route object (the one that
 // already reaches the service, else an HTTPRoute when a Gateway exists, else an Ingress), and
 // every change opens a plan to read before applying.
 import { useForm } from "@tanstack/react-form"
@@ -20,9 +20,9 @@ import { usePlanner } from "@/components/plan/planner"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusPill } from "@/components/status"
 import { FormField } from "@/components/form-field"
-import { Button } from "@engawahq/design-system/components/button"
-import { Input } from "@engawahq/design-system/components/input"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+import { Button } from "@zeabur/design-system/components/button"
+import { Input } from "@zeabur/design-system/components/input"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import {
   endpointsOf,

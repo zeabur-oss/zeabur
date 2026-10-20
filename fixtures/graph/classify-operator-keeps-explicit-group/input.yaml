@@ -4,5 +4,5 @@ metadata:
   name: operator
   namespace: demo
   labels:
-    engawa.engawahq.dev/group: controller
+    zeabur.com/group: controller
     app.kubernetes.io/component: operator

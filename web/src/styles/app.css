@@ -1,8 +1,8 @@
-/* engawa's web interface: engawa's design system (@engawahq/design-system: shadcn/ui's theme and
-   base styles, engawa's tokens, type roles and utilities, Inter and JetBrains Mono), then what
+/* zeabur's web interface: zeabur's design system (@zeabur/design-system: shadcn/ui's theme and
+   base styles, zeabur's tokens, type roles and utilities, Inter and JetBrains Mono), then what
    only this interface uses. */
 @import "tailwindcss";
-@import "@engawahq/design-system";
+@import "@zeabur/design-system";
 
 /* Named sizes the Tailwind scale lacks, so that markup carries no arbitrary values (`p-[13px]`):
    shadcn/lint's no-arbitrary-values (https://github.com/shadcn-ui/lint/blob/main/docs/rules/no-arbitrary-values.md).

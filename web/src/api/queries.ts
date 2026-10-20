@@ -50,7 +50,7 @@ export const whoamiQuery = queryOptions({
   staleTime: Infinity,
 })
 
-/** How the person is signed in to engawa: signing out, admin rights and until when. Asked again
+/** How the person is signed in to zeabur: signing out, admin rights and until when. Asked again
  * while admin rights are in use, so the indicator goes when they end. */
 export const sessionQuery = queryOptions({
   queryKey: ["session"],

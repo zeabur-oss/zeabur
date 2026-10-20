@@ -23,12 +23,12 @@ const pods =
     known[workload.name]
 
 const policies = { group: "networking.k8s.io", version: "v1", resource: "networkpolicies" }
-const remove: Change = { op: "delete", resource: policies, name: "engawa-isolate-api" }
+const remove: Change = { op: "delete", resource: policies, name: "zeabur-isolate-api" }
 
 const isolate = {
   apiVersion: "networking.k8s.io/v1",
   kind: "NetworkPolicy",
-  metadata: { name: "engawa-isolate-api" },
+  metadata: { name: "zeabur-isolate-api" },
   spec: {
     podSelector: { matchLabels: { app: "api" } },
     policyTypes: ["Ingress", "Egress"],
@@ -173,7 +173,7 @@ describe("undoOf", () => {
           apiVersion: "networking.k8s.io/v1",
           kind: "NetworkPolicy",
           plural: "networkpolicies",
-          name: "engawa-isolate-api",
+          name: "zeabur-isolate-api",
         },
         resourceVersion: "812",
       },
@@ -208,11 +208,11 @@ describe("undoOf", () => {
 
 describe("typed confirmation", () => {
   test("a deletion waits for the object's name; other plans do not", () => {
-    expect(typedName([remove])).toBe("engawa-isolate-api")
+    expect(typedName([remove])).toBe("zeabur-isolate-api")
     expect(awaitsName([remove], "")).toBe(true)
-    expect(awaitsName([remove], "engawa-isolate")).toBe(true)
-    expect(awaitsName([remove], "ENGAWA-ISOLATE-API")).toBe(true)
-    expect(awaitsName([remove], " engawa-isolate-api ")).toBe(false)
+    expect(awaitsName([remove], "zeabur-isolate")).toBe(true)
+    expect(awaitsName([remove], "ZEABUR-ISOLATE-API")).toBe(true)
+    expect(awaitsName([remove], " zeabur-isolate-api ")).toBe(false)
     expect(awaitsName([{ op: "restart", workload: api }], "")).toBe(false)
     expect(typedName([{ op: "restart", workload: api }])).toBe(undefined)
   })

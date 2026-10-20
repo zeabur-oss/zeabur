@@ -21,21 +21,21 @@ import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
-import { Alert, AlertDescription } from "@engawahq/design-system/components/alert"
-import { Button } from "@engawahq/design-system/components/button"
+import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
+import { Button } from "@zeabur/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@engawahq/design-system/components/collapsible"
+} from "@zeabur/design-system/components/collapsible"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-} from "@engawahq/design-system/components/dialog"
-import { Input } from "@engawahq/design-system/components/input"
-import { Label } from "@engawahq/design-system/components/label"
+} from "@zeabur/design-system/components/dialog"
+import { Input } from "@zeabur/design-system/components/input"
+import { Label } from "@zeabur/design-system/components/label"
 import { YamlDiff } from "@/components/yaml"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { awaitsName, destinationOf, typedName, undoOf, weigh, type PodsOf } from "@/model/risk"
@@ -286,7 +286,7 @@ function PlannedObject({ object, named }: { object: Schemas["PlannedObject"]; na
   const t = useT()
   const before = object.beforeYaml ?? ""
   const after = object.afterYaml ?? ""
-  const owned = object.owners.filter((o) => o.managers.some((m) => m !== "engawa"))
+  const owned = object.owners.filter((o) => o.managers.some((m) => m !== "zeabur"))
   return (
     <section
       aria-label={`${object.target.kind}/${object.target.name}`}

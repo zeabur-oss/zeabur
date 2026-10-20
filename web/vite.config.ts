@@ -5,18 +5,18 @@ import react from "@vitejs/plugin-react"
 import Icons from "unplugin-icons/vite"
 import { defineConfig } from "vite"
 
-// The Rust server the dev server forwards `/api` to (`cargo run -p engawa-api --example demo`).
-const api = process.env.ENGAWA_API ?? "http://127.0.0.1:8080"
+// The Rust server the dev server forwards `/api` to (`cargo run -p zeabur-api --example demo`).
+const api = process.env.ZEABUR_API ?? "http://127.0.0.1:8080"
 
-// @engawahq/design-system ships its components as sources: they are compiled like this app's own
+// @zeabur/design-system ships its components as sources: they are compiled like this app's own
 // (React Compiler, `~icons/…`), unlike every other package in node_modules.
-const designSystem = "/node_modules/@engawahq/design-system/"
+const designSystem = "/node_modules/@zeabur/design-system/"
 
 // The packages the design system's sources import (`@base-ui/react/select`, `cn` …). Left out of
 // dev pre-bundling, the design system's own imports are not pre-bundled either, and some reach
 // CommonJS (Base UI's `use-sync-external-store/shim`) that the browser cannot load as it is, so they
 // are pre-bundled by name. Read from the sources, so the list follows the pin.
-const designSystemSources = resolve(import.meta.dirname, "node_modules/@engawahq/design-system/src")
+const designSystemSources = resolve(import.meta.dirname, "node_modules/@zeabur/design-system/src")
 const designSystemImports = [
   ...new Set(
     readdirSync(designSystemSources, { recursive: true, encoding: "utf8" })
@@ -38,7 +38,7 @@ export default defineConfig({
     react({
       // The compiler skips node_modules on its own too, unless `sources` names the files.
       compiler: { sources: [resolve(import.meta.dirname, "src") + "/", designSystem] },
-      exclude: /\/node_modules\/(?!@engawahq\/design-system\/)/,
+      exclude: /\/node_modules\/(?!@zeabur\/design-system\/)/,
     }),
     tailwindcss(),
     // `~icons/ph/<name>`: one Phosphor icon, 1em square (scale 1) like Phosphor's own components.
@@ -62,7 +62,7 @@ export default defineConfig({
   // The design system is not pre-bundled in dev: the pre-bundler runs no plugins, so it could not
   // resolve `~icons/…`. What it imports is.
   optimizeDeps: {
-    exclude: ["@engawahq/design-system"],
+    exclude: ["@zeabur/design-system"],
     include: designSystemImports,
   },
   server: {

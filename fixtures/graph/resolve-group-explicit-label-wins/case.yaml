@@ -2,5 +2,5 @@ description: The explicit group label wins over the component label.
 operation: graph.resolveGroup
 params:
   labels:
-    engawa.engawahq.dev/group: database
+    zeabur.com/group: database
     app.kubernetes.io/component: primary

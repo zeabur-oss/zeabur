@@ -1,0 +1,22 @@
+[package]
+name = "zeabur-gaps"
+description = "zeabur: gap rules and plain-language diagnostics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+zeabur-core.workspace = true
+zeabur-graph.workspace = true
+zeabur-model.workspace = true
+k8s-openapi.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+zeabur-test-support.workspace = true
+serde-saphyr.workspace = true

@@ -10,7 +10,7 @@ import { Panel } from "@/components/bits"
 import { VolumeBackups } from "@/components/backups"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { claimOf, volumesOf, type Service } from "@/model/service"
 

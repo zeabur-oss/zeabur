@@ -19,12 +19,12 @@ import { Hint, Panel, Segmented } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { StatusPill } from "@/components/status"
-import { Button } from "@engawahq/design-system/components/button"
-import { Input } from "@engawahq/design-system/components/input"
-import { Select } from "@engawahq/design-system/components/select"
+import { Button } from "@zeabur/design-system/components/button"
+import { Input } from "@zeabur/design-system/components/input"
+import { Select } from "@zeabur/design-system/components/select"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
-import { PageHeader } from "@engawahq/design-system/components/page-header"
+import { PageHeader } from "@zeabur/design-system/components/page-header"
 
 export function SettingsPage() {
   const t = useT()
@@ -123,7 +123,7 @@ const storeHealth = {
   unavailable: "fail",
 } as const satisfies Record<StoreSetting["state"], "ok" | "warn" | "idle" | "fail">
 
-/** The metrics store: which Service history comes from, whether it answers, and, where engawa
+/** The metrics store: which Service history comes from, whether it answers, and, where zeabur
  * keeps settings, a change of it written as the person (so who may is the cluster's decision). */
 function MetricsStorePanel() {
   const t = useT()

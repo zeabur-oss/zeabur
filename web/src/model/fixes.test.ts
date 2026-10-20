@@ -76,8 +76,8 @@ describe("fixTemplates", () => {
   test("isolating a project creates every policy the server proposed, in one plan", () => {
     const fix = fixTemplates["networkPolicy.isolateProject"]!
     const objects = [
-      { kind: "NetworkPolicy", metadata: { name: "engawa-isolate-api" } },
-      { kind: "NetworkPolicy", metadata: { name: "engawa-allow-ingress-api" } },
+      { kind: "NetworkPolicy", metadata: { name: "zeabur-isolate-api" } },
+      { kind: "NetworkPolicy", metadata: { name: "zeabur-allow-ingress-api" } },
     ]
     const shop = { ...project({}), namespace: "shop" } as Project
     const ask = fix(gap({ objects: JSON.stringify(objects) }), shop, t)

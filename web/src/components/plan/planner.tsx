@@ -1,4 +1,4 @@
-// Every write goes the same way: a page describes the change, engawa plans it (writes nothing),
+// Every write goes the same way: a page describes the change, Zeabur plans it (writes nothing),
 // the person reads the plan and confirms it, and it is applied by its token. `usePlanner` gives a
 // page the one call it needs and the dialog to render; the dialog's code loads when the first
 // plan opens. The dialog closes on confirm and the outcome is a toast (outcome.ts), whose

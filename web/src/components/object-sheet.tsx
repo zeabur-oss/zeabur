@@ -8,14 +8,14 @@ import XIcon from "~icons/ph/x"
 import { objectQuery, type ObjectAddress } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { Badge } from "@engawahq/design-system/components/badge"
-import { Button } from "@engawahq/design-system/components/button"
+import { Badge } from "@zeabur/design-system/components/badge"
+import { Button } from "@zeabur/design-system/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-} from "@engawahq/design-system/components/dialog"
+} from "@zeabur/design-system/components/dialog"
 import { YamlView } from "@/components/yaml-view"
 import { useT } from "@/i18n"
 

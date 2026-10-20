@@ -266,7 +266,7 @@ group("describe", () => {
   test("an isolating policy states its consequence first, for the service it was asked from", () => {
     const policy = {
       kind: "NetworkPolicy",
-      metadata: { name: "engawa-isolate-api" },
+      metadata: { name: "zeabur-isolate-api" },
       spec: { policyTypes: ["Ingress", "Egress"] },
     } as unknown as Record<string, never>
     const d = describe(
@@ -277,7 +277,7 @@ group("describe", () => {
       ["isolates"],
     )
     expect(d.consequence).toBe("confirm.isolates(api)")
-    expect(d.lines).toStrictEqual(["confirm.create(NetworkPolicy, engawa-isolate-api)"])
+    expect(d.lines).toStrictEqual(["confirm.create(NetworkPolicy, zeabur-isolate-api)"])
     expect(d.action).toBe("action.isolate")
   })
 })

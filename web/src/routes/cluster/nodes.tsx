@@ -7,14 +7,14 @@ import { nodesQuery, upgradesQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT, type Translate } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import type { Health } from "@/model/service"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { Section } from "@/routes/cluster/section"
-import { Meter } from "@engawahq/design-system/components/meter"
+import { Meter } from "@zeabur/design-system/components/meter"
 
 type Resources = Schemas["Resources"]
 type NodeView = Schemas["NodeView"]

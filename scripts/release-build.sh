@@ -6,12 +6,12 @@
 #   scripts/release-build.sh v0.0.2 arm64 dist
 #
 # On Linux (native architecture only; Docker for the image):
-#   engawactl-<version>-linux-<arch>.tar.gz, engawa-<version>-linux-<arch>.tar.gz: one static musl
+#   zeaburctl-<version>-linux-<arch>.tar.gz, zeabur-<version>-linux-<arch>.tar.gz: one static musl
 #     binary each, with LICENSE;
-#   image.tar: the image of Containerfile around that same `engawa` binary (`docker image save`).
+#   image.tar: the image of Containerfile around that same `zeabur` binary (`docker image save`).
 # On macOS, arm64 only (Apple silicon):
-#   engawactl-<version>-darwin-arm64.tar.gz. The server only runs in a pod
-#   (`ClusterEndpoint::in_cluster`), so there is no macOS `engawa`.
+#   zeaburctl-<version>-darwin-arm64.tar.gz. The server only runs in a pod
+#   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`.
 set -euo pipefail
 
 if [[ $# != 3 ]]; then
@@ -35,8 +35,8 @@ case "$(uname -s):$arch:$(uname -m)" in
   Darwin:arm64:arm64) os=darwin target=aarch64-apple-darwin ;;
   *) echo "cannot build $arch here: each build is native, and macOS is arm64 only" >&2; exit 2 ;;
 esac
-binaries=(engawactl)
-[[ "$os" == linux ]] && binaries+=(engawa)
+binaries=(zeaburctl)
+[[ "$os" == linux ]] && binaries+=(zeabur)
 
 mkdir -p "$3"
 output="$(cd "$3" && pwd)"
@@ -50,7 +50,7 @@ target_dir="${CARGO_TARGET_DIR:-$root/target}"
 # compiled in (https://github.com/rust-secure-code/cargo-auditable).
 packages=()
 for binary in "${binaries[@]}"; do packages+=(-p "$binary"); done
-ENGAWA_UI_DIST="$root/web/dist" cargo auditable build --release --locked --target "$target" \
+ZEABUR_UI_DIST="$root/web/dist" cargo auditable build --release --locked --target "$target" \
   --target-dir "$target_dir" --manifest-path "$root/Cargo.toml" "${packages[@]}"
 
 for binary in "${binaries[@]}"; do
@@ -95,12 +95,12 @@ done
 if [[ "$os" == linux ]]; then
   # The same context as scripts/build-image.sh: explicit modes, which COPY keeps.
   context="$work/image"
-  install -D -m 0555 "$target_dir/$target/release/engawa" "$context/engawa"
+  install -D -m 0555 "$target_dir/$target/release/zeabur" "$context/zeabur"
   install -d -m 0755 "$context/etc" "$context/etc/ssl" "$context/etc/ssl/certs"
-  install -m 0444 "${ENGAWA_CA_BUNDLE:?run inside nix develop}" "$context/etc/ssl/certs/ca-certificates.crt"
-  touch -d "@$SOURCE_DATE_EPOCH" "$context/engawa" "$context/etc" "$context/etc/ssl" \
+  install -m 0444 "${ZEABUR_CA_BUNDLE:?run inside nix develop}" "$context/etc/ssl/certs/ca-certificates.crt"
+  touch -d "@$SOURCE_DATE_EPOCH" "$context/zeabur" "$context/etc" "$context/etc/ssl" \
     "$context/etc/ssl/certs" "$context/etc/ssl/certs/ca-certificates.crt"
-  image="engawa:release-$arch"
+  image="zeabur:release-$arch"
   docker build --platform "linux/$arch" --network none --build-arg "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
     --file "$root/Containerfile" --tag "$image" "$context"
   docker image save --output "$output/image.tar" "$image"

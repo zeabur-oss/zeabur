@@ -18,18 +18,18 @@ import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
-import { Badge } from "@engawahq/design-system/components/badge"
-import { Button } from "@engawahq/design-system/components/button"
+import { Badge } from "@zeabur/design-system/components/badge"
+import { Button } from "@zeabur/design-system/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-} from "@engawahq/design-system/components/dialog"
-import { Input } from "@engawahq/design-system/components/input"
-import { Spinner } from "@engawahq/design-system/components/spinner"
-import { Switch } from "@engawahq/design-system/components/switch"
-import { Textarea } from "@engawahq/design-system/components/textarea"
+} from "@zeabur/design-system/components/dialog"
+import { Input } from "@zeabur/design-system/components/input"
+import { Spinner } from "@zeabur/design-system/components/spinner"
+import { Switch } from "@zeabur/design-system/components/switch"
+import { Textarea } from "@zeabur/design-system/components/textarea"
 import { useT } from "@/i18n"
 import { useScrollOnce } from "@/lib/in-view"
 import { addressOf } from "@/lib/objects"

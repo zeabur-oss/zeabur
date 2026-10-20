@@ -106,8 +106,8 @@ describe("without the right to patch the namespace", () => {
 
   test("the kubectl commands add and remove the one label", () => {
     expect(kubectlLabel("shop")).toStrictEqual({
-      adopt: "kubectl label namespace shop engawa.engawahq.dev/project=true",
-      unadopt: "kubectl label namespace shop engawa.engawahq.dev/project-",
+      adopt: "kubectl label namespace shop zeabur.com/project=true",
+      unadopt: "kubectl label namespace shop zeabur.com/project-",
     })
   })
 

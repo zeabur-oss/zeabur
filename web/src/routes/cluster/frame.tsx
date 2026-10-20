@@ -6,11 +6,11 @@ import type { ReactNode } from "react"
 
 import { clusterQuery, upgradesQuery } from "@/api/queries"
 import { StatusPill } from "@/components/status"
-import { Tabs, TabsList, TabsTrigger } from "@engawahq/design-system/components/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { useT } from "@/i18n"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
-import { PageHeader } from "@engawahq/design-system/components/page-header"
+import { PageHeader } from "@zeabur/design-system/components/page-header"
 
 const paths = { overview: "/cluster", components: "/cluster/components" } as const
 

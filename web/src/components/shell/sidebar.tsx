@@ -31,10 +31,10 @@ import { cn } from "@/lib/utils"
 import { projectTitle } from "@/model/project"
 import { countsHealth } from "@/model/service"
 import { cycleTheme, useTheme } from "@/theme"
-import { Logo } from "@engawahq/design-system/components/brand"
-import { Button } from "@engawahq/design-system/components/button"
-import { Menu, MenuContent, MenuItem, MenuTrigger } from "@engawahq/design-system/components/menu"
-import { Popover, PopoverContent, PopoverTrigger } from "@engawahq/design-system/components/popover"
+import { Logo } from "@zeabur/design-system/components/brand"
+import { Button } from "@zeabur/design-system/components/button"
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
+import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
 import {
   Sidebar as SidebarRoot,
   SidebarContent,
@@ -44,12 +44,12 @@ import {
   SidebarItem,
   SidebarSection,
   sidebarItemVariants,
-} from "@engawahq/design-system/components/sidebar"
-import { Tooltip } from "@engawahq/design-system/components/tooltip"
+} from "@zeabur/design-system/components/sidebar"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
 type Destination = "/" | "/cluster" | "/projects" | "/settings"
 
-const manageSection = remembered("engawa.sidebar.manage", false)
+const manageSection = remembered("zeabur.sidebar.manage", false)
 
 interface Item {
   to: Destination
@@ -99,7 +99,7 @@ export function Sidebar() {
           to="/"
           activeOptions={{ exact: true, includeSearch: false }}
           className="flex h-7 items-center rounded-md outline-none"
-          aria-label="engawa"
+          aria-label="zeabur"
         >
           <Logo className="h-4.5" aria-hidden="true" />
         </Link>

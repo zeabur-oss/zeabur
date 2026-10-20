@@ -15,7 +15,7 @@
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
-    "ui": "@engawahq/design-system/components",
+    "ui": "@zeabur/design-system/components",
     "lib": "@/lib",
     "hooks": "@/hooks"
   },

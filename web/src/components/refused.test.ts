@@ -64,8 +64,8 @@ describe("Admin rights", () => {
     }
   })
 
-  test("are never offered for engawa's own refusals or other problems", () => {
-    // "Only from the engawa page", "a plan made by someone else": no answer from the cluster.
+  test("are never offered for Zeabur's own refusals or other problems", () => {
+    // "Only from the Zeabur page", "a plan made by someone else": no answer from the cluster.
     expect(offersElevation(problem("forbidden", false), "available")).toBe(false)
     expect(offersElevation(problem("not-found", true), "available")).toBe(false)
     expect(offersElevation(problem("conflict", false), "available")).toBe(false)
@@ -82,7 +82,7 @@ describe("A refusal", () => {
     for (const body of [
       problem("unavailable", false),
       problem("internal", false),
-      // engawa's own 403 is not a missing permission.
+      // Zeabur's own 403 is not a missing permission.
       problem("forbidden", false),
     ]) {
       const html = render(createElement(Problem, { problem: body }), "available")

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Checks the Helm chart without a cluster: `helm lint`, then what the chart promises in every
-# rendering (no rights for engawa itself, no service account token, one replica, a locked-down container),
-# and that values.schema.json refuses values that would install a broken engawa.
+# rendering (no rights for zeabur itself, no service account token, one replica, a locked-down container),
+# and that values.schema.json refuses values that would install a broken zeabur.
 # Run inside `nix develop`.
 #   scripts/check-chart.sh
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-chart="$root/deploy/chart/engawa"
+chart="$root/deploy/chart/zeabur"
 failures=0
 
 fail() {
@@ -16,7 +16,7 @@ fail() {
 }
 
 render() { # $@ = extra helm arguments
-  helm template engawa "$chart" --namespace engawa "$@"
+  helm template zeabur "$chart" --namespace zeabur "$@"
 }
 
 # Prints the value of a yq expression over every rendered document, one per line.
@@ -35,14 +35,14 @@ for values in "$chart"/ci/*-values.yaml; do
   helm lint --strict --quiet "$chart" -f "$values" >/dev/null || fail "$name: helm lint failed"
   out=$(render -f "$values")
 
-  # engawa has no rights of its own: no ClusterRole, no binding to a ServiceAccount, and no token
-  # in the pod. The one Role the chart may render lets people read engawa's settings: `get` on
-  # the ConfigMap engawa-settings, nothing else.
+  # zeabur has no rights of its own: no ClusterRole, no binding to a ServiceAccount, and no token
+  # in the pod. The one Role the chart may render lets people read zeabur's settings: `get` on
+  # the ConfigMap zeabur-settings, nothing else.
   expect "$name" "$out" '[select(.kind == "ClusterRole" or .kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "RoleBinding") | .subjects[] | select(.kind == "ServiceAccount")] | length' 0
   expect "$name" "$out" \
     'select(.kind == "Role") | .rules[] | [.apiGroups, .resources, .resourceNames, .verbs] | map(join(",")) | join("|")' \
-    '|configmaps|engawa-settings|get'
+    '|configmaps|zeabur-settings|get'
   expect "$name" "$out" 'select(.kind == "ServiceAccount") | .automountServiceAccountToken' false
   dep='select(.kind == "Deployment")'
   pod="$dep | .spec.template.spec"
@@ -63,13 +63,13 @@ for values in "$chart"/ci/*-values.yaml; do
     /api/healthz,/api/healthz
   # The secrets reach the process as files, never as environment values.
   expect "$name" "$out" "[$container | .env[] | select(.valueFrom.secretKeyRef)] | length" 0
-  # Every variable the chart sets is one engawa reads (crates/engawa/src/config.rs).
+  # Every variable the chart sets is one zeabur reads (crates/zeabur/src/config.rs).
   for env in $(query "$out" "$container | .env[].name"); do
-    grep -q "env = \"$env\"" "$root/crates/engawa/src/config.rs" ||
-      fail "$name: engawa does not read $env"
+    grep -q "env = \"$env\"" "$root/crates/zeabur/src/config.rs" ||
+      fail "$name: zeabur does not read $env"
   done
-  # ENGAWA_ELEVATION is parsed as a bool: exactly true or false.
-  expect "$name" "$out" "$container | .env[] | select(.name == \"ENGAWA_ELEVATION\") | .value | test(\"^(true|false)$\")" true
+  # ZEABUR_ELEVATION is parsed as a bool: exactly true or false.
+  expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_ELEVATION\") | .value | test(\"^(true|false)$\")" true
 done
 
 # The plan key: generated when no Secret is named, else the named one is mounted.
@@ -79,16 +79,16 @@ expect minimal "$out" 'select(.kind == "Secret") | .data["plan-key"] | test("^[A
 out=$(render -f "$chart/ci/full-values.yaml")
 expect full "$out" '[select(.kind == "Secret")] | length' 0
 expect full "$out" 'select(.kind == "Deployment") | .spec.template.spec.volumes[] | select(.name == "plan-key") | .secret.secretName' \
-  engawa-plan-key
+  zeabur-plan-key
 
 # The image: the published one at the chart's appVersion, or exactly the digest a release pins
 # (scripts/release-publish.sh).
 image='select(.kind == "Deployment") | .spec.template.spec.containers[0].image'
 app_version=$(yq '.appVersion' "$chart/Chart.yaml")
-expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/engawahq/engawa:$app_version"
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/zeabur/zeabur:$app_version"
 digest="sha256:$(printf '%064d' 0)"
 expect digest "$(render -f "$chart/ci/minimal-values.yaml" --set image.tag=ignored --set image.digest="$digest")" \
-  "$image" "ghcr.io/engawahq/engawa@$digest"
+  "$image" "ghcr.io/zeabur/zeabur@$digest"
 
 # Everyone signed in reads the settings unless that is turned off.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
@@ -104,9 +104,9 @@ refuse() { # $1 = why, $@ = helm arguments
     fail "accepted $why"
   fi
 }
-refuse "a plain http public URL" --set publicUrl=http://engawa.example.test
-refuse "a public URL with a path" --set publicUrl=https://engawa.example.test/ui
-refuse "an issuer with a trailing slash" --set issuer.url=https://genkan.example.test/
+refuse "a plain http public URL" --set publicUrl=http://zeabur.example.test
+refuse "a public URL with a path" --set publicUrl=https://zeabur.example.test/ui
+refuse "an issuer with a trailing slash" --set issuer.url=https://identity.example.test/
 refuse "no client secret" --set issuer.clientSecret.existingSecret=
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm

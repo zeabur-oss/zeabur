@@ -5,23 +5,23 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: engawa-e2e
+  name: zeabur-e2e
   labels:
-    engawa.engawahq.dev/project: "true"
+    zeabur.com/project: "true"
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: talker-secret
-  namespace: engawa-e2e
+  namespace: zeabur-e2e
 stringData:
-  greeting: engawa-e2e-secret
+  greeting: zeabur-e2e-secret
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: talker
-  namespace: engawa-e2e
+  namespace: zeabur-e2e
 spec:
   replicas: 1
   selector:
@@ -36,7 +36,7 @@ spec:
         - name: talker
           image: busybox:1.37
           command:
-            ["sh", "-c", 'i=0; while true; do i=$((i+1)); echo "engawa-e2e-line $i"; sleep 1; done']
+            ["sh", "-c", 'i=0; while true; do i=$((i+1)); echo "zeabur-e2e-line $i"; sleep 1; done']
           env:
             - name: GREETING
               value: hello
@@ -50,7 +50,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: talker
-  namespace: engawa-e2e
+  namespace: zeabur-e2e
 spec:
   selector:
     app: talker
@@ -62,7 +62,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: crasher
-  namespace: engawa-e2e
+  namespace: zeabur-e2e
 spec:
   replicas: 1
   selector:
@@ -76,13 +76,13 @@ spec:
       containers:
         - name: crasher
           image: busybox:1.37
-          command: ["sh", "-c", "echo engawa-e2e-crash; exit 1"]
+          command: ["sh", "-c", "echo zeabur-e2e-crash; exit 1"]
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: editor-config
-  namespace: engawa-e2e
+  namespace: zeabur-e2e
 data:
   mode: blue
   other: untouched
@@ -91,7 +91,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: editor
-  namespace: engawa-e2e
+  namespace: zeabur-e2e
 spec:
   replicas: 1
   selector:
@@ -119,4 +119,4 @@ spec:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: engawa-e2e-adopt
+  name: zeabur-e2e-adopt

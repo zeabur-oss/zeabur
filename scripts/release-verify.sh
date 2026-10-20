@@ -3,10 +3,10 @@
 # rebuilt: the signed checksums, every signature and provenance attestation, the chart's pinned
 # image, then the artifacts themselves. On Linux it installs the published chart on a disposable
 # k3s cluster, whose node pulls the published image (release-smoke.sh); on macOS it runs
-# engawactl. Run inside `nix develop` on Linux amd64/arm64 or macOS arm64; `gh` must be signed in
+# zeaburctl. Run inside `nix develop` on Linux amd64/arm64 or macOS arm64; `gh` must be signed in
 # (the attestations are read from GitHub's API).
 #   scripts/release-verify.sh v0.0.2 downloaded \
-#     https://github.com/engawahq/engawa/.github/workflows/release.yml@refs/tags/v0.0.2
+#     https://github.com/zeabur/zeabur/.github/workflows/release.yml@refs/tags/v0.0.2
 set -euo pipefail
 
 if [[ $# != 3 ]]; then
@@ -29,7 +29,7 @@ case "$(uname -s):$(uname -m)" in
   *) echo "release verification runs on Linux amd64/arm64 or macOS arm64" >&2; exit 2 ;;
 esac
 plain="${version#v}"
-repository="${GITHUB_REPOSITORY:-engawahq/engawa}"
+repository="${GITHUB_REPOSITORY:-zeabur/zeabur}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 # A fresh, empty registry configuration: a publisher's login must not hide a private package.
@@ -40,11 +40,11 @@ attestation=(--repo "$repository" --cert-identity "$identity")
 
 # 1. The checksums: signed by the release workflow at this tag, and covering every asset.
 cosign verify-blob "${certificate[@]}" --bundle "$directory/SHA256SUMS.sigstore.json" "$directory/SHA256SUMS"
-expected=(digests.txt "engawa-$plain.tgz")
+expected=(digests.txt "zeabur-$plain.tgz")
 for build in linux-amd64 linux-arm64 darwin-arm64; do
-  expected+=("engawactl-$version-$build.tar.gz")
+  expected+=("zeaburctl-$version-$build.tar.gz")
 done
-expected+=("engawa-$version-linux-amd64.tar.gz" "engawa-$version-linux-arm64.tar.gz")
+expected+=("zeabur-$version-linux-amd64.tar.gz" "zeabur-$version-linux-arm64.tar.gz")
 listed="$(awk '{ print $2 }' "$directory/SHA256SUMS" | sort)"
 if [[ "$listed" != "$(printf '%s\n' "${expected[@]}" | sort)" ]]; then
   echo "SHA256SUMS does not list exactly the release assets:" >&2
@@ -89,18 +89,18 @@ done
 # 4. The chart in the registry is the checksummed asset, and it installs that image by default.
 mkdir "$work/chart"
 helm pull "oci://$chart" --destination "$work/chart"
-cmp "$work/chart/engawa@sha256-${chart##*@sha256:}.tgz" "$directory/engawa-$plain.tgz"
-values="$(helm show values "$directory/engawa-$plain.tgz")"
+cmp "$work/chart/zeabur@sha256-${chart##*@sha256:}.tgz" "$directory/zeabur-$plain.tgz"
+values="$(helm show values "$directory/zeabur-$plain.tgz")"
 pinned="$(yq '.image.repository + "@" + .image.digest' <<<"$values")"
 [[ "$pinned" == "$image" ]] || { echo "the chart installs $pinned, not $image" >&2; exit 1; }
 
 # 5. The artifacts themselves.
 if [[ "$platform" == linux-* ]]; then
-  "$root/scripts/release-smoke.sh" "$directory/engawactl-$version-$platform.tar.gz" "oci://$chart"
+  "$root/scripts/release-smoke.sh" "$directory/zeaburctl-$version-$platform.tar.gz" "oci://$chart"
 else
-  tar -xOzf "$directory/engawactl-$version-$platform.tar.gz" engawactl >"$work/engawactl"
-  chmod 0755 "$work/engawactl"
-  said="$("$work/engawactl" --version)"
-  [[ "$said" == "engawactl $plain" ]] || { echo "engawactl says '$said'" >&2; exit 1; }
+  tar -xOzf "$directory/zeaburctl-$version-$platform.tar.gz" zeaburctl >"$work/zeaburctl"
+  chmod 0755 "$work/zeaburctl"
+  said="$("$work/zeaburctl" --version)"
+  [[ "$said" == "zeaburctl $plain" ]] || { echo "zeaburctl says '$said'" >&2; exit 1; }
 fi
 echo "release $version verified on $platform"

@@ -3,4 +3,4 @@ operation: mutation.plan
 params:
   request:
     changes:
-      - {"op": "create", "object": {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {"name": "engawa-isolate-web", "labels": {"app.kubernetes.io/managed-by": "engawa"}}, "spec": {"podSelector": {"matchLabels": {"app": "web"}}, "policyTypes": ["Ingress"], "ingress": [{"from": [{"podSelector": {}}]}]}, "status": {"ignored": true}}}
+      - {"op": "create", "object": {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy", "metadata": {"name": "zeabur-isolate-web", "labels": {"app.kubernetes.io/managed-by": "zeabur"}}, "spec": {"podSelector": {"matchLabels": {"app": "web"}}, "policyTypes": ["Ingress"], "ingress": [{"from": [{"podSelector": {}}]}]}, "status": {"ignored": true}}}

@@ -72,7 +72,7 @@ export const en = {
   "elevate.retry": "Retry as admin",
   "elevate.title": "Admin rights",
   "elevate.waiting": "Confirm with your passkey in the new window.",
-  "elevate.notAllowed": "This engawa may not ask for admin rights. Ask your cluster administrator.",
+  "elevate.notAllowed": "This Zeabur may not ask for admin rights. Ask your cluster administrator.",
   "elevate.blocked": "The browser blocked the window. Allow pop-ups for this site, then try again.",
   "elevate.failed": "Admin rights were not granted.",
   "elevate.signedOut": "Your session ended. Sign in again.",
@@ -133,7 +133,7 @@ export const en = {
   "problem.title.invalid": "The cluster rejected the change",
   "problem.title.too-many-requests": "The cluster is busy",
   "problem.title.unavailable": "The cluster cannot be reached",
-  "problem.title.internal": "Something went wrong in engawa",
+  "problem.title.internal": "Something went wrong in Zeabur",
   "problem.fix.bad-request": "Check the request and try again.",
   "problem.fix.unauthenticated": "Sign in again.",
   "problem.fix.signed-out": "Sign in again.",
@@ -155,7 +155,7 @@ export const en = {
   "problem.fix.unavailable":
     "Check that the cluster is running and that this machine can reach it.",
   "problem.fix.internal": "Try again; if it keeps happening, report it with the details.",
-  "problem.detail": "engawa's message",
+  "problem.detail": "Zeabur's message",
   "problem.about": "What this kind of problem means",
   "problem.retryAfter": (s: number) => `The cluster asked to wait ${waitEn(s)}.`,
   // A problem type's page (/problems/{kind}): the rule behind it
@@ -163,15 +163,15 @@ export const en = {
   "problemPage.rule": "The rule",
   "problemPage.kubernetes": "In the Kubernetes documentation",
   "problemPage.rule.bad-request":
-    "engawa checks each request before anything reaches the cluster: what it asks to change must be complete and well formed. A request that is not is refused, and nothing is written.",
+    "Zeabur checks each request before anything reaches the cluster: what it asks to change must be complete and well formed. A request that is not is refused, and nothing is written.",
   "problemPage.rule.unauthenticated":
     "Every request reaches the cluster with your own sign-in. When the cluster no longer accepts it (it expired, or was revoked), nothing can be read or changed until you sign in again.",
   "problemPage.rule.signed-out":
-    "Your engawa session ended, so engawa holds no sign-in to act with for you. Nothing is read or changed until you sign in again.",
+    "Your Zeabur session ended, so Zeabur holds no sign-in to act with for you. Nothing is read or changed until you sign in again.",
   "problemPage.rule.forbidden":
-    "The cluster decides what each person may do, by rules (RBAC) that say who may read or change which kinds of objects, in which projects. engawa acts only with your own rights: what they do not allow, it cannot do for you.",
+    "The cluster decides what each person may do, by rules (RBAC) that say who may read or change which kinds of objects, in which projects. Zeabur acts only with your own rights: what they do not allow, it cannot do for you.",
   "problemPage.rule.elevation-required":
-    "Your everyday rights do not allow this, but this engawa can give you admin rights for a short time once you confirm with your passkey. Everything you do then uses them, until they end or you drop them.",
+    "Your everyday rights do not allow this, but this Zeabur can give you admin rights for a short time once you confirm with your passkey. Everything you do then uses them, until they end or you drop them.",
   "problemPage.rule.quota-exceeded":
     "A project can have limits on what all its services may reserve together: CPU, memory, the number of replicas or objects. The cluster refuses a change that would go over them, whatever your rights.",
   "problemPage.rule.policy-denied":
@@ -181,11 +181,11 @@ export const en = {
   "problemPage.rule.log-unavailable":
     "The cluster keeps a container's log for its current run and the run before, and only while its replica exists. A log never written, or one whose replica is gone, cannot be read.",
   "problemPage.rule.conflict":
-    "engawa writes a change only onto the version you reviewed. When someone or something (a deploy tool, an autoscaler) changed the object after that, nothing is written, so no one's change is lost.",
+    "Zeabur writes a change only onto the version you reviewed. When someone or something (a deploy tool, an autoscaler) changed the object after that, nothing is written, so no one's change is lost.",
   "problemPage.rule.managed":
-    "Another tool (Helm, Argo CD, Flux) owns this object and puts its own version back at its next sync or upgrade. A change made here would be undone, so engawa refuses it.",
+    "Another tool (Helm, Argo CD, Flux) owns this object and puts its own version back at its next sync or upgrade. A change made here would be undone, so Zeabur refuses it.",
   "problemPage.rule.plan-expired":
-    "A plan is what engawa will write, as you reviewed it. It holds for a few minutes only, so what is applied still matches the cluster as it is.",
+    "A plan is what Zeabur will write, as you reviewed it. It holds for a few minutes only, so what is applied still matches the cluster as it is.",
   "problemPage.rule.system-namespace":
     "Kubernetes keeps some namespaces for its own components (kube-system, kube-public, kube-node-lease). They cannot become projects.",
   "problemPage.rule.invalid":
@@ -193,9 +193,9 @@ export const en = {
   "problemPage.rule.too-many-requests":
     "The cluster limits how many requests it serves at once, so it stays responsive. It turned this one away for now; nothing was changed.",
   "problemPage.rule.unavailable":
-    "engawa could not reach the cluster's API server: it may be down or restarting, or out of reach from where engawa runs.",
+    "Zeabur could not reach the cluster's API server: it may be down or restarting, or out of reach from where Zeabur runs.",
   "problemPage.rule.internal":
-    "Something failed inside engawa itself, not in the cluster. The details hold what engawa knows about it.",
+    "Something failed inside Zeabur itself, not in the cluster. The details hold what Zeabur knows about it.",
   "refused.admin": "This needs admin rights.",
   "refused.adminFor": (what: string) => `${what} needs admin rights.`,
   "refused.rights": "This needs more rights.",
@@ -956,7 +956,7 @@ export const en = {
   "fix.isolateProject": (project: string) => `Isolate the services of ${project}`,
   "gap.unreadable": "Some checks need rights you don't have.",
   "install.title": "Install",
-  "install.note": "engawa runs none of this. Run it, or commit it to your GitOps repository.",
+  "install.note": "Zeabur runs none of this. Run it, or commit it to your GitOps repository.",
   "install.profile": "Profile",
   "install.singleNode": "Single node",
   "install.multiNode": "Several nodes",
@@ -1089,10 +1089,10 @@ export const en = {
   "usage.installVm": "Install VictoriaMetrics",
   "usage.chooseStore": "Choose another store",
   "usage.needsStoreHint": (service: string) =>
-    `engawa looked for ${service}. Any Prometheus-compatible store works (Prometheus, VictoriaMetrics); its Service is set in Settings.`,
+    `Zeabur looked for ${service}. Any Prometheus-compatible store works (Prometheus, VictoriaMetrics); its Service is set in Settings.`,
   "usage.whatHistory": "Seeing usage history",
   "usage.proxyHint":
-    "engawa reads the metrics store through the Kubernetes API as you. Whoever may do so can read every project's metrics, so it is usually kept to administrators.",
+    "Zeabur reads the metrics store through the Kubernetes API as you. Whoever may do so can read every project's metrics, so it is usually kept to administrators.",
   "usage.storeUnavailable": "The metrics store did not answer.",
   "usage.noSeries": (name: string, range: string) => `No samples for ${name} in the last ${range}.`,
   "usage.noSeriesHint":
@@ -1102,16 +1102,16 @@ export const en = {
   "usage.stepMinutes": (n: number) => `a point every ${n} min`,
   "usage.tenancy": "Who can see this",
   "usage.tenancyHint":
-    "engawa asks only for this project's replicas. The store itself is not split by project: anyone allowed to open it can read every project's metrics.",
+    "Zeabur asks only for this project's replicas. The store itself is not split by project: anyone allowed to open it can read every project's metrics.",
   "usage.loadingChart": "Loading the chart",
 
   // Settings: the metrics store
   "settings.metricsStore": "Usage history",
   "settings.store": "History source",
   "settings.storeHint":
-    "The Service history is read from, as namespace/name:port. Any store with the Prometheus HTTP API works. engawa reads it through the Kubernetes API as each person.",
+    "The Service history is read from, as namespace/name:port. Any store with the Prometheus HTTP API works. Zeabur reads it through the Kubernetes API as each person.",
   "settings.storeDefault": "Default",
-  "settings.storeChosen": "Chosen in engawa",
+  "settings.storeChosen": "Chosen in Zeabur",
   "settings.storeState": "Status",
   "settings.storeState.available": "Answers",
   "settings.storeState.not-configured": "Not found",
@@ -1123,11 +1123,11 @@ export const en = {
   "settings.storeWho": "Usually only cluster administrators can change this.",
   "settings.storeWhereLabel": "Where this is kept",
   "settings.storeWhere": (namespace: string) =>
-    `Kept in the ConfigMap engawa-settings in namespace ${namespace}: whoever may change that ConfigMap may change this.`,
+    `Kept in the ConfigMap zeabur-settings in namespace ${namespace}: whoever may change that ConfigMap may change this.`,
   "settings.storeDenied": "You may not change it.",
   "settings.storeChange": "Changing the history source",
   "settings.storeLocal":
-    "engawa runs on this computer and keeps no settings. Start it with --metrics-service namespace/name:port to use another store.",
+    "Zeabur runs on this computer and keeps no settings. Start it with --metrics-service namespace/name:port to use another store.",
   "settings.storeTenancy":
     "Whoever may read the store can read every project's metrics. Grant it only to people who may see the whole cluster.",
   // Sentences the server names by key (diagnoses, gaps, problems), with their values: the
@@ -1271,8 +1271,8 @@ export const en = {
     p.reason ? `${p.service} is failing (${p.reason}).` : `${p.service} is failing.`,
   "sentence.diagnosis.unexplained.why": (p: P) =>
     p.reason
-      ? `engawa has no explanation for the state the cluster reports, ${p.reason}.`
-      : "engawa has no explanation for the state the cluster reports.",
+      ? `Zeabur has no explanation for the state the cluster reports, ${p.reason}.`
+      : "Zeabur has no explanation for the state the cluster reports.",
   "sentence.diagnosis.unexplained.fix": () => "Its events and logs may say more.",
   "sentence.problem.summary.bad-request": () => "The request isn't valid.",
   "sentence.problem.summary.unauthenticated": () => "The cluster didn't accept your sign-in.",
@@ -1297,7 +1297,7 @@ export const en = {
     p.name ? `The cluster refused the change to ${p.name}.` : "The cluster refused the change.",
   "sentence.problem.summary.too-many-requests": () => "The cluster is busy.",
   "sentence.problem.summary.unavailable": () => "The cluster can't be reached.",
-  "sentence.problem.summary.internal": () => "Something went wrong in engawa.",
+  "sentence.problem.summary.internal": () => "Something went wrong in zeabur.",
   "sentence.problem.summary.quota-exceeded": (p: P) =>
     p.name
       ? `The change to ${p.name} would go over the project's limit.`

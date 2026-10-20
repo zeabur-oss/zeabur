@@ -1,0 +1,25 @@
+[package]
+name = "zeabur-test-support"
+description = "zeabur: test helpers (fixture loading, the cluster tests' sandbox)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# The cluster tests' sandbox, which needs a kube client; the fixture tests do without it.
+sandbox = ["dep:zeabur-core", "dep:zeabur-kube", "dep:kube", "dep:tokio"]
+
+[dependencies]
+zeabur-core = { workspace = true, optional = true }
+zeabur-kube = { workspace = true, optional = true }
+kube = { workspace = true, optional = true }
+serde.workspace = true
+serde-saphyr.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, optional = true }

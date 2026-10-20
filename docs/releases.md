@@ -1,6 +1,6 @@
 # Releases
 
-engawa is released from CI only, by `.github/workflows/release.yml`, when a maintainer pushes a
+Zeabur is released from CI only, by `.github/workflows/release.yml`, when a maintainer pushes a
 tag `v<version>`. The workflow publishes the image and the chart, and leaves a **draft** GitHub
 release; a maintainer checks the draft and publishes it by hand. CI never publishes a release.
 
@@ -13,16 +13,16 @@ tag v0.0.2 ─▶ CI ─▶ build (Linux amd64/arm64, macOS arm64) ─▶ smoke 
 
 | Artifact | Where |
 |---|---|
-| Image, linux/amd64 and linux/arm64 | `ghcr.io/engawahq/engawa:<version>`; install by the index digest in `digests.txt` |
-| Helm chart, its default image pinned to that digest | `oci://ghcr.io/engawahq/charts/engawa`, version `<version>`; also the asset `engawa-<version>.tgz` |
-| `engawactl`, Linux amd64 and arm64 (static, musl), macOS arm64 (Apple silicon) | `engawactl-v<version>-<os>-<arch>.tar.gz` |
-| `engawa`, the server binary in the image, Linux amd64 and arm64 | `engawa-v<version>-linux-<arch>.tar.gz` |
+| Image, linux/amd64 and linux/arm64 | `ghcr.io/zeabur/zeabur:<version>`; install by the index digest in `digests.txt` |
+| Helm chart, its default image pinned to that digest | `oci://ghcr.io/zeabur/charts/zeabur`, version `<version>`; also the asset `zeabur-<version>.tgz` |
+| `zeaburctl`, Linux amd64 and arm64 (static, musl), macOS arm64 (Apple silicon) | `zeaburctl-v<version>-<os>-<arch>.tar.gz` |
+| `zeabur`, the server binary in the image, Linux amd64 and arm64 | `zeabur-v<version>-linux-<arch>.tar.gz` |
 | Digests of the image index, each platform's image and the chart | `digests.txt` |
 | Checksums of every asset above, and their signature | `SHA256SUMS`, `SHA256SUMS.sigstore.json` |
 
 The registry also keeps each platform image under a tag `candidate-<run>-<attempt>-<arch>`,
 the run that pushed it before it joined the index. Every archive holds the binary and `LICENSE`.
-There is no macOS `engawa`: the server runs only in a pod. macOS builds are for Apple silicon
+There is no macOS `zeabur`: the server runs only in a pod. macOS builds are for Apple silicon
 only. The image, its two platform images, the chart and `SHA256SUMS` are signed keyless with
 [Sigstore](https://docs.sigstore.dev/) by the release workflow at the release's tag. The image,
 the chart and every asset carry a
@@ -31,27 +31,27 @@ from the same workflow.
 
 The macOS build is not notarized by Apple. A file downloaded in a browser is quarantined and
 refused; `gh release download` and `curl` do not quarantine. For a browser download, check it as
-below, then `xattr -d com.apple.quarantine engawactl`.
+below, then `xattr -d com.apple.quarantine zeaburctl`.
 
-## Download and verify engawactl
+## Download and verify zeaburctl
 
 With `gh`, `cosign` 3 and GNU `sha256sum` (all in `nix develop`):
 
 ```sh
 version=0.0.2
 platform=darwin-arm64     # linux-amd64, linux-arm64
-identity="https://github.com/engawahq/engawa/.github/workflows/release.yml@refs/tags/v$version"
-gh release download "v$version" --repo engawahq/engawa --dir "engawa-$version" \
+identity="https://github.com/zeabur/zeabur/.github/workflows/release.yml@refs/tags/v$version"
+gh release download "v$version" --repo zeabur/zeabur --dir "zeabur-$version" \
   --pattern SHA256SUMS --pattern SHA256SUMS.sigstore.json \
-  --pattern "engawactl-v$version-$platform.tar.gz"
-cd "engawa-$version"
+  --pattern "zeaburctl-v$version-$platform.tar.gz"
+cd "zeabur-$version"
 cosign verify-blob --bundle SHA256SUMS.sigstore.json --certificate-identity "$identity" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
-gh attestation verify "engawactl-v$version-$platform.tar.gz" --repo engawahq/engawa \
+gh attestation verify "zeaburctl-v$version-$platform.tar.gz" --repo zeabur/zeabur \
   --cert-identity "$identity"
-tar -xzf "engawactl-v$version-$platform.tar.gz" engawactl
-./engawactl --version
+tar -xzf "zeaburctl-v$version-$platform.tar.gz" zeaburctl
+./zeaburctl --version
 ```
 
 The image and the chart: [Install in a cluster](install.md), step 1.
@@ -60,7 +60,7 @@ The image and the chart: [Install in a cluster](install.md), step 1.
 
 1. On a branch, set the version in `Cargo.toml` (`[workspace.package]`, then
    `nix develop -c cargo update --workspace` for `Cargo.lock`) and in
-   `deploy/chart/engawa/Chart.yaml` (`version` and `appVersion`, without the `v`). Rename
+   `deploy/chart/zeabur/Chart.yaml` (`version` and `appVersion`, without the `v`). Rename
    `## [Unreleased]` in `CHANGELOG.md` to `## [<version>] - <date>` and add its link at the end;
    that section becomes the release notes. Merge the pull request to `main`.
 2. Rehearse: **Actions → Release → Run workflow** on `main` with the version, `v<version>`. It
@@ -79,12 +79,12 @@ The image and the chart: [Install in a cluster](install.md), step 1.
    The `verify` jobs have downloaded the draft's assets on fresh runners, checked every
    signature, checksum and attestation without a registry login, installed the published chart
    on a new k3s cluster on Linux amd64 and arm64, whose node pulled the published image, and run
-   `engawactl` on macOS arm64.
+   `zeaburctl` on macOS arm64.
 6. Check the draft: the notes, the asset list, the digests. Optionally install it on a cluster of
    your own as [Install in a cluster](install.md) describes.
 7. Publish it: on the release page, **Edit → Publish release**, or
-   `gh release edit v0.0.2 --repo engawahq/engawa --draft=false`. It stays marked as a
-   pre-release while engawa is before 1.0. Then download it once without signing in and repeat
+   `gh release edit v0.0.2 --repo zeabur/zeabur --draft=false`. It stays marked as a
+   pre-release while Zeabur is before 1.0. Then download it once without signing in and repeat
    the checks above against the public release.
 
 The tag must match `Cargo.toml` and `Chart.yaml`, `CHANGELOG.md` must have its section, and the
@@ -95,7 +95,7 @@ commit must be on `main`; otherwise the run stops before building.
 These are repository and organisation settings, not files; a maintainer sets them once.
 
 - **Package visibility.** A public repository does not make its packages public. The first
-  release run creates the packages `engawa` and `charts/engawa` on ghcr.io, private by default,
+  release run creates the packages `zeabur` and `charts/zeabur` on ghcr.io, private by default,
   so its `verify` jobs fail: they pull without a login on purpose. Make both packages public
   (package settings → **Change visibility**) and confirm that the repository has write access
   under **Manage Actions access**, then run verify-only as below.
@@ -121,7 +121,7 @@ already exists.
   `main`), then run a new verification with the scripts of `main` against the existing assets:
 
   ```sh
-  gh workflow run release.yml --repo engawahq/engawa --ref main \
+  gh workflow run release.yml --repo zeabur/zeabur --ref main \
     -f version=v0.0.2 -F verify_only=true
   ```
 

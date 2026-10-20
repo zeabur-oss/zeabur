@@ -11,12 +11,12 @@ import LockSimpleIcon from "~icons/ph/lock-simple"
 import type { Problem, Schemas } from "@/api/client"
 import { sessionQuery } from "@/api/queries"
 import { retryAsAdmin } from "@/auth/elevation"
-import { Button } from "@engawahq/design-system/components/button"
+import { Button } from "@zeabur/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@engawahq/design-system/components/collapsible"
+} from "@zeabur/design-system/components/collapsible"
 import { useT } from "@/i18n"
 import { en } from "@/i18n/en"
 import { cn } from "@/lib/utils"

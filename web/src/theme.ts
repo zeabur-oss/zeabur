@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react"
 
 export type ThemeChoice = "system" | "light" | "dark"
 
-const key = "engawa.theme"
+const key = "zeabur.theme"
 const query = window.matchMedia("(prefers-color-scheme: dark)")
 const listeners = new Set<() => void>()
 

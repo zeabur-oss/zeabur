@@ -5,5 +5,5 @@ params:
     changes:
       - op: delete
         resource: {group: networking.k8s.io, version: v1, resource: networkpolicies}
-        name: engawa-isolate-web
+        name: zeabur-isolate-web
         resourceVersion: "70"

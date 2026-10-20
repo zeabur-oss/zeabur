@@ -7,7 +7,7 @@ import { Link } from "@tanstack/react-router"
 import { useT } from "@/i18n"
 import type { ProjectEntry } from "@/lib/place"
 import { cn } from "@/lib/utils"
-import { PageHeader } from "@engawahq/design-system/components/page-header"
+import { PageHeader } from "@zeabur/design-system/components/page-header"
 
 const everyday: { entry: ProjectEntry; to: string }[] = [
   { entry: "overview", to: "/projects/$project" },

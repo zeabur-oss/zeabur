@@ -32,7 +32,7 @@ cargo deny --locked check
 (cd web && bun run lint && bun run knip && bun run test && bun run gen:api)
 git diff --exit-code -- web/src/api/schema.d.ts     # the generated API types are up to date
 ./scripts/ui-budget.sh
-ENGAWA_UI_DIST="$PWD/web/dist" cargo build --release --locked -p engawa -p engawactl
+ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
 ```
 
 `bun run knip` finds unused files, exports and dependencies in `web/`; `bun run test` runs the
@@ -47,10 +47,10 @@ for each rule or term it relaxes. Any warning fails the check.
 When you change the vendored recommendations or their pin, also run the check that compares them
 with their upstream (it downloads it; `.github/workflows/vendored.yml` runs it only for such
 changes). The files vendored for the interface's styles are checked in
-[engawahq/design-system](https://github.com/engawahq/design-system).
+[zeabur/design-system](https://github.com/zeabur/design-system).
 
 ```sh
-./scripts/check-recommendations.sh
+./scripts/check-catalog.sh
 ```
 
 Every CI job is a call to `scripts/ci.sh <job>` (`scripts/ci.sh --list` names them), which enters
@@ -61,7 +61,7 @@ and prints one result line per job; use a disposable machine or VM for the clust
 
 Design rationale lives next to the code, in rustdoc: state the decision and its reason, and
 cite the specification section, paper or prior art it rests on (the crates show the style).
-Never cite something you have not read; write "not verified" instead. Every claim that engawa
+Never cite something you have not read; write "not verified" instead. Every claim that Zeabur
 does something better or safer is backed by a test, not only by documentation. Documentation is
 written in English.
 
@@ -136,7 +136,7 @@ the same delay.
 A dependency that reaches the shipped binaries and contains `unsafe` code or builds native code
 needs an entry in `supply-chain/unsafe-allowlist.toml` with a reason and the date a maintainer
 approved it. `scripts/unsafe-report.sh` scans the shipped dependency graph (normal and build
-dependencies of `engawa` and `engawactl` for the image target), lists every such crate and fails
+dependencies of `zeabur` and `zeaburctl` for the image target), lists every such crate and fails
 on one that is not approved; an entry marked `pending` is a proposal awaiting review. The count
 is a review signal, not an audit.
 
@@ -152,37 +152,37 @@ What to test, at which level, and what not to test: [docs/testing.md](docs/testi
 
 ### Disposable k3d cluster
 
-Run from the engawa checkout on a Linux machine or VM with Docker running, Nix with flakes, and
+Run from the Zeabur checkout on a Linux machine or VM with Docker running, Nix with flakes, and
 permission to use Docker. Enter `nix develop` for the tools, including k3d and kubectl. Do not use
 a production cluster: the tests create and delete namespaces, service accounts and RBAC.
 
 ```sh
 nix develop
 export KUBECONFIG=$(mktemp)
-k3d cluster create engawa --image rancher/k3s:v1.36.5-k3s1 --no-lb --wait --timeout 300s
-docker pull busybox:1.37 && k3d image import busybox:1.37 --cluster engawa
+k3d cluster create zeabur --image rancher/k3s:v1.36.5-k3s1 --no-lb --wait --timeout 300s
+docker pull busybox:1.37 && k3d image import busybox:1.37 --cluster zeabur
 kubectl get nodes                         # Ready
 cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
-./scripts/build-ui.sh && ./scripts/e2e-ui.sh   # browser tests of engawactl ui (Playwright)
+./scripts/build-ui.sh && ./scripts/e2e-ui.sh   # browser tests of zeaburctl ui (Playwright)
 ```
 
 Each cluster test works in a namespace of its own with a person in it, from
-`engawa-test-support`'s `sandbox`, and deletes it when it ends. The separate kubeconfig prevents
+`zeabur-test-support`'s `sandbox`, and deletes it when it ends. The separate kubeconfig prevents
 k3d from changing your normal cluster context. When finished:
 
 ```sh
-k3d cluster delete engawa
+k3d cluster delete zeabur
 ```
 
-### engawa in a cluster with Genkan
+### Zeabur in a cluster with Zeabur Identity
 
-`scripts/e2e-l2.sh` (the `kubernetes-l2` job) creates a cluster of its own, `engawa-l2`, installs
-Genkan and engawa from their images (engawa with its chart) behind Traefik over HTTPS, and drives
+`scripts/e2e-l2.sh` (the `kubernetes-l2` job) creates a cluster of its own, `zeabur-l2`, installs
+Zeabur Identity and Zeabur from their images (Zeabur with its chart) behind Traefik over HTTPS, and drives
 a browser through passkey sign-in, a terminal confirmed with the passkey again, and reads and
-changes with admin rights. It builds Genkan from a checkout next to this one (`GENKAN_SRC`,
-default `../genkan`) at the commit in `GENKAN_PINNED`, refusing a checkout at another commit, and
-uses port 443 on the machine. To move to a newer Genkan, check it out, write its commit to
-`GENKAN_PINNED`, and run the script.
+changes with admin rights. It builds Zeabur Identity from a checkout next to this one (`ZEABUR_IDENTITY_SRC`,
+default `../identity`) at the commit in `ZEABUR_IDENTITY_PINNED`, refusing a checkout at another commit, and
+uses port 443 on the machine. To move to a newer Zeabur Identity, check it out, write its commit to
+`ZEABUR_IDENTITY_PINNED`, and run the script.
 
 ```sh
 nix develop -c ./scripts/e2e-l2.sh
@@ -195,23 +195,23 @@ with a few example projects, on `127.0.0.1:8080`) and Vite's dev server, which f
 to it:
 
 ```sh
-cargo run -p engawa-api --example demo
+cargo run -p zeabur-api --example demo
 (cd web && bun ci && bun run dev)
 ```
 
-The example's documentation (`crates/engawa-api/examples/demo.rs`) lists the variables that
+The example's documentation (`crates/zeabur-api/examples/demo.rs`) lists the variables that
 refuse reads or offer admin rights, to see those states.
 
 Components, tokens and fonts come from
-[engawahq/design-system](https://github.com/engawahq/design-system), a Git dependency pinned to a
+[zeabur/design-system](https://github.com/zeabur/design-system), a Git dependency pinned to a
 commit in `web/package.json`. It ships its sources, which Vite compiles like the interface's own
 (`web/vite.config.ts`). To change a component, change it there, then move the pin:
 
 ```sh
-(cd web && bun add 'github:engawahq/design-system#<commit>')
+(cd web && bun add 'github:zeabur/design-system#<commit>')
 ```
 
 To try a design-system change here before it is pushed, link a checkout next to this one with
 `bun link` (see its README), and run `bun install` afterwards to return to the pin.
 
-A release binary embeds the built interface; see the `engawa-ui` crate documentation.
+A release binary embeds the built interface; see the `zeabur-ui` crate documentation.

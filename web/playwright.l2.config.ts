@@ -1,7 +1,7 @@
-// End-to-end tests of engawa in a cluster with Genkan (e2e/l2/), run by scripts/e2e-l2.sh:
+// End-to-end tests of Zeabur in a cluster with Zeabur Identity (e2e/l2/), run by scripts/e2e-l2.sh:
 //
-//   ENGAWA_L2_URL   engawa's public URL, https://engawa.localhost
-//   ENGAWA_L2_SPKI  base64 SHA-256 of the test certificate's public key (SubjectPublicKeyInfo)
+//   ZEABUR_L2_URL   Zeabur's public URL, https://zeabur.localhost
+//   ZEABUR_L2_SPKI  base64 SHA-256 of the test certificate's public key (SubjectPublicKeyInfo)
 //
 // Both host names end in `.localhost` and reach the cluster's ingress on this machine's port 443
 // (`--host-resolver-rules`). The certificate comes from a CA the script makes; naming its key in
@@ -10,10 +10,10 @@
 // do. Chromium honours that switch only with `--user-data-dir`, which Playwright always passes.
 import { defineConfig, devices } from "@playwright/test"
 
-const url = process.env.ENGAWA_L2_URL
-if (!url) throw new Error("ENGAWA_L2_URL is not set")
-const spki = process.env.ENGAWA_L2_SPKI
-if (!spki) throw new Error("ENGAWA_L2_SPKI is not set")
+const url = process.env.ZEABUR_L2_URL
+if (!url) throw new Error("ZEABUR_L2_URL is not set")
+const spki = process.env.ZEABUR_L2_SPKI
+if (!spki) throw new Error("ZEABUR_L2_SPKI is not set")
 
 export default defineConfig({
   testDir: "e2e/l2",

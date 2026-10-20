@@ -1,5 +1,5 @@
 // What a project or the cluster is missing: each gap with its sentence, the object it is about,
-// the guidance it rests on, and its fix. A fix engawa can write opens a plan; an install links to
+// the guidance it rests on, and its fix. A fix Zeabur can write opens a plan; an install links to
 // the component's install texts; otherwise the server's YAML snippet is there to copy.
 import { Link } from "@tanstack/react-router"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
@@ -9,12 +9,12 @@ import WrenchIcon from "~icons/ph/wrench"
 import type { Schemas } from "@/api/client"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
-import { Button, buttonVariants } from "@engawahq/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@engawahq/design-system/components/collapsible"
+} from "@zeabur/design-system/components/collapsible"
 import { YamlBlock } from "@/components/yaml"
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
