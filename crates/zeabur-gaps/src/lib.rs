@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 mod diagnose;
+mod durability;
 mod event;
 mod incident;
 mod rules;
@@ -8,6 +9,7 @@ mod snippet;
 mod trace;
 
 pub use diagnose::{Namespace, RECENT, diagnose};
+pub use durability::EphemeralData;
 pub use event::Event;
 pub use incident::{
     Component, ComponentKind, NodeState, Reach, Wide, components, incidents, link, link_project,
