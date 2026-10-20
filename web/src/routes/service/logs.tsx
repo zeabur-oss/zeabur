@@ -32,6 +32,7 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
+  EmptyTitle,
 } from "@zeabur/design-system/components/empty"
 import { Illustration } from "@zeabur/design-system/components/illustration"
 import { Select } from "@zeabur/design-system/components/select"
@@ -105,9 +106,12 @@ export function LogsTab({
 
   if (!pod) {
     return (
-      <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed p-8 text-sm text-muted-foreground">
-        {t("logs.noPods")}
-      </div>
+      <Empty variant="outline">
+        <EmptyHeader>
+          <EmptyTitle>{t("logs.noPods")}</EmptyTitle>
+          <EmptyDescription>{t("logs.noPodsBody")}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
 

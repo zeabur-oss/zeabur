@@ -70,7 +70,8 @@ export function ProjectsPage() {
                 <EmptyMedia>
                   <Illustration kind="empty" seed="projects" />
                 </EmptyMedia>
-                <EmptyDescription>{t("cluster.noProjects")}</EmptyDescription>
+                <EmptyTitle>{t("cluster.noProjects")}</EmptyTitle>
+                <EmptyDescription>{t("projects.noneBody")}</EmptyDescription>
               </EmptyHeader>
             </Empty>
           )}

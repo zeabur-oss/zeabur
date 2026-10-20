@@ -10,6 +10,12 @@ import { sessionQuery, whoamiQuery } from "@/api/queries"
 import { Problem } from "@/components/problem"
 import { Refused } from "@/components/refused"
 import { Button } from "@zeabur/design-system/components/button"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+} from "@zeabur/design-system/components/empty"
 import { Select } from "@zeabur/design-system/components/select"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
@@ -48,9 +54,12 @@ export function TerminalTab({
 
   if (!pod) {
     return (
-      <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed p-8 text-sm text-muted-foreground">
-        {t("logs.noPods")}
-      </div>
+      <Empty variant="outline">
+        <EmptyHeader>
+          <EmptyTitle>{t("logs.noPods")}</EmptyTitle>
+          <EmptyDescription>{t("terminal.noPodsBody")}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     )
   }
   const url = terminalUrl(window.location, project, pod.name, chosen)

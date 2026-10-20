@@ -34,6 +34,7 @@ import {
   shownCoverage,
   useBackups,
 } from "@/components/backups"
+import { NoServices } from "@/components/no-services"
 import { useT } from "@/i18n"
 import { podEventsLink, podLogsLink, serviceLink } from "@/lib/place"
 import { useProjectSummary } from "@/lib/project-name"
@@ -92,6 +93,9 @@ function Overview({
       <Health project={project} data={data} />
       <div className="flex flex-wrap items-start gap-x-8 gap-y-7">
         <div className="flex min-w-0 flex-main flex-col gap-7">
+          {data.services.length === 0 && refused(refusedPlaces.services).length === 0 ? (
+            <NoServices project={project} />
+          ) : null}
           <Failing project={project} services={data.services} />
           <ServicesSummary
             project={project}
@@ -214,9 +218,7 @@ function Health({ project, data }: { project: string; data: Project }) {
             <Stat label={t("metric.restarts")} value={summary.restarts} />
           </StatGroup>
         </>
-      ) : (
-        <p className="text-muted-foreground">{t("project.noServices")}</p>
-      )}
+      ) : null}
     </section>
   )
 }
@@ -526,15 +528,12 @@ function Domains({
 }) {
   const t = useT()
   const domains = summarise(data).domains
+  if (domains.length === 0 && refused.length === 0) return null
   return (
     <section aria-labelledby="overview-domains" className="flex flex-col gap-1">
       <Heading id="overview-domains" title={t("common.domains")} count={domains.length} />
       <RefusedKinds unreadable={refused} line />
-      {domains.length === 0 ? (
-        refused.length > 0 ? null : (
-          <p className="border-t border-rule py-2.75 text-muted-foreground">{t("domains.none")}</p>
-        )
-      ) : (
+      {domains.length === 0 ? null : (
         <ul className="flex flex-col">
           {domains.map((domain) => {
             const Lock = domain.https ? LockSimpleIcon : LockSimpleOpenIcon
@@ -598,6 +597,7 @@ function Storage({
   const total = sized.reduce((sum, c) => sum + (c.bytes ?? 0), 0)
   const anyKnown = sized.some((c) => c.bytes !== undefined)
   const [totalValue, totalUnit] = memoryParts(total)
+  if (claims.length === 0 && refused.length === 0) return null
   return (
     <section aria-labelledby="overview-storage" className="flex flex-col gap-1">
       <Heading
@@ -606,11 +606,7 @@ function Storage({
         count={anyKnown ? t("storage.requestedTotal", `${totalValue} ${totalUnit}`) : undefined}
       />
       <RefusedKinds unreadable={refused} line />
-      {claims.length === 0 ? (
-        refused.length > 0 ? null : (
-          <p className="border-t border-rule py-2.75 text-muted-foreground">{t("storage.none")}</p>
-        )
-      ) : (
+      {claims.length === 0 ? null : (
         <>
           {total > 0 ? (
             <div className="my-1.5">

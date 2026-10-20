@@ -28,9 +28,11 @@ import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
+  EmptyTitle,
 } from "@zeabur/design-system/components/empty"
 import { Illustration } from "@zeabur/design-system/components/illustration"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
@@ -350,8 +352,14 @@ function ProjectsSection({
             <EmptyMedia>
               <Illustration kind="empty" seed="projects" />
             </EmptyMedia>
-            <EmptyDescription>{t("cluster.noProjects")}</EmptyDescription>
+            <EmptyTitle>{t("cluster.noProjects")}</EmptyTitle>
+            <EmptyDescription>{t("cluster.noProjectsBody")}</EmptyDescription>
           </EmptyHeader>
+          <EmptyContent>
+            <Link to="/projects" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              {t("cluster.openProjects")}
+            </Link>
+          </EmptyContent>
         </Empty>
       ) : (
         <ProjectCollection projects={shown} label={t("shell.projects")} />

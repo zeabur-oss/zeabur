@@ -303,7 +303,9 @@ function ObjectList({
             <EmptyMedia>
               <Illustration kind={needle ? "no-results" : "empty"} seed="objects" />
             </EmptyMedia>
-            <EmptyDescription>{t("objects.none")}</EmptyDescription>
+            <EmptyDescription>
+              {needle ? t("objects.noMatch", query.trim()) : t("objects.none")}
+            </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (

@@ -11,6 +11,7 @@ import PlusIcon from "~icons/ph/plus"
 import { Hint } from "@/components/bits"
 import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot, useStatusWord } from "@/components/status"
+import { NoServices } from "@/components/no-services"
 import { useT } from "@/i18n"
 import { canvasViewport, type Viewport } from "@/lib/stores"
 import { cn } from "@/lib/utils"
@@ -59,8 +60,8 @@ function Architecture({ project, data }: { project: string; data: Project }) {
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       {data.services.length === 0 ? (
-        <div className="flex h-full items-center justify-center bg-dots text-sm text-muted-foreground">
-          {t("project.noServices")}
+        <div className="flex h-full items-center justify-center p-6">
+          <NoServices project={project} framed={false} />
         </div>
       ) : (
         <Graph project={project} data={data} selected={search.service} onOpen={select} />

@@ -392,7 +392,7 @@ function InstalledSection() {
       ) : capabilities.isError ? (
         <Problem error={capabilities.error} />
       ) : installed.length === 0 ? (
-        <p className="text-muted-foreground">{t("cluster.noComponents")}</p>
+        <p className="max-w-prose text-muted-foreground">{t("cluster.noComponents")}</p>
       ) : (
         <ul className="flex flex-col">
           {installed.map(({ capability, i }) => (
