@@ -912,8 +912,8 @@ export const zhTW: Messages = {
   "fix.isolateProject": (project: string) => `隔離 ${project} 的服務`,
   "gap.unreadable": "部分檢查需要你沒有的權限。",
   "install.title": "安裝",
-  "install.note": "Zeabur 不會執行這些指令。請自行執行，或提交到你的 GitOps repository。",
-  "install.profile": "設定檔",
+  "install.note": "Zeabur 不會執行這些內容。自己執行，或提交到 GitOps 儲存庫。",
+  "install.profile": "安裝方式",
   "install.singleNode": "單一節點",
   "install.multiNode": "多個節點",
   "install.forCluster": "適合這個叢集",
@@ -921,41 +921,41 @@ export const zhTW: Messages = {
   "install.security": "權限",
   "install.clusterWide": "叢集範圍的 RBAC",
   "install.privileged": "特權模式",
-  "install.connectsTo": "會連線到",
-  "install.credentials": "憑證",
+  "install.connectsTo": "會連到",
+  "install.credentials": "認證資訊",
   "install.risks": "風險",
   "install.inputs": "需要填入的值",
   "install.generated": "自動產生",
   "install.required": "必填",
-  "install.alsoAdds": "也會加入設定到",
+  "install.alsoAdds": "也會為這些元件加入值",
   "install.k3sPackaged": (addon: string) =>
-    `在 k3s 上，請先停用內建的 ${addon}：在每台 server 的 /etc/rancher/k3s/config.yaml 把它加進 disable，再重新啟動 k3s。`,
+    `在 k3s 上，先停用內建的 ${addon}：在每台 server 的 /etc/rancher/k3s/config.yaml 把它加進 disable，再重新啟動 k3s。`,
   "install.k3sPackagedTraefik":
-    "這會刪除 Traefik 的 CRD 與所有 IngressRoute、Middleware 物件；在這個安裝執行前，Ingress 流量會中斷。",
-  "install.k3sPackagedMetrics": "在這個安裝執行前，metrics API 無法使用。",
-  "install.k3sPackagedOther": "在這個安裝執行前，它的工作負載會停止。",
+    "這會刪除 Traefik 的 CRD 與所有 IngressRoute、Middleware 物件；這個元件開始執行前，Ingress 流量會中斷。",
+  "install.k3sPackagedMetrics": "這個元件開始執行前，metrics API 無法使用。",
+  "install.k3sPackagedOther": "這個元件開始執行前，內建版本的工作負載會停止。",
   "reach.title": "可達性",
-  "reach.addPolicy": "加入規則",
+  "reach.addPolicy": "加入政策",
   "reach.isolate": "隔離這個服務",
-  "reach.allowIngress": "允許 ingress controller",
-  "reach.allowFrom": (name) => `允許來自 ${name}`,
+  "reach.allowIngress": "允許 ingress controller 連入",
+  "reach.allowFrom": (name) => `允許 ${name} 連入`,
   "reach.planIsolate": (name) => `隔離 ${name}`,
   "reach.planAllowIngress": (name) => `允許 ingress controller 連到 ${name}`,
   "reach.planAllowFrom": (from, to) => `允許 ${from} 連到 ${to}`,
   "reach.policies": "NetworkPolicy",
-  "reach.noPolicies": "這個專案沒有規則：全部都能連線。",
-  "reach.noneSelect": "沒有規則套用在這個服務。",
+  "reach.noPolicies": "這個專案沒有政策，所有連線都允許。",
+  "reach.noneSelect": "沒有政策套用到這個服務。",
   "reach.in": "連入",
   "reach.out": "連出",
   "reach.ingressController": "Ingress controller",
-  "reach.otherNamespaces": "其他命名空間",
+  "reach.otherNamespaces": "其他 Namespace",
   "reach.dns": "DNS",
   "reach.outside": "叢集外",
   "reach.cni": "規則是否真的生效，取決於叢集的網路外掛（CNI）。",
   "reach.allowed": "允許",
   "reach.limited": "部分",
-  "reach.blocked": "擋住",
-  "reach.edgeBlocked": "被 NetworkPolicy 擋住",
+  "reach.blocked": "封鎖",
+  "reach.edgeBlocked": "NetworkPolicy 不允許",
   "reach.edgeLimited": "NetworkPolicy 只允許一部分",
   "backups.title": "備份",
   "backups.namespace": "命名空間的物件",
@@ -1322,9 +1322,9 @@ export const zhTW: Messages = {
   "sentence.gap.ingressToHttpRoute.retired": (p) =>
     `Ingress ${p.ingress} 使用 ${p.class}，它的 controller 已停止維護。`,
   "sentence.gap.ingressToHttpRoute.available": (p) =>
-    `Ingress ${p.ingress} 可以改成 HTTPRoute；叢集已有 Gateway API。`,
+    `叢集已有 Gateway API，Ingress ${p.ingress} 可以改用 HTTPRoute。`,
   "sentence.gap.retiredIngressController": (p) =>
-    `IngressClass ${p.class} 由 ${p.controller} 提供，它已停止維護。`,
+    `IngressClass ${p.class} 的 controller ${p.controller} 已停止維護。`,
   "sentence.gap.danglingRoute.noService": (p) =>
     `${p.kind} ${p.route} 指定的 Service ${(p.services ?? "").split(",").join("、")} 不在這個專案裡。`,
   "sentence.gap.danglingRoute.noGateway": (p) =>
@@ -1335,15 +1335,15 @@ export const zhTW: Messages = {
     `沒有任何 Gateway 接受 HTTPRoute ${p.route}${p.reason ? `（${p.reason}）` : ""}，所以它收不到任何流量。`,
   "sentence.gap.blockedConnection": (p) =>
     p.at === "egress"
-      ? `${p.from} 會連到 ${p.to}（依它的變數），但它自己的 NetworkPolicy 不讓它連出去。`
+      ? `${p.from} 的變數指向 ${p.to}，但 ${p.from} 的 NetworkPolicy 不允許連出。`
       : p.at === "both"
-        ? `${p.from} 會連到 ${p.to}（依它的變數），但兩端的 NetworkPolicy 都擋住了。`
-        : `${p.from} 會連到 ${p.to}（依它的變數），但 ${p.to} 的 NetworkPolicy 不讓它進來。`,
+        ? `${p.from} 的變數指向 ${p.to}，但兩端的 NetworkPolicy 都封鎖了這條連線。`
+        : `${p.from} 的變數指向 ${p.to}，但 ${p.to} 的 NetworkPolicy 不允許 ${p.from} 連入。`,
   "sentence.gap.noNetworkPolicy": (p) => {
     const blocked = cuts(
       p,
       {
-        otherNamespaces: "來自其他命名空間的連線",
+        otherNamespaces: "來自其他 Namespace 的連線",
         outside: "連到叢集外的連線",
         published: "NodePort 與 LoadBalancer 的流量",
         connections: "服務之間的一條連線",
@@ -1353,7 +1353,7 @@ export const zhTW: Messages = {
     return [
       `沒有 NetworkPolicy 保護 ${(p.services ?? "").split(",").join("、")}：叢集裡任何 Pod 都連得到。`,
       p.enforcement === "unknown" ? "NetworkPolicy 要網路外掛（CNI）支援才會生效。" : "",
-      blocked ? `隔離後也會擋住${blocked}。` : "",
+      blocked ? `隔離後也會封鎖${latinStart(blocked)}${blocked}。` : "",
     ].join("")
   },
   "sentence.gap.volumeWithoutBackup": (p) => `磁碟區 ${p.claim} 沒有備份排程。`,

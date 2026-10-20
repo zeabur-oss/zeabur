@@ -911,8 +911,8 @@ export const zhCN: Messages = {
   "fix.isolateProject": (project: string) => `隔离 ${project} 的服务`,
   "gap.unreadable": "部分检查需要你没有的权限。",
   "install.title": "安装",
-  "install.note": "Zeabur 不会执行这些命令。请自行执行，或提交到你的 GitOps 仓库。",
-  "install.profile": "配置",
+  "install.note": "Zeabur 不会执行这些内容。自己执行，或提交到 GitOps 仓库。",
+  "install.profile": "安装方式",
   "install.singleNode": "单节点",
   "install.multiNode": "多节点",
   "install.forCluster": "适合这个集群",
@@ -921,40 +921,40 @@ export const zhCN: Messages = {
   "install.clusterWide": "集群范围的 RBAC",
   "install.privileged": "特权模式",
   "install.connectsTo": "会连接到",
-  "install.credentials": "凭据",
+  "install.credentials": "凭证",
   "install.risks": "风险",
   "install.inputs": "需要填入的值",
   "install.generated": "自动生成",
   "install.required": "必填",
-  "install.alsoAdds": "也会加入设置到",
+  "install.alsoAdds": "也会为这些组件添加值",
   "install.k3sPackaged": (addon: string) =>
-    `在 k3s 上，请先禁用内置的 ${addon}：在每台 server 的 /etc/rancher/k3s/config.yaml 中把它加入 disable，然后重启 k3s。`,
+    `在 k3s 上，先禁用内置的 ${addon}：在每台 server 的 /etc/rancher/k3s/config.yaml 中把它加入 disable，然后重启 k3s。`,
   "install.k3sPackagedTraefik":
-    "这会删除 Traefik 的 CRD 以及所有 IngressRoute、Middleware 对象；在这个安装运行之前，Ingress 流量会中断。",
-  "install.k3sPackagedMetrics": "在这个安装运行之前，metrics API 不可用。",
-  "install.k3sPackagedOther": "在这个安装运行之前，它的工作负载会停止。",
+    "这会删除 Traefik 的 CRD 以及所有 IngressRoute、Middleware 对象；这个组件开始运行前，Ingress 流量会中断。",
+  "install.k3sPackagedMetrics": "这个组件开始运行前，metrics API 不可用。",
+  "install.k3sPackagedOther": "这个组件开始运行前，内置版本的工作负载会停止。",
   "reach.title": "可达性",
-  "reach.addPolicy": "添加规则",
+  "reach.addPolicy": "添加策略",
   "reach.isolate": "隔离这个服务",
-  "reach.allowIngress": "允许 ingress controller",
-  "reach.allowFrom": (name) => `允许来自 ${name}`,
+  "reach.allowIngress": "允许 ingress controller 连入",
+  "reach.allowFrom": (name) => `允许 ${name} 连入`,
   "reach.planIsolate": (name) => `隔离 ${name}`,
   "reach.planAllowIngress": (name) => `允许 ingress controller 连到 ${name}`,
   "reach.planAllowFrom": (from, to) => `允许 ${from} 连到 ${to}`,
   "reach.policies": "NetworkPolicy",
-  "reach.noPolicies": "这个项目没有规则：都可以连接。",
-  "reach.noneSelect": "没有规则作用于这个服务。",
+  "reach.noPolicies": "这个项目没有策略，所有连接都允许。",
+  "reach.noneSelect": "没有策略作用于这个服务。",
   "reach.in": "入站",
   "reach.out": "出站",
   "reach.ingressController": "Ingress controller",
-  "reach.otherNamespaces": "其他命名空间",
+  "reach.otherNamespaces": "其他 Namespace",
   "reach.dns": "DNS",
   "reach.outside": "集群外",
   "reach.cni": "规则是否真正生效，取决于集群的网络插件（CNI）。",
   "reach.allowed": "允许",
   "reach.limited": "部分",
   "reach.blocked": "拦截",
-  "reach.edgeBlocked": "被 NetworkPolicy 拦截",
+  "reach.edgeBlocked": "NetworkPolicy 不允许",
   "reach.edgeLimited": "NetworkPolicy 只允许一部分",
   "backups.title": "备份",
   "backups.namespace": "命名空间的对象",
@@ -1319,9 +1319,9 @@ export const zhCN: Messages = {
   "sentence.gap.ingressToHttpRoute.retired": (p) =>
     `Ingress ${p.ingress} 使用 ${p.class}，它的 controller 已停止维护。`,
   "sentence.gap.ingressToHttpRoute.available": (p) =>
-    `Ingress ${p.ingress} 可以改成 HTTPRoute；集群已有 Gateway API。`,
+    `集群已有 Gateway API，Ingress ${p.ingress} 可以改用 HTTPRoute。`,
   "sentence.gap.retiredIngressController": (p) =>
-    `IngressClass ${p.class} 由 ${p.controller} 提供，它已停止维护。`,
+    `IngressClass ${p.class} 的 controller ${p.controller} 已停止维护。`,
   "sentence.gap.danglingRoute.noService": (p) =>
     `${p.kind} ${p.route} 指定的 Service ${(p.services ?? "").split(",").join("、")} 不在这个项目里。`,
   "sentence.gap.danglingRoute.noGateway": (p) =>
@@ -1332,15 +1332,15 @@ export const zhCN: Messages = {
     `没有任何 Gateway 接受 HTTPRoute ${p.route}${p.reason ? `（${p.reason}）` : ""}，所以它收不到任何流量。`,
   "sentence.gap.blockedConnection": (p) =>
     p.at === "egress"
-      ? `${p.from} 会连到 ${p.to}（依它的变量），但它自己的 NetworkPolicy 挡住了出去的路。`
+      ? `${p.from} 的变量指向 ${p.to}，但 ${p.from} 的 NetworkPolicy 不允许连出。`
       : p.at === "both"
-        ? `${p.from} 会连到 ${p.to}（依它的变量），但两端的 NetworkPolicy 都挡住了。`
-        : `${p.from} 会连到 ${p.to}（依它的变量），但 ${p.to} 的 NetworkPolicy 不让它进来。`,
+        ? `${p.from} 的变量指向 ${p.to}，但两端的 NetworkPolicy 都拦截了这条连接。`
+        : `${p.from} 的变量指向 ${p.to}，但 ${p.to} 的 NetworkPolicy 不允许 ${p.from} 连入。`,
   "sentence.gap.noNetworkPolicy": (p) => {
     const blocked = cuts(
       p,
       {
-        otherNamespaces: "来自其他命名空间的连接",
+        otherNamespaces: "来自其他 Namespace 的连接",
         outside: "连到集群外的连接",
         published: "NodePort 与 LoadBalancer 的流量",
         connections: "服务之间的一条连接",
@@ -1350,7 +1350,7 @@ export const zhCN: Messages = {
     return [
       `没有 NetworkPolicy 保护 ${(p.services ?? "").split(",").join("、")}：集群里任何 Pod 都连得到。`,
       p.enforcement === "unknown" ? "NetworkPolicy 要网络插件（CNI）支持才会生效。" : "",
-      blocked ? `隔离后也会挡住${blocked}。` : "",
+      blocked ? `隔离后也会拦截${latinStart(blocked)}${blocked}。` : "",
     ].join("")
   },
   "sentence.gap.volumeWithoutBackup": (p) => `卷 ${p.claim} 没有备份计划。`,

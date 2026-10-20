@@ -736,7 +736,7 @@ test("Overview lists what the project misses, and a fix is planned and applied",
   page,
 }) => {
   await page.goto(project)
-  const missing = page.getByRole("region", { name: "Missing" })
+  const missing = page.getByRole("region", { name: "Missing setup" })
   // The e2e workloads set no requests or limits; only `editor` is changed.
   const limits = missing
     .getByRole("listitem")

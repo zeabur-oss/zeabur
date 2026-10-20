@@ -977,7 +977,7 @@ export const en = {
   "diagnosis.action.reservation": "Change reservation",
   "diagnosis.action.variables": "Variables",
   "diagnosis.action.storage": "Storage",
-  "gap.title": "Missing",
+  "gap.title": "Missing setup",
   "gap.warning": "Warning",
   "gap.advice": "Advice",
   "gap.fix": "Fix",
@@ -993,8 +993,8 @@ export const en = {
   "install.singleNode": "Single node",
   "install.multiNode": "Several nodes",
   "install.forCluster": "fits this cluster",
-  "install.needs": "Needs first",
-  "install.security": "Access",
+  "install.needs": "Install first",
+  "install.security": "Permissions",
   "install.clusterWide": "Cluster-wide RBAC",
   "install.privileged": "Privileged",
   "install.connectsTo": "Connects to",
@@ -1019,8 +1019,8 @@ export const en = {
   "reach.planAllowIngress": (name: string) => `Let the ingress controller reach ${name}`,
   "reach.planAllowFrom": (from: string, to: string) => `Let ${from} reach ${to}`,
   "reach.policies": "NetworkPolicy",
-  "reach.noPolicies": "None in this project: everything may connect.",
-  "reach.noneSelect": "None select this service.",
+  "reach.noPolicies": "None in this project, so every connection is allowed.",
+  "reach.noneSelect": "None applies to this service.",
   "reach.in": "In",
   "reach.out": "Out",
   "reach.ingressController": "Ingress controller",
@@ -1429,11 +1429,11 @@ export const en = {
   "sentence.gap.healthChecks.livenessOnly": (p: P) =>
     `${p.container} has a restart check but no traffic check.`,
   "sentence.gap.ingressToHttpRoute.retired": (p: P) =>
-    `Ingress ${p.ingress} uses ${p.class}, whose controller is retired.`,
+    `Ingress ${p.ingress} uses ${p.class}, whose controller is no longer maintained.`,
   "sentence.gap.ingressToHttpRoute.available": (p: P) =>
-    `Ingress ${p.ingress} can move to an HTTPRoute; Gateway API is available.`,
+    `Gateway API is available, so Ingress ${p.ingress} can move to an HTTPRoute.`,
   "sentence.gap.retiredIngressController": (p: P) =>
-    `IngressClass ${p.class} is served by ${p.controller}, which is retired.`,
+    `IngressClass ${p.class} is served by ${p.controller}, which is no longer maintained.`,
   "sentence.gap.danglingRoute.noService": (p: P) => {
     const services = (p.services ?? "").split(",")
     const many = services.length > 1
@@ -1450,10 +1450,10 @@ export const en = {
     `No Gateway has accepted HTTPRoute ${p.route}${p.reason ? ` (${p.reason})` : ""}, so it receives no traffic.`,
   "sentence.gap.blockedConnection": (p: P) =>
     p.at === "egress"
-      ? `${p.from} calls ${p.to} (its variables say so), but its NetworkPolicy blocks the way out.`
+      ? `${p.from}'s variables point to ${p.to}, but ${p.from}'s own NetworkPolicy blocks the outgoing connection.`
       : p.at === "both"
-        ? `${p.from} calls ${p.to} (its variables say so), but NetworkPolicy blocks both ends.`
-        : `${p.from} calls ${p.to} (its variables say so), but ${p.to}'s NetworkPolicy doesn't let it in.`,
+        ? `${p.from}'s variables point to ${p.to}, but NetworkPolicy blocks the connection at both ends.`
+        : `${p.from}'s variables point to ${p.to}, but ${p.to}'s NetworkPolicy doesn't let ${p.from} in.`,
   "sentence.gap.noNetworkPolicy": (p: P) => {
     const blocked = cuts(
       p,
