@@ -2,9 +2,11 @@ import { useForm } from "@tanstack/react-form"
 import { useState, type ReactNode } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
+import ClockIcon from "~icons/ph/clock"
 import GlobeIcon from "~icons/ph/globe"
 import LockSimpleBoldIcon from "~icons/ph/lock-simple-bold"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
+import PlugsIcon from "~icons/ph/plugs"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 
@@ -15,7 +17,17 @@ import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusPill } from "@/components/status"
 import { FormField } from "@/components/form-field"
 import { Button } from "@zeabur/design-system/components/button"
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@zeabur/design-system/components/empty"
 import { Input } from "@zeabur/design-system/components/input"
+import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { Term, TermDetail } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import {
@@ -23,13 +35,13 @@ import {
   hostUrl,
   publicRoutesOf,
   routesOf,
+  type Endpoint,
   type Network,
   type PublicRoute,
   type Service,
 } from "@/model/service"
 import { refusedPlaces } from "@/routes/project/data"
 import { Reachability } from "@/routes/service/reachability"
-import { Section } from "@/routes/service/section"
 
 // RFC 1123 host names, with the leading wildcard label Ingress and HTTPRoute allow. A hint only:
 // the plan checks the name again.
@@ -79,239 +91,259 @@ export function NetworkingTab({
   const canWrite = endpoints.length > 0 && !managed
   const refusedRoutes = refusedAmong(unreadable, refusedPlaces.routes)
   const refusedEndpoints = refusedAmong(unreadable, refusedPlaces.endpoints)
+  const routeKinds = [
+    ...new Set(routesOf(network, service).map((r) => r.origin.kind as string)),
+  ].join(" · ")
+
+  const scheduled = service.kind === "CronJob" || service.kind === "Job"
+  const noAddress =
+    routes.length === 0 &&
+    endpoints.length === 0 &&
+    adding === undefined &&
+    refusedRoutes.length === 0 &&
+    refusedEndpoints.length === 0
+  const expose =
+    service.kind === "Deployment"
+      ? `kubectl -n ${service.namespace} expose deployment ${service.name}`
+      : undefined
 
   return (
-    <div className="flex flex-col gap-6">
-      <Section
-        title={t("net.public")}
-        action={
-          <Managed tool={managed}>
-            <Button
-              variant="outline"
-              size="xs"
-              disabled={!canWrite || adding !== undefined}
-              onClick={() => setAdding("")}
-            >
-              <PlusIcon aria-hidden="true" data-icon="inline-start" />
-              {t("net.addDomain")}
-            </Button>
-          </Managed>
-        }
-      >
-        {adding !== undefined ? (
-          <HostForm
-            value={adding}
-            onCancel={() => setAdding(undefined)}
-            onReview={(host) => {
-              planner.plan({
-                title: t("title.addDomain", host),
-                changes: [{ op: "addDomain", workload, hostname: host }],
-              })
-              setAdding(undefined)
-            }}
-          />
-        ) : null}
-        <RefusedKinds unreadable={refusedRoutes} />
-        {routes.length === 0 ? (
-          adding === undefined && refusedRoutes.length === 0 ? (
-            <Empty>{t("domains.none")}</Empty>
-          ) : null
-        ) : (
-          <Table label={t("net.public")} minWidth="sm:min-w-160">
-            <thead className={thead}>
-              <tr>
-                <th className={`${head} pl-4`}>{t("table.domain")}</th>
-                <th className={head}>{t("net.path")}</th>
-                <th className={head}>{t("net.via")}</th>
-                <th className={head}>{t("net.target")}</th>
-                <th className={head}>{t("pod.pods")}</th>
-                <th className={`${head} pr-4`}>
-                  <span className="sr-only">{t("table.actions")}</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y max-sm:block">
-              {routes.map((route, i) => (
-                <tr
-                  className={row}
-                  key={`${route.ingress}/${route.host ?? ""}/${route.path ?? ""}/${i}`}
-                >
-                  <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
-                    {renaming && route.host === renaming.from ? (
-                      <HostForm
-                        value={renaming.to}
-                        onCancel={() => setRenaming(undefined)}
-                        onReview={(to) => {
-                          planner.plan({
-                            title: t("title.renameDomain", renaming.from, to),
-                            service: workload,
-                            changes: [
-                              {
-                                op: "renameDomain",
-                                route: routeOf(route),
-                                from: renaming.from,
-                                to,
-                              },
-                            ],
-                          })
-                          setRenaming(undefined)
-                        }}
-                      />
-                    ) : (
-                      <Host route={route} />
-                    )}
-                  </td>
-                  <td className={cell}>
-                    <Path route={route} />
-                  </td>
-                  <td className={cell}>
-                    <Step>
-                      <span className="text-muted-foreground">Ingress/</span>
-                      {route.ingress}
-                    </Step>
-                  </td>
-                  <td className={cell}>
-                    <Step>
-                      {route.backend}:{route.port ?? "?"}
-                    </Step>
-                  </td>
-                  <td className={cell}>
-                    <span className="flex items-center gap-2">
-                      <ArrowRightIcon
-                        className="size-3 shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                      />
-                      <StatusPill health={podsOk ? "ok" : "fail"} size="sm">
-                        {t("pod.readyCount", ready, service.pods.length)}
-                      </StatusPill>
-                    </span>
-                  </td>
-                  <td className={`${cell} pr-4 max-sm:ml-auto`}>
-                    {route.host ? (
-                      <span className="flex items-center justify-end gap-0.5">
-                        <Managed tool={managed}>
-                          <Button
-                            variant="muted"
-                            size="icon-xs"
-                            disabled={Boolean(managed) || renaming !== undefined}
-                            aria-label={t("edit.edit", route.host)}
-                            title={t("edit.edit", route.host)}
-                            onClick={() =>
-                              route.host
-                                ? setRenaming({ from: route.host, to: route.host })
-                                : undefined
-                            }
-                          >
-                            <PencilSimpleIcon aria-hidden="true" />
-                          </Button>
-                        </Managed>
-                        <Managed tool={managed}>
-                          <Button
-                            variant="muted"
-                            size="icon-xs"
-                            disabled={Boolean(managed)}
-                            aria-label={t("edit.remove", route.host)}
-                            title={t("edit.remove", route.host)}
-                            onClick={() =>
-                              route.host
-                                ? planner.plan({
-                                    title: t("title.removeDomain", route.host),
-                                    service: workload,
-                                    changes: [
-                                      {
-                                        op: "removeDomain",
-                                        route: routeOf(route),
-                                        hostname: route.host,
-                                      },
-                                    ],
-                                  })
-                                : undefined
-                            }
-                          >
-                            <TrashIcon aria-hidden="true" />
-                          </Button>
-                        </Managed>
-                      </span>
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        )}
-      </Section>
-
-      <Section title={t("net.private")}>
-        <RefusedKinds unreadable={refusedEndpoints} />
-        {endpoints.length === 0 ? (
-          refusedEndpoints.length > 0 ? null : (
-            <Empty>{t("net.noService")}</Empty>
-          )
-        ) : (
-          <Table label={t("net.private")} minWidth="sm:min-w-140">
-            <thead className={thead}>
-              <tr>
-                <th className={`${head} pl-4`}>{t("net.dns")}</th>
-                <th className={head}>{t("net.ports")}</th>
-                <th className={`${head} pr-4`}>{t("net.type")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y max-sm:block">
-              {endpoints.map((e) => {
-                const dns = `${e.name}.${service.namespace}.svc.cluster.local`
-                return (
-                  <tr key={e.name} className={row}>
-                    <td className={`${cell} pl-4 max-sm:w-full`}>
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <Tooltip content={`Service ${e.name}`}>
-                          <span className="truncate font-mono text-xs font-medium" translate="no">
-                            {dns}
-                          </span>
-                        </Tooltip>
-                        <CopyButton value={dns} />
-                      </span>
-                      <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                        {t("net.alsoAs")}
-                        <code className="rounded bg-muted px-1 font-mono text-foreground">
-                          {e.name}
-                        </code>
-                        <code className="rounded bg-muted px-1 font-mono text-foreground">
-                          {e.name}.{service.namespace}
-                        </code>
-                      </span>
-                    </td>
-                    <td className={cell}>
-                      <ul className="flex flex-wrap gap-1.5">
-                        {e.ports.map((p) => (
-                          <li
-                            key={`${p.port}/${p.name ?? ""}`}
-                            className="inline-flex items-center gap-1.5 font-mono text-xs"
-                          >
-                            {p.name ? (
-                              <span className="text-muted-foreground">{p.name}</span>
-                            ) : null}
-                            <span className="font-medium">:{p.port}</span>
-                            {p.targetPort && p.targetPort !== String(p.port) ? (
-                              <span className="text-muted-foreground">→ {p.targetPort}</span>
-                            ) : null}
-                            <span className="type-nano text-muted-foreground">{p.protocol}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </td>
-                    <td className={`${cell} pr-4 font-mono text-xs`}>
-                      {e.type ?? "ClusterIP"}
-                      {e.clusterIP && e.clusterIP !== "None" ? (
-                        <span className="block text-muted-foreground">{e.clusterIP}</span>
-                      ) : null}
-                    </td>
+    <div className="flex flex-col gap-8">
+      {noAddress ? (
+        <Empty variant="outline" size="inline">
+          <EmptyMedia variant="glyph">
+            {scheduled ? <ClockIcon aria-hidden="true" /> : <PlugsIcon aria-hidden="true" />}
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle>
+              {scheduled ? t("net.scheduledTitle", service.name) : t("net.noneTitle", service.name)}
+            </EmptyTitle>
+            <EmptyDescription>
+              {scheduled ? t("net.scheduledBody") : t("net.noneBody")}
+            </EmptyDescription>
+            {scheduled ? null : <ExposeHint command={expose} />}
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <>
+          <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-public">
+            <SectionHeader
+              id="net-public"
+              title={<Term detail={routeKinds || "Ingress"}>{t("net.publicTitle")}</Term>}
+              count={routes.length > 0 ? routes.length : undefined}
+              description={t("net.publicAbout")}
+              action={
+                routes.length > 0 ? (
+                  <Managed tool={managed}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!canWrite || adding !== undefined}
+                      onClick={() => setAdding("")}
+                    >
+                      <PlusIcon aria-hidden="true" data-icon="inline-start" />
+                      {t("net.addDomain")}
+                    </Button>
+                  </Managed>
+                ) : undefined
+              }
+            />
+            {adding !== undefined ? (
+              <HostForm
+                value={adding}
+                onCancel={() => setAdding(undefined)}
+                onReview={(host) => {
+                  planner.plan({
+                    title: t("title.addDomain", host),
+                    changes: [{ op: "addDomain", workload, hostname: host }],
+                  })
+                  setAdding(undefined)
+                }}
+              />
+            ) : null}
+            <RefusedKinds unreadable={refusedRoutes} />
+            {routes.length === 0 ? (
+              adding === undefined && refusedRoutes.length === 0 ? (
+                <Empty variant="outline" size="inline">
+                  <EmptyMedia variant="glyph">
+                    <GlobeIcon aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyHeader>
+                    <EmptyTitle>{t("net.publicEmpty", service.name)}</EmptyTitle>
+                    <EmptyDescription>
+                      {endpoints.length > 0
+                        ? t("net.publicEmptyBody")
+                        : t("net.publicNeedsPrivate")}
+                    </EmptyDescription>
+                  </EmptyHeader>
+                  {endpoints.length > 0 ? (
+                    <EmptyContent>
+                      <Managed tool={managed}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={!canWrite}
+                          onClick={() => setAdding("")}
+                        >
+                          <PlusIcon aria-hidden="true" data-icon="inline-start" />
+                          {t("net.addDomain")}
+                        </Button>
+                      </Managed>
+                    </EmptyContent>
+                  ) : null}
+                </Empty>
+              ) : null
+            ) : (
+              <Table label={t("net.publicTitle")} minWidth="sm:min-w-160">
+                <thead className={thead}>
+                  <tr>
+                    <th className={`${head} pl-4`}>{t("table.domain")}</th>
+                    <th className={head}>{t("net.path")}</th>
+                    <th className={head}>{t("net.sendsTo")}</th>
+                    <th className={head}>{t("pod.pods")}</th>
+                    <th className={`${head} pr-4`}>
+                      <span className="sr-only">{t("table.actions")}</span>
+                    </th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </Table>
-        )}
-      </Section>
+                </thead>
+                <tbody className="divide-y max-sm:block">
+                  {routes.map((route, i) => (
+                    <tr
+                      className={row}
+                      key={`${route.ingress}/${route.host ?? ""}/${route.path ?? ""}/${i}`}
+                    >
+                      <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
+                        {renaming && route.host === renaming.from ? (
+                          <HostForm
+                            value={renaming.to}
+                            onCancel={() => setRenaming(undefined)}
+                            onReview={(to) => {
+                              planner.plan({
+                                title: t("title.renameDomain", renaming.from, to),
+                                service: workload,
+                                changes: [
+                                  {
+                                    op: "renameDomain",
+                                    route: routeOf(route),
+                                    from: renaming.from,
+                                    to,
+                                  },
+                                ],
+                              })
+                              setRenaming(undefined)
+                            }}
+                          />
+                        ) : (
+                          <Host route={route} />
+                        )}
+                      </td>
+                      <td className={cell}>
+                        <Path route={route} />
+                      </td>
+                      <td className={cell}>
+                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                          <ArrowRightIcon
+                            className="size-3 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                          <span className="font-mono whitespace-nowrap" translate="no">
+                            {route.backend}:{route.port ?? "?"}
+                          </span>
+                          <TermDetail>
+                            {routeOf(route).kind} {route.ingress}
+                          </TermDetail>
+                        </span>
+                      </td>
+                      <td className={cell}>
+                        <StatusPill health={podsOk ? "ok" : "fail"} size="sm">
+                          {t("pod.readyCount", ready, service.pods.length)}
+                        </StatusPill>
+                      </td>
+                      <td className={`${cell} pr-4 max-sm:ml-auto`}>
+                        {route.host ? (
+                          <span className="flex items-center justify-end gap-0.5">
+                            <Managed tool={managed}>
+                              <Button
+                                variant="muted"
+                                size="icon-xs"
+                                disabled={Boolean(managed) || renaming !== undefined}
+                                aria-label={t("edit.edit", route.host)}
+                                title={t("edit.edit", route.host)}
+                                onClick={() =>
+                                  route.host
+                                    ? setRenaming({ from: route.host, to: route.host })
+                                    : undefined
+                                }
+                              >
+                                <PencilSimpleIcon aria-hidden="true" />
+                              </Button>
+                            </Managed>
+                            <Managed tool={managed}>
+                              <Button
+                                variant="muted"
+                                size="icon-xs"
+                                disabled={Boolean(managed)}
+                                aria-label={t("edit.remove", route.host)}
+                                title={t("edit.remove", route.host)}
+                                onClick={() =>
+                                  route.host
+                                    ? planner.plan({
+                                        title: t("title.removeDomain", route.host),
+                                        service: workload,
+                                        changes: [
+                                          {
+                                            op: "removeDomain",
+                                            route: routeOf(route),
+                                            hostname: route.host,
+                                          },
+                                        ],
+                                      })
+                                    : undefined
+                                }
+                              >
+                                <TrashIcon aria-hidden="true" />
+                              </Button>
+                            </Managed>
+                          </span>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </Table>
+            )}
+          </section>
+
+          <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-private">
+            <SectionHeader
+              id="net-private"
+              title={<Term detail="Service">{t("net.privateTitle")}</Term>}
+              description={t("net.privateAbout")}
+            />
+            <RefusedKinds unreadable={refusedEndpoints} />
+            {endpoints.length === 0 ? (
+              refusedEndpoints.length > 0 ? null : (
+                <Empty variant="outline" size="inline">
+                  <EmptyMedia variant="glyph">
+                    <PlugsIcon aria-hidden="true" />
+                  </EmptyMedia>
+                  <EmptyHeader>
+                    <EmptyTitle>{t("net.privateEmpty", service.name)}</EmptyTitle>
+                    <EmptyDescription>{t("net.privateEmptyBody")}</EmptyDescription>
+                    <ExposeHint command={expose} />
+                  </EmptyHeader>
+                </Empty>
+              )
+            ) : (
+              <ul className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
+                {endpoints.map((e) => (
+                  <PrivateAddress key={e.name} endpoint={e} namespace={service.namespace} />
+                ))}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
       {reachability ? (
         <ReachabilityFor
           project={project}
@@ -323,6 +355,82 @@ export function NetworkingTab({
       ) : null}
       <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.policies)} />
       {planner.dialog}
+    </div>
+  )
+}
+
+function PrivateAddress({ endpoint: e, namespace }: { endpoint: Endpoint; namespace: string }) {
+  const t = useT()
+  const fqdn = `${e.name}.${namespace}.svc.cluster.local`
+  const ports = e.ports.length > 0 ? e.ports : [undefined]
+  const first = e.ports[0]?.port
+  return (
+    <li className="flex flex-col gap-2 px-4 py-3">
+      <ul className="flex flex-col gap-1">
+        {ports.map((p) => {
+          const address = p ? `${fqdn}:${p.port}` : fqdn
+          return (
+            <li
+              key={p ? `${p.port}/${p.protocol}` : "none"}
+              className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5"
+            >
+              <span className="flex min-w-0 items-center gap-1">
+                <span
+                  className="truncate font-mono text-xs font-medium"
+                  translate="no"
+                  title={address}
+                >
+                  {address}
+                </span>
+                <CopyButton value={address} />
+              </span>
+              {p ? (
+                <span
+                  className="flex items-center gap-1.5 font-mono type-meta text-muted-foreground"
+                  translate="no"
+                >
+                  {p.name ? <span>{p.name}</span> : null}
+                  {p.targetPort && p.targetPort !== String(p.port) ? (
+                    <Tooltip content={t("net.forwardsTo", p.targetPort)}>
+                      <span>→ {p.targetPort}</span>
+                    </Tooltip>
+                  ) : null}
+                  <span className="type-nano">{p.protocol}</span>
+                </span>
+              ) : null}
+            </li>
+          )
+        })}
+      </ul>
+      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 type-meta text-muted-foreground">
+        {t("net.shortForm")}
+        <code className="rounded bg-muted px-1 font-mono text-foreground" translate="no">
+          {first === undefined ? e.name : `${e.name}:${first}`}
+        </code>
+        <span className="ml-auto flex flex-wrap items-center gap-1.5">
+          <TermDetail>Service {e.name}</TermDetail>
+          <TermDetail>
+            {e.type ?? "ClusterIP"}
+            {e.clusterIP && e.clusterIP !== "None" ? ` ${e.clusterIP}` : ""}
+          </TermDetail>
+        </span>
+      </p>
+    </li>
+  )
+}
+
+function ExposeHint({ command }: { command?: string }) {
+  const t = useT()
+  if (!command) return null
+  return (
+    <div className="mt-2 flex w-full flex-col gap-1.5">
+      <span className="type-meta text-muted-foreground">{t("net.exposeHint")}</span>
+      <span className="flex max-w-full min-w-0 items-center gap-1 self-start rounded-md bg-muted px-2 py-1">
+        <code className="truncate font-mono text-xs" translate="no">
+          {command}
+        </code>
+        <CopyButton value={command} />
+      </span>
     </div>
   )
 }
@@ -406,23 +514,6 @@ function Table({
         {children}
       </table>
     </div>
-  )
-}
-
-function Empty({ children }: { children: ReactNode }) {
-  return (
-    <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-      {children}
-    </p>
-  )
-}
-
-function Step({ children }: { children: ReactNode }) {
-  return (
-    <span className="flex items-center gap-2 font-mono text-xs whitespace-nowrap" translate="no">
-      <ArrowRightIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span>{children}</span>
-    </span>
   )
 }
 

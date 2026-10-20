@@ -84,7 +84,7 @@ describe("server sentences", () => {
       "The container has 30 × 10 seconds (5 minutes) to pass the startup check; then the cluster restarts it. Every 10 seconds is the default.",
     )
     expect(why("readiness", { container: "api" })).toBe(
-      "While the traffic check fails, the container gets no traffic from its internal addresses.",
+      "While the traffic check fails, the container gets no traffic from its private addresses.",
     )
   })
 })

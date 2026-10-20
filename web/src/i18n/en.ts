@@ -244,7 +244,7 @@ export const en = {
 
   // Roles
   "role.web": "Web",
-  "role.internal": "Internal",
+  "role.internal": "Private services",
   "role.worker": "Workers",
   "role.job": "Jobs",
   "role.data": "Data",
@@ -407,7 +407,7 @@ export const en = {
   // Architecture
   "lane.domains": "Domains",
   "lane.web": "Web",
-  "lane.internal": "Internal",
+  "lane.internal": "Private services",
   "lane.workers": "Workers & jobs",
   "lane.data": "Data",
   "edge.declared": "Declared",
@@ -545,18 +545,32 @@ export const en = {
 
   // Networking
   "net.path": "Path",
-  "net.via": "Route",
-  "net.target": "Target",
-  "net.dns": "DNS name",
-  "net.ports": "Ports",
-  "net.type": "Type",
+  "net.publicTitle": "Public domains",
+  "net.publicAbout": "Anyone on the internet can open these addresses.",
+  "net.publicEmpty": (name: string) => `${name} has no public domain yet`,
+  "net.publicEmptyBody": "Add a domain to open this service from a browser.",
+  "net.publicNeedsPrivate":
+    "A domain sends requests to the service's private address, so it needs one first.",
+  "net.sendsTo": "Sends to",
+  "net.privateTitle": "Private network",
+  "net.privateAbout":
+    "Other services in the cluster connect to it at these addresses. The internet can't reach them.",
+  "net.privateEmpty": (name: string) => `${name} has no private address`,
+  "net.privateEmptyBody":
+    "Other services and its public domains can send it traffic only once it has one.",
+  "net.shortForm": "Short form within this project",
+  "net.forwardsTo": (port: string) => `Forwarded to the container's port ${port}`,
+  "net.exposeHint": "To add one, apply a Service or run this command.",
+  "net.noneTitle": (name: string) => `${name} can't receive connections`,
+  "net.noneBody":
+    "It has no private address and no public domain. A worker that only makes outgoing connections needs neither, and can still reach other services and the internet.",
+  "net.scheduledTitle": (name: string) => `${name} doesn't receive traffic`,
+  "net.scheduledBody":
+    "A job runs and exits, so nothing connects to it. It can still connect to other services and the internet.",
+  "reach.about": "Which connections to and from this service the cluster allows.",
+  "reach.fromDomains": "Public domains",
   "net.anyHost": "Any host",
   "net.defaultBackend": "Default backend",
-  "net.private": "Private",
-  "net.public": "Public",
-  "net.alsoAs": "Also reachable as",
-  "net.noService":
-    "Nothing in the cluster can reach it yet: it has no internal address. Add one so other services or a domain can send it traffic.",
 
   // Storage
   "storage.noClaims": "No volumes.",
@@ -1012,29 +1026,28 @@ export const en = {
     "That deletes the Traefik CRDs and any IngressRoute or Middleware objects; Ingress traffic stops until this one runs.",
   "install.k3sPackagedMetrics": "The metrics API is unavailable until this one runs.",
   "install.k3sPackagedOther": "Its workloads stop until this one runs.",
-  "reach.title": "Reachability",
-  "reach.addPolicy": "Add policy",
+  "reach.title": "Connection rules",
+  "reach.addPolicy": "Add rule",
   "reach.isolate": "Isolate this service",
-  "reach.allowIngress": "Allow the ingress controller",
+  "reach.allowIngress": "Allow traffic from public domains",
   "reach.allowFrom": (name: string) => `Allow from ${name}`,
   "reach.planIsolate": (name: string) => `Isolate ${name}`,
-  "reach.planAllowIngress": (name: string) => `Let the ingress controller reach ${name}`,
+  "reach.planAllowIngress": (name: string) => `Let public domains reach ${name}`,
   "reach.planAllowFrom": (from: string, to: string) => `Let ${from} reach ${to}`,
-  "reach.policies": "NetworkPolicy",
-  "reach.noPolicies": "None in this project, so every connection is allowed.",
-  "reach.noneSelect": "None applies to this service.",
-  "reach.in": "In",
-  "reach.out": "Out",
-  "reach.ingressController": "Ingress controller",
+  "reach.policies": "Rules",
+  "reach.noPolicies": "This project has no connection rules, so every connection is allowed.",
+  "reach.noneSelect": "No rule applies to this service, so every connection is allowed.",
+  "reach.in": "Incoming",
+  "reach.out": "Outgoing",
   "reach.otherNamespaces": "Other namespaces",
-  "reach.dns": "DNS",
+  "reach.dns": "Name lookups",
   "reach.outside": "Outside the cluster",
   "reach.cni": "Whether these rules are enforced depends on the cluster's network plugin (CNI).",
   "reach.allowed": "Allowed",
   "reach.limited": "Partly",
   "reach.blocked": "Blocked",
-  "reach.edgeBlocked": "Blocked by a NetworkPolicy",
-  "reach.edgeLimited": "Only partly allowed by NetworkPolicy",
+  "reach.edgeBlocked": "Blocked by a connection rule",
+  "reach.edgeLimited": "Only partly allowed by connection rules",
   "backups.title": "Backups",
   "backups.namespace": "All objects in the namespace",
   "backups.unscheduled": "No schedule",
@@ -1220,9 +1233,9 @@ export const en = {
     return t
       ? timingEn(
           t,
-          `The cluster checks every ${secondsEn(t.period)}; after ${t.threshold} failures in a row (about ${secondsEn(t.total)}) the container gets no traffic from its internal addresses until it passes again.`,
+          `The cluster checks every ${secondsEn(t.period)}; after ${t.threshold} failures in a row (about ${secondsEn(t.total)}) the container gets no traffic from its private addresses until it passes again.`,
         )
-      : "While the traffic check fails, the container gets no traffic from its internal addresses."
+      : "While the traffic check fails, the container gets no traffic from its private addresses."
   },
   "sentence.diagnosis.probeFailure.why.startup": (p: P) => {
     const t = probeTiming(p)
@@ -1278,7 +1291,7 @@ export const en = {
   "sentence.diagnosis.quotaBlocked.fix": () =>
     "Run fewer replicas, reserve less per replica, or ask an admin to raise the limit.",
   "sentence.diagnosis.unreachable.cause.noService": (p: P) =>
-    `Nothing in the cluster can reach ${p.service} yet: it has no internal address.`,
+    `Nothing in the cluster can reach ${p.service} yet: it has no private address (Service).`,
   "sentence.diagnosis.unreachable.cause.targetPort": (p: P) =>
     `${p.endpoint} sends to port ${p.targetPort}, which ${p.service}'s containers don't declare${p.ports ? ` (they declare ${p.ports})` : ""}.`,
   "sentence.diagnosis.unreachable.cause.noReadyEndpoints": (p: P) =>
@@ -1286,17 +1299,17 @@ export const en = {
   "sentence.diagnosis.unreachable.cause.routeNotAccepted": (p: P) =>
     `Requests to the domain of ${p.route} don't reach ${p.service}: its entry point reports ${p.condition} ${p.reason}.`,
   "sentence.diagnosis.unreachable.why.noService": (p: P) =>
-    `${p.from} sends traffic to ${p.service} by name, but only an internal address with that name can receive it.`,
+    `${p.from} sends traffic to ${p.service} by name, but only a private address (Service) with that name can receive it.`,
   "sentence.diagnosis.unreachable.why.targetPort": () =>
-    "An internal address forwards to the port it names; a named port must be one the containers declare.",
+    "A private address forwards to the port it names; a named port must be one the containers declare.",
   "sentence.diagnosis.unreachable.why.noReadyEndpoints": () =>
-    "An internal address sends traffic only to replicas that pass their traffic check.",
+    "A private address sends traffic only to replicas that pass their traffic check.",
   "sentence.diagnosis.unreachable.why.routeNotAccepted": () =>
     "A domain's entry point must accept the route and find the address it names before requests go through.",
   "sentence.diagnosis.unreachable.fix.noService": () =>
-    "Add an internal address so other services or a domain can send it traffic.",
+    "Add a private address (Service) so other services or a domain can send it traffic.",
   "sentence.diagnosis.unreachable.fix.targetPort": () =>
-    "Point the internal address at a port the containers declare.",
+    "Point the private address at a port the containers declare.",
   "sentence.diagnosis.unreachable.fix.noReadyEndpoints": () =>
     "Find out why no replica is ready: its other problems, its traffic check, its logs.",
   "sentence.diagnosis.unreachable.fix.routeNotAccepted": () =>

@@ -219,7 +219,7 @@ export const zhCN: Messages = {
   "phase.Unknown": "未知",
 
   "role.web": "Web",
-  "role.internal": "内部",
+  "role.internal": "私有服务",
   "role.worker": "后台任务",
   "role.job": "批处理任务",
   "role.data": "数据",
@@ -368,7 +368,7 @@ export const zhCN: Messages = {
 
   "lane.domains": "域名",
   "lane.web": "Web",
-  "lane.internal": "内部",
+  "lane.internal": "私有服务",
   "lane.workers": "后台与批处理任务",
   "lane.data": "数据",
   "edge.declared": "声明",
@@ -498,18 +498,28 @@ export const zhCN: Messages = {
   "vars.keys": (n) => `${n} 个键`,
 
   "net.path": "路径",
-  "net.via": "路由",
-  "net.target": "目标",
-  "net.dns": "DNS 名称",
-  "net.ports": "端口",
-  "net.type": "类型",
+  "net.publicTitle": "公开域名",
+  "net.publicAbout": "互联网上的任何人都能打开这些地址。",
+  "net.publicEmpty": (name) => `${name} 还没有公开域名`,
+  "net.publicEmptyBody": "添加域名后，就能用浏览器打开这个服务。",
+  "net.publicNeedsPrivate": "域名会把请求转发到服务的私有地址，所以要先有私有地址。",
+  "net.sendsTo": "转发到",
+  "net.privateTitle": "私有网络",
+  "net.privateAbout": "集群里的其他服务通过这些地址连接它；互联网无法访问这些地址。",
+  "net.privateEmpty": (name) => `${name} 没有私有地址`,
+  "net.privateEmptyBody": "有了私有地址，其他服务和它的公开域名才能把流量发给它。",
+  "net.shortForm": "同项目内的简写",
+  "net.forwardsTo": (port) => `转发到容器的端口 ${port}`,
+  "net.exposeHint": "要添加私有地址，请应用 Service 或运行这条命令。",
+  "net.noneTitle": (name) => `${name} 无法接收连接`,
+  "net.noneBody":
+    "它没有私有地址，也没有公开域名。只主动向外连接的后台任务两者都不需要，仍然可以连接其他服务和互联网。",
+  "net.scheduledTitle": (name) => `${name} 不接收流量`,
+  "net.scheduledBody": "批处理任务运行完就结束，不会有连接进来；它仍然可以连接其他服务和互联网。",
+  "reach.about": "集群允许哪些连接进出这个服务。",
+  "reach.fromDomains": "公开域名",
   "net.anyHost": "任何域名",
   "net.defaultBackend": "默认后端",
-  "net.private": "私有",
-  "net.public": "公开",
-  "net.alsoAs": "也可用",
-  "net.noService":
-    "集群里还没有东西连得到它：它没有内部地址。加上内部地址后，其他服务或域名才能把流量发给它。",
 
   "storage.noClaims": "没有卷。",
   "storage.requested": "申请容量",
@@ -934,29 +944,28 @@ export const zhCN: Messages = {
     "这会删除 Traefik 的 CRD 以及所有 IngressRoute、Middleware 对象；这个组件开始运行前，Ingress 流量会中断。",
   "install.k3sPackagedMetrics": "这个组件开始运行前，metrics API 不可用。",
   "install.k3sPackagedOther": "这个组件开始运行前，内置版本的工作负载会停止。",
-  "reach.title": "可达性",
-  "reach.addPolicy": "添加策略",
+  "reach.title": "连接规则",
+  "reach.addPolicy": "添加规则",
   "reach.isolate": "隔离这个服务",
-  "reach.allowIngress": "允许 ingress controller 连入",
+  "reach.allowIngress": "允许来自公开域名的流量",
   "reach.allowFrom": (name) => `允许 ${name} 连入`,
   "reach.planIsolate": (name) => `隔离 ${name}`,
-  "reach.planAllowIngress": (name) => `允许 ingress controller 连到 ${name}`,
+  "reach.planAllowIngress": (name) => `允许公开域名连接 ${name}`,
   "reach.planAllowFrom": (from, to) => `允许 ${from} 连到 ${to}`,
-  "reach.policies": "NetworkPolicy",
-  "reach.noPolicies": "这个项目没有策略，所有连接都允许。",
-  "reach.noneSelect": "没有策略作用于这个服务。",
+  "reach.policies": "规则",
+  "reach.noPolicies": "这个项目没有连接规则，所以允许所有连接。",
+  "reach.noneSelect": "没有规则应用到这个服务，所以允许所有连接。",
   "reach.in": "入站",
   "reach.out": "出站",
-  "reach.ingressController": "Ingress controller",
   "reach.otherNamespaces": "其他 Namespace",
-  "reach.dns": "DNS",
+  "reach.dns": "域名解析",
   "reach.outside": "集群外",
   "reach.cni": "规则是否真正生效，取决于集群的网络插件（CNI）。",
   "reach.allowed": "允许",
   "reach.limited": "部分",
   "reach.blocked": "拦截",
-  "reach.edgeBlocked": "NetworkPolicy 不允许",
-  "reach.edgeLimited": "NetworkPolicy 只允许一部分",
+  "reach.edgeBlocked": "连接规则不允许",
+  "reach.edgeLimited": "连接规则只允许一部分",
   "backups.title": "备份",
   "backups.namespace": "Namespace 内的所有对象",
   "backups.unscheduled": "没有备份计划",
@@ -1132,9 +1141,9 @@ export const zhCN: Messages = {
     return t
       ? timingZhCN(
           t,
-          `集群每 ${secondsZhCN(t.period)}检查一次；连续失败 ${t.threshold} 次（约 ${secondsZhCN(t.total)}）后，容器就不会从内部地址收到流量，直到再次通过。`,
+          `集群每 ${secondsZhCN(t.period)}检查一次；连续失败 ${t.threshold} 次（约 ${secondsZhCN(t.total)}）后，容器就不会从私有地址收到流量，直到再次通过。`,
         )
-      : "就绪检查失败期间，容器不会从内部地址收到流量。"
+      : "就绪检查失败期间，容器不会从私有地址收到流量。"
   },
   "sentence.diagnosis.probeFailure.why.startup": (p) => {
     const t = probeTiming(p)
@@ -1186,7 +1195,7 @@ export const zhCN: Messages = {
   "sentence.diagnosis.quotaBlocked.fix": () =>
     "减少副本数、调低每个副本的预留量，或请管理员调高上限。",
   "sentence.diagnosis.unreachable.cause.noService": (p) =>
-    `集群里还没有东西连得到 ${p.service}：它没有内部地址。`,
+    `集群里的其他服务还连不到 ${p.service}：它没有私有地址（Service）。`,
   "sentence.diagnosis.unreachable.cause.targetPort": (p) =>
     `${p.endpoint} 把流量送到端口 ${p.targetPort}，但 ${p.service} 的容器没有声明这个端口${p.ports ? `（声明的是 ${p.ports}）` : ""}。`,
   "sentence.diagnosis.unreachable.cause.noReadyEndpoints": (p) =>
@@ -1194,16 +1203,16 @@ export const zhCN: Messages = {
   "sentence.diagnosis.unreachable.cause.routeNotAccepted": (p) =>
     `发往 ${p.route} 域名的请求到不了 ${p.service}：流量入口报告 ${p.condition} ${p.reason}。`,
   "sentence.diagnosis.unreachable.why.noService": (p) =>
-    `${p.from} 用名称 ${p.service} 发送流量给它，但要有同名的内部地址才收得到。`,
+    `${p.from} 用名称 ${p.service} 发送流量给它，但要有同名的私有地址（Service）才收得到。`,
   "sentence.diagnosis.unreachable.why.targetPort": () =>
-    "内部地址会转发到它指定的端口；用名称指定时，必须是容器声明的端口。",
+    "私有地址会转发到它指定的端口；用名称指定时，必须是容器声明的端口。",
   "sentence.diagnosis.unreachable.why.noReadyEndpoints": () =>
-    "内部地址只会把流量送给通过就绪检查的副本。",
+    "私有地址只会把流量送给通过就绪检查的副本。",
   "sentence.diagnosis.unreachable.why.routeNotAccepted": () =>
     "域名的流量入口必须接受这条路由，并找到它指定的地址，请求才会通过。",
   "sentence.diagnosis.unreachable.fix.noService": () =>
-    "加上内部地址，让其他服务或域名可以把流量送给它。",
-  "sentence.diagnosis.unreachable.fix.targetPort": () => "让内部地址指向容器声明的端口。",
+    "添加私有地址（Service），让其他服务或域名可以把流量发给它。",
+  "sentence.diagnosis.unreachable.fix.targetPort": () => "让私有地址指向容器声明的端口。",
   "sentence.diagnosis.unreachable.fix.noReadyEndpoints": () =>
     "找出为什么没有副本就绪：它的其他问题、就绪检查、日志。",
   "sentence.diagnosis.unreachable.fix.routeNotAccepted": () =>

@@ -741,10 +741,10 @@ test("Networking shows who may reach a service, and a ready-made policy isolates
 }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=networking`)
   const panel = page.getByRole("tabpanel", { name: /^Networking/ })
-  await expect(panel.getByRole("heading", { name: "Reachability", exact: true })).toBeVisible()
+  await expect(panel.getByRole("heading", { name: /^Connection rules/ })).toBeVisible()
   await expect(panel).toContainText("NetworkPolicy")
   await expect(panel).toContainText("network plugin (CNI)")
-  await panel.getByRole("button", { name: "Add policy" }).click()
+  await panel.getByRole("button", { name: "Add rule" }).click()
   await page.getByRole("menuitem", { name: "Isolate this service" }).click()
   await confirmPlan(
     page,
@@ -763,9 +763,9 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
   const allowIngress = async () => {
     await page.goto(`${project}/services/Deployment/${editor}?tab=networking`)
     const panel = page.getByRole("tabpanel", { name: /^Networking/ })
-    await panel.getByRole("button", { name: "Add policy" }).click()
-    await page.getByRole("menuitem", { name: "Allow the ingress controller" }).click()
-    const applied = await confirmPlan(page, `Let the ingress controller reach ${editor}`, "Allow")
+    await panel.getByRole("button", { name: "Add rule" }).click()
+    await page.getByRole("menuitem", { name: "Allow traffic from public domains" }).click()
+    const applied = await confirmPlan(page, `Let public domains reach ${editor}`, "Allow")
     await expect(panel).toContainText(policy, { timeout: 15_000 })
     return { panel, applied }
   }

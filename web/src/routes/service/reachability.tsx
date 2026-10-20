@@ -11,7 +11,8 @@ import { useT } from "@/i18n"
 import type { Health } from "@/model/service"
 import type { Service } from "@/model/service"
 import type { PlanAsk } from "@/components/plan/planner"
-import { Section } from "@/routes/service/section"
+import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { Term } from "@zeabur/design-system/components/term"
 
 type Access = Schemas["NetworkPolicyAccess"]
 
@@ -71,32 +72,40 @@ export function Reachability({
     "flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-rule py-2 first:border-t-0"
 
   return (
-    <Section
-      title={t("reach.title")}
-      action={
-        <Menu>
-          <MenuTrigger render={<Button variant="outline" size="xs" />}>
-            <ShieldPlusIcon aria-hidden="true" data-icon="inline-start" />
-            {t("reach.addPolicy")}
-            <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
-          </MenuTrigger>
-          <MenuContent className="w-72">
-            <MenuItem onClick={() => void choose("isolate")}>{t("reach.isolate")}</MenuItem>
-            <MenuItem onClick={() => void choose("allow-from-ingress-controller")}>
-              {t("reach.allowIngress")}
-            </MenuItem>
-            {others.map((other) => (
-              <MenuItem key={other.id} onClick={() => void choose("allow-from-service", other.id)}>
-                {t("reach.allowFrom", other.name)}
+    <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-rules">
+      <SectionHeader
+        id="net-rules"
+        title={<Term detail="NetworkPolicy">{t("reach.title")}</Term>}
+        description={t("reach.about")}
+        action={
+          <Menu>
+            <MenuTrigger render={<Button variant="outline" size="xs" />}>
+              <ShieldPlusIcon aria-hidden="true" data-icon="inline-start" />
+              {t("reach.addPolicy")}
+              <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
+            </MenuTrigger>
+            <MenuContent className="w-72">
+              <MenuItem onClick={() => void choose("isolate")}>{t("reach.isolate")}</MenuItem>
+              <MenuItem onClick={() => void choose("allow-from-ingress-controller")}>
+                {t("reach.allowIngress")}
               </MenuItem>
-            ))}
-          </MenuContent>
-        </Menu>
-      }
-    >
+              {others.map((other) => (
+                <MenuItem
+                  key={other.id}
+                  onClick={() => void choose("allow-from-service", other.id)}
+                >
+                  {t("reach.allowFrom", other.name)}
+                </MenuItem>
+              ))}
+            </MenuContent>
+          </Menu>
+        }
+      />
       <div className="rounded-xl border border-v2-border bg-card px-4 py-1 text-sm">
         <div className={row}>
-          <span className="w-28 shrink-0 text-muted-foreground">{t("reach.policies")}</span>
+          <span className="w-28 shrink-0 text-muted-foreground max-sm:w-full">
+            {t("reach.policies")}
+          </span>
           {reach.selectedBy.length === 0 ? (
             <span className="text-muted-foreground">
               {policies.length === 0 ? t("reach.noPolicies") : t("reach.noneSelect")}
@@ -110,9 +119,9 @@ export function Reachability({
           )}
         </div>
         <div className={row}>
-          <span className="w-28 shrink-0 text-muted-foreground">{t("reach.in")}</span>
+          <span className="w-28 shrink-0 text-muted-foreground max-sm:w-full">{t("reach.in")}</span>
           <span className="flex items-center gap-1.5">
-            {t("reach.ingressController")}
+            <Term detail="ingress controller">{t("reach.fromDomains")}</Term>
             <AccessPill access={reach.fromIngressController} />
           </span>
           <span className="flex items-center gap-1.5">
@@ -129,9 +138,11 @@ export function Reachability({
           ))}
         </div>
         <div className={row}>
-          <span className="w-28 shrink-0 text-muted-foreground">{t("reach.out")}</span>
+          <span className="w-28 shrink-0 text-muted-foreground max-sm:w-full">
+            {t("reach.out")}
+          </span>
           <span className="flex items-center gap-1.5">
-            {t("reach.dns")}
+            <Term detail="DNS">{t("reach.dns")}</Term>
             <AccessPill access={reach.toDns} />
           </span>
           <span className="flex items-center gap-1.5">
@@ -142,6 +153,6 @@ export function Reachability({
       </div>
       <p className="type-meta text-muted-foreground">{t("reach.cni")}</p>
       {problem ? <p className="type-meta text-fail">{problem}</p> : null}
-    </Section>
+    </section>
   )
 }

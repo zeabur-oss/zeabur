@@ -219,7 +219,7 @@ export const zhTW: Messages = {
   "phase.Unknown": "未知",
 
   "role.web": "網站",
-  "role.internal": "內部",
+  "role.internal": "私有服務",
   "role.worker": "背景工作",
   "role.job": "批次工作",
   "role.data": "資料",
@@ -368,7 +368,7 @@ export const zhTW: Messages = {
 
   "lane.domains": "網域",
   "lane.web": "網站",
-  "lane.internal": "內部",
+  "lane.internal": "私有服務",
   "lane.workers": "背景與批次工作",
   "lane.data": "資料",
   "edge.declared": "宣告",
@@ -499,18 +499,28 @@ export const zhTW: Messages = {
   "vars.keys": (n) => `${n} 個鍵`,
 
   "net.path": "路徑",
-  "net.via": "路由",
-  "net.target": "目標",
-  "net.dns": "DNS 名稱",
-  "net.ports": "連接埠",
-  "net.type": "類型",
+  "net.publicTitle": "公開網域",
+  "net.publicAbout": "網際網路上的任何人都能開啟這些位址。",
+  "net.publicEmpty": (name) => `${name} 還沒有公開網域`,
+  "net.publicEmptyBody": "新增網域後，就能用瀏覽器開啟這個服務。",
+  "net.publicNeedsPrivate": "網域會把請求轉送到服務的私有位址，所以要先有私有位址。",
+  "net.sendsTo": "轉送到",
+  "net.privateTitle": "私有網路",
+  "net.privateAbout": "叢集裡的其他服務用這些位址連到它；網際網路連不到這些位址。",
+  "net.privateEmpty": (name) => `${name} 沒有私有位址`,
+  "net.privateEmptyBody": "有了私有位址，其他服務和它的公開網域才能把流量送給它。",
+  "net.shortForm": "同專案內的簡寫",
+  "net.forwardsTo": (port) => `轉送到容器的連接埠 ${port}`,
+  "net.exposeHint": "要新增私有位址，請套用 Service 或執行這個指令。",
+  "net.noneTitle": (name) => `${name} 無法接收連線`,
+  "net.noneBody":
+    "它沒有私有位址，也沒有公開網域。只會主動往外連的背景工作兩者都不需要，仍然可以連到其他服務和網際網路。",
+  "net.scheduledTitle": (name) => `${name} 不接收流量`,
+  "net.scheduledBody": "批次工作執行完就結束，不會有連線進來；它仍然可以連到其他服務和網際網路。",
+  "reach.about": "叢集允許哪些連線進出這個服務。",
+  "reach.fromDomains": "公開網域",
   "net.anyHost": "任何網域",
   "net.defaultBackend": "預設後端",
-  "net.private": "私有",
-  "net.public": "公開",
-  "net.alsoAs": "也可用",
-  "net.noService":
-    "叢集裡還沒有東西連得到它：它沒有內部位址。加上內部位址後，其他服務或網域才能把流量送給它。",
 
   "storage.noClaims": "沒有磁碟區。",
   "storage.requested": "申請容量",
@@ -935,29 +945,28 @@ export const zhTW: Messages = {
     "這會刪除 Traefik 的 CRD 與所有 IngressRoute、Middleware 物件；這個元件開始執行前，Ingress 流量會中斷。",
   "install.k3sPackagedMetrics": "這個元件開始執行前，metrics API 無法使用。",
   "install.k3sPackagedOther": "這個元件開始執行前，內建版本的工作負載會停止。",
-  "reach.title": "可達性",
-  "reach.addPolicy": "加入政策",
+  "reach.title": "連線規則",
+  "reach.addPolicy": "新增規則",
   "reach.isolate": "隔離這個服務",
-  "reach.allowIngress": "允許 ingress controller 連入",
+  "reach.allowIngress": "允許來自公開網域的流量",
   "reach.allowFrom": (name) => `允許 ${name} 連入`,
   "reach.planIsolate": (name) => `隔離 ${name}`,
-  "reach.planAllowIngress": (name) => `允許 ingress controller 連到 ${name}`,
+  "reach.planAllowIngress": (name) => `允許公開網域連到 ${name}`,
   "reach.planAllowFrom": (from, to) => `允許 ${from} 連到 ${to}`,
-  "reach.policies": "NetworkPolicy",
-  "reach.noPolicies": "這個專案沒有政策，所有連線都允許。",
-  "reach.noneSelect": "沒有政策套用到這個服務。",
+  "reach.policies": "規則",
+  "reach.noPolicies": "這個專案沒有連線規則，所以允許所有連線。",
+  "reach.noneSelect": "沒有規則套用到這個服務，所以允許所有連線。",
   "reach.in": "連入",
   "reach.out": "連出",
-  "reach.ingressController": "Ingress controller",
   "reach.otherNamespaces": "其他 Namespace",
-  "reach.dns": "DNS",
+  "reach.dns": "名稱查詢",
   "reach.outside": "叢集外",
   "reach.cni": "規則是否真的生效，取決於叢集的網路外掛（CNI）。",
   "reach.allowed": "允許",
   "reach.limited": "部分",
   "reach.blocked": "封鎖",
-  "reach.edgeBlocked": "NetworkPolicy 不允許",
-  "reach.edgeLimited": "NetworkPolicy 只允許一部分",
+  "reach.edgeBlocked": "連線規則不允許",
+  "reach.edgeLimited": "連線規則只允許一部分",
   "backups.title": "備份",
   "backups.namespace": "Namespace 內的所有物件",
   "backups.unscheduled": "沒有排程",
@@ -1133,9 +1142,9 @@ export const zhTW: Messages = {
     return t
       ? timingZhTW(
           t,
-          `叢集每 ${secondsZh(t.period)}檢查一次；連續失敗 ${t.threshold} 次（約 ${secondsZh(t.total)}）後，容器就不會從內部位址收到流量，直到再次通過。`,
+          `叢集每 ${secondsZh(t.period)}檢查一次；連續失敗 ${t.threshold} 次（約 ${secondsZh(t.total)}）後，容器就不會從私有位址收到流量，直到再次通過。`,
         )
-      : "就緒檢查失敗期間，容器不會從內部位址收到流量。"
+      : "就緒檢查失敗期間，容器不會從私有位址收到流量。"
   },
   "sentence.diagnosis.probeFailure.why.startup": (p) => {
     const t = probeTiming(p)
@@ -1188,7 +1197,7 @@ export const zhTW: Messages = {
   "sentence.diagnosis.quotaBlocked.fix": () =>
     "減少副本數、調低每個副本的保留量，或請管理員調高上限。",
   "sentence.diagnosis.unreachable.cause.noService": (p) =>
-    `叢集裡還沒有東西連得到 ${p.service}：它沒有內部位址。`,
+    `叢集裡的其他服務還連不到 ${p.service}：它沒有私有位址（Service）。`,
   "sentence.diagnosis.unreachable.cause.targetPort": (p) =>
     `${p.endpoint} 把流量送到連接埠 ${p.targetPort}，${p.service} 的容器卻沒有宣告它${p.ports ? `；容器宣告的是 ${p.ports}` : ""}。`,
   "sentence.diagnosis.unreachable.cause.noReadyEndpoints": (p) =>
@@ -1196,16 +1205,16 @@ export const zhTW: Messages = {
   "sentence.diagnosis.unreachable.cause.routeNotAccepted": (p) =>
     `送到 ${p.route} 網域的請求到不了 ${p.service}：流量入口回報 ${p.condition} ${p.reason}。`,
   "sentence.diagnosis.unreachable.why.noService": (p) =>
-    `${p.from} 用名稱 ${p.service} 送流量給它，但要有同名的內部位址才收得到。`,
+    `${p.from} 用名稱 ${p.service} 送流量給它，但要有同名的私有位址（Service）才收得到。`,
   "sentence.diagnosis.unreachable.why.targetPort": () =>
-    "內部位址會轉送到它指定的連接埠；用名稱指定時，必須是容器宣告的連接埠。",
+    "私有位址會轉送到它指定的連接埠；用名稱指定時，必須是容器宣告的連接埠。",
   "sentence.diagnosis.unreachable.why.noReadyEndpoints": () =>
-    "內部位址只會把流量送給通過就緒檢查的副本。",
+    "私有位址只會把流量送給通過就緒檢查的副本。",
   "sentence.diagnosis.unreachable.why.routeNotAccepted": () =>
     "網域的流量入口必須接受這條路由，並找到它指定的位址，請求才會通過。",
   "sentence.diagnosis.unreachable.fix.noService": () =>
-    "加上內部位址，讓其他服務或網域可以把流量送給它。",
-  "sentence.diagnosis.unreachable.fix.targetPort": () => "讓內部位址指向容器宣告的連接埠。",
+    "新增私有位址（Service），讓其他服務或網域可以把流量送給它。",
+  "sentence.diagnosis.unreachable.fix.targetPort": () => "讓私有位址指向容器宣告的連接埠。",
   "sentence.diagnosis.unreachable.fix.noReadyEndpoints": () =>
     "找出為什麼沒有副本就緒：它的其他問題、就緒檢查、日誌。",
   "sentence.diagnosis.unreachable.fix.routeNotAccepted": () =>
