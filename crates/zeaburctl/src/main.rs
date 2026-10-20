@@ -26,7 +26,8 @@ enum Command {
     Ui(ui::UiArgs),
     /// Serve a read-only Model Context Protocol server over stdio.
     Mcp(mcp::McpArgs),
-    /// Check the cluster version, the Zeabur Identity setup and the recommended components.
+    /// Check the cluster version, the Zeabur Identity setup and the components Zeabur Catalog
+    /// recommends.
     Doctor(doctor::DoctorArgs),
 }
 

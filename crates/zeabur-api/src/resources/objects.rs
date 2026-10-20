@@ -359,7 +359,7 @@ pub(crate) async fn list(
             kubernetes: refused.into_iter().next().map(|r| r.kubernetes),
             ..Problem::new(
                 Kind::Forbidden,
-                format!("You may not list anything in project {project}."),
+                format!("You do not have permission to list anything in project {project}."),
             )
         }));
     }

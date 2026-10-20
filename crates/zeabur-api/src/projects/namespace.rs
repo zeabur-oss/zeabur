@@ -102,7 +102,7 @@ pub(crate) async fn get(
         .ok_or_else(|| {
             ApiError::from(Problem::new(
                 zeabur_core::problem::Kind::NotFound,
-                format!("{what} could not be found."),
+                format!("There is no {what}."),
             ))
         })?;
     let metadata = namespace.metadata;

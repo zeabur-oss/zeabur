@@ -171,7 +171,7 @@ impl Planner<'_> {
             Err(error(
                 ErrorKind::BadRequest,
                 "unchanged",
-                format!("The details of {name} are already so."),
+                format!("{name} already has these details."),
             ))
         }
     }

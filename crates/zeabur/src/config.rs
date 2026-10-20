@@ -55,7 +55,7 @@ pub(crate) struct Args {
     pub(crate) session_max_hours: u32,
     /// The metrics store history is read from, until someone chooses another in the settings: a
     /// Service port serving the Prometheus HTTP API, as `namespace/name:port`. Empty: where
-    /// Zeabur's recommendation installs VictoriaMetrics.
+    /// Zeabur Catalog installs VictoriaMetrics.
     #[arg(long, env = "ZEABUR_METRICS_SERVICE", default_value = "")]
     pub(crate) metrics_service: String,
     /// The namespace Zeabur runs in, where the ConfigMap `zeabur-settings` keeps the settings

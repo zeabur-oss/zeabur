@@ -695,7 +695,7 @@ impl<'a> Planner<'a> {
             return Err(error(
                 ErrorKind::BadRequest,
                 "no_changes",
-                "The resources are as asked already.",
+                "The resources already have these values.",
             ));
         }
         let (index, container_pointer, mut steps) = self.container_slot(found, &target)?;
@@ -736,7 +736,7 @@ impl<'a> Planner<'a> {
             error(
                 ErrorKind::BadRequest,
                 "invalid_yaml",
-                format!("The YAML does not read: {e}"),
+                format!("Unable to read the YAML: {e}"),
             )
         })?;
         let allowed = resource_allowed(resource);

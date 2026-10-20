@@ -89,7 +89,7 @@ fn refused(error: ClusterError, what: &str, rule: &str, read: Denied) -> ApiErro
     let mut problem = error.into_problem(what);
     if problem.kind == Kind::Forbidden {
         problem.deny(read);
-        format!("You may not read {what}.").clone_into(&mut problem.detail);
+        format!("You do not have permission to read {what}.").clone_into(&mut problem.detail);
         problem.fix_for_occasion(
             format!(
                 "Ask a cluster administrator for {rule}, for example with a ClusterRole granting \
@@ -155,8 +155,8 @@ pub(crate) async fn capabilities(
             kubernetes: Some(refused.status.clone()),
             ..Problem::new(
                 Kind::Forbidden,
-                "Managing the cluster's components needs the rights of a cluster administrator: \
-                 seeing what is installed requires reading the whole cluster.",
+                "Managing the cluster's components needs cluster administrator rights: Zeabur \
+                 reads the whole cluster to see what is installed.",
             )
         };
         problem.deny(list_read_of_key(&refused.resource));

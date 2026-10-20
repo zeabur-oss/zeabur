@@ -36,7 +36,7 @@ pub(crate) async fn releases(
     let missing = || {
         ApiError::from(Problem::new(
             Kind::NotFound,
-            format!("There is no {kind} named {name} in project {project}."),
+            format!("Project {project} has no {kind} named {name}."),
         ))
     };
     let workload_kind = WorkloadKind::parse(&kind).ok_or_else(missing)?;

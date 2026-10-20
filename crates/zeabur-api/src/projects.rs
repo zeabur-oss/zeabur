@@ -74,7 +74,7 @@ pub(crate) async fn list(Person(cluster): Person) -> Result<Json<ProjectList>, A
         if problem.kind == Kind::Forbidden {
             problem.deny(list_read("", "namespaces", None));
             // Many people may use some namespaces without listing all of them: say how to go on.
-            "You may not list the cluster's namespaces, so Zeabur cannot show your projects."
+            "You do not have permission to list the cluster's namespaces, so Zeabur cannot show your projects."
                 .clone_into(&mut problem.detail);
             problem.fix_for_occasion(
                 "Ask a cluster administrator for `list` on `namespaces`, for example with a \

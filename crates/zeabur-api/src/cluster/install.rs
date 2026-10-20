@@ -53,8 +53,14 @@ pub(crate) async fn guide_for(
     let profile = asked.as_deref().unwrap_or(default_profile);
     let guide = guide(&format!("{capability}/{component}"), profile).map_err(|e| {
         ApiError::from(match e {
-            InstallError::UnknownComponent(_) => Problem::new(Kind::NotFound, e.to_string()),
-            InstallError::UnknownProfile(_) => Problem::new(Kind::BadRequest, e.to_string()),
+            InstallError::UnknownComponent(id) => Problem::new(
+                Kind::NotFound,
+                format!("Zeabur Catalog has no component {id}."),
+            ),
+            InstallError::UnknownProfile(profile) => Problem::new(
+                Kind::BadRequest,
+                format!("There is no profile {profile}; use single-node or multi-node."),
+            ),
             InstallError::Catalogue(..) => Problem::new(Kind::Internal, e.to_string()),
         })
     })?;

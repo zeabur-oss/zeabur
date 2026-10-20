@@ -630,7 +630,7 @@ impl ClusterError {
             ),
             Self::Decode(message) => Problem::new(
                 zeabur_core::problem::Kind::Internal,
-                format!("The cluster's answer about {what} could not be read ({message})."),
+                format!("Zeabur could not read the cluster's answer about {what} ({message})."),
             ),
             Self::InvalidName(message) => Problem::new(
                 zeabur_core::problem::Kind::NotFound,

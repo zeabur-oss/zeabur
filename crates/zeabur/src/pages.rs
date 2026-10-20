@@ -79,18 +79,18 @@ impl SignInProblem {
             (Self::Failed, Lang::ZhTw) => "登入沒有完成。",
             (Self::Failed, Lang::ZhCn) => "登录没有完成。",
             (Self::Expired, Lang::En) => "This sign-in expired or was started in another browser.",
-            (Self::Expired, Lang::ZhTw) => "這次登入已過期，或是在別的瀏覽器開始的。",
-            (Self::Expired, Lang::ZhCn) => "这次登录已过期，或是在别的浏览器开始的。",
+            (Self::Expired, Lang::ZhTw) => "這次登入已過期，或是從其他瀏覽器開始的。",
+            (Self::Expired, Lang::ZhCn) => "这次登录已过期，或是在其他浏览器中发起的。",
             (Self::IssuerUnreachable, Lang::En) => {
-                "The sign-in service cannot be reached. Try again in a moment."
+                "Unable to reach the sign-in service. Try again in a moment."
             }
-            (Self::IssuerUnreachable, Lang::ZhTw) => "無法連上登入服務，請稍後再試。",
-            (Self::IssuerUnreachable, Lang::ZhCn) => "无法连上登录服务，请稍后再试。",
+            (Self::IssuerUnreachable, Lang::ZhTw) => "無法連上登入服務，稍後再試一次。",
+            (Self::IssuerUnreachable, Lang::ZhCn) => "无法连接登录服务，稍后再试一次。",
             (Self::ClusterRefused, Lang::En) => {
-                "The cluster did not accept your sign-in. Ask your cluster administrator."
+                "The cluster did not accept your sign-in. Ask a cluster administrator to check your access."
             }
-            (Self::ClusterRefused, Lang::ZhTw) => "叢集不接受這次登入，請洽叢集管理員。",
-            (Self::ClusterRefused, Lang::ZhCn) => "集群不接受这次登录，请联系集群管理员。",
+            (Self::ClusterRefused, Lang::ZhTw) => "叢集不接受這次登入。請叢集管理員確認你的權限。",
+            (Self::ClusterRefused, Lang::ZhCn) => "集群不接受这次登录。请集群管理员确认你的权限。",
         }
     }
 
@@ -155,7 +155,7 @@ fn html(status: StatusCode, lang: Lang, attributes: &str, script: bool, body: &s
     };
     let page = format!(
         "<!doctype html><html lang=\"{}\"{attributes}><head><meta charset=\"utf-8\">\
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>zeabur</title>\
+<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Zeabur</title>\
 {script}</head><body>{body}</body></html>",
         lang.code()
     );

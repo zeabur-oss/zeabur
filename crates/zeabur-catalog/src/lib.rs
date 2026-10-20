@@ -128,7 +128,7 @@ struct File {
 
 /// Why the catalogue could not be read.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("recommendations catalogue, {capability}/{id}: {message}")]
+#[error("Zeabur Catalog, {capability}/{id}: {message}")]
 pub struct CatalogueError {
     capability: String,
     id: String,

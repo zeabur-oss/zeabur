@@ -160,7 +160,7 @@ pub async fn guard(State(access): State<Arc<Access>>, request: Request, next: Ne
         Err(Refusal::Host) => not_this_address(),
         Err(Refusal::CrossSite | Refusal::NotFromZeabur) => problem(
             Kind::Forbidden,
-            "Changes are accepted only from the Zeabur page itself.",
+            "Zeabur accepts changes only from its own page.",
         ),
     }
 }

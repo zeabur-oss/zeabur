@@ -240,7 +240,7 @@ pub(crate) async fn plan(
     let token = token::sign(&key, &claims).map_err(|_random| {
         ApiError::from(Problem::new(
             Kind::Internal,
-            "The system random number generator failed, so the plan could not be sealed.",
+            "The system random number generator failed, so Zeabur could not seal the plan.",
         ))
     })?;
     Ok(Json(PlanResponse {
@@ -283,7 +283,12 @@ pub(crate) async fn apply(
                 TokenError::Expired => Kind::PlanExpired,
                 TokenError::Altered | TokenError::Malformed => Kind::BadRequest,
             };
-            let mut problem = Problem::new(kind, error.to_string());
+            let detail = match error {
+                TokenError::Expired => "The plan expired.",
+                TokenError::Altered => "The plan token was altered, or it is not from this server.",
+                TokenError::Malformed => "The plan token is malformed.",
+            };
+            let mut problem = Problem::new(kind, detail);
             let (fix, key) = match error {
                 TokenError::Expired => (
                     "Plans last ten minutes. Make the plan again.",
@@ -291,7 +296,7 @@ pub(crate) async fn apply(
                         .with("minutes", (LIFETIME_SECONDS / 60).to_string()),
                 ),
                 TokenError::Altered | TokenError::Malformed => (
-                    "Make the plan again; a plan is applied only by the token it came with, \
+                    "Make the plan again; a plan applies only with the token it came with, \
                      unchanged, on the server that made it.",
                     zeabur_core::message::Message::new("problem.badRequest.fix.planToken"),
                 ),
@@ -316,14 +321,14 @@ pub(crate) async fn apply(
     if (identity.username.as_str(), identity.groups.as_slice()) != planned_by {
         return Err(ApiError::from(Problem::new(
             Kind::Forbidden,
-            "This plan was made by someone else, or with other group memberships.",
+            "Someone else made this plan, or you made it with other group memberships.",
         )));
     }
     let plan = compute(cluster.as_ref(), &project, &claims.request, &claims.made_at).await?;
     if zeabur_plan::versions(&plan) != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Conflict,
-            "Something the plan changes was changed by someone else after the plan was made.",
+            "Someone changed an object in this plan after the plan was made.",
         )));
     }
     let writes: Vec<(zeabur_plan::Target, WriteRequest)> = plan

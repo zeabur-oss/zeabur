@@ -310,7 +310,7 @@ mod tests {
             problem["detail"]
                 .as_str()
                 .unwrap()
-                .contains("ZEABUR_METRICS_SERVICE")
+                .contains("--metrics-service")
         );
 
         // In the cluster: the first change creates the ConfigMap, and history follows it.

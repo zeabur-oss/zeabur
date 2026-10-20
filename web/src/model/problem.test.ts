@@ -14,7 +14,7 @@ function refused(overrides: Partial<Problem> = {}): Problem {
     type: "/problems/elevation-required",
     title: "This needs admin rights",
     status: 403,
-    detail: "You may not read the cluster's nodes.",
+    detail: "You do not have permission to read the cluster's nodes.",
     fix: "Retry as admin, or ask a cluster administrator for access.",
     kind: "elevation-required",
     summary: {
@@ -31,7 +31,7 @@ const quota: Problem = {
   title: "The project's limit does not allow this",
   status: 403,
   detail: 'deployments.apps "web" is forbidden: exceeded quota: compute',
-  fix: "Scale web to fewer, lower what it reserves, or ask an administrator to raise the limit compute.",
+  fix: "Ask for less, free some of what the project uses, or ask a cluster administrator to raise the limit compute.",
   kind: "quota-exceeded",
   summary: { key: "problem.summary.quota-exceeded", params: { name: "web" } },
   why: {
@@ -66,7 +66,7 @@ describe("problem text", () => {
     expect(text.fix).toBe(zhTW["problem.fix.elevation-required"])
     // The refusal is said by the summary; the server's English sentence is folded away.
     expect(text.why).toBe(undefined)
-    expect(text.folded).toStrictEqual(["You may not read the cluster's nodes."])
+    expect(text.folded).toStrictEqual(["You do not have permission to read the cluster's nodes."])
   })
 
   test("a fix written for the occasion without a key is shown in English, folded otherwise", () => {
@@ -74,7 +74,10 @@ describe("problem text", () => {
     expect(problemText(translator(en), "en", refused({ fix })).fix).toBe(fix)
     const zh = problemText(translator(zhTW), "zh-TW", refused({ fix }))
     expect(zh.fix).toBe(zhTW["problem.fix.elevation-required"])
-    expect(zh.folded).toStrictEqual(["You may not read the cluster's nodes.", fix])
+    expect(zh.folded).toStrictEqual([
+      "You do not have permission to read the cluster's nodes.",
+      fix,
+    ])
   })
 
   test("a detail that is the only explanation is the why, marked as English", () => {
@@ -93,7 +96,7 @@ describe("problem text", () => {
     expect(invalid.folded).toStrictEqual([])
     // A refusal without `denied` has nothing else that says what was refused.
     const bare = problemText(translator(zhTW), "zh-TW", refused({ denied: undefined }))
-    expect(bare.why).toBe("You may not read the cluster's nodes.")
+    expect(bare.why).toBe("You do not have permission to read the cluster's nodes.")
   })
 
   test("a policy's own words are quoted, not translated", () => {

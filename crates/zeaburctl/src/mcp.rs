@@ -24,7 +24,7 @@ pub(crate) struct McpArgs {
     #[arg(long)]
     context: Option<String>,
     /// The metrics store history is read from: a Service port serving the Prometheus HTTP API,
-    /// as `namespace/name:port` (default: where Zeabur's recommendation installs
+    /// as `namespace/name:port` (default: where Zeabur Catalog installs
     /// VictoriaMetrics).
     #[arg(long, env = "ZEABUR_METRICS_SERVICE")]
     metrics_service: Option<String>,

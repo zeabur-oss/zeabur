@@ -286,7 +286,7 @@ where
         } else {
             Err(ApiError::from(Problem::new(
                 Kind::Forbidden,
-                "A terminal can be opened only from the Zeabur page itself.",
+                "Only the Zeabur page itself can open a terminal.",
             )))
         };
         std::future::ready(terminal)
@@ -362,7 +362,7 @@ async fn open(
         .find_object(&pods, Some(project), pod)
         .await
         .map_err(|e| read_problem(e, &what, get_read("", "pods", Some(project), pod)))?
-        .ok_or_else(|| Problem::new(Kind::NotFound, format!("Pod {pod} could not be found.")))?;
+        .ok_or_else(|| Problem::new(Kind::NotFound, format!("There is no pod named {pod}.")))?;
     let container = pick_container(&object.data, pod, query.container)?;
     let request = ExecRequest {
         container: container.clone(),
@@ -446,7 +446,7 @@ fn pick_container(pod: &Value, name: &str, asked: Option<String>) -> Result<Stri
         format!("Container {container} in pod {name} is not running{why}."),
     );
     problem.fix_for_occasion(
-        "Wait until it runs; its logs and events say why it does not.",
+        "Wait until it runs; its logs and events say why it doesn't.",
         zeabur_core::message::Message::new("problem.conflict.fix.waitForContainer"),
     );
     Err(problem.into())

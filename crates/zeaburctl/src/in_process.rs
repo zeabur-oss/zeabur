@@ -63,9 +63,9 @@ impl InProcess {
         let success = response.status().is_success();
         let body = axum::body::to_bytes(response.into_body(), MAX_BODY)
             .await
-            .map_err(|e| internal(&format!("cannot read the answer: {e}")))?;
+            .map_err(|e| internal(&format!("Unable to read the answer: {e}")))?;
         let value: Value = serde_json::from_slice(&body)
-            .map_err(|e| internal(&format!("the answer is not JSON: {e}")))?;
+            .map_err(|e| internal(&format!("The answer is not JSON: {e}")))?;
         if success { Ok(value) } else { Err(value) }
     }
 }

@@ -124,11 +124,11 @@ async fn check(State(auth): State<Arc<Auth>>, request: Request, next: Next) -> R
         Ok(()) => next.run(request).await,
         Err(Refusal::Host) => problem(
             Kind::Forbidden,
-            "This address does not belong to this zeabur; open it at its own address.",
+            "This address does not belong to this Zeabur. Open Zeabur at its own address.",
         ),
         Err(Refusal::CrossSite | Refusal::NotFromZeabur) => problem(
             Kind::Forbidden,
-            "Changes are accepted only from the Zeabur page itself.",
+            "Zeabur accepts changes only from its own page.",
         ),
     }
 }
@@ -161,7 +161,7 @@ struct SessionAccess {
 fn signed_out() -> Box<Problem> {
     Box::new(Problem::new(
         Kind::SignedOut,
-        "Sign in to use zeabur; your session ended or you signed out.",
+        "Your session ended, or you signed out. Sign in to use Zeabur.",
     ))
 }
 
@@ -171,7 +171,7 @@ fn credentials(parts: &Parts) -> Result<&Credentials<Connection>, Box<Problem>> 
         Some(Signed::IssuerDown) => {
             let mut problem = Problem::new(
                 Kind::Unavailable,
-                "Your sign-in is due for renewal, and the sign-in service cannot be reached.",
+                "Your sign-in needs renewing, and Zeabur cannot reach the sign-in service.",
             );
             problem.fix_for_occasion(
                 "Try again in a moment.",
@@ -254,16 +254,20 @@ fn set_cookies(headers: &mut HeaderMap, cookies: &[String]) {
     }
 }
 
+/// The problem detail when a sign-in cannot start for want of randomness.
+const RANDOM_FAILED: &str =
+    "The system random number generator failed, so Zeabur could not start a sign-in.";
+
 /// Sends the browser to Zeabur Identity for `purpose`, with the flow in `cookie_name`.
 async fn start(auth: &Auth, headers: &HeaderMap, purpose: Purpose, cookie_name: &str) -> Response {
     let Ok(pending) = Pending::start(purpose, (auth.clock)()) else {
-        return problem(Kind::Internal, "The random number generator failed.");
+        return problem(Kind::Internal, RANDOM_FAILED);
     };
     let (Ok(sealed), url) = (
         pending.seal(&auth.flow_key),
         auth.oauth.authorization_url(&pending).await,
     ) else {
-        return problem(Kind::Internal, "The random number generator failed.");
+        return problem(Kind::Internal, RANDOM_FAILED);
     };
     match url {
         Ok(url) => redirect(
@@ -304,7 +308,7 @@ async fn login(State(auth): State<Arc<Auth>>, uri: Uri, headers: HeaderMap) -> R
 /// `GET /auth/elevate`, in a window the interface opened.
 async fn elevate(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Response {
     if !auth.elevation {
-        return problem(Kind::NotFound, "Admin rights are not offered here.");
+        return problem(Kind::NotFound, "This Zeabur does not offer admin rights.");
     }
     // Only Zeabur's own page opens this window; a navigation from another site could start an
     // elevation the person did not ask for.
@@ -314,7 +318,7 @@ async fn elevate(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Response 
     {
         return problem(
             Kind::Forbidden,
-            "Admin rights are asked for only from the Zeabur page itself.",
+            "Only the Zeabur page itself can ask for admin rights.",
         );
     }
     let signed_in = match cookie::get(&headers, cookie::SESSION) {

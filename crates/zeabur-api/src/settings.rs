@@ -410,8 +410,8 @@ pub(crate) mod store {
         let Some(namespace) = state.settings.namespace.clone() else {
             return Err(ApiError::from(Problem::new(
                 Kind::BadRequest,
-                "Zeabur runs on this computer and keeps no settings here. Start it with \
-                 ZEABUR_METRICS_SERVICE=namespace/name:port to read history from another store.",
+                "Zeabur runs on this computer and keeps no settings. To read history from \
+                 another store, start it with --metrics-service namespace/name:port.",
             )));
         };
         let service = change
@@ -438,7 +438,7 @@ pub(crate) mod store {
                 if matches!(&error, ClusterError::Status(status) if status.code == 422) {
                     return ApiError::from(Problem::new(
                         Kind::Conflict,
-                        "The settings changed while you were changing them. Read them again, \
+                        "Someone changed the settings after you loaded them. Load them again, \
                          then make your change.",
                     ));
                 }

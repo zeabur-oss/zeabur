@@ -21,7 +21,7 @@ pub(crate) struct UiArgs {
     #[arg(long)]
     no_browser: bool,
     /// The metrics store history is read from: a Service port serving the Prometheus HTTP API,
-    /// as `namespace/name:port` (default: where Zeabur's recommendation installs
+    /// as `namespace/name:port` (default: where Zeabur Catalog installs
     /// VictoriaMetrics).
     #[arg(long, env = "ZEABUR_METRICS_SERVICE")]
     metrics_service: Option<String>,
@@ -106,6 +106,6 @@ fn open_browser(url: &str) {
         .spawn()
         .is_ok();
     if !opened {
-        output::info("Could not open a browser; open the link above yourself.");
+        output::info("Could not open a browser. Open the link above.");
     }
 }

@@ -157,13 +157,13 @@ pub struct InstallGuide {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum InstallError {
     /// No such component in the catalogue.
-    #[error("the catalogue has no component {0}")]
+    #[error("Zeabur Catalog has no component {0}")]
     UnknownComponent(String),
     /// No such profile.
     #[error("unknown profile {0}; use single-node or multi-node")]
     UnknownProfile(String),
     /// The catalogue file or its values do not parse; a test renders them all.
-    #[error("recommendations catalogue, {0}: {1}")]
+    #[error("Zeabur Catalog, {0}: {1}")]
     Catalogue(String, String),
 }
 
