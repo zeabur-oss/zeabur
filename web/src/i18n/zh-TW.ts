@@ -109,34 +109,34 @@ export const zhTW: Messages = {
   "problem.title.elevation-required": "這需要管理員權限",
   "problem.title.quota-exceeded": "這會超過專案的用量上限",
   "problem.title.policy-denied": "叢集裡的政策拒絕了這項變更",
-  "problem.title.not-found": "它不存在",
+  "problem.title.not-found": "找不到這個物件",
   "problem.title.log-unavailable": "無法取得日誌",
-  "problem.title.conflict": "它在這段期間有了變動",
+  "problem.title.conflict": "這段期間已有其他變更",
   "problem.title.managed": "由其他工具管理",
   "problem.title.plan-expired": "計畫已過期",
-  "problem.title.system-namespace": "這是 Kubernetes 自用的命名空間",
+  "problem.title.system-namespace": "這是 Kubernetes 自用的 Namespace",
   "problem.title.invalid": "叢集拒絕了這項變更",
   "problem.title.too-many-requests": "叢集忙碌中",
   "problem.title.unavailable": "無法連上叢集",
   "problem.title.internal": "Zeabur 發生錯誤",
   "problem.fix.bad-request": "檢查請求後再試一次。",
-  "problem.fix.unauthenticated": "請重新登入。",
-  "problem.fix.signed-out": "請重新登入。",
-  "problem.fix.forbidden": "請叢集管理員給你權限，或改用有權限的帳號。",
-  "problem.fix.elevation-required": "以管理員身分重試，或請叢集管理員給你權限。",
-  "problem.fix.quota-exceeded": "減少要求的用量、釋出專案正在用的資源，或請叢集管理員調高上限。",
+  "problem.fix.unauthenticated": "重新登入。",
+  "problem.fix.signed-out": "重新登入。",
+  "problem.fix.forbidden": "向叢集管理員要求權限，或改用有權限的帳號。",
+  "problem.fix.elevation-required": "以管理員身分重試，或向叢集管理員要求權限。",
+  "problem.fix.quota-exceeded": "減少要求的量、釋出專案已用的資源，或請叢集管理員調高上限。",
   "problem.fix.policy-denied": "依政策指出的地方修改，或向叢集管理員詢問這項政策。",
-  "problem.fix.not-found": "它可能已經刪除或改名，請重新載入頁面。",
+  "problem.fix.not-found": "重新載入頁面，看看叢集目前有什麼。",
   "problem.fix.log-unavailable": "改看這次執行的日誌，或稍候再重新整理。",
   "problem.fix.conflict": "重新載入看最新版本，再做一次變更。",
   "problem.fix.managed":
-    "請到管理工具讀取設定的地方變更（Helm values 或 Git 儲存庫）；這裡仍然可以重新啟動。",
-  "problem.fix.plan-expired": "請重新產生計畫。",
-  "problem.fix.system-namespace": "請改為納入你自己的命名空間。",
-  "problem.fix.invalid": "修正細節中叢集指出的值，再重試。",
+    "到管理工具讀取設定的地方變更，例如 Helm values 或 Git 儲存庫。這裡仍然可以重新啟動。",
+  "problem.fix.plan-expired": "重新產生計畫。",
+  "problem.fix.system-namespace": "改為納入你自己的 Namespace。",
+  "problem.fix.invalid": "修正細節中叢集指出的欄位，再試一次。",
   "problem.fix.too-many-requests": "稍等一下再試一次。",
   "problem.fix.unavailable": "確認叢集正在運作，而且這台機器連得到它。",
-  "problem.fix.internal": "請再試一次；如果一直發生，請附上細節回報。",
+  "problem.fix.internal": "再試一次。如果一直發生，請附上細節回報。",
   "problem.detail": "Zeabur 的訊息",
   "problem.about": "這類問題的說明",
   "problem.retryAfter": (s) => `叢集要求等 ${waitZh(s)}。`,
@@ -144,9 +144,9 @@ export const zhTW: Messages = {
   "problemPage.rule": "規則",
   "problemPage.kubernetes": "Kubernetes 文件",
   "problemPage.rule.bad-request":
-    "每個請求送到叢集之前，Zeabur 會先檢查：要變更的內容必須完整、格式正確。不符合的請求會被拒絕，什麼都不會寫入。",
+    "Zeabur 會在請求送到叢集之前先檢查：要變更的內容必須完整、格式正確。不符合的請求，Zeabur 會直接拒絕，什麼都不寫入。",
   "problemPage.rule.unauthenticated":
-    "每個請求都以你自己的登入身分送到叢集。叢集不再接受這個登入時（過期或被撤銷），在你重新登入之前，什麼都無法讀取或變更。",
+    "每個請求都以你自己的登入身分送到叢集。如果叢集不再接受這個登入（已過期或已撤銷），在你重新登入之前，什麼都無法讀取或變更。",
   "problemPage.rule.signed-out":
     "你的 Zeabur 工作階段已結束，Zeabur 手上沒有可以代你使用的登入。在你重新登入之前，什麼都不會讀取或變更。",
   "problemPage.rule.forbidden":
@@ -154,24 +154,24 @@ export const zhTW: Messages = {
   "problemPage.rule.elevation-required":
     "你平常的權限不允許這件事，但這個 Zeabur 可以在你用通行密鑰確認後，短時間給你管理員權限。在權限到期或你放棄之前，你的所有操作都會使用它。",
   "problemPage.rule.quota-exceeded":
-    "專案可以設定所有服務加起來能保留的上限：CPU、記憶體、副本或物件的數量。會超過上限的變更會被叢集拒絕，與你的權限無關。",
+    "專案可以設定所有服務加起來能保留的上限：CPU、記憶體、副本或物件的數量。變更如果會超過上限，叢集就會拒絕，與你的權限無關。",
   "problemPage.rule.policy-denied":
     "叢集可以用自己的政策（由 admission webhook 或政策引擎執行）檢查每一項變更。政策拒絕時，它的原話會說明原因；你的權限改變不了它的回應。",
-  "problemPage.rule.not-found": "要找的東西不在叢集裡：頁面讀取之後，它可能已被刪除或改名。",
+  "problemPage.rule.not-found": "要找的東西不在叢集裡：頁面讀取之後，可能有人刪除或改名了它。",
   "problemPage.rule.log-unavailable":
     "叢集只保留容器這一次與上一次執行的日誌，而且只在副本還存在時保留。從未寫出的日誌，或副本已經不在的日誌，都無法讀取。",
   "problemPage.rule.conflict":
     "Zeabur 只會把變更寫到你預覽的那個版本上。如果之後有人或其他程式（例如部署工具、自動擴縮）改了這個物件，就什麼都不會寫入，誰的變更都不會遺失。",
   "problemPage.rule.managed":
-    "這個物件由其他工具（Helm、Argo CD、Flux）管理，下一次同步或升級時會換回它自己的版本。在這裡做的變更會被蓋掉，所以 Zeabur 不接受。",
+    "這個物件由其他工具（Helm、Argo CD、Flux）管理。那個工具下一次同步或升級時，會換回自己的版本，蓋掉在這裡做的變更，所以 Zeabur 不接受。",
   "problemPage.rule.plan-expired":
     "計畫就是你預覽過、Zeabur 將要寫入的內容。它只在幾分鐘內有效，這樣套用時，內容仍符合叢集現況。",
   "problemPage.rule.system-namespace":
-    "Kubernetes 保留了幾個命名空間給自己的元件使用（kube-system、kube-public、kube-node-lease），它們不能成為專案。",
+    "Kubernetes 保留了幾個 Namespace 給自己的元件使用（kube-system、kube-public、kube-node-lease），它們不能成為專案。",
   "problemPage.rule.invalid":
-    "叢集儲存物件之前，會依照它的結構描述與規則檢查。這個物件被拒絕了，叢集也指出了哪些欄位無效。",
+    "叢集儲存物件之前，會依照它的結構描述與規則檢查。叢集拒絕了這個物件，並指出哪些欄位無效。",
   "problemPage.rule.too-many-requests":
-    "叢集會限制同時處理的請求數，以維持回應速度。這個請求暫時被拒絕，沒有任何變更。",
+    "叢集會限制同時處理的請求數，以維持回應速度。叢集暫時拒絕了這個請求，沒有任何變更。",
   "problemPage.rule.unavailable":
     "Zeabur 連不到叢集的 API 伺服器：它可能停機或正在重新啟動，或從 Zeabur 執行的地方連不到。",
   "problemPage.rule.internal": "出錯的是 Zeabur 本身，不是叢集。詳細資料裡有 Zeabur 知道的資訊。",
@@ -189,11 +189,11 @@ export const zhTW: Messages = {
   "refused.reveal": (name) => `顯示 ${name} 的值`,
   "refused.listThese": "列出這些物件",
   "refused.adopt": (ns) => `納入 ${ns}`,
-  "refused.unadopt": (ns) => `讓 ${ns} 不再當作專案`,
+  "refused.unadopt": (ns) => `從 Zeabur 移除 ${ns}`,
 
   "status.ready": "就緒",
   "status.rollingOut": "部署中",
-  "status.failing": "失敗中",
+  "status.failing": "異常",
   "status.degraded": "未全數就緒",
   "status.scheduled": "已排程",
   "status.paused": "已暫停",
@@ -210,8 +210,8 @@ export const zhTW: Messages = {
   "reason.configMissing": "缺少設定",
   "reason.cantStart": "無法啟動",
   "reason.waitingForRoom": "等待可用資源",
-  "reason.starting": "啟動中",
-  "reason.evicted": "被移出節點",
+  "reason.starting": "正在啟動",
+  "reason.evicted": "已移出節點",
   "reason.releaseStuck": "部署卡住",
   "reason.gaveUp": "已放棄重試",
   "phase.Running": "執行中",
@@ -901,7 +901,7 @@ export const zhTW: Messages = {
   "diagnosis.action.events": "開啟事件",
   "diagnosis.action.replicas": "調整副本數",
   "diagnosis.action.reservation": "調整保留量",
-  "diagnosis.action.variables": "變數",
+  "diagnosis.action.variables": "環境變數",
   "diagnosis.action.storage": "儲存空間",
   "gap.title": "缺少的設定",
   "gap.warning": "警告",
@@ -1082,27 +1082,27 @@ export const zhTW: Messages = {
   "settings.storeTenancy":
     "能讀取儲存服務的人，就能看到所有專案的指標。只開放給可以檢視整個叢集的人。",
   "sentence.problem.forbidden.fix.askForRule": (p) =>
-    `請叢集管理員給你 ${p.rule} 的權限，例如用授予它的 ClusterRole 和綁定到你的 ClusterRoleBinding。`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "請洽管理員，或以管理員身分重試。",
+    `向叢集管理員要求 ${p.rule} 的權限，例如建立授予這項權限的 ClusterRole，以及綁定到你的 ClusterRoleBinding。`,
+  "sentence.problem.forbidden.fix.askOrRetry": () => "洽詢管理員，或以管理員身分重試。",
   "sentence.problem.forbidden.fix.sendGrant": () =>
-    "把下面的設定交給管理員，套用後只會在這個專案授予這項權限。",
+    "把下面的設定交給管理員。它只授予這項權限，而且只在這個專案有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
-    `計畫的有效時間是 ${p.minutes} 分鐘。請重新產生計畫。`,
+    `計畫只在 ${p.minutes} 分鐘內有效。重新產生計畫。`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "請重新產生計畫；計畫只能用它原本的權杖、原封不動地在產生它的伺服器上套用。",
-  "sentence.problem.conflict.fix.review": () => "請重新預覽，從它目前的狀態開始。",
+    "重新產生計畫。計畫只能在產生它的伺服器上，用原本的權杖原封不動地套用。",
+  "sentence.problem.conflict.fix.review": () => "重新預覽，從它目前的狀態開始。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等它開始執行；它的日誌和事件會說明為什麼還沒執行。",
-  "sentence.problem.unavailable.fix.tryAgainSoon": () => "請稍後再試。",
+  "sentence.problem.unavailable.fix.tryAgainSoon": () => "稍後再試一次。",
   "sentence.problem.logUnavailable.fix.noPreviousRun": () => "改看這一次執行的日誌。",
   "sentence.problem.logUnavailable.fix.notStarted": () =>
     "等容器啟動；副本的事件會說明它在等什麼。",
   "sentence.problem.logUnavailable.fix.removed": () =>
-    "稍候再重新整理；如果還是無法讀取，請看這一次執行的日誌。要在重新啟動後保留日誌，請把它送到日誌儲存服務。",
+    "稍候再重新整理。如果還是無法讀取，改看這一次執行的日誌。要在重新啟動後保留日誌，把日誌送到日誌儲存服務。",
   "sentence.problem.quotaExceeded.fix.scale": (p) =>
     p.object
-      ? `請減少 ${p.object} 的數量、調低它的保留量，或請管理員調高上限 ${p.quota}。`
-      : `請減少要求的用量、釋出專案正在用的資源，或請管理員調高上限 ${p.quota}。`,
+      ? `減少 ${p.object} 的副本數、調低每個副本的保留量，或請管理員調高上限 ${p.quota}。`
+      : `減少要求的量、釋出專案已用的資源，或請管理員調高上限 ${p.quota}。`,
   "sentence.problem.policyDenied.fix.change": () => "修改它指出的地方，或洽詢負責這項政策的人。",
   "sentence.diagnosis.crashLoop.why.backOff": (p) =>
     `它已重新啟動 ${p.restarts} 次；叢集每次都會再啟動它，兩次之間等得越來越久，預設最多等 5 分鐘。`,
@@ -1154,11 +1154,11 @@ export const zhTW: Messages = {
   "sentence.diagnosis.configMissing.cause.unknown": (p) =>
     `${p.container} 無法啟動：缺少它讀取的機密或設定檔。`,
   "sentence.diagnosis.configMissing.cause.volume": (p) =>
-    `${mountedZhTW(p)} 無法啟動：磁碟區 ${p.volume} 來自的 ${objectZhTW(p)} 不存在。`,
+    `${mountedZhTW(p)} 無法啟動：磁碟區 ${p.volume} 取自 ${objectZhTW(p)}，但它不存在。`,
   "sentence.diagnosis.configMissing.why": () =>
     "容器讀取的每個機密、設定檔和其中的鍵都存在之後，叢集才會啟動它。",
   "sentence.diagnosis.configMissing.why.volume": () =>
-    "叢集會先掛載所有磁碟區，才啟動副本的容器；磁碟區如果來自不存在的機密或設定檔，就無法掛載，容器會一直等待。",
+    "叢集會先掛載所有磁碟區，再啟動副本的容器；磁碟區如果取自不存在的機密或設定檔，就無法掛載，容器會一直等待。",
   "sentence.diagnosis.configMissing.fix.object": (p) =>
     `在專案裡加上 ${objectZhTW(p)}，或不再讀取它。`,
   "sentence.diagnosis.configMissing.fix.key": (p) =>
@@ -1175,7 +1175,7 @@ export const zhTW: Messages = {
     `${p.service} 正在等待可以執行它的機器。`,
   "sentence.diagnosis.unschedulable.cause.other": (p) => `${p.service} 正在等待可以執行的機器。`,
   "sentence.diagnosis.unschedulable.why": (p) =>
-    `每個副本要放在有空間容納其保留量的機器上；叢集的說明：${p.message}`,
+    `每個副本要放到容得下它保留量的機器上；叢集的說明：${p.message}`,
   "sentence.diagnosis.unschedulable.fix.cpu": () => "減少保留的 CPU、減少副本數，或加一台機器。",
   "sentence.diagnosis.unschedulable.fix.memory": () =>
     "減少保留的記憶體、減少副本數，或加一台機器。",
@@ -1228,14 +1228,12 @@ export const zhTW: Messages = {
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "它不存在。"),
   "sentence.problem.summary.log-unavailable": () => "無法讀取這份日誌。",
   "sentence.problem.summary.conflict": (p) =>
-    p.name ? `你預覽後，${p.name} 已被變更。` : "你預覽後，它已被變更。",
+    p.name ? `你預覽之後，${p.name} 又有了變更。` : "你預覽之後，它又有了變更。",
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "這由其他工具管理。",
   "sentence.problem.summary.plan-expired": () => "計畫已過期。",
   "sentence.problem.summary.system-namespace": (p) =>
-    p.name
-      ? `${p.name} 是 Kubernetes 自己使用的命名空間。`
-      : "這是 Kubernetes 自己使用的命名空間。",
+    p.name ? `${p.name} 是 Kubernetes 自用的 Namespace。` : "這是 Kubernetes 自用的 Namespace。",
   "sentence.problem.summary.invalid": (p) =>
     p.name ? `叢集拒絕了對 ${p.name} 的變更。` : "叢集拒絕了這項變更。",
   "sentence.problem.summary.too-many-requests": () => "叢集正忙。",
@@ -1244,7 +1242,7 @@ export const zhTW: Messages = {
   "sentence.problem.summary.quota-exceeded": (p) =>
     p.name ? `變更 ${p.name} 會超過專案的用量上限。` : "這會超過專案的用量上限。",
   "sentence.problem.summary.policy-denied": (p) =>
-    p.name ? `叢集政策拒絕變更 ${p.name}。` : "叢集政策拒絕了這項變更。",
+    p.name ? `叢集裡的政策不允許變更 ${p.name}。` : "叢集裡的政策不允許這項變更。",
   "sentence.problem.why.quota-exceeded": (p) =>
     p.resource
       ? `專案用量上限 ${p.quota} 允許 ${p.resource} 最多 ${p.hard}，目前已用 ${p.used}。`
@@ -1253,16 +1251,16 @@ export const zhTW: Messages = {
     p.policy ? `政策 ${p.policy} 的回應是：` : "叢集的回應是：",
   "sentence.diagnosis.crashLoop.cause.exitCode": (p) => `${p.container} 反覆崩潰、重新啟動。`,
   "sentence.diagnosis.crashLoop.cause.exitsZero": (p) =>
-    `${p.container} 反覆正常結束、又被重新啟動。`,
+    `${p.container} 反覆正常結束後又重新啟動。`,
   "sentence.diagnosis.crashLoop.cause.notExecutable": (p) =>
     `${p.container} 無法執行它的指令：這個檔案不能執行。`,
   "sentence.diagnosis.crashLoop.cause.commandNotFound": (p) =>
     `${p.container} 無法執行它的指令：映像檔裡沒有這個指令。`,
   "sentence.diagnosis.crashLoop.cause.killed": (p) => `${p.container} 反覆被強制終止、重新啟動。`,
   "sentence.diagnosis.crashLoop.cause.terminated": (p) =>
-    `${p.container} 反覆被要求停止、重新啟動。`,
+    `${p.container} 反覆收到停止要求後重新啟動。`,
   "sentence.diagnosis.crashLoop.fix.exitsZero": () =>
-    "服務必須持續執行；一次性的工作請改用一次性工作（Job）。",
+    "服務必須持續執行；一次性的工作改用 Job 執行。",
   "sentence.diagnosis.crashLoop.fix.command": () => "檢查映像檔的 entrypoint、command 與 args。",
   "sentence.diagnosis.crashLoop.fix.killed": () => "有東西終止了它：檢查記憶體用量與存活檢查。",
   "sentence.diagnosis.crashLoop.fix.terminated": () => "檢查存活檢查，以及是什麼讓程式停止。",
@@ -1274,10 +1272,12 @@ export const zhTW: Messages = {
   "sentence.diagnosis.runFailed.cause.commandNotFound": (p) =>
     `${p.container} 上一次執行在映像檔裡找不到指令。`,
   "sentence.diagnosis.runFailed.cause.killed": (p) => `${p.container} 上一次執行被強制終止。`,
-  "sentence.diagnosis.runFailed.cause.terminated": (p) => `${p.container} 上一次執行被要求停止。`,
-  "sentence.diagnosis.outOfMemory.cause.limit": (p) => `${p.container} 記憶體不足，被系統終止。`,
+  "sentence.diagnosis.runFailed.cause.terminated": (p) =>
+    `${p.container} 上一次執行收到停止要求而結束。`,
+  "sentence.diagnosis.outOfMemory.cause.limit": (p) =>
+    `${p.container} 用完了記憶體，系統終止了它。`,
   "sentence.diagnosis.outOfMemory.cause.noLimit": (p) =>
-    `${p.container} 因為機器記憶體不足，被系統終止。`,
+    `機器的記憶體不足，系統終止了 ${p.container}。`,
   "sentence.diagnosis.outOfMemory.fix.limit": () => "調高記憶體上限，或找出用掉記憶體的地方。",
   "sentence.diagnosis.outOfMemory.fix.noLimit": () => "依實際用量設定記憶體的保留量與上限。",
   "sentence.diagnosis.imagePull.cause.notFound": (p) =>
@@ -1287,7 +1287,7 @@ export const zhTW: Messages = {
   "sentence.diagnosis.imagePull.cause.unauthorized": (p) =>
     `${p.container} 無法下載映像檔：映像檔倉庫拒絕了登入資訊。`,
   "sentence.diagnosis.imagePull.cause.rateLimited": (p) =>
-    `${p.container} 無法下載映像檔：碰到映像檔倉庫的次數限制。`,
+    `${p.container} 無法下載映像檔：超過映像檔倉庫的下載次數限制。`,
   "sentence.diagnosis.imagePull.cause.unreachable": (p) =>
     `${p.container} 無法下載映像檔：連不到映像檔倉庫。`,
   "sentence.diagnosis.imagePull.cause.invalidName": (p) =>
@@ -1296,7 +1296,7 @@ export const zhTW: Messages = {
     `${p.container} 無法下載映像檔 ${p.image ?? ""}。`,
   "sentence.diagnosis.imagePull.fix.notFound": () => "確認映像檔的名稱與版本標籤。",
   "sentence.diagnosis.imagePull.fix.notFoundOrPrivate": () =>
-    "確認名稱與版本標籤；如果是私有映像檔，請替專案加上映像檔倉庫的登入資訊。",
+    "確認名稱與版本標籤；如果是私有映像檔，替專案加上映像檔倉庫的登入資訊。",
   "sentence.diagnosis.imagePull.fix.unauthorized": () =>
     "替專案加上映像檔倉庫的登入資訊（imagePullSecret），或修正現有的。",
   "sentence.diagnosis.imagePull.fix.rateLimited": () => "登入映像檔倉庫，或改用鏡像站。",
@@ -1313,7 +1313,7 @@ export const zhTW: Messages = {
   "sentence.diagnosis.probeFailure.fix.readiness": () =>
     "到健康檢查確認就緒檢查的路徑、連接埠與時間設定。",
   "sentence.diagnosis.probeFailure.fix.startup": () =>
-    "如果只是啟動得比較慢，請到健康檢查放寬時間；如果早該啟動好，請看日誌找原因。",
+    "如果只是啟動得比較慢，到健康檢查放寬時間；如果早該啟動好了，日誌會說明原因。",
   "sentence.gap.resourceLimits.none": (p) =>
     `${p.container} 沒有設定 CPU 與記憶體的 request 或 limit。`,
   "sentence.gap.resourceLimits.partial": (p) =>

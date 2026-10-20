@@ -143,18 +143,18 @@ export const en = {
     "Ask for less, free some of what the project uses, or ask a cluster administrator to raise the limit.",
   "problem.fix.policy-denied":
     "Change what the policy names, or ask a cluster administrator about the policy.",
-  "problem.fix.not-found": "It may have been deleted or renamed; reload the page.",
+  "problem.fix.not-found": "Reload the page to see what the cluster has now.",
   "problem.fix.log-unavailable": "Read the current run's log, or wait a moment and refresh.",
   "problem.fix.conflict": "Reload to see the latest version, then make the change again.",
   "problem.fix.managed":
-    "Make the change where the managing tool reads it (Helm values or the Git repository); restarting is still possible here.",
+    "Change it where the managing tool reads it, such as Helm values or a Git repository. Restarting still works here.",
   "problem.fix.plan-expired": "Make the plan again.",
   "problem.fix.system-namespace": "Adopt a namespace of your own instead.",
-  "problem.fix.invalid": "Correct the values the cluster names in the details, then retry.",
+  "problem.fix.invalid": "Correct the fields the cluster names in the details, then try again.",
   "problem.fix.too-many-requests": "Wait a moment and try again.",
   "problem.fix.unavailable":
     "Check that the cluster is running and that this machine can reach it.",
-  "problem.fix.internal": "Try again; if it keeps happening, report it with the details.",
+  "problem.fix.internal": "Try again. If it keeps happening, report it with the details.",
   "problem.detail": "Zeabur's message",
   "problem.about": "What this kind of problem means",
   "problem.retryAfter": (s: number) => `The cluster asked to wait ${waitEn(s)}.`,
@@ -210,7 +210,7 @@ export const en = {
   "refused.reveal": (name: string) => `Showing the values of ${name}`,
   "refused.listThese": "Listing these",
   "refused.adopt": (ns: string) => `Adopting ${ns}`,
-  "refused.unadopt": (ns: string) => `Letting ${ns} go as a project`,
+  "refused.unadopt": (ns: string) => `Removing ${ns} from Zeabur`,
 
   // Status words
   "status.ready": "Ready",
@@ -231,12 +231,12 @@ export const en = {
   "reason.outOfMemory": "Out of memory",
   "reason.imagePull": "Can't download image",
   "reason.imageName": "Image name is wrong",
-  "reason.configMissing": "Missing setting",
+  "reason.configMissing": "Missing config",
   "reason.cantStart": "Can't start",
   "reason.waitingForRoom": "Waiting for room",
   "reason.starting": "Starting",
   "reason.evicted": "Moved off its machine",
-  "reason.releaseStuck": "Release stuck",
+  "reason.releaseStuck": "Rollout stuck",
   "reason.gaveUp": "Gave up",
   "phase.Running": "Running",
   "phase.Progressing": "Progressing",
@@ -1172,11 +1172,11 @@ export const en = {
     `Ask a cluster administrator for ${p.rule}, for example with a ClusterRole granting it and a ClusterRoleBinding to you.`,
   "sentence.problem.forbidden.fix.askOrRetry": () => "Ask an admin, or retry as admin.",
   "sentence.problem.forbidden.fix.sendGrant": () =>
-    "Send this to an admin; it grants only that, in this project only.",
+    "Send this to an admin. It grants only that permission, and only in this project.",
   "sentence.problem.planExpired.fix.again": (p: P) =>
     `Plans last ${p.minutes} minutes. Make the plan again.`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "Make the plan again; a plan applies only with the token it came with, unchanged, on the server that made it.",
+    "Make the plan again. A plan applies only on the server that made it, with its token unchanged.",
   "sentence.problem.conflict.fix.review": () => "Review again to start from its current state.",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "Wait until it runs; its logs and events say why it doesn't.",
@@ -1185,10 +1185,10 @@ export const en = {
   "sentence.problem.logUnavailable.fix.notStarted": () =>
     "Wait for the container to start; the replica's events say what it is waiting for.",
   "sentence.problem.logUnavailable.fix.removed": () =>
-    "Wait a moment and refresh; if it stays unavailable, read the current run's log. To keep logs past restarts, send them to a log store.",
+    "Wait a moment and refresh. If it stays unavailable, read the current run's log. To keep logs past restarts, send them to a log store.",
   "sentence.problem.quotaExceeded.fix.scale": (p: P) =>
     p.object
-      ? `Scale ${p.object} to fewer, lower what it reserves, or ask an admin to raise the limit ${p.quota}.`
+      ? `Run fewer replicas of ${p.object}, reserve less for each, or ask an admin to raise the limit ${p.quota}.`
       : `Ask for less, free some of what the project uses, or ask an admin to raise the limit ${p.quota}.`,
   "sentence.problem.policyDenied.fix.change": () =>
     "Change what it names, or ask whoever runs the policy.",
@@ -1333,7 +1333,7 @@ export const en = {
     p.name ? `The cluster refused the change to ${p.name}.` : "The cluster refused the change.",
   "sentence.problem.summary.too-many-requests": () => "The cluster is busy.",
   "sentence.problem.summary.unavailable": () => "The cluster can't be reached.",
-  "sentence.problem.summary.internal": () => "Something went wrong in zeabur.",
+  "sentence.problem.summary.internal": () => "Something went wrong in Zeabur.",
   "sentence.problem.summary.quota-exceeded": (p: P) =>
     p.name
       ? `The change to ${p.name} would go over the project's limit.`
@@ -1363,7 +1363,7 @@ export const en = {
   "sentence.diagnosis.crashLoop.fix.exitsZero": () =>
     "A service must keep running; run one-off work as a task (Job).",
   "sentence.diagnosis.crashLoop.fix.command": () =>
-    "Check the image's entrypoint, command and args.",
+    "Check the image's entrypoint, command, and args.",
   "sentence.diagnosis.crashLoop.fix.killed": () =>
     "Something killed it: check its memory use and its restart check.",
   "sentence.diagnosis.crashLoop.fix.terminated": () =>
@@ -1419,11 +1419,11 @@ export const en = {
   "sentence.diagnosis.probeFailure.cause.startup": (p: P) =>
     `${p.container} didn't finish starting in time.`,
   "sentence.diagnosis.probeFailure.fix.liveness": () =>
-    "Check the restart check's path, port and timing in Health checks.",
+    "Check the restart check's path, port, and timing in Health checks.",
   "sentence.diagnosis.probeFailure.fix.readiness": () =>
-    "Check the traffic check's path, port and timing in Health checks.",
+    "Check the traffic check's path, port, and timing in Health checks.",
   "sentence.diagnosis.probeFailure.fix.startup": () =>
-    "If it just starts slowly, allow more time in Health checks; if it should be up by now, its logs say why.",
+    "If it only starts slowly, allow more time in Health checks; if it should be up by now, its logs say why.",
   "sentence.gap.resourceLimits.none": (p: P) =>
     `${p.container} sets no CPU or memory requests or limits.`,
   "sentence.gap.resourceLimits.partial": (p: P) =>

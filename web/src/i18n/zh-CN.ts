@@ -109,34 +109,34 @@ export const zhCN: Messages = {
   "problem.title.elevation-required": "这需要管理员权限",
   "problem.title.quota-exceeded": "这会超过项目的用量上限",
   "problem.title.policy-denied": "集群里的策略拒绝了这项更改",
-  "problem.title.not-found": "它不存在",
+  "problem.title.not-found": "找不到这个对象",
   "problem.title.log-unavailable": "无法获取日志",
-  "problem.title.conflict": "它在此期间被更改了",
+  "problem.title.conflict": "在此期间已有其他更改",
   "problem.title.managed": "由其他工具管理",
   "problem.title.plan-expired": "计划已过期",
-  "problem.title.system-namespace": "这是 Kubernetes 自用的命名空间",
-  "problem.title.invalid": "集群拒绝了这项变更",
+  "problem.title.system-namespace": "这是 Kubernetes 自用的 Namespace",
+  "problem.title.invalid": "集群拒绝了这项更改",
   "problem.title.too-many-requests": "集群繁忙",
   "problem.title.unavailable": "无法连接集群",
   "problem.title.internal": "Zeabur 出错了",
   "problem.fix.bad-request": "检查请求后重试。",
-  "problem.fix.unauthenticated": "请重新登录。",
-  "problem.fix.signed-out": "请重新登录。",
-  "problem.fix.forbidden": "请集群管理员授予你权限，或改用有权限的账号。",
-  "problem.fix.elevation-required": "以管理员身份重试，或请集群管理员授予你权限。",
-  "problem.fix.quota-exceeded": "减少请求的用量、释放项目正在用的资源，或请集群管理员调高上限。",
+  "problem.fix.unauthenticated": "重新登录。",
+  "problem.fix.signed-out": "重新登录。",
+  "problem.fix.forbidden": "向集群管理员申请权限，或改用有权限的账号。",
+  "problem.fix.elevation-required": "以管理员身份重试，或向集群管理员申请权限。",
+  "problem.fix.quota-exceeded": "减少请求的量、释放项目已占用的资源，或请集群管理员调高上限。",
   "problem.fix.policy-denied": "按策略指出的地方修改，或向集群管理员询问这项策略。",
-  "problem.fix.not-found": "它可能已被删除或重命名，请重新加载页面。",
+  "problem.fix.not-found": "刷新页面，查看集群当前有什么。",
   "problem.fix.log-unavailable": "改看本次运行的日志，或稍后再刷新。",
-  "problem.fix.conflict": "重新加载查看最新版本，再做一次变更。",
+  "problem.fix.conflict": "刷新页面查看最新版本，再做一次更改。",
   "problem.fix.managed":
-    "请到管理工具读取配置的地方更改（Helm values 或 Git 仓库）；这里仍然可以重启。",
-  "problem.fix.plan-expired": "请重新生成计划。",
-  "problem.fix.system-namespace": "请改为纳入你自己的命名空间。",
-  "problem.fix.invalid": "修正详细信息中集群指出的值，然后重试。",
+    "到管理工具读取配置的地方更改，例如 Helm values 或 Git 仓库。这里仍然可以重启。",
+  "problem.fix.plan-expired": "重新生成计划。",
+  "problem.fix.system-namespace": "改为纳入你自己的 Namespace。",
+  "problem.fix.invalid": "修正详细信息中集群指出的字段，然后重试。",
   "problem.fix.too-many-requests": "稍等片刻再重试。",
   "problem.fix.unavailable": "确认集群正在运行，并且这台机器能连接到它。",
-  "problem.fix.internal": "请重试；如果一直出现，请附上详细信息报告。",
+  "problem.fix.internal": "再试一次。如果问题持续出现，请附上详细信息反馈。",
   "problem.detail": "Zeabur 的消息",
   "problem.about": "这类问题的说明",
   "problem.retryAfter": (s) => `集群要求等待 ${waitZhCN(s)}。`,
@@ -144,9 +144,9 @@ export const zhCN: Messages = {
   "problemPage.rule": "规则",
   "problemPage.kubernetes": "Kubernetes 文档",
   "problemPage.rule.bad-request":
-    "每个请求发到集群之前，Zeabur 会先检查：要更改的内容必须完整、格式正确。不符合的请求会被拒绝，什么都不会写入。",
+    "Zeabur 会在请求发到集群之前先检查：要更改的内容必须完整、格式正确。不符合的请求，Zeabur 会直接拒绝，什么都不写入。",
   "problemPage.rule.unauthenticated":
-    "每个请求都以你自己的登录身份发到集群。集群不再接受这个登录时（过期或被撤销），在你重新登录之前，什么都无法读取或更改。",
+    "每个请求都以你自己的登录身份发到集群。如果集群不再接受这个登录（已过期或已撤销），在你重新登录之前，什么都无法读取或更改。",
   "problemPage.rule.signed-out":
     "你的 Zeabur 会话已结束，Zeabur 手上没有可以代你使用的登录。在你重新登录之前，什么都不会读取或更改。",
   "problemPage.rule.forbidden":
@@ -154,24 +154,24 @@ export const zhCN: Messages = {
   "problemPage.rule.elevation-required":
     "你平常的权限不允许这件事，但这个 Zeabur 可以在你用通行密钥确认后，短时间给你管理员权限。在权限到期或你放弃之前，你的所有操作都会使用它。",
   "problemPage.rule.quota-exceeded":
-    "项目可以设置所有服务加起来能预留的上限：CPU、内存、副本或对象的数量。会超过上限的更改会被集群拒绝，与你的权限无关。",
+    "项目可以设置所有服务加起来能预留的上限：CPU、内存、副本或对象的数量。更改如果会超过上限，集群就会拒绝，与你的权限无关。",
   "problemPage.rule.policy-denied":
     "集群可以用自己的策略（由 admission webhook 或策略引擎执行）检查每一项更改。策略拒绝时，它的原话会说明原因；你的权限改变不了它的回应。",
-  "problemPage.rule.not-found": "要找的东西不在集群里：页面读取之后，它可能已被删除或改名。",
+  "problemPage.rule.not-found": "要找的东西不在集群里：页面读取之后，可能有人删除或重命名了它。",
   "problemPage.rule.log-unavailable":
     "集群只保留容器这一次与上一次运行的日志，而且只在副本还存在时保留。从未写出的日志，或副本已经不在的日志，都无法读取。",
   "problemPage.rule.conflict":
     "Zeabur 只会把更改写到你预览的那个版本上。如果之后有人或其他程序（例如部署工具、自动扩缩）改了这个对象，就什么都不会写入，谁的更改都不会丢失。",
   "problemPage.rule.managed":
-    "这个对象由其他工具（Helm、Argo CD、Flux）管理，下一次同步或升级时会换回它自己的版本。在这里做的更改会被覆盖，所以 Zeabur 不接受。",
+    "这个对象由其他工具（Helm、Argo CD、Flux）管理。那个工具下一次同步或升级时，会换回自己的版本，覆盖在这里做的更改，所以 Zeabur 不接受。",
   "problemPage.rule.plan-expired":
-    "计划就是你预览过、Zeabur 将要写入的内容。它只在几分钟内有效，让应用的内容仍然符合集群当前的状态。",
+    "计划就是你预览过、Zeabur 将要写入的内容。它只在几分钟内有效，确保应用时内容仍然符合集群当前的状态。",
   "problemPage.rule.system-namespace":
-    "Kubernetes 保留了几个命名空间给自己的组件使用（kube-system、kube-public、kube-node-lease），它们不能成为项目。",
+    "Kubernetes 保留了几个 Namespace 给自己的组件使用（kube-system、kube-public、kube-node-lease），它们不能成为项目。",
   "problemPage.rule.invalid":
-    "集群存储对象之前，会按照它的模式与规则检查。这个对象被拒绝了，集群也指出了哪些字段无效。",
+    "集群存储对象之前，会按照它的模式与规则检查。集群拒绝了这个对象，并指出了哪些字段无效。",
   "problemPage.rule.too-many-requests":
-    "集群会限制同时处理的请求数，以保持响应速度。这个请求暂时被拒绝，没有任何更改。",
+    "集群会限制同时处理的请求数，以保持响应速度。集群暂时拒绝了这个请求，没有任何更改。",
   "problemPage.rule.unavailable":
     "Zeabur 连不上集群的 API 服务器：它可能停机或正在重启，或从 Zeabur 运行的地方连不上。",
   "problemPage.rule.internal": "出错的是 Zeabur 本身，不是集群。详细信息里有 Zeabur 知道的情况。",
@@ -189,10 +189,10 @@ export const zhCN: Messages = {
   "refused.reveal": (name) => `显示 ${name} 的值`,
   "refused.listThese": "列出这些对象",
   "refused.adopt": (ns) => `纳入 ${ns}`,
-  "refused.unadopt": (ns) => `让 ${ns} 不再作为项目`,
+  "refused.unadopt": (ns) => `从 Zeabur 移除 ${ns}`,
 
   "status.ready": "就绪",
-  "status.rollingOut": "发布中",
+  "status.rollingOut": "部署中",
   "status.failing": "异常",
   "status.degraded": "未全部就绪",
   "status.scheduled": "已调度",
@@ -210,12 +210,12 @@ export const zhCN: Messages = {
   "reason.configMissing": "缺少配置",
   "reason.cantStart": "无法启动",
   "reason.waitingForRoom": "等待可用资源",
-  "reason.starting": "启动中",
-  "reason.evicted": "被移出节点",
+  "reason.starting": "正在启动",
+  "reason.evicted": "已移出节点",
   "reason.releaseStuck": "部署卡住",
   "reason.gaveUp": "已放弃重试",
   "phase.Running": "运行中",
-  "phase.Progressing": "发布中",
+  "phase.Progressing": "部署中",
   "phase.Degraded": "未全部就绪",
   "phase.Paused": "已暂停",
   "phase.Suspended": "已挂起",
@@ -1081,27 +1081,27 @@ export const zhCN: Messages = {
   "settings.storeTenancy":
     "能读取存储服务的人，就能看到所有项目的指标。只开放给可以查看整个集群的人。",
   "sentence.problem.forbidden.fix.askForRule": (p) =>
-    `请集群管理员给你 ${p.rule} 的权限，例如用授予它的 ClusterRole 和绑定到你的 ClusterRoleBinding。`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "请联系管理员，或以管理员身份重试。",
+    `向集群管理员申请 ${p.rule} 的权限，例如创建授予该权限的 ClusterRole，以及绑定到你的 ClusterRoleBinding。`,
+  "sentence.problem.forbidden.fix.askOrRetry": () => "联系管理员，或以管理员身份重试。",
   "sentence.problem.forbidden.fix.sendGrant": () =>
-    "把下面的配置交给管理员，应用后只会在这个项目授予这项权限。",
+    "把下面的配置交给管理员。它只授予这项权限，而且只在这个项目有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
-    `计划的有效时间是 ${p.minutes} 分钟。请重新生成计划。`,
+    `计划只在 ${p.minutes} 分钟内有效。重新生成计划。`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "请重新生成计划；计划只能用它原来的令牌、原封不动地在生成它的服务器上应用。",
-  "sentence.problem.conflict.fix.review": () => "请重新预览，从它当前的状态开始。",
+    "重新生成计划。计划只能在生成它的服务器上，用原来的令牌原样应用。",
+  "sentence.problem.conflict.fix.review": () => "重新预览，从它当前的状态开始。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等它开始运行；它的日志和事件会说明为什么还没运行。",
-  "sentence.problem.unavailable.fix.tryAgainSoon": () => "请稍后再试。",
+  "sentence.problem.unavailable.fix.tryAgainSoon": () => "稍后再试一次。",
   "sentence.problem.logUnavailable.fix.noPreviousRun": () => "改看这一次运行的日志。",
   "sentence.problem.logUnavailable.fix.notStarted": () =>
     "等容器启动；副本的事件会说明它在等什么。",
   "sentence.problem.logUnavailable.fix.removed": () =>
-    "稍候再刷新；如果还是无法读取，请看这一次运行的日志。要在重启后保留日志，请把它发送到日志存储服务。",
+    "稍后再刷新。如果还是无法读取，改看这一次运行的日志。要在重启后保留日志，把日志发送到日志存储服务。",
   "sentence.problem.quotaExceeded.fix.scale": (p) =>
     p.object
-      ? `请减少 ${p.object} 的数量、调低它的预留量，或请管理员调高上限 ${p.quota}。`
-      : `请减少请求的用量、释放项目正在用的资源，或请管理员调高上限 ${p.quota}。`,
+      ? `减少 ${p.object} 的副本数、调低每个副本的预留量，或请管理员调高上限 ${p.quota}。`
+      : `减少请求的量、释放项目已占用的资源，或请管理员调高上限 ${p.quota}。`,
   "sentence.problem.policyDenied.fix.change": () => "修改它指出的地方，或咨询负责这项策略的人。",
   "sentence.diagnosis.crashLoop.why.backOff": (p) =>
     `它已重新启动 ${p.restarts} 次；集群每次都会再启动它，两次之间等得越来越久，默认最多等 5 分钟。`,
@@ -1153,11 +1153,11 @@ export const zhCN: Messages = {
   "sentence.diagnosis.configMissing.cause.unknown": (p) =>
     `${p.container} 无法启动：缺少它读取的机密或配置文件。`,
   "sentence.diagnosis.configMissing.cause.volume": (p) =>
-    `${mountedZhCN(p)} 无法启动：存储卷 ${p.volume} 来自的 ${objectZhCN(p)} 不存在。`,
+    `${mountedZhCN(p)} 无法启动：卷 ${p.volume} 来自 ${objectZhCN(p)}，但它不存在。`,
   "sentence.diagnosis.configMissing.why": () =>
     "容器读取的每个机密、配置文件和其中的键都存在之后，集群才会启动它。",
   "sentence.diagnosis.configMissing.why.volume": () =>
-    "集群会先挂载所有存储卷，才启动副本的容器；来自不存在的机密或配置文件的存储卷无法挂载，容器就一直等待。",
+    "集群会先挂载所有卷，再启动副本的容器；卷如果来自不存在的机密或配置文件，就无法挂载，容器会一直等待。",
   "sentence.diagnosis.configMissing.fix.object": (p) =>
     `在项目里加上 ${objectZhCN(p)}，或不再读取它。`,
   "sentence.diagnosis.configMissing.fix.key": (p) =>
@@ -1165,7 +1165,7 @@ export const zhCN: Messages = {
   "sentence.diagnosis.configMissing.fix.unknown": () =>
     "副本的事件会说缺少什么；把它加上，或不再读取它。",
   "sentence.diagnosis.configMissing.fix.volume": (p) =>
-    `在项目里加上 ${objectZhCN(p)}，或移除存储卷 ${p.volume}。`,
+    `在项目里加上 ${objectZhCN(p)}，或移除卷 ${p.volume}。`,
   "sentence.diagnosis.unschedulable.cause.cpu": (p) =>
     `${p.service} 正在等待可用资源：没有机器有足够的 CPU。`,
   "sentence.diagnosis.unschedulable.cause.memory": (p) =>
@@ -1174,7 +1174,7 @@ export const zhCN: Messages = {
     `${p.service} 正在等待可以运行它的机器。`,
   "sentence.diagnosis.unschedulable.cause.other": (p) => `${p.service} 正在等待可以运行的机器。`,
   "sentence.diagnosis.unschedulable.why": (p) =>
-    `每个副本要放在有空间容纳其预留量的机器上；集群的说明：${p.message}`,
+    `每个副本要放到容得下它预留量的机器上；集群的说明：${p.message}`,
   "sentence.diagnosis.unschedulable.fix.cpu": () => "减少预留的 CPU、减少副本数，或加一台机器。",
   "sentence.diagnosis.unschedulable.fix.memory": () => "减少预留的内存、减少副本数，或加一台机器。",
   "sentence.diagnosis.unschedulable.fix.placement": () =>
@@ -1226,14 +1226,12 @@ export const zhCN: Messages = {
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "它不存在。"),
   "sentence.problem.summary.log-unavailable": () => "无法读取这份日志。",
   "sentence.problem.summary.conflict": (p) =>
-    p.name ? `你预览后，${p.name} 已被更改。` : "你预览后，它已被更改。",
+    p.name ? `你预览之后，${p.name} 又有了更改。` : "你预览之后，它又有了更改。",
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "这由其他工具管理。",
   "sentence.problem.summary.plan-expired": () => "计划已过期。",
   "sentence.problem.summary.system-namespace": (p) =>
-    p.name
-      ? `${p.name} 是 Kubernetes 自己使用的命名空间。`
-      : "这是 Kubernetes 自己使用的命名空间。",
+    p.name ? `${p.name} 是 Kubernetes 自用的 Namespace。` : "这是 Kubernetes 自用的 Namespace。",
   "sentence.problem.summary.invalid": (p) =>
     p.name ? `集群拒绝了对 ${p.name} 的更改。` : "集群拒绝了这项更改。",
   "sentence.problem.summary.too-many-requests": () => "集群正忙。",
@@ -1242,7 +1240,7 @@ export const zhCN: Messages = {
   "sentence.problem.summary.quota-exceeded": (p) =>
     p.name ? `更改 ${p.name} 会超过项目的用量上限。` : "这会超过项目的用量上限。",
   "sentence.problem.summary.policy-denied": (p) =>
-    p.name ? `集群里的策略拒绝了对 ${p.name} 的更改。` : "集群里的策略拒绝了这项更改。",
+    p.name ? `集群里的策略不允许更改 ${p.name}。` : "集群里的策略不允许这项更改。",
   "sentence.problem.why.quota-exceeded": (p) =>
     p.resource
       ? `项目用量上限 ${p.quota} 允许 ${p.resource} 最多 ${p.hard}，目前已用 ${p.used}。`
@@ -1251,16 +1249,16 @@ export const zhCN: Messages = {
     p.policy ? `策略 ${p.policy} 的回应是：` : "集群的回应是：",
   "sentence.diagnosis.crashLoop.cause.exitCode": (p) => `${p.container} 反复崩溃、重新启动。`,
   "sentence.diagnosis.crashLoop.cause.exitsZero": (p) =>
-    `${p.container} 反复正常退出、又被重新启动。`,
+    `${p.container} 反复正常退出后又重新启动。`,
   "sentence.diagnosis.crashLoop.cause.notExecutable": (p) =>
     `${p.container} 无法运行它的命令：这个文件不能执行。`,
   "sentence.diagnosis.crashLoop.cause.commandNotFound": (p) =>
     `${p.container} 无法运行它的命令：镜像里没有这个命令。`,
   "sentence.diagnosis.crashLoop.cause.killed": (p) => `${p.container} 反复被强制终止、重新启动。`,
   "sentence.diagnosis.crashLoop.cause.terminated": (p) =>
-    `${p.container} 反复被要求停止、重新启动。`,
+    `${p.container} 反复收到停止请求后重新启动。`,
   "sentence.diagnosis.crashLoop.fix.exitsZero": () =>
-    "服务必须持续运行；一次性的工作请改用一次性任务（Job）。",
+    "服务必须持续运行；一次性的工作改用 Job 运行。",
   "sentence.diagnosis.crashLoop.fix.command": () => "检查镜像的 entrypoint、command 与 args。",
   "sentence.diagnosis.crashLoop.fix.killed": () => "有东西终止了它：检查内存用量与存活检查。",
   "sentence.diagnosis.crashLoop.fix.terminated": () => "检查存活检查，以及是什么让程序停止。",
@@ -1272,12 +1270,13 @@ export const zhCN: Messages = {
   "sentence.diagnosis.runFailed.cause.commandNotFound": (p) =>
     `${p.container} 上一次运行在镜像里找不到命令。`,
   "sentence.diagnosis.runFailed.cause.killed": (p) => `${p.container} 上一次运行被强制终止。`,
-  "sentence.diagnosis.runFailed.cause.terminated": (p) => `${p.container} 上一次运行被要求停止。`,
-  "sentence.diagnosis.outOfMemory.cause.limit": (p) => `${p.container} 内存不足，被系统终止。`,
+  "sentence.diagnosis.runFailed.cause.terminated": (p) =>
+    `${p.container} 上一次运行收到停止请求而结束。`,
+  "sentence.diagnosis.outOfMemory.cause.limit": (p) => `${p.container} 用完了内存，系统终止了它。`,
   "sentence.diagnosis.outOfMemory.cause.noLimit": (p) =>
-    `${p.container} 因为机器内存不足，被系统终止。`,
+    `机器的内存不足，系统终止了 ${p.container}。`,
   "sentence.diagnosis.outOfMemory.fix.limit": () => "调高内存上限，或找出用掉内存的地方。",
-  "sentence.diagnosis.outOfMemory.fix.noLimit": () => "按实际用量设置内存的保留量与上限。",
+  "sentence.diagnosis.outOfMemory.fix.noLimit": () => "按实际用量设置内存的预留量与上限。",
   "sentence.diagnosis.imagePull.cause.notFound": (p) =>
     `${p.container} 无法下载镜像 ${p.image ?? ""}：镜像仓库里没有这个镜像。`,
   "sentence.diagnosis.imagePull.cause.notFoundOrPrivate": (p) =>
@@ -1285,7 +1284,7 @@ export const zhCN: Messages = {
   "sentence.diagnosis.imagePull.cause.unauthorized": (p) =>
     `${p.container} 无法下载镜像：镜像仓库拒绝了登录信息。`,
   "sentence.diagnosis.imagePull.cause.rateLimited": (p) =>
-    `${p.container} 无法下载镜像：触发了镜像仓库的次数限制。`,
+    `${p.container} 无法下载镜像：超出了镜像仓库的下载次数限制。`,
   "sentence.diagnosis.imagePull.cause.unreachable": (p) =>
     `${p.container} 无法下载镜像：连不上镜像仓库。`,
   "sentence.diagnosis.imagePull.cause.invalidName": (p) =>
@@ -1294,7 +1293,7 @@ export const zhCN: Messages = {
     `${p.container} 无法下载镜像 ${p.image ?? ""}。`,
   "sentence.diagnosis.imagePull.fix.notFound": () => "确认镜像的名称与版本标签。",
   "sentence.diagnosis.imagePull.fix.notFoundOrPrivate": () =>
-    "确认名称与版本标签；如果是私有镜像，请为项目加上镜像仓库的登录信息。",
+    "确认名称与版本标签；如果是私有镜像，为项目加上镜像仓库的登录信息。",
   "sentence.diagnosis.imagePull.fix.unauthorized": () =>
     "为项目加上镜像仓库的登录信息（imagePullSecret），或修正现有的。",
   "sentence.diagnosis.imagePull.fix.rateLimited": () => "登录镜像仓库，或改用镜像站。",
@@ -1311,7 +1310,7 @@ export const zhCN: Messages = {
   "sentence.diagnosis.probeFailure.fix.readiness": () =>
     "到健康检查确认就绪检查的路径、端口与时间设置。",
   "sentence.diagnosis.probeFailure.fix.startup": () =>
-    "如果只是启动得比较慢，请到健康检查放宽时间；如果早该启动好，请看日志找原因。",
+    "如果只是启动得比较慢，到健康检查放宽时间；如果早该启动好了，日志会说明原因。",
   "sentence.gap.resourceLimits.none": (p) =>
     `${p.container} 没有设置 CPU 与内存的 request 或 limit。`,
   "sentence.gap.resourceLimits.partial": (p) =>

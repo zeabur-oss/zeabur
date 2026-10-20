@@ -48,7 +48,7 @@ const quota = {
   title: "The project's limit does not allow this",
   status: 403,
   detail: `deployments.apps "${service}" is forbidden: exceeded quota: compute`,
-  fix: "Scale it to fewer, lower what it reserves, or ask an admin to raise the limit compute.",
+  fix: "Ask for less, free some of what the project uses, or ask a cluster administrator to raise the limit compute.",
   kind: "quota-exceeded",
   summary: { key: "problem.summary.quota-exceeded", params: { name: service } },
   why: {
@@ -108,7 +108,7 @@ test("a project's limit says what happened, why with its numbers, and what to do
   await expect(problem).toContainText(
     "The project's limit compute allows 4 of requests.cpu, and 3500m is already used.",
   )
-  await expect(problem).toContainText(`What to do: Scale ${service} to fewer`)
+  await expect(problem).toContainText(`What to do: Run fewer replicas of ${service}`)
   await expect(problem).not.toContainText("as admin")
   // The evidence and kube-apiserver's answer are folded.
   await expect(problem).not.toContainText("ResourceQuota/compute")

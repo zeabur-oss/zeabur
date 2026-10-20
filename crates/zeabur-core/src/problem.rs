@@ -236,7 +236,7 @@ impl Kind {
             Self::Invalid => "The cluster rejected the change",
             Self::TooManyRequests => "The cluster is busy",
             Self::Unavailable => "The cluster cannot be reached",
-            Self::Internal => "Something went wrong in zeabur",
+            Self::Internal => "Something went wrong in Zeabur",
         }
     }
 
@@ -257,21 +257,21 @@ impl Kind {
             Self::Forbidden => {
                 "Ask a cluster administrator for access, or use an account that has it."
             }
-            Self::NotFound => "It may have been deleted or renamed; reload the page.",
+            Self::NotFound => "Reload the page to see what the cluster has now.",
             Self::LogUnavailable => "Read the current run's log, or wait a moment and refresh.",
             Self::Conflict => "Reload to see the latest version, then make the change again.",
             Self::Managed => {
-                "Make the change where the managing tool reads it (Helm values or the Git \
-                 repository); restarting is still possible here."
+                "Change it where the managing tool reads it, such as Helm values or a Git \
+                 repository. Restarting still works here."
             }
             Self::PlanExpired => "Make the plan again.",
             Self::SystemNamespace => "Adopt a namespace of your own instead.",
-            Self::Invalid => "Correct the values the cluster names in the details, then retry.",
+            Self::Invalid => "Correct the fields the cluster names in the details, then try again.",
             Self::TooManyRequests => "Wait a moment and try again.",
             Self::Unavailable => {
                 "Check that the cluster is running and that this machine can reach it."
             }
-            Self::Internal => "Try again; if it keeps happening, report it with the details.",
+            Self::Internal => "Try again. If it keeps happening, report it with the details.",
         }
     }
 
@@ -498,7 +498,7 @@ impl UnavailableLog {
                 format!("There is no previous run for {what}: the container has not restarted.")
             }
             Self::NotStarted => format!("There is no {what} yet: the container has not started."),
-            Self::Removed => format!("The cluster does not have that run's container, nor {what}."),
+            Self::Removed => format!("The cluster no longer has that run's container or {what}."),
         }
     }
 
@@ -518,10 +518,10 @@ impl UnavailableLog {
         match self {
             Self::NoPreviousRun => "Read the current run's log instead.",
             Self::NotStarted => {
-                "Wait for the container to start; the pod's events say what it is waiting for."
+                "Wait for the container to start; the replica's events say what it is waiting for."
             }
             Self::Removed => {
-                "Wait a moment and refresh; if it stays unavailable, read the current run's log. \
+                "Wait a moment and refresh. If it stays unavailable, read the current run's log. \
                  To keep logs past restarts, send them to a log store."
             }
         }
@@ -584,7 +584,7 @@ impl Problem {
                 format!("The cluster does not let you change {what}.")
             }
             Kind::Unauthenticated | Kind::SignedOut => {
-                "The cluster did not accept your credentials; they may have expired.".to_owned()
+                "The cluster did not accept your credentials. They may have expired.".to_owned()
             }
             Kind::NotFound => format!("{what} could not be found."),
             // kube-apiserver never answers with Zeabur's own kind.
