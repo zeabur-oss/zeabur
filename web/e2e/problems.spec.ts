@@ -171,14 +171,20 @@ test("the account menu offers admin rights while they are offered, and dropping 
 }) => {
   await stub(page, sessionPath, session("available"))
   await page.goto("/")
-  await page.getByRole("button", { name: "Account" }).first().click()
+  await page
+    .getByRole("button", { name: /^Cluster .*, signed in as / })
+    .first()
+    .click()
   await expect(page.getByRole("menuitem", { name: "Use admin rights" })).toBeVisible()
   await expect(page.getByRole("menuitem", { name: "Drop admin rights" })).toHaveCount(0)
 
   await page.unroute(sessionPath)
   await stub(page, sessionPath, session("active"))
   await page.reload()
-  await page.getByRole("button", { name: "Account" }).first().click()
+  await page
+    .getByRole("button", { name: /^Cluster .*, signed in as / })
+    .first()
+    .click()
   await expect(page.getByRole("menuitem", { name: "Drop admin rights" })).toBeVisible()
   await expect(page.getByRole("menuitem", { name: "Use admin rights" })).toHaveCount(0)
 })

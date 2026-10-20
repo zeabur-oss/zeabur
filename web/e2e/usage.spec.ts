@@ -8,7 +8,7 @@ const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const service = env("ZEABUR_E2E_SERVICE", "talker")
 const pod = env("ZEABUR_E2E_POD")
-// The Usage tab is `?tab=metrics`.
+// Usage is a view of Inspect; the old `?tab=metrics` leads there.
 const page_ = `/projects/${encodeURIComponent(namespace)}/services/Deployment/${service}?tab=metrics`
 const STORE = "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428"
 const MiB = 2 ** 20
@@ -93,7 +93,7 @@ test("without metrics-server, the reserved amounts stay and Install is offered",
     /\/cluster\/components\?component=metrics%2Fmetrics-server/,
   )
   await expect(panel).toContainText(/Each replica \(×\d+\)/)
-  await page.goto(`/projects/${encodeURIComponent(namespace)}`)
+  await page.goto(`/projects/${encodeURIComponent(namespace)}?view=list`)
   const table = page.getByRole("table", { name: /Services/ })
   await expect(table).toBeVisible()
   await expect(table.getByRole("columnheader", { name: "Memory" })).toHaveCount(0)
@@ -111,7 +111,7 @@ test("a refused read of live usage is a quiet line with the missing right", asyn
 
 test("the services table shows each service's live CPU and memory", async ({ page }) => {
   await stub(page, usagePath, usage("available", [{ pod, cpu: 1234, memory: 3 * 2 ** 30 }]))
-  await page.goto(`/projects/${encodeURIComponent(namespace)}`)
+  await page.goto(`/projects/${encodeURIComponent(namespace)}?view=list`)
   const row = page
     .getByRole("table", { name: /Services/ })
     .getByRole("row")
