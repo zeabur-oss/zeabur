@@ -46,7 +46,9 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   conventions in `web/DESIGN.md`, "Lint"). Pages pass only layout classes to a component: a
   repeated treatment becomes a cva variant or size in the design system, not a className at each
   call site. No arbitrary values (`type-*` roles, the spacing scale, or a named token); `style`
-  carries only CSS custom properties, read by classes such as `left-(--x)`.
+  carries only CSS custom properties, read by classes such as `left-(--x)`. No `@base-ui/react`,
+  Radix, Headless UI or Motion imports (`no-restricted-imports`): add the component to the design
+  system instead.
 - **Budgets.** `scripts/ui-budget.sh` checks the brotli size of what the first page load needs;
   raise a budget only with a reason in the commit. Menus, popovers, tooltips and dialogs load
   after the first page (the design system's `popup.tsx`): use them through the design system, never

@@ -100,6 +100,8 @@ the design system's components by their import (`componentImports` in `.oxlintrc
   another app could use it, to `app.css` if it is a layout of this interface.
 - **Dynamic values are custom properties** (`no-inline-styles`): `style` sets only `--*`
   properties, read by classes (`left-(--x)`, `translate-y-(--slide-y)`, `h-(--bar)`).
+- **Design system components only** (`no-restricted-imports`): no `@base-ui/react`, Radix,
+  Headless UI or Motion imports in app code; a missing component is added to the design system.
 - **Static classes** (`require-static-classes`): a component's `className` is literal strings or
   `cn` of literals; pick a variant rather than indexing a lookup table.
 

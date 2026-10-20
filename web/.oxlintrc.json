@@ -18,6 +18,26 @@
     "shadcn/no-arbitrary-values": "error",
     "shadcn/no-inline-styles": "error",
     "shadcn/no-unknown-classes": "error",
-    "shadcn/require-static-classes": "error"
+    "shadcn/require-static-classes": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "@base-ui/react",
+              "@base-ui/react/*",
+              "@radix-ui/*",
+              "radix-ui",
+              "@headlessui/*",
+              "framer-motion",
+              "motion",
+              "motion/*"
+            ],
+            "message": "Use the @zeabur/design-system component (web/DESIGN.md, \"Lint\"); a missing one is added there."
+          }
+        ]
+      }
+    ]
   }
 }

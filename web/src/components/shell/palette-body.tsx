@@ -3,6 +3,7 @@
 // inline in the dialog (https://base-ui.com/react/components/autocomplete#command-palette): it
 // moves the highlight, keeps it in view and names it to assistive technology, and Enter while
 // composing a character (an IME) does nothing. The filter is the palette's own.
+// oxlint-disable-next-line no-restricted-imports -- the design system has no inline autocomplete (command list) yet
 import { Autocomplete } from "@base-ui/react/autocomplete"
 import { useQueries, useQuery } from "@tanstack/react-query"
 import { useRouter } from "@tanstack/react-router"
