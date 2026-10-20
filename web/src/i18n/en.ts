@@ -524,20 +524,24 @@ export const en = {
   "terminal.debugLabel": "kubectl debug",
 
   // Variables
-  "vars.definedHere": "Defined here",
-  "vars.fromObjects": "From other objects",
-  "vars.reveal": (secret: string) => `Reveal ${secret}`,
-  "vars.hide": (secret: string) => `Hide ${secret}`,
+  "vars.title": "Environment variables",
+  "vars.about": "Settings the app reads when it starts, such as a database address or an API key.",
+  "vars.emptyTitle": "No environment variables yet",
+  "vars.emptyBody": "Add one to change a setting without building a new image.",
+  "vars.direct": "Set directly",
+  "vars.fromObjects": "From config files and secrets",
+  "vars.fromCluster": "Filled in by Kubernetes",
+  "vars.reveal": (secret: string) => `Show values in ${secret}`,
+  "vars.hide": (secret: string) => `Hide values in ${secret}`,
   "vars.secretsHint": "About Secret values",
   "vars.revealHint":
     "Zeabur fetches a value only when you reveal it, and keeps it on this page only.",
   "vars.view": "View",
   "vars.list": "List",
-  "vars.names": (service: string) => `Names the Service ${service}`,
+  "vars.names": (service: string) => `Points to the service ${service}`,
   "vars.atRuntime": "Set at runtime",
   "vars.allKeys": "All keys",
   "vars.keys": (n: number) => plural(n, "key", "keys"),
-  "vars.none": "None.",
 
   // Networking
   "net.path": "Path",

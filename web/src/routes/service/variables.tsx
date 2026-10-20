@@ -1,6 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
-import { lazy, Suspense, useState, type ReactElement } from "react"
+import { lazy, Suspense, useState, type ReactElement, type ReactNode } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
 import EyeIcon from "~icons/ph/eye"
@@ -15,15 +15,24 @@ import TreeStructureIcon from "~icons/ph/tree-structure"
 
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { configMapsQuery } from "@/api/queries"
-import { CopyButton, Hint, Panel, Segmented } from "@/components/bits"
+import { CopyButton, Hint, Segmented } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { RefusedKinds } from "@/components/refused"
 import { Button } from "@zeabur/design-system/components/button"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@zeabur/design-system/components/empty"
 import { Input } from "@zeabur/design-system/components/input"
+import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Select } from "@zeabur/design-system/components/select"
 import { Spinner } from "@zeabur/design-system/components/spinner"
+import { Term } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import type { Edge } from "@/model/connections"
@@ -156,66 +165,158 @@ export function VariablesTab({
     }),
   ].join("\n")
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {secretNames.map((name) => {
-            const state = secrets[name]
-            return state?.values ? (
-              <Button key={name} variant="outline" size="sm" onClick={() => hide(name)}>
-                <EyeSlashIcon aria-hidden="true" data-icon="inline-start" />
-                {t("vars.hide", name)}
-              </Button>
-            ) : (
-              <Button
-                key={name}
-                variant="outline"
-                size="sm"
-                onClick={() => void reveal(name)}
-                disabled={state?.pending}
-              >
-                {state?.pending ? (
-                  <Spinner data-icon="inline-start" />
-                ) : (
-                  <EyeIcon aria-hidden="true" data-icon="inline-start" />
-                )}
-                {t("vars.reveal", name)}
-              </Button>
-            )
-          })}
-          {secretNames.length > 0 ? (
-            <Hint label={t("vars.secretsHint")}>{t("vars.revealHint")}</Hint>
-          ) : null}
-        </div>
-        <span className="ml-auto">
-          <Segmented
-            label={t("vars.view")}
-            value={raw ? "raw" : "list"}
-            onChange={(value) => setRaw(value === "raw")}
-            options={[
-              {
-                value: "list",
-                label: (
-                  <>
-                    <ListBulletsIcon className="size-3.5" aria-hidden="true" />
-                    {t("vars.list")}
-                  </>
-                ),
-              },
-              {
-                value: "raw",
-                label: (
-                  <>
-                    <BracketsCurlyIcon className="size-3.5" aria-hidden="true" />
-                    .env
-                  </>
-                ),
-              },
-            ]}
+  const fromObjects = referenced.filter(
+    ({ env }) => env.source.kind === "Secret" || env.source.kind === "ConfigMap",
+  )
+  const fromCluster = referenced.filter(
+    ({ env }) => env.source.kind !== "Secret" && env.source.kind !== "ConfigMap",
+  )
+  const total =
+    literal.length +
+    referenced.length +
+    imported.reduce((n, i) => n + (i.imported.keyCount ?? 0), 0)
+  const adding = draft !== undefined && draft.was === undefined
+  const objectKinds = [
+    ...new Set([
+      ...fromObjects.map(({ env }) => env.source.kind),
+      ...imported.map(({ imported: i }) => i.source.kind),
+    ]),
+  ].join(" · ")
+  const clusterKinds = [
+    ...new Set(
+      fromCluster.map(({ env }) =>
+        env.source.kind === "PodField"
+          ? "fieldRef"
+          : env.source.kind === "ResourceField"
+            ? "resourceFieldRef"
+            : env.source.kind,
+      ),
+    ),
+  ].join(" · ")
+
+  const revealButtons =
+    secretNames.length > 0 ? (
+      <span className="flex flex-wrap items-center gap-1.5">
+        {secretNames.map((name) => {
+          const state = secrets[name]
+          return state?.values ? (
+            <Button key={name} variant="outline" size="xs" onClick={() => hide(name)}>
+              <EyeSlashIcon aria-hidden="true" data-icon="inline-start" />
+              {t("vars.hide", name)}
+            </Button>
+          ) : (
+            <Button
+              key={name}
+              variant="outline"
+              size="xs"
+              onClick={() => void reveal(name)}
+              disabled={state?.pending}
+            >
+              {state?.pending ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <EyeIcon aria-hidden="true" data-icon="inline-start" />
+              )}
+              {t("vars.reveal", name)}
+            </Button>
+          )
+        })}
+        <Hint label={t("vars.secretsHint")}>{t("vars.revealHint")}</Hint>
+      </span>
+    ) : null
+
+  const sourceRow = ({ container, env }: { container: string; env: Schemas["EnvVar"] }) => {
+    const value = valueOf(env)
+    const secret = env.source.kind === "Secret"
+    return (
+      <li
+        key={`${container}/${env.name}`}
+        className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
+      >
+        <span className="font-mono text-xs font-medium" translate="no">
+          {env.name}
+        </span>
+        <span className="flex min-w-0 items-center gap-1">
+          {value !== undefined ? (
+            <>
+              <span className="truncate font-mono text-xs" translate="no">
+                {value}
+              </span>
+              <CopyButton value={value} />
+            </>
+          ) : secret ? (
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs tracking-widest text-muted-foreground">
+              <KeyIcon className="size-3.5" aria-hidden="true" />
+              ••••••••
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">{t("vars.atRuntime")}</span>
+          )}
+        </span>
+        <span className="flex items-center justify-end gap-1">
+          <SourceChip source={env.source} />
+          <EditSource
+            source={env.source}
+            onOpen={(kind, name) => setEditor({ kind, name, key: env.source.key ?? undefined })}
           />
         </span>
-      </div>
+      </li>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionHeader
+        title={t("vars.title")}
+        count={total > 0 ? total : undefined}
+        description={t("vars.about")}
+        action={
+          <>
+            {total > 0 ? (
+              <Segmented
+                label={t("vars.view")}
+                value={raw ? "raw" : "list"}
+                onChange={(value) => setRaw(value === "raw")}
+                options={[
+                  {
+                    value: "list",
+                    label: (
+                      <>
+                        <ListBulletsIcon className="size-3.5" aria-hidden="true" />
+                        {t("vars.list")}
+                      </>
+                    ),
+                  },
+                  {
+                    value: "raw",
+                    label: (
+                      <>
+                        <BracketsCurlyIcon className="size-3.5" aria-hidden="true" />
+                        .env
+                      </>
+                    ),
+                  },
+                ]}
+              />
+            ) : null}
+            <ManagedTip tool={managed}>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={Boolean(managed) || draft !== undefined}
+                onClick={() => {
+                  setRaw(false)
+                  setDraft({ container: containers[0]?.name ?? "", name: "", value: "" })
+                }}
+              >
+                <PlusIcon aria-hidden="true" data-icon="inline-start" />
+                {t("vars.add")}
+              </Button>
+            </ManagedTip>
+          </>
+        }
+      />
+      <RefusedKinds unreadable={refused} line />
       {secretNames.map((name) =>
         secrets[name]?.problem ? (
           <Problem
@@ -227,190 +328,138 @@ export function VariablesTab({
         ) : null,
       )}
 
-      {raw ? (
-        <div className="relative rounded-lg border bg-muted/30">
-          <CopyButton value={dotenv} className="absolute top-2 right-2" />
-          <pre className="overflow-x-auto p-4 font-mono text-xs leading-6" translate="no">
-            {dotenv || "# —"}
-          </pre>
-        </div>
-      ) : (
+      {total === 0 && !adding ? (
+        <Empty variant="outline" size="inline">
+          <EmptyMedia variant="glyph">
+            <KeyIcon aria-hidden="true" />
+          </EmptyMedia>
+          <EmptyHeader>
+            <EmptyTitle>{t("vars.emptyTitle")}</EmptyTitle>
+            <EmptyDescription>{t("vars.emptyBody")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : raw ? (
         <>
-          <Panel
-            title={t("vars.definedHere")}
-            action={
-              <ManagedTip tool={managed}>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  disabled={Boolean(managed) || draft !== undefined}
-                  onClick={() =>
-                    setDraft({ container: containers[0]?.name ?? "", name: "", value: "" })
-                  }
-                >
-                  <PlusIcon aria-hidden="true" data-icon="inline-start" />
-                  {t("vars.add")}
-                </Button>
-              </ManagedTip>
-            }
-          >
-            {draft && draft.was === undefined ? (
-              <DraftRow
-                draft={draft}
-                containers={containers.map((c) => c.name)}
-                onCancel={() => setDraft(undefined)}
-                onReview={(done) => {
-                  planEnv(done.container, [
-                    { name: done.name.trim(), op: "set", value: done.value },
-                  ])
-                  setDraft(undefined)
-                }}
-              />
-            ) : null}
-            {literal.length === 0 ? (
-              draft ? null : (
-                <p className="text-sm text-muted-foreground">{t("vars.none")}</p>
-              )
-            ) : (
-              <ul className="-my-1 flex flex-col divide-y">
-                {literal.map(({ container, env }) => {
-                  const targets = named.get(`${container}/${env.name}`) ?? []
-                  if (draft?.was === env.name && draft.container === container)
+          {revealButtons}
+          <div className="relative rounded-lg border bg-muted/30">
+            <CopyButton value={dotenv} className="absolute top-2 right-2" />
+            <pre className="overflow-x-auto p-4 font-mono text-xs leading-6" translate="no">
+              {dotenv || "# —"}
+            </pre>
+          </div>
+        </>
+      ) : (
+        <div className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
+          {literal.length > 0 || adding ? (
+            <VarGroup label={t("vars.direct")} detail="env.value">
+              {adding ? (
+                <DraftRow
+                  draft={draft}
+                  containers={containers.map((c) => c.name)}
+                  onCancel={() => setDraft(undefined)}
+                  onReview={(done) => {
+                    planEnv(done.container, [
+                      { name: done.name.trim(), op: "set", value: done.value },
+                    ])
+                    setDraft(undefined)
+                  }}
+                />
+              ) : null}
+              {literal.length > 0 ? (
+                <ul className="flex flex-col divide-y">
+                  {literal.map(({ container, env }) => {
+                    const targets = named.get(`${container}/${env.name}`) ?? []
+                    if (draft?.was === env.name && draft.container === container)
+                      return (
+                        <li key={`${container}/${env.name}`} className="py-2">
+                          <DraftRow
+                            draft={draft}
+                            containers={[container]}
+                            onCancel={() => setDraft(undefined)}
+                            onReview={(done) => {
+                              planEnv(container, [{ name: env.name, op: "set", value: done.value }])
+                              setDraft(undefined)
+                            }}
+                          />
+                        </li>
+                      )
                     return (
-                      <li key={`${container}/${env.name}`} className="py-2">
-                        <DraftRow
-                          draft={draft}
-                          containers={[container]}
-                          onCancel={() => setDraft(undefined)}
-                          onReview={(done) => {
-                            planEnv(container, [{ name: env.name, op: "set", value: done.value }])
-                            setDraft(undefined)
-                          }}
-                        />
+                      <li
+                        key={`${container}/${env.name}`}
+                        className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
+                      >
+                        <span
+                          className="flex items-center gap-1.5 font-mono text-xs font-medium"
+                          translate="no"
+                        >
+                          {env.name}
+                          {multi ? (
+                            <span className="font-normal text-muted-foreground">{container}</span>
+                          ) : null}
+                        </span>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="truncate font-mono text-xs"
+                            translate="no"
+                            title={env.value ?? ""}
+                          >
+                            {env.value}
+                          </span>
+                          <CopyButton value={env.value ?? ""} />
+                          {targets.map((target) => (
+                            <Tooltip key={target} content={t("vars.names", target)}>
+                              <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
+                                <ArrowRightIcon className="size-3" aria-hidden="true" />
+                                {target}
+                              </span>
+                            </Tooltip>
+                          ))}
+                        </span>
+                        <span className="flex items-center justify-end gap-0.5">
+                          <ManagedTip tool={managed}>
+                            <Button
+                              variant="muted"
+                              size="icon-xs"
+                              disabled={Boolean(managed) || draft !== undefined}
+                              aria-label={t("edit.edit", env.name)}
+                              title={t("edit.edit", env.name)}
+                              onClick={() =>
+                                setDraft({
+                                  container,
+                                  name: env.name,
+                                  value: env.value ?? "",
+                                  was: env.name,
+                                })
+                              }
+                            >
+                              <PencilSimpleIcon aria-hidden="true" />
+                            </Button>
+                          </ManagedTip>
+                          <ManagedTip tool={managed}>
+                            <Button
+                              variant="muted"
+                              size="icon-xs"
+                              disabled={Boolean(managed)}
+                              aria-label={t("edit.remove", env.name)}
+                              title={t("edit.remove", env.name)}
+                              onClick={() => planEnv(container, [{ name: env.name, op: "remove" }])}
+                            >
+                              <TrashIcon aria-hidden="true" />
+                            </Button>
+                          </ManagedTip>
+                        </span>
                       </li>
                     )
-                  return (
-                    <li
-                      key={`${container}/${env.name}`}
-                      className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
-                    >
-                      <span
-                        className="flex items-center gap-1.5 font-mono text-xs font-medium"
-                        translate="no"
-                      >
-                        {env.name}
-                        {multi ? (
-                          <span className="font-normal text-muted-foreground">{container}</span>
-                        ) : null}
-                      </span>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="truncate font-mono text-xs"
-                          translate="no"
-                          title={env.value ?? ""}
-                        >
-                          {env.value}
-                        </span>
-                        <CopyButton value={env.value ?? ""} />
-                        {targets.map((target) => (
-                          <Tooltip key={target} content={t("vars.names", target)}>
-                            <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
-                              <ArrowRightIcon className="size-3" aria-hidden="true" />
-                              {target}
-                            </span>
-                          </Tooltip>
-                        ))}
-                      </span>
-                      <span className="flex items-center justify-end gap-0.5">
-                        <ManagedTip tool={managed}>
-                          <Button
-                            variant="muted"
-                            size="icon-xs"
-                            disabled={Boolean(managed) || draft !== undefined}
-                            aria-label={t("edit.edit", env.name)}
-                            title={t("edit.edit", env.name)}
-                            onClick={() =>
-                              setDraft({
-                                container,
-                                name: env.name,
-                                value: env.value ?? "",
-                                was: env.name,
-                              })
-                            }
-                          >
-                            <PencilSimpleIcon aria-hidden="true" />
-                          </Button>
-                        </ManagedTip>
-                        <ManagedTip tool={managed}>
-                          <Button
-                            variant="muted"
-                            size="icon-xs"
-                            disabled={Boolean(managed)}
-                            aria-label={t("edit.remove", env.name)}
-                            title={t("edit.remove", env.name)}
-                            onClick={() => planEnv(container, [{ name: env.name, op: "remove" }])}
-                          >
-                            <TrashIcon aria-hidden="true" />
-                          </Button>
-                        </ManagedTip>
-                      </span>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </Panel>
+                  })}
+                </ul>
+              ) : null}
+            </VarGroup>
+          ) : null}
 
-          <Panel title={t("vars.fromObjects")} bodyClassName="flex flex-col gap-3">
-            <RefusedKinds unreadable={refused} line />
-            {referenced.length + imported.length === 0 ? (
-              refused.length > 0 ? null : (
-                <p className="text-sm text-muted-foreground">{t("vars.none")}</p>
-              )
-            ) : (
-              <ul className="-my-1 flex flex-col divide-y">
-                {referenced.map(({ container, env }) => {
-                  const value = valueOf(env)
-                  const secret = env.source.kind === "Secret"
-                  return (
-                    <li
-                      key={`${container}/${env.name}`}
-                      className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
-                    >
-                      <span className="font-mono text-xs font-medium" translate="no">
-                        {env.name}
-                      </span>
-                      <span className="flex min-w-0 items-center gap-1">
-                        {value !== undefined ? (
-                          <>
-                            <span className="truncate font-mono text-xs" translate="no">
-                              {value}
-                            </span>
-                            <CopyButton value={value} />
-                          </>
-                        ) : secret ? (
-                          <span className="inline-flex items-center gap-1.5 font-mono text-xs tracking-widest text-muted-foreground">
-                            <KeyIcon className="size-3.5" aria-hidden="true" />
-                            ••••••••
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">
-                            {t("vars.atRuntime")}
-                          </span>
-                        )}
-                      </span>
-                      <span className="flex items-center justify-end gap-1">
-                        <SourceChip source={env.source} />
-                        <EditSource
-                          source={env.source}
-                          onOpen={(kind, name) =>
-                            setEditor({ kind, name, key: env.source.key ?? undefined })
-                          }
-                        />
-                      </span>
-                    </li>
-                  )
-                })}
+          {fromObjects.length + imported.length > 0 ? (
+            <VarGroup label={t("vars.fromObjects")} detail={objectKinds} action={revealButtons}>
+              <ul className="flex flex-col divide-y">
+                {fromObjects.map(sourceRow)}
                 {imported.map(({ container, imported: i }) => (
                   <li
                     key={`${container}/${i.origin.fieldPath ?? i.source.name}`}
@@ -435,9 +484,15 @@ export function VariablesTab({
                   </li>
                 ))}
               </ul>
-            )}
-          </Panel>
-        </>
+            </VarGroup>
+          ) : null}
+
+          {fromCluster.length > 0 ? (
+            <VarGroup label={t("vars.fromCluster")} detail={clusterKinds}>
+              <ul className="flex flex-col divide-y">{fromCluster.map(sourceRow)}</ul>
+            </VarGroup>
+          ) : null}
+        </div>
       )}
       {editor ? (
         <Suspense fallback={null}>
@@ -453,6 +508,30 @@ export function VariablesTab({
       ) : null}
       {planner.dialog}
     </div>
+  )
+}
+
+function VarGroup({
+  label,
+  detail,
+  action,
+  children,
+}: {
+  label: string
+  detail?: string
+  action?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <section className="flex flex-col px-5 pt-3 pb-1">
+      <div className="flex flex-wrap items-center gap-2 pb-1">
+        <h3 className="type-meta font-medium text-secondary">
+          <Term detail={detail || undefined}>{label}</Term>
+        </h3>
+        {action ? <span className="ml-auto">{action}</span> : null}
+      </div>
+      {children}
+    </section>
   )
 }
 
