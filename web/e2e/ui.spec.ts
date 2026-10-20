@@ -282,7 +282,12 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
   ])
   await page.keyboard.press("Escape")
   await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true")
-  await expect(page.getByRole("tabpanel", { name: "Overview" })).toContainText(pod)
+  const overview = page.getByRole("tabpanel", { name: "Overview" })
+  await expect(overview.getByRole("region", { name: "Status" })).toContainText("Source")
+  await overview.getByRole("button", { name: /^Replicas \d+\/\d+$/ }).click()
+  await expect(page.getByRole("dialog")).toContainText(pod)
+  await page.keyboard.press("Escape")
+  await expect(overview.getByRole("button", { name: "Logs", exact: true })).toBeVisible()
   await expect(page.getByRole("button", { name: "Restart" })).toBeEnabled()
   const sections = page.getByRole("navigation", { name: "Project sections" })
   await expect(sections.getByRole("link", { name: "Projects" })).toHaveAttribute(

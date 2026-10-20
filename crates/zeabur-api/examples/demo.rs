@@ -36,7 +36,7 @@ use axum::http::request::Parts;
 use serde_json::{Value, json};
 use zeabur_api::access::{Access, ClusterAccess, Elevation};
 use zeabur_core::problem::Problem;
-use zeabur_kube::k8s_openapi::api::apps::v1::{Deployment, StatefulSet};
+use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use zeabur_kube::k8s_openapi::api::batch::v1::{CronJob, Job};
 use zeabur_kube::k8s_openapi::api::core::v1::{
     ConfigMap, Namespace, Node, PersistentVolumeClaim, Pod, Secret, Service,
@@ -630,13 +630,38 @@ fn internal_tools() -> NamespaceObjects {
                     &running(name, 0),
                 )
             })
+            .chain([pod_in(
+                ns,
+                "cadvisor-k7m2p",
+                "cadvisor",
+                Some(("DaemonSet", "cadvisor")),
+                &running("cadvisor", 1),
+            )])
             .collect(),
         services: tools
             .iter()
             .map(|(name, _)| service_in(ns, name, 80, "http"))
             .collect(),
+        daemon_sets: vec![cadvisor(ns)],
         ..NamespaceObjects::default()
     }
+}
+
+/// cAdvisor as a DaemonSet with one ready pod, the shape most node agents have.
+fn cadvisor(namespace: &str) -> DaemonSet {
+    from(json!({
+        "metadata": {"name": "cadvisor", "namespace": namespace, "generation": 1,
+            "creationTimestamp": created("cadvisor"),
+            "labels": {"app.kubernetes.io/name": "cadvisor"}},
+        "spec": {"selector": {"matchLabels": {"app": "cadvisor"}},
+            "template": {"metadata": {"labels": {"app": "cadvisor"}}, "spec": {"containers": [{
+                "name": "cadvisor", "image": "ghcr.io/google/cadvisor:v0.60.5",
+                "ports": [{"name": "http", "containerPort": 8080}]
+            }]}}},
+        "status": {"observedGeneration": 1, "desiredNumberScheduled": 1,
+            "currentNumberScheduled": 1, "numberReady": 1, "updatedNumberScheduled": 1,
+            "numberAvailable": 1, "numberMisscheduled": 0}
+    }))
 }
 
 fn state() -> State {

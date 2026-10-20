@@ -161,13 +161,9 @@ test("a pod that runs again after a recent crash keeps the service failing, in p
     return body
   })
   await page.goto(servicePage)
-  const pill = page.getByRole("heading", { level: 1, name: service }).locator("xpath=..")
-  await expect(pill).toContainText("Keeps crashing")
-  await expect(pill).toContainText("Running, 5 restarts, last exit 1, 4 minutes ago")
-  await pill.getByText("Keeps crashing").hover()
-  await expect(
-    page.getByText("Running, 5 restarts, last exit 1, 4 minutes ago").last(),
-  ).toBeVisible()
+  const status = page.getByRole("region", { name: "Status" })
+  await expect(status.getByRole("heading", { level: 2 })).toHaveText("Keeps crashing")
+  await expect(status.getByText("Running, 5 restarts, last exit 1, 4 minutes ago")).toBeVisible()
 })
 
 test("the account menu offers admin rights while they are offered, and dropping them while in use", async ({

@@ -30,6 +30,7 @@ import {
 } from "@/model/usage"
 import type { Guide } from "@/routes/service/history-chart"
 import { Meter } from "@zeabur/design-system/components/meter"
+import { SummaryCardAside } from "@zeabur/design-system/components/summary-card"
 
 const HistoryChart = lazy(() => import("@/routes/service/history-chart"))
 
@@ -137,6 +138,50 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
         )}
       </div>
     </Panel>
+  )
+}
+
+/** Live CPU and memory beside the service's status; nothing until metrics-server answers. */
+export function UsageGlance({
+  project,
+  service,
+  action,
+}: {
+  project: string
+  service: Service
+  action: ReactNode
+}) {
+  const t = useT()
+  const usage = useQuery(usageQuery(project))
+  if (usage.data?.state !== "available") return null
+  const { requests, limits } = templateAmounts(service)
+  const sum = sumUsage(measured(service, usage.data))
+  if (sum.pods === 0) return null
+  const scale = (value?: number) => (value === undefined ? undefined : value * sum.pods)
+  const replicas = service.pods.length
+  return (
+    <SummaryCardAside>
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 type-meta text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-ok" aria-hidden="true" />
+          {t("usage.title")}
+        </span>
+        {action}
+      </div>
+      {(["cpu", "memory"] as const).map((kind) => (
+        <TotalBlock
+          key={kind}
+          title={t(kind === "cpu" ? "resources.cpu" : "resources.memory")}
+          used={sum[kind]}
+          request={scale(requests[kind])}
+          limit={scale(limits[kind])}
+          kind={kind}
+          replicas={replicas}
+          measuredPods={sum.pods}
+          showUsage
+        />
+      ))}
+    </SummaryCardAside>
   )
 }
 

@@ -155,7 +155,7 @@ export function reasonWord(reason: string | undefined, task: boolean): ReasonWor
 
 export const isTask = (kind: string) => kind === "Job" || kind === "CronJob"
 
-export function podFacts(pod: Pod): PodFacts {
+function podFacts(pod: Pod): PodFacts {
   const ended = (pod.containerStatuses ?? [])
     .map((c) => c.lastTermination)
     .filter((t): t is NonNullable<typeof t> => !!t && t.exitCode !== 0)

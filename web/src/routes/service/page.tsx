@@ -1,14 +1,12 @@
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi } from "@tanstack/react-router"
 import { lazy, Suspense } from "react"
-import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import BellIcon from "~icons/ph/bell"
 import ChartBarIcon from "~icons/ph/chart-bar"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import CodeIcon from "~icons/ph/code"
 import DotsThreeIcon from "~icons/ph/dots-three"
 import GearSixIcon from "~icons/ph/gear-six"
-import GitBranchIcon from "~icons/ph/git-branch"
 import GlobeIcon from "~icons/ph/globe"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 import InfoIcon from "~icons/ph/info"
@@ -20,13 +18,11 @@ import TrashIcon from "~icons/ph/trash"
 import type { Schemas } from "@/api/client"
 import { projectQuery } from "@/api/queries"
 import { CopyButton } from "@/components/bits"
-import { Identity } from "@/components/identity"
 import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { refusedAmong, refusedElsewhere, RefusedKinds, RefusedSome } from "@/components/refused"
 import { ServiceIcon } from "@/components/service-icon"
-import { ServiceStatus } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Menu,
@@ -43,14 +39,7 @@ import type { Icon } from "@/lib/icon"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
-import {
-  eventsFor,
-  imageTag,
-  serviceId,
-  statusOf,
-  type Project,
-  type Service,
-} from "@/model/service"
+import { eventsFor, serviceId, type Project, type Service } from "@/model/service"
 import { inServiceTabs, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import type { ServiceTab } from "@/routes/search"
 import { EventsTab } from "@/routes/service/events"
@@ -164,7 +153,6 @@ function ServiceView({
   const edges = edgesOf(data)
   const mine = eventsFor(events, service)
   const tab = search.tab ?? "overview"
-  const status = statusOf(service)
   const setTab = (next: ServiceTab, pod?: string) =>
     void navigate({
       search: (previous) => ({
@@ -203,107 +191,57 @@ function ServiceView({
     >
       <header className="shrink-0 px-4 md:px-8">
         <div className="mx-auto flex w-full max-w-content flex-col">
-          <div className="flex flex-wrap items-start gap-x-3 gap-y-3 py-4 md:py-6">
+          <div className="flex items-start gap-x-3 py-4 md:py-6">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-main bg-card">
               <ServiceIcon service={service} size="lg" />
             </span>
             <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className="min-w-0 truncate type-name" translate="no">
-                  {service.displayName ?? service.name}
-                </h1>
-                <ServiceStatus status={status} counts />
-              </div>
+              <h1 className="min-w-0 truncate type-name" translate="no">
+                {service.displayName ?? service.name}
+              </h1>
               <div className="flex min-w-0 flex-col gap-0.5 text-xs text-secondary">
-                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
-                  {service.created ? (
-                    <span>{t("service.created", formatDate(service.created, locale))}</span>
-                  ) : null}
-                  {service.provenance.tool ? (
-                    <Tooltip content={t("common.managedByDetail", service.provenance.tool)}>
-                      <span className="inline-flex cursor-help items-center gap-1">
-                        <GitBranchIcon className="size-3" aria-hidden="true" />
-                        {t("common.managedBy", service.provenance.tool)}
-                      </span>
-                    </Tooltip>
-                  ) : null}
-                </span>
-                <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5">
-                  <span className="flex min-w-0 items-center gap-1">
-                    <span className="truncate font-mono" translate="no">
-                      {id}
-                    </span>
-                    <CopyButton value={id} />
-                  </span>
-                  {service.image ? (
-                    <span className="flex min-w-0 items-center font-mono" title={service.image}>
-                      <span className="truncate" translate="no">
-                        {service.image.replace(/[:@][^:/@]+$/, "")}
-                      </span>
-                      <span className="rounded bg-muted px-1 text-main" translate="no">
-                        :{imageTag(service.image)}
-                      </span>
-                      <CopyButton value={service.image} />
-                    </span>
-                  ) : null}
-                </span>
-              </div>
-            </div>
-            <div className="flex w-full shrink-0 flex-col items-start gap-2 sm:w-auto sm:items-end">
-              <div className="flex items-center gap-1.5">
-                {restartable ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      planner.plan({
-                        title: t("title.restart", service.name),
-                        changes: [
-                          { op: "restart", workload: { kind: service.kind, name: service.name } },
-                        ],
-                      })
-                    }
-                  >
-                    <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-                    {t("ops.restart")}
-                  </Button>
+                {service.created ? (
+                  <span>{t("service.created", formatDate(service.created, locale))}</span>
                 ) : null}
-                <Menu>
-                  <MenuTrigger
-                    render={
-                      <Button variant="outline" size="icon-sm" aria-label={t("service.more")} />
-                    }
-                  >
-                    <DotsThreeIcon aria-hidden="true" />
-                  </MenuTrigger>
-                  <MenuContent>
-                    <MenuItem onClick={() => setTab("terminal")}>
-                      <TerminalWindowIcon aria-hidden="true" />
-                      {t("service.openTerminal")}
-                    </MenuItem>
-                    <MenuItem onClick={() => setTab("yaml")}>
-                      <CodeIcon aria-hidden="true" />
-                      {t("service.viewYaml")}
-                    </MenuItem>
-                    <MenuSeparator />
-                    {service.provenance.tool ? (
-                      <Tooltip content={t("common.managedByDetail", service.provenance.tool)}>
-                        <MenuItem disabled>
-                          <TrashIcon aria-hidden="true" />
-                          {t("service.delete")}
-                        </MenuItem>
-                      </Tooltip>
-                    ) : (
-                      <MenuItem onClick={planDeletion}>
-                        <TrashIcon aria-hidden="true" />
-                        {t("service.delete")}
-                      </MenuItem>
-                    )}
-                  </MenuContent>
-                </Menu>
+                <span className="flex min-w-0 items-center gap-1">
+                  <span className="truncate font-mono" translate="no">
+                    {id}
+                  </span>
+                  <CopyButton value={id} />
+                </span>
               </div>
-              {restartable ? <Identity /> : null}
             </div>
+            <Menu>
+              <MenuTrigger
+                render={<Button variant="outline" size="icon-sm" aria-label={t("service.more")} />}
+              >
+                <DotsThreeIcon aria-hidden="true" />
+              </MenuTrigger>
+              <MenuContent>
+                <MenuItem onClick={() => setTab("terminal")}>
+                  <TerminalWindowIcon aria-hidden="true" />
+                  {t("service.openTerminal")}
+                </MenuItem>
+                <MenuItem onClick={() => setTab("yaml")}>
+                  <CodeIcon aria-hidden="true" />
+                  {t("service.viewYaml")}
+                </MenuItem>
+                <MenuSeparator />
+                {service.provenance.tool ? (
+                  <Tooltip content={t("common.managedByDetail", service.provenance.tool)}>
+                    <MenuItem disabled>
+                      <TrashIcon aria-hidden="true" />
+                      {t("service.delete")}
+                    </MenuItem>
+                  </Tooltip>
+                ) : (
+                  <MenuItem onClick={planDeletion}>
+                    <TrashIcon aria-hidden="true" />
+                    {t("service.delete")}
+                  </MenuItem>
+                )}
+              </MenuContent>
+            </Menu>
           </div>
           <RefusedSome unreadable={refusedElsewhere(unreadable, inServiceTabs)} />
           <div className="pt-1 pb-3">
@@ -337,6 +275,17 @@ function ServiceView({
               edges={edges}
               events={mine}
               onTab={setTab}
+              onRestart={
+                restartable
+                  ? () =>
+                      planner.plan({
+                        title: t("title.restart", service.name),
+                        changes: [
+                          { op: "restart", workload: { kind: service.kind, name: service.name } },
+                        ],
+                      })
+                  : undefined
+              }
             />
           </TabsContent>
           <TabsContent value="logs" className="flex min-h-0 flex-1 flex-col">
