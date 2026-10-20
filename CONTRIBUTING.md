@@ -42,7 +42,8 @@ The interface's zh-TW wording is checked with [zhtw-mcp](https://github.com/sysp
 a dev shell of its own (it builds from source; the pin and how to bump it are in `flake.nix`), as
 CI's `wording` job does: `nix develop .#zh -c ./scripts/check-zh-tw.sh`. `web/scripts/zh-tw-strings.ts` prints every zh-TW
 string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen terms and the reason
-for each rule or term it relaxes. Any warning fails the check.
+for each rule or term it relaxes. Any warning fails the check. How the interface's text reads in
+every locale, and the term chosen for each concept, is in [docs/wording.md](docs/wording.md).
 
 When you change the vendored recommendations or their pin, also run the check that compares them
 with their upstream (it downloads it; `.github/workflows/vendored.yml` runs it only for such
