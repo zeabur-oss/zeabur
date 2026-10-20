@@ -1,4 +1,3 @@
-import { getRouteApi } from "@tanstack/react-router"
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react"
 import CornersOutIcon from "~icons/ph/corners-out"
 import GitBranchIcon from "~icons/ph/git-branch"
@@ -9,14 +8,15 @@ import MinusIcon from "~icons/ph/minus"
 import PlusIcon from "~icons/ph/plus"
 
 import { Hint } from "@/components/bits"
+import { Badge } from "@zeabur/design-system/components/badge"
 import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot, useStatusWord } from "@/components/status"
-import { NoServices } from "@/components/no-services"
 import { useT } from "@/i18n"
 import { canvasViewport, type Viewport } from "@/lib/stores"
 import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
+import { originOf } from "@/model/origin"
 import { bounds, layout, type LaidEdge, type LaidNode, type Lane } from "@/model/layout"
 import {
   claimOf,
@@ -27,45 +27,31 @@ import {
   type Project,
   type Service,
 } from "@/model/service"
-import { ProjectData, useProjectEvents } from "@/routes/project/data"
-import { ProjectHeader } from "@/routes/project/header"
+import { useProjectEvents } from "@/routes/project/data"
 import { QuickLook } from "@/routes/project/quick-look"
-
-const route = getRouteApi("/projects/$project/architecture")
 
 const px = (n: number) => `${n}px`
 
-export function ArchitecturePage() {
-  const { project } = route.useParams()
-  return (
-    <div className="flex min-h-140 flex-1 flex-col">
-      <ProjectHeader entry="architecture" column="full" />
-      <ProjectData project={project}>
-        {(data) => <Architecture project={project} data={data} />}
-      </ProjectData>
-    </div>
-  )
-}
-
-function Architecture({ project, data }: { project: string; data: Project }) {
+/** The services drawn by role, with what connects them; a click opens the quick look. */
+export function ProjectMap({
+  project,
+  data,
+  selected,
+  onSelect,
+}: {
+  project: string
+  data: Project
+  selected?: string
+  onSelect: (id?: string) => void
+}) {
   const t = useT()
-  const search = route.useSearch()
-  const navigate = route.useNavigate()
   const events = useProjectEvents(project)
   const edges = edgesOf(data)
-  const open = data.services.find((s) => serviceId(s) === search.service)
-  const select = (id?: string) =>
-    void navigate({ search: (previous) => ({ ...previous, service: id }) })
+  const open = data.services.find((s) => serviceId(s) === selected)
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
-      {data.services.length === 0 ? (
-        <div className="flex h-full items-center justify-center p-6">
-          <NoServices project={project} framed={false} />
-        </div>
-      ) : (
-        <Graph project={project} data={data} selected={search.service} onOpen={select} />
-      )}
+      <Graph project={project} data={data} selected={selected} onOpen={onSelect} />
       {open ? (
         <QuickLook
           key={serviceId(open)}
@@ -74,13 +60,11 @@ function Architecture({ project, data }: { project: string; data: Project }) {
           services={data.services}
           edges={edges}
           events={events}
-          onClose={() => select(undefined)}
-          onSelect={select}
+          onClose={() => onSelect(undefined)}
+          onSelect={onSelect}
         />
       ) : null}
-      {data.services.length > 0 ? (
-        <span className="sr-only">{t("architecture.edges", edges.length)}</span>
-      ) : null}
+      <span className="sr-only">{t("architecture.edges", edges.length)}</span>
     </div>
   )
 }
@@ -439,8 +423,10 @@ function ServiceCard({
   onHover: (on: boolean) => void
   word: ReturnType<typeof useStatusWord>
 }) {
+  const t = useT()
   const status = statusOf(service)
   const volumes = volumesOf(service)
+  const first = service.diagnoses?.[0]
   return (
     <div
       data-node
@@ -478,6 +464,11 @@ function ServiceCard({
               {host ?? service.kind}
             </span>
           </span>
+          {first ? (
+            <Badge variant="fail" className="shrink-0">
+              {t(`origin.${originOf(first).origin}`)}
+            </Badge>
+          ) : null}
           {service.provenance.tool ? (
             <GitBranchIcon
               className="size-3.5 text-muted-foreground"

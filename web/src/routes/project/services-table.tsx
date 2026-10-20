@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
@@ -8,13 +9,13 @@ import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 
 import { Segmented } from "@/components/bits"
 import { PodCells, replicaCounts } from "@/components/pods"
-import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus, useStatusWord } from "@/components/status"
 import { Select } from "@zeabur/design-system/components/select"
 import { useT } from "@/i18n"
-import { useHistoryIndex, useLocationText } from "@/lib/history"
+import { usageQuery } from "@/api/queries"
 import { serviceLink } from "@/lib/place"
+import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
   domainsOf,
@@ -28,31 +29,10 @@ import {
   type Project,
   type Service,
 } from "@/model/service"
-import { ProjectData, refusedPlaces } from "@/routes/project/data"
-import { ProjectHeader } from "@/routes/project/header"
-import { validateServicesSearch, type ServicesSearch, type SortKey } from "@/routes/search"
+import { serviceUsage } from "@/model/usage"
+import type { ProjectSearch, SortKey } from "@/routes/search"
 
-const route = getRouteApi("/projects/$project/services")
-
-export function ServicesPage() {
-  const { project } = route.useParams()
-  // After Back, Forward or a link, the box starts again from the URL.
-  const entry = useHistoryIndex()
-  const typed = useLocationText((search) => validateServicesSearch(search).q ?? "")
-  return (
-    <>
-      <ProjectHeader entry="services" column="wide" />
-      <ProjectData project={project}>
-        {(data, unreadable) => (
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 pt-1 pb-16 md:box-content md:px-8">
-            <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.services)} />
-            <ServicesTable key={entry} project={project} data={data} typed={typed} />
-          </div>
-        )}
-      </ProjectData>
-    </>
-  )
-}
+const route = getRouteApi("/projects/$project")
 
 /** A select's empty value means none. */
 const ALL_KINDS = "*"
@@ -80,7 +60,7 @@ function compare(key: SortKey, a: Service, b: Service): number {
 
 const largestFirst: ReadonlySet<SortKey> = new Set(["restarts"])
 
-function ServicesTable({
+export function ServicesTable({
   project,
   data,
   typed,
@@ -92,9 +72,12 @@ function ServicesTable({
   const t = useT()
   const word = useStatusWord()
   const search = route.useSearch()
-  const navigate = useNavigate({ from: "/projects/$project/services" })
+  const navigate = useNavigate({ from: "/projects/$project" })
+  const f = useQuantityFormat()
+  const usage = useQuery(usageQuery(project)).data
+  const live = usage?.state === "available"
   const [query, setQuery] = useState(typed)
-  const set = (patch: Partial<ServicesSearch>) =>
+  const set = (patch: Partial<ProjectSearch>) =>
     void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
 
   const sort = search.sort ?? "status"
@@ -201,6 +184,12 @@ function ServicesTable({
               {sortable("status", t("table.status"))}
               {sortable("ready", t("table.pods"))}
               {sortable("restarts", t("table.restarts"), "text-right")}
+              {live ? (
+                <>
+                  <th className={cn(head, "text-right")}>{t("resources.cpu")}</th>
+                  <th className={cn(head, "text-right")}>{t("resources.memory")}</th>
+                </>
+              ) : null}
               <th className={head}>{t("table.domain")}</th>
               {sortable("kind", t("table.kind"), "pr-4")}
             </tr>
@@ -208,7 +197,10 @@ function ServicesTable({
           <tbody className="divide-y">
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-muted-foreground">
+                <td
+                  colSpan={live ? 8 : 6}
+                  className="px-4 py-6 text-center text-sm text-muted-foreground"
+                >
                   {t("services.noMatch")}
                 </td>
               </tr>
@@ -217,6 +209,7 @@ function ServicesTable({
               const status = statusOf(service)
               const restarts = restartsOf(service)
               const domain = domainsOf(data, service)[0]
+              const used = live ? serviceUsage(service, usage) : undefined
               return (
                 <tr key={serviceId(service)} className="hover:bg-hover">
                   <td className="py-2 pr-3 pl-4">
@@ -255,6 +248,24 @@ function ServicesTable({
                   >
                     {restarts}
                   </td>
+                  {live ? (
+                    <>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {used?.cpu !== undefined ? f.cpu(used.cpu) : "—"}
+                      </td>
+                      <td
+                        className={cn(
+                          "px-3 py-2 text-right tabular-nums",
+                          used?.nearLimit && "font-medium text-warn-strong",
+                        )}
+                      >
+                        {used?.memory !== undefined ? f.memory(used.memory) : "—"}
+                        {used?.nearLimit ? (
+                          <span className="sr-only">{` ${t("usage.note.nearLimit")}`}</span>
+                        ) : null}
+                      </td>
+                    </>
+                  ) : null}
                   <td className="max-w-52 px-3 py-2">
                     {domain ? (
                       <span className="flex items-center gap-1.5 text-xs">

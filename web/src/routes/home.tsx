@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQueries, useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import TerminalIcon from "~icons/ph/terminal"
+import type { ReactNode } from "react"
 
 import { isStatus, type Schemas } from "@/api/client"
 import {
@@ -12,19 +12,29 @@ import {
   upgradesQuery,
 } from "@/api/queries"
 import { Ago } from "@/components/bits"
-import { DiagnosisLine } from "@/components/diagnoses"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { FactsPill, plainReason, StatusDot, StatusPill } from "@/components/status"
+import { ProblemRow } from "@/components/problem-row"
+import { StatusDot, StatusPill } from "@/components/status"
 import { buttonVariants } from "@zeabur/design-system/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
-import { useT, type Translate } from "@/i18n"
+import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
-import { cn } from "@/lib/utils"
-import { countsHealth, healthRank, type Event } from "@/model/service"
+import { originOf, originRank, type Origin } from "@/model/origin"
+import {
+  byHealth,
+  countsHealth,
+  healthRank,
+  needsAttention,
+  serviceId,
+  statusOf,
+  type Event,
+  type Service,
+} from "@/model/service"
 import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
+import { useAttention, type ClusterItem } from "@/routes/cluster/attention"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
 import {
   Empty,
@@ -36,10 +46,8 @@ import {
 } from "@zeabur/design-system/components/empty"
 import { Illustration } from "@zeabur/design-system/components/illustration"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
-import { Stat, StatGroup } from "@zeabur/design-system/components/stat"
 
 type ProjectItem = Schemas["ProjectSummary"]
-type Brief = Schemas["ServiceSummary"]
 
 const PROJECTS_SHOWN = 9
 const WARNINGS_SHOWN = 5
@@ -48,16 +56,14 @@ export function HomePage() {
   const t = useT()
   const projects = useQuery(projectsQuery)
   const adopted = projects.data?.items.filter((p) => p.adopted) ?? []
-  const attention = needingAttention(adopted)
+  const problems = useProblems(adopted)
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-6 pb-12 type-body md:box-content md:px-8 md:pt-10">
-      <PageHeader title={t("home.title")} />
-      <StatusLine
-        adopted={adopted}
-        loaded={projects.isSuccess}
-        allHealthy={projects.isSuccess && attention.length === 0}
-      />
-      <Attention items={attention} />
+      <div className="flex flex-col gap-2">
+        <PageHeader title={t("home.title")} />
+        <StateLine adopted={adopted} loaded={projects.isSuccess} problems={problems} />
+      </div>
+      <ProblemsSection problems={problems} />
       <ProjectsSection
         adopted={adopted}
         pending={projects.isPending}
@@ -68,53 +74,102 @@ export function HomePage() {
   )
 }
 
-function StatusLine({
+interface Found {
+  project: string
+  service: Service
+}
+
+interface Problems {
+  /** Still reading the documents of the projects in trouble. */
+  pending: boolean
+  cluster: { item: ClusterItem; affects: Found[] }[]
+  /** Cluster warnings that take nothing down yet: a count and a link. */
+  notices: number
+  byOrigin: { origin: Origin; items: Found[] }[]
+  rolling: Found[]
+  count: number
+}
+
+/** Every problem once, by where it comes from: a node down shows once, with the services it takes
+ * down under it. */
+function useProblems(adopted: ProjectItem[]): Problems {
+  const clusterItems = useAttention().filter((i) => i.health === "fail" || i.health === "warn")
+  const troubled = adopted.filter((p) =>
+    (p.services ?? []).some((s) => s.health !== "ok" && s.health !== "idle"),
+  )
+  const documents = useQueries({
+    queries: troubled.map((p) => projectQuery(p.name)),
+  })
+  const found: Found[] = documents.flatMap((d, i) =>
+    (d.data?.services ?? []).map((service) => ({ project: troubled[i]?.name ?? "", service })),
+  )
+  const down = new Map(clusterItems.flatMap((i) => (i.node ? [[i.node, i] as const] : [])))
+  const cluster = clusterItems.map((item) => ({ item, affects: [] as Found[] }))
+  const origins = new Map<Origin, Found[]>()
+  const rolling: Found[] = []
+  for (const f of found) {
+    const status = statusOf(f.service)
+    if (status.health === "progress") {
+      rolling.push(f)
+      continue
+    }
+    if (!needsAttention(status)) continue
+    const node = f.service.pods.find((p) => p.health !== "ok" && p.node && down.has(p.node))?.node
+    const host = node ? cluster.find((c) => c.item.node === node) : undefined
+    if (host) {
+      host.affects.push(f)
+      continue
+    }
+    const first = f.service.diagnoses?.[0]
+    const origin = first ? originOf(first).origin : "unknown"
+    origins.set(origin, [...(origins.get(origin) ?? []), f])
+  }
+  const byOrigin = [...origins.entries()]
+    .map(([origin, items]) => ({ origin, items: items.toSorted(byFound) }))
+    .toSorted((a, b) => originRank[a.origin] - originRank[b.origin])
+  const shown = cluster.filter((c) => c.item.health === "fail" || c.affects.length > 0)
+  return {
+    pending: documents.some((d) => d.isPending),
+    cluster: shown,
+    notices: cluster.length - shown.length,
+    byOrigin,
+    rolling: rolling.toSorted(byFound),
+    count: cluster.length + byOrigin.reduce((n, g) => n + g.items.length, 0),
+  }
+}
+
+const byFound = (a: Found, b: Found) =>
+  byHealth(a.service, b.service) ||
+  a.project.localeCompare(b.project) ||
+  a.service.name.localeCompare(b.service.name)
+
+function StateLine({
   adopted,
   loaded,
-  allHealthy,
+  problems,
 }: {
   adopted: ProjectItem[]
   loaded: boolean
-  allHealthy: boolean
+  problems: Problems
 }) {
   const t = useT()
-  const totals = { services: 0, healthy: 0, failing: 0, warning: 0, progressing: 0 }
-  for (const project of adopted) {
-    const h = project.health
-    if (!h) continue
-    totals.services += h.services
-    totals.healthy += h.healthy
-    totals.failing += h.failing
-    totals.warning += h.warning
-    totals.progressing += h.progressing
-  }
-  const figure = (value: number | string) =>
-    loaded ? value : <Skeleton className="my-1 h-4 w-10" />
+  if (!loaded || problems.pending) return <Skeleton className="h-5 w-72" />
+  const services = adopted.reduce((n, p) => n + (p.health?.services ?? 0), 0)
+  const parts =
+    problems.count > 0
+      ? [t("home.state.problems", problems.count)]
+      : problems.rolling.length === 0
+        ? [t("home.state.fine", services, adopted.length)]
+        : []
+  if (problems.rolling.length > 0) parts.push(t("home.state.rolling", problems.rolling.length))
+  const health = problems.count > 0 ? "fail" : problems.rolling.length > 0 ? "progress" : "ok"
   return (
-    <section aria-label={t("home.status")}>
-      <StatGroup>
-        <Stat
-          label={t("metric.services")}
-          value={figure(`${totals.healthy}/${totals.services}`)}
-          tone={loaded && totals.services > 0 && allHealthy ? "ok" : undefined}
-        />
-        <Stat
-          label={t("status.failing")}
-          value={figure(totals.failing)}
-          tone={totals.failing > 0 ? "fail" : undefined}
-        />
-        <Stat
-          label={t("status.degraded")}
-          value={figure(totals.warning)}
-          tone={totals.warning > 0 ? "warn" : undefined}
-        />
-        <Stat
-          label={t("status.rollingOut")}
-          value={figure(totals.progressing)}
-          tone={totals.progressing > 0 ? "progress" : undefined}
-        />
-        <ClusterFacts />
-      </StatGroup>
+    <section aria-label={t("home.status")} className="flex flex-wrap items-center gap-x-4 gap-y-1">
+      <p className="flex items-center gap-2 font-medium">
+        <StatusDot health={health} />
+        {parts.join(" ")}
+      </p>
+      <ClusterFacts />
     </section>
   )
 }
@@ -130,175 +185,142 @@ function ClusterFacts() {
   const ready = items?.filter((node) => node.ready === "True").length
   if (!version && !items && !badge) return null
   return (
-    <Stat
-      label={t("shell.cluster")}
-      value={
-        <Link
-          to="/cluster"
-          className="rounded-md type-mono outline-none hover:underline"
-          translate="no"
-        >
-          {version
-            ? `${cluster.data?.distribution ? `${cluster.data.distribution} ` : ""}${version}`
-            : t("shell.cluster")}
-        </Link>
-      }
-      hint={
-        (items && items.length > 0) || badge ? (
-          <span className="flex items-center gap-2">
-            {items && items.length > 0 ? t("home.nodesReady", ready ?? 0, items.length) : null}
-            {badge ? (
-              <StatusPill health={badge.health} size="sm">
-                {badge.text}
-              </StatusPill>
-            ) : null}
-          </span>
-        ) : undefined
-      }
-    />
+    <span className="flex flex-wrap items-center gap-2 type-meta text-muted-foreground">
+      <Link
+        to="/cluster"
+        className="type-mono hover:text-foreground hover:underline"
+        translate="no"
+      >
+        {version
+          ? `${cluster.data?.distribution ? `${cluster.data.distribution} ` : ""}${version}`
+          : t("shell.cluster")}
+      </Link>
+      {items && items.length > 0 ? (
+        <span>{t("home.nodesReady", ready ?? 0, items.length)}</span>
+      ) : null}
+      {badge ? (
+        <StatusPill health={badge.health} size="sm">
+          {badge.text}
+        </StatusPill>
+      ) : null}
+    </span>
   )
 }
 
-interface AttentionItem {
-  project: string
-  service: Brief
-}
-
-function needingAttention(adopted: ProjectItem[]): AttentionItem[] {
-  return adopted
-    .flatMap((p) =>
-      (p.services ?? [])
-        .filter((s) => s.health === "fail" || s.health === "warn" || s.health === "progress")
-        .map((service) => ({ project: p.name, service })),
-    )
-    .toSorted(
-      (a, b) =>
-        healthRank[a.service.health] - healthRank[b.service.health] ||
-        a.project.localeCompare(b.project) ||
-        a.service.name.localeCompare(b.service.name),
-    )
-}
-
-function briefWord(t: Translate, service: Brief): string {
-  const plain = plainReason(
-    t,
-    service.reason ?? undefined,
-    service.kind === "Job" || service.kind === "CronJob",
-  )
-  if (plain) return plain
-  switch (service.health) {
-    case "fail":
-      return t("status.failing")
-    case "warn":
-      return t("status.degraded")
-    case "progress":
-      return t("status.rollingOut")
-    case "ok":
-      return t("status.ready")
-    case "idle":
-      return t("status.unknown")
-  }
-}
-
-function Attention({ items }: { items: AttentionItem[] }) {
+function ProblemsSection({ problems }: { problems: Problems }) {
   const t = useT()
-  if (items.length === 0) return null
+  if (problems.pending) return <LoadingRows label={t("common.loading")} rows={2} />
+  if (problems.count === 0 && problems.rolling.length === 0)
+    return problems.notices > 0 ? <Notices count={problems.notices} /> : null
   return (
-    <section aria-labelledby="home-attention">
-      <Card variant="list">
-        <CardHeader className="flex items-center">
-          <CardTitle className="flex items-baseline">
-            <h2 id="home-attention" className="type-heading">
-              {t("attention.title")}
-            </h2>
-            <span className="ml-2.5 type-meta font-normal text-muted-foreground">
-              {items.length}
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ul className="flex flex-col">
-            {items.map((item) => (
-              <AttentionRow key={item.service.id} item={item} />
-            ))}
-          </ul>
-        </CardContent>
-      </Card>
+    <section aria-labelledby="home-problems" className="flex flex-col gap-3">
+      <h2 id="home-problems" className="type-heading">
+        {t("home.problems")}
+      </h2>
+      {problems.cluster.length > 0 ? (
+        <Group title={t("origin.cluster")} hint={t("origin.cluster.hint")}>
+          {problems.cluster.map(({ item, affects }) => (
+            <li
+              key={item.key}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-rule px-4 py-3 first:border-t-0"
+            >
+              <StatusDot health={item.health} />
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="font-medium">{item.text}</span>
+                {affects.length > 0 ? (
+                  <span className="type-meta text-muted-foreground">
+                    {t("home.affects")}
+                    {t("common.colon")}
+                    {affects.map((f, i) => (
+                      <span key={serviceId(f.service)}>
+                        {i > 0 ? t("common.sep") : null}
+                        <Link
+                          {...serviceLink(f.project, f.service)}
+                          className="text-foreground hover:underline"
+                          translate="no"
+                        >
+                          {f.project}/{f.service.name}
+                        </Link>
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
+              </span>
+              {item.link ? (
+                <span className="type-meta text-muted-foreground">{item.link}</span>
+              ) : null}
+            </li>
+          ))}
+        </Group>
+      ) : null}
+      {problems.byOrigin.map(({ origin, items }) => (
+        <Group
+          key={origin}
+          title={t(`origin.${origin}`)}
+          hint={t(`origin.${origin}.hint`)}
+          count={items.length}
+        >
+          {items.map((f) => (
+            <ProblemRow key={f.service.id} project={f.project} service={f.service} showProject />
+          ))}
+        </Group>
+      ))}
+      {problems.notices > 0 ? <Notices count={problems.notices} /> : null}
+      {problems.rolling.length > 0 ? (
+        <Group title={t("home.inProgress")} count={problems.rolling.length}>
+          {problems.rolling.map((f) => (
+            <ProblemRow key={f.service.id} project={f.project} service={f.service} showProject />
+          ))}
+        </Group>
+      ) : null}
     </section>
   )
 }
 
-function AttentionRow({ item }: { item: AttentionItem }) {
+function Notices({ count }: { count: number }) {
   const t = useT()
-  const { project, service } = item
-  const facts = [
-    service.desired !== undefined && service.desired !== null
-      ? t("attention.ready", service.ready ?? 0, service.desired)
-      : "",
-    service.restarts > 0 ? t("pod.restarts", service.restarts) : "",
-  ].filter(Boolean)
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rule px-4 py-3 first:border-t-0 md:grid md:grid-cols-attention">
-      <span className="flex min-w-0 items-baseline gap-1.5">
-        <Link
-          to="/projects/$project"
-          params={{ project }}
-          className="type-meta text-muted-foreground hover:text-foreground hover:underline"
-          translate="no"
-        >
-          {project}
-        </Link>
-        <span aria-hidden="true" className="type-meta text-muted-foreground">
-          /
-        </span>
-        <Link
-          {...serviceLink(project, service)}
-          className="truncate font-semibold hover:underline"
-          translate="no"
-        >
-          {service.name}
-        </Link>
-        <span className="type-meta text-muted-foreground" translate="no">
-          {service.kind}
-        </span>
-      </span>
-      <span className="flex">
-        <FactsPill health={service.health} size="sm" facts={service.reason ?? undefined}>
-          {briefWord(t, service)}
-        </FactsPill>
-      </span>
-      <span className="flex min-w-0 flex-col">
-        <span className="type-meta text-muted-foreground">{facts.join(t("common.sep"))}</span>
-        <AttentionDiagnosis project={project} service={service} />
-      </span>
-      <span className="flex items-center gap-1.5 md:justify-end">
-        <Link
-          {...serviceLink(project, service, { tab: "logs" })}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          aria-label={t("attention.logsOf", service.name)}
-        >
-          <TerminalIcon aria-hidden="true" data-icon="inline-start" />
-          {t("tab.logs")}
-        </Link>
-        <Link
-          {...serviceLink(project, service, { tab: "events" })}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          aria-label={t("attention.eventsOf", service.name)}
-        >
-          {t("tab.events")}
-        </Link>
-      </span>
-    </li>
+    <p className="flex items-center gap-2 type-meta text-muted-foreground">
+      <StatusDot health="warn" />
+      {t("home.clusterNotices", count)}
+      <Link to="/cluster" className="text-foreground hover:underline">
+        {t("shell.cluster")}
+      </Link>
+    </p>
   )
 }
 
-/** The project list carries no diagnoses, so they come from the project's document. */
-function AttentionDiagnosis({ project, service }: { project: string; service: Brief }) {
-  const document = useQuery(projectQuery(project, { poll: false }))
-  const diagnoses = document.data?.services.find(
-    (s) => s.kind === service.kind && s.name === service.name,
-  )?.diagnoses
-  return <DiagnosisLine diagnoses={diagnoses} />
+function Group({
+  title,
+  hint,
+  count,
+  children,
+}: {
+  title: string
+  hint?: string
+  count?: number
+  children: ReactNode
+}) {
+  return (
+    <Card variant="list">
+      <CardHeader className="flex items-center">
+        <CardTitle>
+          <span className="flex flex-wrap items-baseline gap-x-2.5">
+            <h3 className="font-semibold">{title}</h3>
+            {count !== undefined ? (
+              <span className="type-meta font-normal text-muted-foreground">{count}</span>
+            ) : null}
+            {hint ? (
+              <span className="type-meta font-normal text-muted-foreground">{hint}</span>
+            ) : null}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="flex flex-col">{children}</ul>
+      </CardContent>
+    </Card>
+  )
 }
 
 function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
