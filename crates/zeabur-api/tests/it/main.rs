@@ -7,6 +7,7 @@ mod api;
 #[path = "../common/mod.rs"]
 mod common;
 mod exec;
+mod incidents;
 mod namespace;
 mod releases;
 mod usage;

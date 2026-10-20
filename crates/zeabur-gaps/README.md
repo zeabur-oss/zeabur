@@ -11,8 +11,18 @@ the project's events and its `HTTPRoutes`, and returns what fails: a crash loop,
 run, out of memory, an image that cannot be pulled, a failing probe, traffic that cannot reach
 it, a quota that blocks its pods, no node with room, a missing Secret or ConfigMap, and, for a
 failing service nothing else explains, the reason the cluster gave. Each has a cause, why (the
-rule that applies), a fix and the evidence (status fields and events) it rests on. See the
+rule that applies), a fix and the evidence (status fields and events) it rests on, and a fault:
+where the cause lies (the code, the configuration, the cluster, a component, an upstream
+registry) and who can remove it (you, a cluster administrator, the component's owner). See the
 `diagnose` module for the rules and their sources.
+
+## Incidents
+
+`incidents` reads the cluster's components (an ingress controller, cert-manager, cluster DNS,
+metrics-server, recognised by their labels) and nodes, and turns each one that is down into one
+incident with its blast radius: the services, domains and projects it reaches. `link` marks the
+diagnoses an incident explains, so a cluster's fault is not shown as each service's own. See the
+`incident` module for what each cause reaches.
 
 ## Gap rules
 

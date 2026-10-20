@@ -203,6 +203,16 @@ pub(crate) async fn document_of(
     cluster: &dyn Cluster,
     project: &str,
 ) -> Result<ProjectDocument, ApiError> {
+    Ok(read(cluster, project).await?.document)
+}
+
+/// One read of a project: the document and what it was made from.
+pub(crate) struct ProjectRead {
+    pub(crate) document: ProjectDocument,
+    pub(crate) snapshot: Snapshot,
+}
+
+pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectRead, ApiError> {
     let (objects, events) = futures_util::future::join(
         cluster.namespace_objects(project),
         cluster.list::<Event>(Some(project)),
@@ -237,11 +247,14 @@ pub(crate) async fn document_of(
         network_policy: network_policy::extension(cluster, &snapshot, &projection, &mut unreadable)
             .await?,
     };
-    Ok(ProjectDocument {
-        id: id::project(project),
-        project: projection,
-        unreadable,
-        extensions,
+    Ok(ProjectRead {
+        document: ProjectDocument {
+            id: id::project(project),
+            project: projection,
+            unreadable,
+            extensions,
+        },
+        snapshot,
     })
 }
 

@@ -13,6 +13,7 @@
 //! | `GET /api/v1/cluster/nodes` | nodes, with requests against allocatable |
 //! | `GET /api/v1/cluster/events` | events of every namespace, newest first, `limit` of them |
 //! | `GET /api/v1/cluster/gaps` | what the cluster itself is missing, with fixes |
+//! | `GET /api/v1/cluster/incidents` | components down and nodes not ready, with the domains and projects they reach |
 //! | `GET /api/v1/cluster/capabilities` | what is installed (with versions), and what to install |
 //! | `GET /api/v1/cluster/components/{capability}/{component}/install` | how to install it yourself, in four forms |
 //! | `GET /api/v1/settings/metrics-store` | the metrics store history is read from, whether it answers, who may change it |
@@ -25,6 +26,7 @@
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/history` | its pods' CPU, memory and restarts over a range, from the metrics store |
 //! | `GET /api/v1/projects/{p}/usage` | what each pod uses now, from metrics-server |
 //! | `GET /api/v1/projects/{p}/gaps` | what the project is missing, with citations and fixes |
+//! | `GET /api/v1/projects/{p}/incidents` | the cluster incidents that reach the project, with the services they break |
 //! | `GET /api/v1/projects/{p}/objects` | every object of every namespaced kind, by kind |
 //! | `GET /api/v1/projects/{p}/objects/{group}/{version}/{resource}/{name}` | one object as YAML (`core` for the empty group) |
 //! | `GET /api/v1/projects/{p}/configmaps` | the ConfigMaps, in full |
@@ -70,6 +72,7 @@ mod error;
 pub mod gaps;
 mod handlers;
 pub mod identity;
+pub mod incidents;
 pub mod local;
 pub mod pods;
 pub mod projects;
@@ -149,11 +152,13 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::upgrades))
         .routes(routes!(cluster::events))
         .routes(routes!(gaps::cluster))
+        .routes(routes!(incidents::cluster))
         .routes(routes!(projects::list))
         .routes(routes!(projects::get))
         .routes(routes!(projects::namespace::get))
         .routes(routes!(services::service))
         .routes(routes!(gaps::project))
+        .routes(routes!(incidents::project))
         .routes(routes!(resources::objects::list))
         .routes(routes!(resources::objects::get))
         .routes(routes!(resources::config::config_maps))

@@ -181,6 +181,26 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/incidents:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Every incident on the cluster: a component down or a node not ready, with the domains and
+        projects it reaches, as far as the person can list Ingresses and pods. Services are not named:
+        they are a project's, see `listProjectIncidents`.
+      operationId: listClusterIncidents
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentList"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/nodes:
     get:
       tags:
@@ -447,6 +467,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GapList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/incidents":
+    get:
+      tags:
+      - projects
+      summary: |-
+        What on the cluster's side is breaking this project's services: a component down or a node
+        not ready, with the services, domains and projects it reaches.
+      operationId: listProjectIncidents
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentList"
         "403":
           content:
             application/problem+json:
@@ -1133,6 +1179,34 @@ components:
       - ReadWriteOncePod
       - ReadWriteMany
       - ReadOnlyMany
+    AffectedService:
+      type: object
+      description: A service an incident reaches.
+      required:
+      - id
+      - project
+      - kind
+      - name
+      properties:
+        id:
+          type: string
+          description: Its id, `projects/<project>/services/<kind>/<name>`.
+        kind:
+          $ref: "#/components/schemas/WorkloadKind"
+          description: The workload's kind.
+        name:
+          type: string
+          description: The workload's name.
+        project:
+          type: string
+          description: The project.
+        symptoms:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiagnosisKind"
+          description: >-
+            The kinds of its diagnoses this incident explains, sorted; empty when it shows
+            none yet.
     Applied:
       type: object
       description: One object an apply wrote.
@@ -2329,9 +2403,19 @@ components:
           items:
             $ref: "#/components/schemas/Origin"
           description: The status fields and events it rests on.
+        fault:
+          $ref: "#/components/schemas/Fault"
+          description: Where the cause lies and who can remove it.
         fix:
           $ref: "#/components/schemas/Message"
           description: What to do about it, in one sentence.
+        incident:
+          type:
+          - string
+          - "null"
+          description: |-
+            The cluster incident this is a symptom of ([`Incident::id`]); set only in answers that
+            read the incidents too.
         kind:
           $ref: "#/components/schemas/DiagnosisKind"
           description: What kind of failure.
@@ -2543,6 +2627,40 @@ components:
       enum:
       - command-not-found
       - failed
+    Fault:
+      type: object
+      description: Where a failure's cause lies, and who can fix it.
+      required:
+      - origin
+      - fixer
+      properties:
+        component:
+          type:
+          - string
+          - "null"
+          description: |-
+            The component or upstream service, for [`FaultOrigin::Component`] and
+            [`FaultOrigin::Upstream`]: `ingress-controller`, `cert-manager`, `cluster-dns`,
+            `metrics-server`, `node/<name>`, or a registry's host.
+        fixer:
+          $ref: "#/components/schemas/Fixer"
+          description: Who can fix it.
+        origin:
+          $ref: "#/components/schemas/FaultOrigin"
+          description: Where the cause lies.
+    FaultOrigin:
+      type: string
+      description: >-
+        Where the cause of a failure lies, so a cluster's fault never reads as the
+        reader's.
+      enum:
+      - code
+      - configuration
+      - cluster
+      - component
+      - upstream
+      - zeabur
+      - unknown
     FieldCause:
       type: object
       description: |-
@@ -2610,6 +2728,13 @@ components:
       - plan
       - install
       - snippet
+    Fixer:
+      type: string
+      description: Who can remove the cause.
+      enum:
+      - you
+      - clusterAdmin
+      - componentOwner
     Gap:
       type: object
       description: One finding of a rule.
@@ -2738,6 +2863,89 @@ components:
         source:
           $ref: "#/components/schemas/ValueSource"
           description: The imported ConfigMap or Secret.
+    Incident:
+      type: object
+      description: |-
+        One cause on the cluster's side with everything it reaches, told once instead of as a
+        separate problem of every service it breaks.
+      required:
+      - id
+      - kind
+      - cause
+      - why
+      - fix
+      - fault
+      - services
+      - domains
+      - projects
+      - evidence
+      properties:
+        cause:
+          $ref: "#/components/schemas/Message"
+          description: The cause, in one sentence.
+        domains:
+          type: array
+          items:
+            type: string
+          description: The public domains it reaches, sorted.
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: The objects and fields it rests on.
+        fault:
+          $ref: "#/components/schemas/Fault"
+          description: Where it lies and who can fix it.
+        fix:
+          $ref: "#/components/schemas/Message"
+          description: What to do, and who does it.
+        id:
+          type: string
+          description: "`incidents/<kind>/<name>`, stable while the cause lasts, so diagnoses link to it."
+        kind:
+          $ref: "#/components/schemas/IncidentKind"
+          description: What kind of cause.
+        projects:
+          type: array
+          items:
+            type: string
+          description: The projects it reaches, sorted.
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffectedService"
+          description: The services it reaches, sorted by id, as far as the reader could see them.
+        since:
+          type:
+          - string
+          - "null"
+          description: Since when, in RFC 3339, when known.
+        why:
+          $ref: "#/components/schemas/Message"
+          description: What stops working because of it.
+    IncidentKind:
+      type: string
+      description: What kind of cluster-side cause an incident is.
+      enum:
+      - componentDown
+      - nodeNotReady
+    IncidentList:
+      type: object
+      description: The incidents found, and the reads that were refused.
+      required:
+      - items
+      - unreadable
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Incident"
+          description: The incidents, sorted by id.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; incidents they would have shown are missing.
     InferredFrom:
       type: string
       description: |-

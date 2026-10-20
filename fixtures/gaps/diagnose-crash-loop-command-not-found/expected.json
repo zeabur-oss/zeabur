@@ -7,6 +7,7 @@
       "key": "diagnosis.crashLoop.cause.commandNotFound",
       "params": {"container": "worker", "restarts": "5", "exitCode": "127", "reason": "Error"}
     },
-    "fix": {"key": "diagnosis.crashLoop.fix.command", "params": {"container": "worker"}}
+    "fix": {"key": "diagnosis.crashLoop.fix.command", "params": {"container": "worker"}},
+    "fault": {"origin": "configuration", "fixer": "you"}
   }
 ]

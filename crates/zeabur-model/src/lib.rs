@@ -20,7 +20,10 @@ pub use container::{
     ProbeSummary, Probes, Quantities, ReadOnlyReason,
 };
 pub use details::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, ProjectDetails, ProjectIcon};
-pub use diagnosis::{Diagnosis, DiagnosisKind, Message};
+pub use diagnosis::{
+    AffectedService, Diagnosis, DiagnosisKind, Fault, FaultOrigin, Fixer, Incident, IncidentKind,
+    Message,
+};
 pub use gap::{Citation, Fix, FixKind, Gap, Severity};
 pub use health::{Health, ProjectHealth, ServiceStatus, StatusWord};
 pub use http_route::{
