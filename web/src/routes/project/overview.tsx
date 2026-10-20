@@ -62,7 +62,6 @@ import {
 } from "@/model/service"
 import { serviceUsage } from "@/model/usage"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
-import { ProjectHeader } from "@/routes/project/header"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { Stat, StatGroup } from "@zeabur/design-system/components/stat"
 import { MeterStack, meterPartTone } from "@zeabur/design-system/components/meter"
@@ -73,7 +72,6 @@ export function OverviewPage() {
   const { project } = route.useParams()
   return (
     <>
-      <ProjectHeader project={project} entry="overview" />
       <ProjectData project={project}>
         {(data, unreadable) => <Overview project={project} data={data} unreadable={unreadable} />}
       </ProjectData>
@@ -95,7 +93,7 @@ function Overview({
   // NetworkPolicies feed no list here, so they are not mentioned.
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
   return (
-    <div className="flex w-full max-w-310 flex-col gap-7 px-4 pt-6 pb-12 type-body md:px-8 md:pt-7">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-7 px-4 pt-6 pb-12 type-body md:px-8 md:pt-8">
       <Health project={project} data={data} />
       <div className="flex flex-wrap items-start gap-x-8 gap-y-7">
         <div className="flex min-w-0 flex-main flex-col gap-7">

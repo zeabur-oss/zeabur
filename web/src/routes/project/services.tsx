@@ -44,10 +44,10 @@ export function ServicesPage() {
   const typed = useLocationText((search) => validateServicesSearch(search).q ?? "")
   return (
     <>
-      <ProjectHeader project={project} entry="services" />
+      <ProjectHeader entry="services" column="wide" />
       <ProjectData project={project}>
         {(data, unreadable) => (
-          <div className="flex flex-col gap-4 px-4 py-5 pb-16 md:px-8">
+          <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 pt-1 pb-16 md:box-content md:px-8">
             <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.services)} />
             <ServicesTable key={entry} project={project} data={data} typed={typed} />
           </div>
@@ -202,7 +202,7 @@ function ServicesTable({
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border bg-card shadow-xs">
+      <div className="overflow-x-auto rounded-xl border border-v2-border bg-card">
         <table className="w-full min-w-205 text-sm" aria-label={t("project.services")}>
           <thead className="border-b bg-muted/30">
             <tr>

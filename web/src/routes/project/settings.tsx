@@ -1,30 +1,40 @@
-// A project's settings: its details (display name, description, icon; annotations on its
-// namespace) and whether the namespace shows as a project. Both are plans like any change. Who
-// may not patch the namespace sees the details read-only, with the right to ask for, or, while
-// admin rights are offered, the way to use them (the hint is checked with everyday rights); the
-// permission is the API's hint (`canChange`), and when it is unknown the form stays open and the
-// plan's dry run decides.
+// A project's settings, laid out as the dashboard's project settings (its General page): groups
+// under a section label, each a card of rows with the setting's name and what it does on the left
+// and its control on the right. Basic information (icon, name, description: annotations on the
+// namespace), the Kubernetes namespace (its name to copy, and whether it shows as a project),
+// batch actions (pause or restart every service, each one reviewed plan) and the danger zone
+// (removing it from Zeabur, which only takes the project label off). Every change is a plan like
+// any other. Who may not patch the namespace sees the details read-only, with the right to ask
+// for, or, while admin rights are offered, the way to use them (the hint is checked with everyday
+// rights); the permission is the API's hint (`canChange`), and when it is unknown the form stays
+// open and the plan's dry run decides. Deleting the namespace is not offered: plans refuse it
+// (`tenant_level`).
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
+import CaretDownIcon from "~icons/ph/caret-down"
 
 import type { Schemas } from "@/api/client"
-import { namespaceQuery } from "@/api/queries"
+import { namespaceQuery, projectQuery } from "@/api/queries"
 import { AccessDialog, AdoptButton } from "@/components/adopt"
+import { CopyButton } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
-import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { projectGlyphs } from "@/components/project-icon"
-import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
-import { Textarea } from "@zeabur/design-system/components/textarea"
-import { ToggleGroup, ToggleGroupItem } from "@zeabur/design-system/components/toggle-group"
+import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { useT } from "@/i18n"
 import { mayChange, projectIcons, type ProjectIconName } from "@/model/project"
-import { ProjectHeader } from "@/routes/project/header"
+import type { Service } from "@/model/service"
+import { Button } from "@zeabur/design-system/components/button"
+import { Card, CardFooter, CardRow, SectionLabel } from "@zeabur/design-system/components/card"
+import { Input } from "@zeabur/design-system/components/input"
+import { PageHeader } from "@zeabur/design-system/components/page-header"
+import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
+import { Textarea } from "@zeabur/design-system/components/textarea"
+import { ToggleGroup, ToggleGroupItem } from "@zeabur/design-system/components/toggle-group"
 
 const route = getRouteApi("/projects/$project/settings")
 
@@ -38,9 +48,9 @@ export function ProjectSettingsPage() {
   const namespace = useQuery(namespaceQuery(project))
   const data = namespace.data
   return (
-    <>
-      <ProjectHeader project={project} entry="settings" />
-      <div className="flex max-w-3xl flex-col gap-8 px-4 py-5 pb-16 md:px-8">
+    <div className="px-4 pt-6 pb-20 md:px-8 md:pt-8">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
+        <PageHeader title={t("projectSettings.general")} />
         {namespace.isPending ? (
           <LoadingRows label={t("common.loading")} rows={4} />
         ) : namespace.isError ? (
@@ -49,7 +59,7 @@ export function ProjectSettingsPage() {
           <ProjectSettings namespace={data} />
         ) : null}
       </div>
-    </>
+    </div>
   )
 }
 
@@ -61,15 +71,17 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
   return (
     <>
       {namespace.adopted ? (
-        <Section title={t("projectSettings.details")}>
+        <Group label={t("projectSettings.basic")}>
           {elevation ? (
-            <RefusedHint
-              hint={namespace.canChange}
-              what={t("projectSettings.changeDetails")}
-              missing={[permission("patch", "namespaces")]}
-            />
+            <div className="mb-3">
+              <RefusedHint
+                hint={namespace.canChange}
+                what={t("projectSettings.changeDetails")}
+                missing={[permission("patch", "namespaces")]}
+              />
+            </div>
           ) : readOnly ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-secondary">
               {t("projectSettings.readOnly")}
               <Button size="sm" variant="link" onClick={() => setHelp(true)}>
                 {t("projectSettings.getAccess")}
@@ -82,28 +94,53 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
             namespace={namespace}
             readOnly={readOnly}
           />
-        </Section>
+        </Group>
       ) : null}
-      <Section title={t("projectSettings.project")}>
-        {namespace.system ? (
-          <p className="text-sm text-muted-foreground">{t("projectSettings.system")}</p>
-        ) : (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border px-4 py-3">
-            <div className="flex min-w-0 flex-col gap-0.5 text-sm">
-              <span>
-                {namespace.adopted
-                  ? t("projectSettings.adopted", namespace.name)
-                  : t("projectSettings.notAdopted", namespace.name)}
-              </span>
-            </div>
-            <AdoptButton
-              namespace={namespace.name}
-              adopted={namespace.adopted}
-              variant={namespace.adopted ? "destructive" : "outline"}
-            />
-          </div>
-        )}
-      </Section>
+      <Group label={t("projectSettings.namespaceGroup")}>
+        <Card variant="list">
+          <CardRow
+            label={t("projectSettings.namespace")}
+            description={t("projectSettings.namespaceHint")}
+          >
+            <span className="flex items-center gap-1 font-mono text-sm" translate="no">
+              {namespace.name}
+              <CopyButton value={namespace.name} />
+            </span>
+          </CardRow>
+          <CardRow
+            label={t("projectSettings.shown")}
+            description={
+              namespace.system
+                ? t("projectSettings.system")
+                : namespace.adopted
+                  ? t("projectSettings.shownYes")
+                  : t("projectSettings.shownNo")
+            }
+          >
+            {namespace.system || namespace.adopted ? null : (
+              <AdoptButton namespace={namespace.name} adopted={false} />
+            )}
+          </CardRow>
+        </Card>
+      </Group>
+      {namespace.adopted ? <BatchActions project={namespace.name} /> : null}
+      {namespace.adopted && !namespace.system ? (
+        <Group label={t("projectSettings.danger")}>
+          <Card variant="list">
+            <CardRow
+              label={t("projectSettings.remove")}
+              description={t("projectSettings.removeHint")}
+            >
+              <AdoptButton
+                namespace={namespace.name}
+                adopted
+                variant="destructive"
+                label={t("projectSettings.removeAction")}
+              />
+            </CardRow>
+          </Card>
+        </Group>
+      ) : null}
       {help ? (
         <AccessDialog
           namespace={namespace.name}
@@ -113,6 +150,15 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
         />
       ) : null}
     </>
+  )
+}
+
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section>
+      <SectionLabel>{label}</SectionLabel>
+      {children}
+    </section>
   )
 }
 
@@ -151,101 +197,215 @@ function DetailsForm({
       [...value.trim()].length > max ? t("projectSettings.tooLong", max) : undefined
   return (
     <form
-      className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault()
         if (!readOnly) void form.handleSubmit()
       }}
     >
-      <form.Field name="displayName" validators={{ onChange: atMost(DISPLAY_NAME_MAX) }}>
-        {(f) => (
-          <FormField label={t("projectSettings.displayName")} errors={f.state.meta.errors}>
-            <Input
-              value={f.state.value}
-              placeholder={namespace.name}
-              disabled={readOnly}
-              onChange={(event) => f.handleChange(event.target.value)}
-              onBlur={f.handleBlur}
-            />
-          </FormField>
-        )}
-      </form.Field>
-      <form.Field name="description" validators={{ onChange: atMost(DESCRIPTION_MAX) }}>
-        {(f) => (
-          <FormField label={t("projectSettings.description")} errors={f.state.meta.errors}>
-            <Textarea
-              value={f.state.value}
-              rows={3}
-              disabled={readOnly}
-              onChange={(event) => f.handleChange(event.target.value)}
-              onBlur={f.handleBlur}
-            />
-          </FormField>
-        )}
-      </form.Field>
-      <form.Field name="icon">
-        {(f) => (
-          <div className="flex flex-col gap-1">
-            <span className="type-meta text-muted-foreground">{t("projectSettings.icon")}</span>
-            <ToggleGroup
-              aria-label={t("projectSettings.icon")}
-              value={f.state.value ? [f.state.value] : []}
-              onValueChange={(next) => {
-                const choice = next[0]
-                f.handleChange(projectIcons.find((name) => name === choice))
-              }}
-              disabled={readOnly}
-              variant="outline"
-              className="flex-wrap"
-            >
-              {projectIcons.map((name) => {
-                const Glyph = projectGlyphs[name]
-                return (
-                  <ToggleGroupItem
-                    key={name}
-                    value={name}
-                    aria-label={t(`icon.${name}`)}
-                    title={t(`icon.${name}`)}
-                    variant="outline"
-                  >
-                    <Glyph aria-hidden="true" />
-                  </ToggleGroupItem>
-                )
-              })}
-            </ToggleGroup>
-          </div>
-        )}
-      </form.Field>
-      {readOnly ? null : (
-        <form.Subscribe
-          selector={(s) =>
-            [
-              s.canSubmit,
-              s.values.displayName.trim() !== initial.displayName ||
-                s.values.description.trim() !== initial.description ||
-                s.values.icon !== initial.icon,
-            ] as const
-          }
-        >
-          {([canSubmit, changed]) => (
-            <div>
-              <Button type="submit" size="sm" disabled={!changed || !canSubmit}>
-                {t("action.saveDetails")}
-              </Button>
-            </div>
+      <Card variant="list">
+        <form.Field name="icon">
+          {(f) => (
+            <CardRow label={t("projectSettings.icon")} description={t("projectSettings.iconHint")}>
+              <IconPicker value={f.state.value} onChange={f.handleChange} disabled={readOnly} />
+            </CardRow>
           )}
-        </form.Subscribe>
-      )}
+        </form.Field>
+        <form.Field name="displayName" validators={{ onChange: atMost(DISPLAY_NAME_MAX) }}>
+          {(f) => (
+            <CardRow
+              label={t("projectSettings.name")}
+              description={t("projectSettings.nameHint", namespace.name)}
+            >
+              <FormField
+                label={t("projectSettings.name")}
+                hideLabel
+                errors={f.state.meta.errors}
+                className="w-full sm:w-70"
+              >
+                <Input
+                  value={f.state.value}
+                  placeholder={namespace.name}
+                  disabled={readOnly}
+                  onChange={(event) => f.handleChange(event.target.value)}
+                  onBlur={f.handleBlur}
+                />
+              </FormField>
+            </CardRow>
+          )}
+        </form.Field>
+        <form.Field name="description" validators={{ onChange: atMost(DESCRIPTION_MAX) }}>
+          {(f) => (
+            <CardRow
+              label={t("projectSettings.description")}
+              description={t("projectSettings.descriptionHint")}
+              align="start"
+            >
+              <FormField
+                label={t("projectSettings.description")}
+                hideLabel
+                errors={f.state.meta.errors}
+                className="w-full sm:w-80"
+              >
+                <Textarea
+                  value={f.state.value}
+                  rows={3}
+                  disabled={readOnly}
+                  onChange={(event) => f.handleChange(event.target.value)}
+                  onBlur={f.handleBlur}
+                />
+              </FormField>
+            </CardRow>
+          )}
+        </form.Field>
+        {readOnly ? null : (
+          <form.Subscribe
+            selector={(s) =>
+              [
+                s.canSubmit,
+                s.values.displayName.trim() !== initial.displayName ||
+                  s.values.description.trim() !== initial.description ||
+                  s.values.icon !== initial.icon,
+              ] as const
+            }
+          >
+            {([canSubmit, changed]) => (
+              <CardFooter className="justify-end">
+                <Button type="submit" size="sm" disabled={!changed || !canSubmit}>
+                  {t("action.saveDetails")}
+                </Button>
+              </CardFooter>
+            )}
+          </form.Subscribe>
+        )}
+      </Card>
       {planner.dialog}
     </form>
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/** The icon on its tile, and a button that opens the built-in set (nothing is uploaded). */
+function IconPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value?: ProjectIconName
+  onChange: (icon: ProjectIconName | undefined) => void
+  disabled: boolean
+}) {
+  const t = useT()
+  const Current = projectGlyphs[value ?? "folder"]
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium">{title}</h2>
-      {children}
-    </section>
+    <span className="flex items-center gap-3">
+      <span className="flex size-9 items-center justify-center rounded-lg border border-main bg-secondary text-main">
+        <Current aria-hidden="true" className="size-4.5" />
+      </span>
+      <Popover>
+        <PopoverTrigger
+          render={<Button type="button" variant="outline" size="sm" disabled={disabled} />}
+        >
+          {t("projectSettings.changeIcon")}
+          <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64">
+          <ToggleGroup
+            aria-label={t("projectSettings.icon")}
+            value={value ? [value] : []}
+            onValueChange={(next) => {
+              const choice = next[0]
+              onChange(projectIcons.find((name) => name === choice))
+            }}
+            variant="outline"
+            className="flex-wrap"
+          >
+            {projectIcons.map((name) => {
+              const Glyph = projectGlyphs[name]
+              return (
+                <ToggleGroupItem
+                  key={name}
+                  value={name}
+                  aria-label={t(`icon.${name}`)}
+                  title={t(`icon.${name}`)}
+                  variant="outline"
+                >
+                  <Glyph aria-hidden="true" />
+                </ToggleGroupItem>
+              )
+            })}
+          </ToggleGroup>
+        </PopoverContent>
+      </Popover>
+    </span>
+  )
+}
+
+const restartable = (s: Service) =>
+  s.kind === "Deployment" || s.kind === "StatefulSet" || s.kind === "DaemonSet"
+
+/** Pause (scale to zero) or restart every service, each as one plan the person reviews. Pausing
+ * leaves out what cannot scale (DaemonSets, Jobs, CronJobs), what is already at zero, and what
+ * another tool manages (it would scale it back). */
+function BatchActions({ project }: { project: string }) {
+  const t = useT()
+  const view = useQuery(projectQuery(project))
+  const planner = usePlanner(project)
+  const services = view.data?.services ?? []
+  const pausable = services.filter(
+    (s) =>
+      (s.kind === "Deployment" || s.kind === "StatefulSet") &&
+      (s.replicas?.desired ?? 0) > 0 &&
+      !s.provenance.tool,
+  )
+  const restarting = services.filter(restartable)
+  if (services.length === 0) return null
+  return (
+    <Group label={t("projectSettings.batch")}>
+      <Card variant="list">
+        <CardRow
+          label={t("projectSettings.pauseAll")}
+          description={t("projectSettings.pauseAllHint")}
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pausable.length === 0}
+            onClick={() =>
+              planner.plan({
+                title: t("title.pauseAll", project),
+                changes: pausable.map((s) => ({
+                  op: "scale" as const,
+                  workload: { kind: s.kind, name: s.name },
+                  replicas: 0,
+                })),
+              })
+            }
+          >
+            {t("projectSettings.pause")}
+          </Button>
+        </CardRow>
+        <CardRow
+          label={t("projectSettings.restartAll")}
+          description={t("projectSettings.restartAllHint")}
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={restarting.length === 0}
+            onClick={() =>
+              planner.plan({
+                title: t("title.restartAll", project),
+                changes: restarting.map((s) => ({
+                  op: "restart" as const,
+                  workload: { kind: s.kind, name: s.name },
+                })),
+              })
+            }
+          >
+            {t("ops.restart")}
+          </Button>
+        </CardRow>
+      </Card>
+      {planner.dialog}
+    </Group>
   )
 }

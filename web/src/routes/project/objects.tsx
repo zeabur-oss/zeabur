@@ -126,8 +126,8 @@ export function ObjectsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ProjectHeader project={project} entry="objects" />
-      <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pb-8 md:px-8">
+      <ProjectHeader entry="objects" column="wide" />
+      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-3 px-4 pb-8 md:box-content md:px-8">
         {base.isPending ? (
           <LoadingRows label={t("common.loading")} rows={8} />
         ) : base.isError ? (
@@ -322,7 +322,7 @@ function ObjectList({
       ) : (
         <div
           ref={scroller}
-          className="min-h-96 flex-1 overflow-y-auto rounded-lg border bg-card shadow-xs"
+          className="min-h-96 flex-1 overflow-y-auto rounded-xl border border-v2-border bg-card"
           role="list"
           aria-label={t("project.entry.objects")}
         >

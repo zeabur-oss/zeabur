@@ -38,10 +38,13 @@ export function AdoptButton({
   namespace,
   adopted,
   variant = "outline",
+  label,
 }: {
   namespace: string
   adopted: boolean
   variant?: "outline" | "destructive"
+  /** The button's own words, where the row around it already says what it does. */
+  label?: string
 }) {
   const t = useT()
   const planner = usePlanner(namespace)
@@ -64,7 +67,7 @@ export function AdoptButton({
   return (
     <>
       <Button size="sm" variant={variant} disabled={checking} onClick={() => void start()}>
-        {adopted ? t("action.unadopt") : t("action.adopt")}
+        {label ?? (adopted ? t("action.unadopt") : t("action.adopt"))}
       </Button>
       {planner.dialog}
       {help ? (

@@ -45,7 +45,7 @@ export function ArchitecturePage() {
   const { project } = route.useParams()
   return (
     <div className="flex min-h-140 flex-1 flex-col">
-      <ProjectHeader project={project} entry="architecture" />
+      <ProjectHeader entry="architecture" column="full" />
       <ProjectData project={project}>
         {(data) => <Architecture project={project} data={data} />}
       </ProjectData>

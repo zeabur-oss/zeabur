@@ -246,7 +246,7 @@ function ComponentCard({
   return (
     <article
       className={cn(
-        "flex w-full flex-col gap-3 rounded-lg border bg-card shadow-xs p-4 transition-colors hover:border-foreground/20",
+        "flex w-full flex-col gap-3 rounded-xl border border-v2-border bg-card p-4 transition-colors hover:border-foreground/20",
         installed && "border-ok/30",
       )}
     >
