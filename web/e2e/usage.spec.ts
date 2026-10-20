@@ -10,7 +10,8 @@ const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const service = env("ZEABUR_E2E_SERVICE", "talker")
 const pod = env("ZEABUR_E2E_POD")
-const page_ = `/projects/${encodeURIComponent(namespace)}/services/Deployment/${service}`
+// Usage and history are on the service's Metrics tab.
+const page_ = `/projects/${encodeURIComponent(namespace)}/services/Deployment/${service}?tab=metrics`
 const STORE = "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428"
 const MiB = 2 ** 20
 

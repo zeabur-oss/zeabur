@@ -56,3 +56,9 @@ export function ServiceIcon({
     <Glyph aria-hidden="true" className={cn("shrink-0 text-muted-foreground", glyph, className)} />
   )
 }
+
+/** A role's glyph, for a group of services of that role (the project sidebar). */
+export function RoleIcon({ role, className }: { role: Role; className?: string }) {
+  const Glyph = roleIcons[role]
+  return <Glyph aria-hidden="true" className={cn("shrink-0", className)} />
+}

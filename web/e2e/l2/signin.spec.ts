@@ -125,9 +125,10 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     // on that message, whether or not the window could close.
     await page.goto(servicePage)
     await expect(page.getByRole("heading", { level: 1, name: service })).toBeVisible()
-    // The terminal is under More (web/DESIGN.md, "Depth"); once open it is a tab of its own.
-    await page.getByRole("button", { name: "More", exact: true }).click()
-    await page.getByRole("menuitem", { name: "Terminal" }).click()
+    // The terminal opens from the header's menu (web/DESIGN.md, "Depth"); once open it is a tab
+    // of its own.
+    await page.getByRole("button", { name: "More actions" }).click()
+    await page.getByRole("menuitem", { name: "Open terminal" }).click()
     await expect(
       page
         .getByRole("tablist", { name: "Service sections" })

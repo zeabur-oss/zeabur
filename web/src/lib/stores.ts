@@ -1,5 +1,5 @@
-// Small external stores for shell state: the command palette, whether the sidebar is folded
-// (remembered in localStorage, which may be unavailable), the phone menu, recent palette items, and
+// Small external stores for shell state: the command palette, the phone menu, folding groups
+// (remembered in localStorage, which may be unavailable), recent palette items, and
 // each project's Architecture viewport (kept for this visit, so going back to the canvas finds it
 // as it was).
 import { useSyncExternalStore } from "react"
@@ -42,16 +42,6 @@ function save(key: string, value: string) {
 export const palette = store(false)
 export const mobileNav = store(false)
 
-// The sidebar folds away and stays so (remembered); the project's own column is in the panel, so
-// one setting serves every page. Values saved by the earlier icon rail ("rail", "full") read as open.
-const sidebarKey = "zeabur.sidebar"
-export const sidebarCollapsed = store(load(sidebarKey) === "collapsed")
-
-export function setSidebarCollapsed(collapsed: boolean) {
-  sidebarCollapsed.set(collapsed)
-  save(sidebarKey, collapsed ? "collapsed" : "open")
-}
-
 /** Whether a folding group (an advanced section) is open, remembered per key; `initial` until the
  * person opens or closes it. Advanced groups start closed: the everyday path comes first. */
 export function remembered(key: string, initial: boolean) {
@@ -64,6 +54,9 @@ export function remembered(key: string, initial: boolean) {
     },
   }
 }
+
+/** Projects as a list rather than a grid of cards (Home and the Projects page). */
+export const projectsAsList = remembered("zeabur.projects.list", false)
 
 /** A service's Health checks in Settings: folded until opened, and opened by a diagnosis that
  * leads there ("Check the health checks"). */

@@ -8,6 +8,8 @@
    shadcn/lint's no-arbitrary-values (https://github.com/shadcn-ui/lint/blob/main/docs/rules/no-arbitrary-values.md).
    Each is a Tailwind theme variable, so it makes the matching utility (`grid-cols-settings`). */
 @theme {
+  /* Zeabur's content column: a service's tabs and their content, a project's pages (960px). */
+  --container-content: 60rem;
   /* A label column and its value: settings rows. */
   --grid-template-columns-settings: 12rem 1fr;
   /* A term and its description (`dl`). */

@@ -57,13 +57,15 @@ test("Home names the failing service across projects and lists the project", asy
   await expect(row).toContainText(/CrashLoopBackOff|Error|last exit 1/)
   await expect(row).toContainText("Deployment")
   if (!namespace.startsWith("kube-")) {
-    const projects = page.getByRole("table", { name: "Projects" })
-    await expect(projects.getByRole("link", { name: namespace, exact: true })).toBeVisible()
-    // Failing projects come first: none of the rows above this one is fully healthy.
-    const rows = await projects.getByRole("row").allInnerTexts()
-    const mine = rows.findIndex((text) => text.includes(namespace))
-    for (const text of rows.slice(1, mine)) {
-      const [healthy, total] = (text.match(/(\d+)\/(\d+)/) ?? []).slice(1).map(Number)
+    // The projects as cards, failing first: none of the cards before this one is fully healthy.
+    const projects = page.getByRole("list", { name: "Projects" })
+    await expect(
+      projects.getByRole("link", { name: new RegExp(`^${namespace}\\b`) }).first(),
+    ).toBeVisible()
+    const cards = await projects.getByRole("listitem").allInnerTexts()
+    const mine = cards.findIndex((text) => text.includes(namespace))
+    for (const text of cards.slice(0, mine)) {
+      const [healthy, total] = (text.match(/(\d+)\/(\d+) healthy/) ?? []).slice(1).map(Number)
       expect(healthy).toBeLessThan(total ?? 0)
     }
   }
@@ -96,12 +98,13 @@ test("a popup pressed before its code arrives opens when it does, by click and b
     })
     return release
   }
-  const language = page.getByRole("button", { name: "Language" })
-  const english = page.getByRole("button", { name: "English" })
+  // The account menu at the foot of the sidebar holds the language.
+  const language = page.getByRole("button", { name: "Account" })
+  const english = page.getByRole("menuitem", { name: "English" })
 
   let release = await hold()
   await page.goto("/")
-  await expect(language).toHaveAttribute("aria-haspopup", "dialog")
+  await expect(language).toHaveAttribute("aria-haspopup", "menu")
   await expect(language).toHaveAttribute("aria-expanded", "false")
   await language.click()
   await expect(english).toBeHidden()
@@ -273,33 +276,38 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
   await page.goto(`${project}/services/Deployment/${healthy}`)
   await expect(page.getByRole("heading", { level: 1, name: healthy })).toBeVisible()
   const tabs = page.getByRole("tablist", { name: "Service sections" })
-  // The everyday tabs; the rest are under More (web/DESIGN.md, "Depth").
-  await expect(tabs.getByRole("tab")).toHaveText([
-    /^Overview/,
-    /^Logs/,
-    /^Variables/,
-    /^Networking/,
-    /^Settings/,
+  // The everyday tabs, then Events while there are any and Releases (web/DESIGN.md, "Depth");
+  // Terminal and YAML open from the header's menu.
+  const names = await tabs.getByRole("tab").allInnerTexts()
+  expect(names.slice(0, 7).map((n) => n.trim())).toEqual([
+    "Overview",
+    "Logs",
+    "Variables",
+    "Metrics",
+    "Networking",
+    "Storage",
+    "Settings",
   ])
-  await page.getByRole("button", { name: "More", exact: true }).click()
+  expect(names.map((n) => n.trim())).toContain("Releases")
+  await page.getByRole("button", { name: "More actions" }).click()
   await expect(page.getByRole("menuitem")).toHaveText([
-    /^Events/,
-    /^Releases/,
-    /^Storage/,
-    /^Terminal/,
-    /^YAML/,
+    "Open terminal",
+    "View YAML",
+    "Delete service",
   ])
   await page.keyboard.press("Escape")
   await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true")
   await expect(page.getByRole("tabpanel", { name: "Overview" })).toContainText(pod)
   await expect(page.getByRole("button", { name: "Restart" })).toBeEnabled()
-  // Each fact once: the way back names the project, the kind is said once, and the line beside
-  // Restart names only the cluster.
-  const back = page.getByRole("link", { name: /^Back to / })
-  await expect(back).toHaveAttribute("href", project)
-  const header = back.locator("xpath=..")
-  await expect(header.getByText(`Deployment/${healthy}`, { exact: true })).toHaveCount(0)
-  await expect(header.getByText("Deployment", { exact: true })).toHaveCount(1)
+  // The way back is the project sidebar's; each fact once in the header: `Kind/name` to copy,
+  // and the line beside Restart names only the cluster.
+  const sections = page.getByRole("navigation", { name: "Project sections" })
+  await expect(sections.getByRole("link", { name: "Projects" })).toHaveAttribute(
+    "href",
+    "/projects",
+  )
+  const header = page.locator("main header").first()
+  await expect(header.getByText(`Deployment/${healthy}`, { exact: true })).toHaveCount(1)
   await expect(header.getByText(/^Namespace/)).toHaveCount(0)
 
   await tabs.getByRole("tab", { name: "Logs" }).click()
@@ -314,15 +322,15 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
     timeout: 30_000,
   })
 
-  // A tab from More shows as a tab of its own while it is open.
-  await page.getByRole("button", { name: "More", exact: true }).click()
-  await page.getByRole("menuitem", { name: /^Events/ }).click()
-  await expect(page).toHaveURL(/tab=events/)
-  await expect(tabs.getByRole("tab", { name: /^Events/ })).toHaveAttribute("aria-selected", "true")
-  await tabs.getByRole("tab", { name: /^Networking/ }).click()
+  // A view from the header's menu shows as a tab of its own while it is open.
+  await page.getByRole("button", { name: "More actions" }).click()
+  await page.getByRole("menuitem", { name: "View YAML" }).click()
+  await expect(page).toHaveURL(/tab=yaml/)
+  await expect(tabs.getByRole("tab", { name: "YAML" })).toHaveAttribute("aria-selected", "true")
+  await tabs.getByRole("tab", { name: "Networking" }).click()
   await expect(page).toHaveURL(/tab=networking/)
   await page.goBack()
-  await expect(page).toHaveURL(/tab=events/)
+  await expect(page).toHaveURL(/tab=yaml/)
 })
 
 /** The Architecture canvas's zoom, as its readout shows it ("120%"). */
@@ -363,7 +371,7 @@ test("a Secret's values appear only when revealed; they and the log filter stay 
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${healthy}?tab=logs`)
-  const column = page.getByRole("complementary", { name: "Services" })
+  const column = page.getByRole("navigation", { name: "Project sections" })
   await page.getByRole("textbox", { name: "Filter lines" }).fill("zeabur-e2e-nothing-matches")
   await column.getByRole("link", { name: new RegExp(`^${failing}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=logs`))
@@ -396,9 +404,9 @@ test("the Services search box follows the URL on Back and Forward", async ({ pag
   await expect(page).toHaveURL(new RegExp(`q=${failing}`))
   await expect(healthyRow).toHaveCount(0)
 
-  // The Services entry again: a new history entry without a query.
+  // All services again, from the sidebar: a new history entry without a query.
   const sections = page.getByRole("navigation", { name: "Project sections" })
-  await sections.getByRole("link", { name: /^Services/ }).click()
+  await sections.getByRole("link", { name: "All services" }).click()
   await expect(page).not.toHaveURL(/q=/)
   await expect(box).toHaveValue("")
   await expect(healthyRow).toBeVisible()
@@ -833,17 +841,22 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   await expect(row.getByRole("button", { name: "Adopt" })).toHaveCount(0, { timeout: 15_000 })
 
   await page.goto(`/projects/${other}/settings`)
-  await page.getByRole("textbox", { name: "Display name" }).fill("Adopted in a test")
+  await page.getByRole("textbox", { name: "Project name" }).fill("Adopted in a test")
+  await page.getByRole("button", { name: "Change icon" }).click()
   await page.getByRole("button", { name: "Rocket" }).click()
+  await page.keyboard.press("Escape")
   await page.getByRole("button", { name: "Save details" }).click()
   await confirmPlan(page, `Details of ${other}`, "Save details")
-  // The display name names the project in the breadcrumb.
-  await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toContainText(
+  // The display name names the project in its sidebar.
+  await page.goto(`/projects/${other}`)
+  await expect(page.getByRole("navigation", { name: "Project sections" })).toContainText(
     "Adopted in a test",
     { timeout: 15_000 },
   )
 
-  await page.getByRole("button", { name: "Stop showing as project" }).click()
+  // The settings' own navigation replaces the project's; Remove from Zeabur is in the danger zone.
+  await page.goto(`/projects/${other}/settings`)
+  await page.getByRole("button", { name: "Remove", exact: true }).click()
   await confirmPlan(
     page,
     `Stop showing ${other} as a project`,

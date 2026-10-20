@@ -1,22 +1,25 @@
-// The shell around every page (agent-playground's frame, the design system's AppFrame): the global
-// sidebar on the window ground, folding away from the panel's header or with ⌘\ (remembered), and
-// one content panel holding, inside a project, the project's column, then the top bar and the page.
-// Below `md` the sidebar and the project's column move into a sheet opened from the top bar. The ⌘K
-// palette, and one toaster for the outcomes of writes.
-import { Outlet } from "@tanstack/react-router"
-import { lazy, Suspense, useEffect } from "react"
+// The shell around every page, Zeabur's: the navigation drawer (the design system's AppFrame and
+// Sidebar, 224px) beside the page, which scrolls on its own. Inside a project the project's
+// sidebar takes the global one's place; the way back is its "Projects" row. There is no top bar:
+// the sidebars say where the page is, and ⌘K jumps anywhere. Below `md` the sidebar moves into a
+// sheet opened from a bar along the top, as the dashboard's phone header. The ⌘K palette, and
+// one toaster for the outcomes of writes.
+import { Link, Outlet } from "@tanstack/react-router"
+import { lazy, Suspense } from "react"
+import ListIcon from "~icons/ph/list"
+import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import XIcon from "~icons/ph/x"
 
 import { elevation } from "@/auth/elevation"
 import { PlanFallback } from "@/components/plan/fallback"
 import { CommandPalette } from "@/components/shell/command-palette"
-import { ProjectColumn } from "@/components/shell/project-column"
+import { ProjectSidebar } from "@/components/shell/project-sidebar"
 import { Sidebar } from "@/components/shell/sidebar"
-import { TopBar } from "@/components/shell/topbar"
 import { useT } from "@/i18n"
 import { usePlace } from "@/lib/place"
-import { mobileNav, setSidebarCollapsed, sidebarCollapsed } from "@/lib/stores"
+import { mobileNav, palette } from "@/lib/stores"
 import { useTheme } from "@/theme"
+import { Logo } from "@zeabur/design-system/components/brand"
 import { Button } from "@zeabur/design-system/components/button"
 import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
 import { AppFrame, FramePanel, FrameSidebar } from "@zeabur/design-system/components/frame"
@@ -35,24 +38,11 @@ const ElevationDialog = lazy(() =>
 export function AppShell() {
   const t = useT()
   const place = usePlace()
-  const collapsed = sidebarCollapsed.useValue()
   const mobileOpen = mobileNav.useValue()
   const elevating = elevation.useValue()
   const theme = useTheme()
-
-  // ⌘\ (Ctrl+\ elsewhere) folds the sidebar, as in agent-playground.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "\\" || !(event.metaKey || event.ctrlKey) || event.altKey) return
-      // Ctrl+\ is SIGQUIT in the terminal, and a key in any field or editor belongs to it.
-      const target = event.target instanceof Element ? event.target : null
-      if (target?.closest("input, textarea, select, [contenteditable], .xterm, .cm-editor")) return
-      event.preventDefault()
-      setSidebarCollapsed(!sidebarCollapsed.get())
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [])
+  // The project's sidebar replaces the global one on every page of a project.
+  const nav = place.project ? <ProjectSidebar project={place.project} /> : <Sidebar />
 
   return (
     <TooltipProvider>
@@ -63,37 +53,26 @@ export function AppShell() {
         >
           {t("shell.skip")}
         </a>
-        <FrameSidebar collapsed={collapsed}>
-          <Sidebar />
-        </FrameSidebar>
-        <FramePanel className="flex-row">
-          {place.project ? (
-            <ProjectColumn project={place.project} className="hidden md:flex" />
-          ) : null}
-          <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar />
-            <main
-              id="content"
-              tabIndex={-1}
-              className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain outline-none"
-            >
-              <Outlet />
-            </main>
-          </div>
+        <FrameSidebar>{nav}</FrameSidebar>
+        <FramePanel>
+          <PhoneBar />
+          <main
+            id="content"
+            tabIndex={-1}
+            className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain outline-none"
+          >
+            <Outlet />
+          </main>
         </FramePanel>
       </AppFrame>
       <Dialog open={mobileOpen} onOpenChange={(open) => mobileNav.set(open)}>
-        <DialogContent
-          variant="sheet"
-          className="flex flex-col overflow-y-auto"
-          aria-describedby={undefined}
-        >
+        <DialogContent variant="sheet" className="flex flex-col" aria-describedby={undefined}>
           <DialogTitle className="sr-only">{t("shell.menu")}</DialogTitle>
           <Button
             variant="muted"
             size="icon-sm"
             onClick={() => mobileNav.set(false)}
-            className="absolute top-2.5 right-2.5 z-10"
+            className="absolute top-5 right-3 z-10"
             aria-label={t("common.close")}
           >
             <XIcon aria-hidden="true" />
@@ -102,15 +81,9 @@ export function AppShell() {
             onClickCapture={(event) => {
               if ((event.target as HTMLElement).closest("a")) mobileNav.set(false)
             }}
-            className="flex flex-col"
+            className="flex min-h-0 flex-1 flex-col"
           >
-            <Sidebar />
-            {place.project ? (
-              <ProjectColumn
-                project={place.project}
-                className="h-auto w-full border-t border-r-0"
-              />
-            ) : null}
+            {nav}
           </div>
         </DialogContent>
       </Dialog>
@@ -125,5 +98,34 @@ export function AppShell() {
         <Toaster theme={theme} position="bottom-right" containerAriaLabel={t("toast.region")} />
       </Suspense>
     </TooltipProvider>
+  )
+}
+
+/** The phone's header (below `md`): the menu that opens the sidebar, the logo, and search. */
+function PhoneBar() {
+  const t = useT()
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-main bg-card px-3 md:hidden">
+      <Button
+        variant="muted"
+        size="icon-sm"
+        onClick={() => mobileNav.set(true)}
+        aria-label={t("shell.menu")}
+      >
+        <ListIcon aria-hidden="true" />
+      </Button>
+      <Link to="/" className="flex h-7 items-center rounded-md outline-none" aria-label="zeabur">
+        <Logo className="h-5" aria-hidden="true" />
+      </Link>
+      <Button
+        variant="muted"
+        size="icon-sm"
+        className="ml-auto"
+        onClick={() => palette.set(true)}
+        aria-label={t("shell.search")}
+      >
+        <MagnifyingGlassIcon aria-hidden="true" />
+      </Button>
+    </header>
   )
 }
