@@ -1,6 +1,3 @@
-// The person's menu at the foot of the sidebar, as Zeabur's UserMenu: who is signed in (the name
-// Kubernetes sees and its groups), admin rights while they are offered or in use, signing out
-// where people sign in (the in-cluster server), then the language and the theme.
 import { useQuery } from "@tanstack/react-query"
 import CheckIcon from "~icons/ph/check"
 import DesktopIcon from "~icons/ph/desktop"
@@ -72,9 +69,7 @@ export function UserMenu() {
                 {t("elevate.drop")}
               </MenuItem>
             ) : (
-              // The way in that every page has, while admin rights are offered. Once they are
-              // granted, every query is read again (auth/follow-elevation.ts), so nothing needs
-              // retrying.
+              // Granted rights re-read every query (auth/follow-elevation.ts): nothing to retry.
               <MenuItem onClick={() => void retryAsAdmin()}>
                 <ShieldCheckIcon aria-hidden="true" />
                 {t("elevate.use")}

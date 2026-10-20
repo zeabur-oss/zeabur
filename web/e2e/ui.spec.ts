@@ -2,9 +2,8 @@ import type { Page } from "@playwright/test"
 
 import { expect, test } from "./fixtures.ts"
 
-// The read-only interface on a real cluster (scripts/e2e-ui.sh applies
-// e2e/manifests/talker.yaml) or on the demo server. See playwright.config.ts for
-// ZEABUR_E2E_URL; the rest describe the project:
+// Runs on a real cluster (scripts/e2e-ui.sh) or the demo server. ZEABUR_E2E_URL: see
+// playwright.config.ts.
 //
 //   ZEABUR_E2E_NAMESPACE     the project
 //   ZEABUR_E2E_POD           a pod of the healthy Deployment, logging ZEABUR_E2E_LOG_LINE
@@ -32,7 +31,6 @@ test.beforeAll(() => {
   if (!pod) throw new Error("ZEABUR_E2E_POD is not set")
 })
 
-/** The replica the Logs tab shows: its picker is labelled "Replica <name>". */
 const logsPod = (page: Page) =>
   page.getByRole("tabpanel", { name: "Logs" }).getByRole("button", { name: /^Replica / })
 
@@ -42,22 +40,18 @@ test("Home names the failing service across projects and lists the project", asy
   const nav = page.getByRole("navigation", { name: "Main" })
   await expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page")
   const status = page.getByRole("region", { name: "Status" })
-  // Key figures: each label, then its figure.
   await expect(status).toContainText(/Failing\s*[1-9]\d*/)
   await expect(status).toContainText(/Services\s*\d+\/\d+/)
   await expect(status.getByRole("link")).toHaveAttribute("href", "/cluster")
 
   const attention = page.getByRole("region", { name: "Needs attention" })
   const row = attention.getByRole("listitem").filter({ hasText: `${namespace}/${failing}` })
-  // The pill says it in plain words, whichever the kubelet reports: `CrashLoopBackOff` (waiting),
-  // `Error` (terminated), or, in the moment after a restart while the container runs again,
-  // "Running" with its last exit (its recent crash still fails it). The facts are read with the
-  // word, from the tooltip's text.
+  // The kubelet reports `CrashLoopBackOff`, `Error`, or briefly "Running" with its last exit.
   await expect(row).toContainText("Keeps crashing")
   await expect(row).toContainText(/CrashLoopBackOff|Error|last exit 1/)
   await expect(row).toContainText("Deployment")
   if (!namespace.startsWith("kube-")) {
-    // The projects as cards, failing first: none of the cards before this one is fully healthy.
+    // Failing projects sort first.
     const projects = page.getByRole("list", { name: "Projects" })
     await expect(
       projects.getByRole("link", { name: new RegExp(`^${namespace}\\b`) }).first(),
@@ -74,7 +68,6 @@ test("Home names the failing service across projects and lists the project", asy
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=logs`))
   await expect(page.getByRole("tab", { name: "Logs" })).toHaveAttribute("aria-selected", "true")
 
-  // The projects list has the namespace too.
   await page.goto("/projects")
   if (namespace.startsWith("kube-")) {
     await page.getByRole("switch", { name: "Show system namespaces" }).click()
@@ -98,7 +91,6 @@ test("a popup pressed before its code arrives opens when it does, by click and b
     })
     return release
   }
-  // The account menu at the foot of the sidebar holds the language.
   const language = page.getByRole("button", { name: "Account" })
   const english = page.getByRole("menuitem", { name: "English" })
 
@@ -147,7 +139,6 @@ test("the palette jumps to a service by keyboard, and Enter while composing does
   })
   await expect(palette).toBeVisible()
   await expect(page).toHaveURL((url) => url.pathname === "/")
-  // Arrow keys move the highlight onto this project's service; Enter opens it.
   while ((await option.getAttribute("data-highlighted")) === null)
     await page.keyboard.press("ArrowDown")
   await page.keyboard.press("Enter")
@@ -182,7 +173,7 @@ test("the cluster page shows the cluster itself, and its components on their own
   await page.goBack()
   await expect(page).toHaveURL(/\/cluster$/)
 
-  // The old address still arrives.
+  // Old address redirects.
   await page.goto("/settings/components")
   await expect(page).toHaveURL(/\/cluster\/components$/)
 })
@@ -194,8 +185,6 @@ test("Overview puts the failing service first, with a link to its failing pod's 
   await expect(page.getByRole("heading", { level: 1, name: namespace })).toBeVisible()
   const attention = page.getByRole("region", { name: "Failing" })
   const row = attention.getByRole("listitem").filter({ hasText: failing })
-  // Plain words, whichever the kubelet reports (see the Home test); its own word is in the
-  // tooltip.
   await expect(row).toContainText("Keeps crashing")
   await expect(row).toContainText(/CrashLoopBackOff|Error|last exit 1/)
   await expect(row).toContainText(/restart/)
@@ -209,7 +198,6 @@ test("Overview puts the failing service first, with a link to its failing pod's 
   await expect(page.getByRole("tab", { name: "Logs" })).toHaveAttribute("aria-selected", "true")
   await expect(logsPod(page)).toHaveAccessibleName(`Replica ${failingPod}`)
 
-  // The compact table lists the failing service before the healthy one.
   await page.goto(project)
   const services = page.getByRole("table", { name: "Services" })
   // Wait for the rows to render before reading them all at once.
@@ -258,7 +246,6 @@ test("Services filters, sorts, and leads from a pod to its logs", async ({ page 
   await expect(table.getByRole("link", { name: new RegExp(`^${failing}\\b`) })).toHaveCount(0)
   await page.getByRole("searchbox", { name: "Filter services" }).fill("")
 
-  // The most restarts first: the values descend, and the header says so.
   await table.getByRole("button", { name: "Restarts" }).click()
   await expect(page).toHaveURL(/sort=restarts/)
   await expect(table.getByRole("columnheader", { name: "Restarts" })).toHaveAttribute(
@@ -276,8 +263,6 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
   await page.goto(`${project}/services/Deployment/${healthy}`)
   await expect(page.getByRole("heading", { level: 1, name: healthy })).toBeVisible()
   const tabs = page.getByRole("tablist", { name: "Service sections" })
-  // The everyday tabs, then Events while there are any and Releases (web/DESIGN.md, "Depth");
-  // Terminal and YAML open from the header's menu.
   const names = await tabs.getByRole("tab").allInnerTexts()
   expect(names.slice(0, 7).map((n) => n.trim())).toEqual([
     "Overview",
@@ -299,8 +284,6 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
   await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true")
   await expect(page.getByRole("tabpanel", { name: "Overview" })).toContainText(pod)
   await expect(page.getByRole("button", { name: "Restart" })).toBeEnabled()
-  // The way back is the project sidebar's; each fact once in the header: `Kind/name` to copy,
-  // and the line beside Restart names only the cluster.
   const sections = page.getByRole("navigation", { name: "Project sections" })
   await expect(sections.getByRole("link", { name: "Projects" })).toHaveAttribute(
     "href",
@@ -322,7 +305,6 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
     timeout: 30_000,
   })
 
-  // A view from the header's menu shows as a tab of its own while it is open.
   await page.getByRole("button", { name: "More actions" }).click()
   await page.getByRole("menuitem", { name: "View YAML" }).click()
   await expect(page).toHaveURL(/tab=yaml/)
@@ -333,11 +315,10 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
   await expect(page).toHaveURL(/tab=yaml/)
 })
 
-/** The Architecture canvas's zoom, as its readout shows it ("120%"). */
 const canvasZoom = (page: Page) => page.getByText(/^\d+%$/)
 
 test("each project keeps its own Architecture zoom", async ({ page }) => {
-  // A second project to switch to: kube-system is in every cluster.
+  // kube-system is in every cluster.
   const other = namespace === "kube-system" ? "default" : "kube-system"
   await page.goto(`${project}/architecture`)
   await expect(page.getByRole("button", { name: new RegExp(`^${healthy}\\b`) })).toBeVisible()
@@ -346,7 +327,6 @@ test("each project keeps its own Architecture zoom", async ({ page }) => {
   await expect(canvasZoom(page)).not.toHaveText(before ?? "")
   const mine = (await canvasZoom(page).textContent()) ?? ""
 
-  // To the other project's canvas within the page: the viewports last for this visit only.
   await page.getByRole("button", { name: "Switch project" }).first().click()
   await page.getByRole("button", { name: new RegExp(`^${other}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/projects/${other}$`))
@@ -354,13 +334,11 @@ test("each project keeps its own Architecture zoom", async ({ page }) => {
   await sections.getByRole("link", { name: /^Architecture/ }).click()
   await expect(page).toHaveURL(new RegExp(`/projects/${other}/architecture`))
   await expect(canvasZoom(page)).toBeVisible()
-  // Wheel-zoom it: the wheel listener is where a stale project once saved the view. The zoom
-  // buttons sit on the canvas, so a wheel over one reaches it.
+  // The zoom buttons sit on the canvas, so a wheel over one reaches it.
   await page.getByRole("button", { name: "Zoom in" }).hover()
   await page.mouse.wheel(0, -600)
   await expect(canvasZoom(page)).not.toHaveText(mine)
 
-  // Back to the first project: its zoom is as it was left, not the other project's.
   await page.goBack()
   await page.goBack()
   await expect(page).toHaveURL(new RegExp(`${project}/architecture`))
@@ -377,7 +355,6 @@ test("a Secret's values appear only when revealed; they and the log filter stay 
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=logs`))
   await expect(page.getByRole("textbox", { name: "Filter lines" })).toHaveValue("")
 
-  // A Secret's values appear only when revealed, and hide again on Hide.
   await page.goto(`${project}/services/Deployment/${healthy}?tab=variables`)
   const panel = page.getByRole("tabpanel", { name: /^Variables/ })
   await expect(panel).not.toContainText(secretValue)
@@ -387,7 +364,6 @@ test("a Secret's values appear only when revealed; they and the log filter stay 
   await expect(panel).not.toContainText(secretValue)
   await panel.getByRole("button", { name: `Reveal ${secret}` }).click()
   await expect(panel).toContainText(secretValue)
-  // To another service and back within the page: the value is hidden again.
   await column.getByRole("link", { name: new RegExp(`^${failing}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=variables`))
   await column.getByRole("link", { name: new RegExp(`^${healthy}\\b`) }).click()
@@ -404,7 +380,6 @@ test("the Services search box follows the URL on Back and Forward", async ({ pag
   await expect(page).toHaveURL(new RegExp(`q=${failing}`))
   await expect(healthyRow).toHaveCount(0)
 
-  // All services again, from the sidebar: a new history entry without a query.
   const sections = page.getByRole("navigation", { name: "Project sections" })
   await sections.getByRole("link", { name: "All services" }).click()
   await expect(page).not.toHaveURL(/q=/)
@@ -421,11 +396,8 @@ test("the Services search box follows the URL on Back and Forward", async ({ pag
   await expect(box).toHaveValue("")
 })
 
-// Objects and YAML, then the writes. The writes change and restart only `editor` and its
-// ConfigMap (e2e/manifests/talker.yaml), so the tests above see the same project.
-// Each write test needs only what that manifest sets, not what another test wrote, so one runs
-// alone too. They do expect it as applied: scripts/e2e-ui.sh recreates the namespace before a
-// run, since a variable, volume or policy a previous run added is still there.
+// The writes touch only `editor` and its ConfigMap, so the tests above see the same project.
+// They expect a fresh namespace: scripts/e2e-ui.sh recreates it before a run.
 const editor = "editor"
 
 test("Objects lists the project's objects and opens one as YAML", async ({ page }) => {
@@ -446,8 +418,7 @@ test("Objects reads unusual kinds on click and on a scan", async ({ page }) => {
   await page.goto(`${project}/objects`)
   const list = page.getByRole("list", { name: "Objects" })
   const filter = page.getByRole("searchbox", { name: "Filter objects" })
-  // Leases are generated: hidden until asked for, then read only when opened. The list is
-  // virtual and a cluster serves dozens of kinds, so find the kind by name.
+  // The list is virtual, so find the kind by name.
   await page.getByRole("button", { name: /^Generated/ }).click()
   await filter.fill("Lease")
   const leases = list.getByRole("button", { name: "Read Lease", exact: true })
@@ -455,8 +426,7 @@ test("Objects reads unusual kinds on click and on a scan", async ({ page }) => {
   await leases.click()
   await expect(leases).toBeHidden()
   await filter.fill("")
-  // A scan reads every other kind; the button gives way to a note.
-  // It reads every kind the cluster serves, CRDs included: longer than one read on a slow runner.
+  // Reads every served kind, CRDs included: slow on a slow runner.
   await page.getByRole("button", { name: "Scan all kinds" }).click()
   await expect(page.getByText("All kinds read")).toBeVisible({ timeout: 30_000 })
   await page.getByRole("button", { name: "Refresh" }).click()
@@ -477,7 +447,6 @@ test("YAML never shows a Secret's values", async ({ page }) => {
   await expect(workload).not.toContainText(secretValue)
 })
 
-/** The toast that reports an apply, by its title ("Applied", "web changed after you reviewed it."). */
 const toast = (page: Page, title: string) =>
   page
     .getByRole("region", { name: /^Notifications/ })
@@ -485,8 +454,6 @@ const toast = (page: Page, title: string) =>
     .filter({ hasText: title })
     .first()
 
-/** The open confirmation: waits for the plan and its plain sentence, confirms with the button
- * that names the action, and waits for the "Applied" toast; the dialog closes at once. */
 async function confirmPlan(
   page: Page,
   title: string | RegExp,
@@ -503,7 +470,6 @@ async function confirmPlan(
   return applied
 }
 
-/** The editor Deployment's desired pods, as the project document reports them. */
 async function editorReplicas(page: Page): Promise<number | undefined> {
   const answer = await page.request.get(`/api/v1/projects/${namespace}`)
   const body = (await answer.json()) as {
@@ -512,9 +478,8 @@ async function editorReplicas(page: Page): Promise<number | undefined> {
   return body.services.find((s) => s.kind === "Deployment" && s.name === editor)?.replicas?.desired
 }
 
-/** Plans and applies one change through the API, as another person or tab would. */
 async function applyNow(page: Page, change: Record<string, unknown>) {
-  // What the interface sends with every change (src/auth/session.ts).
+  // As src/auth/session.ts sends them.
   const headers = { Origin: new URL(page.url()).origin, "zeabur-request": "1" }
   const plan = await page.request.post(`/api/v1/projects/${namespace}/plan`, {
     headers,
@@ -567,7 +532,6 @@ test("restart of a single pod is confirmed in full, then reported in a toast", a
   await page.goto(`${project}/services/Deployment/${editor}`)
   await page.getByRole("button", { name: "Restart" }).click()
   const dialog = page.getByRole("dialog", { name: `Restart ${editor}` })
-  // One replica: the consequence first, in a callout; the details folded.
   await expect(dialog.getByRole("note")).toContainText(
     `${editor} has one replica, so it may be down for a few seconds while it restarts.`,
   )
@@ -591,7 +555,6 @@ test("a change made meanwhile is refused in a toast, and Review again plans it a
   await panel.getByRole("button", { name: "Review" }).click()
   const dialog = page.getByRole("dialog", { name: `Variables for ${editor}` })
   await expect(dialog).toContainText("Set E2E_REVIEWED")
-  // Someone else changes the Deployment after the plan was made.
   await applyNow(page, {
     op: "env",
     workload: { kind: "Deployment", name: editor },
@@ -636,10 +599,9 @@ test("a readiness probe is set through a plan", async ({ page }) => {
     .getByRole("tabpanel", { name: "Settings" })
     .locator("form")
     .filter({ has: page.getByRole("heading", { name: "Traffic check" }) })
-  // Health checks are folded until opened (web/DESIGN.md, "Depth").
   const health = page.getByRole("button", { name: "Health checks" })
   if ((await health.getAttribute("aria-expanded")) !== "true") await health.click()
-  // The design system's Select: the list opens in a popup at the page's root, not in the form.
+  // The Select's list is portalled to the page's root, outside the form.
   await form.getByRole("combobox", { name: "Check" }).click()
   await page.getByRole("option", { name: "Command" }).click()
   await form.getByRole("textbox", { name: "Command" }).fill("true")
@@ -665,7 +627,6 @@ test("a volume is added and its claim edited on the Storage tab", async ({ page 
     "Add volume",
     new RegExp(`${editor} gets a new \\S+ volume\\.`),
   )
-  // The new claim's card carries its own forms: grow it, move or protect its mount.
   const card = panel.locator("form").filter({ has: page.getByRole("button", { name: "Grow" }) })
   await expect(card).toBeVisible({ timeout: 15_000 })
   await expect(panel.getByRole("textbox", { name: /^Mount path/ }).first()).toHaveValue("/e2e-data")
@@ -673,11 +634,11 @@ test("a volume is added and its claim edited on the Storage tab", async ({ page 
 
 test("Releases lists the templates and rolls back to one through a plan", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=releases`)
-  // A restart makes a second template to roll back to, whatever ran before.
+  // Guarantees a second template to roll back to.
   await applyNow(page, { op: "restart", workload: { kind: "Deployment", name: editor } })
   const panel = page.getByRole("tabpanel", { name: "Releases" })
   const list = panel.getByRole("list", { name: "Releases" })
-  // The Deployment controller writes the new ReplicaSet shortly after the apply.
+  // The Deployment controller writes the new ReplicaSet a moment after the apply.
   await expect(async () => {
     await page.reload()
     await expect(list.getByRole("listitem").first()).toBeVisible()
@@ -694,20 +655,18 @@ test("Releases lists the templates and rolls back to one through a plan", async 
   )
 })
 
-// CodeMirror and Sonner add <style> elements at run time; the policy must let both apply. The
-// fixture fails the test on a reported violation; the CSS checks show the styles took effect.
+// CodeMirror and Sonner insert <style> elements at run time, which the CSP must allow; the
+// fixture fails on a reported violation.
 test("an object's YAML is edited and planned", async ({ page }) => {
   await page.goto(`${project}/objects?object=core/v1/configmaps/editor-config`)
   const panel = page.getByRole("dialog").filter({ hasText: "editor-config" })
   await panel.getByRole("button", { name: "Edit" }).click()
   const text = panel.getByRole("textbox", { name: "YAML of editor-config" })
-  // CodeMirror's base theme is applied: its editor is a flex box.
   await expect(panel.locator(".cm-editor")).toHaveCSS("display", "flex")
   await text.getByText("untouched").dblclick()
   await page.keyboard.type("edited")
   await panel.getByRole("button", { name: "Review" }).click()
   await confirmPlan(page, "Edit editor-config", "Save YAML", "Zeabur writes the YAML as it is")
-  // Sonner's style sheet is applied: its toaster is fixed to the viewport.
   await expect(page.locator("[data-sonner-toaster]")).toHaveCSS("position", "fixed")
   await expect(panel.getByRole("figure", { name: "YAML of editor-config" })).toContainText(
     "other: edited",
@@ -721,7 +680,6 @@ test("a crash-looping service says why, with its fix and evidence", async ({ pag
   await expect(diagnosis).toContainText(`${failing} keeps crashing and restarting.`, {
     timeout: 60_000,
   })
-  // Why: the rule, with this occurrence's numbers.
   await expect(diagnosis).toContainText(/It has restarted \d+ times/)
   await expect(diagnosis).toContainText("The error is in the logs of the run before the restart.")
   await diagnosis
@@ -729,7 +687,6 @@ test("a crash-looping service says why, with its fix and evidence", async ({ pag
     .first()
     .click()
   await expect(diagnosis).toContainText(/Pod\//)
-  // The kubelet's own words are one fold further down.
   await diagnosis.getByRole("button", { name: "Details for Kubernetes users" }).first().click()
   await expect(diagnosis).toContainText("Exit code")
   await diagnosis.getByRole("button", { name: "Open logs" }).first().click()
@@ -742,7 +699,6 @@ test("Overview lists what the project misses, and a fix is planned and applied",
 }) => {
   await page.goto(project)
   const missing = page.getByRole("region", { name: "Missing setup" })
-  // The e2e workloads set no requests or limits; only `editor` is changed.
   const limits = missing
     .getByRole("listitem")
     .filter({ hasText: `${editor} sets no CPU or memory` })
@@ -764,8 +720,7 @@ test("Overview lists what the project misses, and a fix is planned and applied",
 test("install texts come in four forms for a catalogue component", async ({ page }) => {
   await page.goto("/cluster/components?component=certificates/cert-manager")
   const sheet = page.getByRole("dialog", { name: /cert-manager/ })
-  // The texts themselves are the server's (crates/zeabur-catalog/tests/golden); here, that each
-  // form's tab shows its own, and the profile follows the URL.
+  // The texts are tested server-side (crates/zeabur-catalog/tests/golden).
   const text = (form: string) => sheet.getByRole("figure", { name: new RegExp(` ${form}$`) })
   await expect(text("Helm")).toContainText("cert-manager")
   await sheet.getByRole("tab", { name: "Flux" }).click()
@@ -810,13 +765,11 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
     return { panel, applied }
   }
 
-  // Undo deletes the policy just created, at the version its creation returned.
   const { panel, applied } = await allowIngress()
   await applied.getByRole("button", { name: "Undo" }).click()
   await expect(toast(page, "Undone")).toBeVisible({ timeout: 15_000 })
   await expect(panel).not.toContainText(policy, { timeout: 15_000 })
 
-  // From Objects: Delete waits for the name, and says the deletion cannot be undone.
   await allowIngress()
   const address = `networking.k8s.io/v1/networkpolicies/${policy}`
   await page.goto(`${project}/objects?object=${encodeURIComponent(address)}`)
@@ -835,14 +788,13 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
 })
 
 test("a namespace is adopted, named, and let go, through plans", async ({ page }) => {
-  // A namespace that is not a project (scripts/e2e-ui.sh); the demo server has none.
+  // Set by scripts/e2e-ui.sh; the demo server has no such namespace.
   const other = env("ZEABUR_E2E_ADOPT")
   test.skip(!other, "ZEABUR_E2E_ADOPT is not set")
   await page.goto("/projects")
   const row = page.getByRole("listitem").filter({ hasText: other })
   await row.getByRole("button", { name: "Adopt" }).click()
   await confirmPlan(page, `Adopt ${other}`, "Adopt", "Nothing in it changes.")
-  // Now a project: no longer offered for adoption.
   await expect(row.getByRole("button", { name: "Adopt" })).toHaveCount(0, { timeout: 15_000 })
 
   await page.goto(`/projects/${other}/settings`)
@@ -852,14 +804,12 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   await page.keyboard.press("Escape")
   await page.getByRole("button", { name: "Save details" }).click()
   await confirmPlan(page, `${other} details`, "Save details")
-  // The display name names the project in its sidebar.
   await page.goto(`/projects/${other}`)
   await expect(page.getByRole("navigation", { name: "Project sections" })).toContainText(
     "Adopted in a test",
     { timeout: 15_000 },
   )
 
-  // The settings' own navigation replaces the project's; Remove from Zeabur is in the danger zone.
   await page.goto(`/projects/${other}/settings`)
   await page.getByRole("button", { name: "Remove", exact: true }).click()
   await confirmPlan(

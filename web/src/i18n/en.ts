@@ -1,6 +1,5 @@
 // English: the source of every message key. The other locales are typed as `Messages`, so a key
-// missing there (or added there only) is a TypeScript error. Copy is terse: status is one word,
-// counts are short, explanations go in tooltips.
+// missing there (or added there only) is a TypeScript error.
 import { cuts, probeTiming, type P, type ProbeTiming } from "@/i18n/sentence-parts"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -20,7 +19,6 @@ const verbEn: Record<string, string> = {
 const thingEn = (p: P) =>
   p.name ?? (p.resource ? `${p.resource}${p.namespace ? ` in ${p.namespace}` : ""}` : "this")
 
-/** A Secret or ConfigMap in plain words. */
 const objectEn = (p: P) => (p.object === "Secret" ? `secret ${p.name}` : `config ${p.name}`)
 
 /** Who a volume's mount failure stops: the container, else the replica. */
@@ -65,7 +63,7 @@ export const en = {
   "shell.account": "Account",
   "shell.signOut": "Sign out",
   "shell.theme": "Theme",
-  // Admin rights: retrying a refused change after a passkey confirmation
+  // Admin rights
   "elevate.retry": "Retry as admin",
   "elevate.title": "Admin rights",
   "elevate.waiting": "Confirm with your passkey in the new window.",
@@ -157,7 +155,7 @@ export const en = {
   "problem.detail": "Zeabur's message",
   "problem.about": "What this kind of problem means",
   "problem.retryAfter": (s: number) => `The cluster asked to wait ${waitEn(s)}.`,
-  // A problem type's page (/problems/{kind}): the rule behind it
+  // A problem type's page (/problems/{kind})
   "problemPage.label": "Problem type",
   "problemPage.rule": "The rule",
   "problemPage.kubernetes": "In the Kubernetes documentation",
@@ -224,7 +222,7 @@ export const en = {
   "status.unknown": "Unknown",
   "status.lastExit": (code: number, ago: string) =>
     ago ? `last exit ${code}, ${ago}` : `last exit ${code}`,
-  // A failing pod's reason in plain words; the kubelet's own word is in the tooltip
+  // A failing pod's reason
   "reason.crashing": "Keeps crashing",
   "reason.runFailed": "Run failed",
   "reason.outOfMemory": "Out of memory",
@@ -246,7 +244,7 @@ export const en = {
   "phase.Failed": "Failed",
   "phase.Unknown": "Unknown",
 
-  // Roles (service column groups)
+  // Roles
   "role.web": "Web",
   "role.internal": "Internal",
   "role.worker": "Workers",
@@ -626,7 +624,7 @@ export const en = {
   "cap.vulnerability-scanning": "Vulnerability scanning",
   // Objects and YAML
   "project.entry.objects": "Objects",
-  // A project's namespace: adopting it, letting it go, its details
+  // A project's namespace
   "project.entry.settings": "Settings",
   "action.adopt": "Adopt",
   "action.unadopt": "Stop showing as a project",
@@ -774,7 +772,7 @@ export const en = {
     `No longer isolated: ${names} accept traffic from anywhere`,
   "warn.egressOpened": (names: string) => `No longer limited: ${names} can send traffic anywhere`,
   "warn.connectionsOpened": (pairs: string) => `Allowed again: ${pairs}`,
-  // Confirmations: what will happen, in plain words
+  // Confirmations
   "confirm.restartSingle": (name: string) =>
     `${name} has one replica, so it may be down for a few seconds while it restarts.`,
   "confirm.restartNone": (name: string) =>
@@ -863,7 +861,7 @@ export const en = {
   "action.allow": "Allow",
   "action.create": "Create",
   "action.delete": "Delete",
-  // Toasts: the outcome of an apply
+  // Toasts
   "toast.region": "Notifications",
   "toast.applied": "Applied",
   "toast.view": "View",
@@ -1053,8 +1051,7 @@ export const en = {
   "backups.veleroVolumesNeedSnapshots": "volume data only with snapshots",
   "backups.scheduledOf": (scheduled: number, total: number) => `${scheduled}/${total} scheduled`,
 
-  // Usage and history (requests are "reserved", limits the "maximum"; the Kubernetes words are
-  // in the hints)
+  // Usage and history
   "usage.title": "Current usage",
   "usage.history": "History",
   "usage.live": "Live",
@@ -1165,8 +1162,8 @@ export const en = {
     "Zeabur runs on this computer and keeps no settings. Start it with --metrics-service namespace/name:port to use another store.",
   "settings.storeTenancy":
     "Anyone who can read the store can read every project's metrics. Grant access only to people who may see the whole cluster.",
-  // Sentences the server names by key (diagnoses, gaps, problems), with their values: the
-  // server never sends prose. `writeSentence` finds them under `sentence.<key>`.
+  // Sentences the server names by key (diagnoses, gaps, problems); `writeSentence` finds them
+  // under `sentence.<key>`.
   "sentence.problem.forbidden.fix.askForRule": (p: P) =>
     `Ask a cluster administrator for ${p.rule}, for example with a ClusterRole granting it and a ClusterRoleBinding to you.`,
   "sentence.problem.forbidden.fix.askOrRetry": () => "Ask an admin, or retry as admin.",

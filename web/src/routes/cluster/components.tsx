@@ -1,8 +1,3 @@
-// The cluster's Components tab: what is installed, with its version against the tested one, then
-// the catalogue as a grid grouped by category, with a state chip each (Installed ✓ with its
-// evidence on hover, Recommended, Optional, Not supported) and filters. Reading it takes an
-// administrator's rights; anyone else gets the missing permissions and a ClusterRole to copy.
-// Installing arrives later; the command button is there, disabled.
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { lazy, Suspense, useState } from "react"
@@ -226,8 +221,8 @@ export function ComponentsPage() {
   )
 }
 
-/** This component itself was found, not just another one of its capability: metrics-server
- * covers "metrics" without VictoriaMetrics being installed. */
+/** This component itself, not another of its capability: metrics-server covers "metrics" without
+ * VictoriaMetrics being installed. */
 const isInstalled = (capability: Schemas["Capability"], component: Schemas["Component"]) =>
   capability.installations.some((i) => i.component === component.id)
 
@@ -330,8 +325,6 @@ function StateChip({ state, evidence }: { state: string; evidence: string[] }) {
     )
   return <span className="shrink-0 type-meta text-muted-foreground">{t("settings.optional")}</span>
 }
-
-// ── Installed ────────────────────────────────────────────────────────────────────────────────────
 
 function UpgradeTag({ installation }: { installation: Schemas["Installation"] }) {
   const t = useT()

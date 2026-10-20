@@ -1,6 +1,3 @@
-// While "Retry as admin" waits for the passkey confirmation in its own window, and when it ends
-// without admin rights: one small dialog with the state in one sentence. A granted elevation
-// closes it at once and what was refused is asked again (auth/elevation.ts).
 import { Button } from "@zeabur/design-system/components/button"
 import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
 import { Spinner } from "@zeabur/design-system/components/spinner"
@@ -28,7 +25,6 @@ export function ElevationDialog({ state }: { state: Exclude<ElevationState, { ph
   const t = useT()
   const close = () =>
     state.phase === "waiting" ? state.cancel() : elevation.set({ phase: "idle" })
-  // Asking again helps unless the client may not ask at all, or the session is over.
   const again =
     state.phase === "ended" &&
     state.outcome.result !== "not-allowed" &&

@@ -1,7 +1,3 @@
-// A service's replicas in a table: the count of ready ones out of all ("2/3"), which says it in
-// words, then one small square per replica, rounded 2px: ready (green), starting (orange, hatched),
-// failing (red), finished (a ring). Inside a table a pixel links to that
-// pod's logs, so the entry is as fine-grained as where it leads.
 import { Link } from "@tanstack/react-router"
 
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
@@ -18,7 +14,6 @@ const cellColour = {
   progress: "bg-progress",
 } as const
 
-/** A replica's square, its corners just softened. */
 const cellBox = "size-2 rounded-xs"
 
 function usePodLabel() {
@@ -33,8 +28,7 @@ function usePodLabel() {
   }
 }
 
-/** Ready out of desired: the controller's count where there is one (right during a rollout, when
- * old and new pods overlap), else the pods themselves. What the replicas column shows and sorts by. */
+/** The controller's count where there is one: during a rollout old and new pods overlap. */
 export function replicaCounts(service: Service): { ready: number; desired: number } {
   return (
     service.replicas ?? {
@@ -50,9 +44,8 @@ export function PodCells({
   max = 10,
 }: {
   service: Service
-  /** When given, each pixel links to the pod's logs. */
+  /** Given, each square links to the pod's logs. */
   project?: string
-  /** Most pixels drawn; the rest are counted. */
   max?: number
 }) {
   const t = useT()

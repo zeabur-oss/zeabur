@@ -7,15 +7,12 @@ import { en } from "@/i18n/en"
 import { zhTW } from "@/i18n/zh-TW"
 import type { Pods, PodsOf } from "@/model/risk"
 
-// The tests read what `describe` decides (which sentence, with which values, in which order)
-// through a translator that writes a message as its key and arguments: `confirm.scale(api, 2, 4)`.
-// A copy edit to a catalogue then changes no test; a different sentence or value does.
+// Messages render as key and arguments (`confirm.scale(api, 2, 4)`), so copy edits change no test.
 const show = (value: unknown): string =>
   Array.isArray(value) ? `[${value.map(show).join(", ")}]` : String(value)
 const t = ((key: string, ...args: unknown[]) =>
   args.length > 0 ? `${key}(${args.map(show).join(", ")})` : key) as unknown as Translate
 
-/** The English catalogue, for the one test of how sentences read once rendered. */
 const english = translator(en)
 
 type Plan = Pick<Schemas["PlanResponse"], "objects" | "impact" | "warnings">
@@ -27,7 +24,6 @@ const pods =
   (workload) =>
     known[workload.name]
 
-/** A planned object whose pod template changes. */
 const templated = (name: string) =>
   ({
     target: { apiVersion: "apps/v1", kind: "Deployment", plural: "deployments", name },
@@ -337,7 +333,6 @@ group("replaced", () => {
 })
 
 group("failureOf", () => {
-  /** A problem as the server sends it, its fix the kind's own. */
   const problem = (
     kind: Schemas["Kind"],
     extra: Partial<Schemas["Problem"]> = {},

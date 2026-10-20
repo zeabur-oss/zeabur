@@ -1,6 +1,4 @@
-// One object's YAML in a panel along the right edge: the Objects page, the project column's other
-// objects and ⌘K open it. The server writes the YAML without its bookkeeping and with a Secret's
-// values hidden; Edit plans a change to it, Delete its deletion.
+// The server's YAML leaves out bookkeeping fields and hides a Secret's values.
 import { useQuery } from "@tanstack/react-query"
 import GitBranchIcon from "~icons/ph/git-branch"
 import XIcon from "~icons/ph/x"

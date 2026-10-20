@@ -1,7 +1,3 @@
-// A service's storage: one card per PersistentVolumeClaim (requested size, status, access mode,
-// storage class, mount path) with its forms to grow the claim and move or protect the mount, then
-// adding a volume, the other mounts and backups. The forms load with the form library, after the
-// cards; every one ends in the plan dialog.
 import { lazy, Suspense } from "react"
 import FileTextIcon from "~icons/ph/file-text"
 import HardDriveIcon from "~icons/ph/hard-drive"

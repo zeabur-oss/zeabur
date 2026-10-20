@@ -1,8 +1,3 @@
-// The global sidebar, Zeabur's navigation drawer (the design system's Sidebar): the logo; where
-// the dashboard has its workspace picker, the cluster (its name, a link to its page); the search
-// row that opens the ⌘K palette; Home and Projects, then Cluster and Settings under Manage; and the
-// person's menu pinned at the bottom (admin rights, signing out, language and theme). Inside a
-// project the project's sidebar takes its place (app-shell.tsx).
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
@@ -43,7 +38,6 @@ export function Sidebar() {
   const t = useT()
   const { route } = usePlace()
 
-  // The everyday path first (web/DESIGN.md, "Depth"): where things stand, and the projects.
   const everyday: Item[] = [
     { to: "/", icon: HouseIcon, label: t("shell.home"), active: route === "/" },
     {
@@ -53,7 +47,6 @@ export function Sidebar() {
       active: route === "/projects",
     },
   ]
-  // The cluster itself and the preferences.
   const manage: Item[] = [
     {
       to: "/cluster",
@@ -100,8 +93,7 @@ function navItem(item: Item) {
   return (
     <SidebarItem
       key={item.to}
-      // The exact path, whatever the search: the router would otherwise mark every link whose path
-      // is a prefix of the page's, or none once the page has a search.
+      // Otherwise the router marks every prefix of the path, or nothing once the page has a search.
       render={<Link to={item.to} activeOptions={{ exact: true, includeSearch: false }} />}
       icon={<ItemIcon aria-hidden="true" />}
       current={item.active}
@@ -111,9 +103,6 @@ function navItem(item: Item) {
   )
 }
 
-/** The workspace picker's place: Zeabur has one cluster for now, so it names the cluster (the
- * kubeconfig's name for it on this machine, kube-apiserver's host in a cluster) and opens its
- * page. */
 function ClusterPicker() {
   const t = useT()
   const cluster = useQuery(clusterQuery)

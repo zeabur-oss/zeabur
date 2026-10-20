@@ -1,8 +1,6 @@
 import { expect, test as setup } from "./fixtures.ts"
 
-// Opens the one-time launch link once; the server sets the session cookie and redirects to `/`,
-// the home page.
-// A plain URL (the demo server, which needs no session) works too.
+// The launch link sets the session cookie; a plain URL works for the demo server.
 setup("open the launch link", async ({ page }) => {
   const launch = process.env.ZEABUR_E2E_URL
   if (!launch) throw new Error("ZEABUR_E2E_URL is not set")

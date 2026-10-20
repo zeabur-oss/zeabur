@@ -1,5 +1,3 @@
-// The Architecture quick look: a service's status, pods, what it depends on and what depends on
-// it, and its latest events, over the canvas. Logs, variables and the rest are on the service page.
 import { Link } from "@tanstack/react-router"
 import { useEffect } from "react"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
@@ -186,8 +184,7 @@ export function QuickLook({
   )
 }
 
-/** Moves focus into the panel when it opens. Declared outside the component, so React calls it
- * when the panel mounts, not on every render. */
+/** Outside the component, so React calls it on mount, not on every render. */
 function focusOnMount(element: HTMLElement | null) {
   element?.focus()
 }

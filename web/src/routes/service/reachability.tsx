@@ -1,7 +1,3 @@
-// Who may reach a service and where it may go, from the project's NetworkPolicy objects (the
-// project document's `extensions.networkPolicy`, evaluated on the server). Whether the cluster's
-// network plugin enforces the policies is not known, and the section says so. Ready-made policies
-// (isolate, allow the ingress controller, allow one service) open a plan to read before applying.
 import { useState } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 import ShieldPlusIcon from "~icons/ph/shield-plus"
@@ -42,7 +38,6 @@ export function Reachability({
   service: Service
   services: Service[]
   reach: Schemas["NetworkPolicyService"]
-  /** Every policy of the project. */
   policies: string[]
   plan: (ask: PlanAsk) => void
 }) {

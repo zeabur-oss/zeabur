@@ -33,7 +33,6 @@ function problem(kind: ProblemBody["kind"], fromCluster: boolean): ProblemBody {
   }
 }
 
-/** The markup `element` renders to, with the session's elevation state already known. */
 function render(element: ReactElement, elevation?: Schemas["ElevationState"]): string {
   const client = new QueryClient()
   if (elevation) client.setQueryData(sessionQuery.queryKey, { elevation } as never)

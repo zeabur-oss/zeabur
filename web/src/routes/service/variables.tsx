@@ -1,9 +1,3 @@
-// A service's variables in two sections: "Defined here" (literal values, with the service a value
-// names) and "From other objects" (ConfigMap, Secret and field references, each a chip naming its
-// object). Secret values stay masked until revealed (POST, one Secret at a time, kept in this
-// component's state only); a raw dotenv view shows the same. Literal values are added, edited and
-// removed here; a value from a ConfigMap or Secret is edited in that object, its key highlighted.
-// Every edit opens a plan to read before applying.
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import { lazy, Suspense, useState, type ReactElement } from "react"
@@ -41,17 +35,14 @@ const DataEditor = lazy(() =>
 
 type Revealed = Record<string, Schemas["SecretValue"]>
 
-/** A literal variable being added or edited. */
 interface Draft {
   container: string
   name: string
   value: string
-  /** The name before editing; absent for a new variable. */
   was?: string
 }
 
-/** A variable's name: a C identifier is what a shell reads; Kubernetes also accepts dots and
- * dashes. */
+/** Kubernetes also accepts dots and dashes, which a shell cannot read. */
 const nameRule = /^[-._a-zA-Z][-._a-zA-Z0-9]*$/
 
 interface SecretState {
@@ -68,13 +59,11 @@ export function VariablesTab({
 }: {
   project: string
   service: Service
-  /** The service's outgoing edges: a variable whose value names another service. */
   edges: Edge[]
-  /** Secrets and ConfigMaps the person may not list. */
   refused: Schemas["UnreadableView"][]
 }) {
   const t = useT()
-  // Revealed values live in this component's state only: never in the query cache, never stored.
+  // Revealed values never go into the query cache or storage.
   const [secrets, setSecrets] = useState<Record<string, SecretState>>({})
   const [raw, setRaw] = useState(false)
   const [draft, setDraft] = useState<Draft>()
@@ -93,7 +82,6 @@ export function VariablesTab({
     })
   const configMapList = useQuery(configMapsQuery(project))
   const configMaps = new Map((configMapList.data?.items ?? []).map((c) => [c.origin.name, c.data]))
-  // Which Kubernetes Service each literal variable names, from the server's connection evidence.
   const named = new Map<string, string[]>()
   for (const edge of edges)
     for (const evidence of edge.evidence)
@@ -468,7 +456,6 @@ export function VariablesTab({
   )
 }
 
-/** A disabled edit control says why: the workload is managed elsewhere. */
 function ManagedTip({ tool, children }: { tool?: string; children: ReactElement }) {
   const t = useT()
   if (!tool) return children
@@ -479,7 +466,6 @@ function ManagedTip({ tool, children }: { tool?: string; children: ReactElement 
   )
 }
 
-/** "Edit in ConfigMap x": opens the object a value comes from. */
 function EditSource({
   source,
   onOpen,
@@ -504,7 +490,6 @@ function EditSource({
   )
 }
 
-/** A literal variable's name (when new), container (when there are several) and value. */
 function DraftRow({
   draft,
   containers,
@@ -616,8 +601,6 @@ function SourceChip({
     ) : (
       <TreeStructureIcon className="size-3" aria-hidden="true" />
     )
-  // The key or field path follows the name after a space, the way `kubectl explain` and the
-  // pod spec name them (secretKeyRef name, key), not joined with a dot.
   const detail =
     "key" in source && source.key
       ? source.key

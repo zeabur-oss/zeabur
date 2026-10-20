@@ -2,7 +2,6 @@ import { useEffect, useState } from "react"
 
 import { localProblem, type Problem } from "@/api/client"
 
-/** At most this many lines are kept while following; older ones are dropped. */
 const maxLines = 20_000
 
 export interface LogStream {
@@ -15,12 +14,8 @@ function isProblem(value: unknown): value is Problem {
   return typeof value === "object" && value !== null && "detail" in value && "fix" in value
 }
 
-/**
- * Follows a log over Server-Sent Events. Lines arriving within one animation frame are added
- * together. The server's `error` event carries a problem and ends the stream; a dropped connection
- * also ends it (the browser would otherwise reconnect and repeat the tail). The caller mounts the
- * component using this hook under a `key` of the URL, so a new URL starts from an empty state.
- */
+/** A dropped connection ends the stream: EventSource would reconnect and repeat the tail. Callers
+ * key the component by `url`, so a new URL starts empty. */
 export function useLogStream(url: string): LogStream {
   const [state, setState] = useState<LogStream>({ lines: [], ended: false })
 

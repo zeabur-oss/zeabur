@@ -1,8 +1,3 @@
-// An object's YAML that can be edited: read-only until Edit, then a YAML editor (loaded on first
-// use) whose text goes to a plan like every other write. A Secret's values arrive hidden; left
-// hidden they are kept as they are, never written as the mask. An object a tool manages stays
-// read-only, with where to change it instead. Where the host offers it, Delete plans the
-// object's deletion, confirmed by typing its name.
 import { lazy, Suspense, useState } from "react"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import TrashIcon from "~icons/ph/trash"
@@ -22,8 +17,7 @@ const YamlEditor = lazy(() =>
 /** Kinds Kubernetes makes on its own or that a plan cannot edit as a whole. */
 const readOnlyResources = new Set(["pods", "events", "replicasets", "controllerrevisions"])
 
-/** Kinds Kubernetes makes on its own, which come back when deleted. A pod is deleted to be
- * replaced; the server refuses an object a tool or a controller would make again. */
+/** Recreated when deleted; the server refuses one a tool or a controller would make again. */
 const undeletableResources = new Set([
   "events",
   "replicasets",
@@ -43,11 +37,9 @@ export function YamlView({
   project: string
   address: ObjectAddress
   yaml: string
-  /** The tool that manages the object (Helm, Argo CD, Flux), if any. */
   managedBy?: string | null
-  /** The object's kind, for the deletion's title. */
   kind?: string
-  /** Offers Delete, and runs once the object is deleted. */
+  /** Offers Delete when given. */
   onDeleted?: () => void
 }) {
   const t = useT()

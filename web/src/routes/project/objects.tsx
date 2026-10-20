@@ -1,10 +1,3 @@
-// Project › Objects: every kind the namespace can hold, kinds first. The kinds a project usually
-// holds and the pinned kinds are read when the page opens; every other kind is a collapsed row
-// read on click, and "Scan all kinds" reads them all at once (generated kinds only when opened).
-// Kinds the person may not list are marked from one rules review instead of being tried; a kind
-// tried and refused says so under its row. Answers are kept 45 s and refreshed on demand, never
-// polled. A name opens its YAML in a side panel
-// (`?object=`).
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { getRouteApi } from "@tanstack/react-router"
@@ -57,24 +50,22 @@ type Row =
       key: string
       count?: number
       loading: boolean
-      /** A refusal row follows, which says it. */
       refused: boolean
     }
   | { type: "object"; kind: Kind; object: Schemas["ObjectSummary"] }
   | { type: "refused"; kind: Kind; refused: Schemas["UnreadableView"] }
-  /** A kind the rules review says no to, while admin rights are offered. */
   | { type: "denied"; kind: Kind }
 
 const HEAD = 40
 const ITEM = 34
-/** A refusal row grows when its details open; the list measures it. */
+/** Estimates: a refusal row grows when its details open, and the list measures it. */
 const sizes: Record<Row["type"], number> = { kind: HEAD, object: ITEM, refused: 46, denied: 46 }
 
-/** `<resource>.<group>`, as `unreadable` names a kind. */
+/** As `unreadable` names a kind. */
 const resourceKey = (kind: Pick<Kind, "group" | "resource">) =>
   kind.group ? `${kind.resource}.${kind.group}` : kind.resource
 
-/** `<group>/<resource>`, `core` for the core group, as the API names a kind. */
+/** As the API names a kind. */
 const kindKey = (kind: Pick<Kind, "group" | "resource">) =>
   `${kind.group || "core"}/${kind.resource}`
 
@@ -106,7 +97,6 @@ export function ObjectsPage() {
     void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: !patch.object })
   const address = search.object ? parseObjectKey(search.object) : undefined
 
-  // The base answer names every kind; later answers fill in the kinds they read.
   const reads = [pinnedRead, ...openedReads, scanned]
   const kinds = new Map<string, Kind>()
   const unreadable = new Map<string, Schemas["UnreadableView"]>()
@@ -215,14 +205,11 @@ function ObjectList({
   onOpen: (key: string) => void
 }) {
   const t = useT()
-  // The rules review is the person's everyday rights: a kind it says no to can be seen as admin.
   const elevation = useHintOffersElevation("denied")
   const scroller = useRef<HTMLDivElement>(null)
   const needle = query.trim().toLowerCase()
   const folded = kinds.filter((k) => k.generated)
   const emptyKinds = kinds.filter((k) => k.listed && k.items.length === 0)
-  // Pinned and read kinds first (a kind tried and refused among them), then the unread ones,
-  // each by kind name. Pinned kinds always show; the toggles only fold the rest.
   const refusedBy = new Map(unreadable.map((u) => [u.resource, u]))
   const isPinned = (k: Kind) => pins.includes(kindKey(k))
   const order = (k: Kind) => (isPinned(k) ? 0 : k.listed || refusedBy.has(resourceKey(k)) ? 1 : 2)

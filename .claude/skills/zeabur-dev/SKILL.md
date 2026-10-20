@@ -51,8 +51,10 @@ environment, not a fresh one; on a VM, snapshot its clean state and restore it a
   `doc-valid-idents` instead of backticking them.
 
 ## Documentation
-- Rationale goes in rustdoc next to the code: state the decision and why, cite the
-  specification section, paper or prior art (see `zeabur-spec-work`). Each crate's README is its
+- A comment says only what the code cannot: a quirk and its cause, a workaround, or the
+  specification section or issue behind behaviour that must not change, cited in rustdoc (see
+  `zeabur-spec-work`). Usually one line; no design rationale, history or measurements (Rust,
+  TypeScript, CSS and scripts alike). Each crate's README is its
   crate-level doc (`#![doc = include_str!("../README.md")]`).
 - A claim that Zeabur does something better or safer needs a test that proves it.
 

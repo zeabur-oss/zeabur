@@ -1,5 +1,3 @@
-// The forms on the Storage tab: grow a claim, move or protect its mount, add a volume. Each ends in
-// the plan dialog; nothing is written from here. Loaded with the form library when the tab opens.
 import { useForm } from "@tanstack/react-form"
 import CaretRightIcon from "~icons/ph/caret-right"
 

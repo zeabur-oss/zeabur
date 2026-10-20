@@ -1,11 +1,3 @@
-// The confirmation of a planned write, in three layers: one plain sentence of what will happen
-// (and, for a high-risk change, what it costs, said first); a button that names the action; and
-// the technical details folded away: the YAML diff, and the fields other tools own. Nothing
-// is said twice: the diff is the one place for the fields that change, and an object is named
-// only when the plan changes more than one. Its weight follows the risk (model/risk.ts): a low-risk change gets a
-// smaller dialog, a high-risk one the consequence in a callout. Confirming closes the dialog;
-// the outcome is a toast (outcome.ts). The plan's token expires; the countdown shows only in its
-// last two minutes.
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
@@ -40,7 +32,6 @@ import { YamlDiff } from "@/components/yaml"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { awaitsName, destinationOf, typedName, undoOf, weigh, type PodsOf } from "@/model/risk"
 
-/** The countdown shows from here on. */
 const COUNTDOWN_FROM_SECONDS = 120
 
 export function PlanDialog({
@@ -54,17 +45,14 @@ export function PlanDialog({
   project: string
   ask: PlanAsk
   onClose: () => void
-  /** Runs once the change is applied (a host editor closes with it). */
   onApplied?: () => void
-  /** Opens the dialog again for the same change, from the failure toast. */
   reopen: (ask: PlanAsk) => void
-  /** Hands the fields the cluster refused back to the form, when the dialog closes on them. */
   onRefused?: (fields: Schemas["FieldCause"][]) => void
 }) {
   const t = useT()
   const { locale } = useI18n()
   const navigate = useNavigate()
-  // Planning writes nothing, so it is a query: asking again is a refetch.
+  // Planning writes nothing, so it is a query.
   const plan = useQuery({
     queryKey: ["plan", project, ask],
     queryFn: async ({ signal }) =>
@@ -79,7 +67,6 @@ export function PlanDialog({
     staleTime: Infinity,
     gcTime: 0,
   })
-  // The pods each workload has, from the project document the page already read.
   const document = useQuery({ ...projectQuery(project, { poll: false }), enabled: false })
   const podsOf: PodsOf = (workload) => {
     const service = document.data?.services.find(
@@ -92,7 +79,6 @@ export function PlanDialog({
   const left = useSecondsLeft(plan.data?.expiresAt)
   const expired = left !== undefined && left <= 0
   const description = plan.data ? describe(t, ask, plan.data, podsOf, weight.reasons) : undefined
-  // A deletion cannot be taken back: the person types the object's name first.
   const named = typedName(ask.changes)
   const [typed, setTyped] = useState("")
   const unconfirmed = awaitsName(ask.changes, typed)
@@ -118,7 +104,6 @@ export function PlanDialog({
     })
     onClose()
   }
-  /** Closes without applying; a plan the cluster refused leaves its fields marked in the form. */
   const cancel = () => {
     if (plan.isError) onRefused?.(toProblem(plan.error).fields ?? [])
     onClose()
@@ -194,10 +179,8 @@ export function PlanDialog({
   )
 }
 
-/** Seconds until `expiresAt`, counting down while the dialog is open. */
 function useSecondsLeft(expiresAt?: string): number | undefined {
   const [now, setNow] = useState(Date.now)
-  // The clock is outside React: tick once a second while the dialog is open.
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
@@ -223,7 +206,6 @@ function PlanBody({
 }: {
   plan: Schemas["PlanResponse"]
   lines: string[]
-  /** Set for a high-risk change: the first sentence and this go in a callout. */
   consequence?: string
 }) {
   const t = useT()
@@ -281,7 +263,6 @@ function PlanBody({
   )
 }
 
-/** One object's diff; `named` heads it with the object, for a plan of several. */
 function PlannedObject({ object, named }: { object: Schemas["PlannedObject"]; named: boolean }) {
   const t = useT()
   const before = object.beforeYaml ?? ""

@@ -1,5 +1,3 @@
-// Search parameters of the project and service pages. Everything a person picks — tab, filter,
-// sort, selected service or pod — is in the URL, so a link shows the same view and Back works.
 import { ranges, splits, type Range, type Split } from "@/model/usage"
 
 const serviceTabs = [
@@ -25,11 +23,10 @@ const oneOf = <T extends string>(values: readonly T[], value: unknown): T | unde
 
 export interface ServiceSearch {
   tab?: ServiceTab
-  /** The pod the Logs and Terminal tabs read, or the Events tab filters on. */
   pod?: string
-  /** How far back the Overview's history reaches (`1h` when absent). */
+  /** `1h` when absent. */
   range?: Range
-  /** The history per replica (when absent) or summed. */
+  /** Per replica when absent. */
   split?: Split
 }
 
@@ -43,7 +40,7 @@ export function validateServiceSearch(search: Record<string, unknown>): ServiceS
 }
 
 export interface OverviewSearch {
-  /** Show every event instead of warnings only. */
+  /** Absent: warnings only. */
   events?: "all"
 }
 
@@ -64,9 +61,7 @@ export interface ObjectsSearch {
   q?: string
   /** `group/version/resource/name` of the object whose YAML is open. */
   object?: string
-  /** Also list the kinds controllers create on their own. */
   generated?: boolean
-  /** Also show the kinds that were read and hold nothing. */
   empty?: boolean
 }
 
@@ -84,7 +79,7 @@ export const profiles = ["single-node", "multi-node"] as const
 export interface ComponentsSearch {
   /** `capability/id` of the component whose install texts are open. */
   component?: string
-  /** The profile those texts are for; the cluster's own by default. */
+  /** The cluster's own when absent. */
   profile?: (typeof profiles)[number]
 }
 

@@ -1,6 +1,3 @@
-// Theme: the operating system's preference unless the person picked light or dark (remembered in
-// localStorage; when storage is unavailable the choice lasts this visit). shadcn/ui's theme
-// switches under a `.dark` class.
 import { useSyncExternalStore } from "react"
 
 export type ThemeChoice = "system" | "light" | "dark"

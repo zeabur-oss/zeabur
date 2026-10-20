@@ -1,6 +1,3 @@
-// The title of a project page, in the page's column: Zeabur's content column (960px) for Settings,
-// a wider one for the lists (Services, Objects), the whole pane for Architecture's canvas. The
-// project's pages are in its sidebar; the Overview draws its own header, with the project's health.
 import { useT } from "@/i18n"
 import type { ProjectEntry } from "@/lib/place"
 import { cn } from "@/lib/utils"

@@ -1,86 +1,46 @@
 # Zeabur interface design
 
-Zeabur's own rules for the web interface. Components, tokens and fonts come from
-[@zeabur/design-system](https://github.com/zeabur/design-system) (preview them in its
-Storybook): shadcn/ui's components on Base UI with Zeabur's variants, shadcn/ui's theme (preset
-brrM) and Zeabur's tokens. Build from those components (Badge, Card, Table, ToggleGroup,
-Tooltip…) and compose Zeabur's own visuals on top rather than hand-rolling look-alikes.
-`src/styles/app.css` imports the design system and adds only this interface's layout tokens. The
-design system's tokens:
+Rules for the web interface. Components, tokens and fonts come from
+[@zeabur/design-system](https://github.com/zeabur/design-system) (its README lists the tokens;
+preview them in its Storybook). Build from its components and their variants rather than
+look-alikes; `src/styles/app.css` imports it and adds only this interface's layout tokens.
 
-- **agent-playground's and lymeno's language** (Linear's, measured from its desktop app): two
-  grounds, the window `--chrome` under the sidebar and one rounded panel (`--background`) on it,
-  with white cards, fields and popups in the panel; near-hueless greys; 0.5px hairlines (`border`
-  is 0.5px); faint layered shadows (`shadow-xs` on what sits on the panel, `shadow-md` on what
-  floats, `shadow-xl` on dialogs). **Lime and ink** are Zeabur's accent: lime with ink text on solid
-  buttons and switches, ink for the logo (lime on dark), lime under ink for the selection;
-  `brand-strong` (lime deepened to 4.5:1) for a check, a link and a focused field's edge. Never a
-  status.
-- **Status**: `--ok` (green), `--progress` (blue), `--warn` (orange), `--fail` (red), `--idle`
-  (grey), each with `-soft` (pill fill) and `-strong` (pill text). Status is a pill (Badge, dot
-  and one word) where there is room and a bare round dot in dense places, with its word in a
-  tooltip.
-- **Surfaces and fills**: the window ground `--chrome` around the panel, `--plane` (a ground for
-  things laid out in space, a segmented control's groove), `--rule` (hairlines between rows);
-  hover, a selected row and a press are translucent fills over any ground (`bg-hover` 3.5%,
-  `bg-selected` 6%, `bg-press` 8%) that show at once and fade when the pointer leaves.
-- **Shape**: controls 28 / 32 / 40px tall and rounded 8 (`rounded-lg`); cards rounded 8 with a
-  hairline and `shadow-xs`; small parts (chips, inline links, a count) rounded 6 (`rounded-md`);
-  the panel, menus, popovers, dialogs and dashed state blocks rounded 12 (`rounded-xl`); icon
-  buttons, avatars, status dots and counts round (`rounded-full`).
-- **Type**: Inter, 13px at 450 for text: `type-title` 24/32, `type-heading` 15/22,
-  `type-body` 13/20, `type-meta` 12/18, `type-micro` 11/16, `type-nano` 10/14 (counts, axes, key
-  hints), `type-figure` 18/24, all in every language; `type-mono` for machine values only, in
-  JetBrains Mono 12 (both self-hosted by the design system). Han text falls back to the system's
-  CJK face for the locale; `text-autospace` spaces it from Latin and digits. 500 for emphasis
-  (labels, buttons, sidebar rows), 600 for titles. Figures are tabular everywhere.
-- **Motion**: the sidebar folds with Linear's easing; active markers slide (`slide`: segmented
-  controls, the tabs' pill); popups fade and grow a little from their trigger; panels come in
-  from their edge (the quick look `enter-from-right`, a `panel` or `sheet` dialog); toasts slide in;
-  `prefers-reduced-motion` turns it off.
-- **Buttons** are the design system's: 13px at 500, sentence case. Default is lime with ink text,
-  outline is white with a hairline, ghost and muted are for toolbars and rows, icon buttons are
-  round.
+- **Tokens**: zGray surfaces and text (`text-main`, `text-secondary`, `text-tertiary`,
+  `bg-surface-page`, `border-main`, `*-v2-*`), Zeabur violet for actions and the current place,
+  orange-red for danger, and shadcn/ui's theme variables mapped onto them, light and dark.
+- **Status**: `ok`, `progress`, `warn`, `fail`, `idle`, each with `-soft` (pill fill) and
+  `-strong` (pill text). A pill (Badge, dot and one word) where there is room, a bare dot in
+  dense places with its word in a tooltip.
+- **Type**: Geist and Geist Mono, self-hosted; the `type-*` roles (`type-title`, `type-heading`,
+  `type-body`, `type-meta`, `type-label`, `type-micro`, `type-nano`, `type-figure`); `type-mono`
+  for machine values only. Han text falls back to the system's CJK face; `text-autospace` spaces
+  it from Latin and digits. Figures are tabular.
+- **Motion**: `slide`, `enter-from-right` and the popups' transitions; `prefers-reduced-motion`
+  turns them off.
 - **Replicas** are said in words first, "2/3" (ready out of desired), then one small square per
   replica in its state, at most 10 and the rest counted; only in tables, where each square opens
-  that pod's logs. No field of dots without words.
-- **Bars** are the design system's `Meter` (a value on a track, a request as a mark) or
-  `MeterStack` (parts of a whole), so every bar is the same: a 6px round-ended track at 8% of the
-  text colour, filled in blue at 70%, orange near a limit, grey for what is reserved. No bar of
-  its own.
-- **Segmented** switches show the choice on a white thumb in a grey groove (a lighter grey in
-  dark mode). Tabs are the same: the dashboard's TabSwitcher (`Tabs`), the only tab style; a
-  service's tabs fill its column, each with its icon, no counts, and scroll sideways when they do
-  not fit. Vertical tabs are drawn as sidebar rows.
-- **Columns**: a service's header, tabs and content sit in Zeabur's 960px column
-  (`max-w-content`), centred; Home, Projects and the project's lists in a wider one
-  (`max-w-6xl`); project settings in the dashboard's settings column (`max-w-4xl`); the
-  Architecture canvas takes the whole pane.
-- **Pages** follow cloud consoles (GCP, Volcengine): every page starts with the design system's
-  `PageHeader` (one title size; a pill or version beside the title, actions or meta such as
-  "Updated" at the end of its row). An overview puts its key figures right under it in a
-  `StatGroup`, from the left, before anything drawn; lists are tables in a bordered card with
-  Table `ruled` (the heading row on a light fill). A name, a namespace or an object never breaks
-  onto a second line: it truncates, with the whole of it in `title`.
-- **Illustrations** are the landing site's mosaic tiles (the design system's `Illustration`): a
-  state that fills a page or a section (no projects yet, no releases, no objects, an empty or
-  unmatched log, not found, refused, a route that failed) is an `Empty` with its illustration and
-  one line. A "None." inside a card stays text, and "nothing needs attention" stays a dot and a
-  line: a picture there would draw the eye to nothing. No other illustration style, no icons as
-  pictures.
-- **Choices** are the design system's `Select`, whose list is the menu; never a native `<select>`,
-  whose list the browser draws.
-- **Focus**: no focus rings, as in agent-playground and Linear (a product decision). A field
-  shows where typing goes by its edge (`focus-within:border-ring` on a field-like wrapper); a list
-  or menu by its highlighted row. Keyboard use itself stays: Tab order, Esc, arrow keys.
-- **Not used** (`scripts/check-ui-styles.sh` fails on them): all caps and wide tracking,
-  gradients, backdrop blur, Phosphor `duotone`, focus rings (`focus-visible:ring-*`,
-  `focus-visible:outline-*`), a kind after a heading, middle-dot strings, bordered pills for facts;
-  also no hover lifts, no icon tiles, no `→` after link text (see Copy).
+  that pod's logs.
+- **Bars** are `Meter` (a value on a track, a request as a mark) or `MeterStack` (parts of a
+  whole); no bar of its own.
+- **Tabs** are the segmented `Tabs`, the only tab style; a service's tabs fill its column, each
+  with its icon, no counts. Vertical tabs are sidebar rows.
+- **Columns**: a service's page in `max-w-content`; Home, Projects and the project's lists in
+  `max-w-6xl`; project settings in `max-w-4xl`; the Architecture canvas takes the whole pane.
+- **Pages** start with `PageHeader`. An overview puts its key figures under it in a `StatGroup`;
+  lists are tables in a bordered card with Table `ruled`. A name, a namespace or an object
+  truncates rather than wrapping, with the whole of it in `title`.
+- **Empty states** that fill a page or a section are an `Empty` with its `Illustration` and one
+  line; a "None." inside a card stays text.
+- **Choices** are `Select`, never a native `<select>`.
+- **Focus**: no focus rings. A field shows focus by its edge (`focus-within:border-ring`), a list
+  or menu by its highlighted row; Tab order, Esc and arrow keys work.
+- **Not used** (`scripts/check-ui-styles.sh` fails on them): `uppercase` and wide tracking,
+  `bg-gradient-*`, backdrop blur, Phosphor `duotone`,
+  focus rings (`focus-visible:ring-*`, `focus-visible:outline-*`), middle-dot strings, bordered
+  pills for facts; also no hover lifts, no icon tiles, no `→` after link text (see Copy).
 
-Icons: Phosphor only (`import XIcon from "~icons/ph/x"`, `src/lib/icon.ts`), regular weight, bare,
-`aria-hidden` when decorative, 14px in rows and buttons; the design system draws their lines at
-about 1.2px, as agent-playground's.
+Icons: Phosphor only (`import XIcon from "~icons/ph/x"`, `src/lib/icon.ts`), regular weight,
+`aria-hidden` when decorative, 14px in rows and buttons.
 
 ## Lint
 
@@ -121,7 +81,7 @@ Kubernetes is one deliberate step further. Decide a feature's layer before its p
   Settings are in a Manage group after them. A project's sidebar lists Overview, Architecture
   and Settings, then its services, with Objects under Advanced. A service shows seven tabs, then
   Events while it has any and Releases where they apply; Terminal and YAML open from the header's
-  menu. There is no "More" menu (Zeabur's dashboard has none): what does not apply is left out.
+  menu. There is no "More" menu: what does not apply is left out.
   In a form, an adjusting part is a folding section (Collapsible `section`).
 - **Fold, never hide.** Every deeper page stays one press away: a folded group remembers being
   opened (`remembered` in `lib/stores.ts`), a group that holds the page shown opens itself, and
@@ -140,7 +100,7 @@ project fits together. Workflow, comparison and relationships each have their ow
 | `/`                                 | **Home**: key figures (services healthy, failing, not ready, rolling out; the cluster's version, nodes ready and upgrade pill, linking to `/cluster`), needs attention (every unhealthy service across projects with its Logs and Events), projects failing first (services healthy out of all with what needs attention in a pill, warnings of the last hour, domain; 20 shown), recent warnings (5).       |
 | `/cluster`                          | **Cluster**, tab Overview: version with an upgrade pill, needs attention, nodes with requests against allocatable (usage when metrics-server is there), the last hour's warnings about the cluster itself (no namespace, a Node, or a `kube-` namespace). Projects are Home's. Each section loads alone; a section the person may not read names the missing rule and copies a ClusterRole.                  |
 | `/cluster/components`               | **Cluster**, tab Components: installed components with their versions against the tested ones, then the catalogue. Reading it takes an administrator's rights; anyone else sees the missing rules and a ClusterRole to copy.                                                                                                                                                                                 |
-| `/projects`                         | Projects as Zeabur's project cards (namespace, services' health, domain; failing first), or as a list (remembered), then the other namespaces.                                                                                                                                                                                                                                                               |
+| `/projects`                         | Projects as cards (namespace, services' health, domain; failing first), or as a list (remembered), then the other namespaces.                                                                                                                                                                                                                                                                                |
 | `/projects/:p`                      | **Overview** (default): name and health, key figures, Failing (failing pod → its Logs and Events), services table (failures first; live CPU and memory when metrics-server answers), events (`?events=all`), domains, storage.                                                                                                                                                                               |
 | `/projects/:p/architecture`         | **Architecture**: layered canvas, declared (solid) and inferred (dashed) edges, PVCs under cards; a card opens a quick look (`?service=Kind/name`).                                                                                                                                                                                                                                                          |
 | `/projects/:p/services`             | **Services**: full table; `?q`, `?status=attention\|healthy`, `?kind`, `?sort`, `?desc`. A name opens the service; a replica's square opens that pod's logs.                                                                                                                                                                                                                                                 |
@@ -155,16 +115,13 @@ back from a service page finds the canvas as it was.
 
 ## Shell
 
-The frame is Zeabur's dashboard, from the design system (`AppFrame`, `FrameSidebar`, `Sidebar`):
-the navigation drawer (224px) beside the page, which scrolls on its own. There is no top bar and no
-breadcrumb: the sidebar says where the page is, and ⌘K jumps anywhere.
+The frame is the design system's (`AppFrame`, `FrameSidebar`, `Sidebar`): the navigation drawer
+beside the page, which scrolls on its own. There is no top bar and no breadcrumb.
 
-- **Sidebar**: the logo; where the dashboard has its workspace picker, the cluster (its name, a
-  link to `/cluster`, `SidebarPicker`); the search row (`SidebarSearch`, ⌘K); Home and Projects,
-  then Cluster and Settings under Manage; at the foot, "Admin until 14:05" while admin rights are
+- **Sidebar**: the logo; the cluster (its name, a link to `/cluster`, `SidebarPicker`); the search
+  row (`SidebarSearch`, ⌘K); Home and Projects, then Cluster and Settings under Manage; at the foot, "Admin until 14:05" while admin rights are
   in use, and the person's menu (`SidebarPicker` as a menu trigger): who is signed in, Use or Drop
-  admin rights, the language, the theme, and Sign out where people sign in. Rows are 32px, a 14px
-  icon and a 13px label at 500; the current one is raised on the white pill.
+  admin rights, the language, the theme, and Sign out where people sign in.
 - **Project sidebar**, which replaces the global one on every project page: back to Projects, the
   project's name (with its icon and a switcher) and description, the search row, Overview,
   Architecture and Settings, then the services under a Services label (its action opens the full
@@ -173,7 +130,7 @@ breadcrumb: the sidebar says where the page is, and ⌘K jumps anywhere.
   flat. Objects and the objects that belong to no service are under Advanced, folded. The
   namespace is in a pill to copy at the foot (`SidebarCopyPill`). On the settings pages the
   sidebar is their navigation instead: Back, the title, General.
-- **Phones** (< 768 px): the dashboard's header (menu, logo, search) above the page; the menu opens
+- **Phones** (below `md`): a header (menu, logo, search) above the page; the menu opens
   the sidebar (global or the project's) in a sheet from the left.
 - **⌘K palette**: projects, services, pods (their logs), domains, a few actions, recent items.
   Enter while an IME is composing does nothing.

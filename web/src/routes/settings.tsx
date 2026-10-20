@@ -1,5 +1,3 @@
-// Settings: preferences (language, theme), the metrics store usage history is read from, the
-// signed-in person and About. Components are part of the cluster (/cluster/components).
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useId, useState } from "react"
 import { toast } from "sonner"
@@ -123,8 +121,6 @@ const storeHealth = {
   unavailable: "fail",
 } as const satisfies Record<StoreSetting["state"], "ok" | "warn" | "idle" | "fail">
 
-/** The metrics store: which Service history comes from, whether it answers, and, where zeabur
- * keeps settings, a change of it written as the person (so who may is the cluster's decision). */
 function MetricsStorePanel() {
   const t = useT()
   const store = useQuery(metricsStoreQuery)

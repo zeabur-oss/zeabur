@@ -1,7 +1,3 @@
-// The cluster's Overview tab: the cluster itself, not its projects (Home has those). What needs
-// attention, the nodes and their capacity, and the last hour's warnings about the cluster (no
-// namespace, a Node, or a kube- namespace). Each section reads its own endpoint and shows its own
-// loading, empty and permission state.
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
@@ -42,8 +38,6 @@ export function ClusterPage() {
   )
 }
 
-/** What the cluster itself is missing (an IngressClass of a retired controller); hidden when
- * nothing is. */
 function ClusterGaps() {
   const t = useT()
   const gaps = useQuery(clusterGapsQuery)
@@ -55,8 +49,6 @@ function ClusterGaps() {
     </Section>
   )
 }
-
-// ── Needs attention ──────────────────────────────────────────────────────────────────────────────
 
 interface Item {
   key: string
@@ -191,8 +183,6 @@ function Attention() {
     </section>
   )
 }
-
-// ── Warnings ─────────────────────────────────────────────────────────────────────────────────────
 
 const WARNINGS_SHOWN = 20
 

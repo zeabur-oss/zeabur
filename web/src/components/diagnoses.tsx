@@ -1,9 +1,3 @@
-// What is going wrong with a service, in plain words and in the layers a problem has: what
-// happened, why (the rule, with this occurrence's numbers), what to do with one action that opens
-// the tab where it is done, then the status fields and events it rests on and the kubelet's own
-// words, folded. The server names the sentences by key (crate zeabur-gaps); `useSentence` writes
-// them in the reader's language. The action is the interface's: it maps the diagnosis's kind and
-// keys to its own tabs.
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
 import type { Schemas } from "@/api/client"
@@ -16,7 +10,6 @@ import { healthChecksSection } from "@/lib/stores"
 
 export type Diagnosis = Schemas["Diagnosis"]
 
-/** Where a diagnosis's fix is done: the tab, the button's words, and the replica it is about. */
 export interface DiagnosisAction {
   tab: ServiceTab
   label:
@@ -30,11 +23,10 @@ export interface DiagnosisAction {
     | "diagnosis.action.variables"
     | "diagnosis.action.storage"
   pod?: string
-  /** A folded section of the tab the action leads to, opened on the way. */
+  /** A folded section of that tab to open. */
   opens?: "healthChecks"
 }
 
-/** The one action beside a diagnosis's fix, by its kind and the key of its cause. */
 export function diagnosisAction(d: Diagnosis): DiagnosisAction {
   const pod = d.pods[0]
   const cause = d.cause.key
@@ -66,7 +58,6 @@ export function diagnosisAction(d: Diagnosis): DiagnosisAction {
   }
 }
 
-/** The cause of a service's first diagnosis, in one line; nothing when it has none. */
 export function DiagnosisLine({ diagnoses }: { diagnoses?: Diagnosis[] }) {
   const write = useSentence()
   const first = diagnoses?.[0]
@@ -74,13 +65,11 @@ export function DiagnosisLine({ diagnoses }: { diagnoses?: Diagnosis[] }) {
   return <span className="type-meta text-foreground">{write(first.cause)}</span>
 }
 
-/** What the kubelet says of a diagnosis's replica, in its own words. */
 function rawRows(t: Translate, d: Diagnosis, service?: Service): RawRow[] {
   const pod = service?.pods.find((p) => p.name === d.pods[0])
   const container = pod?.containerStatuses?.find((c) => c.name === d.container)
   const ended = container?.lastTermination ?? container?.terminated ?? undefined
-  // The service's own reason only explains the fallback; the other kinds about the whole service
-  // (traffic, quota, scheduling) have their evidence instead.
+  // Other service-wide kinds (traffic, quota, scheduling) show their evidence, not this reason.
   const reason =
     container?.waiting?.reason ??
     ended?.reason ??
@@ -97,7 +86,6 @@ function rawRows(t: Translate, d: Diagnosis, service?: Service): RawRow[] {
   ]
 }
 
-/** Every diagnosis of a service, each in its layers. `onAction` opens the tab its fix is done in. */
 export function Diagnoses({
   diagnoses,
   service,

@@ -8,7 +8,6 @@ import { releasesQuery } from "@/api/queries"
 import type { Service } from "@/model/service"
 import { ReleasesTab } from "@/routes/service/releases"
 
-/** The Releases tab of a `kind` named `name` once the server has answered with no releases. */
 function emptyTab(kind: string, name: string): string {
   const client = new QueryClient()
   client.setQueryData(releasesQuery("shop", kind, name).queryKey, { items: [] })

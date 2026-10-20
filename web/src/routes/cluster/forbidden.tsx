@@ -1,7 +1,3 @@
-// A section the person may not read, shown quietly in its place (components/refused.tsx): "View as
-// admin" where admin rights are offered, and folded under "Details" the permissions it lacks, in
-// Kubernetes' own words, and a ClusterRole with its binding to the person, ready to hand to a
-// cluster administrator.
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import CheckIcon from "~icons/ph/check"
@@ -20,7 +16,6 @@ export interface Rule {
   resources: string[]
 }
 
-/** Every section of the page but Components: one role, so an administrator grants it once. */
 export const overviewRole: Role = {
   name: "zeabur-cluster-overview",
   rules: [
@@ -34,13 +29,11 @@ export const overviewRole: Role = {
 export interface Role {
   name: string
   rules: Rule[]
-  /** `list secrets` in every namespace returns every Secret's data, so the role is as strong as
-   * a cluster administrator's for reading; the page and the YAML both say so. */
+  /** `list secrets` in every namespace returns every Secret's data: an administrator's read. */
   readsSecrets?: boolean
 }
 
-/** What reading the installed components takes: every probe the detection runs. Listing Helm's
- * release Secrets cluster-wide is close to reading every Secret, so this is an administrator's. */
+/** Listing Helm's release Secrets cluster-wide is close to reading every Secret. */
 export const componentsRole: Role = {
   name: "zeabur-cluster-components",
   readsSecrets: true,
@@ -55,7 +48,6 @@ export const componentsRole: Role = {
   ],
 }
 
-/** `role` as a ClusterRole that may list what it names, bound to `username`. */
 function clusterRoleYaml(role: Role, username: string, warning?: string): string {
   return roleYaml({
     name: role.name,
@@ -75,13 +67,10 @@ export function Forbidden({
   role,
   error,
 }: {
-  /** The refused request's error; none for a part the answer marked `unreadable`. */
+  /** None for a part the answer marked `unreadable`. */
   error?: unknown
-  /** What the person cannot see, as a phrase: "the nodes". */
   what: string
-  /** The rules this section lacks. */
   missing: Rule[]
-  /** The role to copy. */
   role: Role
 }) {
   const t = useT()

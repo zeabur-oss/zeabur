@@ -1,7 +1,3 @@
-// A project as Zeabur's dashboard shows one, on Home and the Projects page: a card in a grid (its
-// icon and name, its description, then rows for the namespace, the services' health and the domain
-// it is known by) or a row in a list. The whole card opens the project. Health comes with the
-// project list; the domain is in the project's document, which the page reads when it wants it.
 import { useQueries } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
@@ -22,8 +18,7 @@ import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
 type ProjectItem = Schemas["ProjectSummary"]
 
-/** The domain a project is known by: the one with the fewest labels (`shop.example.com` before
- * `api.shop.example.com`), then the shortest, then by name. */
+/** Fewest labels (`shop.example.com` before `api.shop.example.com`), then shortest, then by name. */
 function primaryDomain(document: Project): Domain | undefined {
   const labels = (host: string) => host.split(".").length
   return document.services
@@ -38,13 +33,10 @@ function primaryDomain(document: Project): Domain | undefined {
 
 interface CardProps {
   project: ProjectItem
-  /** The project's document, for its domain; absent until read. */
   document?: Project
-  /** The document is being read: the domain shows a placeholder. */
   documentPending?: boolean
 }
 
-/** The project's tile: its icon, or its initial on the tile when it has none. */
 function ProjectTile({ project }: { project: ProjectItem }) {
   return (
     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-main bg-secondary text-main">
@@ -59,8 +51,6 @@ function ProjectTile({ project }: { project: ProjectItem }) {
   )
 }
 
-/** The services' health: a dot per state present (running, failing, anything else), then healthy
- * out of all, with every state counted in the tooltip. */
 function ServicesHealth({ project }: { project: ProjectItem }) {
   const t = useT()
   const h = project.health
@@ -117,7 +107,6 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** The project as a card in a grid. */
 function ProjectCard({ project, document, documentPending }: CardProps) {
   const t = useT()
   return (
@@ -151,7 +140,6 @@ function ProjectCard({ project, document, documentPending }: CardProps) {
   )
 }
 
-/** The project as a row of the list view (inside one bordered card, rows divided). */
 function ProjectListRow({ project, document, documentPending }: CardProps) {
   return (
     <Link
@@ -184,7 +172,6 @@ function ProjectListRow({ project, document, documentPending }: CardProps) {
   )
 }
 
-/** The grid or list switch (the dashboard's segmented switcher with two icons); remembered. */
 export function ProjectViewSwitch() {
   const t = useT()
   const list = projectsAsList.useValue()
@@ -202,17 +189,7 @@ export function ProjectViewSwitch() {
   )
 }
 
-/** Projects as cards (one, two or three to a row, by the width of their container) or as rows,
- * as the switch says. Their documents, for the domains, are read once the list is near the
- * viewport, without polling. */
-export function ProjectCollection({
-  projects,
-  label,
-}: {
-  projects: ProjectItem[]
-  /** The list's accessible name. */
-  label: string
-}) {
+export function ProjectCollection({ projects, label }: { projects: ProjectItem[]; label: string }) {
   const list = projectsAsList.useValue()
   const [ref, seen] = useSeen<HTMLDivElement>()
   const documents = useQueries({

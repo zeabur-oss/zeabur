@@ -2,15 +2,13 @@ import type { Page } from "@playwright/test"
 
 import { expect, test } from "./fixtures.ts"
 
-// Usage, history and the metrics store setting in each state the API reports. The answers of
 // /usage, /history and /settings/metrics-store are stubbed (page.route), so every state shows on
-// any server: a cluster without metrics-server or a store, or the demo. Everything else is the
-// server's. ZEABUR_E2E_NAMESPACE, ZEABUR_E2E_SERVICE and ZEABUR_E2E_POD as in ui.spec.ts.
+// any server. ZEABUR_E2E_NAMESPACE, ZEABUR_E2E_SERVICE and ZEABUR_E2E_POD as in ui.spec.ts.
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const service = env("ZEABUR_E2E_SERVICE", "talker")
 const pod = env("ZEABUR_E2E_POD")
-// Usage and history are on the service's Usage tab (?tab=metrics).
+// The Usage tab is `?tab=metrics`.
 const page_ = `/projects/${encodeURIComponent(namespace)}/services/Deployment/${service}?tab=metrics`
 const STORE = "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428"
 const MiB = 2 ** 20
@@ -95,7 +93,6 @@ test("without metrics-server, the reserved amounts stay and Install is offered",
     /\/cluster\/components\?component=metrics%2Fmetrics-server/,
   )
   await expect(panel).toContainText(/Each replica \(×\d+\)/)
-  // The services table has no usage columns to fill.
   await page.goto(`/projects/${encodeURIComponent(namespace)}`)
   const table = page.getByRole("table", { name: /Services/ })
   await expect(table).toBeVisible()
@@ -178,7 +175,6 @@ test("history draws a line per replica or the total, and keeps the choice in the
   )
   await page.goto(page_)
   const panel = page.getByRole("region", { name: "History" })
-  // The chart's own chunk has loaded and drawn the replica's line in each chart.
   await expect(panel.locator(".recharts-line-curve")).toHaveCount(2)
   await expect(panel.getByText(pod, { exact: true })).toBeVisible()
   await expect(panel).toContainText(`From ${STORE}`)

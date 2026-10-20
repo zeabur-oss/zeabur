@@ -1,6 +1,3 @@
-// Which environment a page or an operation is about: the cluster and the namespace. The cluster is
-// named as /cluster names it (the kubeconfig's name for it, else kube-apiserver's host). The
-// version is the cluster page's to show, not repeated beside every operation.
 import { useQuery } from "@tanstack/react-query"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 
@@ -8,23 +5,16 @@ import { clusterQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 
-/** `k3d-zeabur`, or undefined until the cluster's answer is in. */
 function useClusterLabel(): string | undefined {
   return useQuery(clusterQuery).data?.name || undefined
 }
 
-/**
- * "Cluster k3d-zeabur  Namespace shop  Deployment/worker": labelled pairs set apart by space, not joined
- * with dots, so each value reads with its own label. A page that already names the namespace and
- * the object (a service's header) leaves them out.
- */
 export function Identity({
   namespace,
   target,
   className,
 }: {
   namespace?: string
-  /** The object an operation acts on: `Deployment/worker`. */
   target?: string
   className?: string
 }) {

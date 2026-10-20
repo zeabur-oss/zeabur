@@ -2,11 +2,8 @@ import type { Page } from "@playwright/test"
 
 import { expect, test } from "./fixtures.ts"
 
-// Problems in their layers, the plain status words and the ways to admin rights, in states a test
-// cluster does not reach on its own: a project's limit or a policy refusing a plan, a pod that runs
-// again after a recent crash, and a session that offers admin rights. Those answers are stubbed
-// (page.route), as in usage.spec.ts; everything else is the server's. ZEABUR_E2E_NAMESPACE and
-// ZEABUR_E2E_SERVICE as in ui.spec.ts.
+// States a test cluster does not reach on its own, stubbed with page.route. ZEABUR_E2E_NAMESPACE
+// and ZEABUR_E2E_SERVICE as in ui.spec.ts.
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const service = env("ZEABUR_E2E_SERVICE", "talker")
@@ -23,7 +20,6 @@ async function stub(page: Page, path: RegExp, body: object, status = 200) {
   )
 }
 
-/** The server's answer at `path`, changed by `edit`. */
 async function change<T>(page: Page, path: RegExp, edit: (body: T) => T) {
   await page.route(path, async (route) => {
     const response = await route.fetch()
@@ -89,7 +85,6 @@ const policy = {
   kubernetes: { code: 400, reason: "BadRequest", message: "label team is required" },
 }
 
-/** Opens the plan for restarting the service, which the stubbed plan answer refuses. */
 async function planRestart(page: Page) {
   await page.goto(servicePage)
   await page.getByRole("button", { name: "Restart", exact: true }).click()
@@ -99,7 +94,7 @@ async function planRestart(page: Page) {
 test("a project's limit says what happened, why with its numbers, and what to do", async ({
   page,
 }) => {
-  // Admin rights are offered: a quota's refusal still never offers them.
+  // A quota's refusal never offers admin rights, even when they are available.
   await stub(page, sessionPath, session("available"))
   await stub(page, planPath, quota, 403)
   const dialog = await planRestart(page)
@@ -110,7 +105,6 @@ test("a project's limit says what happened, why with its numbers, and what to do
   )
   await expect(problem).toContainText(`What to do: Run fewer replicas of ${service}`)
   await expect(problem).not.toContainText("as admin")
-  // The evidence and kube-apiserver's answer are folded.
   await expect(problem).not.toContainText("ResourceQuota/compute")
   await problem.getByRole("button", { name: "Evidence" }).click()
   await expect(problem).toContainText("ResourceQuota/compute status.used.requests.cpu")
@@ -169,7 +163,6 @@ test("a pod that runs again after a recent crash keeps the service failing, in p
   await page.goto(servicePage)
   const pill = page.getByRole("heading", { level: 1, name: service }).locator("xpath=..")
   await expect(pill).toContainText("Keeps crashing")
-  // The tooltip's facts, which a screen reader reads with the word.
   await expect(pill).toContainText("Running, 5 restarts, last exit 1, 4 minutes ago")
   await pill.getByText("Keeps crashing").hover()
   await expect(

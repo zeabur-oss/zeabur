@@ -1,9 +1,3 @@
-// A project's sidebar, Zeabur's: inside a project it takes the global sidebar's place. The way back
-// to Projects; the project's name (with its icon, a switcher, and its description); the search row
-// (⌘K); its pages Overview, Architecture and Settings; its services under a Services label, grouped
-// by `part-of` or by role as folding rows, each with a status dot; Objects and the objects that
-// belong to no service under Advanced, folded; and the namespace in a pill to copy at the foot.
-// The current page or service is the one raised row.
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
@@ -43,7 +37,6 @@ import {
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
-/** The Kubernetes objects behind each role, for the group's tooltip. */
 const roleKube: Record<string, string> = {
   web: "Ingress",
   internal: "Service",
@@ -54,7 +47,6 @@ const roleKube: Record<string, string> = {
 
 type Entry = { entry: ProjectEntry; to: string; icon: Icon }
 
-// The everyday pages (web/DESIGN.md, "Depth"); the services follow, and Objects is under Advanced.
 const pages: Entry[] = [
   { entry: "overview", to: "/projects/$project", icon: SquaresFourIcon },
   { entry: "architecture", to: "/projects/$project/architecture", icon: GraphIcon },
@@ -65,12 +57,10 @@ const advancedSection = remembered("zeabur.column.advanced", false)
 
 export function ProjectSidebar({ project }: { project: string }) {
   const place = usePlace()
-  // On the settings pages the sidebar is their navigation, as the dashboard's project settings.
   if (place.entry === "settings") return <SettingsSidebar project={project} />
   return <ProjectNav project={project} />
 }
 
-/** The project settings' navigation: the way back to the project, the title, and its pages. */
 function SettingsSidebar({ project }: { project: string }) {
   const t = useT()
   return (
@@ -194,7 +184,6 @@ function ProjectNav({ project }: { project: string }) {
         </SidebarSection>
         <SidebarSection
           title={t("column.advanced")}
-          // Open while it holds the page shown: the current row is never folded away.
           open={advancedOpen || advancedHolds}
           // Held open by the page shown, a click is not a choice to remember.
           onOpenChange={(open) => {
@@ -213,8 +202,6 @@ function ProjectNav({ project }: { project: string }) {
   )
 }
 
-/** The services, in their groups. One group is listed flat; several are folding rows, each holding
- * its services on the tree rail, as the dashboard's service groups. */
 function Services({ project, data }: { project: string; data: Project }) {
   const t = useT()
   const place = usePlace()
@@ -299,7 +286,6 @@ function ServiceRow({
   )
 }
 
-/** The objects that belong to no service, folded; the unused ones are counted. */
 function OtherObjects({ project, data }: { project: string; data: Project }) {
   const t = useT()
   const unused = data.resources.filter((r) => r.attribution.ownership === "orphan").length
@@ -328,8 +314,7 @@ function OtherObjects({ project, data }: { project: string; data: Project }) {
               to="/projects/$project/objects"
               params={{ project }}
               search={{ object: objectKeyOf(r.kind, r.name) }}
-              // These rows share one path and differ by `?object=`: match the search, and only
-              // as far as it goes (the page may also have `?q`). Nothing lives under /objects.
+              // The rows share one path and differ by `?object=`; the page may also have `?q`.
               activeOptions={{ exact: false }}
             />
           }
@@ -350,7 +335,6 @@ function OtherObjects({ project, data }: { project: string; data: Project }) {
   )
 }
 
-/** `?object=` for a resource the projection names. */
 function objectKeyOf(kind: string, name: string): string | undefined {
   const address = addressOf(kind, name)
   return address ? objectKey(address) : undefined

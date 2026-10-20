@@ -1,6 +1,3 @@
-// A service's metrics: usage against requests and limits, live (per replica) and over time
-// (`?range`, `?split`). CronJobs and Jobs, whose pods come and go between samples, and services
-// without metrics keep their requests and limits alone.
 import { Hint, Panel } from "@/components/bits"
 import { useT } from "@/i18n"
 import type { Service } from "@/model/service"

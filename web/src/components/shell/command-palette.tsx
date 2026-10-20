@@ -1,5 +1,4 @@
-// The ⌘K palette: jump to a project, service, pod (its logs) or domain, run a few actions, and see
-// recent items. Its contents load when it first opens, so the first page load carries only this.
+// The contents load when the palette first opens, keeping them off the first page load.
 import { lazy, Suspense, useEffect } from "react"
 
 import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"

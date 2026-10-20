@@ -1,8 +1,3 @@
-// Project › Architecture: how the services relate. Layers left to right (domains, web, internal,
-// workers and jobs, data), edges from Kubernetes objects (solid) or variable values (dashed), the
-// PVCs each service mounts under its card. Hand-made SVG edges under HTML cards; drag to pan, wheel
-// or the buttons to zoom. A card opens a quick look; the service page has everything else. The
-// viewport is kept per project and the selection is in the URL, so Back returns to the same view.
 import { getRouteApi } from "@tanstack/react-router"
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react"
 import CornersOutIcon from "~icons/ph/corners-out"
@@ -37,8 +32,6 @@ import { QuickLook } from "@/routes/project/quick-look"
 
 const route = getRouteApi("/projects/$project/architecture")
 
-/** A length on the canvas. Boxes get their place as custom properties (`--x`, `--y`, `--w`,
- * `--h`) that their `left-(--x) top-(--y) w-(--w) h-(--h)` classes read. */
 const px = (n: number) => `${n}px`
 
 export function ArchitecturePage() {
@@ -133,14 +126,13 @@ function Graph({
   const fit = () => {
     const el = viewport.current
     if (!el) return
-    // With the quick look open (400 px from `sm`), fit into the space left of it.
+    // Leave room for the quick look, which sits over the canvas from `sm`.
     const w = el.clientWidth - (selected && el.clientWidth >= 640 ? 400 : 0)
     const h = el.clientHeight
     const bw = box.maxX - box.minX
     const bh = box.maxY - box.minY
     const pad = w < 640 ? 16 : 56
     const k = Math.min(1.1, (w - pad * 2) / bw, (h - pad * 2 - 40) / bh)
-    // Too small to read with a service selected: zoom to a readable size around it instead.
     const node = graph.nodes.find((n) => n.id === selected)
     if (node && k < 0.75) {
       const z = 0.75
@@ -150,9 +142,8 @@ function Graph({
     setView({ k, x: (w - bw * k) / 2 - box.minX * k, y: (h - bh * k) / 2 - box.minY * k + 8 })
   }
 
-  // Fit on first visit; a kept viewport (coming back from a service page) stays as it was. The
-  // route mounts the page afresh for each project (`remountDeps`), so `project` and the `setView`
-  // the wheel listener below holds never belong to another project.
+  // The route remounts per project (`remountDeps`), so `fit` and the wheel listener's `setView`
+  // never belong to another project.
   useLayoutEffect(() => {
     if (!canvasViewport.get(project)) fit()
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- once per mount, which is per project
@@ -440,7 +431,6 @@ function ServiceCard({
 }: {
   node: LaidNode
   service: Service
-  /** The first domain that reaches it, shown in place of its kind. */
   host?: string
   selected: boolean
   faded: boolean

@@ -1,5 +1,4 @@
-// The terminal's connection, apart from the screen: the WebSocket address, the control frames the
-// server sends (crates/zeabur-api/src/pods/exec.rs documents the protocol) and the states the tab shows.
+// Protocol: crates/zeabur-api/src/pods/exec.rs.
 import type { Problem, Schemas } from "@/api/client"
 import { isRefusal } from "@/model/problem"
 import { roleYaml } from "@/model/rbac"
@@ -7,8 +6,7 @@ import { roleYaml } from "@/model/rbac"
 export type ServerFrame = Schemas["ServerFrame"]
 export type ClientFrame = Schemas["ClientFrame"]
 
-/** The close codes the server uses on its own: the credential expired, or nothing happened for
- * too long. Any other close without an `exit` or `error` frame first is a lost connection. */
+// Any other close without an `exit` or `error` frame first is a lost connection.
 const closeExpired = 4000
 const closeIdle = 4001
 
@@ -26,8 +24,6 @@ export type TerminalState =
 
 export type TerminalEvent = { type: "frame"; frame: ServerFrame } | { type: "close"; code: number }
 
-/** The state after `event`. An `exit` or `error` frame is the last word: the close that follows
- * it does not replace it. */
 export function nextState(state: TerminalState, event: TerminalEvent): TerminalState {
   if (event.type === "frame") {
     const frame = event.frame
@@ -51,11 +47,6 @@ export function nextState(state: TerminalState, event: TerminalEvent): TerminalS
   return { phase: "closed", why: "lost" }
 }
 
-/**
- * Whether a terminal connects again on its own: the cluster refused it, and admin rights have
- * just become active. Whatever granted them (this tab's "Retry as admin", another refusal's
- * button, another browser tab), the refused terminal is tried with them.
- */
 export function reconnectsWithRights(
   state: TerminalState,
   before: Schemas["ElevationState"] | undefined,
@@ -66,8 +57,7 @@ export function reconnectsWithRights(
   )
 }
 
-/** A control frame from the server, or `undefined` for one this interface does not know (the
- * protocol lets either side add frames). */
+/** `undefined` for an unknown frame: the protocol lets either side add frames. */
 export function parseFrame(text: string): ServerFrame | undefined {
   try {
     const value: unknown = JSON.parse(text)
@@ -81,7 +71,6 @@ export function parseFrame(text: string): ServerFrame | undefined {
   }
 }
 
-/** The WebSocket address of a terminal in `container` of `pod`, on the page's own origin. */
 export function terminalUrl(
   location: Pick<Location, "protocol" | "host">,
   project: string,
@@ -93,10 +82,8 @@ export function terminalUrl(
   return `${scheme}//${location.host}/api/v1/projects/${encodeURIComponent(project)}/pods/${encodeURIComponent(pod)}/exec${query}`
 }
 
-/** A Role and RoleBinding that let `user` open terminals in `namespace`: `get` on pods, which the
- * server reads first, and `get` and `create` on `pods/exec`. The terminal reaches kube-apiserver
- * over a WebSocket, whose handshake is a GET (RFC 6455 §4.1), so RBAC checks `get` on `pods/exec`
- * where `kubectl exec` over SPDY needs `create`; granting both covers either
+/** Both verbs on `pods/exec`: a WebSocket handshake is a GET (RFC 6455 §4.1), so RBAC checks `get`
+ * where `kubectl exec` over SPDY needs `create`
  * (https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb). */
 export function execRole(namespace: string, user: string): string {
   return roleYaml({

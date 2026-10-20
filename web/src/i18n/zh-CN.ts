@@ -16,7 +16,6 @@ const verbZhCN: Record<string, string> = {
   delete: "删除",
 }
 
-/** A Secret or ConfigMap in plain words. */
 const objectZhCN = (p: P) => (p.object === "Secret" ? `机密 ${p.name}` : `配置文件 ${p.name}`)
 
 /** Who a volume's mount failure stops: the container, else the replica. */
@@ -37,7 +36,6 @@ const timingZhCN = (t: ProbeTiming, sentence: string) =>
         t.thresholdOnly ? `${t.threshold} 次是默认值。` : ""
       }`
 
-// 简体中文。Kubernetes 名词（Deployment、Secret…）在类型标签与 YAML 里保留原文；Pod 在上层一律称“副本”。
 export const zhCN: Messages = {
   "shell.skip": "跳到主要内容",
   "shell.nav": "主导航",
@@ -576,7 +574,7 @@ export const zhCN: Messages = {
   "cap.vulnerability-scanning": "漏洞扫描",
   // 对象与 YAML
   "project.entry.objects": "对象",
-  // 项目的 Namespace：纳入、移出、详细信息
+  // 项目的 Namespace
   "project.entry.settings": "设置",
   "action.adopt": "纳入",
   "action.unadopt": "不再显示为项目",
@@ -714,7 +712,7 @@ export const zhCN: Messages = {
   "warn.ingressOpened": (names: string) => `不再隔离：${names} 会接受任何来源的流量`,
   "warn.egressOpened": (names: string) => `不再限制：${names} 可以把流量发送到任何地方`,
   "warn.connectionsOpened": (pairs: string) => `恢复允许：${pairs}`,
-  // 确认：用大白话说明会发生什么
+  // 确认
   "confirm.restartSingle": (name) => `${name} 只有一个副本，重启时可能中断几秒。`,
   "confirm.restartNone": (name) => `${name} 当前没有就绪的副本，重启会替换全部副本。`,
   "confirm.rolling": (name, pods) => `${name} 的 ${pods} 个副本会逐个替换，服务不会中断。`,
@@ -785,7 +783,7 @@ export const zhCN: Messages = {
   "action.allow": "允许",
   "action.create": "创建",
   "action.delete": "删除",
-  // 通知：应用的结果
+  // 通知
   "toast.region": "通知",
   "toast.applied": "已应用",
   "toast.view": "查看",
@@ -975,7 +973,7 @@ export const zhCN: Messages = {
   "backups.veleroVolumesNeedSnapshots": "卷数据需配合快照",
   "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有备份计划`,
 
-  // 用量与历史（request 称“预留量”，limit 称“上限”；Kubernetes 原文写在说明里）
+  // 用量与历史
   "usage.title": "当前用量",
   "usage.history": "历史",
   "usage.live": "实时",

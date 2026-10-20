@@ -1,8 +1,3 @@
-// What the cluster refused, shown as a normal state rather than an error: a muted line in place of
-// the missing data, one sentence in the reader's language, one action ("View as admin", or "Retry
-// as admin" where it re-runs something) when admin rights are offered, else "Ask a cluster
-// administrator", and everything else (the refused request, kube-apiserver's answer, a role to
-// hand over) folded behind one "Details". Real errors keep `Problem`'s alert.
 import { useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
@@ -22,20 +17,15 @@ import { en } from "@/i18n/en"
 import { cn } from "@/lib/utils"
 import { isRefusal } from "@/model/problem"
 
-/** What was refused: a problem, a section the person may not read (`unreadable`), or a change a
- * permission hint says they may not make (`hint`), asked before anything reached the cluster. */
+/** `hint`: a permission hint said no before anything reached the cluster. */
 export type Refusal = Problem | "unreadable" | "hint"
 
 type Unreadable = Schemas["UnreadableView"]
 
 export { isRefusal }
 
-/**
- * Whether admin rights could change the answer. The server already says so for a refused request
- * (`elevation-required`). An older answer, read before the session's state was known, is a
- * `forbidden` from kube-apiserver (it carries `kubernetes`); a section answered with `unreadable`
- * and a hint carry no problem. All are offered only while rights are offered and not in use.
- */
+/** An answer read before the session's state was known is kube-apiserver's `forbidden` (it
+ * carries `kubernetes`), not `elevation-required`. */
 export function offersElevation(
   refusal: Refusal,
   elevation: Schemas["ElevationState"] | undefined,
@@ -48,17 +38,13 @@ export function offersElevation(
   )
 }
 
-/** Whether admin rights could change the answer, for this session. */
 function useOffersElevation(refusal: Refusal): boolean {
   const session = useQuery(sessionQuery).data
   return offersElevation(refusal, session?.elevation)
 }
 
-/**
- * Whether a permission hint that says no can turn with admin rights: the server checks hints with
- * the person's everyday rights, so `denied` is not final while admin rights are offered. An
- * `unknown` hint leaves the page open, and the cluster decides when the change is planned.
- */
+/** The server checks hints with everyday rights, so `denied` is not final while admin rights are
+ * offered. */
 export function hintOffersElevation(
   hint: Schemas["Permission"] | undefined,
   elevation: Schemas["ElevationState"] | undefined,
@@ -66,19 +52,12 @@ export function hintOffersElevation(
   return hint === "denied" && offersElevation("hint", elevation)
 }
 
-/** Whether `hint` says no while admin rights are offered, for this session. */
 export function useHintOffersElevation(hint: Schemas["Permission"] | undefined): boolean {
   const session = useQuery(sessionQuery).data
   return hintOffersElevation(hint, session?.elevation)
 }
 
-/**
- * Where a permission hint says no while admin rights are offered, the `Refused` line in place of a
- * dead end: "Changing the history source needs admin rights" with "Use admin rights" ("View as
- * admin" for a `read`). Once the rights are granted every query is read again
- * (auth/follow-elevation.ts), the hint with them; `retry` also runs what that does not. Nothing
- * when the hint does not say no or no rights are offered: the page keeps its own line then.
- */
+/** Granted rights re-read every query (auth/follow-elevation.ts); `retry` runs what that does not. */
 export function RefusedHint({
   hint,
   what,
@@ -105,25 +84,18 @@ export function RefusedHint({
   )
 }
 
-/** `get pods/exec`, `list httproutes.gateway.networking.k8s.io`: a permission as RBAC names it. */
 export function permission(verb: string, resource: string, group = ""): string {
   return `${verb} ${group ? `${resource}.${group}` : resource}`
 }
 
-/** The server's English sentences about a refused request: its `detail`, and its `fix` when it
- * was written for the occasion (the catalogue's fix is what the line already says). */
+/** The catalogue's `fix` is what the line already says; only one written for the occasion is added. */
 function serverSentences(problem: Problem): string[] {
   const own = problem.kind === "forbidden" || problem.kind === "elevation-required"
   const fix = own && problem.fix !== en[`problem.fix.${problem.kind}`] ? [problem.fix] : []
   return [problem.detail, ...fix].filter(Boolean)
 }
 
-/**
- * A refusal where the refused data would be. `what` names what needs the rights ("Opening a
- * terminal"); `retry` re-runs what refetching the page does not (a POST, a reconnect) and makes the
- * action "Retry as admin"; `missing` lists the permissions (by default the refused request);
- * `children` adds to the folded details. `line` drops the frame, for a row or a page's one line.
- */
+/** `retry` re-runs what refetching the page does not (a POST, a reconnect). */
 export function Refused({
   refusal,
   what,
@@ -235,7 +207,6 @@ export function Refused({
   )
 }
 
-/** How a page names the kinds it lists; any other kind by its resource. */
 const resourceNames: Record<string, string> = {
   secrets: "Secrets",
   configmaps: "ConfigMaps",
@@ -253,12 +224,10 @@ const resourceNames: Record<string, string> = {
   "events.events.k8s.io": "Events",
 }
 
-/** The kinds of `unreadable` among `resources` (`secrets`, `httproutes.gateway.networking.k8s.io`). */
 export function refusedAmong(unreadable: Unreadable[], resources: readonly string[]): Unreadable[] {
   return unreadable.filter((u) => resources.includes(u.resource))
 }
 
-/** The kinds of `unreadable` that no place on the view shows: not among `placed`. */
 export function refusedElsewhere(
   unreadable: Unreadable[],
   placed: readonly string[],
@@ -266,8 +235,6 @@ export function refusedElsewhere(
   return unreadable.filter((u) => !placed.includes(u.resource))
 }
 
-/** Kinds the person may not list, where their objects would be: "Seeing Secrets needs admin
- * rights", the `list` each lacks and kube-apiserver's answer folded. Nothing when there are none. */
 export function RefusedKinds({ unreadable, line }: { unreadable: Unreadable[]; line?: boolean }) {
   const t = useT()
   if (unreadable.length === 0) return null
@@ -284,7 +251,6 @@ export function RefusedKinds({ unreadable, line }: { unreadable: Unreadable[]; l
   )
 }
 
-/** The page's one quiet line for kinds that have no place of their own on it. */
 export function RefusedSome({ unreadable }: { unreadable: Unreadable[] }) {
   const t = useT()
   if (unreadable.length === 0) return null

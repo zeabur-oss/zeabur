@@ -1,5 +1,3 @@
-// Nodes and capacity: what the pods request against what each node can give them (allocatable),
-// limits as a tick, and usage as a second, thinner bar when metrics-server is installed.
 import { useQuery } from "@tanstack/react-query"
 
 import { isStatus, type Schemas } from "@/api/client"
@@ -19,13 +17,13 @@ import { Meter } from "@zeabur/design-system/components/meter"
 type Resources = Schemas["Resources"]
 type NodeView = Schemas["NodeView"]
 
-/** Requests above this share of allocatable need attention. */
+/** Share of allocatable requested above which a node needs attention. */
 export const TIGHT = 0.9
 
 export const share = (part: number | undefined, whole: number) =>
   whole > 0 && part !== undefined ? part / whole : undefined
 
-/** A node's state in one word, worst first: not ready, a pressure, cordoned, ready. */
+/** Worst first: not ready, a pressure, cordoned, ready. */
 export function nodeState(node: NodeView, t: Translate): { health: Health; word: string } {
   if (node.ready !== "True")
     return {
@@ -38,8 +36,6 @@ export function nodeState(node: NodeView, t: Translate): { health: Health; word:
   return { health: "ok", word: t("status.ready") }
 }
 
-/** One bar as on a service's usage (the design system's Meter): what is requested of the node as
- * the fill, ochre once it is tight, and what is used as the mark. Shares of allocatable. */
 function CapacityBar({
   requested,
   used,
@@ -77,7 +73,6 @@ function Total({
   limits?: number
   usage?: number
   format: (value: number) => string
-  /** "1.2 of 2 cores requested"; pods say so their own way. */
   describe?: (requests: string, allocatable: string) => string
 }) {
   const t = useT()

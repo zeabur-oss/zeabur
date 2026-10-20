@@ -1,5 +1,3 @@
-// A service's overview: what is wrong with it, its status, replicas, connections, domains and
-// recent events, each a card that leads to the tab with the details. Usage is on the Usage tab.
 import { Link } from "@tanstack/react-router"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
 import ArrowRightIcon from "~icons/ph/arrow-right"

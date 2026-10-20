@@ -1,15 +1,9 @@
-// What the interface derives from one project's API answer: each service's role, health and status
-// word, the project column's groups, and the numbers the project pages show. Pure functions of the
-// answer, so every page agrees on what "broken" means.
 import type { Schemas } from "@/api/client"
 
 export type Pod = Schemas["PodSummary"]
 export type Service = Schemas["Service"]
 export type Endpoint = Schemas["Endpoint"]
 export type Route = Schemas["Route"]
-/** Where a service's endpoints and routes are looked up: the project document lists each
- * Kubernetes Service and Ingress once, and a service names its own (`endpointNames`,
- * `routeNames`). */
 export type Network = Pick<Schemas["Project"], "endpoints" | "routes">
 export type Event = Schemas["EventView"]
 export type Health = Schemas["Health"]
@@ -28,12 +22,10 @@ const workloadKinds: Schemas["WorkloadKind"][] = [
   "StatefulSet",
 ]
 
-/** A workload kind as the API spells it (`deployment` is `Deployment`); the API reads any case, so
- * links people type or copy from kubectl work. An unknown kind is returned as it is. */
+/** The API reads any case, so links typed or copied from kubectl work; an unknown kind is kept. */
 export const canonicalKind = (kind: string): string =>
   workloadKinds.find((known) => known.toLowerCase() === kind.toLowerCase()) ?? kind
 
-/** The image's tag (`2.1`), the start of its digest, or `latest`. */
 export function imageTag(image?: string | null): string {
   if (!image) return ""
   const last = image.split("/").at(-1) ?? image
@@ -43,7 +35,6 @@ export function imageTag(image?: string | null): string {
   return colon >= 0 ? last.slice(colon + 1) : "latest"
 }
 
-/** The PersistentVolumeClaims a service mounts, once each. */
 export function volumesOf(service: Service): Schemas["Mount"][] {
   const seen = new Set<string>()
   const out: Schemas["Mount"][] = []
@@ -62,9 +53,6 @@ export function volumesOf(service: Service): Schemas["Mount"][] {
 export const claimOf = (mount: Schemas["Mount"]) =>
   mount.object?.name ?? mount.claimName ?? mount.name
 
-/** Web: exposed by an Ingress (the server names an Ingress only when it routes to one of the
- * service's Kubernetes Services). Data: a data store, as the server judges it (`dataStore`). Job:
- * a CronJob or Job. Internal: behind a Kubernetes Service. Worker: everything else. */
 export function roleOf(service: Service): Role {
   if (service.routeNames.length > 0) return "web"
   if (service.dataStore) return "data"
@@ -73,7 +61,6 @@ export function roleOf(service: Service): Role {
   return "worker"
 }
 
-/** Each list's entries by name, built once per list the document holds. */
 const byName = new WeakMap<readonly { name: string }[], Map<string, { name: string }>>()
 
 function named<T extends { name: string }>(list: readonly T[], names: readonly string[]): T[] {
@@ -85,23 +72,16 @@ function named<T extends { name: string }>(list: readonly T[], names: readonly s
   return names.flatMap((name) => index.get(name) ?? [])
 }
 
-/** The Kubernetes Services selecting the service's pods, in the order it names them. */
 export const endpointsOf = (network: Network, service: Service): Endpoint[] =>
   named(network.endpoints, service.endpointNames)
 
-/** The Ingresses routing to those Services, in the order the service names them. */
 export const routesOf = (network: Network, service: Service): Route[] =>
   named(network.routes, service.routeNames)
 
-// ── Pods ─────────────────────────────────────────────────────────────────────────────────────────
-
-/** Why a pod is not running or ready. */
 export const podReason = (pod: Pod): string | undefined => pod.reason ?? undefined
 
-/** A pod's health, as the server judges it. */
 export const podHealth = (pod: Pod): Health => pod.health
 
-/** The pod to look at first: a failing one, else one not ready, else the first. */
 export function worstPod(service: Service): Pod | undefined {
   return (
     service.pods.find((pod) => pod.health === "fail") ??
@@ -113,26 +93,20 @@ export function worstPod(service: Service): Pod | undefined {
 export const restartsOf = (service: Service) =>
   service.pods.reduce((sum, pod) => sum + pod.restarts, 0)
 
-// ── Status ───────────────────────────────────────────────────────────────────────────────────────
-
 type StatusWord = Schemas["StatusWord"]
 
 export interface Status {
   health: Health
   word: StatusWord
-  /** The failing pod's reason as the kubelet gives it (`CrashLoopBackOff`): in the tooltip, and
-   * as a plain word (`reasonWord`) in place of the status word. */
+  /** The kubelet's reason (`CrashLoopBackOff`). */
   reason?: string
-  /** A task (Job, CronJob): a run that ends with an error failed, rather than crashed. */
+  /** Job or CronJob: a run that ends with an error failed, rather than crashed. */
   task?: boolean
   ready?: number
   desired?: number
-  /** The pod the reason is about, for the tooltip. */
   pod?: PodFacts
 }
 
-/** What the tooltip says of the pod a status is about: running or not, how often it restarted,
- * and how its last run that failed ended. */
 export interface PodFacts {
   /** Ready now, though the reason says it crashed recently. */
   running: boolean
@@ -140,8 +114,6 @@ export interface PodFacts {
   lastExit?: { code: number; finished?: string }
 }
 
-/** A raw reason's plain word (research: the status pill says what it means; the raw word stays in
- * its tooltip and the details). */
 export type ReasonWord =
   | "crashing"
   | "runFailed"
@@ -174,8 +146,7 @@ const reasonWords: Record<string, ReasonWord> = {
   BackoffLimitExceeded: "gaveUp",
 }
 
-/** The plain word for a raw reason, or undefined when there is none and the status word stands.
- * `Error` is how a run ended: a task's run failed, a service that keeps restarting crashed. */
+/** `Error` is how a run ended: a task's run failed, a service that keeps restarting crashed. */
 export function reasonWord(reason: string | undefined, task: boolean): ReasonWord | undefined {
   if (!reason) return undefined
   if (reason === "Error") return task ? "runFailed" : "crashing"
@@ -184,7 +155,6 @@ export function reasonWord(reason: string | undefined, task: boolean): ReasonWor
 
 export const isTask = (kind: string) => kind === "Job" || kind === "CronJob"
 
-/** The facts of the pod a failing or waiting status is about. */
 export function podFacts(pod: Pod): PodFacts {
   const ended = (pod.containerStatuses ?? [])
     .map((c) => c.lastTermination)
@@ -197,8 +167,7 @@ export function podFacts(pod: Pod): PodFacts {
   }
 }
 
-/** A service's status as the server judges it (`crates/zeabur-graph/src/health.rs`), with its
- * replica counts; a CronJob between runs has none. */
+/** Mirrors `crates/zeabur-graph/src/health.rs`; a CronJob between runs has no replica counts. */
 export function statusOf(service: Service): Status {
   const { health, word, reason } = service.status
   const counts =
@@ -216,8 +185,7 @@ export function statusOf(service: Service): Status {
   }
 }
 
-/** The worst health in a project's service counts (the project list's `health`), as
- * `worstHealth` gives it for the same services. */
+/** Must agree with `worstHealth` over the same services. */
 export function countsHealth(counts: Schemas["ProjectHealth"]): Health {
   if (counts.failing > 0) return "fail"
   if (counts.warning > 0) return "warn"
@@ -231,7 +199,6 @@ export const needsAttention = (status: Status) =>
 
 export const healthRank: Record<Health, number> = { fail: 0, warn: 1, progress: 2, ok: 3, idle: 4 }
 
-/** Worst first, then by name. */
 export function byHealth(a: Service, b: Service): number {
   return (
     healthRank[statusOf(a).health] - healthRank[statusOf(b).health] || a.name.localeCompare(b.name)
@@ -247,32 +214,25 @@ function worstHealth(statuses: Status[]): Health {
   return worst
 }
 
-// ── Domains and configuration ────────────────────────────────────────────────────────────────────
-
 export interface Domain {
   host: string
   ingress: string
-  /** Listed in the Ingress's TLS section: HTTPS is configured (not that the certificate is valid). */
+  /** Listed in the Ingress's TLS section; says nothing of the certificate's validity. */
   https: boolean
   service: Service
 }
 
-/** An Ingress backend that reaches one of the service's Kubernetes Services. */
 export interface PublicRoute {
-  /** Absent: every host (the default backend, or a rule without a host). */
+  /** Absent for the default backend or a rule without a host. */
   host?: string
   path?: string
   pathType?: string
   ingress: string
-  /** The Kubernetes Service. */
   backend: string
-  /** A port number or name, as the Ingress writes it. */
   port?: string
   https: boolean
 }
 
-/** The Ingress backends that reach the service, in Ingress order. An Ingress lists rules for
- * other services too; only those whose backend is one of this service's Services count. */
 export function publicRoutesOf(network: Network, service: Service): PublicRoute[] {
   const mine = new Set(service.endpointNames)
   return routesOf(network, service).flatMap((route) =>
@@ -290,7 +250,6 @@ export function publicRoutesOf(network: Network, service: Service): PublicRoute[
   )
 }
 
-/** The hosts that reach the service, each once. */
 export function domainsOf(network: Network, service: Service): Domain[] {
   const seen = new Map<string, Domain>()
   for (const route of publicRoutesOf(network, service))
@@ -307,7 +266,6 @@ export function domainsOf(network: Network, service: Service): Domain[] {
 export const hostUrl = (domain: Pick<Domain, "host" | "https">) =>
   `${domain.https ? "https" : "http"}://${domain.host}`
 
-/** The Secrets and ConfigMaps a service reads values or files from. */
 export function configObjectsOf(
   service: Service,
 ): { kind: "Secret" | "ConfigMap"; name: string }[] {
@@ -325,11 +283,8 @@ export function configObjectsOf(
   return [...seen.values()]
 }
 
-// ── Project column groups ────────────────────────────────────────────────────────────────────────
-
 export interface ServiceGroup {
   key: string
-  /** A role (translated by the caller), or the `part-of` group name as written. */
   role?: Role
   name?: string
   services: Service[]
@@ -360,8 +315,6 @@ export function groupServices(services: Service[]): ServiceGroup[] {
     }))
     .filter((group) => group.services.length > 0)
 }
-
-// ── Project summary ──────────────────────────────────────────────────────────────────────────────
 
 export type Project = Schemas["Project"]
 
@@ -395,12 +348,10 @@ export interface Claim {
   sizeBytes?: number | null
   status?: string | null
   storageClass?: string | null
-  /** The services mounting it. */
   services: Service[]
   orphan: boolean
 }
 
-/** Every PersistentVolumeClaim of the project, with the services that mount it. */
 export function claimsOf(project: Project): Claim[] {
   const claims = new Map<string, Claim>()
   for (const service of project.services)
@@ -428,12 +379,10 @@ export function claimsOf(project: Project): Claim[] {
   return [...claims.values()].toSorted((a, b) => a.name.localeCompare(b.name))
 }
 
-// ── Events ───────────────────────────────────────────────────────────────────────────────────────
-
 export const newestFirst = (a: Event, b: Event) =>
   (b.lastSeen ?? "").localeCompare(a.lastSeen ?? "")
 
-/** Events about a service: the workload itself or one of its pods. */
+/** About the workload itself or one of its pods. */
 export function eventsFor(events: Event[], service: Service): Event[] {
   const pods = new Set(service.pods.map((p) => p.name))
   return events.filter(

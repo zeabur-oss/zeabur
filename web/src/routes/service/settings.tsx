@@ -1,8 +1,3 @@
-// A service's settings as forms: compute (replicas, and requests and limits per container against
-// the largest node) and health checks (readiness, liveness and startup probes, which also gate a
-// rollout), then the sections modules add. Storage is edited on its own tab, next to the volumes.
-// Every form ends in the plan dialog; nothing is written from here. This tab is its own chunk, with
-// the form library.
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
@@ -68,7 +63,6 @@ export function SettingsTab({
               refused={planner.fields}
             />
           </Section>
-          {/* Adjusting, not everyday (web/DESIGN.md, "Depth"): folded until opened. */}
           <Collapsible open={healthOpen} onOpenChange={(open) => healthChecksSection.set(open)}>
             <CollapsibleTrigger variant="section">
               {t("form.health")}
@@ -109,12 +103,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-// ── Compute ──────────────────────────────────────────────────────────────────────────────────
-
 type Change = Schemas["Change"]
 type Amounts = { cpuRequest: string; memoryRequest: string; cpuLimit: string; memoryLimit: string }
 
-/** Where each amount is in a container, as kube-apiserver names a field it refused. */
+/** As kube-apiserver names a field it refused. */
 const paths: Record<keyof Amounts, string> = {
   cpuRequest: "requests.cpu",
   memoryRequest: "requests.memory",
@@ -133,7 +125,6 @@ function Compute({
   workload: Schemas["WorkloadRef"]
   disabled: boolean
   onPlan: (changes: Change[]) => void
-  /** The fields the cluster refused in the last plan, marked where they are. */
   refused: Schemas["FieldCause"][]
 }) {
   const t = useT()
@@ -287,8 +278,6 @@ function Compute({
   )
 }
 
-// ── Health checks ────────────────────────────────────────────────────────────────────────────
-
 type ProbeValues = {
   handler: Schemas["ProbeHandler"] | "none"
   path: string
@@ -298,7 +287,6 @@ type ProbeValues = {
   failureThreshold: string
 }
 
-/** The container's probe as the current release's template holds it. */
 function currentProbe(template: unknown, container: string, kind: ProbeKind): ProbeValues {
   const spec = (template as { spec?: { containers?: Record<string, unknown>[] } } | undefined)?.spec
   const found = spec?.containers?.find((c) => c.name === container)?.[`${kind}Probe`] as
@@ -327,7 +315,6 @@ function Probes({
 }: {
   project: string
   service: Service
-  /** The Kubernetes Services selecting its pods. */
   endpoints: Endpoint[]
   disabled: boolean
   onPlan: (change: Change) => void

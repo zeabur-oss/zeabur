@@ -1,10 +1,3 @@
-// The service page, as Zeabur's: a header (the service's icon, name and status, its kind and when
-// it was created, `Kind/name` to copy, the image, and the operations with the cluster they act on
-// next to them), then the tabs as one segmented switcher across the content column, Overview, Logs,
-// Variables, Metrics, Networking, Storage and Settings, with Events and Releases where they apply
-// and Terminal and YAML opened from the header's menu (shown as a tab while open). The open tab and
-// pod are in the URL. Restart and Delete, like every write, open a plan to read before applying; a
-// deleted service's page goes back to the project's services.
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi } from "@tanstack/react-router"
 import { lazy, Suspense } from "react"
@@ -83,7 +76,6 @@ const tabIcons: Record<ServiceTab, Icon> = {
   yaml: CodeIcon,
 }
 
-// What everyone needs of a service (web/DESIGN.md, "Depth"), always shown.
 const everydayTabs: readonly ServiceTab[] = [
   "overview",
   "logs",
@@ -93,12 +85,8 @@ const everydayTabs: readonly ServiceTab[] = [
   "storage",
   "settings",
 ]
-// From the header's menu (or a link), shown as a tab while open.
 const openedTabs: readonly ServiceTab[] = ["terminal", "yaml"]
 
-/** The tabs the service shows: the everyday ones, Events while it has any, Releases for a workload
- * that keeps them, and the tab open from the menu. The dashboard leaves out what does not apply
- * rather than folding it under "More". */
 export function serviceTabs(
   service: Pick<Service, "kind">,
   { events, open }: { events: number; open: ServiceTab },
@@ -111,20 +99,16 @@ export function serviceTabs(
   return tabs
 }
 
-// The log viewer (virtual list, ANSI parsing, streaming) loads when the Logs tab first opens.
 const LogsTab = lazy(() => import("@/routes/service/logs").then((m) => ({ default: m.LogsTab })))
-// The terminal (xterm.js) loads when the Terminal tab first opens.
 const TerminalTab = lazy(() =>
   import("@/routes/service/terminal").then((m) => ({ default: m.TerminalTab })),
 )
-// The settings forms and their form library load when the Settings tab first opens.
 const SettingsTab = lazy(() =>
   import("@/routes/service/settings").then((m) => ({ default: m.SettingsTab })),
 )
 
 const route = getRouteApi("/projects/$project/services/$kind/$name")
 
-/** The resource of each workload kind, as a deletion names it. */
 const workloadResource: Record<Service["kind"], Schemas["ResourceRef"]> = {
   Deployment: { group: "apps", version: "v1", resource: "deployments" },
   StatefulSet: { group: "apps", version: "v1", resource: "statefulsets" },
@@ -318,8 +302,6 @@ function ServiceView({
                   </MenuContent>
                 </Menu>
               </div>
-              {/* The sidebar names the project, the title the service: the cluster is what is
-                  left to say about where Restart acts. */}
               {restartable ? <Identity /> : null}
             </div>
           </div>
@@ -435,7 +417,6 @@ function ServiceView({
   )
 }
 
-/** The content column, for the states before the service is there. */
 function Column({ children }: { children: React.ReactNode }) {
   return (
     <div className="px-4 py-6 md:px-8 md:py-8">

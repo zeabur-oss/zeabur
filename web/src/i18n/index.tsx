@@ -1,10 +1,3 @@
-// A small typed i18n: one message object per locale, typed against English, so a missing key is a
-// compile error. The locale comes from a saved preference, else the browser's languages.
-//
-// English is in the main bundle: it types the others and is the fallback. The other catalogues are
-// chunks loaded when chosen or detected; `prepareI18n` loads the first one before the app renders,
-// so a person reading Chinese never sees English first. That delays the first paint by one small
-// same-origin request for them, and by nothing for English.
 import { createContext, use, useEffect, useState, type ReactNode } from "react"
 
 import { en, type Messages } from "@/i18n/en"
@@ -12,7 +5,6 @@ import { en, type Messages } from "@/i18n/en"
 export const locales = ["en", "zh-TW", "zh-CN"] as const
 export type Locale = (typeof locales)[number]
 
-/** Each locale's name in its own language, for the switch. */
 export const localeNames: Record<Locale, string> = {
   en: "English",
   "zh-TW": "繁體中文（台灣）",
@@ -26,16 +18,14 @@ const loaders: Record<Exclude<Locale, "en">, Loader> = {
   "zh-CN": () => import("@/i18n/zh-CN").then((m) => m.zhCN),
 }
 
-/** A catalogue as loaded: the locale it is in, English when the wanted one could not load. */
+/** `locale` is English when the wanted catalogue could not load. */
 export interface Catalogue {
   locale: Locale
   messages: Messages
 }
 
-/**
- * Loads catalogues through `from`, keeping each one that loaded. A chunk that fails (a network
- * error, or a deploy that replaced the hashed file) gives English; the next request tries again.
- */
+/** A chunk that fails to load (a deploy may have replaced the hashed file) gives English; the next
+ * request tries again. */
 export function catalogueLoader(from: Record<Exclude<Locale, "en">, Loader>) {
   const loaded = new Map<Locale, Messages>([["en", en]])
   let latest = 0
@@ -52,13 +42,12 @@ export function catalogueLoader(from: Record<Exclude<Locale, "en">, Loader>) {
     }
   }
   return {
-    /** The catalogue already loaded for `locale`, if any. */
     cached: (locale: Locale): Catalogue | undefined => {
       const messages = loaded.get(locale)
       return messages ? { locale, messages } : undefined
     },
     load,
-    /** The person's choice: its catalogue, or `undefined` when a later choice came first. */
+    /** `undefined` when a later choice came first. */
     choose: async (locale: Locale): Promise<Catalogue | undefined> => {
       const request = ++latest
       const catalogue = await load(locale)
@@ -69,7 +58,7 @@ export function catalogueLoader(from: Record<Exclude<Locale, "en">, Loader>) {
 
 const catalogues = catalogueLoader(loaders)
 
-/** Loads the catalogue of the starting locale; the app renders once it resolves. Never rejects. */
+/** Never rejects. */
 export function prepareI18n(): Promise<Catalogue> {
   return catalogues.load(initialLocale())
 }
@@ -121,7 +110,6 @@ type Key = keyof Messages
 type Args<K extends Key> = Messages[K] extends (...args: infer A) => string ? A : []
 export type Translate = <K extends Key>(key: K, ...args: Args<K>) => string
 
-/** `t` over one catalogue. */
 export function translator(messages: Messages): Translate {
   return (key, ...args) => {
     const message = messages[key] as string | ((...a: unknown[]) => string)
@@ -172,7 +160,6 @@ export function useT(): Translate {
   return use(I18nContext).t
 }
 
-/** A sentence the server names by key (a diagnosis, a gap, a problem), with its values. */
 export interface Sentence {
   key: string
   params?: Record<string, string>
@@ -182,8 +169,7 @@ type SentenceKey = Extract<Key, `sentence.${string}`>
 
 const isSentenceKey = (key: string): key is SentenceKey => Object.hasOwn(en, key)
 
-/** A server sentence written by `t`, or undefined for a key this build does not know. Every
- * catalogue has every key English has, so a known key is always in the reader's language. */
+/** Undefined for a key this build does not know. */
 export function writeSentence(t: Translate, { key, params }: Sentence): string | undefined {
   const full = `sentence.${key}`
   // Every sentence takes the parameters, or nothing; a key known only at run time cannot pick one.
@@ -191,8 +177,7 @@ export function writeSentence(t: Translate, { key, params }: Sentence): string |
   return isSentenceKey(full) ? write(full, params ?? {}) : undefined
 }
 
-/** Writes a server sentence in the current locale; the key itself when this build does not know
- * it. */
+/** Falls back to the key itself when this build does not know it. */
 export function useSentence(): (sentence: Sentence) => string {
   const t = useT()
   return (sentence) => writeSentence(t, sentence) ?? sentence.key

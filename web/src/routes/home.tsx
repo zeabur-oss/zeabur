@@ -1,8 +1,3 @@
-// Home: what is running and what is broken, across projects. A status line (services by health,
-// the cluster's version, nodes and upgrade state), the services that need attention, the projects
-// failing first, and the last hour's warnings. Everything comes from the projects list, which
-// carries each adopted project's services with their health, and the cluster's own reads; each
-// part leaves out what the person may not read rather than guessing it.
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import TerminalIcon from "~icons/ph/terminal"
@@ -44,9 +39,7 @@ import { Stat, StatGroup } from "@zeabur/design-system/components/stat"
 type ProjectItem = Schemas["ProjectSummary"]
 type Brief = Schemas["ServiceSummary"]
 
-/** Projects the section shows before "All projects": three rows of cards. */
 const PROJECTS_SHOWN = 9
-/** Folded warnings the page shows before "All events". */
 const WARNINGS_SHOWN = 5
 
 export function HomePage() {
@@ -73,9 +66,6 @@ export function HomePage() {
   )
 }
 
-// ── Key figures ─────────────────────────────────────────────────────────────────────────────────
-
-/** The services of every adopted project by state, then the cluster: a console's row of figures. */
 function StatusLine({
   adopted,
   loaded,
@@ -127,8 +117,6 @@ function StatusLine({
   )
 }
 
-/** The cluster: distribution and version (a link to it), nodes ready and the upgrade pill; each
- * part only when readable. */
 function ClusterFacts() {
   const t = useT()
   const cluster = useQuery(clusterQuery)
@@ -153,7 +141,6 @@ function ClusterFacts() {
             : t("shell.cluster")}
         </Link>
       }
-      // Nodes ready and the upgrade pill, each when it is readable: one does not wait for the other.
       hint={
         (items && items.length > 0) || badge ? (
           <span className="flex items-center gap-2">
@@ -170,14 +157,11 @@ function ClusterFacts() {
   )
 }
 
-// ── Needs attention ──────────────────────────────────────────────────────────────────────────────
-
 interface AttentionItem {
   project: string
   service: Brief
 }
 
-/** Failing, then not ready, then rolling-out services of every project; then by project, name. */
 function needingAttention(adopted: ProjectItem[]): AttentionItem[] {
   return adopted
     .flatMap((p) =>
@@ -193,7 +177,6 @@ function needingAttention(adopted: ProjectItem[]): AttentionItem[] {
     )
 }
 
-/** A service's status word: what its failing pod's reason means, when known. */
 function briefWord(t: Translate, service: Brief): string {
   const plain = plainReason(
     t,
@@ -307,9 +290,7 @@ function AttentionRow({ item }: { item: AttentionItem }) {
   )
 }
 
-/** The cause of a service's first diagnosis, from its project's document. The list on Home has
- * no events, so the document (one per project with something to attend to, shared with the
- * project cards) supplies it; until it arrives the row shows the facts alone. */
+/** The project list carries no diagnoses, so they come from the project's document. */
 function AttentionDiagnosis({ project, service }: { project: string; service: Brief }) {
   const document = useQuery(projectQuery(project, { poll: false }))
   const diagnoses = document.data?.services.find(
@@ -318,9 +299,6 @@ function AttentionDiagnosis({ project, service }: { project: string; service: Br
   return <DiagnosisLine diagnoses={diagnoses} />
 }
 
-// ── Projects ─────────────────────────────────────────────────────────────────────────────────────
-
-/** Failing projects first, then warning, rolling out and healthy; by name within each. */
 function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
   const rank = (p: ProjectItem) => (p.health ? healthRank[countsHealth(p.health)] : healthRank.ok)
   return rank(a) - rank(b) || a.name.localeCompare(b.name)
@@ -382,8 +360,6 @@ function ProjectsSection({
   )
 }
 
-// ── Recent warnings ──────────────────────────────────────────────────────────────────────────────
-
 interface Folded {
   key: string
   namespace?: string
@@ -391,9 +367,7 @@ interface Folded {
   count: number
 }
 
-/** The last hour's warnings folded by namespace, the object they are about and reason, newest
- * first. A pod's warnings stay under the pod: the events read does not say which workload owns
- * it. */
+/** A pod's warnings stay under the pod: the events read does not say which workload owns it. */
 function fold(events: Event[]): Folded[] {
   const folded = new Map<string, Folded>()
   for (const event of events) {
@@ -412,7 +386,6 @@ const workloadKinds = new Set(["Deployment", "StatefulSet", "DaemonSet", "Job", 
 function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
   const t = useT()
   const warnings = useQuery(recentWarningsQuery)
-  // A whole area the person may not read is left out.
   if (warnings.isError && isStatus(warnings.error, 403)) return null
   const rows = warnings.data ? fold(warnings.data.items).slice(0, WARNINGS_SHOWN) : []
   const services = new Map(

@@ -25,7 +25,7 @@ export default defineConfig({
   use: {
     baseURL: url,
     locale: "en-US",
-    // Full Chromium in its new headless mode, as in playwright.config.ts.
+    // Full Chromium in its new headless mode.
     channel: "chromium",
     trace: "retain-on-failure",
     launchOptions: {

@@ -1,38 +1,22 @@
-/* zeabur's web interface: zeabur's design system (@zeabur/design-system: shadcn/ui's theme and
-   base styles, zeabur's tokens, type roles and utilities, Inter and JetBrains Mono), then what
-   only this interface uses. */
 @import "tailwindcss";
 @import "@zeabur/design-system";
 
-/* Named sizes the Tailwind scale lacks, so that markup carries no arbitrary values (`p-[13px]`):
-   shadcn/lint's no-arbitrary-values (https://github.com/shadcn-ui/lint/blob/main/docs/rules/no-arbitrary-values.md).
-   Each is a Tailwind theme variable, so it makes the matching utility (`grid-cols-settings`). */
+/* Markup carries no arbitrary values (shadcn/lint no-arbitrary-values); each variable here makes
+   its utility (`grid-cols-settings`). */
 @theme {
-  /* Zeabur's content column: a service's tabs and their content, a project's pages (960px). */
   --container-content: 60rem;
-  /* A label column and its value: settings rows. */
   --grid-template-columns-settings: 12rem 1fr;
-  /* A term and its description (`dl`). */
   --grid-template-columns-pairs: auto 1fr;
-  /* An event: its dot, the text, the time. */
   --grid-template-columns-event: 0.75rem minmax(0, 1fr) auto;
-  /* A variable's name and value, and its actions. */
   --grid-template-columns-variable: minmax(10rem, 14rem) 1fr;
   --grid-template-columns-variable-actions: minmax(10rem, 14rem) 1fr auto;
-  /* The home page's rows: a service needing attention (name, status, counts, actions) and a
-     warning (object, reason and note, time). */
   --grid-template-columns-attention: minmax(12rem, 1.3fr) minmax(10rem, 1fr) minmax(10rem, 1fr) auto;
   --grid-template-columns-warning: minmax(10rem, 1fr) minmax(0, 2fr) auto;
-  /* The sidebar opening into a rail and back. */
   --transition-property-width: width;
-  /* A tooltip above the point it describes (an edge on the Architecture canvas). */
   --translate-tooltip: calc(100% + 0.5rem);
-  /* The ⌘K palette's list. */
   --max-height-palette: min(60vh, 420px);
 }
 
-/* The project overview's two columns: the main one takes the room, the side one wraps under it
-   when the two no longer fit side by side. */
 @utility flex-main {
   flex: 999 1 35rem;
 }
@@ -40,8 +24,7 @@
   flex: 1 1 18.75rem;
 }
 
-/* Toasts in the interface's font, descriptions muted. Sonner inserts its own <style> after this
-   sheet, so these rules carry one more type selector than the ones they override. */
+/* Sonner inserts its own <style> after this sheet, so these rules carry one more type selector. */
 html [data-sonner-toaster] {
   font-family: inherit;
 }

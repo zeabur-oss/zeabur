@@ -1,4 +1,3 @@
-// A route that failed to load: the problem, and a way to try again.
 import type { ErrorComponentProps } from "@tanstack/react-router"
 
 import { Problem } from "@/components/problem"

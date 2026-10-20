@@ -1,4 +1,3 @@
-// A service's glyph: by the kind of data store it is (postgres, redis…), else by role.
 import ClockIcon from "~icons/ph/clock"
 import DatabaseIcon from "~icons/ph/database"
 import GearSixIcon from "~icons/ph/gear-six"
@@ -40,7 +39,6 @@ function glyphKey(service: Service): string {
   return service.dataStore ? `flavour:${service.dataStore}` : `role:${roleOf(service)}`
 }
 
-/** The bare glyph in the muted colour, regular weight: no tile, no gradient. */
 export function ServiceIcon({
   service,
   size = "md",
@@ -57,7 +55,6 @@ export function ServiceIcon({
   )
 }
 
-/** A role's glyph, for a group of services of that role (the project sidebar). */
 export function RoleIcon({ role, className }: { role: Role; className?: string }) {
   const Glyph = roleIcons[role]
   return <Glyph aria-hidden="true" className={cn("shrink-0", className)} />

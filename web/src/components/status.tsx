@@ -1,7 +1,3 @@
-// Status as a pill (a dot and one plain word on a soft fill, "● Keeps crashing") where there is
-// room, and a bare dot where there is not (the project column). Never colour alone: a dot always
-// has its word next to it, in a tooltip or for screen readers. The kubelet's own word
-// (`CrashLoopBackOff`) is in the pill's tooltip, with the restarts and the last failed exit.
 import type { ReactNode } from "react"
 
 import { Badge } from "@zeabur/design-system/components/badge"
@@ -19,7 +15,6 @@ const healthBg: Record<Health, string> = {
   idle: "bg-idle",
 }
 
-/** A 7px round dot; idle (scheduled, paused, completed) is a ring rather than a grey disc. */
 export function StatusDot({ health, className }: { health: Health; className?: string }) {
   return (
     <span
@@ -33,21 +28,17 @@ export function StatusDot({ health, className }: { health: Health; className?: s
   )
 }
 
-/** A raw reason in plain words ("Keeps crashing"), or undefined when it has none. */
 export function plainReason(t: Translate, reason: string | undefined, task: boolean) {
   const word = reasonWord(reason, task)
   return word ? t(`reason.${word}`) : undefined
 }
 
-/** The status in one plain word: what the failing pod's reason means, else the status word. */
 export function useStatusWord() {
   const t = useT()
   return (status: Status) =>
     plainReason(t, status.reason, status.task ?? false) ?? t(`status.${status.word}`)
 }
 
-/** What a status rests on, for its tooltip: "CrashLoopBackOff, 14 restarts", or, for a pod that
- * runs again after a recent crash, "Running, 5 restarts, last exit 1, 4 minutes ago". */
 export function useStatusFacts() {
   const t = useT()
   const { locale } = useI18n()
@@ -67,8 +58,6 @@ export function useStatusFacts() {
   }
 }
 
-/** shadcn/ui's Badge in a status tone (its variant per health: the soft fill behind the strong
- * text), with its dot. `sm` for table rows. */
 export function StatusPill({
   health,
   size = "md",
@@ -78,7 +67,6 @@ export function StatusPill({
 }: {
   health: Health
   size?: "sm" | "md"
-  /** Leave the dot out where the pill is a count, not a state ("1 unused"). */
   dot?: boolean
   className?: string
   children: ReactNode
@@ -91,7 +79,6 @@ export function StatusPill({
   )
 }
 
-/** A service's status as a pill; `counts` adds "3/3" after the word. */
 export function ServiceStatus({
   status,
   size = "md",
@@ -117,8 +104,6 @@ export function ServiceStatus({
   )
 }
 
-/** A status pill whose plain word rests on `facts` (the raw reason, the restarts): shown in a
- * tooltip on hover, and read with the word by a screen reader. */
 export function FactsPill({
   health,
   size,

@@ -1,5 +1,3 @@
-// Small pieces every page uses: panels, metric tiles, relative times, copyable machine values, an
-// (i) hint, a histogram and a replica bar.
 import { useState, type ReactNode } from "react"
 import CheckIcon from "~icons/ph/check"
 import CopyIcon from "~icons/ph/copy"
@@ -12,10 +10,6 @@ import { useI18n, useT } from "@/i18n"
 import { formatAgo, formatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-/**
- * A card with a plain title and an action. The title is the plain word ("Storage"); the Kubernetes
- * kind behind it belongs in the content, a tooltip or the YAML tab, not after the title.
- */
 export function Panel({
   title,
   action,
@@ -50,7 +44,6 @@ export function Panel({
   )
 }
 
-/** "5 minutes ago", with the absolute time in a tooltip. */
 export function Ago({ iso, className }: { iso?: string | null; className?: string }) {
   const { locale } = useI18n()
   if (!iso) return <span className={className}>—</span>
@@ -93,7 +86,6 @@ export function CopyButton({ value, className }: { value: string; className?: st
   )
 }
 
-/** An (i) that explains something on hover or focus, instead of a sentence on the page. */
 export function Hint({ children, label }: { children: ReactNode; label: string }) {
   return (
     <Tooltip content={children}>
@@ -113,7 +105,6 @@ export interface Bucket {
   normal: number
 }
 
-/** Stacked bars: warnings (red) on the rest (grey). */
 export function Histogram({
   buckets,
   className,
@@ -162,11 +153,6 @@ export function Histogram({
   )
 }
 
-/**
- * A segmented two- or three-way switch: shadcn/ui's ToggleGroup with equal segments and a thumb
- * that slides to the choice. The segments share the width, so the thumb is one segment wide and
- * moves by whole widths of itself (`translate` in percent), with nothing to measure.
- */
 export function Segmented<T extends string>({
   value,
   options,

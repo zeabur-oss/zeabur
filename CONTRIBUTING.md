@@ -60,8 +60,9 @@ the same on any Linux machine with Nix, and Docker for the cluster jobs: `script
 `scripts/ci-local.sh [job…]` runs several (all by default), each in its own copy of the checkout,
 and prints one result line per job; use a disposable machine or VM for the cluster jobs.
 
-Design rationale lives next to the code, in rustdoc: state the decision and its reason, and
-cite the specification section, paper or prior art it rests on (the crates show the style).
+A comment says what the code cannot: a quirk and its cause, a workaround, or the specification
+section, RFC or issue behind behaviour that must not change (rustdoc cites it as the crates do).
+Usually one line; no design rationale, history, measurements or restatements of the code.
 Never cite something you have not read; write "not verified" instead. Every claim that Zeabur
 does something better or safer is backed by a test, not only by documentation. Documentation is
 written in English.

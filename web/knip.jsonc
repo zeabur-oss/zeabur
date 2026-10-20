@@ -1,8 +1,7 @@
-// Unused files, exports and dependencies (https://knip.dev), run by `bun run knip` in CI.
 {
   "$schema": "https://unpkg.com/knip@6.41.0/schema.json",
   "entry": ["e2e/**/*.ts", "playwright*.config.ts", "scripts/*.ts"],
-  // Its plugin loads playwright.config.ts, which throws without a running zeabur to test.
+  // Its plugin loads playwright.config.ts, which throws without a running Zeabur.
   "playwright": false,
   // unplugin-icons' JSX compiler loads it by name.
   "ignoreDependencies": ["@svgr/plugin-jsx"],

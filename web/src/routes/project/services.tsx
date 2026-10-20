@@ -1,5 +1,3 @@
-// Project › Services: every service in one table to search, filter and compare. A service's name
-// leads to its overview; a pod cell leads to that pod's logs.
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
@@ -38,8 +36,7 @@ const route = getRouteApi("/projects/$project/services")
 
 export function ServicesPage() {
   const { project } = route.useParams()
-  // The search box keeps what is typed and writes it to the URL with `replace`; after Back, Forward
-  // or a link, the table starts again from the URL so the box shows what the URL says.
+  // After Back, Forward or a link, the box starts again from the URL.
   const entry = useHistoryIndex()
   const typed = useLocationText((search) => validateServicesSearch(search).q ?? "")
   return (
@@ -57,16 +54,14 @@ export function ServicesPage() {
   )
 }
 
-/** The kind filter's "All kinds": an explicit value, since a select's empty value means none. */
+/** A select's empty value means none. */
 const ALL_KINDS = "*"
 
-/** The share of replicas ready, as the column shows it; nothing desired sorts last. */
 const readyRatio = (s: Service) => {
   const { ready, desired } = replicaCounts(s)
   return desired > 0 ? ready / desired : 2
 }
 
-/** Orders two services by a column's values, smallest first. */
 function compare(key: SortKey, a: Service, b: Service): number {
   switch (key) {
     case "status":
@@ -83,7 +78,6 @@ function compare(key: SortKey, a: Service, b: Service): number {
   }
 }
 
-/** The columns a first click sorts largest first: the most restarts are what a person looks for. */
 const largestFirst: ReadonlySet<SortKey> = new Set(["restarts"])
 
 function ServicesTable({
@@ -93,21 +87,18 @@ function ServicesTable({
 }: {
   project: string
   data: Project
-  /** The search box's text in this history entry's URL. */
   typed: string
 }) {
   const t = useT()
   const word = useStatusWord()
   const search = route.useSearch()
   const navigate = useNavigate({ from: "/projects/$project/services" })
-  // The box shows what is typed at once; the URL follows without adding history entries.
   const [query, setQuery] = useState(typed)
   const set = (patch: Partial<ServicesSearch>) =>
     void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
 
   const sort = search.sort ?? "status"
-  // `desc` in the URL turns a column's first order around. `descending` is the order of the
-  // values shown, which is what a header's aria-sort states
+  // `descending` is the order shown, which aria-sort states
   // (https://www.w3.org/TR/wai-aria-1.2/#aria-sort).
   const descending = largestFirst.has(sort) !== (search.desc === true)
   const kinds = [...new Set(data.services.map((s) => s.kind))].toSorted()

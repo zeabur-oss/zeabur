@@ -1,5 +1,3 @@
-// "Admin until 14:05" in the top bar while requests use admin rights, with a way to drop them
-// early. Nothing shows otherwise, and nothing at all on this machine (`zeaburctl ui`).
 import { useQuery } from "@tanstack/react-query"
 import ShieldCheckFillIcon from "~icons/ph/shield-check-fill"
 

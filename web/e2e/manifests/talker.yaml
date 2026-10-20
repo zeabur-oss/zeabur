@@ -1,7 +1,5 @@
-# The project the browser tests open: a Deployment that writes a numbered line every second and
-# reads a Secret, a Service in front of it, a Deployment that keeps crashing, and a Deployment
-# reading a ConfigMap that the write tests change and restart (so the others stay as they are).
-# Applied by scripts/e2e-ui.sh and scripts/e2e-l2.sh.
+# The browser tests' project, applied by scripts/e2e-ui.sh and scripts/e2e-l2.sh. Only `editor`
+# is changed by the write tests.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -115,7 +113,7 @@ spec:
                   name: editor-config
                   key: mode
 ---
-# A namespace that is not a project: the browser tests adopt it and let it go.
+# Not a project: the tests adopt it and let it go.
 apiVersion: v1
 kind: Namespace
 metadata:

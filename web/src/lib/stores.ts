@@ -1,7 +1,3 @@
-// Small external stores for shell state: the command palette, the phone menu, folding groups
-// (remembered in localStorage, which may be unavailable), recent palette items, and
-// each project's Architecture viewport (kept for this visit, so going back to the canvas finds it
-// as it was).
 import { useSyncExternalStore } from "react"
 
 export function store<T>(initial: T) {
@@ -42,8 +38,7 @@ function save(key: string, value: string) {
 export const palette = store(false)
 export const mobileNav = store(false)
 
-/** Whether a folding group (an advanced section) is open, remembered per key; `initial` until the
- * person opens or closes it. Advanced groups start closed: the everyday path comes first. */
+/** `initial` until the person opens or closes it. */
 export function remembered(key: string, initial: boolean) {
   const value = store(load(key) === null ? initial : load(key) === "open")
   return {
@@ -55,11 +50,8 @@ export function remembered(key: string, initial: boolean) {
   }
 }
 
-/** Projects as a list rather than a grid of cards (Home and the Projects page). */
 export const projectsAsList = remembered("zeabur.projects.list", false)
 
-/** A service's Health checks in Settings: folded until opened, and opened by a diagnosis that
- * leads there ("Check the health checks"). */
 export const healthChecksSection = remembered("zeabur.service.health", false)
 
 export interface Recent {
@@ -88,8 +80,7 @@ export function remember(item: Recent) {
   save(recentKey, JSON.stringify(next))
 }
 
-// Kinds pinned on the Objects page (`<group>/<resource>`), read at once in every project. A
-// convenience: without storage the pins last this visit.
+// Pinned kinds, as `<group>/<resource>`.
 const pinnedKey = "zeabur.objects.pinned"
 
 function loadPinned(): string[] {

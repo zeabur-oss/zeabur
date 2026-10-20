@@ -1,9 +1,5 @@
-// What to ask for when the person may not patch a namespace: the right (patch on that one
-// Namespace, limited with `resourceNames`), what else that right allows (RBAC cannot narrow a
-// patch to one label, so it covers the Pod Security Admission labels too:
-// https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces),
-// a ClusterRole and binding an administrator can apply, and the kubectl command that does what
-// Zeabur's plan would.
+// RBAC cannot narrow a patch to one label, so the right also covers the Pod Security Admission
+// labels: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
 import { useQuery } from "@tanstack/react-query"
 import WarningFillIcon from "~icons/ph/warning-fill"
 

@@ -1,17 +1,11 @@
-// A server problem in the reader's language, in the layers it is shown in: what happened (the
-// keyed `summary`, naming the object), why (the keyed `why`, the rule with this occurrence's
-// numbers), what to do (the keyed `fixKey` when the server wrote a fix for the occasion, else the
-// kind's fix from the catalogue), then the evidence and the raw answer, folded. The server also
-// writes `title`, `detail` and `fix` in English (RFC 9457, for other clients); `detail` says in
-// English what the summary says, so it moves into the folded details, unless it is the only
-// place that says what went wrong.
+// The server's `title`, `detail` and `fix` are English (RFC 9457, for other clients); `detail` is
+// folded unless it is the only place that says what went wrong.
 import type { Problem, Schemas } from "@/api/client"
 import { writeSentence, type Locale, type Translate } from "@/i18n"
 import { en } from "@/i18n/en"
 
 type Kind = Schemas["Kind"]
 
-/** Every kind the catalogue has a title and a fix for. */
 const kinds = [
   "bad-request",
   "unauthenticated",
@@ -34,12 +28,7 @@ const kinds = [
 
 const known = new Set<string>(kinds)
 
-/**
- * Kinds whose `detail` says what no key does yet: which request was malformed, which values the
- * cluster rejected, what was already written before a conflict, which tool manages the object,
- * what failed inside Zeabur. A refusal is said by `denied` when it is there, and by its `detail`
- * only without it.
- */
+/** Kinds whose `detail` says what no key does yet. */
 const detailExplains = new Set<string>([
   "bad-request",
   "invalid",
@@ -49,18 +38,12 @@ const detailExplains = new Set<string>([
 ] satisfies Kind[])
 
 export interface ProblemText {
-  /** What happened, naming the object. */
   headline: string
-  /** Why: the rule, with this occurrence's numbers. */
   why?: string
-  /** `why` is the server's English sentence, not a keyed one. */
   whyInEnglish?: boolean
-  /** Words the problem quotes as they were said (a policy's answer). */
+  /** A policy's answer, quoted verbatim. */
   quote?: string
-  /** What to do, in one sentence. */
   fix: string
-  /** The server's English sentences that the layers above already say, folded with
-   * kube-apiserver's answer. */
   folded: string[]
 }
 
@@ -70,7 +53,7 @@ export function isKind(kind: string): kind is Kind {
 
 export function problemText(t: Translate, locale: Locale, problem: Problem): ProblemText {
   const kind = problem.kind
-  // A problem made in this page, or a kind newer than this page.
+  // A problem made in this page, or a kind newer than this build.
   if (!isKind(kind) || !problem.type.startsWith("/problems/"))
     return {
       headline:
@@ -87,7 +70,7 @@ export function problemText(t: Translate, locale: Locale, problem: Problem): Pro
   const refusal = kind === "forbidden" || kind === "elevation-required"
   const detailShown =
     !keyedWhy && (detailExplains.has(kind) || (refusal && problem.denied === undefined))
-  // A fix written for the occasion without a key is English only: shown in English, else folded.
+  // An unkeyed fix is English only: shown in English, else folded.
   const ownFix = !problem.fixKey && problem.fix !== en[`problem.fix.${kind}`]
   const keyedFix = problem.fixKey ? writeSentence(t, problem.fixKey) : undefined
   const fix = keyedFix ?? (ownFix && locale === "en" ? problem.fix : t(`problem.fix.${kind}`))
@@ -105,11 +88,7 @@ export function problemText(t: Translate, locale: Locale, problem: Problem): Pro
   }
 }
 
-/**
- * What kube-apiserver said about the form's field at `path` (`spec.replicas`), for the form to mark
- * it: a cause about that field, about one inside it, or about the object it is in
- * (`…resources.requests` marks `…resources.requests.cpu`).
- */
+/** A cause about `path`, a field inside it, or the object it is in. */
 export function refusedField(
   fields: readonly Schemas["FieldCause"][],
   path: string,
@@ -121,10 +100,8 @@ export function refusedField(
 }
 
 /**
- * Whether a problem is the cluster's refusal (a missing permission, a normal state) rather than an
- * error. Zeabur's own 403s ("only from the Zeabur page", "a plan made by someone else") name no
- * refused request and carry no answer from kube-apiserver; they stay errors. A quota's or a
- * policy's refusal is not about rights: admin rights would not change it.
+ * Zeabur's own 403s ("only from the Zeabur page", "a plan made by someone else") carry no
+ * kube-apiserver answer and stay errors; quota and policy refusals are not about rights.
  */
 export function isRefusal(problem: Problem): boolean {
   if (problem.kind === "elevation-required") return true

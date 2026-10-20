@@ -1,7 +1,3 @@
-// A service's releases: every pod template its workload has run, newest first (a Deployment's
-// ReplicaSets, a StatefulSet's or DaemonSet's ControllerRevisions). Any two compare as a YAML
-// diff; Roll back plans a return to an older template, which the plan dialog explains (ConfigMap
-// and Secret contents stay as they are). A workload a tool manages is rolled back there instead.
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
@@ -34,7 +30,7 @@ export function ReleasesTab({ project, service }: { project: string; service: Se
   const t = useT()
   const releases = useQuery(releasesQuery(project, service.kind, service.name))
   const planner = usePlanner(project)
-  // The release compared with the current one; the newest older one until a person picks.
+  // null: the newest older release.
   const [picked, setPicked] = useState<number | null>(null)
 
   if (releases.isPending) return <LoadingRows label={t("common.loading")} rows={4} />
@@ -161,7 +157,6 @@ function RollbackButton({ managed, onClick }: { managed?: string | null; onClick
   )
 }
 
-/** What changed from an older release to the current one. */
 function Comparison({ from, to }: { from: Release; to: Release }) {
   const t = useT()
   const before = from.templateYaml

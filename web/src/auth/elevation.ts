@@ -1,29 +1,17 @@
-// "Retry as admin": when the cluster refuses something and the server offers elevation
-// (`elevation-required`), the person confirms with their passkey in a window of its own, and what
-// was refused is asked again with the short-lived admin token, which every request then carries.
-//
-// The window cannot report back through `window.opener`: this page sets
-// Cross-Origin-Opener-Policy: same-origin, so the trip through Zeabur Identity severs it. The server's last
-// page in the window posts its outcome on a BroadcastChannel, which reaches every page of this
-// origin and no other; the page that asked listens before it opens the window, and takes the first
-// message that reads as an outcome. The window is opened in the click's handler, or the browser
-// blocks it.
+// Cross-Origin-Opener-Policy: same-origin severs `window.opener` on the trip through Zeabur
+// Identity, so the window's last page posts its outcome on a BroadcastChannel.
 import { queryClient } from "@/api/queries"
 import { REQUEST_HEADERS } from "@/auth/session"
 import { store } from "@/lib/stores"
 
-/** How an elevation ended; the server's results, plus what happens on this page. */
 export type Outcome =
   | { result: "done"; until?: string }
   | { result: "not-allowed" | "cancelled" | "failed" | "signed-out" }
-  /** The browser blocked the window. */
   | { result: "blocked" }
-  /** The person closed the waiting dialog. */
   | { result: "dismissed" }
 
 const fromServer = new Set(["done", "not-allowed", "cancelled", "failed", "signed-out"])
 
-/** A message from the elevation window, or undefined for anything else on the channel. */
 export function outcomeOf(data: unknown): Outcome | undefined {
   if (typeof data !== "object" || data === null || !("result" in data)) return undefined
   const { result } = data
@@ -35,11 +23,9 @@ export function outcomeOf(data: unknown): Outcome | undefined {
   return { result } as Outcome
 }
 
-/** What elevation needs from the browser; tests pass their own. */
 export interface Ports {
-  /** Opens the window at `url`; false when the browser blocked it. */
+  /** False when the browser blocked the window. */
   open: (url: string) => boolean
-  /** Listens for messages from the window; returns how to stop. */
   listen: (onMessage: (data: unknown) => void) => () => void
 }
 
@@ -54,7 +40,6 @@ const browserPorts: Ports = {
   },
 }
 
-/** Opens the elevation window and waits for its outcome; `cancel` stops waiting. */
 export function requestElevation(ports: Ports): {
   outcome: Promise<Outcome>
   cancel: () => void
@@ -79,7 +64,6 @@ export function requestElevation(ports: Ports): {
   return { outcome, cancel: () => finish({ result: "dismissed" }) }
 }
 
-/** What the elevation dialog shows. */
 export type ElevationState =
   | { phase: "idle" }
   | { phase: "waiting"; cancel: () => void }
@@ -87,11 +71,7 @@ export type ElevationState =
 
 export const elevation = store<ElevationState>({ phase: "idle" })
 
-/**
- * Asks for admin rights, then runs `retry` (the same apply, a reconnect) once they are granted;
- * what the page reads is fetched again on its own (auth/follow-elevation.ts). Call it from a click
- * handler.
- */
+/** Call from a click handler: the browser blocks a window opened later. */
 export async function retryAsAdmin(
   retry: () => void = () => {},
   ports: Ports = browserPorts,
@@ -121,7 +101,6 @@ export async function retryAsAdmin(
   }
 }
 
-/** Drops admin rights before they expire. */
 export async function dropElevation(): Promise<void> {
   await fetch("/auth/elevation", {
     method: "DELETE",

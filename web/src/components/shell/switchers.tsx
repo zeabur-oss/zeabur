@@ -1,5 +1,3 @@
-// The project switcher beside the project's name in its sidebar: a filterable list of the other
-// projects.
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useState } from "react"

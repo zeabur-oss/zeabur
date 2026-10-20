@@ -1,11 +1,9 @@
-/** A timestamp as the person's locale writes it, with the full RFC 3339 value for a tooltip. */
 export function formatTime(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date)
 }
 
-/** How long ago, in the person's locale ("5 minutes ago"). */
 export function formatAgo(iso: string, locale: string, now = Date.now()): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
@@ -22,7 +20,6 @@ export function formatAgo(iso: string, locale: string, now = Date.now()): string
   return format.format(seconds, "second")
 }
 
-/** A day as the person's locale writes it ("Oct 20, 2026"). */
 export function formatDate(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso

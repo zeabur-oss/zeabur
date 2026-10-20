@@ -1,7 +1,3 @@
-// Project › Overview: where it is broken first. The project's name and health, the pod strip (every
-// service's pods, outside to inside) with the counts, then what is failing with direct links to the
-// failing pod's logs and events, the services table (failures first, with live CPU and memory when
-// metrics-server is there) and the events; domains and storage at the side.
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
@@ -89,8 +85,7 @@ function Overview({
   unreadable: Schemas["UnreadableView"][]
 }) {
   const events = useProjectEvents(project)
-  // A refused kind shows in the section its objects feed; Secrets, ConfigMaps, Services and
-  // NetworkPolicies feed no list here, so they are not mentioned.
+  // Secrets, ConfigMaps, Services and NetworkPolicies feed no list here: their refusals are not shown.
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-7 px-4 pt-6 pb-12 type-body md:px-8 md:pt-8">
@@ -121,8 +116,6 @@ function Overview({
   )
 }
 
-/** What the project is missing (limits, probes, Ingress to HTTPRoute), each with its fix. Read
- * on its own, not polled with the document; hidden when nothing is missing. */
 function Gaps({ project, data }: { project: string; data: Project }) {
   const t = useT()
   const gaps = useQuery(projectGapsQuery(project))
@@ -139,7 +132,6 @@ function Gaps({ project, data }: { project: string; data: Project }) {
   )
 }
 
-/** A section heading with its count and an optional action at the right. */
 function Heading({
   id,
   title,
@@ -166,8 +158,6 @@ function Heading({
   )
 }
 
-// ── Health: title, pill, pod strip, counts ───────────────────────────────────────────────────────
-
 function Health({ project, data }: { project: string; data: Project }) {
   const t = useT()
   const view = useQuery(projectQuery(project))
@@ -185,8 +175,6 @@ function Health({ project, data }: { project: string; data: Project }) {
       pill = <StatusPill health="progress">{t("status.rollingOut")}</StatusPill>
     else pill = <StatusPill health="ok">{t("overview.healthy")}</StatusPill>
   }
-  // A console's overview: the header and the key figures from the left under it; each service's
-  // replicas are in the services table below.
   return (
     <section aria-label={t("overview.health")} className="flex flex-col gap-5">
       <PageHeader
@@ -232,8 +220,6 @@ function Health({ project, data }: { project: string; data: Project }) {
     </section>
   )
 }
-
-// ── Failing ──────────────────────────────────────────────────────────────────────────────────────
 
 function Failing({ project, services }: { project: string; services: Service[] }) {
   const t = useT()
@@ -346,8 +332,6 @@ function FailingRow({ project, service }: { project: string; service: Service })
   )
 }
 
-// ── Services ─────────────────────────────────────────────────────────────────────────────────────
-
 function ServicesSummary({
   project,
   services,
@@ -360,7 +344,6 @@ function ServicesSummary({
   const t = useT()
   const f = useQuantityFormat()
   const usage = useQuery(usageQuery(project)).data
-  // Columns only with numbers to put in them: no zeros where metrics-server is missing.
   const live = usage?.state === "available"
   if (services.length === 0 && refused.length === 0) return null
   return (
@@ -455,8 +438,6 @@ function ServicesSummary({
   )
 }
 
-// ── Events ───────────────────────────────────────────────────────────────────────────────────────
-
 function RecentEvents({
   project,
   services,
@@ -479,7 +460,6 @@ function RecentEvents({
       replace: true,
     })
 
-  /** The service an event is about, by its workload or one of its pods. */
   const objectLink = (event: Event, label: string) => {
     const regarding = event.regarding
     if (!regarding) return label
@@ -524,7 +504,6 @@ function RecentEvents({
   )
 }
 
-/** A segment's label and its count, the count quieter. */
 function counted(label: string, count: number) {
   return (
     <>
@@ -533,8 +512,6 @@ function counted(label: string, count: number) {
     </>
   )
 }
-
-// ── Side: domains and storage ────────────────────────────────────────────────────────────────────
 
 const sideRow = "flex items-center gap-2.5 border-t border-rule py-2.75"
 
@@ -636,7 +613,6 @@ function Storage({
       ) : (
         <>
           {total > 0 ? (
-            // The volumes by size, in the design system's bar; each one's square below has its tone.
             <div className="my-1.5">
               <MeterStack parts={sized.map((c) => c.bytes ?? 0)} />
             </div>
@@ -700,8 +676,6 @@ function Storage({
   )
 }
 
-/** Backups across providers: one row per claim and database, then the namespace. Shown only
- * when the project has something to back up. */
 function Backups({ project }: { project: string }) {
   const t = useT()
   const backups = useBackups(project)

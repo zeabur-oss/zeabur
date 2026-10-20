@@ -1,10 +1,3 @@
-// Adopting a namespace and letting it go: both are plans like any change (one label on the
-// Namespace). Before planning, the namespace's permission hint is read: someone who may not patch
-// it gets the RBAC to ask for and the kubectl command instead of a plan the cluster would refuse.
-// While admin rights are offered, the same dialog first offers to use them (the hint is checked
-// with everyday rights) and plans again once they are granted.
-// When the hint is unknown (another authorizer may allow it), the plan goes ahead and its dry run
-// decides.
 import { useState } from "react"
 import XIcon from "~icons/ph/x"
 
@@ -22,7 +15,6 @@ import {
 import { useT } from "@/i18n"
 import { mayChange } from "@/model/project"
 
-/** Reads whether the person may patch `namespace`; `true` unless the rules say no. */
 async function allowedToChange(namespace: string): Promise<boolean> {
   try {
     const ns = await queryClient.fetchQuery({ ...namespaceQuery(namespace), staleTime: 0 })
@@ -33,7 +25,6 @@ async function allowedToChange(namespace: string): Promise<boolean> {
   }
 }
 
-/** "Adopt" for a namespace that is not a project, or "Stop showing as a project" for one that is. */
 export function AdoptButton({
   namespace,
   adopted,
@@ -43,7 +34,6 @@ export function AdoptButton({
   namespace: string
   adopted: boolean
   variant?: "outline" | "destructive"
-  /** The button's own words, where the row around it already says what it does. */
   label?: string
 }) {
   const t = useT()
@@ -86,8 +76,6 @@ export function AdoptButton({
   )
 }
 
-/** The rights to ask for to change a namespace's labels, and, while admin rights are offered, the
- * way to use them first: `what` names the change, `retry` asks for it again once they are granted. */
 export function AccessDialog({
   namespace,
   adopted,

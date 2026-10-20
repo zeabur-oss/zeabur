@@ -1,7 +1,3 @@
-// Backups of a project's claims, databases and namespace, from every backup provider the server
-// has (K8up, Velero, CloudNativePG; `GET /projects/{p}/backups`). Shared by the Storage tab and the
-// project Overview: one row per target with what schedules it and how its latest backup went, the
-// schedules and runs behind a disclosure, and honest notes when a provider is missing or refused.
 import { Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
 import CaretRightIcon from "~icons/ph/caret-right"
@@ -31,7 +27,6 @@ const outcomeHealth: Record<Outcome, Health> = {
 
 const row = "flex items-center gap-2.5 border-t border-rule py-2.5"
 
-/** The project's backups, read where they are shown. */
 export function useBackups(project: string) {
   return useQuery(backupsQuery(project))
 }
@@ -40,15 +35,13 @@ function providerOf(scheduledBy: string) {
   return scheduledBy.split(":")[0] ?? scheduledBy
 }
 
-/** The rows worth showing: every claim and database, and the namespace once something backs it
- * up (a namespace row with nothing to say would only repeat the provider note). */
+/** A namespace row with nothing backing it up would only repeat the provider note. */
 export function shownCoverage(coverage: Coverage[]) {
   return coverage.filter(
     (c) => c.target.kind !== "namespace" || c.scheduledBy.length > 0 || c.lastRun,
   )
 }
 
-/** One target: its name, what schedules it, and its latest run. */
 export function CoverageRow({ coverage }: { coverage: Coverage }) {
   const t = useT()
   const run = coverage.lastRun
@@ -81,7 +74,6 @@ export function CoverageRow({ coverage }: { coverage: Coverage }) {
   )
 }
 
-/** Notes for providers that are missing or refused, one line each. */
 export function ProviderNotes({ data }: { data: Schemas["ProjectBackups"] }) {
   const t = useT()
   const installed = data.providers.filter((p) => p.state === "installed")
@@ -105,7 +97,6 @@ export function ProviderNotes({ data }: { data: Schemas["ProjectBackups"] }) {
   )
 }
 
-/** The schedules and runs behind the rows, folded. */
 export function BackupDetails({ data }: { data: Schemas["ProjectBackups"] }) {
   const t = useT()
   if (data.schedules.length === 0 && data.runs.length === 0) return null
@@ -168,7 +159,6 @@ export function BackupDetails({ data }: { data: Schemas["ProjectBackups"] }) {
   )
 }
 
-/** The backups of some claims (a service's), for its Storage tab. */
 export function VolumeBackups({ project, claims }: { project: string; claims: string[] }) {
   const t = useT()
   const backups = useBackups(project)

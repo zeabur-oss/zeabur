@@ -1,11 +1,5 @@
-// One history chart, through shadcn/ui's Chart (Recharts): a line per replica (or the total),
-// the reserved amount and the maximum as dashed lines, restarts as marks on the time axis, and a
-// crosshair with every value at that time on hover or with the arrow keys (`accessibilityLayer`).
-// Loaded on its own, after the page: Recharts is not part of the first load (scripts/ui-budget.sh).
-//
-// Colours are the theme's `--chart-1…5` (@zeabur/design-system, src/theme.css), named in the marks themselves.
-// The ChartConfig carries labels only, so shadcn's ChartStyle writes no <style> element: it would
-// need `dangerouslySetInnerHTML`, which the Trusted Types policy (`trusted-types 'none'`) refuses.
+// The ChartConfig carries labels only: shadcn's ChartStyle would write a <style> through
+// `dangerouslySetInnerHTML`, which Trusted Types refuses.
 import { CartesianGrid, Line, LineChart, ReferenceDot, ReferenceLine, XAxis, YAxis } from "recharts"
 
 import {
@@ -17,7 +11,6 @@ import {
 import { useI18n, useT } from "@/i18n"
 import { colours, type Restart, type Series } from "@/model/usage"
 
-/** A round number at or above `value` for the axis' top: a step of 1, 1.5, 2, 2.5, 3, 4, 5, 6 or 8 × 10ⁿ, in `unit`s (MiB for memory, so the top reads round). */
 function niceCeil(value: number, unit: number): number {
   const units = value / unit
   if (units <= 0) return unit
@@ -32,7 +25,7 @@ export interface Guide {
   value: number
 }
 
-/** Each series' key in the rows (a pod name may hold a `.`, which Recharts reads as a path). */
+/** A pod name may hold a `.`, which Recharts reads as a path. */
 const key = (index: number) => `s${index}`
 
 export default function HistoryChart({
@@ -49,17 +42,14 @@ export default function HistoryChart({
 }: {
   times: number[]
   series: Series[]
-  /** Pods a rollout has replaced: drawn faded. */
   gone: Set<string>
   guides: Guide[]
   restarts: Restart[]
   format: (value: number) => string
-  /** The axis' shorter numbers (the unit is in the chart's title). */
   tick: (value: number) => string
-  /** What the axis' top is a round number of: 1 (a millicore) for CPU, 2²⁰ (a MiB) for memory. */
+  /** 1 (a millicore) for CPU, 2²⁰ (a MiB) for memory. */
   unit: number
   label: string
-  /** Seconds the chart covers, for the time labels. */
   span: number
 }) {
   const t = useT()
@@ -96,7 +86,6 @@ export default function HistoryChart({
     `${g.kind === "max" ? t("usage.maxLine") : t("usage.reservedLine")} ${format(g.value)}`
   return (
     <div className="flex flex-col gap-1">
-      {/* The lines' values sit above the plot, not on it, where the series would cover them. */}
       {guides.length > 0 ? (
         <ul className="flex flex-wrap justify-end gap-x-3 text-xs text-muted-foreground">
           {guides.map((g) => (

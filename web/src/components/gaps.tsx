@@ -1,6 +1,3 @@
-// What a project or the cluster is missing: each gap with its sentence, the object it is about,
-// the guidance it rests on, and its fix. A fix Zeabur can write opens a plan; an install links to
-// the component's install texts; otherwise the server's YAML snippet is there to copy.
 import { Link } from "@tanstack/react-router"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretRightIcon from "~icons/ph/caret-right"
@@ -28,7 +25,7 @@ export function GapList({
   document,
 }: {
   gaps: Gap[]
-  /** The project the gaps are about; absent for cluster gaps. */
+  /** Absent for cluster gaps. */
   project?: string
   document?: Schemas["Project"]
 }) {
@@ -60,8 +57,6 @@ function GapRow({ gap, onPlan }: { gap: Gap; onPlan?: () => void }) {
   const install = gap.fix.kind === "install" ? gap.fix.id.split("/") : undefined
   return (
     <li className="flex flex-col gap-1.5 border-t border-rule py-3 first:border-t-0">
-      {/* Pill, sentence and button share the sentence's first line, however many it takes; the
-          sentence wraps without leaving one word, or one CJK character, on its last line. */}
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <StatusPill health={gap.severity === "warning" ? "warn" : "idle"} size="sm">
           {t(gap.severity === "warning" ? "gap.warning" : "gap.advice")}

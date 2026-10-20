@@ -1,5 +1,3 @@
-// The frame of the cluster's pages: its version and what it calls for, then the tabs Overview
-// (/cluster) and Components (/cluster/components). The URL is the tab.
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import type { ReactNode } from "react"
@@ -44,8 +42,7 @@ function Heading() {
   const upgrades = useQuery(upgradesQuery)
   const badge = useUpgradeBadge(upgrades.data)
   const data = upgrades.data
-  // Plans refused: system-upgrade-controller is installed but its Plans are not readable, so
-  // newer versions are not known; say which permission is missing.
+  // Without readable Plans newer versions are unknown.
   const plansRefused = data?.unreadable?.some((u) => u.resource === "plans.upgrade.cattle.io")
   const version = cluster.data?.kubernetesVersion
   return (
@@ -54,7 +51,6 @@ function Heading() {
       badges={
         <>
           {version ? (
-            // The version usually names the distribution (`v1.36.5+k3s1`); otherwise it goes first.
             <span className="type-mono text-muted-foreground" translate="no">
               {cluster.data?.distribution && !version.includes(cluster.data.distribution)
                 ? `${cluster.data.distribution} ${version}`

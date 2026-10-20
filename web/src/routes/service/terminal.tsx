@@ -1,12 +1,4 @@
-// A terminal in one of the service's containers, filling the remaining height: pod and container
-// pickers (the pod in the URL, else a ready one), the connection's state and Reconnect. The
-// server runs `/bin/sh` as the person (crates/zeabur-api/src/pods/exec.rs); when the person may not,
-// the tab says so in one quiet line with "Retry as admin" where admin rights are offered, the
-// Role to ask for folded under "Details". A refused terminal reconnects on its own once admin
-// rights become active, whatever granted them; Reconnect starts again after they expire. An image
-// without a shell gets the `kubectl debug` command instead.
-// xterm.js loads with this tab, never with the first page. Nothing typed or shown is kept or
-// logged.
+// Protocol: crates/zeabur-api/src/pods/exec.rs.
 import { useQuery } from "@tanstack/react-query"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal, type ITheme } from "@xterm/xterm"
@@ -89,8 +81,8 @@ export function TerminalTab({
         project={project}
         pod={pod.name}
         container={chosen}
-        // The attempt this session is, plus one: a second call from the same session (the refusal's
-        // button and the rights it granted) starts one new connection, not two.
+        // Not `a => a + 1`: the refusal's button and the rights it granted both call this, and
+        // must start one connection, not two.
         onReconnect={() => setAttempt(attempt + 1)}
       />
     </div>
@@ -115,19 +107,15 @@ function Session({
   const [state, dispatch] = useReducer(nextState, { phase: "connecting" })
   const elevation = useQuery(sessionQuery).data?.elevation
   const seen = useRef(elevation)
-  // The rights this connection opened with. The server closes an admin terminal when the admin
-  // rights end, and the next connection uses the person's own.
+  // The server closes an admin terminal when the admin rights end.
   const [asAdmin] = useState(elevation === "active")
 
-  // Admin rights became active while the cluster refused this terminal: try again with them.
   useEffect(() => {
     const before = seen.current
     seen.current = elevation
     if (reconnectsWithRights(state, before, elevation)) onReconnect()
   }, [state, elevation, onReconnect])
 
-  // The terminal and its WebSocket are outside React: created once per session (the parent keys
-  // this component by address and attempt) and torn down with it.
   useEffect(() => {
     const element = host.current
     if (!element) return
@@ -150,8 +138,7 @@ function Session({
   }, [url])
 
   const live = state.phase === "connecting" || state.phase === "open"
-  // A refusal or a problem says everything: the screen it never opened stays out of sight (kept
-  // mounted, since the screen lives in it until this session ends).
+  // Hidden, not unmounted: the screen lives in this element until the session ends.
   const screen = state.phase === "error" ? "hidden" : "flex"
   return (
     <>
@@ -215,8 +202,6 @@ function statusText(state: TerminalState, asAdmin: boolean, t: ReturnType<typeof
   }
 }
 
-/** What the person needs when the terminal did not run as asked: the refusal with the Role to ask
- * for folded, the problem, or the `kubectl debug` way into an image without a shell. */
 function Notice({
   state,
   project,
@@ -271,7 +256,6 @@ function Notice({
   return null
 }
 
-/** Opens the screen in `element` and the WebSocket to `url`; returns what closes both. */
 function connect(
   element: HTMLElement,
   url: string,
@@ -317,7 +301,6 @@ function connect(
   const resized = terminal.onResize(sendSize)
   const sizes = new ResizeObserver(() => fit.fit())
   sizes.observe(element)
-  // The theme follows the page's light or dark class.
   const themes = new MutationObserver(() => {
     terminal.options.theme = themeFromTokens()
   })
@@ -333,8 +316,7 @@ function connect(
   }
 }
 
-/** The page's colour tokens as the screen's theme. The tokens are `oklch()`, which xterm.js does
- * not parse, so each is painted on a one-pixel canvas and read back as RGBA. */
+/** xterm.js does not parse `oklch()`: each token is painted on a one-pixel canvas and read back. */
 function themeFromTokens(): ITheme {
   const canvas = document.createElement("canvas")
   canvas.width = 1

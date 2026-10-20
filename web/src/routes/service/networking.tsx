@@ -1,9 +1,3 @@
-// A service's networking as two tables. Public: one row per Ingress backend that reaches the
-// service, its columns in request order (host and path → Ingress → Service:port → pods), so the
-// row is the request path. Private: one row per Kubernetes Service, with its cluster DNS names.
-// Domains are added, changed and removed here; Zeabur picks the route object (the one that
-// already reaches the service, else an HTTPRoute when a Gateway exists, else an Ingress), and
-// every change opens a plan to read before applying.
 import { useForm } from "@tanstack/react-form"
 import { useState, type ReactNode } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
@@ -37,8 +31,8 @@ import { refusedPlaces } from "@/routes/project/data"
 import { Reachability } from "@/routes/service/reachability"
 import { Section } from "@/routes/service/section"
 
-// RFC 1123 host names, with an optional leading wildcard label as Ingress and HTTPRoute allow: an
-// instant hint while typing; the plan checks the name again.
+// RFC 1123 host names, with the leading wildcard label Ingress and HTTPRoute allow. A hint only:
+// the plan checks the name again.
 const hostname = /^(\*\.)?([a-z0-9]([-a-z0-9]*[a-z0-9])?\.)*[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
 const isHost = (text: string) => {
   const host = text.trim().toLowerCase()
@@ -47,8 +41,6 @@ const isHost = (text: string) => {
 
 const head = "px-3 py-2 text-left type-meta font-medium text-muted-foreground whitespace-nowrap"
 const cell = "px-3 py-2 align-middle max-sm:p-0"
-// Below the sm breakpoint a table becomes a list: the header goes, and each row's cells flow
-// and wrap like a sentence ("host / → Ingress/shop → api:80 → 3/3 ready").
 const thead = "border-b bg-muted/30 max-sm:hidden"
 const row =
   "max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-1.5 max-sm:px-4 max-sm:py-3"
@@ -64,11 +56,9 @@ export function NetworkingTab({
   project: string
   service: Service
   services: Service[]
-  /** Where its endpoints and routes are looked up. */
   network: Network
-  /** The project's NetworkPolicy reachability; absent when it was not read. */
+  /** Absent when it was not read. */
   reachability?: Schemas["NetworkPolicyReachability"]
-  /** Kinds the person may not list; routes, Services and NetworkPolicies show in place. */
   unreadable: Schemas["UnreadableView"][]
 }) {
   const t = useT()
@@ -347,7 +337,6 @@ function Managed({ tool, children }: { tool?: string; children: ReactNode }) {
   )
 }
 
-/** A host name to add, or a new name for one. */
 function HostForm({
   value,
   onCancel,
@@ -428,7 +417,6 @@ function Empty({ children }: { children: ReactNode }) {
   )
 }
 
-/** A hop after the first: an arrow, then the name. */
 function Step({ children }: { children: ReactNode }) {
   return (
     <span className="flex items-center gap-2 font-mono text-xs whitespace-nowrap" translate="no">

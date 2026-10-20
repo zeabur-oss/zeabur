@@ -30,17 +30,13 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
 - **Icons.** Phosphor only, one import per icon: `import XIcon from "~icons/ph/x"` (a weight is
   its own name, `~icons/ph/warning-fill`), built at build time from `@iconify-json/ph` by
   unplugin-icons (its JSX compiler, through svgr); decorative ones with `aria-hidden`.
-- **Design.** Zeabur's dashboard (reference: its `NavigationDrawer`, project sidebar,
-  `ServiceHeader` and `ProjectCard`): the navigation drawer (`AppFrame`, `FrameSidebar`,
-  `Sidebar` with `SidebarPicker`, `SidebarSearch`, `SidebarMenu`, `SidebarCopyPill`) and no top
-  bar; inside a project its own sidebar (`components/shell/project-sidebar.tsx`) replaces the
-  global one; a service page is a header and the segmented `Tabs` across the 960px column
-  (`max-w-content`); projects are cards (`components/project-card.tsx`); settings are
-  `SectionLabel` over `Card variant="list"` of `CardRow`s. Tabs are only the segmented switcher:
-  no underline tabs, no "More" menu; leave out what does not apply. Build from the design
-  system's components and their variants rather than look-alikes. Tokens, layout, shell and
-  banned styles are in `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including
-  focus rings).
+- **Design.** The frame is the design system's (`AppFrame`, `FrameSidebar`, `Sidebar` with
+  `SidebarPicker`, `SidebarSearch`, `SidebarMenu`, `SidebarCopyPill`), with no top bar; inside a
+  project its own sidebar (`components/shell/project-sidebar.tsx`) replaces the global one. A
+  service page is a header and the segmented `Tabs` in `max-w-content`; projects are cards
+  (`components/project-card.tsx`); settings are `SectionLabel` over `Card variant="list"` of
+  `CardRow`s. No underline tabs, no "More" menu. Tokens, layout, shell and banned styles are in
+  `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including focus rings).
 - **Lint.** `bun run lint` includes [shadcn/lint](https://github.com/shadcn-ui/lint) (rules in
   `web/.oxlintrc.json`, which recognises the design system's components by `componentImports`;
   conventions in `web/DESIGN.md`, "Lint"). Pages pass only layout classes to a component: a

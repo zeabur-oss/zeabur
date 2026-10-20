@@ -1,7 +1,3 @@
-// A ConfigMap's or Secret's keys, edited in place: the key a variable reads is highlighted, a
-// change is planned and applied like every other write, and the plan names every service that
-// reads the object. A Secret's values stay hidden until revealed (the same request and right as
-// the Variables tab); a new value can be typed without revealing the old one.
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
@@ -38,8 +34,6 @@ import { cn } from "@/lib/utils"
 type Kind = "ConfigMap" | "Secret"
 type Edit = { op: "set"; value: string } | { op: "remove" }
 
-/** What the person changed: edits of the keys there are (by key), new keys, and whether the
- * readers restart after the write. */
 interface Draft {
   edits: Record<string, Edit>
   added: { key: string; value: string }[]
@@ -48,7 +42,6 @@ interface Draft {
 
 const blank: Draft = { edits: {}, added: [], restartAfter: false }
 
-/** The writes a draft asks for: the edits, then the new keys that have a name. */
 function changesOf({ edits, added }: Draft): Schemas["DataEdit"][] {
   return [
     ...Object.entries(edits).map(([key, edit]): Schemas["DataEdit"] =>
@@ -60,7 +53,7 @@ function changesOf({ edits, added }: Draft): Schemas["DataEdit"][] {
   ]
 }
 
-/** A Secret's keys, read from its YAML (values hidden): the lines under `data:` and `stringData:`. */
+/** From its YAML, whose values the server hides. */
 function secretKeys(yaml: string): string[] {
   const keys: string[] = []
   let inData = false
@@ -86,9 +79,7 @@ export function DataEditor({
   project: string
   kind: Kind
   name: string
-  /** The key a variable reads, shown highlighted. */
   highlight?: string
-  /** The service the editor was opened from. */
   service?: Schemas["WorkloadRef"]
   onClose: () => void
 }) {
@@ -224,7 +215,6 @@ export function DataEditor({
                     const current = values[key]
                     const shown = edit?.op === "set" ? edit.value : (current ?? "")
                     const hit = key === highlight
-                    /** The edits with `key`'s set to `next`, or dropped when it is undefined. */
                     const withEdit = (next: Edit | undefined) => {
                       const { [key]: _dropped, ...rest } = edits
                       return next ? { ...rest, [key]: next } : rest

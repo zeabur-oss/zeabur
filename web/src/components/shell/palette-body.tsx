@@ -1,8 +1,4 @@
-// The ⌘K palette's contents, loaded when it first opens: jump to a project, service, pod (its
-// logs) or domain, run a few actions, and see recent items. The list is Base UI's Autocomplete,
-// inline in the dialog (https://base-ui.com/react/components/autocomplete#command-palette): it
-// moves the highlight, keeps it in view and names it to assistive technology, and Enter while
-// composing a character (an IME) does nothing. The filter is the palette's own.
+// https://base-ui.com/react/components/autocomplete#command-palette
 // oxlint-disable-next-line no-restricted-imports -- the design system has no inline autocomplete (command list) yet
 import { Autocomplete } from "@base-ui/react/autocomplete"
 import { useQueries, useQuery } from "@tanstack/react-query"
@@ -58,8 +54,8 @@ export function PaletteBody() {
   const [query, setQuery] = useState("")
   const projects = useQuery(projectsQuery)
   const adopted = (projects.data?.items ?? []).filter((p) => p.adopted)
-  // Every adopted project at once: read on load, not polled (five-second polls of every project
-  // would multiply the cluster reads). TODO(part C): use the list's health counts instead.
+  // Not polled: polling every project would multiply the cluster reads.
+  // TODO: use the list's health counts instead.
   const views = useQueries({
     queries: adopted.map((p) => projectQuery(p.name, { poll: false })),
   })
@@ -86,7 +82,6 @@ export function PaletteBody() {
         href: r.href,
       })
 
-  // Actions about the current service come first.
   const currentKey = place.service
   const currentProject = views.find((v) => v.data?.namespace === place.project)?.data
   const current = currentProject?.services.find((s) => serviceId(s) === currentKey)
@@ -217,7 +212,6 @@ export function PaletteBody() {
     item.run?.()
   }
 
-  // Groups in the order their first item comes, each item in its own group's place.
   const groups: Group[] = []
   for (const item of shown) {
     const group = groups.find((g) => g.label === item.group)

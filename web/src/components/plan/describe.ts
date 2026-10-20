@@ -1,9 +1,3 @@
-// The plain layer of a write confirmation: one sentence of what will happen, the consequence of a
-// high-risk change, who else it touches, and the name of the button that does it. Built from the
-// change a page asked for, the plan Zeabur answered with, and the pods the project reports.
-// The dialog's title already names the action, so a sentence says its effect, with the values
-// that decide it (a probe's port and interval, a container's requests), and never repeats the
-// title. Pure: the same inputs give the same words, so each case is tested (describe.test.ts).
 import type { Schemas } from "@/api/client"
 import type { Locale, Translate } from "@/i18n"
 import { problemText } from "@/model/problem"
@@ -15,7 +9,6 @@ type Plan = Pick<Schemas["PlanResponse"], "objects" | "impact" | "warnings">
 
 const workloadKinds = new Set(["Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"])
 
-/** The workloads whose pod template a plan changes: their pods are replaced. */
 export function replaced(plan: Plan): WorkloadRef[] {
   return plan.objects
     .filter(
@@ -28,8 +21,6 @@ export function replaced(plan: Plan): WorkloadRef[] {
 
 const same = (a: WorkloadRef, b: WorkloadRef) => a.kind === b.kind && a.name === b.name
 
-/** One sentence on how a workload's pods are replaced: one at a time with two or more ready,
- * with a short gap with one. */
 function rolling(t: Translate, workload: WorkloadRef, podsOf: PodsOf, restart: boolean): string {
   const pods = podsOf(workload)
   const ready = pods?.ready ?? 0
@@ -41,7 +32,6 @@ function rolling(t: Translate, workload: WorkloadRef, podsOf: PodsOf, restart: b
   return restart ? t("confirm.restartNone", workload.name) : t("confirm.rollingNone", workload.name)
 }
 
-/** One sentence of what a single change does. */
 export function sentenceOf(t: Translate, change: Change, podsOf: PodsOf): string {
   const list = (items: string[]) => t("common.list", items)
   switch (change.op) {
@@ -121,8 +111,7 @@ export function sentenceOf(t: Translate, change: Change, podsOf: PodsOf): string
   }
 }
 
-/** What a probe does once set, or what goes without it once removed. Unset timings are
- * Kubernetes' defaults: every 10 seconds, 3 failures in a row
+/** Unset timings are Kubernetes' defaults
  * (https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-probes). */
 function probeSentence(
   t: Translate,
@@ -144,7 +133,6 @@ function probeSentence(
   return t(`confirm.probeSet.${probe}`, check, period, failures)
 }
 
-/** The requests and limits a resources change sets, as the compute form names them. */
 function resourcesSentence(
   t: Translate,
   requests: Record<string, string> = {},
@@ -162,9 +150,7 @@ function resourcesSentence(
   return t("confirm.resources", pairs)
 }
 
-/** What a high-risk reason costs, said before anything else; `undefined` where the sentence of
- * what happens already says it (a one-pod restart, scaling to zero, a rollback, a deleted key,
- * a grown volume, a YAML edit, a removed domain, a deleted object). */
+/** `undefined` where the sentence of what happens already says it. */
 function consequence(t: Translate, reason: Reason, service?: WorkloadRef): string | undefined {
   switch (reason) {
     case "fewPods":
@@ -184,22 +170,17 @@ function consequence(t: Translate, reason: Reason, service?: WorkloadRef): strin
 }
 
 export interface Description {
-  /** For a high-risk change: what it costs, said first. */
   consequence?: string
-  /** What will happen, in order. */
   lines: string[]
-  /** The primary button. */
   action: string
 }
 
 export interface Asked {
   changes: readonly Change[]
   restartAfter?: boolean
-  /** The service the change was asked from. */
   service?: WorkloadRef
 }
 
-/** The plain sentences and the button for a planned change. */
 export function describe(
   t: Translate,
   ask: Asked,
@@ -210,7 +191,6 @@ export function describe(
   const list = (items: string[]) => t("common.list", items)
   const lines: string[] = []
   const said: WorkloadRef[] = []
-  // Of a high-risk plan, the sentence that carries the consequence comes first.
   const consequences = reasons
     .map((r) => consequence(t, r, ask.service))
     .filter((s): s is string => !!s)
@@ -233,7 +213,7 @@ export function describe(
         : t("confirm.keepsOld", names, waiting.length),
     )
   }
-  // A deleted workload is the subject of its own sentence, not one the change also affects.
+  // A deleted workload gets its own sentence, not an "also affects" one.
   const deleted = ask.changes.flatMap((c) => (c.op === "delete" ? [c.name] : []))
   const others = plan.impact.filter(
     (w) =>
@@ -261,7 +241,6 @@ function hasWarning(plan: Plan, code: Schemas["PlanWarning"]["code"]): boolean {
   return plan.warnings.some((w) => w.code === code)
 }
 
-/** The primary button: the action named, never a bare "Apply" unless the changes are mixed. */
 export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
   const ops = new Set(ask.changes.map((c) => c.op))
   const [change] = ask.changes
@@ -319,18 +298,13 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
   }
 }
 
-/** What a toast says about a failed apply: the problem's headline, why and what to do (its
- * evidence and raw answer stay in the plan dialog), and whether reviewing the change again can help
- * (the object moved on, or the plan's time ran out). */
 export interface Failure {
   title: string
   description?: string
   review: boolean
 }
 
-/** The failure of an apply, from its problem (RFC 9457). Only the problem's typed members and keyed
- * sentences are read (`managedBy`, `kind`, `summary`, `why`, `fixKey`), never the wording of its
- * English messages. */
+/** Reads only the problem's typed members and keyed sentences, never its English wording. */
 export function failureOf(t: Translate, locale: Locale, problem: Schemas["Problem"]): Failure {
   // Refused because Helm, Argo CD or Flux would undo it (a 409): reviewing again cannot help.
   const tool = problem.managedBy

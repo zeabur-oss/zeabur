@@ -1,5 +1,3 @@
-// A service's events: the list, repeats folded ("×14"). With a pod in the URL, only that pod's
-// events, until the filter is cleared.
 import XIcon from "~icons/ph/x"
 
 import { EventList } from "@/components/events"

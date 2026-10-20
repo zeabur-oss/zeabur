@@ -14,11 +14,6 @@ import {
 import { useI18n, useT } from "@/i18n"
 import { isKind, problemText } from "@/model/problem"
 
-/** Shows an API problem (RFC 9457). The cluster's refusal is a normal state and is shown quietly
- * by `Refused`: `what` names what needs the rights, `retry` re-runs what refetching the page's
- * data does not. Any other problem is an alert in five layers (`Layers`): what happened, why,
- * what to do (with `action`, the page's way to do it), then the evidence and the raw answer,
- * folded. */
 export function Problem({
   error,
   problem,
@@ -38,8 +33,6 @@ export function Problem({
   return <Failure problem={body} retryAfter={retryAfter} action={action} />
 }
 
-/** `retryAfter`: the wait a 429 or 503 asked for. A read's error is shown only once its retries
- * are spent, so the wait is said as the cluster's request, not as a promise to try again. */
 function Failure({
   problem: body,
   retryAfter,
@@ -54,7 +47,7 @@ function Failure({
   const text = problemText(t, locale, body)
   const fix = !retryAfter ? text.fix : `${text.fix} ${t("problem.retryAfter", retryAfter)}`
   const status = body.kubernetes ?? undefined
-  // Zeabur's sentence is often kube-apiserver's own message; it is said once.
+  // The sentence is often kube-apiserver's own message; say it once.
   const folded = text.folded.filter((sentence) => sentence !== status?.message)
   const rows: RawRow[] = [
     ...(body.denied
@@ -112,12 +105,6 @@ function Failure({
   )
 }
 
-/**
- * Layers two to five of a problem or a diagnosis, under its headline: why (muted; a policy's own
- * words quoted beneath), what to do with the page's `action` beside it, then the evidence (each
- * value with where it was read, and the fields kube-apiserver named) and `children`, the raw
- * answer, each folded.
- */
 export function Layers({
   why,
   whyLang,
@@ -206,13 +193,10 @@ function Fold({
   )
 }
 
-/** `Pod/web-1 status.containerStatuses[name=web].lastState`: where a value was read. */
 function origin(o: Schemas["Origin"]): string {
   return [`${o.kind}/${o.name}`, o.fieldPath].filter(Boolean).join(" ")
 }
 
-/** Each value beside where it was read ("4  ResourceQuota/compute status.hard.requests.cpu"), and
- * each field kube-apiserver refused beside its message. */
 function Evidence({
   evidence,
   fields,
@@ -246,10 +230,9 @@ function Evidence({
   )
 }
 
-/** A label, a raw value, and the value's language when it is not the page's. */
+/** Label, raw value, and the value's language when it is not the page's. */
 export type RawRow = readonly [string, string] | readonly [string, string, string]
 
-/** The raw layer: labelled values as Kubernetes gives them. */
 export function Raw({ rows }: { rows: readonly RawRow[] }) {
   if (rows.length === 0) return null
   return (

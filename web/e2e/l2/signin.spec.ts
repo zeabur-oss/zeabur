@@ -2,20 +2,15 @@ import type { CDPSession, Page } from "@playwright/test"
 
 import { expect, test } from "../fixtures.ts"
 
-// Zeabur in the cluster, signing in through Zeabur Identity, as one person would use it the first time:
-// enrol a passkey from Zeabur Identity's setup link, sign in, find that the terminal and the cluster's
-// nodes need the passkey again, confirm it from the terminal and run a command, see the nodes,
-// and restart a service with the same admin rights. scripts/e2e-l2.sh installs both and sets:
+// Zeabur in a cluster with Zeabur Identity, first sign-in to admin rights. scripts/e2e-l2.sh sets:
 //
 //   ZEABUR_L2_URL          Zeabur's public URL (https://zeabur.localhost)
 //   ZEABUR_L2_SETUP_LINK   the one-time link `zeabur-identityctl setup-link` printed for user `admin`
 //   ZEABUR_L2_NAMESPACE    a project with a running Deployment whose image has a shell
 //   ZEABUR_L2_SERVICE      that Deployment (default talker)
 //
-// The passkey lives in Chromium's virtual authenticator (DevTools protocol, WebAuthn domain:
-// https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn/): a platform authenticator
-// (internal transport) that verifies the user, as Touch ID or Windows Hello would. The steps
-// after sign-in use the elevation and terminal interfaces by their roles and names.
+// The passkey lives in Chromium's virtual authenticator, a user-verifying platform authenticator
+// (https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn/).
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const setupLink = env("ZEABUR_L2_SETUP_LINK")
 const namespace = env("ZEABUR_L2_NAMESPACE")
@@ -34,8 +29,7 @@ async function stored(cdp: CDPSession, authenticatorId: string) {
 }
 type Passkey = Awaited<ReturnType<typeof stored>>[number]
 
-/** Gives `page` a virtual platform authenticator holding `passkeys`. Each page (a popup too)
- * has authenticators of its own, so a popup gets a copy of the passkeys. */
+/** Each page (a popup too) has authenticators of its own, so a popup gets a copy of the passkeys. */
 async function authenticator(page: Page, passkeys: Passkey[] = []) {
   const cdp = await page.context().newCDPSession(page)
   await cdp.send("WebAuthn.enable", { enableUI: false })
@@ -55,9 +49,8 @@ async function authenticator(page: Page, passkeys: Passkey[] = []) {
   return { passkeys: () => stored(cdp, authenticatorId) }
 }
 
-/** Zeabur Identity's sign-in page, until it leaves for Zeabur. The page also offers the passkey through
- * autofill (conditional mediation), which the virtual authenticator, presence simulated, may
- * answer by itself before the button is clicked; either way counts. */
+/** The virtual authenticator may answer the page's autofill (conditional mediation) before the
+ * button is clicked; either way counts. */
 async function signInAtZeaburIdentity(page: Page) {
   await expect(page).toHaveURL((url) => url.origin === identity)
   const left = page
@@ -102,12 +95,11 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     expect(identity.username).toBe("zeabur:admin")
     expect(identity.groups).toContain("zeabur:admins")
     expect(identity.groups).not.toContain("zeabur:elevated:admins")
-    // The sidebar's account menu (only where people sign in) shows the user name.
     await expect(page.getByRole("button", { name: "Account" })).toContainText(identity.username)
   })
 
   await test.step("before elevating, the cluster's nodes are refused with View as admin", async () => {
-    // Zeabur Identity's admins group has the `view` role day to day, which does not list nodes.
+    // Without elevation the admins group has `view`, which does not list nodes.
     await page.goto("/cluster")
     const nodes = page.getByRole("region", { name: "Nodes" })
     await expect(nodes.getByText("Seeing the nodes needs admin rights.")).toBeVisible({
@@ -117,16 +109,11 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
   })
 
   await test.step("the terminal asks for the passkey, then runs a command in the pod", async () => {
-    // Exec takes `get` on pods/exec, which `view` lacks: the terminal's error frame offers
-    // "Retry as admin", which opens /auth/elevate in a window of its own, which goes to Zeabur Identity for
-    // the passkey. Zeabur's page sets Cross-Origin-Opener-Policy: same-origin, so that trip
-    // severs window.opener: the window's last page (/auth/callback) posts the outcome on
-    // BroadcastChannel("zeabur-elevation") and tries to close itself, and this page reconnects
-    // on that message, whether or not the window could close.
+    // Cross-Origin-Opener-Policy: same-origin severs window.opener on the trip through Zeabur
+    // Identity, so /auth/callback reports on BroadcastChannel("zeabur-elevation") and the popup
+    // may or may not close itself.
     await page.goto(servicePage)
     await expect(page.getByRole("heading", { level: 1, name: service })).toBeVisible()
-    // The terminal opens from the header's menu (web/DESIGN.md, "Depth"); once open it is a tab
-    // of its own.
     await page.getByRole("button", { name: "More actions" }).click()
     await page.getByRole("menuitem", { name: "Open terminal" }).click()
     await expect(
@@ -134,9 +121,7 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
         .getByRole("tablist", { name: "Service sections" })
         .getByRole("tab", { name: "Terminal" }),
     ).toHaveAttribute("aria-selected", "true")
-    // The terminal's own refusal, not another one on the page (Secrets the `view` role cannot
-    // list also offer admin rights): wait for it inside the Terminal tab, then use its button.
-    // The terminal reconnects on its own once the rights are active, whichever button granted them.
+    // Scoped to the tab: refused Secrets elsewhere on the page also offer admin rights.
     const panel = page.getByRole("tabpanel", { name: "Terminal" })
     await expect(panel.getByText("Opening a terminal needs admin rights.")).toBeVisible({
       timeout: 30_000,

@@ -1,9 +1,3 @@
-// The shell around every page, Zeabur's: the navigation drawer (the design system's AppFrame and
-// Sidebar, 224px) beside the page, which scrolls on its own. Inside a project the project's
-// sidebar takes the global one's place; the way back is its "Projects" row. There is no top bar:
-// the sidebars say where the page is, and ⌘K jumps anywhere. Below `md` the sidebar moves into a
-// sheet opened from a bar along the top, as the dashboard's phone header. The ⌘K palette, and
-// one toaster for the outcomes of writes.
 import { Link, Outlet } from "@tanstack/react-router"
 import { lazy, Suspense } from "react"
 import ListIcon from "~icons/ph/list"
@@ -25,8 +19,7 @@ import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/compon
 import { AppFrame, FramePanel, FrameSidebar } from "@zeabur/design-system/components/frame"
 import { TooltipProvider } from "@zeabur/design-system/components/tooltip"
 
-// Toasts report writes, which start from a lazily loaded dialog: the toaster (and Sonner) load after
-// the first page rather than with it.
+// Lazy: Sonner stays out of the first page load (scripts/ui-budget.sh).
 const Toaster = lazy(() =>
   import("@zeabur/design-system/components/sonner").then((m) => ({ default: m.Toaster })),
 )
@@ -41,7 +34,6 @@ export function AppShell() {
   const mobileOpen = mobileNav.useValue()
   const elevating = elevation.useValue()
   const theme = useTheme()
-  // The project's sidebar replaces the global one on every page of a project.
   const nav = place.project ? <ProjectSidebar project={place.project} /> : <Sidebar />
 
   return (
@@ -101,7 +93,6 @@ export function AppShell() {
   )
 }
 
-/** The phone's header (below `md`): the menu that opens the sidebar, the logo, and search. */
 function PhoneBar() {
   const t = useT()
   return (

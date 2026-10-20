@@ -1,6 +1,3 @@
-// Projects, as Zeabur's dashboard lists them: the title with the grid or list switch, the adopted
-// projects as cards (failing first) with their health, then the other namespaces, which can be
-// opened as they are or adopted.
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useId, useState } from "react"

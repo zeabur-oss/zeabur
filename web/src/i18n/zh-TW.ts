@@ -16,7 +16,6 @@ const verbZhTW: Record<string, string> = {
   delete: "刪除",
 }
 
-/** A Secret or ConfigMap in plain words. */
 const objectZhTW = (p: P) => (p.object === "Secret" ? `機密 ${p.name}` : `設定檔 ${p.name}`)
 
 /** Who a volume's mount failure stops: the container, else the replica. */
@@ -37,7 +36,6 @@ const timingZhTW = (t: ProbeTiming, sentence: string) =>
         t.thresholdOnly ? `${t.threshold} 次是預設值。` : ""
       }`
 
-// 繁體中文（台灣用語）。Kubernetes 名詞（Deployment、Secret…）在種類標籤與 YAML 裡維持原文；Pod 在上層一律稱「副本」。
 export const zhTW: Messages = {
   "shell.skip": "跳到主要內容",
   "shell.nav": "主選單",
@@ -577,7 +575,7 @@ export const zhTW: Messages = {
   "cap.vulnerability-scanning": "弱點掃描",
   // 物件與 YAML
   "project.entry.objects": "物件",
-  // 專案的 Namespace：納入、移出、詳細資料
+  // 專案的 Namespace
   "project.entry.settings": "設定",
   "action.adopt": "納入",
   "action.unadopt": "不再顯示為專案",
@@ -715,7 +713,7 @@ export const zhTW: Messages = {
   "warn.ingressOpened": (names: string) => `不再隔離：${names} 會接受任何來源的流量`,
   "warn.egressOpened": (names: string) => `不再限制：${names} 可以把流量送到任何地方`,
   "warn.connectionsOpened": (pairs: string) => `恢復允許：${pairs}`,
-  // 確認：用白話說明會發生什麼事
+  // 確認
   "confirm.restartSingle": (name) => `${name} 只有一個副本，重新啟動時可能中斷幾秒。`,
   "confirm.restartNone": (name) => `${name} 目前沒有就緒的副本，重新啟動會替換全部副本。`,
   "confirm.rolling": (name, pods) => `${name} 的 ${pods} 個副本會逐一替換，服務不會中斷。`,
@@ -786,7 +784,7 @@ export const zhTW: Messages = {
   "action.allow": "允許",
   "action.create": "建立",
   "action.delete": "刪除",
-  // 通知：套用的結果
+  // 通知
   "toast.region": "通知",
   "toast.applied": "已套用",
   "toast.view": "檢視",
@@ -976,7 +974,7 @@ export const zhTW: Messages = {
   "backups.veleroVolumesNeedSnapshots": "磁碟區資料需搭配快照",
   "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有排程`,
 
-  // 用量與歷史（request 稱「保留量」，limit 稱「上限」；Kubernetes 原文寫在說明裡）
+  // 用量與歷史
   "usage.title": "目前用量",
   "usage.history": "歷史紀錄",
   "usage.live": "即時",

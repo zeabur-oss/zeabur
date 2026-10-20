@@ -8,14 +8,11 @@ import { defineConfig } from "vite"
 // The Rust server the dev server forwards `/api` to (`cargo run -p zeabur-api --example demo`).
 const api = process.env.ZEABUR_API ?? "http://127.0.0.1:8080"
 
-// @zeabur/design-system ships its components as sources: they are compiled like this app's own
-// (React Compiler, `~icons/…`), unlike every other package in node_modules.
+// The design system ships sources, compiled like this app's own (React Compiler, `~icons/…`).
 const designSystem = "/node_modules/@zeabur/design-system/"
 
-// The packages the design system's sources import (`@base-ui/react/select`, `cn` …). Left out of
-// dev pre-bundling, the design system's own imports are not pre-bundled either, and some reach
-// CommonJS (Base UI's `use-sync-external-store/shim`) that the browser cannot load as it is, so they
-// are pre-bundled by name. Read from the sources, so the list follows the pin.
+// The design system's imports, pre-bundled by name: some reach CommonJS the browser cannot load
+// (`use-sync-external-store/shim`).
 const designSystemSources = resolve(import.meta.dirname, "node_modules/@zeabur/design-system/src")
 const designSystemImports = [
   ...new Set(
@@ -32,8 +29,6 @@ const designSystemImports = [
 ]
 
 export default defineConfig({
-  // React Compiler through oxc-transform-react (experimental); the fallback is
-  // @rolldown/plugin-babel with reactCompilerPreset().
   plugins: [
     react({
       // The compiler skips node_modules on its own too, unless `sources` names the files.
@@ -41,7 +36,6 @@ export default defineConfig({
       exclude: /\/node_modules\/(?!@zeabur\/design-system\/)/,
     }),
     tailwindcss(),
-    // `~icons/ph/<name>`: one Phosphor icon, 1em square (scale 1) like Phosphor's own components.
     Icons({ scale: 1, compiler: "jsx", jsx: "react" }),
   ],
   resolve: {
@@ -50,8 +44,7 @@ export default defineConfig({
     },
   },
   build: {
-    // Every supported browser has <link rel="modulepreload">; the polyfill would only add code
-    // and a fetch() to the entry script.
+    // Every supported browser has <link rel="modulepreload">.
     modulePreload: { polyfill: false },
     // Hashed file names live under assets/; the server caches exactly these as immutable.
     assetsDir: "assets",
@@ -59,8 +52,7 @@ export default defineConfig({
     assetsInlineLimit: 0,
     sourcemap: false,
   },
-  // The design system is not pre-bundled in dev: the pre-bundler runs no plugins, so it could not
-  // resolve `~icons/…`. What it imports is.
+  // Not pre-bundled: the pre-bundler runs no plugins, so it cannot resolve `~icons/…`.
   optimizeDeps: {
     exclude: ["@zeabur/design-system"],
     include: designSystemImports,

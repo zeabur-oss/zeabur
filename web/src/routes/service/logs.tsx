@@ -1,8 +1,3 @@
-// A pod's log, filling the remaining height: pod picker (ready, reason, restarts; the pod in the
-// URL, else a failing one), container, previous instance, a filter box with counted severity
-// chips, Follow, wrap, timestamps, download, and a small severity histogram. Severity is a thin
-// left bar, never the whole row. Lines are fetched with timestamps for the histogram; they are
-// shown only when asked. Loaded on first use (the virtual list is not in the first page load).
 import { useQuery } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useEffect, useRef, useState, type ReactNode } from "react"
@@ -95,7 +90,6 @@ export function LogsTab({
 }) {
   const t = useT()
   const pods = service.pods
-  // The failing pod first: that is usually why someone opens the logs.
   const pod = pods.find((p) => p.name === selectedPod) ?? worstPod(service)
   const containerNames =
     pod && pod.containers.length > 0 ? pod.containers : service.containers.map((c) => c.name)
@@ -276,7 +270,7 @@ function Snapshot({
   if (logs.isError) {
     const problem = toProblem(logs.error)
     if (!problem.unavailableLog) return <Problem problem={problem} />
-    // The kubelet had no log to give: a state of the container, not an error, and no line.
+    // The kubelet had no log: a container state, not an error.
     const reason = problem.unavailableLog
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 text-center text-sm">
@@ -378,7 +372,6 @@ function LogView({
   for (const line of matching) counts[line.severity]++
   const shown = severity === "all" ? matching : matching.filter((l) => l.severity === severity)
 
-  // Histogram: by time when lines carry timestamps, else by position.
   const n = 40
   const times = lines.map((l) => l.time).filter((x): x is number => x !== undefined)
   const first = times.length ? Math.min(...times) : 0

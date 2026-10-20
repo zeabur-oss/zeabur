@@ -1,14 +1,6 @@
-// Prints every zh-TW user string after its key, for scripts/check-zh-tw.sh: the catalogue in
-// src/i18n/zh-TW.ts (with the server's sentences, `sentence.*`) and the zh-TW texts of the
-// server's sign-in pages (crates/zeabur/src/pages.rs). zh-CN is never printed.
-//
-// Each string is one line and a paragraph of its own (a blank line between them), so the linter
-// reads no sentence across two strings; the key is in brackets, which it does not read as a word.
-// A function value is called with its parameters' names as placeholders (`<service>`: Latin, which
-// the linter leaves alone), so it prints one of its forms; a server sentence gets every parameter
-// it reads, as its name. The catalogues are imported by a
-// computed path: this file is type-checked with tsconfig.node.json, which does not resolve the
-// interface's `@/` imports.
+// Prints every zh-TW user string after its key, for scripts/check-zh-tw.sh. Each string is its own
+// paragraph so the linter reads no sentence across two; placeholders are Latin (`<service>`), which
+// it leaves alone. Imported by a computed path: tsconfig.node.json does not resolve `@/`.
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
@@ -17,18 +9,16 @@ type Message = (...args: unknown[]) => unknown
 const load = async (file: string) =>
   (await import(resolve(import.meta.dirname, "../src/i18n", file))) as Record<string, unknown>
 
-/** A parameter's placeholder: its name in text, 2 in arithmetic and comparisons. */
+/** Its name in text, 2 in arithmetic and comparisons. */
 const placeholder = (name: string) => ({
   [Symbol.toPrimitive]: (hint: string) => (hint === "number" ? 2 : `<${name}>`),
 })
-/** The parameter names of an arrow function, from its source. */
 const parameters = (f: Message) =>
   (/^\(?([^)=]*)\)?\s*=>/.exec(f.toString())?.[1] ?? "")
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean)
-// A function that takes a list (`common.list`, `confirm.resources`) gets one, of pairs first: a
-// list of names would be read as pairs of letters.
+// Pairs first: a list of names would be destructured as pairs of letters.
 const attempts: ((name: string) => unknown)[] = [
   (name: string) => placeholder(name),
   (name: string) => [[`<${name}>`, "<value>"]],

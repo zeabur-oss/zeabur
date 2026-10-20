@@ -1,7 +1,3 @@
-// A service's Overview: Usage and History. Usage lays live CPU and memory from metrics-server over
-// what each replica reserves and may use at most (requests and limits, from the pod template), per
-// replica and in total. History draws CPU and memory from the metrics store over a chosen range,
-// per replica or in total, with restarts marked.
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
 import { lazy, Suspense, type ReactNode } from "react"
@@ -38,9 +34,6 @@ import { Meter } from "@zeabur/design-system/components/meter"
 const HistoryChart = lazy(() => import("@/routes/service/history-chart"))
 
 const route = getRouteApi("/projects/$project/services/$kind/$name")
-
-// ---------------------------------------------------------------------------------------------
-// Usage (live)
 
 export function UsagePanel({ project, service }: { project: string; service: Service }) {
   const t = useT()
@@ -147,8 +140,6 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
   )
 }
 
-/** Usage as the fill, the reserved amount as a tick, the maximum as the bar's end (hatched when
- * there is none: the end is then only room, not a wall). */
 function UsageBar({
   used,
   request,
@@ -245,7 +236,6 @@ function TotalBlock({
   )
 }
 
-/** What each replica reserves and may use at most, when there is no usage to show. */
 function TemplateLine({
   requests,
   limits,
@@ -405,9 +395,6 @@ function NotePill({ note }: { note: Note }) {
       return pill("plain", t("usage.note.noSample"), t("usage.note.noSampleHint"))
   }
 }
-
-// ---------------------------------------------------------------------------------------------
-// History
 
 export function HistoryPanel({ project, service }: { project: string; service: Service }) {
   const t = useT()
@@ -621,7 +608,6 @@ function HistoryBody({
   )
 }
 
-/** One swatch per series, the replaced pods folded into one entry. */
 function Legend({ series, gone }: { series: ServiceHistory["memory"]; gone: Set<string> }) {
   const t = useT()
   const strokes = colours(series, gone)

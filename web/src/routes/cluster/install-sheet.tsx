@@ -1,6 +1,3 @@
-// How to install a catalogue component yourself, in a panel along the right edge: what it needs
-// first, what access it gets, the values to fill in, and the texts in four forms (Helm, k3s,
-// Flux, Argo CD). A component k3s also packages carries a warning to disable k3s's copy first. The server renders them from the catalogue; Zeabur runs none of them.
 import { keepPreviousData as keep, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import WarningFillIcon from "~icons/ph/warning-fill"
@@ -50,7 +47,6 @@ export function InstallSheet({
 }) {
   const t = useT()
   const [capability = "", id = ""] = component.split("/")
-  // The previous profile's texts stay while the next load, and the chosen form stays chosen.
   const guide = useQuery({ ...installQuery(capability, id, profile), placeholderData: keep })
   const [format, setFormat] = useState<string>("helm")
   const data = guide.data

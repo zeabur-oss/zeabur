@@ -1,14 +1,4 @@
-// A project's settings, laid out as the dashboard's project settings (its General page): groups
-// under a section label, each a card of rows with the setting's name and what it does on the left
-// and its control on the right. Basic information (icon, name, description: annotations on the
-// namespace), the Kubernetes namespace (its name to copy, and whether it shows as a project),
-// batch actions (pause or restart every service, each one reviewed plan) and the danger zone
-// (removing it from Zeabur, which only takes the project label off). Every change is a plan like
-// any other. Who may not patch the namespace sees the details read-only, with the right to ask
-// for, or, while admin rights are offered, the way to use them (the hint is checked with everyday
-// rights); the permission is the API's hint (`canChange`), and when it is unknown the form stays
-// open and the plan's dry run decides. Deleting the namespace is not offered: plans refuse it
-// (`tenant_level`).
+// Deleting the namespace is not offered: plans refuse it (`tenant_level`).
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi } from "@tanstack/react-router"
@@ -38,7 +28,7 @@ import { ToggleGroup, ToggleGroupItem } from "@zeabur/design-system/components/t
 
 const route = getRouteApi("/projects/$project/settings")
 
-/** The longest display name and description (zeabur-model `DISPLAY_NAME_MAX`, `DESCRIPTION_MAX`). */
+/** zeabur-model `DISPLAY_NAME_MAX`, `DESCRIPTION_MAX`. */
 export const DISPLAY_NAME_MAX = 64
 export const DESCRIPTION_MAX = 500
 
@@ -283,7 +273,6 @@ function DetailsForm({
   )
 }
 
-/** The icon on its tile, and a button that opens the built-in set (nothing is uploaded). */
 function IconPicker({
   value,
   onChange,
@@ -342,9 +331,7 @@ function IconPicker({
 const restartable = (s: Service) =>
   s.kind === "Deployment" || s.kind === "StatefulSet" || s.kind === "DaemonSet"
 
-/** Pause (scale to zero) or restart every service, each as one plan the person reviews. Pausing
- * leaves out what cannot scale (DaemonSets, Jobs, CronJobs), what is already at zero, and what
- * another tool manages (it would scale it back). */
+/** Pausing skips what another tool manages: it would scale it back. */
 function BatchActions({ project }: { project: string }) {
   const t = useT()
   const view = useQuery(projectQuery(project))
