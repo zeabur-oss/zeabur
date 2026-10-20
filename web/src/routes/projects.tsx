@@ -1,12 +1,19 @@
-import { useQueries, useQuery } from "@tanstack/react-query"
+// Projects, as Zeabur's dashboard lists them: the title with the grid or list switch, the adopted
+// projects as cards (failing first) with their health, then the other namespaces, which can be
+// opened as they are or adopted.
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useId, useState } from "react"
 
 import { isStatus, toProblem } from "@/api/client"
-import { eventsQuery, projectQuery, projectsQuery } from "@/api/queries"
+import { projectsQuery } from "@/api/queries"
 import { AdoptButton } from "@/components/adopt"
 import { Problem } from "@/components/problem"
+import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { ProjectIcon } from "@/components/project-icon"
+import { useT } from "@/i18n"
+import { otherNamespaces } from "@/model/project"
+import { countsHealth, healthRank } from "@/model/service"
 import {
   Empty,
   EmptyDescription,
@@ -14,15 +21,11 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@zeabur/design-system/components/empty"
+import { Illustration } from "@zeabur/design-system/components/illustration"
 import { Label } from "@zeabur/design-system/components/label"
+import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Switch } from "@zeabur/design-system/components/switch"
-import { useT } from "@/i18n"
-import { otherNamespaces } from "@/model/project"
-import { summarise } from "@/model/service"
-import { ProjectCard } from "@/components/project-card"
-import { Illustration } from "@zeabur/design-system/components/illustration"
-import { PageHeader } from "@zeabur/design-system/components/page-header"
 
 export function ProjectsPage() {
   const t = useT()
@@ -30,24 +33,20 @@ export function ProjectsPage() {
   const [showSystem, setShowSystem] = useState(false)
   const switchId = useId()
   const items = projects.data?.items ?? []
-  const adopted = items.filter((p) => p.adopted)
+  const rank = (p: (typeof items)[number]) =>
+    p.health ? healthRank[countsHealth(p.health)] : healthRank.ok
+  const adopted = items
+    .filter((p) => p.adopted)
+    .toSorted((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
   const other = otherNamespaces(items, showSystem)
-  // Every adopted project at once: read on load, not polled (five-second polls of every project
-  // would multiply the cluster reads). TODO(part C): use the list's health counts instead.
-  const views = useQueries({
-    queries: adopted.map((p) => projectQuery(p.name, { poll: false })),
-  })
-  const events = useQueries({
-    queries: adopted.map((p) => eventsQuery(p.name, { poll: false })),
-  })
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
-      <PageHeader title={t("projects.title")} />
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-6 pb-12 md:box-content md:px-8 md:pt-10">
+      <PageHeader title={t("projects.title")} actions={<ProjectViewSwitch />} />
       {projects.isPending ? (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} variant="card" className="h-44" />
+            <Skeleton key={i} variant="card" className="h-42" />
           ))}
         </div>
       ) : projects.isError ? (
@@ -66,37 +65,33 @@ export function ProjectsPage() {
         )
       ) : (
         <>
-          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {adopted.map((p, i) => {
-              const data = views[i]?.data
-              return (
-                <li key={p.name} className="flex">
-                  <ProjectCard
-                    name={p.name}
-                    details={p}
-                    project={data}
-                    summary={data ? summarise(data) : undefined}
-                    events={events[i]?.data?.items ?? []}
-                  />
-                </li>
-              )
-            })}
-          </ul>
+          {adopted.length > 0 ? (
+            <ProjectCollection projects={adopted} label={t("projects.title")} />
+          ) : (
+            <Empty size="sm">
+              <EmptyHeader>
+                <EmptyMedia>
+                  <Illustration kind="empty" seed="projects" />
+                </EmptyMedia>
+                <EmptyDescription>{t("cluster.noProjects")}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
           <section className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end justify-between gap-2">
-              <h2 className="text-base font-medium">{t("projects.other")}</h2>
+              <h2 className="type-heading">{t("projects.other")}</h2>
               <div className="flex items-center gap-2">
                 <Switch id={switchId} checked={showSystem} onCheckedChange={setShowSystem} />
                 <Label htmlFor={switchId}>{t("projects.showSystem")}</Label>
               </div>
             </div>
-            <ul className="divide-y overflow-hidden rounded-lg border bg-card shadow-xs">
+            <ul className="flex flex-col divide-y divide-main overflow-hidden rounded-xl border border-main bg-card">
               {other.map((p) => (
                 <li key={p.name} className="flex items-center gap-3 pr-3">
                   <Link
                     to="/projects/$project"
                     params={{ project: p.name }}
-                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-sm outline-none hover:bg-hover"
+                    className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-sm outline-none hover:bg-v2-surface-hover"
                   >
                     <ProjectIcon icon={p.icon} />
                     <span className="truncate font-medium" translate="no">
