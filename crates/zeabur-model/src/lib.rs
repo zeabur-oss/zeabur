@@ -17,8 +17,8 @@ mod workload;
 
 pub use attribution::{Attribution, NamespaceAttribution, Ownership, WorkloadRef};
 pub use container::{
-    Container, ContainerResources, EnvVar, ImportedEnv, Mount, MountCategory, ProbeHandler,
-    ProbeSummary, Probes, Quantities, ReadOnlyReason,
+    Container, ContainerResources, EnvVar, ImportedEnv, Mount, MountCategory, PendingRestart,
+    ProbeHandler, ProbeSummary, Probes, Quantities, ReadOnlyReason,
 };
 pub use details::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, ProjectDetails, ProjectIcon};
 pub use diagnosis::{

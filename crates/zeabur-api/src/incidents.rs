@@ -39,7 +39,7 @@ pub struct IncidentList {
     pub unreadable: Vec<UnreadableView>,
 }
 
-fn allowed<T>(
+pub(crate) fn allowed<T>(
     result: Result<T, ClusterError>,
     resource: &str,
     unreadable: &mut Vec<UnreadableView>,

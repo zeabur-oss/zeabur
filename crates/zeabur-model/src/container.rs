@@ -163,8 +163,37 @@ pub struct EnvVar {
     /// read made with the person's own credential.
     #[serde(default, skip_serializing_if = "is_false")]
     pub masked: bool,
+    /// The ConfigMap or Secret it reads was written after a running pod started; see
+    /// [`PendingRestart`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_restart: Option<PendingRestart>,
     /// The entry in its workload.
     pub origin: Origin,
+}
+
+/// A variable's ConfigMap or Secret was written after the oldest running pod started.
+///
+/// That pod may still hold the old value: a container reads its variables once, when it starts
+/// [k8s-configmap-env].
+///
+/// `managedFields` keep one time per field manager [k8s-ssa-fields], the time of its last write
+/// to any field it owns, so a manager owning this key that later wrote another key also counts:
+/// the pod *may* hold an old value, a restart settles it.
+///
+/// [k8s-configmap-env]: https://kubernetes.io/docs/concepts/configuration/configmap/#configmaps-and-pods
+/// [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingRestart {
+    /// When the object was last written by a field manager that owns the key (for an `envFrom`
+    /// import, any key), RFC 3339.
+    pub written_at: String,
+    /// That manager.
+    pub manager: String,
+    /// When the oldest running pod started (`status.startTime`), RFC 3339.
+    pub pod_started_at: String,
+    /// That pod.
+    pub pod: String,
 }
 
 /// One `envFrom` entry. Imports are not flattened into variables: a ConfigMap's twelve keys
@@ -186,6 +215,9 @@ pub struct ImportedEnv {
     /// Why it is read-only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub read_only_reason: Option<ReadOnlyReason>,
+    /// The imported object was written after a running pod started; see [`PendingRestart`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_restart: Option<PendingRestart>,
     /// The entry in its workload.
     pub origin: Origin,
 }

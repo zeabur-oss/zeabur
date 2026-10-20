@@ -197,7 +197,7 @@ fn service(
     workload: Workload<'_>,
 ) -> Service {
     // Ephemeral containers belong to running pods, not to the workload's template.
-    let projected = workload
+    let mut projected: Vec<Container> = workload
         .pod_spec()
         .into_iter()
         .flat_map(containers)
@@ -217,6 +217,7 @@ fn service(
             })
         })
         .collect();
+    crate::restart::mark(snapshot, &index.objects, workload, &mut projected);
     let me = workload.reference();
     let summary = summarise(snapshot, workload);
     let pods = crate::pods::pods_of(snapshot, workload);

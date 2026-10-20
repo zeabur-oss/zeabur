@@ -10,6 +10,7 @@ mod mounts;
 mod network;
 mod pods;
 mod project;
+mod restart;
 mod snapshot;
 mod workload;
 

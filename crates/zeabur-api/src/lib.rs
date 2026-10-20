@@ -36,7 +36,7 @@
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs` | a log snapshot |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs/follow` | a log as Server-Sent Events |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/exec` | a terminal in a container, over a WebSocket (see the `pods::exec` module) |
-//! | `POST /api/v1/projects/{p}/plan` | the writes a change needs, and a token; writes nothing |
+//! | `POST /api/v1/projects/{p}/plan` | the writes a change needs, what they do (pods replaced, fit, data and fields removed), and a token; writes nothing |
 //! | `POST /api/v1/projects/{p}/apply` | carries out a plan by its token |
 //!
 //! There are no `/connections`, `/relations`, `/pods` or `/containers` collections: they only

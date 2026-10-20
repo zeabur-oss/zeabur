@@ -9,6 +9,7 @@ mod common;
 mod exec;
 mod incidents;
 mod namespace;
+mod preview;
 mod releases;
 mod trace;
 mod usage;

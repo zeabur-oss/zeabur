@@ -1436,6 +1436,42 @@ components:
       - volume
       - database
       - namespace
+    Blocker:
+      type: object
+      description: One limit the new pods exceed.
+      required:
+      - kind
+      - resource
+      - need
+      - available
+      properties:
+        available:
+          type: integer
+          format: int64
+          description: What is left.
+          minimum: 0
+        kind:
+          $ref: "#/components/schemas/BlockerKind"
+          description: A quota or the nodes.
+        name:
+          type:
+          - string
+          - "null"
+          description: The quota's name.
+        need:
+          type: integer
+          format: int64
+          description: "What the plan needs, in the resource's unit: millicores, bytes or pods."
+          minimum: 0
+        resource:
+          type: string
+          description: "The resource: `requests.cpu`, `limits.memory`, `pods`, `cpu`, `memory`, …"
+    BlockerKind:
+      type: string
+      description: What keeps a pod from being created or placed.
+      enum:
+      - quota
+      - node
     Capability:
       type: object
       description: Whether a capability is present on the cluster, and on what evidence.
@@ -2375,6 +2411,42 @@ components:
       enum:
       - ConfigMap
       - Secret
+    DataLoss:
+      type: object
+      description: Data a plan loses.
+      required:
+      - kind
+      properties:
+        claim:
+          type:
+          - string
+          - "null"
+          description: The claim, or the StatefulSet's claim template.
+        kind:
+          $ref: "#/components/schemas/DataLossKind"
+          description: What kind.
+        mountPaths:
+          type: array
+          items:
+            type: string
+          description: Where the containers mount it.
+        volume:
+          type:
+          - string
+          - "null"
+          description: The volume.
+        workload:
+          oneOf:
+          - $ref: "#/components/schemas/WorkloadRef"
+            description: The workload whose pods hold it.
+          - type: "null"
+    DataLossKind:
+      type: string
+      description: What kind of data a plan loses.
+      enum:
+      - claimDeleted
+      - emptyDir
+      - claimsOfStatefulSet
     DataStore:
       type: string
       description: What kind of data store a service is, as far as its image's name tells.
@@ -2594,6 +2666,13 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The entry in its workload.
+        pendingRestart:
+          oneOf:
+          - $ref: "#/components/schemas/PendingRestart"
+            description: |-
+              The ConfigMap or Secret it reads was written after a running pod started; see
+              [`PendingRestart`].
+          - type: "null"
         source:
           $ref: "#/components/schemas/ValueSource"
           description: Where the value is read from.
@@ -2743,6 +2822,46 @@ components:
         path:
           type: string
           description: The field, dotted; keyed list entries as `[name=app]`, others by position.
+    Fit:
+      type: object
+      description: Whether the plan's new pods fit, and what blocks them.
+      required:
+      - status
+      - pods
+      - cpuMillicores
+      - memoryBytes
+      properties:
+        blockers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Blocker"
+          description: What blocks them, quotas first.
+        cpuMillicores:
+          type: integer
+          format: int64
+          description: CPU requests it adds at its peak, millicores.
+          minimum: 0
+        memoryBytes:
+          type: integer
+          format: int64
+          description: Memory requests it adds at its peak, bytes.
+          minimum: 0
+        pods:
+          type: integer
+          format: int64
+          description: Pods the plan adds at its peak.
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/FitStatus"
+          description: The verdict.
+    FitStatus:
+      type: string
+      description: Whether the plan's new pods fit.
+      enum:
+      - notNeeded
+      - fits
+      - blocked
+      - unknown
     Fix:
       type: object
       description: The fix of a gap.
@@ -2940,6 +3059,13 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The entry in its workload.
+        pendingRestart:
+          oneOf:
+          - $ref: "#/components/schemas/PendingRestart"
+            description: >-
+              The imported object was written after a running pod started; see
+              [`PendingRestart`].
+          - type: "null"
         prefix:
           type:
           - string
@@ -4020,6 +4146,40 @@ components:
       - owned
       - shared
       - orphan
+    PendingRestart:
+      type: object
+      description: |-
+        A variable's ConfigMap or Secret was written after the oldest running pod started.
+        
+        That pod may still hold the old value: a container reads its variables once, when it starts
+        [k8s-configmap-env].
+        
+        `managedFields` keep one time per field manager [k8s-ssa-fields], the time of its last write
+        to any field it owns, so a manager owning this key that later wrote another key also counts:
+        the pod *may* hold an old value, a restart settles it.
+        
+        [k8s-configmap-env]: https://kubernetes.io/docs/concepts/configuration/configmap/#configmaps-and-pods
+        [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
+      required:
+      - writtenAt
+      - manager
+      - podStartedAt
+      - pod
+      properties:
+        manager:
+          type: string
+          description: That manager.
+        pod:
+          type: string
+          description: That pod.
+        podStartedAt:
+          type: string
+          description: When the oldest running pod started (`status.startTime`), RFC 3339.
+        writtenAt:
+          type: string
+          description: |-
+            When the object was last written by a field manager that owns the key (for an `envFrom`
+            import, any key), RFC 3339.
     Permission:
       type: string
       description: Whether the person may change something, as far as their RBAC rules tell.
@@ -4103,10 +4263,16 @@ components:
         required:
         - token
         - expiresAt
+        - preview
         properties:
           expiresAt:
             type: string
             description: When the token stops working, RFC 3339.
+          preview:
+            $ref: "#/components/schemas/Preview"
+            description: |-
+              What the plan does once applied: the pods it replaces, whether new ones fit, the data
+              and fields it removes.
           token:
             type: string
             description: Send this to `apply` to carry out exactly this plan.
@@ -4679,6 +4845,39 @@ components:
           items:
             $ref: "#/components/schemas/NetworkPolicyPreset"
           description: Isolate first, then allow the ingress controller, then one per other service.
+    Preview:
+      type: object
+      description: What a plan does once applied.
+      required:
+      - rollouts
+      - fit
+      - dataLoss
+      - removals
+      - unreadable
+      properties:
+        dataLoss:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataLoss"
+          description: The data it loses.
+        fit:
+          $ref: "#/components/schemas/Fit"
+          description: Whether the new pods fit.
+        removals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Removal"
+          description: The fields it removes, by object then path.
+        rollouts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Rollout"
+          description: The workloads whose pods change, sorted.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused, and what they left unchecked.
     ProbeHandler:
       type: string
       description: How a probe checks the container.
@@ -5381,6 +5580,27 @@ components:
         released:
           type: string
           description: Its first release.
+    Removal:
+      type: object
+      description: A field the plan removes.
+      required:
+      - target
+      - path
+      - before
+      - leftOutOfEdit
+      properties:
+        before:
+          type: string
+          description: Its value now (redacted for a Secret).
+        leftOutOfEdit:
+          type: boolean
+          description: It was left out of an edited YAML, rather than asked to be removed.
+        path:
+          type: string
+          description: The field.
+        target:
+          $ref: "#/components/schemas/ObjectName"
+          description: The object.
     Replicas:
       type: object
       description: Ready and desired replicas (per node for a DaemonSet, completions for a Job).
@@ -5512,6 +5732,56 @@ components:
         risk:
           type: string
           description: The risk.
+    Rollout:
+      type: object
+      description: One workload whose pods a plan changes.
+      required:
+      - workload
+      - actions
+      - downtime
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RolloutAction"
+          description: What happens to its pods.
+        downtime:
+          type: boolean
+          description: There is a moment with no pod serving (on a node, for a DaemonSet).
+        fields:
+          type: array
+          items:
+            type: string
+          description: The pod template fields that change, at most ten.
+        fromReplicas:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Replicas before, for a scale.
+        replicas:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Replicas after.
+        strategy:
+          type:
+          - string
+          - "null"
+          description: "`RollingUpdate`, `Recreate` or `OnDelete`, for a roll."
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
+    RolloutAction:
+      type: string
+      description: What happens to a workload's pods.
+      enum:
+      - roll
+      - scale
+      - start
+      - stop
+      - pendingRestart
     Route:
       type: object
       description: "An Ingress routing to workloads' Services: how they are reached from outside."
