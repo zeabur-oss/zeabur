@@ -25,11 +25,11 @@ function emptyTab(kind: string, name: string): string {
 describe("An empty Releases tab", () => {
   test("says a Deployment has no earlier release yet", () => {
     const html = emptyTab("Deployment", "worker")
-    expect(html).toMatch(/No earlier release yet\./)
+    expect(html).toMatch(/No earlier releases yet\./)
     expect(html).not.toMatch(/Jobs and CronJobs/)
   })
 
-  test("says Jobs and CronJobs keep none", () => {
-    expect(emptyTab("CronJob", "nightly")).toMatch(/Jobs and CronJobs keep none\./)
+  test("says Jobs and CronJobs keep no releases", () => {
+    expect(emptyTab("CronJob", "nightly")).toMatch(/Jobs and CronJobs keep no releases\./)
   })
 })

@@ -61,8 +61,8 @@ describe("the list of namespaces to adopt", () => {
 describe("adopting and letting go, as a plan", () => {
   test("letting go says nothing in the namespace is deleted, and adopting that nothing changes", () => {
     const unadopt = describePlan(english, { changes: [{ op: "unadopt" }] }, empty, () => undefined)
-    expect(unadopt.lines.join(" ")).toMatch(/Nothing in the namespace is deleted/)
-    expect(unadopt.action).toBe("Stop showing as project")
+    expect(unadopt.lines.join(" ")).toMatch(/Nothing in it is deleted/)
+    expect(unadopt.action).toBe("Stop showing as a project")
     const adopt = describePlan(english, { changes: [{ op: "adopt" }] }, empty, () => undefined)
     expect(adopt.lines.join(" ")).toMatch(/Nothing in it changes/)
     expect(actionOf(english, { changes: [{ op: "details" }] })).toBe("Save details")

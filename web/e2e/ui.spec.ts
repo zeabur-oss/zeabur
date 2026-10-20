@@ -536,7 +536,12 @@ test("a variable is added through a plan", async ({ page }) => {
   await panel.getByRole("textbox", { name: "Name" }).fill("E2E_ADDED")
   await panel.getByRole("textbox", { name: "Value" }).fill("added-1")
   await panel.getByRole("button", { name: "Review" }).click()
-  await confirmPlan(page, `Variables of ${editor}`, "Save variables", `Set E2E_ADDED on ${editor}.`)
+  await confirmPlan(
+    page,
+    `Variables for ${editor}`,
+    "Save variables",
+    `Set E2E_ADDED on ${editor}.`,
+  )
   await expect(panel).toContainText("E2E_ADDED", { timeout: 15_000 })
   await expect(panel).toContainText("added-1")
 })
@@ -584,7 +589,7 @@ test("a change made meanwhile is refused in a toast, and Review again plans it a
   await panel.getByRole("textbox", { name: "Name" }).fill("E2E_REVIEWED")
   await panel.getByRole("textbox", { name: "Value" }).fill("reviewed-1")
   await panel.getByRole("button", { name: "Review" }).click()
-  const dialog = page.getByRole("dialog", { name: `Variables of ${editor}` })
+  const dialog = page.getByRole("dialog", { name: `Variables for ${editor}` })
   await expect(dialog).toContainText("Set E2E_REVIEWED")
   // Someone else changes the Deployment after the plan was made.
   await applyNow(page, {
@@ -598,7 +603,7 @@ test("a change made meanwhile is refused in a toast, and Review again plans it a
   const refused = toast(page, "changed after you reviewed it")
   await expect(refused).toBeVisible({ timeout: 15_000 })
   await refused.getByRole("button", { name: "Review again" }).click()
-  await confirmPlan(page, `Variables of ${editor}`, "Save variables", "Set E2E_REVIEWED")
+  await confirmPlan(page, `Variables for ${editor}`, "Save variables", "Set E2E_REVIEWED")
   await expect(panel).toContainText("E2E_REVIEWED", { timeout: 15_000 })
 })
 
@@ -615,7 +620,7 @@ test("scaling goes through a plan from Settings, and is undone from its toast", 
   await replicas.press("Enter")
   const applied = await confirmPlan(
     page,
-    `Compute of ${editor}`,
+    `Compute for ${editor}`,
     `Scale to ${more}`,
     `Scale ${editor} from ${before} to ${more} replicas.`,
   )
@@ -641,7 +646,7 @@ test("a readiness probe is set through a plan", async ({ page }) => {
   await form.getByRole("button", { name: "Review" }).click()
   await confirmPlan(
     page,
-    `Health checks of ${editor}`,
+    `Health checks for ${editor}`,
     "Save health checks",
     "A replica gets no traffic until running true succeeds (checked every 10 s).",
   )
@@ -685,7 +690,7 @@ test("Releases lists the templates and rolls back to one through a plan", async 
     page,
     new RegExp(`^Roll back ${editor} to #\\d+$`),
     /^Roll back to revision \d+$/,
-    "ConfigMap and Secret contents are not rolled back.",
+    "A rollback leaves ConfigMap and Secret contents as they are.",
   )
 })
 
@@ -701,7 +706,7 @@ test("an object's YAML is edited and planned", async ({ page }) => {
   await text.getByText("untouched").dblclick()
   await page.keyboard.type("edited")
   await panel.getByRole("button", { name: "Review" }).click()
-  await confirmPlan(page, "Edit editor-config", "Save YAML", "Your YAML is written as it is")
+  await confirmPlan(page, "Edit editor-config", "Save YAML", "Zeabur writes the YAML as it is")
   // Sonner's style sheet is applied: its toaster is fixed to the viewport.
   await expect(page.locator("[data-sonner-toaster]")).toHaveCSS("position", "fixed")
   await expect(panel.getByRole("figure", { name: "YAML of editor-config" })).toContainText(
@@ -817,7 +822,7 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
   await page.goto(`${project}/objects?object=${encodeURIComponent(address)}`)
   await page.getByRole("button", { name: "Delete", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: `Delete NetworkPolicy ${policy}` })
-  await expect(dialog).toContainText(`Delete ${policy}. This cannot be undone.`)
+  await expect(dialog).toContainText(`Delete ${policy}. This can't be undone.`)
   const confirm = dialog.getByRole("button", { name: "Delete", exact: true })
   await expect(confirm).toBeDisabled()
   await dialog.getByRole("textbox", { name: `Type ${policy} to confirm` }).fill(policy)
@@ -846,7 +851,7 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   await page.getByRole("button", { name: "Rocket" }).click()
   await page.keyboard.press("Escape")
   await page.getByRole("button", { name: "Save details" }).click()
-  await confirmPlan(page, `Details of ${other}`, "Save details")
+  await confirmPlan(page, `${other} details`, "Save details")
   // The display name names the project in its sidebar.
   await page.goto(`/projects/${other}`)
   await expect(page.getByRole("navigation", { name: "Project sections" })).toContainText(
@@ -860,8 +865,8 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   await confirmPlan(
     page,
     `Stop showing ${other} as a project`,
-    "Stop showing as project",
-    "Nothing in the namespace is deleted.",
+    "Stop showing as a project",
+    "Nothing in it is deleted.",
   )
   await page.goto("/projects")
   await expect(

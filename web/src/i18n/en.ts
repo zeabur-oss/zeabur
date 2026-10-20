@@ -630,16 +630,16 @@ export const en = {
   // A project's namespace: adopting it, letting it go, its details
   "project.entry.settings": "Settings",
   "action.adopt": "Adopt",
-  "action.unadopt": "Stop showing as project",
+  "action.unadopt": "Stop showing as a project",
   "action.saveDetails": "Save details",
   "title.adopt": (ns: string) => `Adopt ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
-  "title.details": (ns: string) => `Details of ${ns}`,
+  "title.details": (ns: string) => `${ns} details`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
   "title.restartAll": (ns: string) => `Restart every service in ${ns}`,
   "confirm.adopt": "Adds the project label to the namespace. Nothing in it changes.",
-  "confirm.unadopt": "Nothing in the namespace is deleted. It only stops showing as a project.",
-  "confirm.details": "Saves the name, description and icon on the namespace.",
+  "confirm.unadopt": "The namespace stops showing as a project. Nothing in it is deleted.",
+  "confirm.details": "Saves the name, description, and icon on the namespace.",
   "access.title": (ns: string) => `You can't change ${ns}`,
   "access.you": "<your user name>",
   "access.ask": (ns: string) =>
@@ -715,8 +715,8 @@ export const en = {
   "objects.updated": "updated",
   "objects.refresh": "Refresh",
   "objects.load": (kind: string) => `Read ${kind}`,
-  "objects.unread": "not read",
-  "objects.denied": "no access",
+  "objects.unread": "Not read",
+  "objects.denied": "No access",
   "objects.pin": (kind: string) => `Pin ${kind}`,
   "objects.unpin": (kind: string) => `Unpin ${kind}`,
   "tab.yaml": "YAML",
@@ -746,13 +746,13 @@ export const en = {
     `${route} lists the old host for HTTPS; ${host} needs a new certificate`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
     `Attaches to Gateway ${gateway} (${of} found)`,
-  "warn.gatewaysUnreadable": "Gateways not readable: uses an Ingress",
+  "warn.gatewaysUnreadable": "Unable to read Gateways: Zeabur uses an Ingress",
   "warn.secretValuesUnknown": (name: string) =>
-    `${name}'s values not readable: diff shows keys only`,
+    `Unable to read ${name}'s values: the diff shows keys only`,
   "warn.configNotRolledBack": (workload: string) =>
-    `${workload} reads ConfigMaps or Secrets: their contents are not rolled back`,
+    `${workload} reads ConfigMaps or Secrets: a rollback leaves their contents as they are`,
   "warn.storageClassUnknown": (claim: string) =>
-    `StorageClass of ${claim} not readable: the cluster decides whether it can grow`,
+    `Unable to read the StorageClass of ${claim}: the cluster decides whether it can grow`,
   "warn.readWriteOnceShared": (workload: string) =>
     `${workload} runs several replicas: a ReadWriteOnce volume mounts on one node only`,
   "warn.readWriteOncePodShared": (workload: string) =>
@@ -766,14 +766,14 @@ export const en = {
   "warn.claimDataRetained": (claim: string, volume: string) =>
     `Volume ${volume} keeps ${claim}'s data (reclaim policy Retain) until an admin removes it`,
   "warn.claimDataUnknown": (claim: string) =>
-    `${claim}'s data may be lost: its volume's reclaim policy is not readable`,
+    `${claim}'s data may be lost: unable to read its volume's reclaim policy`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} still read ${name}: their new replicas will not start without it`,
   "warn.claimStillMounted": (name: string, names: string) =>
-    `${names} still mount ${name}: it goes once no replica uses it`,
+    `${names} still mount ${name}: Kubernetes removes it once no replica uses it`,
   "warn.ingressOpened": (names: string) =>
     `No longer isolated: ${names} accept traffic from anywhere`,
-  "warn.egressOpened": (names: string) => `No longer limited: ${names} may send anywhere`,
+  "warn.egressOpened": (names: string) => `No longer limited: ${names} can send traffic anywhere`,
   "warn.connectionsOpened": (pairs: string) => `Allowed again: ${pairs}`,
   // Confirmations: what will happen, in plain words
   "confirm.restartSingle": (name: string) =>
@@ -792,9 +792,9 @@ export const en = {
   "confirm.dataSet": (keys: string, kind: string, name: string) =>
     `Set ${keys} in ${kind} ${name}.`,
   "confirm.dataRemove": (keys: string, kind: string, name: string) =>
-    `Delete ${keys} from ${kind} ${name}. The old value cannot be brought back here.`,
+    `Delete ${keys} from ${kind} ${name}. The old value can't be restored here.`,
   "confirm.dataBoth": (set: string, removed: string, kind: string, name: string) =>
-    `Set ${set} and delete ${removed} in ${kind} ${name}. A deleted value cannot be brought back here.`,
+    `Set ${set} and delete ${removed} in ${kind} ${name}. A deleted value can't be restored here.`,
   "confirm.keepsOld": (names: string, count: number) =>
     `${names} ${count === 1 ? "keeps" : "keep"} the old value until restarted.`,
   "confirm.readersKeepOld": (names: string, object: string, count: number) =>
@@ -807,8 +807,8 @@ export const en = {
   "confirm.removeDomain": (host: string) => `Requests to ${host} no longer reach this project.`,
   "confirm.rollback": (revision: number) =>
     `Template changes made after revision ${revision} are undone.`,
-  "confirm.notRolledBack": "ConfigMap and Secret contents are not rolled back.",
-  "confirm.noShrink": "Once grown, the volume cannot shrink again.",
+  "confirm.notRolledBack": "A rollback leaves ConfigMap and Secret contents as they are.",
+  "confirm.noShrink": "A volume can't shrink after it grows.",
   "confirm.addVolume": (size: string, service: string) => `${service} gets a new ${size} volume.`,
   "confirm.moveMount": (service: string, from: string, to: string) =>
     `Move ${service}'s mount from ${from} to ${to}.`,
@@ -818,11 +818,12 @@ export const en = {
   "confirm.probeSet.readiness": (check: string, period: number, _failures: number) =>
     `A replica gets no traffic until ${check} succeeds (checked every ${period} s).`,
   "confirm.probeSet.liveness": (check: string, period: number, failures: number) =>
-    `If ${check} fails ${failures} times in a row, the container is restarted (checked every ${period} s).`,
+    `If ${check} fails ${failures} times in a row, the cluster restarts the container (checked every ${period} s).`,
   "confirm.probeSet.startup": (check: string, period: number, failures: number) =>
-    `Other checks wait until ${check} succeeds; after ${failures} failures the container is restarted (checked every ${period} s).`,
+    `Other checks wait until ${check} succeeds; after ${failures} failures the cluster restarts the container (checked every ${period} s).`,
   "confirm.probeRemoved.readiness": "Without it, a replica gets traffic as soon as it starts.",
-  "confirm.probeRemoved.liveness": "Without it, a container that hangs is not restarted.",
+  "confirm.probeRemoved.liveness":
+    "Without it, the cluster doesn't restart a container that hangs.",
   "confirm.probeRemoved.startup":
     "Without it, the other checks start as soon as the container does.",
   "confirm.check.http": (port: string, path: string) => `GET ${path} on port ${port}`,
@@ -838,11 +839,11 @@ export const en = {
   "confirm.resources": (pairs: [string, string][]) =>
     `${pairs.map(([label, value]) => `${label} ${value}`).join(", ")}.`,
   "confirm.yamlAsIs":
-    "Your YAML is written as it is: every field you changed takes effect at once.",
+    "Zeabur writes the YAML as it is: every field you changed takes effect at once.",
   "confirm.create": (kind: string, name: string) => `Create ${kind} ${name}.`,
   "confirm.isolates": (name: string) =>
-    `${name} then accepts and sends only what this and other policies allow; the rest is blocked.`,
-  "confirm.delete": (name: string) => `Delete ${name}. This cannot be undone.`,
+    `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
+  "confirm.delete": (name: string) => `Delete ${name}. This can't be undone.`,
   "action.restart": "Restart",
   "action.saveVariables": "Save variables",
   "action.saveValues": "Save values",
@@ -872,7 +873,7 @@ export const en = {
   "toast.managed": (tool: string) => `Managed by ${tool}`,
   "toast.managedHelm": "Change it in the chart's values and upgrade the release.",
   "toast.managedGit": (tool: string) => `Change it in the Git repository ${tool} syncs from.`,
-  "title.env": (service: string) => `Variables of ${service}`,
+  "title.env": (service: string) => `Variables for ${service}`,
   "title.data": (kind: string, name: string) => `${kind} ${name}`,
   "title.restart": (service: string) => `Restart ${service}`,
   "title.addDomain": (host: string) => `Add ${host}`,
@@ -886,15 +887,15 @@ export const en = {
   "title.editYaml": (name: string) => `Edit ${name}`,
   "title.delete": (kind: string, name: string) => `Delete ${kind} ${name}`,
   "yaml.delete": "Delete",
-  "yaml.notDeletable": "Kubernetes makes this kind itself; delete the object that owns it.",
+  "yaml.notDeletable": "Kubernetes creates this kind itself; delete the object that owns it.",
   "title.rollback": (service: string, revision: number) => `Roll back ${service} to #${revision}`,
-  "title.compute": (service: string) => `Compute of ${service}`,
-  "title.probe": (service: string) => `Health checks of ${service}`,
+  "title.compute": (service: string) => `Compute for ${service}`,
+  "title.probe": (service: string) => `Health checks for ${service}`,
   "title.expand": (claim: string, size: string) => `Grow ${claim} to ${size}`,
   "title.mount": (path: string) => `Change mount ${path}`,
   "title.addVolume": (path: string) => `Add a volume at ${path}`,
-  "releases.none": "No earlier release yet.",
-  "releases.noneTask": "No releases: Jobs and CronJobs keep none.",
+  "releases.none": "No earlier releases yet.",
+  "releases.noneTask": "Jobs and CronJobs keep no releases.",
   "releases.current": "Running",
   "releases.compare": "Compare",
   "releases.rollback": "Roll back",
@@ -902,7 +903,7 @@ export const en = {
   "releases.same": "The two templates are the same.",
   "form.compute": "Compute",
   "form.health": "Health checks",
-  "form.jobs": "Jobs run once; change their template as YAML.",
+  "form.jobs": "Jobs run once. Change their template in YAML.",
   "form.replicas": "Replicas",
   "form.cpuRequest": "CPU request",
   "form.memoryRequest": "Memory request",
@@ -910,15 +911,15 @@ export const en = {
   "form.memoryLimit": "Memory limit",
   "form.largestNode": (cores: string, memory: string) => `Largest node: ${cores} cores, ${memory}`,
   "form.badQuantity": "Use a quantity such as 250m, 1 or 512Mi.",
-  "form.badReplicas": "A whole number, 0 to 1000.",
-  "form.badNumber": "A whole number above 0.",
-  "form.badPath": "An absolute path, such as /data.",
-  "form.badName": "Lower-case letters, digits and -.",
+  "form.badReplicas": "Enter a whole number from 0 to 1000.",
+  "form.badNumber": "Enter a whole number above 0.",
+  "form.badPath": "Enter an absolute path, such as /data.",
+  "form.badName": "Use lowercase letters, digits, and -.",
   "form.probe.readiness": "Traffic check",
   "form.probe.liveness": "Restart check",
   "form.probe.startup": "Startup check",
   "form.probeEffect.readiness": "Traffic goes only to replicas that pass.",
-  "form.probeEffect.liveness": "A container that keeps failing is restarted.",
+  "form.probeEffect.liveness": "The cluster restarts a container that keeps failing.",
   "form.probeEffect.startup": "Holds the other checks until the app has started.",
   "form.probeCheck": "Check",
   "form.probeNone": "None",
@@ -931,7 +932,7 @@ export const en = {
   "form.probeFailures": "Failures",
   "form.probePreset": (port: string) => `HTTP on ${port}`,
   "form.size": "Size",
-  "form.sizeHint": "Claims grow, never shrink.",
+  "form.sizeHint": "A volume can grow but never shrink.",
   "form.expand": "Grow",
   "form.readOnly": "Read-only",
   "form.addVolume": "Add a volume",
@@ -939,8 +940,8 @@ export const en = {
   "form.statefulVolumes": "A StatefulSet's volumes are set when it is created.",
   "form.advanced": "Advanced",
   "form.claimName": "Claim name",
-  "form.claimNameHint": "A new claim; a name already in use is refused.",
-  "form.badClaimName": "Lower-case letters, digits, - and ., at most 253.",
+  "form.claimNameHint": "Creates a new claim; the cluster refuses a name already in use.",
+  "form.badClaimName": "Use lowercase letters, digits, -, and ., at most 253 characters.",
   "form.accessMode": "Access mode",
   "form.accessModeHint": "Many-node modes need storage that supports them.",
   "ops.managedEdit": (tool: string) => `Managed by ${tool}: change it at its source`,
@@ -959,10 +960,10 @@ export const en = {
   "vars.editIn": (kind: string, name: string) => `Edit in ${kind} ${name}`,
   "data.addKey": "Add key",
   "data.key": "Key",
-  "data.restartAfter": "Restart readers after apply",
+  "data.restartAfter": "Restart readers after applying",
   "data.readers": "Read by",
   "data.reveal": "Reveal values",
-  "data.binary": "binary",
+  "data.binary": "Binary",
   "data.noChanges": "No changes.",
   "net.addDomain": "Add domain",
   "net.domain": "Domain",
