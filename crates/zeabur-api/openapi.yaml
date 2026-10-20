@@ -1044,6 +1044,48 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/rollout":
+    get:
+      tags:
+      - services
+      summary: |-
+        How far a service's rollout has come: pods of the new release and of earlier ones, ready or
+        not, and whether it is done, progressing, or stuck (with the reason and the plan that rolls
+        back). Poll it while `status` is `progressing`.
+      operationId: serviceRollout
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset or daemonset; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RolloutProgress"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/services/{kind}/{name}/timeline":
     get:
       tags:
@@ -5893,6 +5935,96 @@ components:
       - start
       - stop
       - pendingRestart
+    RolloutProgress:
+      type: object
+      description: How far a service's rollout has come.
+      required:
+      - id
+      - workload
+      - status
+      - message
+      - desired
+      - updated
+      - updatedReady
+      - old
+      - oldReady
+      - evidence
+      - unreadable
+      properties:
+        desired:
+          type: integer
+          format: int32
+          description: The pods it should have (nodes, for a DaemonSet).
+        diagnoses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Diagnosis"
+          description: The diagnoses of the new pods.
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: The status fields it rests on.
+        id:
+          type: string
+          description: "`projects/<project>/services/<kind>/<name>/rollout`."
+        message:
+          $ref: "#/components/schemas/Message"
+          description: "`rollout.<progressing|done|paused|waitsForDeletion>` or `rollout.stuck.<reason>`."
+        old:
+          type: integer
+          format: int32
+          description: Pods of earlier releases still there.
+        oldReady:
+          type: integer
+          format: int32
+          description: Of those, ready.
+        reason:
+          oneOf:
+          - $ref: "#/components/schemas/StuckReason"
+            description: Why it is stuck.
+          - type: "null"
+        revision:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: The release it rolls out.
+        rollback:
+          oneOf:
+          - $ref: "#/components/schemas/PlanRequest"
+            description: >-
+              The changes that return to the release before, to send to `plan`; while it is
+              not done.
+          - type: "null"
+        status:
+          $ref: "#/components/schemas/RolloutStatus"
+          description: Where it stands.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused.
+        updated:
+          type: integer
+          format: int32
+          description: Pods of the new release.
+        updatedReady:
+          type: integer
+          format: int32
+          description: Of those, ready.
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
+    RolloutStatus:
+      type: string
+      description: Where a rollout stands.
+      enum:
+      - progressing
+      - done
+      - stuck
+      - paused
+      - waitsForDeletion
     Route:
       type: object
       description: "An Ingress routing to workloads' Services: how they are reached from outside."
@@ -6489,6 +6621,19 @@ components:
       - not-configured
       - unreadable
       - unavailable
+    StuckReason:
+      type: string
+      description: Why a rollout is stuck.
+      enum:
+      - crashLoop
+      - outOfMemory
+      - imagePull
+      - unschedulable
+      - quota
+      - configMissing
+      - runFailed
+      - deadlineExceeded
+      - replicaFailure
     Suggestion:
       type: string
       description: How strongly the catalogue suggests a missing capability.

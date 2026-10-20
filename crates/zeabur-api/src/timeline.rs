@@ -533,7 +533,7 @@ pub(crate) fn newest(mut items: Vec<TimelineEntry>) -> (Vec<TimelineEntry>, bool
     (items, truncated)
 }
 
-async fn history(
+pub(crate) async fn history(
     cluster: &dyn Cluster,
     project: &str,
     unreadable: &mut Vec<UnreadableView>,
