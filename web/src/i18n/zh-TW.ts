@@ -77,7 +77,6 @@ export const zhTW: Messages = {
   "theme.light": "淺色",
   "theme.dark": "深色",
 
-  // Between a label and what follows it ("What to do: …")
   "common.colon": "：",
   "common.loading": "正在載入…",
   "common.retry": "再試一次",

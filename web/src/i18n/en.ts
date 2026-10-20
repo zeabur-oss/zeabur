@@ -90,7 +90,6 @@ export const en = {
   "theme.dark": "Dark",
 
   // Common
-  // Between a label and what follows it ("What to do: …")
   "common.colon": ": ",
   "common.loading": "Loading…",
   "common.retry": "Try again",
@@ -1481,7 +1480,7 @@ export const en = {
   },
   "sentence.gap.volumeWithoutBackup": (p: P) => `Volume ${p.claim} has no backup schedule.`,
   "sentence.gap.databaseWithoutBackup": (p: P) => `Database ${p.database} has no backup schedule.`,
-  // Problems this page makes itself: no answer, a proxy's error, a log it could not follow
+  // Problems the page makes itself
   "sentence.page.noAnswer": () => "Zeabur didn't respond.",
   "sentence.page.status": (p: P) => `The request failed with HTTP ${p.status}.`,
   "sentence.page.reload": () => "Check that Zeabur is still running, then reload the page.",

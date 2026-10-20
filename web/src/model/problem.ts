@@ -70,8 +70,7 @@ export function isKind(kind: string): kind is Kind {
 
 export function problemText(t: Translate, locale: Locale, problem: Problem): ProblemText {
   const kind = problem.kind
-  // A problem made in this page (no answer, a proxy's error), written from its keys, or a kind
-  // newer than this page, shown as it came.
+  // A problem made in this page, or a kind newer than this page.
   if (!isKind(kind) || !problem.type.startsWith("/problems/"))
     return {
       headline:

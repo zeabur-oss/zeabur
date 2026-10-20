@@ -155,7 +155,7 @@ test("history in each state: no store, not allowed, not answering, no samples", 
   await page.unroute(historyPath)
   await stub(page, historyPath, { ...history("unavailable"), message: "no endpoints available" })
   await page.reload()
-  await expect(panel).toContainText("The metrics store did not answer.")
+  await expect(panel).toContainText("The metrics store did not respond.")
 
   await page.unroute(historyPath)
   await stub(page, historyPath, history("available", { cpu: [], memory: [] }))

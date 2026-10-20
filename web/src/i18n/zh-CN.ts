@@ -77,7 +77,6 @@ export const zhCN: Messages = {
   "theme.light": "亮色",
   "theme.dark": "暗色",
 
-  // Between a label and what follows it ("What to do: …")
   "common.colon": "：",
   "common.loading": "正在加载…",
   "common.retry": "重试",
@@ -1104,7 +1103,7 @@ export const zhCN: Messages = {
       : `减少请求的量、释放项目已占用的资源，或请管理员调高上限 ${p.quota}。`,
   "sentence.problem.policyDenied.fix.change": () => "修改它指出的地方，或咨询负责这项策略的人。",
   "sentence.diagnosis.crashLoop.why.backOff": (p) =>
-    `它已重新启动 ${p.restarts} 次；集群每次都会再启动它，两次之间等得越来越久，默认最多等 5 分钟。`,
+    `它已重启 ${p.restarts} 次；集群每次都会再启动它，两次之间等得越来越久，默认最多等 5 分钟。`,
   "sentence.diagnosis.crashLoop.why.exitsZero": (p) =>
     `服务应该持续运行，所以程序一结束，即使是正常结束，集群也会再启动它（目前 ${p.restarts} 次）。`,
   "sentence.diagnosis.runFailed.why.exitCode": (p) =>
@@ -1124,9 +1123,9 @@ export const zhCN: Messages = {
     return t
       ? timingZhCN(
           t,
-          `集群每 ${secondsZhCN(t.period)}检查一次，连续失败 ${t.threshold} 次（约 ${secondsZhCN(t.total)}）就会重新启动容器。`,
+          `集群每 ${secondsZhCN(t.period)}检查一次，连续失败 ${t.threshold} 次（约 ${secondsZhCN(t.total)}）就会重启容器。`,
         )
-      : "存活检查连续失败几次后，集群就会重新启动容器。"
+      : "存活检查连续失败几次后，集群就会重启容器。"
   },
   "sentence.diagnosis.probeFailure.why.readiness": (p) => {
     const t = probeTiming(p)
@@ -1142,9 +1141,9 @@ export const zhCN: Messages = {
     return t
       ? timingZhCN(
           t,
-          `容器有 ${t.threshold} × ${secondsZhCN(t.period)}（${secondsZhCN(t.total)}）可以通过启动检查；超过时集群就会重新启动它。`,
+          `容器有 ${t.threshold} × ${secondsZhCN(t.period)}（${secondsZhCN(t.total)}）可以通过启动检查；超过时集群就会重启它。`,
         )
-      : "其他检查会等启动检查通过；如果没有在时限内通过，集群就会重新启动容器。"
+      : "其他检查会等启动检查通过；如果没有在时限内通过，集群就会重启容器。"
   },
   "sentence.diagnosis.configMissing.cause.object": (p) =>
     `${p.container} 无法启动：${objectZhCN(p)} 不存在。`,
@@ -1247,16 +1246,14 @@ export const zhCN: Messages = {
       : `项目用量上限 ${p.quota} 已经没有空间。`,
   "sentence.problem.why.policy-denied": (p) =>
     p.policy ? `策略 ${p.policy} 的回应是：` : "集群的回应是：",
-  "sentence.diagnosis.crashLoop.cause.exitCode": (p) => `${p.container} 反复崩溃、重新启动。`,
-  "sentence.diagnosis.crashLoop.cause.exitsZero": (p) =>
-    `${p.container} 反复正常退出后又重新启动。`,
+  "sentence.diagnosis.crashLoop.cause.exitCode": (p) => `${p.container} 反复崩溃、重启。`,
+  "sentence.diagnosis.crashLoop.cause.exitsZero": (p) => `${p.container} 反复正常退出后又重启。`,
   "sentence.diagnosis.crashLoop.cause.notExecutable": (p) =>
     `${p.container} 无法运行它的命令：这个文件不能执行。`,
   "sentence.diagnosis.crashLoop.cause.commandNotFound": (p) =>
     `${p.container} 无法运行它的命令：镜像里没有这个命令。`,
-  "sentence.diagnosis.crashLoop.cause.killed": (p) => `${p.container} 反复被强制终止、重新启动。`,
-  "sentence.diagnosis.crashLoop.cause.terminated": (p) =>
-    `${p.container} 反复收到停止请求后重新启动。`,
+  "sentence.diagnosis.crashLoop.cause.killed": (p) => `${p.container} 反复被强制终止、重启。`,
+  "sentence.diagnosis.crashLoop.cause.terminated": (p) => `${p.container} 反复收到停止请求后重启。`,
   "sentence.diagnosis.crashLoop.fix.exitsZero": () =>
     "服务必须持续运行；一次性的工作改用 Job 运行。",
   "sentence.diagnosis.crashLoop.fix.command": () => "检查镜像的 entrypoint、command 与 args。",
