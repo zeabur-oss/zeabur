@@ -1,18 +1,14 @@
-import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GearSixIcon from "~icons/ph/gear-six"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 import HouseIcon from "~icons/ph/house"
 
-import { clusterQuery } from "@/api/queries"
-import { AdminBadge } from "@/components/shell/admin-badge"
 import { SearchRow } from "@/components/shell/search-row"
-import { UserMenu } from "@/components/shell/user-menu"
+import { ContextMenu } from "@/components/shell/user-menu"
 import { useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { usePlace } from "@/lib/place"
-import { Avatar } from "@zeabur/design-system/components/avatar"
 import { Logo } from "@zeabur/design-system/components/brand"
 import {
   Sidebar as SidebarRoot,
@@ -21,7 +17,6 @@ import {
   SidebarGroup,
   SidebarHeader,
   SidebarItem,
-  SidebarPicker,
   SidebarSection,
 } from "@zeabur/design-system/components/sidebar"
 
@@ -74,15 +69,13 @@ export function Sidebar() {
           <Logo className="h-5" aria-hidden="true" />
         </Link>
       </SidebarHeader>
-      <ClusterPicker />
       <SearchRow />
       <SidebarContent>
         <SidebarGroup>{everyday.map(navItem)}</SidebarGroup>
         <SidebarSection title={t("shell.manage")}>{manage.map(navItem)}</SidebarSection>
       </SidebarContent>
       <SidebarFooter>
-        <AdminBadge />
-        <UserMenu />
+        <ContextMenu />
       </SidebarFooter>
     </SidebarRoot>
   )
@@ -100,31 +93,5 @@ function navItem(item: Item) {
     >
       {item.label}
     </SidebarItem>
-  )
-}
-
-function ClusterPicker() {
-  const t = useT()
-  const cluster = useQuery(clusterQuery)
-  const name = cluster.data?.name
-  return (
-    <SidebarPicker
-      render={<Link to="/cluster" activeOptions={{ exact: true, includeSearch: false }} />}
-      aria-label={name ? `${t("shell.cluster")} ${name}` : t("shell.cluster")}
-      avatar={
-        <Avatar
-          size="xs"
-          className="size-6"
-          name={name}
-          fallbackIcon={<HardDrivesIcon aria-hidden="true" />}
-        />
-      }
-      label={
-        <span translate="no" title={name}>
-          {name ?? t("shell.cluster")}
-        </span>
-      }
-      trailing={null}
-    />
   )
 }

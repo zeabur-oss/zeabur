@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import CheckIcon from "~icons/ph/check"
 import DesktopIcon from "~icons/ph/desktop"
+import HardDrivesIcon from "~icons/ph/hard-drives"
 import MoonIcon from "~icons/ph/moon"
 import ShieldCheckIcon from "~icons/ph/shield-check"
 import ShieldSlashIcon from "~icons/ph/shield-slash"
 import SignOutIcon from "~icons/ph/sign-out"
 import SunIcon from "~icons/ph/sun"
 
-import { sessionQuery, whoamiQuery } from "@/api/queries"
+import { clusterQuery, sessionQuery, whoamiQuery } from "@/api/queries"
 import { dropElevation, retryAsAdmin } from "@/auth/elevation"
 import { signOut } from "@/auth/session"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
@@ -21,7 +23,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@zeabur/design-system/components/menu"
-import { SidebarPicker } from "@zeabur/design-system/components/sidebar"
+import { ContextChip } from "@zeabur/design-system/components/context-chip"
 
 const themes: { value: ThemeChoice; icon: typeof SunIcon }[] = [
   { value: "system", icon: DesktopIcon },
@@ -29,25 +31,37 @@ const themes: { value: ThemeChoice; icon: typeof SunIcon }[] = [
   { value: "dark", icon: MoonIcon },
 ]
 
-export function UserMenu() {
+/** Which cluster this is, who is signed in, and whether admin rights are on; the account menu. */
+export function ContextMenu() {
   const t = useT()
   const { locale, setLocale } = useI18n()
   const whoami = useQuery(whoamiQuery)
   const session = useQuery(sessionQuery).data
+  const cluster = useQuery(clusterQuery).data
   const theme = useTheme()
   const name = whoami.data?.username ?? ""
   const groups = whoami.data?.groups.join(", ")
+  const until = session?.elevation === "active" ? session.elevatedUntil : undefined
+  const time = until
+    ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(
+        new Date(until),
+      )
+    : undefined
+  const place = cluster?.name ?? t("shell.cluster")
+  const who = name || t("shell.whoamiUnknown")
 
   return (
     <Menu>
       <MenuTrigger
         render={
-          <SidebarPicker
+          <ContextChip
+            place={<span translate="no">{place}</span>}
+            identity={<span translate="no">{who}</span>}
             avatar={<Avatar size="xs" shape="circle" className="size-6" name={name || undefined} />}
-            label={<span translate="no">{name || t("shell.whoamiUnknown")}</span>}
+            elevated={time ? t("elevate.until", time) : undefined}
           />
         }
-        aria-label={t("shell.account")}
+        aria-label={t("shell.context", place, who)}
       />
       <MenuContent align="start" className="w-60">
         <div className="flex flex-col px-2.5 py-2">
@@ -60,14 +74,23 @@ export function UserMenu() {
             </span>
           ) : null}
         </div>
+        <MenuItem render={<Link to="/cluster" />}>
+          <HardDrivesIcon aria-hidden="true" />
+          <span className="flex-1 truncate" translate="no">
+            {place}
+          </span>
+        </MenuItem>
         {session?.elevation === "active" || session?.elevation === "available" ? (
           <>
             <MenuSeparator />
             {session.elevation === "active" ? (
-              <MenuItem onClick={() => void dropElevation()}>
-                <ShieldSlashIcon aria-hidden="true" />
-                {t("elevate.drop")}
-              </MenuItem>
+              <>
+                <p className="px-2.5 py-1.5 text-xs text-secondary">{t("elevate.activeDetail")}</p>
+                <MenuItem onClick={() => void dropElevation()}>
+                  <ShieldSlashIcon aria-hidden="true" />
+                  {t("elevate.drop")}
+                </MenuItem>
+              </>
             ) : (
               // Granted rights re-read every query (auth/follow-elevation.ts): nothing to retry.
               <MenuItem onClick={() => void retryAsAdmin()}>

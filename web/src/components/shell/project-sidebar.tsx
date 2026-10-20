@@ -4,7 +4,6 @@ import ArrowLeftIcon from "~icons/ph/arrow-left"
 import CubeIcon from "~icons/ph/cube"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GearSixIcon from "~icons/ph/gear-six"
-import GraphIcon from "~icons/ph/graph"
 import InfoIcon from "~icons/ph/info"
 import ListBulletsIcon from "~icons/ph/list-bullets"
 import SquaresFourIcon from "~icons/ph/squares-four"
@@ -12,7 +11,7 @@ import StackIcon from "~icons/ph/stack"
 
 import { projectQuery } from "@/api/queries"
 import { RoleIcon, ServiceIcon } from "@/components/service-icon"
-import { AdminBadge } from "@/components/shell/admin-badge"
+import { ContextMenu } from "@/components/shell/user-menu"
 import { ProjectGlyph } from "@/components/shell/project-glyph"
 import { SearchRow } from "@/components/shell/search-row"
 import { ProjectSwitcher } from "@/components/shell/switchers"
@@ -29,6 +28,7 @@ import {
   Sidebar,
   SidebarContent,
   SidebarCopyPill,
+  SidebarFooter,
   SidebarGroup,
   SidebarItem,
   SidebarMenu,
@@ -49,7 +49,6 @@ type Entry = { entry: ProjectEntry; to: string; icon: Icon }
 
 const pages: Entry[] = [
   { entry: "overview", to: "/projects/$project", icon: SquaresFourIcon },
-  { entry: "architecture", to: "/projects/$project/architecture", icon: GraphIcon },
   { entry: "settings", to: "/projects/$project/settings", icon: GearSixIcon },
 ]
 
@@ -95,8 +94,10 @@ function SettingsSidebar({ project }: { project: string }) {
           </SidebarItem>
         </SidebarGroup>
       </SidebarContent>
-      <AdminBadge />
       <SidebarCopyPill label={t("column.namespace")} value={project} copyLabel={t("common.copy")} />
+      <SidebarFooter>
+        <ContextMenu />
+      </SidebarFooter>
     </Sidebar>
   )
 }
@@ -160,11 +161,10 @@ function ProjectNav({ project }: { project: string }) {
           action={
             <Tooltip content={t("column.allServices")}>
               <Link
-                to="/projects/$project/services"
+                to="/projects/$project"
                 params={{ project }}
-                activeOptions={{ exact: true, includeSearch: false }}
+                search={{ view: "list" }}
                 aria-label={t("column.allServices")}
-                aria-current={place.entry === "services" ? "page" : undefined}
                 className="flex size-6 items-center justify-center rounded-md text-tertiary outline-none hover:text-main aria-[current=page]:text-main"
               >
                 <ListBulletsIcon aria-hidden="true" className="size-3.5" />
@@ -196,8 +196,10 @@ function ProjectNav({ project }: { project: string }) {
           ) : null}
         </SidebarSection>
       </SidebarContent>
-      <AdminBadge />
       <SidebarCopyPill label={t("column.namespace")} value={project} copyLabel={t("common.copy")} />
+      <SidebarFooter>
+        <ContextMenu />
+      </SidebarFooter>
     </Sidebar>
   )
 }

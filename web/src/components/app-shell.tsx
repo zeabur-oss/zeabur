@@ -7,6 +7,7 @@ import XIcon from "~icons/ph/x"
 import { elevation } from "@/auth/elevation"
 import { PlanFallback } from "@/components/plan/fallback"
 import { CommandPalette } from "@/components/shell/command-palette"
+import { AdminBadge } from "@/components/shell/admin-badge"
 import { ProjectSidebar } from "@/components/shell/project-sidebar"
 import { Sidebar } from "@/components/shell/sidebar"
 import { useT } from "@/i18n"
@@ -108,10 +109,12 @@ function PhoneBar() {
       <Link to="/" className="flex h-7 items-center rounded-md outline-none" aria-label="Zeabur">
         <Logo className="h-5" aria-hidden="true" />
       </Link>
+      <span className="ml-auto flex">
+        <AdminBadge />
+      </span>
       <Button
         variant="muted"
         size="icon-sm"
-        className="ml-auto"
         onClick={() => palette.set(true)}
         aria-label={t("shell.search")}
       >
