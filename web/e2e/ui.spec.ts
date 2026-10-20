@@ -283,7 +283,7 @@ test("the service page has its tabs, and the Logs tab follows a pod", async ({ p
     "Overview",
     "Logs",
     "Variables",
-    "Metrics",
+    "Usage",
     "Networking",
     "Storage",
     "Settings",

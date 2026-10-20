@@ -57,7 +57,7 @@ export function localProblem(status: number, detail: string): Problem {
   // The English `title` and `fix` are for logs; the page writes the keyed `summary` and `fixKey`.
   return {
     type: "about:blank",
-    title: status === 0 ? "Zeabur didn't answer" : `HTTP ${status}`,
+    title: status === 0 ? "Zeabur didn't respond" : `HTTP ${status}`,
     status,
     detail,
     fix: "Check that Zeabur is still running, then reload the page.",

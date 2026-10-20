@@ -315,7 +315,7 @@ export const en = {
   "cluster.skewUnsupported":
     "Unsupported: newer than the control plane, or more than 3 minor versions older.",
   "cluster.noMetrics": "Install metrics-server to see usage.",
-  "cluster.metricsUnavailable": "metrics-server did not answer.",
+  "cluster.metricsUnavailable": "metrics-server did not respond.",
   "cluster.noUsageYet": "No usage measured yet.",
   "cluster.partialPods": (n: number) => `Reserved amounts count the first ${n} pods only.`,
   "cluster.unscheduled": (n: number) => `${n} pods waiting for a node`,
@@ -450,7 +450,7 @@ export const en = {
   "tab.networking": "Networking",
   "tab.storage": "Storage",
   "tab.events": "Events",
-  "tab.metrics": "Metrics",
+  "tab.metrics": "Usage",
   "ops.restart": "Restart",
   "ops.later": "Arrives in a later version.",
   "cond.available": "Available",
@@ -475,7 +475,7 @@ export const en = {
   "resources.requests": "Request",
   "resources.limits": "Limit",
   "connections.title": "Connections",
-  "connections.none": "None found.",
+  "connections.none": "No connections found.",
 
   // Logs
   "logs.noPods": "No replicas.",
@@ -502,10 +502,10 @@ export const en = {
   "logs.of": (n: number) => `of ${n}`,
   "logs.unavailable.no-previous-run": "No previous run: the container has not restarted.",
   "logs.unavailable.not-started": "No log yet: the container has not started.",
-  "logs.unavailable.removed": "The cluster no longer has this run's container, nor its log.",
+  "logs.unavailable.removed": "The cluster has removed this run's container and its log.",
   "logs.unavailableFix.no-previous-run": "Read the current run's log instead.",
   "logs.unavailableFix.not-started":
-    "Wait for it to start; the replica's events say what it is waiting for.",
+    "Wait for the container to start. The replica's events say what it is waiting for.",
   "logs.unavailableFix.removed":
     "Wait a moment and refresh. To keep logs past restarts, send them to a log store.",
   "logs.currentRun": "Show current run",
@@ -517,14 +517,14 @@ export const en = {
   "terminal.exited": (code: number) => `Exited with code ${code}`,
   "terminal.ended": "Ended",
   "terminal.noShell":
-    "This container has no shell. Distroless images ship none; open an ephemeral debug container instead:",
+    "This container has no shell (distroless images include none). Open an ephemeral debug container instead:",
   "terminal.failed": "The container runtime ended the session.",
-  "terminal.expired": "Session expired, reconnect.",
-  "terminal.adminEnded": "Admin rights ended. Reconnect to go on with your own rights.",
+  "terminal.expired": "The session expired. Reconnect to continue.",
+  "terminal.adminEnded": "Admin rights ended. Reconnect to continue with your own rights.",
   "terminal.idle": "Closed after 15 minutes without input or output.",
   "terminal.lost": "Connection lost.",
   "terminal.rbac":
-    "Opening a terminal needs permission to run commands in this project's containers. Send this to an admin; it grants only that, in this project only:",
+    "Opening a terminal needs permission to run commands in this project's containers. Send this to an admin. It grants only that permission, and only in this project:",
   "terminal.roleLabel": "Role and RoleBinding",
   "terminal.debugLabel": "kubectl debug",
 
@@ -534,7 +534,8 @@ export const en = {
   "vars.reveal": (secret: string) => `Reveal ${secret}`,
   "vars.hide": (secret: string) => `Hide ${secret}`,
   "vars.secretsHint": "About Secret values",
-  "vars.revealHint": "Fetched only when you ask, kept on this page only.",
+  "vars.revealHint":
+    "Zeabur fetches a value only when you reveal it, and keeps it on this page only.",
   "vars.view": "View",
   "vars.list": "List",
   "vars.names": (service: string) => `Names the Service ${service}`,
@@ -554,7 +555,7 @@ export const en = {
   "net.defaultBackend": "Default backend",
   "net.private": "Private",
   "net.public": "Public",
-  "net.alsoAs": "Also",
+  "net.alsoAs": "Also reachable as",
   "net.noService":
     "Nothing in the cluster can reach it yet: it has no internal address. Add one so other services or a domain can send it traffic.",
 
@@ -564,7 +565,7 @@ export const en = {
   "storage.mountPath": "Mount path",
   "storage.accessMode": "Access mode",
   "storage.class": "Storage class",
-  "storage.defaultClass": "default",
+  "storage.defaultClass": "Default",
   "storage.otherMounts": "Other mounts",
 
   // Palette
@@ -1054,11 +1055,11 @@ export const en = {
 
   // Usage and history (requests are "reserved", limits the "maximum"; the Kubernetes words are
   // in the hints)
-  "usage.title": "Usage",
+  "usage.title": "Current usage",
   "usage.history": "History",
   "usage.live": "Live",
   "usage.liveHint":
-    "From metrics-server, measured every 15 s or so, approximate. Memory is the working set, the figure the kubelet acts on. The tick is what each replica reserves (its request); the end of a bar is its maximum (its limit), hatched when it has none.",
+    "Approximate values from metrics-server, measured about every 15 seconds. Memory is the working set, the figure the kubelet acts on. The tick marks what each replica reserves (its request); the bar ends at its maximum (its limit) and is hatched when there is none.",
   "usage.cores": (n: string) => `${n} cores`,
   "usage.coresUnit": "cores",
   "usage.usedWord": (v: string) => `${v} used`,
@@ -1074,13 +1075,14 @@ export const en = {
   "usage.replica": "Replica",
   "usage.notes": "Notes",
   "usage.nearLimitOne": (pod: string) =>
-    `${pod} is close to its memory maximum and may be restarted.`,
+    `${pod} is close to its memory maximum. Going over restarts it.`,
   "usage.nearLimitMany": (n: number) =>
-    `${n} replicas are close to their memory maximum and may be restarted.`,
+    `${n} replicas are close to their memory maximum. Going over restarts them.`,
   "usage.needsMetricsServer": "Live usage needs metrics-server.",
   "usage.install": "Install",
   "usage.whatLive": "Seeing live usage",
-  "usage.unavailable": "metrics-server did not answer. Reserved and maximum amounts are shown.",
+  "usage.unavailable":
+    "metrics-server did not respond, so only reserved and maximum amounts are shown.",
   "usage.note.oom": "Out of memory",
   "usage.note.oomHint":
     "Last stopped with OOMKilled: it went over its memory limit and was restarted.",
@@ -1122,11 +1124,11 @@ export const en = {
   "usage.installVm": "Install VictoriaMetrics",
   "usage.chooseStore": "Choose another store",
   "usage.needsStoreHint": (service: string) =>
-    `Zeabur looked for ${service}. Any Prometheus-compatible store works (Prometheus, VictoriaMetrics); its Service is set in Settings.`,
+    `Zeabur looked for ${service}. Any Prometheus-compatible store works, such as Prometheus or VictoriaMetrics; choose its Service in Settings.`,
   "usage.whatHistory": "Seeing usage history",
   "usage.proxyHint":
-    "Zeabur reads the metrics store through the Kubernetes API as you. Whoever may do so can read every project's metrics, so it is usually kept to administrators.",
-  "usage.storeUnavailable": "The metrics store did not answer.",
+    "Zeabur reads the metrics store through the Kubernetes API as you. Anyone allowed to do that can read every project's metrics, so usually only administrators have that permission.",
+  "usage.storeUnavailable": "The metrics store did not respond.",
   "usage.noSeries": (name: string, range: string) => `No samples for ${name} in the last ${range}.`,
   "usage.noSeriesHint":
     "The store answered but holds nothing for these replicas: it may not collect this machine's container metrics, or not keep data this long.",
@@ -1136,7 +1138,7 @@ export const en = {
   "usage.tenancy": "Who can see this",
   "usage.tenancyHint":
     "Zeabur asks only for this project's replicas. The store itself is not split by project: anyone allowed to open it can read every project's metrics.",
-  "usage.loadingChart": "Loading the chart",
+  "usage.loadingChart": "Loading chart…",
 
   // Settings: the metrics store
   "settings.metricsStore": "Usage history",
@@ -1479,7 +1481,7 @@ export const en = {
   "sentence.gap.volumeWithoutBackup": (p: P) => `Volume ${p.claim} has no backup schedule.`,
   "sentence.gap.databaseWithoutBackup": (p: P) => `Database ${p.database} has no backup schedule.`,
   // Problems this page makes itself: no answer, a proxy's error, a log it could not follow
-  "sentence.page.noAnswer": () => "Zeabur didn't answer.",
+  "sentence.page.noAnswer": () => "Zeabur didn't respond.",
   "sentence.page.status": (p: P) => `The request failed with HTTP ${p.status}.`,
   "sentence.page.reload": () => "Check that Zeabur is still running, then reload the page.",
   "sentence.page.followFailed": () => "Unable to follow the log.",

@@ -10,7 +10,7 @@ const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const service = env("ZEABUR_E2E_SERVICE", "talker")
 const pod = env("ZEABUR_E2E_POD")
-// Usage and history are on the service's Metrics tab.
+// Usage and history are on the service's Usage tab (?tab=metrics).
 const page_ = `/projects/${encodeURIComponent(namespace)}/services/Deployment/${service}?tab=metrics`
 const STORE = "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428"
 const MiB = 2 ** 20
@@ -75,7 +75,7 @@ test("live usage per replica against what it reserves, and a replica without a s
   await stub(page, usagePath, usage("available", [{ pod, cpu: 42, memory: 120 * MiB }]))
   await stub(page, historyPath, history("not-configured"))
   await page.goto(page_)
-  const panel = page.getByRole("region", { name: "Usage" })
+  const panel = page.getByRole("region", { name: "Current usage" })
   await expect(panel.getByText("Live")).toBeVisible()
   const row = panel.getByRole("row").filter({ hasText: pod })
   await expect(row).toContainText("42m")
@@ -88,7 +88,7 @@ test("without metrics-server, the reserved amounts stay and Install is offered",
   await stub(page, usagePath, usage("not-installed"))
   await stub(page, historyPath, history("not-configured"))
   await page.goto(page_)
-  const panel = page.getByRole("region", { name: "Usage" })
+  const panel = page.getByRole("region", { name: "Current usage" })
   await expect(panel).toContainText("Live usage needs metrics-server.")
   await expect(panel.getByRole("link", { name: "Install" })).toHaveAttribute(
     "href",
@@ -106,7 +106,7 @@ test("a refused read of live usage is a quiet line with the missing right", asyn
   await stub(page, usagePath, usage("unreadable"))
   await stub(page, historyPath, history("not-configured"))
   await page.goto(page_)
-  const panel = page.getByRole("region", { name: "Usage" })
+  const panel = page.getByRole("region", { name: "Current usage" })
   await expect(panel).toContainText("Seeing live usage")
   await panel.getByRole("button", { name: "Details" }).click()
   await expect(panel).toContainText("list pods.metrics.k8s.io")
