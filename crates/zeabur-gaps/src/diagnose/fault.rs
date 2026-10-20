@@ -11,12 +11,15 @@
 //! - A registry that throttles, cannot be reached or answers what Zeabur cannot read is
 //!   **upstream**, named by its host; a registry the nodes cannot reach is the cluster
 //!   administrator's to fix.
+//! - An ingress controller with no ready replica is that **component**'s, fixed by whoever runs it;
+//!   a certificate cert-manager has not issued is cert-manager's to report, though the cause (a DNS
+//!   record, a challenge the domain does not answer) is usually the service's to fix.
 //! - The fallback says nothing about where the cause lies: **unknown**.
 
 use zeabur_model::{DiagnosisKind, Fault, FaultOrigin, Fixer, Message};
 
 /// The fault of a diagnosis of `kind` whose cause is `cause`.
-pub(super) fn fault(kind: DiagnosisKind, cause: &Message) -> Fault {
+pub(crate) fn fault(kind: DiagnosisKind, cause: &Message) -> Fault {
     use FaultOrigin::{Cluster, Code, Configuration, Unknown, Upstream};
     use Fixer::{ClusterAdmin, You};
     let variant = cause.key.rsplit('.').next().unwrap_or_default();
@@ -49,6 +52,10 @@ pub(super) fn fault(kind: DiagnosisKind, cause: &Message) -> Fault {
         }
         DiagnosisKind::Unreachable => match variant {
             "noReadyEndpoints" => Fault::new(Code, You),
+            "controllerDown" => {
+                Fault::new(FaultOrigin::Component, Fixer::ComponentOwner).of("ingress-controller")
+            }
+            "certificateNotReady" => Fault::new(FaultOrigin::Component, You).of("cert-manager"),
             _ => Fault::new(Configuration, You),
         },
         DiagnosisKind::QuotaBlocked => Fault::new(Cluster, ClusterAdmin),

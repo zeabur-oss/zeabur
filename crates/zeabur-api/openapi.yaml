@@ -1044,6 +1044,42 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/trace":
+    get:
+      tags:
+      - services
+      summary: |-
+        The way traffic travels to one service, hop by hop: DNS, the ingress controller's address and
+        readiness, the certificate, the route, the Service, its target port and the pods' readiness.
+      operationId: traceService
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset, daemonset, job or cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceTrace"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/usage":
     get:
       tags:
@@ -1179,6 +1215,12 @@ components:
       - ReadWriteOncePod
       - ReadWriteMany
       - ReadOnlyMany
+    AddressKind:
+      type: string
+      description: What kind of address a trace follows.
+      enum:
+      - domain
+      - private
     AffectedService:
       type: object
       description: A service an incident reaches.
@@ -2826,6 +2868,57 @@ components:
         service:
           type: string
           description: Its Service port, `namespace/name:port`.
+    Hop:
+      type: object
+      description: One hop and what was seen there.
+      required:
+      - step
+      - status
+      - message
+      properties:
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: The objects and fields it rests on.
+        expected:
+          type:
+          - string
+          - "null"
+          description: The value it should have, as Kubernetes or DNS writes it, when one is known.
+        message:
+          $ref: "#/components/schemas/Message"
+          description: What was seen, in one sentence.
+        saw:
+          type:
+          - string
+          - "null"
+          description: The value seen, the same way.
+        status:
+          $ref: "#/components/schemas/HopStatus"
+          description: How it fared.
+        step:
+          $ref: "#/components/schemas/HopStep"
+          description: Which hop.
+    HopStatus:
+      type: string
+      description: How a hop fared.
+      enum:
+      - ok
+      - failed
+      - unknown
+    HopStep:
+      type: string
+      description: One hop on the way to a service, in the order traffic takes them.
+      enum:
+      - dns
+      - address
+      - controller
+      - certificate
+      - route
+      - service
+      - targetPort
+      - ready
     ImportedEnv:
       type: object
       description: |-
@@ -5525,6 +5618,51 @@ components:
         service:
           type: string
           description: The backend Service's name.
+    RouteTrace:
+      type: object
+      description: The way to one address of a service.
+      required:
+      - kind
+      - address
+      - via
+      - hops
+      - status
+      properties:
+        address:
+          type: string
+          description: >-
+            The domain (`*` for a rule without a host) or the Service's DNS name, with its
+            port.
+        hops:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hop"
+          description: The hops, in the order traffic takes them.
+        kind:
+          $ref: "#/components/schemas/AddressKind"
+          description: A domain or the private address.
+        status:
+          $ref: "#/components/schemas/HopStatus"
+          description: "`failed` when a hop failed, `unknown` when none failed and one is unknown, else `ok`."
+        via:
+          $ref: "#/components/schemas/Origin"
+          description: "The object that makes the address: the Ingress, `HTTPRoute` or Service."
+    RouteTraceView:
+      allOf:
+      - $ref: "#/components/schemas/RouteTrace"
+        description: The way.
+      - type: object
+        properties:
+          fix:
+            oneOf:
+            - $ref: "#/components/schemas/PlanRequest"
+              description: |-
+                The changes that fix its first failed hop, to send to `plan`; absent when Zeabur cannot
+                write the fix.
+            - type: "null"
+      description: >-
+        One address's way, and the plan that fixes where it stops when Zeabur can write
+        one.
     SecretValue:
       type: object
       description: One value of a revealed Secret.
@@ -5863,6 +6001,33 @@ components:
           type: integer
           format: int32
           description: Restarts, summed over its pods.
+    ServiceTrace:
+      type: object
+      description: Every way to a service, and the diagnoses where they stop.
+      required:
+      - id
+      - routes
+      - diagnoses
+      - unreadable
+      properties:
+        diagnoses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Diagnosis"
+          description: The first failed hop of each address, as a diagnosis, once per cause.
+        id:
+          type: string
+          description: "`projects/<project>/services/<kind>/<name>/trace`."
+        routes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteTraceView"
+          description: Its domains, by route and host, then its private addresses.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; hops that needed them are unknown.
     SessionView:
       type: object
       description: How the person is signed in to Zeabur.

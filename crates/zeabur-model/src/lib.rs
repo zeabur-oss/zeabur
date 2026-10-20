@@ -12,6 +12,7 @@ mod network;
 mod project;
 mod provenance;
 mod source;
+mod trace;
 mod workload;
 
 pub use attribution::{Attribution, NamespaceAttribution, Ownership, WorkloadRef};
@@ -39,6 +40,7 @@ pub use project::{
 };
 pub use provenance::{Provenance, Tool};
 pub use source::{ObjectRef, Origin, Source, SourceKind};
+pub use trace::{AddressKind, Hop, HopStatus, HopStep, RouteTrace};
 pub use workload::{
     Classification, ContainerStatusSummary, ContainerTermination, ContainerWaiting, ManagedBy,
     Phase, PodSummary, Replicas, WorkloadKind, WorkloadSummary,

@@ -5,6 +5,7 @@ mod event;
 mod incident;
 mod rules;
 mod snippet;
+mod trace;
 
 pub use diagnose::{Namespace, RECENT, diagnose};
 pub use event::Event;
@@ -18,4 +19,7 @@ pub use rules::{
     retired_classes,
 };
 pub use snippet::snippet;
+pub use trace::{
+    Certificates, Resolved, TraceInput, diagnoses as trace_diagnoses, names_to_resolve, trace,
+};
 pub use zeabur_core::names::GatewayRef;

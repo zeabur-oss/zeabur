@@ -24,6 +24,14 @@ incident with its blast radius: the services, domains and projects it reaches. `
 diagnoses an incident explains, so a cluster's fault is not shown as each service's own. See the
 `incident` module for what each cause reaches.
 
+## Route traces
+
+`trace` follows every way to a service, hop by hop: for each domain, DNS (answers the caller looked
+up), the ingress controller's address and readiness, the certificate, the route's status; for
+every address, the Service, its target port and the pods' readiness. Each hop is `ok`, `failed`
+or `unknown` with what was expected and what was seen; `diagnoses` turns the first failed hop of
+each address into a diagnosis. See the `trace` module for each hop's rule.
+
 ## Gap rules
 
 A rule implements `Rule`: an id, the guidance it cites, and a check over the project and a few

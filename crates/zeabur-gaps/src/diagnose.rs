@@ -57,7 +57,7 @@ use zeabur_model::{
 
 use crate::event::Event;
 
-mod fault;
+pub(crate) mod fault;
 pub(crate) mod traffic;
 
 /// How long after a failure it still counts, the kubelet's back-off reset window.

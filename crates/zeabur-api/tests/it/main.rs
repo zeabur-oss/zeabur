@@ -10,5 +10,6 @@ mod exec;
 mod incidents;
 mod namespace;
 mod releases;
+mod trace;
 mod usage;
 mod writes;

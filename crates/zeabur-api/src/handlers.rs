@@ -27,6 +27,8 @@ pub struct AppState {
     pub terminal_idle: std::time::Duration,
     /// Zeabur's settings as the server was started (see [`crate::settings`]).
     pub settings: Arc<crate::settings::Settings>,
+    /// How domains are looked up for a route's trace ([`crate::resolve`]).
+    pub resolver: Arc<dyn crate::resolve::Resolve>,
 }
 
 impl std::fmt::Debug for AppState {

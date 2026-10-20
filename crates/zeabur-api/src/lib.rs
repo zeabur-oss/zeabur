@@ -23,6 +23,7 @@
 //! | `GET /api/v1/projects/{p}/namespace` | its Namespace: adopted or not, its details, whether you may change them |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}` | one service, cut from the document |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/releases` | its releases, newest first |
+//! | `GET /api/v1/projects/{p}/services/{kind}/{name}/trace` | every way to it, hop by hop from DNS to a ready pod, and where each stops |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/history` | its pods' CPU, memory and restarts over a range, from the metrics store |
 //! | `GET /api/v1/projects/{p}/usage` | what each pod uses now, from metrics-server |
 //! | `GET /api/v1/projects/{p}/gaps` | what the project is missing, with citations and fixes |
@@ -77,6 +78,7 @@ pub mod local;
 pub mod pods;
 pub mod projects;
 mod query;
+pub mod resolve;
 pub mod resources;
 pub mod services;
 pub mod settings;
@@ -168,6 +170,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(pods::logs::follow_logs))
         .routes(routes!(pods::exec::exec))
         .routes(routes!(services::releases::releases))
+        .routes(routes!(services::trace::trace))
         .routes(routes!(projects::writes::plan))
         .routes(routes!(projects::writes::apply))
         .routes(routes!(projects::backups::get))
@@ -241,12 +244,45 @@ pub fn router_with_terminal_idle(
     )
 }
 
+/// [`router`], looking domains up with `resolver` instead of the system's resolver; for tests.
+pub fn router_with_resolver(
+    access: Arc<dyn ClusterAccess>,
+    resolver: Arc<dyn resolve::Resolve>,
+) -> Router {
+    build_with(
+        access,
+        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
+        PlanKey::random().ok().map(Arc::new),
+        pods::exec::IDLE,
+        Settings::default(),
+        resolver,
+    )
+}
+
 fn build(
     access: Arc<dyn ClusterAccess>,
     clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
     plan_key: Option<Arc<PlanKey>>,
     terminal_idle: std::time::Duration,
     settings: Settings,
+) -> Router {
+    build_with(
+        access,
+        clock,
+        plan_key,
+        terminal_idle,
+        settings,
+        Arc::new(resolve::System),
+    )
+}
+
+fn build_with(
+    access: Arc<dyn ClusterAccess>,
+    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
+    plan_key: Option<Arc<PlanKey>>,
+    terminal_idle: std::time::Duration,
+    settings: Settings,
+    resolver: Arc<dyn resolve::Resolve>,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let state = AppState {
@@ -256,6 +292,7 @@ fn build(
         clock,
         terminal_idle,
         settings: Arc::new(settings),
+        resolver,
     };
     let (router, api) = routes().split_for_parts();
     let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());

@@ -59,6 +59,21 @@ where
     }
 }
 
+/// The cluster's components; `None` when their Deployments could not be listed.
+pub(crate) async fn components(
+    cluster: &dyn Cluster,
+    unreadable: &mut Vec<UnreadableView>,
+) -> Result<Option<Vec<zeabur_gaps::Component>>, ApiError> {
+    let (deployments, daemon_sets) = futures_util::join!(
+        cluster.list::<Deployment>(None),
+        cluster.list::<DaemonSet>(None),
+    );
+    let refused = deployments.is_err();
+    let deployments = allowed(deployments, "deployments.apps", unreadable)?;
+    let daemon_sets = allowed(daemon_sets, "daemonsets.apps", unreadable)?;
+    Ok((!refused).then(|| zeabur_gaps::components(&deployments, &daemon_sets)))
+}
+
 /// The components and nodes of the cluster, as far as the person may list them.
 async fn causes(
     cluster: &dyn Cluster,
