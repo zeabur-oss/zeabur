@@ -39,11 +39,11 @@ export function Panel({
         className,
       )}
     >
-      <header className="flex min-h-12 items-center gap-2 border-b border-v2-border px-5 py-2">
-        <h2 id={id} className="min-w-0 truncate text-sm font-medium">
+      <header className="flex min-h-12 flex-wrap items-center gap-2 border-b border-v2-border px-5 py-2">
+        <h2 id={id} className="max-w-full shrink-0 truncate text-sm font-medium">
           {title}
         </h2>
-        <div className="ml-auto flex shrink-0 items-center gap-1.5">{action}</div>
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">{action}</div>
       </header>
       <div className={cn("flex-1 px-5 py-4", bodyClassName)}>{children}</div>
     </section>
