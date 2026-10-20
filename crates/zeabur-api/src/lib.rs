@@ -25,6 +25,7 @@
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/releases` | its releases, newest first |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/trace` | every way to it, hop by hop from DNS to a ready pod, and where each stops |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/rollout` | how far its rollout has come: new and old pods, done, progressing or stuck and why, with the plan that rolls back |
+//! | `GET /api/v1/projects/{p}/services/{kind}/{name}/evidence` | its problems, trace, events, previous logs and objects as Markdown to copy; never a Secret or a variable's value |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/timeline` | what changed in it and what went wrong, newest first, with the plan that reverts its running release |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/history` | its pods' CPU, memory and restarts over a range, from the metrics store |
 //! | `GET /api/v1/projects/{p}/usage` | what each pod uses now, from metrics-server |
@@ -177,6 +178,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(services::trace::trace))
         .routes(routes!(timeline::service))
         .routes(routes!(services::rollout::rollout))
+        .routes(routes!(services::evidence::evidence))
         .routes(routes!(timeline::project))
         .routes(routes!(projects::writes::plan))
         .routes(routes!(projects::writes::apply))

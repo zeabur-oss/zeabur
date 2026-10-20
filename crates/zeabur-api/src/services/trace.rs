@@ -78,13 +78,24 @@ pub(crate) async fn trace(
         .iter()
         .find(|s| s.workload.kind == workload_kind && s.workload.name == name)
         .ok_or_else(|| not_found(&project, workload_kind.as_str(), &name))?;
+    Ok(Json(of_service(&state, cluster, &read, service).await?))
+}
+
+/// The trace of `service`, read from `read` and the reads only a trace makes.
+pub(crate) async fn of_service(
+    state: &AppState,
+    cluster: &dyn zeabur_kube::Cluster,
+    read: &ProjectRead,
+    service: &Service,
+) -> Result<ServiceTrace, ApiError> {
+    let project = &read.document.project.namespace;
     let mut unreadable = read.document.unreadable.clone();
     let refused = unreadable.len();
     let classes = crate::gaps::ingress_class_facts(cluster, &mut unreadable).await?;
     let classes_readable = unreadable.len() == refused;
     let components = crate::incidents::components(cluster, &mut unreadable).await?;
     let resource = certificates();
-    let listed = match cluster.list_objects(&resource, Some(&project)).await {
+    let listed = match cluster.list_objects(&resource, Some(project)).await {
         Ok(Some(objects)) => Some(
             objects
                 .into_iter()
@@ -131,16 +142,19 @@ pub(crate) async fn trace(
     let routes = traces
         .into_iter()
         .map(|trace| RouteTraceView {
-            fix: fix(&read, service, &trace),
+            fix: fix(read, service, &trace),
             trace,
         })
         .collect();
-    Ok(Json(ServiceTrace {
-        id: format!("{}/trace", id::service(&project, workload_kind, &name)),
+    Ok(ServiceTrace {
+        id: format!(
+            "{}/trace",
+            id::service(project, service.workload.kind, &service.workload.name)
+        ),
         routes,
         diagnoses,
         unreadable,
-    }))
+    })
 }
 
 /// The plan that fixes the first failed hop of `trace`, where Zeabur can write one: a target port

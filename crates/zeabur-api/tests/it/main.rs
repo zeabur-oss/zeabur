@@ -6,6 +6,7 @@ mod api;
 #[cfg(test)]
 #[path = "../common/mod.rs"]
 mod common;
+mod evidence;
 mod exec;
 mod incidents;
 mod namespace;

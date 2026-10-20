@@ -960,6 +960,43 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/evidence":
+    get:
+      tags:
+      - services
+      summary: |-
+        Everything about one service someone helping would ask for, as Markdown to copy: its
+        problems, the way to it hop by hop, recent events, the end of each restarted container's
+        previous log, and its objects with variable values hidden. Never a Secret.
+      operationId: serviceEvidence
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset, daemonset, job or cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceBundle"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/services/{kind}/{name}/history":
     get:
       tags:
@@ -2854,6 +2891,29 @@ components:
         type:
           type: string
           description: "`Normal` or `Warning`."
+    EvidenceBundle:
+      type: object
+      description: A service's evidence, as Markdown.
+      required:
+      - id
+      - generatedAt
+      - markdown
+      - unreadable
+      properties:
+        generatedAt:
+          type: string
+          description: When it was read, RFC 3339.
+        id:
+          type: string
+          description: "`projects/<project>/services/<kind>/<name>/evidence`."
+        markdown:
+          type: string
+          description: The text to copy.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; the text names them too.
     ExitReason:
       type: string
       description: How a terminal's process ended, when it gave no exit code.
