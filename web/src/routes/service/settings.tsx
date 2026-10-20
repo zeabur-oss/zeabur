@@ -185,7 +185,7 @@ function Compute({
 
   return (
     <form
-      className="flex flex-col gap-4 rounded-lg border bg-card shadow-xs p-4"
+      className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-4"
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()
@@ -401,7 +401,7 @@ function ProbeForm({
     value.trim() === "" || /^[1-9]\d*$/.test(value.trim()) ? undefined : t("form.badNumber")
   return (
     <form
-      className="flex flex-col gap-3 rounded-lg border bg-card shadow-xs p-4"
+      className="flex flex-col gap-3 rounded-xl border border-v2-border bg-card p-4"
       onSubmit={(event) => {
         event.preventDefault()
         void form.handleSubmit()

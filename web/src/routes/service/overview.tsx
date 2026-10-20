@@ -1,6 +1,5 @@
-// A service's overview: status, pods, usage against requests and limits (live and over time),
-// connections, domains and recent events, each a card that leads to the tab with the details.
-// CronJobs and Jobs, whose pods come and go between samples, keep requests and limits alone.
+// A service's overview: what is wrong with it, its status, replicas, connections, domains and
+// recent events, each a card that leads to the tab with the details. Usage is the Metrics tab's.
 import { Link } from "@tanstack/react-router"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
 import ArrowRightIcon from "~icons/ph/arrow-right"
@@ -10,7 +9,7 @@ import GlobeIcon from "~icons/ph/globe"
 import LockSimpleBoldIcon from "~icons/ph/lock-simple-bold"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
-import { Ago, Hint, Panel } from "@/components/bits"
+import { Ago, Panel } from "@/components/bits"
 import { Diagnoses } from "@/components/diagnoses"
 import { EventList } from "@/components/events"
 import { ServiceIcon } from "@/components/service-icon"
@@ -32,9 +31,7 @@ import {
   type Network,
   type Service,
 } from "@/model/service"
-import { hasUsage } from "@/model/usage"
 import type { ServiceTab } from "@/routes/search"
-import { HistoryPanel, UsagePanel } from "@/routes/service/usage"
 
 export function OverviewTab({
   project,
@@ -63,17 +60,10 @@ export function OverviewTab({
       ) : null}
       <StatusCard service={service} />
       <PodsCard service={service} onTab={onTab} />
-      {hasUsage(service) ? (
-        <>
-          <UsagePanel project={project} service={service} />
-          <HistoryPanel project={project} service={service} />
-        </>
-      ) : (
-        <ResourcesCard service={service} />
-      )}
       <ConnectionsCard project={project} service={service} services={services} edges={edges} />
       <DomainsCard network={network} service={service} onTab={onTab} />
       <Panel
+        className="lg:col-span-2"
         title={t("project.events")}
         action={<TabLink onClick={() => onTab("events")}>{t("common.all")}</TabLink>}
       >
@@ -162,7 +152,7 @@ function PodsCard({
       bodyClassName="p-0"
     >
       {service.pods.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-muted-foreground">{t("pod.none")}</p>
+        <p className="px-5 py-3 text-sm text-muted-foreground">{t("pod.none")}</p>
       ) : (
         <ul className="flex flex-col divide-y">
           {service.pods.map((pod) => {
@@ -171,7 +161,7 @@ function PodsCard({
             return (
               <li
                 key={pod.name}
-                className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-2 text-xs"
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 px-5 py-2 text-xs"
               >
                 <StatusDot health={health} />
                 <span className="min-w-0 truncate font-mono" translate="no">
@@ -217,56 +207,6 @@ function PodsCard({
           })}
         </ul>
       )}
-    </Panel>
-  )
-}
-
-function cell(value?: string | null) {
-  return value ? (
-    <span className="font-mono">{value}</span>
-  ) : (
-    <span className="text-muted-foreground">—</span>
-  )
-}
-
-function ResourcesCard({ service }: { service: Service }) {
-  const t = useT()
-  const containers = service.containers.filter((c) => !c.init)
-  return (
-    <Panel
-      title={t("resources.title")}
-      action={<Hint label={t("resources.title")}>{t("resources.hint")}</Hint>}
-      bodyClassName="p-0"
-    >
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b text-left text-muted-foreground">
-            <th className="px-4 py-2 font-medium">
-              {containers.length > 1 ? t("resources.container") : ""}
-            </th>
-            <th className="px-2 py-2 font-medium">{t("resources.cpu")}</th>
-            <th className="px-2 py-2 pr-4 font-medium">{t("resources.memory")}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {containers.flatMap((container) =>
-            (["requests", "limits"] as const).map((which) => (
-              <tr key={`${container.name}/${which}`}>
-                <td className="px-4 py-2 text-muted-foreground">
-                  {containers.length > 1 ? (
-                    <span className="mr-1.5 font-mono text-foreground" translate="no">
-                      {container.name}
-                    </span>
-                  ) : null}
-                  {t(`resources.${which}`)}
-                </td>
-                <td className="px-2 py-2">{cell(container.resources?.[which]?.cpu)}</td>
-                <td className="px-2 py-2 pr-4">{cell(container.resources?.[which]?.memory)}</td>
-              </tr>
-            )),
-          )}
-        </tbody>
-      </table>
     </Panel>
   )
 }

@@ -62,7 +62,7 @@ export function ReleasesTab({ project, service }: { project: string; service: Se
   return (
     <div className="flex flex-col gap-6">
       <ol
-        className="flex flex-col rounded-lg border bg-card shadow-xs"
+        className="flex flex-col rounded-xl border border-v2-border bg-card"
         aria-label={t("tab.releases")}
       >
         {items.map((release) => (

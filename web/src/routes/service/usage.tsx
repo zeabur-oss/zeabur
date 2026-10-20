@@ -81,14 +81,14 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
     >
       <div className="flex flex-col" data-usage={state ?? "loading"}>
         {nearLimit.length > 0 ? (
-          <p className="flex items-center gap-2 border-b bg-warn-soft px-4 py-2 text-sm text-warn-strong">
+          <p className="flex items-center gap-2 border-b bg-warn-soft px-5 py-2 text-sm text-warn-strong">
             <span className="size-1.5 shrink-0 rounded-full bg-warn" aria-hidden="true" />
             {nearLimit.length === 1
               ? t("usage.nearLimitOne", nearLimit[0]?.row.pod.name ?? "")
               : t("usage.nearLimitMany", nearLimit.length)}
           </p>
         ) : null}
-        <div className="grid grid-cols-1 gap-x-8 gap-y-5 px-4 py-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-5 px-5 py-4 md:grid-cols-2">
           <TotalBlock
             title={t("resources.cpu")}
             used={available ? sum.cpu : undefined}
@@ -111,7 +111,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
           />
         </div>
         {state === "not-installed" ? (
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-4 py-3 text-sm text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-5 py-3 text-sm text-muted-foreground">
             {t("usage.needsMetricsServer")}
             <Link
               to="/cluster/components"
@@ -123,7 +123,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
           </p>
         ) : null}
         {state === "unreadable" ? (
-          <div className="border-t px-4 py-3">
+          <div className="border-t px-5 py-3">
             <Refused
               refusal="unreadable"
               what={t("usage.whatLive")}
@@ -133,7 +133,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
           </div>
         ) : null}
         {state === "unavailable" ? (
-          <p className="border-t px-4 py-3 text-sm text-muted-foreground">
+          <p className="border-t px-5 py-3 text-sm text-muted-foreground">
             {t("usage.unavailable")}
           </p>
         ) : null}
@@ -260,7 +260,7 @@ function TemplateLine({
   const cell = (value: number | undefined, fmt: (v: number) => string) =>
     value !== undefined ? fmt(value) : "—"
   return (
-    <p className="border-t px-4 py-2 type-meta text-muted-foreground tabular-nums">
+    <p className="border-t px-5 py-2 type-meta text-muted-foreground tabular-nums">
       {t(
         "usage.perPodTemplate",
         replicas,
@@ -304,7 +304,7 @@ function ReplicaTable({
               {pair(requests.memory, limits.memory, f.memory)}
             </span>
           </th>
-          <th className="px-2 py-2 pr-4 font-medium">
+          <th className="px-2 py-2 pr-5 font-medium">
             <span className="sr-only">{t("usage.notes")}</span>
           </th>
         </tr>
@@ -312,7 +312,7 @@ function ReplicaTable({
       <tbody className="divide-y">
         {rows.map(({ row, notes }) => (
           <tr key={row.pod.name}>
-            <td className="w-1/3 max-w-0 truncate px-4 py-2 font-mono" translate="no">
+            <td className="w-1/3 max-w-0 truncate px-5 py-2 font-mono" translate="no">
               {row.pod.name}
             </td>
             <td className="px-2 py-2">
@@ -333,7 +333,7 @@ function ReplicaTable({
                 label={`${t("resources.memory")} ${row.pod.name}`}
               />
             </td>
-            <td className="px-2 py-2 pr-4">
+            <td className="px-2 py-2 pr-5">
               <span className="flex flex-wrap justify-end gap-1">
                 {notes.map((note) => (
                   <NotePill key={note.kind} note={note} />

@@ -7,6 +7,7 @@ const serviceTabs = [
   "logs",
   "terminal",
   "variables",
+  "metrics",
   "networking",
   "storage",
   "settings",

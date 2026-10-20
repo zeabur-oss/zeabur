@@ -26,14 +26,12 @@ export function ClusterFrame({ tab, children }: { tab: ClusterTab; children: Rea
       variant="page"
       className="flex w-full max-w-7xl flex-col"
     >
-      <header className="flex flex-col gap-3 border-b px-4 pt-6 md:px-8 md:pt-7">
+      <header className="flex flex-col gap-4 px-4 pt-6 md:px-8 md:pt-8">
         <Heading />
-        <div className="-mx-1 overflow-x-auto scrollbar-none">
-          <TabsList variant="line" aria-label={t("cluster.tabs")} className="h-9">
-            <TabsTrigger value="overview">{t("cluster.overview")}</TabsTrigger>
-            <TabsTrigger value="components">{t("settings.components")}</TabsTrigger>
-          </TabsList>
-        </div>
+        <TabsList aria-label={t("cluster.tabs")}>
+          <TabsTrigger value="overview">{t("cluster.overview")}</TabsTrigger>
+          <TabsTrigger value="components">{t("settings.components")}</TabsTrigger>
+        </TabsList>
       </header>
       <div className="flex flex-col gap-9 px-4 pt-6 pb-12 type-body md:px-8">{children}</div>
     </Tabs>

@@ -164,7 +164,7 @@ function Session({
       />
       <div
         className={cn(
-          "min-h-0 flex-1 flex-col overflow-hidden rounded-lg border bg-card shadow-xs",
+          "min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-v2-border bg-card",
           screen,
         )}
       >

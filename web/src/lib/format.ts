@@ -21,3 +21,10 @@ export function formatAgo(iso: string, locale: string, now = Date.now()): string
   }
   return format.format(seconds, "second")
 }
+
+/** A day as the person's locale writes it ("Oct 20, 2026"). */
+export function formatDate(iso: string, locale: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+  return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date)
+}

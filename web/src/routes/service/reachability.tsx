@@ -99,7 +99,7 @@ export function Reachability({
         </Menu>
       }
     >
-      <div className="rounded-lg border bg-card shadow-xs px-4 py-1 text-sm">
+      <div className="rounded-xl border border-v2-border bg-card px-4 py-1 text-sm">
         <div className={row}>
           <span className="w-28 shrink-0 text-muted-foreground">{t("reach.policies")}</span>
           {reach.selectedBy.length === 0 ? (

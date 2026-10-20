@@ -40,7 +40,7 @@ export function EventsTab({
           </span>
         </div>
       ) : null}
-      <div className="rounded-lg border bg-card shadow-xs px-4 py-2">
+      <div className="rounded-xl border border-v2-border bg-card px-4 py-2">
         <EventList events={shown} />
       </div>
     </div>
