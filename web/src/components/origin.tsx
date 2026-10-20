@@ -12,7 +12,7 @@ export function OriginChips({ origin, fixer }: { origin: Origin; fixer: Fixer })
         <Badge variant="outline">{t(`origin.${origin}`)}</Badge>
       </Tooltip>
       {fixer === "unknown" ? null : (
-        <Badge variant={fixer === "admin" ? "warn" : "secondary"}>{t(`fixer.${fixer}`)}</Badge>
+        <Badge variant={fixer === "you" ? "secondary" : "warn"}>{t(`fixer.${fixer}`)}</Badge>
       )}
     </span>
   )

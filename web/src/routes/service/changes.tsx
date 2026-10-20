@@ -9,7 +9,7 @@ import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
 import { YamlDiff } from "@/components/yaml"
-import { releasesQuery } from "@/api/queries"
+import { releasesQuery, serviceTimelineQuery } from "@/api/queries"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
 import {
@@ -23,8 +23,9 @@ import { Illustration } from "@zeabur/design-system/components/illustration"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Timeline, TimelineItem } from "@zeabur/design-system/components/timeline"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
-import { useT } from "@/i18n"
+import { useSentence, useT } from "@/i18n"
 import { changesOf, type ChangeEntry } from "@/model/changes"
+import { entryTone, writerOf } from "@/routes/project/side"
 import { imageTag, isTask, type Event, type Service } from "@/model/service"
 
 type Release = Schemas["WorkloadRelease"]
@@ -42,14 +43,16 @@ export function ChangesSection({
 }) {
   const t = useT()
   const releases = useQuery(releasesQuery(project, service.kind, service.name))
+  const timeline = useQuery(serviceTimelineQuery(project, service.kind, service.name))
   const planner = usePlanner(project)
   // null: the newest older release.
   const [picked, setPicked] = useState<number | null>(null)
 
-  if (releases.isPending) return <LoadingRows label={t("common.loading")} rows={4} />
+  if (releases.isPending || timeline.isPending)
+    return <LoadingRows label={t("common.loading")} rows={4} />
   if (releases.isError) return <Problem error={releases.error} />
   const items = releases.data.items
-  const entries = changesOf(items, events)
+  const entries = changesOf(items, events, timeline.data?.items)
   if (entries.length === 0)
     return (
       <Empty size="sm">
@@ -89,6 +92,9 @@ export function ChangesSection({
           title={t("changes.title")}
           description={t("changes.description")}
         />
+        {timeline.data?.truncated ? (
+          <p className="type-meta text-muted-foreground">{t("timeline.truncated")}</p>
+        ) : null}
         <Timeline>
           {entries.map((entry) => (
             <Entry
@@ -114,7 +120,7 @@ const entryKey = (entry: ChangeEntry) =>
     ? `release/${entry.release.name}`
     : entry.kind === "warning"
       ? `warning/${entry.event.id}`
-      : `${entry.kind}/${entry.at}/${entry.summary}`
+      : `${entry.entry.kind}/${entry.at}/${entry.entry.message.key}`
 
 function Entry({
   entry,
@@ -132,6 +138,7 @@ function Entry({
   onEvents: () => void
 }) {
   const t = useT()
+  const write = useSentence()
   const time = entry.at ? <Ago iso={entry.at} /> : undefined
   if (entry.kind === "warning")
     return (
@@ -157,10 +164,33 @@ function Entry({
         </span>
       </TimelineItem>
     )
-  if (entry.kind !== "release")
+  if (entry.kind === "timeline") {
+    const who = writerOf(t, entry.entry.writer)
+    const trouble = entry.entry.kind === "warning" || entry.entry.kind === "termination"
     return (
-      <TimelineItem tone="brand" time={time} title={entry.summary} meta={entry.by ?? undefined} />
+      <TimelineItem
+        tone={entryTone[entry.entry.kind]}
+        time={time}
+        title={
+          <span>
+            {write(entry.entry.message)}
+            {entry.entry.count && entry.entry.count > 1 ? (
+              <span className="ml-1.5 font-normal text-tertiary">×{entry.entry.count}</span>
+            ) : null}
+          </span>
+        }
+        meta={who ? t("timeline.by", who) : undefined}
+        actions={
+          trouble ? (
+            <Button variant="ghost" size="xs" onClick={onEvents}>
+              {t("tab.events")}
+            </Button>
+          ) : undefined
+        }
+      />
     )
+  }
+  const who = writerOf(t, entry.entry?.writer)
   const release = entry.release
   return (
     <TimelineItem
@@ -180,7 +210,11 @@ function Entry({
           ) : null}
         </span>
       }
-      meta={release.changeCause ?? undefined}
+      meta={
+        [release.changeCause, who ? t("timeline.by", who) : undefined]
+          .filter(Boolean)
+          .join(t("common.sep")) || undefined
+      }
       actions={
         release.current ? undefined : (
           <>

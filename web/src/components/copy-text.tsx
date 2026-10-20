@@ -6,12 +6,18 @@ import { Button } from "@zeabur/design-system/components/button"
 import { useT } from "@/i18n"
 
 /** A labelled button that copies text made when it is pressed. */
-export function CopyText({ value, label }: { value: () => string; label: string }) {
+export function CopyText({
+  value,
+  label,
+}: {
+  value: () => string | Promise<string>
+  label: string
+}) {
   const t = useT()
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(value())
+      await navigator.clipboard.writeText(await value())
       setCopied(true)
       window.setTimeout(() => setCopied(false), 1500)
     } catch {

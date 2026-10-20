@@ -6,10 +6,11 @@ import LightbulbIcon from "~icons/ph/lightbulb"
 import TreeStructureIcon from "~icons/ph/tree-structure"
 
 import type { Schemas } from "@/api/client"
-import { projectGapsQuery, projectQuery } from "@/api/queries"
+import { projectGapsQuery, projectIncidentsQuery, projectQuery } from "@/api/queries"
 import { Ago, Segmented } from "@/components/bits"
 import { CopyText } from "@/components/copy-text"
 import { GapList } from "@/components/gaps"
+import { IncidentRow, isTakenDown, takenDown } from "@/components/incident"
 import { ProblemRow } from "@/components/problem-row"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusDot, StatusPill } from "@/components/status"
@@ -235,8 +236,12 @@ function Suggestions({ project, data }: { project: string; data: Project }) {
 
 function Problems({ project, services }: { project: string; services: Service[] }) {
   const t = useT()
-  const broken = services.filter((s) => needsAttention(statusOf(s))).toSorted(byHealth)
-  if (broken.length === 0) return null
+  const incidents = useQuery(projectIncidentsQuery(project)).data?.items ?? []
+  const down = takenDown(incidents)
+  const broken = services
+    .filter((s) => needsAttention(statusOf(s)) && !isTakenDown(down, project, s))
+    .toSorted(byHealth)
+  if (broken.length === 0 && incidents.length === 0) return null
   return (
     <section aria-labelledby="project-problems">
       <Card variant="list">
@@ -246,12 +251,15 @@ function Problems({ project, services }: { project: string; services: Service[] 
               {t("attention.title")}
             </h2>
             <span className="ml-2.5 type-meta font-normal text-muted-foreground">
-              {broken.length}
+              {broken.length + incidents.length}
             </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="flex flex-col">
+            {incidents.map((incident) => (
+              <IncidentRow key={incident.id} incident={incident} showProject={false} />
+            ))}
             {broken.map((service) => (
               <ProblemRow key={serviceId(service)} project={project} service={service} />
             ))}

@@ -19,6 +19,9 @@ export type FixTemplate = (gap: Gap, project: Project, t: Translate) => PlanAsk 
  * at twice the request. The person sees them in the plan before anything is written. */
 const STARTING = { cpu: "100m", memory: "128Mi", memoryLimit: "256Mi" } as const
 
+/** The size a new disk starts at, as in the storage form. */
+const DISK_SIZE = "1Gi"
+
 function target(gap: Gap, project: Project) {
   const service = project.services.find((s) => s.id === gap.fix.params?.service)
   const name = gap.fix.params?.container
@@ -107,6 +110,26 @@ export const fixTemplates: Record<string, FixTemplate> = {
           set: { handler: "TCPSocket", port, periodSeconds: 10 },
         },
       ],
+    }
+  },
+  // A disk at the directory the image keeps its data in. A temporary volume already mounted
+  // there must be replaced by a person, who knows whether its data matters.
+  "storage.addVolume": (gap, project, t) => {
+    const found = target(gap, project)
+    const mountPath = gap.fix.params?.mountPath
+    if (!found || !mountPath?.startsWith("/")) return undefined
+    if (found.container.mounts.some((m) => m.mountPath === mountPath)) return undefined
+    return {
+      title: t("fix.addVolume", found.container.name, mountPath),
+      changes: [
+        {
+          op: "addVolume",
+          workload: workloadOf(found.service),
+          container: found.container.name,
+          volume: { mountPath, size: DISK_SIZE },
+        },
+      ],
+      service: workloadOf(found.service),
     }
   },
 }

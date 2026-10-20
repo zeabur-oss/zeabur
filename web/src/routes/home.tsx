@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 
 import { isStatus, type Schemas } from "@/api/client"
 import {
+  clusterIncidentsQuery,
   clusterQuery,
   nodesQuery,
   projectQuery,
@@ -14,6 +15,7 @@ import {
 import { Ago } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
+import { IncidentRow, isTakenDown, takenDown, type Incident } from "@/components/incident"
 import { ProblemRow } from "@/components/problem-row"
 import { StatusDot, StatusPill } from "@/components/status"
 import { buttonVariants } from "@zeabur/design-system/components/button"
@@ -27,14 +29,13 @@ import {
   countsHealth,
   healthRank,
   needsAttention,
-  serviceId,
   statusOf,
   type Event,
   type Service,
 } from "@/model/service"
 import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
-import { useAttention, type ClusterItem } from "@/routes/cluster/attention"
+import { useAttention } from "@/routes/cluster/attention"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
 import {
   Empty,
@@ -82,7 +83,7 @@ interface Found {
 interface Problems {
   /** Still reading the documents of the projects in trouble. */
   pending: boolean
-  cluster: { item: ClusterItem; affects: Found[] }[]
+  incidents: Incident[]
   /** Cluster warnings that take nothing down yet: a count and a link. */
   notices: number
   byOrigin: { origin: Origin; items: Found[] }[]
@@ -90,10 +91,13 @@ interface Problems {
   count: number
 }
 
-/** Every problem once, by where it comes from: a node down shows once, with the services it takes
- * down under it. */
+/** Every problem once, by where it comes from: a cause in the cluster shows once, with the
+ * services it takes down under it. */
 function useProblems(adopted: ProjectItem[]): Problems {
-  const clusterItems = useAttention().filter((i) => i.health === "fail" || i.health === "warn")
+  const attention = useAttention().filter((i) => i.health === "fail" || i.health === "warn")
+  const incidentList = useQuery(clusterIncidentsQuery)
+  const incidents = incidentList.data?.items ?? []
+  const down = takenDown(incidents)
   const troubled = adopted.filter((p) =>
     (p.services ?? []).some((s) => s.health !== "ok" && s.health !== "idle"),
   )
@@ -103,8 +107,6 @@ function useProblems(adopted: ProjectItem[]): Problems {
   const found: Found[] = documents.flatMap((d, i) =>
     (d.data?.services ?? []).map((service) => ({ project: troubled[i]?.name ?? "", service })),
   )
-  const down = new Map(clusterItems.flatMap((i) => (i.node ? [[i.node, i] as const] : [])))
-  const cluster = clusterItems.map((item) => ({ item, affects: [] as Found[] }))
   const origins = new Map<Origin, Found[]>()
   const rolling: Found[] = []
   for (const f of found) {
@@ -114,12 +116,8 @@ function useProblems(adopted: ProjectItem[]): Problems {
       continue
     }
     if (!needsAttention(status)) continue
-    const node = f.service.pods.find((p) => p.health !== "ok" && p.node && down.has(p.node))?.node
-    const host = node ? cluster.find((c) => c.item.node === node) : undefined
-    if (host) {
-      host.affects.push(f)
+    if (isTakenDown(down, f.project, f.service) || f.service.diagnoses?.some((d) => d.incident))
       continue
-    }
     const first = f.service.diagnoses?.[0]
     const origin = first ? originOf(first).origin : "unknown"
     origins.set(origin, [...(origins.get(origin) ?? []), f])
@@ -127,14 +125,17 @@ function useProblems(adopted: ProjectItem[]): Problems {
   const byOrigin = [...origins.entries()]
     .map(([origin, items]) => ({ origin, items: items.toSorted(byFound) }))
     .toSorted((a, b) => originRank[a.origin] - originRank[b.origin])
-  const shown = cluster.filter((c) => c.item.health === "fail" || c.affects.length > 0)
+  const explained = new Set(incidents.map((i) => i.id))
+  const notices = attention.filter(
+    (i) => !(i.node && explained.has(`incidents/node/${i.node}`)),
+  ).length
   return {
-    pending: documents.some((d) => d.isPending),
-    cluster: shown,
-    notices: cluster.length - shown.length,
+    pending: documents.some((d) => d.isPending) || incidentList.isPending,
+    incidents,
+    notices,
     byOrigin,
     rolling: rolling.toSorted(byFound),
-    count: cluster.length + byOrigin.reduce((n, g) => n + g.items.length, 0),
+    count: incidents.length + byOrigin.reduce((n, g) => n + g.items.length, 0),
   }
 }
 
@@ -217,39 +218,14 @@ function ProblemsSection({ problems }: { problems: Problems }) {
       <h2 id="home-problems" className="type-heading">
         {t("home.problems")}
       </h2>
-      {problems.cluster.length > 0 ? (
-        <Group title={t("origin.cluster")} hint={t("origin.cluster.hint")}>
-          {problems.cluster.map(({ item, affects }) => (
-            <li
-              key={item.key}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-rule px-4 py-3 first:border-t-0"
-            >
-              <StatusDot health={item.health} />
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="font-medium">{item.text}</span>
-                {affects.length > 0 ? (
-                  <span className="type-meta text-muted-foreground">
-                    {t("home.affects")}
-                    {t("common.colon")}
-                    {affects.map((f, i) => (
-                      <span key={serviceId(f.service)}>
-                        {i > 0 ? t("common.sep") : null}
-                        <Link
-                          {...serviceLink(f.project, f.service)}
-                          className="text-foreground hover:underline"
-                          translate="no"
-                        >
-                          {f.project}/{f.service.name}
-                        </Link>
-                      </span>
-                    ))}
-                  </span>
-                ) : null}
-              </span>
-              {item.link ? (
-                <span className="type-meta text-muted-foreground">{item.link}</span>
-              ) : null}
-            </li>
+      {problems.incidents.length > 0 ? (
+        <Group
+          title={t("incident.title")}
+          hint={t("incident.hint")}
+          count={problems.incidents.length}
+        >
+          {problems.incidents.map((incident) => (
+            <IncidentRow key={incident.id} incident={incident} />
           ))}
         </Group>
       ) : null}

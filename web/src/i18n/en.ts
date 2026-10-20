@@ -1009,6 +1009,7 @@ export const en = {
   "gap.snippet": "YAML to add",
   "fix.resources": (container: string) => `Set CPU and memory for ${container}`,
   "fix.readiness": (container: string) => `Add a traffic check to ${container}`,
+  "fix.addVolume": (container: string, path: string) => `Keep ${path} of ${container} on a disk`,
   "fix.isolateProject": (project: string) => `Isolate the services of ${project}`,
   "gap.unreadable": "Some checks need rights you don't have.",
   "install.title": "Install",
@@ -1303,11 +1304,13 @@ export const en = {
   "sentence.diagnosis.unreachable.cause.targetPort": (p: P) =>
     `${p.endpoint} sends to port ${p.targetPort}, which ${p.service}'s containers don't declare${p.ports ? ` (they declare ${p.ports})` : ""}.`,
   "sentence.diagnosis.unreachable.cause.noReadyEndpoints": (p: P) =>
-    `${p.endpoint} has nowhere to send traffic: no replica of ${p.service} is ready.`,
+    `${p.endpoint ?? p.address} has nowhere to send traffic: no replica of ${p.service} is ready.`,
   "sentence.diagnosis.unreachable.cause.routeNotAccepted": (p: P) =>
     `Requests to the domain of ${p.route} don't reach ${p.service}: its entry point reports ${p.condition} ${p.reason}.`,
   "sentence.diagnosis.unreachable.why.noService": (p: P) =>
-    `${p.from} sends traffic to ${p.service} by name, but only a private address (Service) with that name can receive it.`,
+    p.from
+      ? `${p.from} sends traffic to ${p.service} by name, but only a private address (Service) with that name can receive it.`
+      : `A route sends traffic to ${p.endpoint ?? p.service} by name, but only a private address (Service) with that name can receive it.`,
   "sentence.diagnosis.unreachable.why.targetPort": () =>
     "A private address forwards to the port it names; a named port must be one the containers declare.",
   "sentence.diagnosis.unreachable.why.noReadyEndpoints": () =>
@@ -1507,33 +1510,24 @@ export const en = {
   "sentence.page.followFailed": () => "Unable to follow the log.",
   "sentence.page.followOff": () => "Turn off Follow; the snapshot shows the cluster's answer.",
   "status.readyUnchecked": "Running (no traffic check)",
-  "origin.app": "In the app",
-  "origin.config": "In its settings",
+  "origin.code": "In the app",
+  "origin.configuration": "In its settings",
   "origin.cluster": "In the cluster",
   "origin.upstream": "Outside the cluster",
   "origin.unknown": "Cause unknown",
-  "origin.app.hint": "The app's own code or command stops it; its logs say why.",
-  "origin.config.hint":
+  "origin.code.hint": "The app's own code or command stops it; its logs say why.",
+  "origin.configuration.hint":
     "A setting of this service causes it: a variable, a limit, a check or an address.",
   "origin.cluster.hint": "The cluster under the service causes it: its nodes, quotas or room.",
   "origin.upstream.hint": "Something outside the cluster causes it, such as an image registry.",
   "origin.unknown.hint":
     "Zeabur can't tell yet what causes it; the events and logs have the details.",
   "fixer.you": "You can fix this",
-  "fixer.admin": "Needs a cluster admin",
+  "fixer.clusterAdmin": "Needs a cluster admin",
   "fixer.unknown": "Fixer unknown",
   "diagnosis.copy": "Copy diagnosis",
   "diagnosis.lastSeen": "Last seen",
   "trace.title": "Path of a request",
-  "trace.dns": "DNS",
-  "trace.replicas": (ready: number, desired: number) => `${ready}/${desired} replicas ready`,
-  "trace.notChecked":
-    "Not checked yet: Zeabur reads this hop from objects, it doesn't send a request.",
-  "trace.noService": "No Service with this name and port.",
-  "trace.noneReady": "No replica is ready to answer.",
-  "trace.failed": "This hop fails.",
-  "trace.checked": "Checked",
-  "trace.fromObjects": "Read from the objects that route here; requests aren't sent.",
   "status.uncheckedWhy": "Its containers started, but nothing checks that it answers requests.",
   "status.addTrafficCheck": "Add a traffic check",
   "status.reach": "How it's reached",
@@ -1541,7 +1535,6 @@ export const en = {
     "Nothing reaches this service: it has no public domain and no private address.",
   "status.private": "Private",
   "rollout.title": "Rollout",
-  "rollout.release": (revision: number) => `Rolling out release #${revision}`,
   "rollout.ready": (ready: number, desired: number) => `${ready} of ${desired} new replicas ready`,
   "rollout.older": (n: number) =>
     plural(n, "old replica still running", "old replicas still running"),
@@ -1597,6 +1590,284 @@ export const en = {
     n === 1
       ? "1 cluster notice, nothing down because of it:"
       : `${n} cluster notices, nothing down because of them:`,
+  "origin.component": "In a cluster component",
+  "origin.component.hint":
+    "A component the cluster runs for every project causes it, such as the ingress controller or cluster DNS.",
+  "origin.zeabur": "In Zeabur",
+  "origin.zeabur.hint": "Zeabur itself causes it; report it with the copied diagnosis.",
+  "fixer.componentOwner": "Needs the component's owner",
+  "incident.title": "In the cluster",
+  "incident.hint": "One cause takes down several services; fixing it fixes them all.",
+  "incident.domains": (n: number) => plural(n, "domain", "domains"),
+  "incident.causedBy": "Caused by",
+  "timeline.truncated": "Showing the newest 200 changes; older ones are left out.",
+  "timeline.empty":
+    "Nothing has changed lately. The cluster keeps events for about an hour and one write per tool.",
+  "timeline.by": (who: string) => `by ${who}`,
+  "timeline.tool.zeabur": "Zeabur",
+  "timeline.tool.helm": "Helm",
+  "timeline.tool.argoCd": "Argo CD",
+  "timeline.tool.flux": "Flux",
+  "timeline.tool.kubectl": "kubectl",
+  "timeline.tool.autoscaler": "the autoscaler",
+  "trace.step.dns": "DNS",
+  "trace.step.address": "Entry address",
+  "trace.step.controller": "Ingress controller",
+  "trace.step.certificate": "Certificate",
+  "trace.step.route": "Route",
+  "trace.step.service": "Private address",
+  "trace.step.targetPort": "Port",
+  "trace.step.ready": "Ready replicas",
+  "trace.expected": "Expected",
+  "trace.saw": "Found",
+  "trace.fix": "Fix it",
+  "trace.fixTitle": (address: string) => `Fix the way to ${address}`,
+  "trace.someUnknown": "Some hops could not be checked; hover one to see why.",
+  "rollout.rollBack": (name: string) => `Roll back ${name}`,
+  "rollout.rollBackButton": "Roll back",
+  "sentence.incident.componentDown.cause.ingressController": (p: P) =>
+    `The ingress controller ${p.workload} is down: none of its replicas is ready.`,
+  "sentence.incident.componentDown.cause.certManager": (p: P) =>
+    `cert-manager is down: no replica of ${p.workload} is ready.`,
+  "sentence.incident.componentDown.cause.clusterDns": (p: P) =>
+    `Cluster DNS is down: no replica of ${p.workload} is ready.`,
+  "sentence.incident.componentDown.cause.metricsServer": (p: P) =>
+    `metrics-server is down: no replica of ${p.workload} is ready.`,
+  "sentence.incident.componentDown.why.ingressController": (p: P) =>
+    `The ingress controller brings requests for public domains to the services they route to; while it is down, ${plural(Number(p.domains), "domain", "domains")} and ${plural(Number(p.services), "service", "services")} get no requests from outside the cluster.`,
+  "sentence.incident.componentDown.why.certManager": (p: P) =>
+    `cert-manager issues and renews the certificates domains ask it for; while it is down, the certificates of ${plural(Number(p.domains), "domain", "domains")} are neither issued nor renewed, and browsers refuse a certificate once it expires.`,
+  "sentence.incident.componentDown.why.clusterDns": (p: P) =>
+    `Services find each other by name through cluster DNS; while it is down, ${plural(Number(p.services), "service that calls", "services that call")} another by name can't reach it.`,
+  "sentence.incident.componentDown.why.metricsServer": () =>
+    "metrics-server measures what each replica uses; while it is down, usage figures are missing and autoscaling stops.",
+  "sentence.incident.componentDown.fix.ingressController": (p: P) =>
+    `Check why ${p.workload}${p.namespace ? ` in ${p.namespace}` : ""} has no ready replica; its events and logs say why.`,
+  "sentence.incident.componentDown.fix.certManager": (p: P) =>
+    `Check why ${p.workload}${p.namespace ? ` in ${p.namespace}` : ""} has no ready replica; its events and logs say why.`,
+  "sentence.incident.componentDown.fix.clusterDns": (p: P) =>
+    `Check why ${p.workload}${p.namespace ? ` in ${p.namespace}` : ""} has no ready replica; its events and logs say why.`,
+  "sentence.incident.componentDown.fix.metricsServer": (p: P) =>
+    `Check why ${p.workload}${p.namespace ? ` in ${p.namespace}` : ""} has no ready replica; its events and logs say why.`,
+  "sentence.incident.nodeNotReady.cause": (p: P) =>
+    `${p.status === "Unknown" ? `Node ${p.node} stopped reporting to the cluster` : `Node ${p.node} is not ready`}${p.reason ? ` (${p.reason})` : ""}.`,
+  "sentence.incident.nodeNotReady.why": (p: P) =>
+    `A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its pods so they can start elsewhere. ${plural(Number(p.pods), "pod runs", "pods run")} on it; ${plural(Number(p.services), "service has", "services have")} replicas there.`,
+  "sentence.incident.nodeNotReady.fix": (p: P) =>
+    `Check the machine behind ${p.node}: whether it is on, its network, and its node agent (kubelet). If it won't come back, drain it and replace it.`,
+  "sentence.trace.dns.ok": (p: P) => `${p.host} resolves.`,
+  "sentence.trace.dns.notFound": (p: P) =>
+    `${p.host} doesn't resolve from where Zeabur runs; DNS elsewhere may answer differently.`,
+  "sentence.trace.dns.unknown": (p: P) =>
+    `${p.host} wasn't looked up, or the lookup didn't answer in time.`,
+  "sentence.trace.address.noStatus": (p: P) =>
+    `${p.route} has no address in its status yet, so the domain's address can't be compared with it.`,
+  "sentence.trace.address.unresolved": (p: P) =>
+    `The domain didn't resolve, so its address can't be compared with ${p.route}'s.`,
+  "sentence.trace.address.ok": (p: P) =>
+    `The domain points to the address ${p.route} is served on.`,
+  "sentence.trace.address.elsewhere": (p: P) =>
+    `The domain points to another address than ${p.route}'s; a CDN or proxy in front of the cluster answers with its own.`,
+  "sentence.trace.controller.classesUnreadable": (p: P) =>
+    `Zeabur can't read the cluster's IngressClasses, so it can't tell which controller serves ${p.route}.`,
+  "sentence.trace.controller.classMissing": (p: P) =>
+    `${p.route} asks for IngressClass ${p.class}, which the cluster doesn't have.`,
+  "sentence.trace.controller.unreadable": (p: P) =>
+    `Zeabur can't read the cluster's components, so it can't tell whether the ingress controller of ${p.route} runs.`,
+  "sentence.trace.controller.notRecognised": (p: P) =>
+    `Zeabur doesn't recognize the ingress controller${p.controller ? ` ${p.controller}` : ""} that serves ${p.route}, so it can't tell whether it runs.`,
+  "sentence.trace.controller.ok": (p: P) =>
+    `The ingress controller ${p.workload} has a ready replica.`,
+  "sentence.trace.controller.down": (p: P) =>
+    `The ingress controller ${p.workload} has no ready replica, so nothing serves ${p.route}.`,
+  "sentence.trace.certificate.defaultCertificate": (p: P) =>
+    `${p.route} lists ${p.host} for HTTPS without a secret, so the controller serves its default certificate.`,
+  "sentence.trace.certificate.ok": (p: P) =>
+    `The certificate for ${p.host} is issued${p.until ? `, valid until ${p.until}` : ""}.`,
+  "sentence.trace.certificate.notReady": (p: P) =>
+    `Certificate ${p.certificate} for ${p.host} isn't issued${p.reason ? ` (${p.reason})` : ""}.`,
+  "sentence.trace.certificate.pending": (p: P) =>
+    `Certificate ${p.certificate} for ${p.host} has no result yet.`,
+  "sentence.trace.certificate.unreadable": (p: P) =>
+    `Zeabur can't read the project's secrets, so it can't check the certificate for ${p.host} in secret ${p.secret}.`,
+  "sentence.trace.certificate.notChecked": (p: P) =>
+    `Secret ${p.secret} holds the certificate for ${p.host}; Zeabur doesn't check it further.`,
+  "sentence.trace.certificate.secretMissing": (p: P) =>
+    `${p.route} reads the certificate for ${p.host} from secret ${p.secret}, which doesn't exist; the controller serves its default certificate, which browsers refuse.`,
+  "sentence.trace.route.noStatus": (p: P) =>
+    `Nothing has written ${p.route}'s status yet, so whether it is taken up is unknown.`,
+  "sentence.trace.route.ok": (p: P) =>
+    `${p.route} is taken up: its controller wrote an address into its status.`,
+  "sentence.trace.route.accepted": (p: P) => `A Gateway accepted ${p.route}.`,
+  "sentence.trace.route.notAccepted": (p: P) =>
+    `${p.route}'s entry point reports ${p.condition} ${p.reason}; requests don't go through.`,
+  "sentence.trace.service.unreadable": (p: P) =>
+    `Zeabur can't read the project's private addresses (Services), so it can't check ${p.endpoint}.`,
+  "sentence.trace.service.missing": (p: P) =>
+    `No private address (Service) is named ${p.endpoint}.`,
+  "sentence.trace.service.portMissing": (p: P) =>
+    `Private address ${p.endpoint} has no port ${p.port}.`,
+  "sentence.trace.service.selectsOther": (p: P) =>
+    `Private address ${p.endpoint} sends to other replicas, not ${p.service}'s.`,
+  "sentence.trace.service.ok": (p: P) => `Private address ${p.endpoint} sends to ${p.service}.`,
+  "sentence.trace.targetPort.unknown": (p: P) =>
+    `Zeabur couldn't read the containers, so the port ${p.endpoint} sends to isn't checked.`,
+  "sentence.trace.targetPort.notReached": (p: P) =>
+    `Not checked: traffic stops before it reaches a port of ${p.endpoint}.`,
+  "sentence.trace.targetPort.mismatch": (p: P) =>
+    `${p.endpoint} sends to port ${p.targetPort}, which the containers don't declare${p.ports ? ` (they declare ${p.ports})` : ""}.`,
+  "sentence.trace.targetPort.undeclared": (p: P) =>
+    `The containers declare no ports, so whether they listen where ${p.endpoint} sends is unknown.`,
+  "sentence.trace.targetPort.ok": (p: P) => `${p.endpoint} sends to a port the containers declare.`,
+  "sentence.trace.ready.scaledToZero": (p: P) => `${p.service} is scaled to 0 replicas.`,
+  "sentence.trace.ready.ok": (p: P) => `${p.service} has ${p.ready}/${p.pods} replicas ready.`,
+  "sentence.trace.ready.starting": (p: P) => `${p.service} is starting; no replica is ready yet.`,
+  "sentence.trace.ready.noneReady": (p: P) => `No replica of ${p.service} is ready.`,
+  "sentence.diagnosis.unreachable.cause.dnsNotFound": (p: P) =>
+    `Requests to ${p.host} don't reach ${p.service}: the domain doesn't resolve.`,
+  "sentence.diagnosis.unreachable.why.dnsNotFound": () =>
+    "A browser first looks a domain up in DNS. Zeabur looked it up from where it runs; DNS elsewhere may answer differently.",
+  "sentence.diagnosis.unreachable.fix.dnsNotFound": (p: P) =>
+    `Add a DNS record for ${p.host} that points to the cluster's ingress controller.`,
+  "sentence.diagnosis.unreachable.cause.ingressClassMissing": (p: P) =>
+    `Requests to the domain of ${p.route} don't reach ${p.service}: it asks for IngressClass ${p.class}, which the cluster doesn't have.`,
+  "sentence.diagnosis.unreachable.why.ingressClassMissing": () =>
+    "An ingress controller serves only the Ingresses of its own class; with no such class, none serves this one.",
+  "sentence.diagnosis.unreachable.fix.ingressClassMissing": (p: P) =>
+    `Set ${p.route}'s class to one the cluster has, or install the controller for ${p.class}.`,
+  "sentence.diagnosis.unreachable.cause.controllerDown": (p: P) =>
+    `Requests to the domain of ${p.route} don't reach ${p.service}: the ingress controller ${p.workload} has no ready replica.`,
+  "sentence.diagnosis.unreachable.why.controllerDown": () =>
+    "The ingress controller brings requests for a domain into the cluster; while none of its replicas is ready, nothing answers them.",
+  "sentence.diagnosis.unreachable.fix.controllerDown": (p: P) =>
+    `Check why ${p.workload}${p.namespace ? ` in ${p.namespace}` : ""} has no ready replica; its events and logs say why.`,
+  "sentence.diagnosis.unreachable.cause.certificateMissing": (p: P) =>
+    `HTTPS to ${p.host} fails: secret ${p.secret}, which should hold its certificate, doesn't exist.`,
+  "sentence.diagnosis.unreachable.why.certificateMissing": (p: P) =>
+    `Without the secret ${p.route} names, the controller serves its default certificate, which browsers refuse.`,
+  "sentence.diagnosis.unreachable.fix.certificateMissing": (p: P) =>
+    `Add secret ${p.secret} with the certificate for ${p.host}, or have cert-manager issue it.`,
+  "sentence.diagnosis.unreachable.cause.certificateNotReady": (p: P) =>
+    `HTTPS to ${p.host} fails: certificate ${p.certificate} isn't issued${p.reason ? ` (${p.reason})` : ""}.`,
+  "sentence.diagnosis.unreachable.why.certificateNotReady": (p: P) =>
+    `cert-manager writes the certificate into secret ${p.secret} once it is issued; until then the controller serves its default certificate, which browsers refuse.`,
+  "sentence.diagnosis.unreachable.fix.certificateNotReady": (p: P) =>
+    `Certificate ${p.certificate}'s status and events say why it isn't issued.`,
+  "sentence.diagnosis.unreachable.cause.backendPortMissing": (p: P) =>
+    `A route to ${p.service} names port ${p.port}, which its private address ${p.endpoint} doesn't have.`,
+  "sentence.diagnosis.unreachable.why.backendPortMissing": () =>
+    "A route sends to one port of a private address, by number or name; a port the address doesn't have receives nothing.",
+  "sentence.diagnosis.unreachable.fix.backendPortMissing": (p: P) =>
+    `Point the route at a port ${p.endpoint} has, or add port ${p.port} to ${p.endpoint}.`,
+  "sentence.diagnosis.unreachable.cause.selectsOther": (p: P) =>
+    `A route to ${p.service} sends to ${p.endpoint}, which sends to other replicas, not ${p.service}'s.`,
+  "sentence.diagnosis.unreachable.why.selectsOther": () =>
+    "A private address sends to the replicas whose labels match its selector.",
+  "sentence.diagnosis.unreachable.fix.selectsOther": (p: P) =>
+    `Make ${p.endpoint}'s selector match ${p.service}'s labels, or point the route at ${p.service}'s own private address.`,
+  "sentence.diagnosis.unreachable.cause.scaledToZero": (p: P) =>
+    `Nothing reaches ${p.service}: it is scaled to 0 replicas.`,
+  "sentence.diagnosis.unreachable.why.scaledToZero": () =>
+    "A private address sends only to running replicas, and none is set to run.",
+  "sentence.diagnosis.unreachable.fix.scaledToZero": (p: P) =>
+    `Scale ${p.service} to at least 1 replica.`,
+  "sentence.timeline.release": (p: P) =>
+    `Release #${p.revision}${p.images ? ` runs ${p.images}` : ""}${p.changeCause ? ` (${p.changeCause})` : ""}.`,
+  "sentence.timeline.write.zeabur": (p: P) => `Zeabur last changed ${p.fields || "it"}.`,
+  "sentence.timeline.write.helm": (p: P) => `Helm last changed ${p.fields || "it"}.`,
+  "sentence.timeline.write.argoCd": (p: P) =>
+    `Argo CD (${p.manager}) last changed ${p.fields || "it"}.`,
+  "sentence.timeline.write.flux": (p: P) => `Flux (${p.manager}) last changed ${p.fields || "it"}.`,
+  "sentence.timeline.write.kubectl": (p: P) =>
+    `kubectl (${p.manager}) last changed ${p.fields || "it"}.`,
+  "sentence.timeline.write.autoscaler": () =>
+    "The autoscaler (HorizontalPodAutoscaler) last changed the number of replicas.",
+  "sentence.timeline.write.controller": (p: P) =>
+    `Kubernetes (${p.manager}) last changed ${p.fields || "it"}.`,
+  "sentence.timeline.write.other": (p: P) => `${p.manager} last changed ${p.fields || "it"}.`,
+  "sentence.timeline.warning.crashLoop": (p: P) =>
+    `${p.object} kept crashing and restarting (${plural(Number(p.count), "time", "times")}).`,
+  "sentence.timeline.warning.evicted": (p: P) =>
+    `${p.object} was removed from its node (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+  "sentence.timeline.warning.unschedulable": (p: P) =>
+    `${p.object} found no machine to run on (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+  "sentence.timeline.warning.imagePull": (p: P) =>
+    `${p.object} couldn't download its image (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+  "sentence.timeline.warning.probe": (p: P) =>
+    `${p.object} failed a health check (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+  "sentence.timeline.warning.quota": (p: P) =>
+    `${p.object} couldn't create a replica (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+  "sentence.timeline.warning.other": (p: P) =>
+    `${p.reason} on ${p.object} (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+  "sentence.timeline.termination.oomKilled": (p: P) =>
+    `${p.container} in ${p.pod} ran out of memory and was stopped.`,
+  "sentence.timeline.termination.exited": (p: P) =>
+    `${p.container} in ${p.pod} ended with exit code ${p.exitCode}${p.reason ? ` (${p.reason})` : ""}.`,
+  "sentence.rollout.progressing": (p: P) =>
+    `${p.name} is rolling out: ${p.updated} of ${plural(Number(p.desired), "replica runs", "replicas run")} the new release.`,
+  "sentence.rollout.done": (p: P) =>
+    `${p.name} is rolled out: every replica runs the current release.`,
+  "sentence.rollout.paused": (p: P) =>
+    `The rollout of ${p.name} is paused; new replicas start once it is resumed.`,
+  "sentence.rollout.waitsForDeletion": (p: P) =>
+    `${p.name} replaces a replica only when that replica is deleted (OnDelete); ${p.updated} of ${p.desired} run the current release.`,
+  "sentence.rollout.stuck.crashLoop": (p: P) =>
+    `The rollout of ${p.name} is stuck: a new replica keeps crashing.`,
+  "sentence.rollout.stuck.outOfMemory": (p: P) =>
+    `The rollout of ${p.name} is stuck: a new replica runs out of memory.`,
+  "sentence.rollout.stuck.imagePull": (p: P) =>
+    `The rollout of ${p.name} is stuck: a new replica can't download its image.`,
+  "sentence.rollout.stuck.unschedulable": (p: P) =>
+    `The rollout of ${p.name} is stuck: a new replica is waiting for a machine to run on.`,
+  "sentence.rollout.stuck.quota": (p: P) =>
+    `The rollout of ${p.name} is stuck: the project's limit refuses new replicas.`,
+  "sentence.rollout.stuck.configMissing": (p: P) =>
+    `The rollout of ${p.name} is stuck: a new replica reads a secret or config that doesn't exist.`,
+  "sentence.rollout.stuck.runFailed": (p: P) =>
+    `The rollout of ${p.name} is stuck: a new replica's run failed.`,
+  "sentence.rollout.stuck.deadlineExceeded": (p: P) =>
+    `The rollout of ${p.name} is stuck: it made no progress before its deadline (progressDeadlineSeconds).`,
+  "sentence.rollout.stuck.replicaFailure": (p: P) =>
+    `The rollout of ${p.name} is stuck: the cluster can't create a new replica.`,
+  "sentence.gap.ephemeralData.none": (p: P) =>
+    `${p.container} keeps its ${p.software} data in ${p.path}, which is on no volume; it's lost whenever the replica is replaced.`,
+  "sentence.gap.ephemeralData.ephemeral": (p: P) =>
+    `${p.container} keeps its ${p.software} data in ${p.path}, on a volume that lasts only as long as the replica; it's lost whenever the replica is replaced.`,
+  // ia:start
+  "preview.restarts": "What restarts",
+  "preview.roll.rolling": (name: string) => `${name} replaces its replicas one at a time.`,
+  "preview.roll.recreate": (name: string) => `${name} stops every replica, then starts new ones.`,
+  "preview.roll.onDelete": (name: string) =>
+    `${name} uses its new settings only when you delete its old replicas.`,
+  "preview.scale": (name: string, from: number, to: number) =>
+    `${name} goes from ${from} to ${plural(to, "replica", "replicas")}.`,
+  "preview.start": (name: string) => `${name} starts.`,
+  "preview.stop": (name: string) => `${name} stops.`,
+  "preview.pendingRestart": (name: string) => `${name} keeps the old value until it restarts.`,
+  "preview.downtime": "Nothing serves for a moment.",
+  "preview.cores": (n: string) => `${n} CPU`,
+  "preview.fits": (pods: number, cpu: string, memory: string) =>
+    `Fits: it adds ${plural(pods, "pod", "pods")}, ${cpu} and ${memory} at its peak.`,
+  "preview.blocked": "Why it does not fit",
+  "preview.blockedQuota": (name: string, resource: string, need: string, left: string) =>
+    `Quota ${name} blocks it: ${resource} needs ${need}, ${left} is left.`,
+  "preview.blockedNodes": (_name: string, resource: string, need: string, left: string) =>
+    `No node has room: ${resource} needs ${need}, the roomiest node has ${left}.`,
+  "preview.fitUnknown": "Zeabur could not check whether the new pods fit.",
+  "preview.dataLoss": "Data this loses",
+  "preview.loss.claimDeleted": (claim: string, paths: string) =>
+    `Deletes the disk ${claim}${paths ? ` and what is in ${paths}` : ""}.`,
+  "preview.loss.emptyDir": (name: string, volume: string, paths: string) =>
+    `${name} keeps ${paths || volume} on a temporary volume; it is emptied when its replicas are replaced.`,
+  "preview.loss.statefulSet": (name: string, claim: string) =>
+    `${name} deletes the disks it made from ${claim}, with their data.`,
+  "preview.removals": "Settings this removes",
+  "preview.removal": (path: string, name: string) => `Removes ${path} from ${name}, now`,
+  "preview.leftOut": "(left out of your edit)",
+  "env.pendingRestart": "May still use the old value until restarted",
+  "env.pendingRestartDetail": (pod: string) =>
+    `Changed after ${pod} started. Restart the service to use the new value.`,
+  // ia:end
 }
 
 export type Messages = typeof en

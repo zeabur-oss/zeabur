@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 
-import { releasesQuery } from "@/api/queries"
+import { releasesQuery, serviceTimelineQuery } from "@/api/queries"
 import { changesOf } from "@/model/changes"
 import type { Event, Service } from "@/model/service"
 import { ChangesSection } from "@/routes/service/changes"
@@ -12,6 +12,12 @@ import { ChangesSection } from "@/routes/service/changes"
 function emptyTab(kind: string, name: string): string {
   const client = new QueryClient()
   client.setQueryData(releasesQuery("shop", kind, name).queryKey, { items: [] })
+  client.setQueryData(serviceTimelineQuery("shop", kind, name).queryKey, {
+    id: name,
+    items: [],
+    truncated: false,
+    unreadable: [],
+  } as never)
   const service = { kind, name, provenance: {} } as unknown as Service
   return renderToStaticMarkup(
     createElement(
@@ -56,5 +62,26 @@ describe("A service's changes", () => {
       [event("Warning", "2026-10-02T00:00:00Z", "w"), event("Normal", "2026-10-04T00:00:00Z", "n")],
     )
     expect(entries.map((e) => e.kind)).toStrictEqual(["release", "warning", "release"])
+  })
+})
+
+const entry = (kind: string, at: string, revision?: number) =>
+  ({
+    at,
+    kind,
+    workload: { kind: "Deployment", name: "api" },
+    message: { key: `timeline.${kind}` },
+    release: revision ? { revision, name: `api-${revision}`, images: [], current: false } : null,
+  }) as never
+
+describe("A service's changes from the timeline", () => {
+  test("join releases by revision, keep writes, and leave events to the timeline", () => {
+    const entries = changesOf(
+      [release(1, "2026-10-01T00:00:00Z"), release(2, "2026-10-03T00:00:00Z")],
+      [event("Warning", "2026-10-02T00:00:00Z", "w")],
+      [entry("write", "2026-10-04T00:00:00Z"), entry("release", "2026-10-03T00:00:00Z", 2)],
+    )
+    expect(entries.map((e) => e.kind)).toStrictEqual(["timeline", "release", "release"])
+    expect(entries[1]?.kind === "release" && entries[1].entry).toBeTruthy()
   })
 })

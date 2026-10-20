@@ -86,3 +86,23 @@ describe("fixTemplates", () => {
     expect(fix(gap({}), shop, t)).toBe(undefined)
   })
 })
+
+describe("storage.addVolume", () => {
+  const fix = fixTemplates["storage.addVolume"]!
+  const params = { ...target, mountPath: "/var/lib/postgresql" }
+
+  test("puts the data directory on a new disk", () => {
+    const [change] = fix(gap(params), project({ mounts: [] }), t)?.changes ?? []
+    expect(change).toStrictEqual({
+      op: "addVolume",
+      workload: { kind: "Deployment", name: "api" },
+      container: "app",
+      volume: { mountPath: "/var/lib/postgresql", size: "1Gi" },
+    })
+  })
+
+  test("leaves a temporary volume at that path to a person", () => {
+    const mounted = project({ mounts: [{ mountPath: "/var/lib/postgresql", kind: "EmptyDir" }] })
+    expect(fix(gap(params), mounted, t)).toBeUndefined()
+  })
+})

@@ -284,6 +284,106 @@ export const releasesQuery = (project: string, kind: string, name: string) =>
       ),
   })
 
+const servicePath = (project: string, kind: string, name: string) => ({
+  path: { project, kind: kind.toLowerCase(), name },
+})
+
+/** Each domain and private address of a service, followed hop by hop. */
+export const traceQuery = (project: string, kind: string, name: string) =>
+  queryOptions({
+    queryKey: ["project", project, "trace", kind, name],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/services/{kind}/{name}/trace", {
+          params: servicePath(project, kind, name),
+          signal,
+        }),
+      ),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  })
+
+/** How far the current rollout has come; polled while it moves. */
+export const rolloutQuery = (project: string, kind: string, name: string) =>
+  queryOptions({
+    queryKey: ["project", project, "rollout", kind, name],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/services/{kind}/{name}/rollout", {
+          params: servicePath(project, kind, name),
+          signal,
+        }),
+      ),
+    refetchInterval: (query) =>
+      query.state.data?.status === "progressing" || query.state.data?.status === "waitsForDeletion"
+        ? 2_000
+        : POLL,
+    refetchIntervalInBackground: false,
+  })
+
+export const serviceTimelineQuery = (project: string, kind: string, name: string) =>
+  queryOptions({
+    queryKey: ["project", project, "timeline", kind, name],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/services/{kind}/{name}/timeline", {
+          params: servicePath(project, kind, name),
+          signal,
+        }),
+      ),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  })
+
+export const projectTimelineQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "timeline"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/timeline", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  })
+
+/** A service's problems, trace, events and previous logs as one text, read when it is copied. */
+export const evidenceQuery = (project: string, kind: string, name: string) =>
+  queryOptions({
+    queryKey: ["project", project, "evidence", kind, name],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/services/{kind}/{name}/evidence", {
+          params: servicePath(project, kind, name),
+          signal,
+        }),
+      ),
+    staleTime: 0,
+  })
+
+export const projectIncidentsQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "incidents"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/incidents", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    refetchInterval: POLL,
+    refetchIntervalInBackground: false,
+  })
+
+export const clusterIncidentsQuery = queryOptions({
+  queryKey: ["cluster", "incidents"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/incidents", { signal })),
+  refetchInterval: CLUSTER_POLL,
+  refetchIntervalInBackground: false,
+})
+
 /** Same origin, so EventSource sends the cookie. */
 export function followUrl(project: string, pod: string, options: LogOptions): string {
   const query = new URLSearchParams({ tailLines: String(options.tailLines) })

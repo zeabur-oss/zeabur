@@ -1,4 +1,5 @@
 // The project's facts beside its services: domains, storage, backups and what happened lately.
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
@@ -6,6 +7,7 @@ import LockSimpleIcon from "~icons/ph/lock-simple"
 import LockSimpleOpenIcon from "~icons/ph/lock-simple-open"
 
 import type { Schemas } from "@/api/client"
+import { projectTimelineQuery } from "@/api/queries"
 import { Ago, Segmented } from "@/components/bits"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusDot, StatusPill } from "@/components/status"
@@ -18,11 +20,10 @@ import {
   shownCoverage,
   useBackups,
 } from "@/components/backups"
-import { useT } from "@/i18n"
+import { useSentence, useT, type Translate } from "@/i18n"
 import { podEventsLink, serviceLink } from "@/lib/place"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
-import type { ChangeEntry } from "@/model/changes"
 import {
   claimsOf,
   hostUrl,
@@ -64,39 +65,166 @@ function Heading({
 }
 
 const ACTIVITY_SHOWN = 12
-const newest = (a: { at?: string }, b: { at?: string }) =>
-  (b.at ? Date.parse(b.at) : 0) - (a.at ? Date.parse(a.at) : 0)
 
-/** What happened in the project, newest first. `changes` takes the plans and outside edits the
- * API reports; until then the events fill it. */
+type Entry = Schemas["TimelineEntry"]
+
+export const entryTone = {
+  release: "brand",
+  write: "neutral",
+  warning: "warn",
+  termination: "fail",
+} as const
+
+/** Who wrote it: the tool by name, or the field manager when no tool is known. */
+export const writerOf = (t: Translate, writer: Entry["writer"]) =>
+  writer
+    ? writer.tool === "other" || writer.tool === "controller"
+      ? writer.manager
+      : t(`timeline.tool.${writer.tool}`)
+    : undefined
+
+const isTrouble = (entry: Entry) => entry.kind === "warning" || entry.kind === "termination"
+
+/** What happened in the project, newest first: releases, writes and who made them, warnings and
+ * crashes. Before the timeline loads, or where it cannot be read, the events stand in. */
 export function Activity({
   project,
   services,
   events,
   unreadable,
-  changes = [],
 }: {
   project: string
   services: Service[]
   events: Event[]
   unreadable: Schemas["UnreadableView"][]
-  changes?: ChangeEntry[]
 }) {
   const t = useT()
+  const timeline = useQuery(projectTimelineQuery(project))
   const [all, setAll] = useState(false)
-  const warnings = events.filter(isWarning)
-  const shown = (all ? events : warnings).map((event) => ({
-    at: event.lastSeen ?? undefined,
-    event,
-  }))
-  const planned = changes.filter((c) => c.kind === "plan" || c.kind === "external")
-  const entries = [
-    ...shown.map((e) => ({ ...e, change: undefined })),
-    ...planned.map((change) => ({ at: change.at, event: undefined, change })),
-  ]
-    .toSorted(newest)
-    .slice(0, all ? undefined : ACTIVITY_SHOWN)
+  const items = timeline.data?.items
+  const trouble = items ? items.filter(isTrouble).length : events.filter(isWarning).length
+  const total = items ? items.length : events.length
+  return (
+    <section aria-labelledby="project-activity" className="flex flex-col gap-3">
+      <Heading id="project-activity" title={t("project.activity")}>
+        <Segmented
+          label={t("events.show")}
+          value={all ? "all" : "warnings"}
+          onChange={(value) => setAll(value === "all")}
+          options={[
+            { value: "warnings", label: counted(t("events.warnings"), trouble) },
+            { value: "all", label: counted(t("common.all"), total) },
+          ]}
+        />
+      </Heading>
+      <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.events)} line />
+      {items ? (
+        <TimelineEntries
+          project={project}
+          services={services}
+          entries={(all ? items : items.filter(isTrouble)).slice(
+            0,
+            all ? undefined : ACTIVITY_SHOWN,
+          )}
+          empty={all ? t("timeline.empty") : t("events.noWarnings")}
+        />
+      ) : (
+        <EventEntries
+          project={project}
+          services={services}
+          events={(all ? events : events.filter(isWarning)).slice(
+            0,
+            all ? undefined : ACTIVITY_SHOWN,
+          )}
+          empty={all ? t("events.empty") : t("events.noWarnings")}
+        />
+      )}
+    </section>
+  )
+}
 
+/** Timeline entries as a list; also the service's Changes. */
+function TimelineEntries({
+  project,
+  services,
+  entries,
+  empty,
+  actions,
+}: {
+  project: string
+  services?: Service[]
+  entries: Entry[]
+  empty: string
+  actions?: (entry: Entry) => ReactNode
+}) {
+  const t = useT()
+  const write = useSentence()
+  if (entries.length === 0)
+    return (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <StatusDot health="ok" />
+        {empty}
+      </p>
+    )
+  return (
+    <Timeline>
+      {entries.map((entry, i) => {
+        const service = services?.find(
+          (s) => s.kind === entry.workload.kind && s.name === entry.workload.name,
+        )
+        const who = writerOf(t, entry.writer)
+        return (
+          <TimelineItem
+            key={`${entry.at}/${entry.kind}/${entry.workload.name}/${i}`}
+            tone={entryTone[entry.kind]}
+            time={<Ago iso={entry.at} />}
+            title={
+              <span>
+                {write(entry.message)}
+                {entry.count && entry.count > 1 ? (
+                  <span className="text-muted-foreground"> ×{entry.count}</span>
+                ) : null}
+              </span>
+            }
+            meta={
+              services ? (
+                <span className="flex flex-wrap items-center gap-x-1.5">
+                  {service ? (
+                    <Link
+                      {...serviceLink(project, service)}
+                      className="hover:text-foreground hover:underline"
+                      translate="no"
+                    >
+                      {entry.workload.name}
+                    </Link>
+                  ) : (
+                    <span translate="no">{entry.workload.name}</span>
+                  )}
+                  {who ? <span>{t("timeline.by", who)}</span> : null}
+                </span>
+              ) : who ? (
+                t("timeline.by", who)
+              ) : undefined
+            }
+            actions={actions?.(entry)}
+          />
+        )
+      })}
+    </Timeline>
+  )
+}
+
+function EventEntries({
+  project,
+  services,
+  events,
+  empty,
+}: {
+  project: string
+  services: Service[]
+  events: Event[]
+  empty: string
+}) {
   const objectLink = (event: Event) => {
     const regarding = event.regarding
     if (!regarding) return null
@@ -117,63 +245,38 @@ export function Activity({
       </Link>
     )
   }
-
+  if (events.length === 0)
+    return (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <StatusDot health="ok" />
+        {empty}
+      </p>
+    )
   return (
-    <section aria-labelledby="project-activity" className="flex flex-col gap-3">
-      <Heading id="project-activity" title={t("project.activity")}>
-        <Segmented
-          label={t("events.show")}
-          value={all ? "all" : "warnings"}
-          onChange={(value) => setAll(value === "all")}
-          options={[
-            { value: "warnings", label: counted(t("events.warnings"), warnings.length) },
-            { value: "all", label: counted(t("common.all"), events.length) },
-          ]}
-        />
-      </Heading>
-      <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.events)} line />
-      {entries.length === 0 ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <StatusDot health="ok" />
-          {all ? t("events.empty") : t("events.noWarnings")}
-        </p>
-      ) : (
-        <Timeline>
-          {entries.map(({ event, change }) =>
-            event ? (
-              <TimelineItem
-                key={event.id}
-                tone={isWarning(event) ? "warn" : "neutral"}
-                time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
-                title={
-                  <span>
-                    <span className="font-medium" translate="no">
-                      {event.reason}
-                    </span>
-                    {event.count > 1 ? (
-                      <span className="text-muted-foreground"> ×{event.count}</span>
-                    ) : null}
-                  </span>
-                }
-                meta={objectLink(event)}
-              >
-                {event.note ? (
-                  <span className="line-clamp-2 text-muted-foreground">{event.note}</span>
-                ) : undefined}
-              </TimelineItem>
-            ) : change && (change.kind === "plan" || change.kind === "external") ? (
-              <TimelineItem
-                key={`${change.kind}/${change.at}/${change.summary}`}
-                tone="brand"
-                time={<Ago iso={change.at} />}
-                title={change.summary}
-                meta={change.by}
-              />
-            ) : null,
-          )}
-        </Timeline>
-      )}
-    </section>
+    <Timeline>
+      {events.map((event) => (
+        <TimelineItem
+          key={event.id}
+          tone={isWarning(event) ? "warn" : "neutral"}
+          time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
+          title={
+            <span>
+              <span className="font-medium" translate="no">
+                {event.reason}
+              </span>
+              {event.count > 1 ? (
+                <span className="text-muted-foreground"> ×{event.count}</span>
+              ) : null}
+            </span>
+          }
+          meta={objectLink(event)}
+        >
+          {event.note ? (
+            <span className="line-clamp-2 text-muted-foreground">{event.note}</span>
+          ) : undefined}
+        </TimelineItem>
+      ))}
+    </Timeline>
   )
 }
 

@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { lazy, Suspense, useState, type ReactElement, type ReactNode } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
+import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import EyeIcon from "~icons/ph/eye"
 import EyeSlashIcon from "~icons/ph/eye-slash"
 import FileTextIcon from "~icons/ph/file-text"
@@ -21,6 +22,7 @@ import { FormField } from "@/components/form-field"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { RefusedKinds } from "@/components/refused"
+import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Empty,
@@ -172,6 +174,15 @@ export function VariablesTab({
   const fromCluster = referenced.filter(
     ({ env }) => env.source.kind !== "Secret" && env.source.kind !== "ConfigMap",
   )
+  const pending = [
+    ...fromObjects.flatMap(({ env }) => (env.pendingRestart ? [env.pendingRestart] : [])),
+    ...imported.flatMap(({ imported: i }) => (i.pendingRestart ? [i.pendingRestart] : [])),
+  ]
+  const restart = () =>
+    planner.plan({
+      title: t("title.restart", service.name),
+      changes: [{ op: "restart", workload }],
+    })
   const total =
     literal.length +
     referenced.length +
@@ -255,6 +266,7 @@ export function VariablesTab({
           )}
         </span>
         <span className="flex items-center justify-end gap-1">
+          {env.pendingRestart ? <PendingMark pending={env.pendingRestart} /> : null}
           <SourceChip source={env.source} />
           <EditSource
             source={env.source}
@@ -318,6 +330,25 @@ export function VariablesTab({
         }
       />
       <RefusedKinds unreadable={refused} line />
+      {pending[0] ? (
+        <Alert variant="warn" role="status">
+          <ClockCounterClockwiseIcon aria-hidden="true" />
+          <AlertDescription>
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="min-w-0 flex-1">
+                {t("env.pendingRestart")}
+                {t("common.colon")}
+                {t("env.pendingRestartDetail", pending[0].pod)}
+              </span>
+              <ManagedTip tool={managed}>
+                <Button variant="outline" size="sm" disabled={Boolean(managed)} onClick={restart}>
+                  {t("title.restart", service.name)}
+                </Button>
+              </ManagedTip>
+            </span>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {secretNames.map((name) =>
         secrets[name]?.problem ? (
           <Problem
@@ -476,6 +507,7 @@ export function VariablesTab({
                       {t("vars.keys", i.keyCount ?? 0)}
                     </span>
                     <span className="flex items-center justify-end gap-1">
+                      {i.pendingRestart ? <PendingMark pending={i.pendingRestart} /> : null}
                       <SourceChip source={i.source} />
                       <EditSource
                         source={i.source}
@@ -509,6 +541,18 @@ export function VariablesTab({
       ) : null}
       {planner.dialog}
     </div>
+  )
+}
+
+function PendingMark({ pending }: { pending: Schemas["PendingRestart"] }) {
+  const t = useT()
+  return (
+    <Tooltip content={t("env.pendingRestartDetail", pending.pod)}>
+      <span className="flex items-center gap-1 text-xs text-warn-strong">
+        <ClockCounterClockwiseIcon className="size-3.5" aria-hidden="true" />
+        <span className="sr-only">{t("env.pendingRestart")}</span>
+      </span>
+    </Tooltip>
   )
 }
 

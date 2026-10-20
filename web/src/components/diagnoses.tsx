@@ -1,20 +1,41 @@
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import FileTextIcon from "~icons/ph/file-text"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
 import type { Schemas } from "@/api/client"
+import { evidenceQuery, projectIncidentsQuery, queryClient } from "@/api/queries"
 import { CopyText } from "@/components/copy-text"
 import { OriginChips } from "@/components/origin"
 import { Layers, Raw, type RawRow } from "@/components/problem"
 import { buttonVariants } from "@zeabur/design-system/components/button"
-import { useSentence, useT, type Sentence, type Translate } from "@/i18n"
+import { useSentence, useT, writeSentence, type Sentence, type Translate } from "@/i18n"
 import { serviceLink } from "@/lib/place"
+import { writeBundle } from "@/model/bundle"
 import { originOf } from "@/model/origin"
 import { isTask, type Service } from "@/model/service"
 import type { ServicePlace } from "@/routes/search"
 
 export type Diagnosis = Schemas["Diagnosis"]
+
+/** The cluster problem behind a symptom, which fixing the service itself does not cure. */
+function IncidentCause({ project, id }: { project: string; id: string }) {
+  const t = useT()
+  const write = useSentence()
+  const incidents = useQuery(projectIncidentsQuery(project))
+  const incident = incidents.data?.items.find((i) => i.id === id)
+  if (!incident) return null
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t("incident.causedBy")}
+      {t("common.colon")}
+      <Link to="/" className="text-foreground hover:underline">
+        {write(incident.cause)}
+      </Link>
+    </p>
+  )
+}
 
 export interface DiagnosisAction {
   tab: ServicePlace
@@ -152,6 +173,7 @@ export function Diagnoses({
                   <p className="font-medium">{write(d.cause)}</p>
                   <OriginChips {...originOf(d)} />
                 </div>
+                {d.incident ? <IncidentCause project={project} id={d.incident} /> : null}
                 <Layers
                   why={write(d.why)}
                   fix={write(d.fix)}
@@ -182,7 +204,18 @@ export function Diagnoses({
                         </Link>
                       ) : null}
                       <CopyText
-                        value={() => diagnosisText(t, write, d, service, project)}
+                        value={async () => {
+                          try {
+                            const bundle = await queryClient.fetchQuery(
+                              evidenceQuery(project, service.kind, service.name),
+                            )
+                            return writeBundle(bundle.markdown, (sentence) =>
+                              writeSentence(t, sentence),
+                            )
+                          } catch {
+                            return diagnosisText(t, write, d, service, project)
+                          }
+                        }}
                         label={t("diagnosis.copy")}
                       />
                     </span>

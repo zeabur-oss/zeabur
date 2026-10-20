@@ -278,7 +278,6 @@ function ServiceView({
                 project={project}
                 service={service}
                 services={data.services}
-                network={data}
                 edges={edges}
                 events={mine}
                 onTab={go}

@@ -3,93 +3,91 @@ import CheckCircleFillIcon from "~icons/ph/check-circle-fill"
 import QuestionIcon from "~icons/ph/question"
 import XCircleFillIcon from "~icons/ph/x-circle-fill"
 
-import { Ago } from "@/components/bits"
+import type { Schemas } from "@/api/client"
+import { Button } from "@zeabur/design-system/components/button"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
-import { useT } from "@/i18n"
+import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
-import type { Hop, HopState, Trace } from "@/model/trace"
 
-const stateIcon = {
+type Hop = Schemas["Hop"]
+type HopStatus = Schemas["HopStatus"]
+
+const statusIcon = {
   ok: CheckCircleFillIcon,
-  fail: XCircleFillIcon,
+  failed: XCircleFillIcon,
   unknown: QuestionIcon,
 } as const
 
-const stateTone: Record<HopState, string> = {
+const statusTone: Record<HopStatus, string> = {
   ok: "text-ok",
-  fail: "text-fail",
+  failed: "text-fail",
   unknown: "text-tertiary",
 }
 
-/** Each hop from the address to a replica, with what is known of it. */
-export function RouteTrace({ trace }: { trace: Trace }) {
+/** Each hop from the address to a ready replica as the API checked it, and where it stops. */
+export function RouteTrace({
+  route,
+  onFix,
+}: {
+  route: Schemas["RouteTraceView"]
+  /** Plans the change the API proposes for the hop that fails. */
+  onFix?: () => void
+}) {
   const t = useT()
-  const label = (hop: Hop) => {
-    switch (hop.kind) {
-      case "dns":
-        return t("trace.dns")
-      case "route":
-        return `${hop.object} ${hop.name}`
-      case "service":
-        return hop.port ? `Service ${hop.name}:${hop.port}` : `Service ${hop.name}`
-      case "replicas":
-        return t("trace.replicas", hop.ready, hop.desired)
-    }
-  }
-  const note = (hop: Hop) => {
-    if (hop.state === "unknown") return t("trace.notChecked")
-    if (hop.state === "ok") return undefined
-    switch (hop.kind) {
-      case "service":
-        return t("trace.noService")
-      case "replicas":
-        return t("trace.noneReady")
-      default:
-        return t("trace.failed")
-    }
-  }
+  const write = useSentence()
+  const detail = (hop: Hop) =>
+    [
+      write(hop.message),
+      hop.expected ? `${t("trace.expected")}${t("common.colon")}${hop.expected}` : "",
+      hop.saw ? `${t("trace.saw")}${t("common.colon")}${hop.saw}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n")
+  const stop = route.hops.find((h) => h.status === "failed")
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <ol
         className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-1.5"
         aria-label={t("trace.title")}
       >
-        {trace.hops.map((hop, i) => {
-          const Icon = stateIcon[hop.state]
-          const why = note(hop)
-          const chip = (
-            <span
-              className={cn(
-                "flex min-w-0 items-center gap-1.5 rounded-md border border-v2-border px-2 py-0.5 text-xs",
-                hop.state === "fail" && "border-fail/40 bg-fail-soft/40",
-              )}
-            >
-              <Icon className={cn("size-3.5 shrink-0", stateTone[hop.state])} aria-hidden="true" />
-              <span className="truncate font-mono" translate="no">
-                {label(hop)}
-              </span>
-              {why ? <span className="sr-only">{why}</span> : null}
-            </span>
-          )
+        {route.hops.map((hop, i) => {
+          const Icon = statusIcon[hop.status]
           return (
-            <li key={`${hop.kind}-${i}`} className="flex min-w-0 items-center gap-1">
+            <li key={`${hop.step}-${i}`} className="flex min-w-0 items-center gap-1">
               {i > 0 ? (
                 <CaretRightIcon className="size-3 shrink-0 text-tertiary" aria-hidden="true" />
               ) : null}
-              {why ? <Tooltip content={why}>{chip}</Tooltip> : chip}
+              <Tooltip content={<span className="whitespace-pre-line">{detail(hop)}</span>}>
+                <span
+                  className={cn(
+                    "flex min-w-0 items-center gap-1.5 rounded-md border border-v2-border px-2 py-0.5 text-xs",
+                    hop.status === "failed" && "border-fail/40 bg-fail-soft/40",
+                  )}
+                >
+                  <Icon
+                    className={cn("size-3.5 shrink-0", statusTone[hop.status])}
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">{t(`trace.step.${hop.step}`)}</span>
+                  <span className="sr-only">{detail(hop)}</span>
+                </span>
+              </Tooltip>
             </li>
           )
         })}
       </ol>
-      <p className="type-meta text-tertiary">
-        {trace.checkedAt ? (
-          <>
-            {t("trace.checked")} <Ago iso={trace.checkedAt} />
-          </>
-        ) : (
-          t("trace.fromObjects")
-        )}
-      </p>
+      {stop ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <p className="text-sm text-fail-strong">{write(stop.message)}</p>
+          {onFix ? (
+            <Button variant="outline" size="sm" onClick={onFix}>
+              {t("trace.fix")}
+            </Button>
+          ) : null}
+        </div>
+      ) : route.hops.some((h) => h.status === "unknown") ? (
+        <p className="type-meta text-tertiary">{t("trace.someUnknown")}</p>
+      ) : null}
     </div>
   )
 }

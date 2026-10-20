@@ -11,6 +11,7 @@ import { LoadingRows } from "@/components/page"
 import { actionOf, describe, sentenceOf } from "@/components/plan/describe"
 import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk } from "@/components/plan/planner"
+import { PlanPreview } from "@/components/plan/preview"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
@@ -229,6 +230,12 @@ function PlanBody({
           {line}
         </p>
       ))}
+      <PlanPreview
+        preview={plan.preview}
+        warnedClaims={plan.warnings.flatMap((w) =>
+          w.code === "claimDataMayBeLost" ? [w.claim] : [],
+        )}
+      />
       {warnings.length > 0 ? (
         <ul className="flex flex-col gap-1.5" aria-label={t("plan.warnings")}>
           {warnings.map((warning) => (
