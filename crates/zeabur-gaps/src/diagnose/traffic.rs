@@ -179,8 +179,41 @@ impl<'a> Traffic<'a> {
     }
 }
 
+/// Where a Service port sends: its `targetPort`, else its `port`.
+pub(crate) fn target_of(port: &zeabur_model::Port) -> String {
+    port.target_port
+        .clone()
+        .unwrap_or_else(|| port.port.to_string())
+}
+
+/// Whether `target` reaches one of the declared `ports`: a name must be one of theirs, a number
+/// may be any port when none is declared.
+pub(crate) fn target_matches(target: &str, ports: &[(String, Option<String>, i32)]) -> bool {
+    target.parse::<i32>().map_or_else(
+        |_| {
+            ports
+                .iter()
+                .any(|(_, port_name, _)| port_name.as_deref() == Some(target))
+        },
+        |number| ports.is_empty() || ports.iter().any(|(_, _, p)| *p == number),
+    )
+}
+
+/// The declared `ports`, as a reader names them: `http (8080), 9090`.
+pub(crate) fn describe(ports: &[(String, Option<String>, i32)]) -> String {
+    ports
+        .iter()
+        .map(|(_, port_name, number)| {
+            port_name
+                .as_ref()
+                .map_or_else(|| number.to_string(), |n| format!("{n} ({number})"))
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// The ports a workload's containers declare: name and number, with the container.
-fn declared(workload: Workload<'_>) -> Vec<(String, Option<String>, i32)> {
+pub(crate) fn declared(workload: Workload<'_>) -> Vec<(String, Option<String>, i32)> {
     workload
         .pod_spec()
         .into_iter()
@@ -247,33 +280,14 @@ pub(super) fn unreachable(
 
     for endpoint in &endpoints {
         for port in &endpoint.ports {
-            let target = port
-                .target_port
-                .clone()
-                .unwrap_or_else(|| port.port.to_string());
-            let matches = target.parse::<i32>().map_or_else(
-                |_| {
-                    ports
-                        .iter()
-                        .any(|(_, port_name, _)| port_name.as_deref() == Some(target.as_str()))
-                },
-                |number| ports.is_empty() || ports.iter().any(|(_, _, p)| *p == number),
-            );
-            if !matches {
-                let declared: Vec<String> = ports
-                    .iter()
-                    .map(|(_, port_name, number)| {
-                        port_name
-                            .as_ref()
-                            .map_or_else(|| number.to_string(), |n| format!("{n} ({number})"))
-                    })
-                    .collect();
+            let target = target_of(port);
+            if !target_matches(&target, &ports) {
                 add(
                     "targetPort",
                     &[
                         ("endpoint", endpoint.name.clone()),
                         ("targetPort", target),
-                        ("ports", declared.join(", ")),
+                        ("ports", describe(&ports)),
                     ],
                     vec![port.origin.clone()],
                     None,

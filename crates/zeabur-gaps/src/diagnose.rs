@@ -57,7 +57,8 @@ use zeabur_model::{
 
 use crate::event::Event;
 
-mod traffic;
+pub(crate) mod fault;
+pub(crate) mod traffic;
 
 /// How long after a failure it still counts, the kubelet's back-off reset window.
 pub const RECENT: SignedDuration = SignedDuration::from_mins(10);
@@ -328,11 +329,13 @@ impl Found {
                 kind,
                 container,
                 pods: gathered.pods.into_iter().collect(),
+                fault: fault::fault(kind, &gathered.cause),
                 cause: gathered.cause,
                 why: gathered.why,
                 fix: gathered.fix,
                 evidence: gathered.evidence.into_iter().collect(),
                 last_seen: gathered.last.map(|t| t.to_string()),
+                incident: None,
             })
             .collect()
     }
@@ -1099,6 +1102,11 @@ fn unexplained(service: &Service) -> Diagnosis {
             .map(|pod| Origin::field("Pod", &pod.name, "status".to_owned()))
             .collect(),
         last_seen: None,
+        fault: fault::fault(
+            DiagnosisKind::Unexplained,
+            &Message::new("diagnosis.unexplained.cause"),
+        ),
+        incident: None,
     }
 }
 

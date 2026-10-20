@@ -71,8 +71,27 @@ fn ingress_classes() -> ResourceRef {
 
 async fn facts(cluster: &dyn Cluster) -> Result<Facts, ApiError> {
     let mut unreadable = Vec::new();
+    let classes = ingress_class_facts(cluster, &mut unreadable).await?;
+    // Refused (`None`): the rules run as if no Gateway were served and none says one is
+    // missing; the plan names the refusal when a route is written.
+    let gateways = cluster
+        .gateways()
+        .await
+        .map_err(|other| ApiError::from(other.into_problem("Gateways")))?;
+    Ok(Facts {
+        classes,
+        gateways,
+        unreadable,
+    })
+}
+
+/// The cluster's `IngressClasses`; a refusal is added to `unreadable` and gives none.
+pub(crate) async fn ingress_class_facts(
+    cluster: &dyn Cluster,
+    unreadable: &mut Vec<UnreadableView>,
+) -> Result<Vec<IngressClassFact>, ApiError> {
     let resource = ingress_classes();
-    let classes = match cluster.list_objects(&resource, None).await {
+    Ok(match cluster.list_objects(&resource, None).await {
         Ok(objects) => objects
             .unwrap_or_default()
             .into_iter()
@@ -95,17 +114,6 @@ async fn facts(cluster: &dyn Cluster) -> Result<Facts, ApiError> {
             unreadable.push(refusal.into());
             Vec::new()
         }
-    };
-    // Refused (`None`): the rules run as if no Gateway were served and none says one is
-    // missing; the plan names the refusal when a route is written.
-    let gateways = cluster
-        .gateways()
-        .await
-        .map_err(|other| ApiError::from(other.into_problem("Gateways")))?;
-    Ok(Facts {
-        classes,
-        gateways,
-        unreadable,
     })
 }
 

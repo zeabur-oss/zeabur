@@ -181,6 +181,26 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/incidents:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Every incident on the cluster: a component down or a node not ready, with the domains and
+        projects it reaches, as far as the person can list Ingresses and pods. Services are not named:
+        they are a project's, see `listProjectIncidents`.
+      operationId: listClusterIncidents
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentList"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/nodes:
     get:
       tags:
@@ -447,6 +467,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GapList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/incidents":
+    get:
+      tags:
+      - projects
+      summary: |-
+        What on the cluster's side is breaking this project's services: a component down or a node
+        not ready, with the services, domains and projects it reaches.
+      operationId: listProjectIncidents
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IncidentList"
         "403":
           content:
             application/problem+json:
@@ -914,6 +960,43 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/evidence":
+    get:
+      tags:
+      - services
+      summary: |-
+        Everything about one service someone helping would ask for, as Markdown to copy: its
+        problems, the way to it hop by hop, recent events, the end of each restarted container's
+        previous log, and its objects with variable values hidden. Never a Secret.
+      operationId: serviceEvidence
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset, daemonset, job or cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceBundle"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/services/{kind}/{name}/history":
     get:
       tags:
@@ -994,6 +1077,146 @@ paths:
               schema:
                 $ref: "#/components/schemas/WorkloadReleaseList"
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/rollout":
+    get:
+      tags:
+      - services
+      summary: |-
+        How far a service's rollout has come: pods of the new release and of earlier ones, ready or
+        not, and whether it is done, progressing, or stuck (with the reason and the plan that rolls
+        back). Poll it while `status` is `progressing`.
+      operationId: serviceRollout
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset or daemonset; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RolloutProgress"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/timeline":
+    get:
+      tags:
+      - services
+      summary: |-
+        What changed in one service and what went wrong, newest first, each release that runs now with
+        the plan that returns to the one before it.
+      operationId: serviceTimeline
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset, daemonset, job or cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeline"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/trace":
+    get:
+      tags:
+      - services
+      summary: |-
+        The way traffic travels to one service, hop by hop: DNS, the ingress controller's address and
+        readiness, the certificate, the route, the Service, its target port and the pods' readiness.
+      operationId: traceService
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset, daemonset, job or cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceTrace"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/timeline":
+    get:
+      tags:
+      - projects
+      summary: |-
+        What changed in a project and what went wrong, newest first: releases, each field manager's
+        last write, warnings folded by reason and containers that stopped, for every workload.
+      operationId: projectTimeline
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeline"
+        "403":
           content:
             application/problem+json:
               schema:
@@ -1133,6 +1356,40 @@ components:
       - ReadWriteOncePod
       - ReadWriteMany
       - ReadOnlyMany
+    AddressKind:
+      type: string
+      description: What kind of address a trace follows.
+      enum:
+      - domain
+      - private
+    AffectedService:
+      type: object
+      description: A service an incident reaches.
+      required:
+      - id
+      - project
+      - kind
+      - name
+      properties:
+        id:
+          type: string
+          description: Its id, `projects/<project>/services/<kind>/<name>`.
+        kind:
+          $ref: "#/components/schemas/WorkloadKind"
+          description: The workload's kind.
+        name:
+          type: string
+          description: The workload's name.
+        project:
+          type: string
+          description: The project.
+        symptoms:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiagnosisKind"
+          description: >-
+            The kinds of its diagnoses this incident explains, sorted; empty when it shows
+            none yet.
     Applied:
       type: object
       description: One object an apply wrote.
@@ -1320,6 +1577,42 @@ components:
       - volume
       - database
       - namespace
+    Blocker:
+      type: object
+      description: One limit the new pods exceed.
+      required:
+      - kind
+      - resource
+      - need
+      - available
+      properties:
+        available:
+          type: integer
+          format: int64
+          description: What is left.
+          minimum: 0
+        kind:
+          $ref: "#/components/schemas/BlockerKind"
+          description: A quota or the nodes.
+        name:
+          type:
+          - string
+          - "null"
+          description: The quota's name.
+        need:
+          type: integer
+          format: int64
+          description: "What the plan needs, in the resource's unit: millicores, bytes or pods."
+          minimum: 0
+        resource:
+          type: string
+          description: "The resource: `requests.cpu`, `limits.memory`, `pods`, `cpu`, `memory`, …"
+    BlockerKind:
+      type: string
+      description: What keeps a pod from being created or placed.
+      enum:
+      - quota
+      - node
     Capability:
       type: object
       description: Whether a capability is present on the cluster, and on what evidence.
@@ -2259,6 +2552,42 @@ components:
       enum:
       - ConfigMap
       - Secret
+    DataLoss:
+      type: object
+      description: Data a plan loses.
+      required:
+      - kind
+      properties:
+        claim:
+          type:
+          - string
+          - "null"
+          description: The claim, or the StatefulSet's claim template.
+        kind:
+          $ref: "#/components/schemas/DataLossKind"
+          description: What kind.
+        mountPaths:
+          type: array
+          items:
+            type: string
+          description: Where the containers mount it.
+        volume:
+          type:
+          - string
+          - "null"
+          description: The volume.
+        workload:
+          oneOf:
+          - $ref: "#/components/schemas/WorkloadRef"
+            description: The workload whose pods hold it.
+          - type: "null"
+    DataLossKind:
+      type: string
+      description: What kind of data a plan loses.
+      enum:
+      - claimDeleted
+      - emptyDir
+      - claimsOfStatefulSet
     DataStore:
       type: string
       description: What kind of data store a service is, as far as its image's name tells.
@@ -2329,9 +2658,19 @@ components:
           items:
             $ref: "#/components/schemas/Origin"
           description: The status fields and events it rests on.
+        fault:
+          $ref: "#/components/schemas/Fault"
+          description: Where the cause lies and who can remove it.
         fix:
           $ref: "#/components/schemas/Message"
           description: What to do about it, in one sentence.
+        incident:
+          type:
+          - string
+          - "null"
+          description: |-
+            The cluster incident this is a symptom of ([`Incident::id`]); set only in answers that
+            read the incidents too.
         kind:
           $ref: "#/components/schemas/DiagnosisKind"
           description: What kind of failure.
@@ -2402,6 +2741,14 @@ components:
           - string
           - "null"
           description: The Service type, such as `ClusterIP`.
+    EntryKind:
+      type: string
+      description: What an entry records.
+      enum:
+      - release
+      - write
+      - warning
+      - termination
     EnvEdit:
       type: object
       description: One requested change to a container's environment.
@@ -2468,6 +2815,13 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The entry in its workload.
+        pendingRestart:
+          oneOf:
+          - $ref: "#/components/schemas/PendingRestart"
+            description: |-
+              The ConfigMap or Secret it reads was written after a running pod started; see
+              [`PendingRestart`].
+          - type: "null"
         source:
           $ref: "#/components/schemas/ValueSource"
           description: Where the value is read from.
@@ -2537,12 +2891,69 @@ components:
         type:
           type: string
           description: "`Normal` or `Warning`."
+    EvidenceBundle:
+      type: object
+      description: A service's evidence, as Markdown.
+      required:
+      - id
+      - generatedAt
+      - markdown
+      - unreadable
+      properties:
+        generatedAt:
+          type: string
+          description: When it was read, RFC 3339.
+        id:
+          type: string
+          description: "`projects/<project>/services/<kind>/<name>/evidence`."
+        markdown:
+          type: string
+          description: The text to copy.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; the text names them too.
     ExitReason:
       type: string
       description: How a terminal's process ended, when it gave no exit code.
       enum:
       - command-not-found
       - failed
+    Fault:
+      type: object
+      description: Where a failure's cause lies, and who can fix it.
+      required:
+      - origin
+      - fixer
+      properties:
+        component:
+          type:
+          - string
+          - "null"
+          description: |-
+            The component or upstream service, for [`FaultOrigin::Component`] and
+            [`FaultOrigin::Upstream`]: `ingress-controller`, `cert-manager`, `cluster-dns`,
+            `metrics-server`, `node/<name>`, or a registry's host.
+        fixer:
+          $ref: "#/components/schemas/Fixer"
+          description: Who can fix it.
+        origin:
+          $ref: "#/components/schemas/FaultOrigin"
+          description: Where the cause lies.
+    FaultOrigin:
+      type: string
+      description: >-
+        Where the cause of a failure lies, so a cluster's fault never reads as the
+        reader's.
+      enum:
+      - code
+      - configuration
+      - cluster
+      - component
+      - upstream
+      - zeabur
+      - unknown
     FieldCause:
       type: object
       description: |-
@@ -2583,6 +2994,46 @@ components:
         path:
           type: string
           description: The field, dotted; keyed list entries as `[name=app]`, others by position.
+    Fit:
+      type: object
+      description: Whether the plan's new pods fit, and what blocks them.
+      required:
+      - status
+      - pods
+      - cpuMillicores
+      - memoryBytes
+      properties:
+        blockers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Blocker"
+          description: What blocks them, quotas first.
+        cpuMillicores:
+          type: integer
+          format: int64
+          description: CPU requests it adds at its peak, millicores.
+          minimum: 0
+        memoryBytes:
+          type: integer
+          format: int64
+          description: Memory requests it adds at its peak, bytes.
+          minimum: 0
+        pods:
+          type: integer
+          format: int64
+          description: Pods the plan adds at its peak.
+          minimum: 0
+        status:
+          $ref: "#/components/schemas/FitStatus"
+          description: The verdict.
+    FitStatus:
+      type: string
+      description: Whether the plan's new pods fit.
+      enum:
+      - notNeeded
+      - fits
+      - blocked
+      - unknown
     Fix:
       type: object
       description: The fix of a gap.
@@ -2610,6 +3061,13 @@ components:
       - plan
       - install
       - snippet
+    Fixer:
+      type: string
+      description: Who can remove the cause.
+      enum:
+      - you
+      - clusterAdmin
+      - componentOwner
     Gap:
       type: object
       description: One finding of a rule.
@@ -2701,6 +3159,57 @@ components:
         service:
           type: string
           description: Its Service port, `namespace/name:port`.
+    Hop:
+      type: object
+      description: One hop and what was seen there.
+      required:
+      - step
+      - status
+      - message
+      properties:
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: The objects and fields it rests on.
+        expected:
+          type:
+          - string
+          - "null"
+          description: The value it should have, as Kubernetes or DNS writes it, when one is known.
+        message:
+          $ref: "#/components/schemas/Message"
+          description: What was seen, in one sentence.
+        saw:
+          type:
+          - string
+          - "null"
+          description: The value seen, the same way.
+        status:
+          $ref: "#/components/schemas/HopStatus"
+          description: How it fared.
+        step:
+          $ref: "#/components/schemas/HopStep"
+          description: Which hop.
+    HopStatus:
+      type: string
+      description: How a hop fared.
+      enum:
+      - ok
+      - failed
+      - unknown
+    HopStep:
+      type: string
+      description: One hop on the way to a service, in the order traffic takes them.
+      enum:
+      - dns
+      - address
+      - controller
+      - certificate
+      - route
+      - service
+      - targetPort
+      - ready
     ImportedEnv:
       type: object
       description: |-
@@ -2722,6 +3231,13 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The entry in its workload.
+        pendingRestart:
+          oneOf:
+          - $ref: "#/components/schemas/PendingRestart"
+            description: >-
+              The imported object was written after a running pod started; see
+              [`PendingRestart`].
+          - type: "null"
         prefix:
           type:
           - string
@@ -2738,6 +3254,89 @@ components:
         source:
           $ref: "#/components/schemas/ValueSource"
           description: The imported ConfigMap or Secret.
+    Incident:
+      type: object
+      description: |-
+        One cause on the cluster's side with everything it reaches, told once instead of as a
+        separate problem of every service it breaks.
+      required:
+      - id
+      - kind
+      - cause
+      - why
+      - fix
+      - fault
+      - services
+      - domains
+      - projects
+      - evidence
+      properties:
+        cause:
+          $ref: "#/components/schemas/Message"
+          description: The cause, in one sentence.
+        domains:
+          type: array
+          items:
+            type: string
+          description: The public domains it reaches, sorted.
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: The objects and fields it rests on.
+        fault:
+          $ref: "#/components/schemas/Fault"
+          description: Where it lies and who can fix it.
+        fix:
+          $ref: "#/components/schemas/Message"
+          description: What to do, and who does it.
+        id:
+          type: string
+          description: "`incidents/<kind>/<name>`, stable while the cause lasts, so diagnoses link to it."
+        kind:
+          $ref: "#/components/schemas/IncidentKind"
+          description: What kind of cause.
+        projects:
+          type: array
+          items:
+            type: string
+          description: The projects it reaches, sorted.
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/AffectedService"
+          description: The services it reaches, sorted by id, as far as the reader could see them.
+        since:
+          type:
+          - string
+          - "null"
+          description: Since when, in RFC 3339, when known.
+        why:
+          $ref: "#/components/schemas/Message"
+          description: What stops working because of it.
+    IncidentKind:
+      type: string
+      description: What kind of cluster-side cause an incident is.
+      enum:
+      - componentDown
+      - nodeNotReady
+    IncidentList:
+      type: object
+      description: The incidents found, and the reads that were refused.
+      required:
+      - items
+      - unreadable
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Incident"
+          description: The incidents, sorted by id.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; incidents they would have shown are missing.
     InferredFrom:
       type: string
       description: |-
@@ -2993,6 +3592,18 @@ components:
         name:
           type: string
           description: The resource's name.
+    ManagerTool:
+      type: string
+      description: The tool behind a field manager, by its name.
+      enum:
+      - zeabur
+      - helm
+      - argoCd
+      - flux
+      - kubectl
+      - autoscaler
+      - controller
+      - other
     Message:
       type: object
       description: |-
@@ -3719,6 +4330,40 @@ components:
       - owned
       - shared
       - orphan
+    PendingRestart:
+      type: object
+      description: |-
+        A variable's ConfigMap or Secret was written after the oldest running pod started.
+        
+        That pod may still hold the old value: a container reads its variables once, when it starts
+        [k8s-configmap-env].
+        
+        `managedFields` keep one time per field manager [k8s-ssa-fields], the time of its last write
+        to any field it owns, so a manager owning this key that later wrote another key also counts:
+        the pod *may* hold an old value, a restart settles it.
+        
+        [k8s-configmap-env]: https://kubernetes.io/docs/concepts/configuration/configmap/#configmaps-and-pods
+        [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
+      required:
+      - writtenAt
+      - manager
+      - podStartedAt
+      - pod
+      properties:
+        manager:
+          type: string
+          description: That manager.
+        pod:
+          type: string
+          description: That pod.
+        podStartedAt:
+          type: string
+          description: When the oldest running pod started (`status.startTime`), RFC 3339.
+        writtenAt:
+          type: string
+          description: |-
+            When the object was last written by a field manager that owns the key (for an `envFrom`
+            import, any key), RFC 3339.
     Permission:
       type: string
       description: Whether the person may change something, as far as their RBAC rules tell.
@@ -3802,10 +4447,16 @@ components:
         required:
         - token
         - expiresAt
+        - preview
         properties:
           expiresAt:
             type: string
             description: When the token stops working, RFC 3339.
+          preview:
+            $ref: "#/components/schemas/Preview"
+            description: |-
+              What the plan does once applied: the pods it replaces, whether new ones fit, the data
+              and fields it removes.
           token:
             type: string
             description: Send this to `apply` to carry out exactly this plan.
@@ -4378,6 +5029,39 @@ components:
           items:
             $ref: "#/components/schemas/NetworkPolicyPreset"
           description: Isolate first, then allow the ingress controller, then one per other service.
+    Preview:
+      type: object
+      description: What a plan does once applied.
+      required:
+      - rollouts
+      - fit
+      - dataLoss
+      - removals
+      - unreadable
+      properties:
+        dataLoss:
+          type: array
+          items:
+            $ref: "#/components/schemas/DataLoss"
+          description: The data it loses.
+        fit:
+          $ref: "#/components/schemas/Fit"
+          description: Whether the new pods fit.
+        removals:
+          type: array
+          items:
+            $ref: "#/components/schemas/Removal"
+          description: The fields it removes, by object then path.
+        rollouts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Rollout"
+          description: The workloads whose pods change, sorted.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused, and what they left unchecked.
     ProbeHandler:
       type: string
       description: How a probe checks the container.
@@ -5080,6 +5764,56 @@ components:
         released:
           type: string
           description: Its first release.
+    ReleaseRef:
+      type: object
+      description: A release, as an entry names it.
+      required:
+      - revision
+      - name
+      - images
+      - current
+      properties:
+        changeCause:
+          type:
+          - string
+          - "null"
+          description: "`kubernetes.io/change-cause`."
+        current:
+          type: boolean
+          description: It runs now.
+        images:
+          type: array
+          items:
+            type: string
+          description: Its images.
+        name:
+          type: string
+          description: The `ReplicaSet` or `ControllerRevision`.
+        revision:
+          type: integer
+          format: int64
+          description: Its number.
+    Removal:
+      type: object
+      description: A field the plan removes.
+      required:
+      - target
+      - path
+      - before
+      - leftOutOfEdit
+      properties:
+        before:
+          type: string
+          description: Its value now (redacted for a Secret).
+        leftOutOfEdit:
+          type: boolean
+          description: It was left out of an edited YAML, rather than asked to be removed.
+        path:
+          type: string
+          description: The field.
+        target:
+          $ref: "#/components/schemas/ObjectName"
+          description: The object.
     Replicas:
       type: object
       description: Ready and desired replicas (per node for a DaemonSet, completions for a Job).
@@ -5211,6 +5945,146 @@ components:
         risk:
           type: string
           description: The risk.
+    Rollout:
+      type: object
+      description: One workload whose pods a plan changes.
+      required:
+      - workload
+      - actions
+      - downtime
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/RolloutAction"
+          description: What happens to its pods.
+        downtime:
+          type: boolean
+          description: There is a moment with no pod serving (on a node, for a DaemonSet).
+        fields:
+          type: array
+          items:
+            type: string
+          description: The pod template fields that change, at most ten.
+        fromReplicas:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Replicas before, for a scale.
+        replicas:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: Replicas after.
+        strategy:
+          type:
+          - string
+          - "null"
+          description: "`RollingUpdate`, `Recreate` or `OnDelete`, for a roll."
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
+    RolloutAction:
+      type: string
+      description: What happens to a workload's pods.
+      enum:
+      - roll
+      - scale
+      - start
+      - stop
+      - pendingRestart
+    RolloutProgress:
+      type: object
+      description: How far a service's rollout has come.
+      required:
+      - id
+      - workload
+      - status
+      - message
+      - desired
+      - updated
+      - updatedReady
+      - old
+      - oldReady
+      - evidence
+      - unreadable
+      properties:
+        desired:
+          type: integer
+          format: int32
+          description: The pods it should have (nodes, for a DaemonSet).
+        diagnoses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Diagnosis"
+          description: The diagnoses of the new pods.
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: The status fields it rests on.
+        id:
+          type: string
+          description: "`projects/<project>/services/<kind>/<name>/rollout`."
+        message:
+          $ref: "#/components/schemas/Message"
+          description: "`rollout.<progressing|done|paused|waitsForDeletion>` or `rollout.stuck.<reason>`."
+        old:
+          type: integer
+          format: int32
+          description: Pods of earlier releases still there.
+        oldReady:
+          type: integer
+          format: int32
+          description: Of those, ready.
+        reason:
+          oneOf:
+          - $ref: "#/components/schemas/StuckReason"
+            description: Why it is stuck.
+          - type: "null"
+        revision:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: The release it rolls out.
+        rollback:
+          oneOf:
+          - $ref: "#/components/schemas/PlanRequest"
+            description: >-
+              The changes that return to the release before, to send to `plan`; while it is
+              not done.
+          - type: "null"
+        status:
+          $ref: "#/components/schemas/RolloutStatus"
+          description: Where it stands.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused.
+        updated:
+          type: integer
+          format: int32
+          description: Pods of the new release.
+        updatedReady:
+          type: integer
+          format: int32
+          description: Of those, ready.
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
+    RolloutStatus:
+      type: string
+      description: Where a rollout stands.
+      enum:
+      - progressing
+      - done
+      - stuck
+      - paused
+      - waitsForDeletion
     Route:
       type: object
       description: "An Ingress routing to workloads' Services: how they are reached from outside."
@@ -5317,6 +6191,51 @@ components:
         service:
           type: string
           description: The backend Service's name.
+    RouteTrace:
+      type: object
+      description: The way to one address of a service.
+      required:
+      - kind
+      - address
+      - via
+      - hops
+      - status
+      properties:
+        address:
+          type: string
+          description: >-
+            The domain (`*` for a rule without a host) or the Service's DNS name, with its
+            port.
+        hops:
+          type: array
+          items:
+            $ref: "#/components/schemas/Hop"
+          description: The hops, in the order traffic takes them.
+        kind:
+          $ref: "#/components/schemas/AddressKind"
+          description: A domain or the private address.
+        status:
+          $ref: "#/components/schemas/HopStatus"
+          description: "`failed` when a hop failed, `unknown` when none failed and one is unknown, else `ok`."
+        via:
+          $ref: "#/components/schemas/Origin"
+          description: "The object that makes the address: the Ingress, `HTTPRoute` or Service."
+    RouteTraceView:
+      allOf:
+      - $ref: "#/components/schemas/RouteTrace"
+        description: The way.
+      - type: object
+        properties:
+          fix:
+            oneOf:
+            - $ref: "#/components/schemas/PlanRequest"
+              description: |-
+                The changes that fix its first failed hop, to send to `plan`; absent when Zeabur cannot
+                write the fix.
+            - type: "null"
+      description: >-
+        One address's way, and the plan that fixes where it stops when Zeabur can write
+        one.
     SecretValue:
       type: object
       description: One value of a revealed Secret.
@@ -5655,6 +6574,33 @@ components:
           type: integer
           format: int32
           description: Restarts, summed over its pods.
+    ServiceTrace:
+      type: object
+      description: Every way to a service, and the diagnoses where they stop.
+      required:
+      - id
+      - routes
+      - diagnoses
+      - unreadable
+      properties:
+        diagnoses:
+          type: array
+          items:
+            $ref: "#/components/schemas/Diagnosis"
+          description: The first failed hop of each address, as a diagnosis, once per cause.
+        id:
+          type: string
+          description: "`projects/<project>/services/<kind>/<name>/trace`."
+        routes:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteTraceView"
+          description: Its domains, by route and host, then its private addresses.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; hops that needed them are unknown.
     SessionView:
       type: object
       description: How the person is signed in to Zeabur.
@@ -5735,6 +6681,19 @@ components:
       - not-configured
       - unreadable
       - unavailable
+    StuckReason:
+      type: string
+      description: Why a rollout is stuck.
+      enum:
+      - crashLoop
+      - outOfMemory
+      - imagePull
+      - unschedulable
+      - quota
+      - configMissing
+      - runFailed
+      - deadlineExceeded
+      - replicaFailure
     Suggestion:
       type: string
       description: How strongly the catalogue suggests a missing capability.
@@ -5805,6 +6764,86 @@ components:
           - string
           - "null"
           description: Its value.
+    Timeline:
+      type: object
+      description: A timeline.
+      required:
+      - id
+      - items
+      - truncated
+      - unreadable
+      properties:
+        id:
+          type: string
+          description: "`projects/<project>/timeline` or `projects/<project>/services/<kind>/<name>/timeline`."
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEntry"
+          description: Newest first, at most 200.
+        truncated:
+          type: boolean
+          description: Older entries were left out.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; their entries are missing.
+    TimelineEntry:
+      type: object
+      description: One thing that happened.
+      required:
+      - at
+      - kind
+      - workload
+      - message
+      properties:
+        at:
+          type: string
+          description: "When, RFC 3339: the release's creation, the write, the last event, the termination."
+        count:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: How many times, for warnings.
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: "The objects and fields it rests on: the events, the pod's container status."
+        fields:
+          type: array
+          items:
+            type: string
+          description: The fields the manager owns, for a write.
+        kind:
+          $ref: "#/components/schemas/EntryKind"
+          description: What it records.
+        message:
+          $ref: "#/components/schemas/Message"
+          description: |-
+            What happened, in one sentence: `timeline.release`, `timeline.write.<tool>`,
+            `timeline.warning.<crashLoop|evicted|unschedulable|imagePull|probe|quota|other>`,
+            `timeline.termination.<oomKilled|exited>`.
+        release:
+          oneOf:
+          - $ref: "#/components/schemas/ReleaseRef"
+            description: The release.
+          - type: "null"
+        revert:
+          oneOf:
+          - $ref: "#/components/schemas/PlanRequest"
+            description: The changes that undo it, to send to `plan`.
+          - type: "null"
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
+        writer:
+          oneOf:
+          - $ref: "#/components/schemas/Writer"
+            description: Who wrote, for a write.
+          - type: "null"
     Tool:
       type: string
       description: A deployment tool that would revert a direct edit on its next sync or upgrade.
@@ -6160,6 +7199,29 @@ components:
               description: Ready and desired replicas; absent for a CronJob, which has no meaningful ratio.
             - type: "null"
       description: A workload as lists show it.
+    Writer:
+      type: object
+      description: Who wrote, as far as `managedFields` say.
+      required:
+      - manager
+      - tool
+      properties:
+        manager:
+          type: string
+          description: The field manager.
+        operation:
+          type:
+          - string
+          - "null"
+          description: "`Apply` or `Update`."
+        subresource:
+          type:
+          - string
+          - "null"
+          description: The subresource written, such as `scale`.
+        tool:
+          $ref: "#/components/schemas/ManagerTool"
+          description: The tool it is.
 tags:
 - name: identity
   description: Who you are

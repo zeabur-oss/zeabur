@@ -40,7 +40,7 @@ fn owned_by(meta: &ObjectMeta, kind: &str, name: &str) -> bool {
         .any(|owner| owner.kind == kind && owner.name == name)
 }
 
-fn belongs(snapshot: &Snapshot, workload: Workload<'_>, pod: &Pod) -> bool {
+pub(crate) fn belongs(snapshot: &Snapshot, workload: Workload<'_>, pod: &Pod) -> bool {
     let name = workload.name();
     match workload {
         Workload::StatefulSet(_) => owned_by(&pod.metadata, "StatefulSet", name),

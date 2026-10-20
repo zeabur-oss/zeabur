@@ -70,4 +70,179 @@ pub struct Diagnosis {
     /// When it last happened, in RFC 3339, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub last_seen: Option<String>,
+    /// Where the cause lies and who can remove it.
+    #[serde(default)]
+    pub fault: Fault,
+    /// The cluster incident this is a symptom of ([`Incident::id`]); set only in answers that
+    /// read the incidents too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub incident: Option<String>,
+}
+
+/// Where the cause of a failure lies, so a cluster's fault never reads as the reader's.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum FaultOrigin {
+    /// The program in the image: it exits, crashes or does not answer.
+    Code,
+    /// How the service is set up: its command, ports, probes, variables, image name or limits.
+    Configuration,
+    /// The cluster: its nodes, capacity or quotas.
+    Cluster,
+    /// A component installed in the cluster, named in [`Fault::component`].
+    Component,
+    /// A service outside the cluster, named in [`Fault::component`]: an image registry.
+    Upstream,
+    /// Zeabur itself.
+    Zeabur,
+    /// Nothing Zeabur reads tells where it lies.
+    #[default]
+    Unknown,
+}
+
+/// Who can remove the cause.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum Fixer {
+    /// Whoever may change the service.
+    #[default]
+    You,
+    /// A cluster administrator.
+    ClusterAdmin,
+    /// Whoever runs the component or upstream service named in [`Fault::component`].
+    ComponentOwner,
+}
+
+/// Where a failure's cause lies, and who can fix it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Fault {
+    /// Where the cause lies.
+    pub origin: FaultOrigin,
+    /// The component or upstream service, for [`FaultOrigin::Component`] and
+    /// [`FaultOrigin::Upstream`]: `ingress-controller`, `cert-manager`, `cluster-dns`,
+    /// `metrics-server`, `node/<name>`, or a registry's host.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub component: Option<String>,
+    /// Who can fix it.
+    pub fixer: Fixer,
+}
+
+impl Fault {
+    /// A fault of `origin` that `fixer` removes.
+    #[must_use]
+    pub const fn new(origin: FaultOrigin, fixer: Fixer) -> Self {
+        Self {
+            origin,
+            component: None,
+            fixer,
+        }
+    }
+
+    /// This fault, naming `component`.
+    #[must_use]
+    pub fn of(self, component: impl Into<String>) -> Self {
+        Self {
+            component: Some(component.into()),
+            ..self
+        }
+    }
+}
+
+/// What kind of cluster-side cause an incident is.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    utoipa::ToSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub enum IncidentKind {
+    /// A component with no ready replica: an ingress controller, cert-manager, cluster DNS or
+    /// metrics-server.
+    ComponentDown,
+    /// A node whose `Ready` condition is not `True`.
+    NodeNotReady,
+}
+
+/// A service an incident reaches.
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
+)]
+#[serde(rename_all = "camelCase")]
+pub struct AffectedService {
+    /// Its id, `projects/<project>/services/<kind>/<name>`.
+    pub id: String,
+    /// The project.
+    pub project: String,
+    /// The workload's kind.
+    pub kind: crate::WorkloadKind,
+    /// The workload's name.
+    pub name: String,
+    /// The kinds of its diagnoses this incident explains, sorted; empty when it shows none yet.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub symptoms: Vec<DiagnosisKind>,
+}
+
+/// One cause on the cluster's side with everything it reaches, told once instead of as a
+/// separate problem of every service it breaks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Incident {
+    /// `incidents/<kind>/<name>`, stable while the cause lasts, so diagnoses link to it.
+    pub id: String,
+    /// What kind of cause.
+    pub kind: IncidentKind,
+    /// The cause, in one sentence.
+    pub cause: Message,
+    /// What stops working because of it.
+    pub why: Message,
+    /// What to do, and who does it.
+    pub fix: Message,
+    /// Where it lies and who can fix it.
+    pub fault: Fault,
+    /// The services it reaches, sorted by id, as far as the reader could see them.
+    pub services: Vec<AffectedService>,
+    /// The public domains it reaches, sorted.
+    pub domains: Vec<String>,
+    /// The projects it reaches, sorted.
+    pub projects: Vec<String>,
+    /// The objects and fields it rests on.
+    pub evidence: Vec<Origin>,
+    /// Since when, in RFC 3339, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
 }

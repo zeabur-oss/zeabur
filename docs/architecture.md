@@ -100,6 +100,27 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 
 Every crate has a README that is also its crate-level documentation (`cargo doc --open`).
 
+## Explaining problems
+
+Everything Zeabur says about a failure is read from the cluster at the time of the request, with
+the person's rights, and names the objects and fields it rests on:
+
+- **Diagnoses** (`zeabur-gaps`) say what fails, why, how to fix it, where the cause lies (the
+  code, the configuration, the cluster, a component, an upstream registry) and who can fix it.
+- **Incidents** group what one cluster cause breaks (an ingress controller or cluster DNS down,
+  a node not ready), so the cluster's fault is not shown as each service's own.
+- **Traces** follow each domain and private address hop by hop, from DNS to a ready pod.
+- **Plan previews** say, before an apply, which pods are replaced, whether new ones fit the
+  quotas and the nodes, and which data and fields go.
+- **Timelines and rollouts** read releases, `managedFields`, events and container statuses; no
+  history of Zeabur's own is kept, so what the cluster does not keep (who made a write, an
+  event older than its TTL) is not shown.
+- **Evidence bundles** put a service's problems, trace, events, previous logs and objects in one
+  Markdown text, with no Secret and no variable value.
+
+What cannot be read is named (`unreadable`), and a check that cannot be made is `unknown`, never
+`ok`.
+
 ## Web interface
 
 The interface's sources live in [`web/`](../web) (React, TanStack Router and Query, shadcn/ui on

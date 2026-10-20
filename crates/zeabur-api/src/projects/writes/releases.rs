@@ -50,6 +50,16 @@ pub(crate) struct History {
 }
 
 impl History {
+    pub(crate) const fn new(
+        replica_sets: Vec<ReplicaSet>,
+        revisions: Vec<ControllerRevision>,
+    ) -> Self {
+        Self {
+            replica_sets,
+            revisions,
+        }
+    }
+
     pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Self, ApiError> {
         let (replica_sets, revisions) = futures_util::join!(
             cluster.list::<ReplicaSet>(Some(project)),

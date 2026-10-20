@@ -11,8 +11,26 @@ the project's events and its `HTTPRoutes`, and returns what fails: a crash loop,
 run, out of memory, an image that cannot be pulled, a failing probe, traffic that cannot reach
 it, a quota that blocks its pods, no node with room, a missing Secret or ConfigMap, and, for a
 failing service nothing else explains, the reason the cluster gave. Each has a cause, why (the
-rule that applies), a fix and the evidence (status fields and events) it rests on. See the
+rule that applies), a fix and the evidence (status fields and events) it rests on, and a fault:
+where the cause lies (the code, the configuration, the cluster, a component, an upstream
+registry) and who can remove it (you, a cluster administrator, the component's owner). See the
 `diagnose` module for the rules and their sources.
+
+## Incidents
+
+`incidents` reads the cluster's components (an ingress controller, cert-manager, cluster DNS,
+metrics-server, recognised by their labels) and nodes, and turns each one that is down into one
+incident with its blast radius: the services, domains and projects it reaches. `link` marks the
+diagnoses an incident explains, so a cluster's fault is not shown as each service's own. See the
+`incident` module for what each cause reaches.
+
+## Route traces
+
+`trace` follows every way to a service, hop by hop: for each domain, DNS (answers the caller looked
+up), the ingress controller's address and readiness, the certificate, the route's status; for
+every address, the Service, its target port and the pods' readiness. Each hop is `ok`, `failed`
+or `unknown` with what was expected and what was seen; `diagnoses` turns the first failed hop of
+each address into a diagnosis. See the `trace` module for each hop's rule.
 
 ## Gap rules
 
@@ -25,6 +43,7 @@ crate never depends on a module.
 |---|---|---|
 | `resource-limits` | a container without CPU and memory requests or a memory limit | Kubernetes resource management, Pod quality of service classes |
 | `health-checks` | a long-running container behind a Service without a readiness probe | Kubernetes container probes |
+| `ephemeral-data` | an official database image (postgres, mysql, mariadb, mongo, redis, valkey, rabbitmq) whose data directory is on no persistent volume | Kubernetes volumes and persistent volumes, each image's Dockerfile |
 | `ingress-to-httproute` | an Ingress of a retired controller, or one that can move to Gateway API | Kubernetes Ingress, the ingress-nginx retirement notice, Gateway API's migration guide |
 
 ## Hides

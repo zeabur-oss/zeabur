@@ -36,6 +36,7 @@ pub fn env(workload: Workload<'_>, container: &str) -> Option<Vec<EnvVar>> {
                     .value_from
                     .as_ref()
                     .is_some_and(|from| from.secret_key_ref.is_some()),
+                pending_restart: None,
                 origin: workload.origin(format!("{path}.env[name={}]", variable.name)),
             })
             .collect(),
@@ -139,6 +140,7 @@ pub(crate) fn env_from_in(
                     key_count,
                     read_only: read_only_reason.is_some(),
                     read_only_reason,
+                    pending_restart: None,
                     origin: workload.origin(format!("{path}.envFrom[{index}]")),
                 })
             })

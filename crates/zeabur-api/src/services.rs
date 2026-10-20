@@ -1,8 +1,11 @@
 //! A project's services (workloads): each cut from the project document, its releases and the
 //! history of its usage.
 
+pub mod evidence;
 pub mod history;
 pub mod releases;
+pub mod rollout;
+pub mod trace;
 
 use axum::Json;
 use axum::extract::Path;

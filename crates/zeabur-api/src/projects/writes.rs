@@ -36,6 +36,7 @@ mod creations;
 mod deletions;
 mod edits;
 mod namespace;
+pub(crate) mod preview;
 mod refusals;
 pub(crate) mod releases;
 mod secrets;
@@ -77,6 +78,9 @@ pub struct PlanResponse {
     /// The plan.
     #[serde(flatten)]
     pub plan: Plan,
+    /// What the plan does once applied: the pods it replaces, whether new ones fit, the data
+    /// and fields it removes.
+    pub preview: preview::Preview,
 }
 
 /// The token of a plan to apply.
@@ -227,6 +231,7 @@ pub(crate) async fn plan(
     let now = Timestamp::from_second((state.clock)().as_second()).unwrap_or(Timestamp::UNIX_EPOCH);
     let made_at = now.to_string();
     let plan = compute(cluster.as_ref(), &project, &request, &made_at).await?;
+    let preview = preview::read(cluster.as_ref(), &project, &plan, &request).await?;
     let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
     let claims = Claims {
         person: identity.username,
@@ -249,6 +254,7 @@ pub(crate) async fn plan(
             .unwrap_or(Timestamp::UNIX_EPOCH)
             .to_string(),
         plan,
+        preview,
     }))
 }
 

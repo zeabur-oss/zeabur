@@ -112,6 +112,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/incidents": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Every incident on the cluster: a component down or a node not ready, with the domains and
+     *     projects it reaches, as far as the person can list Ingresses and pods. Services are not named:
+     *     they are a project's, see `listProjectIncidents`.
+     */
+    get: operations["listClusterIncidents"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/nodes": {
     parameters: {
       query?: never
@@ -291,6 +312,26 @@ export interface paths {
     }
     /** What a project is missing, by the built-in rules, each with its citations and fix. */
     get: operations["project"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/incidents": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What on the cluster's side is breaking this project's services: a component down or a node
+     *     not ready, with the services, domains and projects it reaches.
+     */
+    get: operations["listProjectIncidents"]
     put?: never
     post?: never
     delete?: never
@@ -505,6 +546,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/services/{kind}/{name}/evidence": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Everything about one service someone helping would ask for, as Markdown to copy: its
+     *     problems, the way to it hop by hop, recent events, the end of each restarted container's
+     *     previous log, and its objects with variable values hidden. Never a Secret.
+     */
+    get: operations["serviceEvidence"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/services/{kind}/{name}/history": {
     parameters: {
       query?: never
@@ -542,6 +604,87 @@ export interface paths {
      *     `current`. A rollback is a plan (`rollback` change).
      */
     get: operations["releases"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/services/{kind}/{name}/rollout": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * How far a service's rollout has come: pods of the new release and of earlier ones, ready or
+     *     not, and whether it is done, progressing, or stuck (with the reason and the plan that rolls
+     *     back). Poll it while `status` is `progressing`.
+     */
+    get: operations["serviceRollout"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/services/{kind}/{name}/timeline": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What changed in one service and what went wrong, newest first, each release that runs now with
+     *     the plan that returns to the one before it.
+     */
+    get: operations["serviceTimeline"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/services/{kind}/{name}/trace": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The way traffic travels to one service, hop by hop: DNS, the ingress controller's address and
+     *     readiness, the certificate, the route, the Service, its target port and the pods' readiness.
+     */
+    get: operations["traceService"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/timeline": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What changed in a project and what went wrong, newest first: releases, each field manager's
+     *     last write, warnings folded by reason and containers that stopped, for every workload.
+     */
+    get: operations["projectTimeline"]
     put?: never
     post?: never
     delete?: never
@@ -648,6 +791,24 @@ export interface components {
      * @enum {string}
      */
     AccessMode: "ReadWriteOnce" | "ReadWriteOncePod" | "ReadWriteMany" | "ReadOnlyMany"
+    /**
+     * @description What kind of address a trace follows.
+     * @enum {string}
+     */
+    AddressKind: "domain" | "private"
+    /** @description A service an incident reaches. */
+    AffectedService: {
+      /** @description Its id, `projects/<project>/services/<kind>/<name>`. */
+      id: string
+      /** @description The workload's kind. */
+      kind: components["schemas"]["WorkloadKind"]
+      /** @description The workload's name. */
+      name: string
+      /** @description The project. */
+      project: string
+      /** @description The kinds of its diagnoses this incident explains, sorted; empty when it shows none yet. */
+      symptoms?: components["schemas"]["DiagnosisKind"][]
+    }
     /** @description One object an apply wrote. */
     Applied: {
       /** @description Its `resourceVersion` after the write. */
@@ -739,6 +900,30 @@ export interface components {
      * @enum {string}
      */
     BackupTargetKind: "volume" | "database" | "namespace"
+    /** @description One limit the new pods exceed. */
+    Blocker: {
+      /**
+       * Format: int64
+       * @description What is left.
+       */
+      available: number
+      /** @description A quota or the nodes. */
+      kind: components["schemas"]["BlockerKind"]
+      /** @description The quota's name. */
+      name?: string | null
+      /**
+       * Format: int64
+       * @description What the plan needs, in the resource's unit: millicores, bytes or pods.
+       */
+      need: number
+      /** @description The resource: `requests.cpu`, `limits.memory`, `pods`, `cpu`, `memory`, … */
+      resource: string
+    }
+    /**
+     * @description What keeps a pod from being created or placed.
+     * @enum {string}
+     */
+    BlockerKind: "quota" | "node"
     /** @description Whether a capability is present on the cluster, and on what evidence. */
     Capability: {
       /** @description The catalogue's components for it: what to install when it is missing. */
@@ -1208,6 +1393,23 @@ export interface components {
      * @enum {string}
      */
     DataKind: "ConfigMap" | "Secret"
+    /** @description Data a plan loses. */
+    DataLoss: {
+      /** @description The claim, or the StatefulSet's claim template. */
+      claim?: string | null
+      /** @description What kind. */
+      kind: components["schemas"]["DataLossKind"]
+      /** @description Where the containers mount it. */
+      mountPaths?: string[]
+      /** @description The volume. */
+      volume?: string | null
+      workload?: components["schemas"]["WorkloadRef"] | null
+    }
+    /**
+     * @description What kind of data a plan loses.
+     * @enum {string}
+     */
+    DataLossKind: "claimDeleted" | "emptyDir" | "claimsOfStatefulSet"
     /**
      * @description What kind of data store a service is, as far as its image's name tells.
      * @enum {string}
@@ -1246,8 +1448,15 @@ export interface components {
       container?: string
       /** @description The status fields and events it rests on. */
       evidence: components["schemas"]["Origin"][]
+      /** @description Where the cause lies and who can remove it. */
+      fault?: components["schemas"]["Fault"]
       /** @description What to do about it, in one sentence. */
       fix: components["schemas"]["Message"]
+      /**
+       * @description The cluster incident this is a symptom of ([`Incident::id`]); set only in answers that
+       *     read the incidents too.
+       */
+      incident?: string | null
       /** @description What kind of failure. */
       kind: components["schemas"]["DiagnosisKind"]
       /** @description When it last happened, in RFC 3339, when known. */
@@ -1292,6 +1501,11 @@ export interface components {
       /** @description The Service type, such as `ClusterIP`. */
       type?: string | null
     }
+    /**
+     * @description What an entry records.
+     * @enum {string}
+     */
+    EntryKind: "release" | "write" | "warning" | "termination"
     /** @description One requested change to a container's environment. */
     EnvEdit: {
       /** @description The variable. */
@@ -1324,6 +1538,7 @@ export interface components {
       name: string
       /** @description The entry in its workload. */
       origin: components["schemas"]["Origin"]
+      pendingRestart?: components["schemas"]["PendingRestart"] | null
       /** @description Where the value is read from. */
       source: components["schemas"]["ValueSource"]
       /** @description The value, for a literal only. */
@@ -1359,11 +1574,47 @@ export interface components {
       /** @description `Normal` or `Warning`. */
       type: string
     }
+    /** @description A service's evidence, as Markdown. */
+    EvidenceBundle: {
+      /** @description When it was read, RFC 3339. */
+      generatedAt: string
+      /** @description `projects/<project>/services/<kind>/<name>/evidence`. */
+      id: string
+      /** @description The text to copy. */
+      markdown: string
+      /** @description Reads the person was refused; the text names them too. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /**
      * @description How a terminal's process ended, when it gave no exit code.
      * @enum {string}
      */
     ExitReason: "command-not-found" | "failed"
+    /** @description Where a failure's cause lies, and who can fix it. */
+    Fault: {
+      /**
+       * @description The component or upstream service, for [`FaultOrigin::Component`] and
+       *     [`FaultOrigin::Upstream`]: `ingress-controller`, `cert-manager`, `cluster-dns`,
+       *     `metrics-server`, `node/<name>`, or a registry's host.
+       */
+      component?: string | null
+      /** @description Who can fix it. */
+      fixer: components["schemas"]["Fixer"]
+      /** @description Where the cause lies. */
+      origin: components["schemas"]["FaultOrigin"]
+    }
+    /**
+     * @description Where the cause of a failure lies, so a cluster's fault never reads as the reader's.
+     * @enum {string}
+     */
+    FaultOrigin:
+      | "code"
+      | "configuration"
+      | "cluster"
+      | "component"
+      | "upstream"
+      | "zeabur"
+      | "unknown"
     /**
      * @description A field kube-apiserver, or an admission webhook, found invalid: one of the `causes` in its
      *     `Status` details [api-conventions].
@@ -1390,6 +1641,33 @@ export interface components {
       /** @description The field, dotted; keyed list entries as `[name=app]`, others by position. */
       path: string
     }
+    /** @description Whether the plan's new pods fit, and what blocks them. */
+    Fit: {
+      /** @description What blocks them, quotas first. */
+      blockers?: components["schemas"]["Blocker"][]
+      /**
+       * Format: int64
+       * @description CPU requests it adds at its peak, millicores.
+       */
+      cpuMillicores: number
+      /**
+       * Format: int64
+       * @description Memory requests it adds at its peak, bytes.
+       */
+      memoryBytes: number
+      /**
+       * Format: int64
+       * @description Pods the plan adds at its peak.
+       */
+      pods: number
+      /** @description The verdict. */
+      status: components["schemas"]["FitStatus"]
+    }
+    /**
+     * @description Whether the plan's new pods fit.
+     * @enum {string}
+     */
+    FitStatus: "notNeeded" | "fits" | "blocked" | "unknown"
     /** @description The fix of a gap. */
     Fix: {
       /** @description The plan template, component or snippet. */
@@ -1406,6 +1684,11 @@ export interface components {
      * @enum {string}
      */
     FixKind: "plan" | "install" | "snippet"
+    /**
+     * @description Who can remove the cause.
+     * @enum {string}
+     */
+    Fixer: "you" | "clusterAdmin" | "componentOwner"
     /** @description One finding of a rule. */
     Gap: {
       /** @description The guidance the rule rests on. */
@@ -1453,6 +1736,39 @@ export interface components {
       /** @description Its Service port, `namespace/name:port`. */
       service: string
     }
+    /** @description One hop and what was seen there. */
+    Hop: {
+      /** @description The objects and fields it rests on. */
+      evidence?: components["schemas"]["Origin"][]
+      /** @description The value it should have, as Kubernetes or DNS writes it, when one is known. */
+      expected?: string | null
+      /** @description What was seen, in one sentence. */
+      message: components["schemas"]["Message"]
+      /** @description The value seen, the same way. */
+      saw?: string | null
+      /** @description How it fared. */
+      status: components["schemas"]["HopStatus"]
+      /** @description Which hop. */
+      step: components["schemas"]["HopStep"]
+    }
+    /**
+     * @description How a hop fared.
+     * @enum {string}
+     */
+    HopStatus: "ok" | "failed" | "unknown"
+    /**
+     * @description One hop on the way to a service, in the order traffic takes them.
+     * @enum {string}
+     */
+    HopStep:
+      | "dns"
+      | "address"
+      | "controller"
+      | "certificate"
+      | "route"
+      | "service"
+      | "targetPort"
+      | "ready"
     /**
      * @description One `envFrom` entry. Imports are not flattened into variables: a ConfigMap's twelve keys
      *     shown as twelve entries would misrepresent what the workload says.
@@ -1465,6 +1781,7 @@ export interface components {
       keyCount?: number | null
       /** @description The entry in its workload. */
       origin: components["schemas"]["Origin"]
+      pendingRestart?: components["schemas"]["PendingRestart"] | null
       /** @description The prefix added to every imported name. */
       prefix?: string | null
       /** @description The import must not be edited in place; see [`ReadOnlyReason`]. */
@@ -1472,6 +1789,46 @@ export interface components {
       readOnlyReason?: components["schemas"]["ReadOnlyReason"] | null
       /** @description The imported ConfigMap or Secret. */
       source: components["schemas"]["ValueSource"]
+    }
+    /**
+     * @description One cause on the cluster's side with everything it reaches, told once instead of as a
+     *     separate problem of every service it breaks.
+     */
+    Incident: {
+      /** @description The cause, in one sentence. */
+      cause: components["schemas"]["Message"]
+      /** @description The public domains it reaches, sorted. */
+      domains: string[]
+      /** @description The objects and fields it rests on. */
+      evidence: components["schemas"]["Origin"][]
+      /** @description Where it lies and who can fix it. */
+      fault: components["schemas"]["Fault"]
+      /** @description What to do, and who does it. */
+      fix: components["schemas"]["Message"]
+      /** @description `incidents/<kind>/<name>`, stable while the cause lasts, so diagnoses link to it. */
+      id: string
+      /** @description What kind of cause. */
+      kind: components["schemas"]["IncidentKind"]
+      /** @description The projects it reaches, sorted. */
+      projects: string[]
+      /** @description The services it reaches, sorted by id, as far as the reader could see them. */
+      services: components["schemas"]["AffectedService"][]
+      /** @description Since when, in RFC 3339, when known. */
+      since?: string | null
+      /** @description What stops working because of it. */
+      why: components["schemas"]["Message"]
+    }
+    /**
+     * @description What kind of cluster-side cause an incident is.
+     * @enum {string}
+     */
+    IncidentKind: "componentDown" | "nodeNotReady"
+    /** @description The incidents found, and the reads that were refused. */
+    IncidentList: {
+      /** @description The incidents, sorted by id. */
+      items: components["schemas"]["Incident"][]
+      /** @description Reads the person was refused; incidents they would have shown are missing. */
+      unreadable: components["schemas"]["UnreadableView"][]
     }
     /**
      * @description Which signal decided a [`PortProtocol`], so a client can tell a declared protocol from a
@@ -1618,6 +1975,19 @@ export interface components {
       /** @description The resource's name. */
       name: string
     }
+    /**
+     * @description The tool behind a field manager, by its name.
+     * @enum {string}
+     */
+    ManagerTool:
+      | "zeabur"
+      | "helm"
+      | "argoCd"
+      | "flux"
+      | "kubectl"
+      | "autoscaler"
+      | "controller"
+      | "other"
     /**
      * @description A sentence a client words in its own language: a stable key and the values it names.
      *
@@ -1977,6 +2347,32 @@ export interface components {
      */
     Ownership: "owned" | "shared" | "orphan"
     /**
+     * @description A variable's ConfigMap or Secret was written after the oldest running pod started.
+     *
+     *     That pod may still hold the old value: a container reads its variables once, when it starts
+     *     [k8s-configmap-env].
+     *
+     *     `managedFields` keep one time per field manager [k8s-ssa-fields], the time of its last write
+     *     to any field it owns, so a manager owning this key that later wrote another key also counts:
+     *     the pod *may* hold an old value, a restart settles it.
+     *
+     *     [k8s-configmap-env]: https://kubernetes.io/docs/concepts/configuration/configmap/#configmaps-and-pods
+     *     [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
+     */
+    PendingRestart: {
+      /** @description That manager. */
+      manager: string
+      /** @description That pod. */
+      pod: string
+      /** @description When the oldest running pod started (`status.startTime`), RFC 3339. */
+      podStartedAt: string
+      /**
+       * @description When the object was last written by a field manager that owns the key (for an `envFrom`
+       *     import, any key), RFC 3339.
+       */
+      writtenAt: string
+    }
+    /**
      * @description Whether the person may change something, as far as their RBAC rules tell.
      * @enum {string}
      */
@@ -2025,6 +2421,11 @@ export interface components {
     PlanResponse: components["schemas"]["Plan"] & {
       /** @description When the token stops working, RFC 3339. */
       expiresAt: string
+      /**
+       * @description What the plan does once applied: the pods it replaces, whether new ones fit, the data
+       *     and fields it removes.
+       */
+      preview: components["schemas"]["Preview"]
       /** @description Send this to `apply` to carry out exactly this plan. */
       token: string
     }
@@ -2289,6 +2690,19 @@ export interface components {
     PresetList: {
       /** @description Isolate first, then allow the ingress controller, then one per other service. */
       items: components["schemas"]["NetworkPolicyPreset"][]
+    }
+    /** @description What a plan does once applied. */
+    Preview: {
+      /** @description The data it loses. */
+      dataLoss: components["schemas"]["DataLoss"][]
+      /** @description Whether the new pods fit. */
+      fit: components["schemas"]["Fit"]
+      /** @description The fields it removes, by object then path. */
+      removals: components["schemas"]["Removal"][]
+      /** @description The workloads whose pods change, sorted. */
+      rollouts: components["schemas"]["Rollout"][]
+      /** @description Reads the person was refused, and what they left unchecked. */
+      unreadable: components["schemas"]["UnreadableView"][]
     }
     /**
      * @description How a probe checks the container.
@@ -2647,6 +3061,33 @@ export interface components {
       /** @description Its first release. */
       released: string
     }
+    /** @description A release, as an entry names it. */
+    ReleaseRef: {
+      /** @description `kubernetes.io/change-cause`. */
+      changeCause?: string | null
+      /** @description It runs now. */
+      current: boolean
+      /** @description Its images. */
+      images: string[]
+      /** @description The `ReplicaSet` or `ControllerRevision`. */
+      name: string
+      /**
+       * Format: int64
+       * @description Its number.
+       */
+      revision: number
+    }
+    /** @description A field the plan removes. */
+    Removal: {
+      /** @description Its value now (redacted for a Secret). */
+      before: string
+      /** @description It was left out of an edited YAML, rather than asked to be removed. */
+      leftOutOfEdit: boolean
+      /** @description The field. */
+      path: string
+      /** @description The object. */
+      target: components["schemas"]["ObjectName"]
+    }
     /** @description Ready and desired replicas (per node for a DaemonSet, completions for a Job). */
     Replicas: {
       /**
@@ -2725,6 +3166,88 @@ export interface components {
       /** @description The risk. */
       risk: string
     }
+    /** @description One workload whose pods a plan changes. */
+    Rollout: {
+      /** @description What happens to its pods. */
+      actions: components["schemas"]["RolloutAction"][]
+      /** @description There is a moment with no pod serving (on a node, for a DaemonSet). */
+      downtime: boolean
+      /** @description The pod template fields that change, at most ten. */
+      fields?: string[]
+      /**
+       * Format: int32
+       * @description Replicas before, for a scale.
+       */
+      fromReplicas?: number | null
+      /**
+       * Format: int32
+       * @description Replicas after.
+       */
+      replicas?: number | null
+      /** @description `RollingUpdate`, `Recreate` or `OnDelete`, for a roll. */
+      strategy?: string | null
+      /** @description The workload. */
+      workload: components["schemas"]["WorkloadRef"]
+    }
+    /**
+     * @description What happens to a workload's pods.
+     * @enum {string}
+     */
+    RolloutAction: "roll" | "scale" | "start" | "stop" | "pendingRestart"
+    /** @description How far a service's rollout has come. */
+    RolloutProgress: {
+      /**
+       * Format: int32
+       * @description The pods it should have (nodes, for a DaemonSet).
+       */
+      desired: number
+      /** @description The diagnoses of the new pods. */
+      diagnoses?: components["schemas"]["Diagnosis"][]
+      /** @description The status fields it rests on. */
+      evidence: components["schemas"]["Origin"][]
+      /** @description `projects/<project>/services/<kind>/<name>/rollout`. */
+      id: string
+      /** @description `rollout.<progressing|done|paused|waitsForDeletion>` or `rollout.stuck.<reason>`. */
+      message: components["schemas"]["Message"]
+      /**
+       * Format: int32
+       * @description Pods of earlier releases still there.
+       */
+      old: number
+      /**
+       * Format: int32
+       * @description Of those, ready.
+       */
+      oldReady: number
+      reason?: components["schemas"]["StuckReason"] | null
+      /**
+       * Format: int64
+       * @description The release it rolls out.
+       */
+      revision?: number | null
+      rollback?: components["schemas"]["PlanRequest"] | null
+      /** @description Where it stands. */
+      status: components["schemas"]["RolloutStatus"]
+      /** @description Reads the person was refused. */
+      unreadable: components["schemas"]["UnreadableView"][]
+      /**
+       * Format: int32
+       * @description Pods of the new release.
+       */
+      updated: number
+      /**
+       * Format: int32
+       * @description Of those, ready.
+       */
+      updatedReady: number
+      /** @description The workload. */
+      workload: components["schemas"]["WorkloadRef"]
+    }
+    /**
+     * @description Where a rollout stands.
+     * @enum {string}
+     */
+    RolloutStatus: "progressing" | "done" | "stuck" | "paused" | "waitsForDeletion"
     /** @description An Ingress routing to workloads' Services: how they are reached from outside. */
     Route: {
       /** @description The Services it routes to, sorted, without duplicates. */
@@ -2782,6 +3305,23 @@ export interface components {
       port?: string | null
       /** @description The backend Service's name. */
       service: string
+    }
+    /** @description The way to one address of a service. */
+    RouteTrace: {
+      /** @description The domain (`*` for a rule without a host) or the Service's DNS name, with its port. */
+      address: string
+      /** @description The hops, in the order traffic takes them. */
+      hops: components["schemas"]["Hop"][]
+      /** @description A domain or the private address. */
+      kind: components["schemas"]["AddressKind"]
+      /** @description `failed` when a hop failed, `unknown` when none failed and one is unknown, else `ok`. */
+      status: components["schemas"]["HopStatus"]
+      /** @description The object that makes the address: the Ingress, `HTTPRoute` or Service. */
+      via: components["schemas"]["Origin"]
+    }
+    /** @description One address's way, and the plan that fixes where it stops when Zeabur can write one. */
+    RouteTraceView: components["schemas"]["RouteTrace"] & {
+      fix?: components["schemas"]["PlanRequest"] | null
     }
     /** @description One value of a revealed Secret. */
     SecretValue: {
@@ -2963,6 +3503,17 @@ export interface components {
        */
       restarts: number
     }
+    /** @description Every way to a service, and the diagnoses where they stop. */
+    ServiceTrace: {
+      /** @description The first failed hop of each address, as a diagnosis, once per cause. */
+      diagnoses: components["schemas"]["Diagnosis"][]
+      /** @description `projects/<project>/services/<kind>/<name>/trace`. */
+      id: string
+      /** @description Its domains, by route and host, then its private addresses. */
+      routes: components["schemas"]["RouteTraceView"][]
+      /** @description Reads the person was refused; hops that needed them are unknown. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /** @description How the person is signed in to Zeabur. */
     SessionView: {
       /** @description When the administrator rights end, RFC 3339, while they are in use. */
@@ -3021,6 +3572,20 @@ export interface components {
      */
     StoreState: "available" | "not-configured" | "unreadable" | "unavailable"
     /**
+     * @description Why a rollout is stuck.
+     * @enum {string}
+     */
+    StuckReason:
+      | "crashLoop"
+      | "outOfMemory"
+      | "imagePull"
+      | "unschedulable"
+      | "quota"
+      | "configMissing"
+      | "runFailed"
+      | "deadlineExceeded"
+      | "replicaFailure"
+    /**
      * @description How strongly the catalogue suggests a missing capability.
      * @enum {string}
      */
@@ -3053,6 +3618,44 @@ export interface components {
       key: string
       /** @description Its value. */
       value?: string | null
+    }
+    /** @description A timeline. */
+    Timeline: {
+      /** @description `projects/<project>/timeline` or `projects/<project>/services/<kind>/<name>/timeline`. */
+      id: string
+      /** @description Newest first, at most 200. */
+      items: components["schemas"]["TimelineEntry"][]
+      /** @description Older entries were left out. */
+      truncated: boolean
+      /** @description Reads the person was refused; their entries are missing. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description One thing that happened. */
+    TimelineEntry: {
+      /** @description When, RFC 3339: the release's creation, the write, the last event, the termination. */
+      at: string
+      /**
+       * Format: int32
+       * @description How many times, for warnings.
+       */
+      count?: number | null
+      /** @description The objects and fields it rests on: the events, the pod's container status. */
+      evidence?: components["schemas"]["Origin"][]
+      /** @description The fields the manager owns, for a write. */
+      fields?: string[]
+      /** @description What it records. */
+      kind: components["schemas"]["EntryKind"]
+      /**
+       * @description What happened, in one sentence: `timeline.release`, `timeline.write.<tool>`,
+       *     `timeline.warning.<crashLoop|evicted|unschedulable|imagePull|probe|quota|other>`,
+       *     `timeline.termination.<oomKilled|exited>`.
+       */
+      message: components["schemas"]["Message"]
+      release?: components["schemas"]["ReleaseRef"] | null
+      revert?: components["schemas"]["PlanRequest"] | null
+      /** @description The workload. */
+      workload: components["schemas"]["WorkloadRef"]
+      writer?: components["schemas"]["Writer"] | null
     }
     /**
      * @description A deployment tool that would revert a direct edit on its next sync or upgrade.
@@ -3243,6 +3846,17 @@ export interface components {
       provenance: components["schemas"]["Provenance"]
       replicas?: components["schemas"]["Replicas"] | null
     }
+    /** @description Who wrote, as far as `managedFields` say. */
+    Writer: {
+      /** @description The field manager. */
+      manager: string
+      /** @description `Apply` or `Update`. */
+      operation?: string | null
+      /** @description The subresource written, such as `scale`. */
+      subresource?: string | null
+      /** @description The tool it is. */
+      tool: components["schemas"]["ManagerTool"]
+    }
   }
   responses: never
   parameters: never
@@ -3415,6 +4029,33 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listClusterIncidents: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["IncidentList"]
+        }
+      }
+      401: {
         headers: {
           [name: string]: unknown
         }
@@ -3719,6 +4360,36 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["GapList"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listProjectIncidents: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["IncidentList"]
         }
       }
       403: {
@@ -4146,6 +4817,38 @@ export interface operations {
       }
     }
   }
+  serviceEvidence: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        /** @description deployment, statefulset, daemonset, job or cronjob; any case */
+        kind: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["EvidenceBundle"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
   getServiceHistory: {
     parameters: {
       query?: {
@@ -4205,6 +4908,140 @@ export interface operations {
         }
       }
       404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  serviceRollout: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        /** @description deployment, statefulset or daemonset; any case */
+        kind: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["RolloutProgress"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  serviceTimeline: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        /** @description deployment, statefulset, daemonset, job or cronjob; any case */
+        kind: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Timeline"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  traceService: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        /** @description deployment, statefulset, daemonset, job or cronjob; any case */
+        kind: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ServiceTrace"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  projectTimeline: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Timeline"]
+        }
+      }
+      403: {
         headers: {
           [name: string]: unknown
         }

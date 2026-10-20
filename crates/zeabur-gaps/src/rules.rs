@@ -55,8 +55,9 @@ pub trait Rule: Sync {
 }
 
 /// The rules Zeabur always runs.
-pub static BUILTIN: [&dyn Rule; 4] = [
+pub static BUILTIN: [&dyn Rule; 5] = [
     &ResourceLimits,
+    &crate::durability::EphemeralData,
     &HealthChecks,
     &IngressToHttpRoute,
     &DanglingRoute,
