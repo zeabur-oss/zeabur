@@ -226,11 +226,11 @@ test("the metrics store setting says where it is kept, who may change it, and sa
   await expect(panel).toContainText("Usually only cluster administrators can change this.")
   await panel.getByRole("button", { name: "Where this is kept" }).hover()
   // Base UI's tooltip popup carries no tooltip role.
-  await expect(page.getByText("ConfigMap zeabur-settings in namespace zeabur")).toBeVisible()
+  await expect(page.getByText("ConfigMap zeabur-settings in the namespace zeabur")).toBeVisible()
   const input = panel.getByRole("textbox", { name: "History source" })
   await input.fill("monitoring/prometheus-operated:9090")
   await panel.getByRole("button", { name: "Save" }).click()
-  await expect(panel).toContainText("Answers")
+  await expect(panel).toContainText("Responding")
   expect(saved).toEqual({ service: "monitoring/prometheus-operated:9090" })
   await expect(panel.getByRole("button", { name: "Use the default" })).toBeVisible()
 })
