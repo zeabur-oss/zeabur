@@ -533,7 +533,7 @@ export const zhCN: Messages = {
   "storage.about":
     "写入卷的文件，在副本重启或迁移到其他节点后仍会保留；容器里其他位置的文件，重启后就会丢失。",
   "storage.emptyTitle": (name) => `${name} 没有卷`,
-  "storage.emptyBody": "如果应用要保存文件，例如用户上传的文件或数据库的数据，就添加一个卷。",
+  "storage.emptyBody": "应用需要长期保存文件时（例如用户上传的文件或数据库），就添加一个卷。",
   "storage.emptyJob": "要为 Job 添加卷，请编辑它的 YAML。",
   "storage.bound": "就绪",
   "storage.pending": "等待存储",

@@ -91,9 +91,7 @@ export function NetworkingTab({
   const canWrite = endpoints.length > 0 && !managed
   const refusedRoutes = refusedAmong(unreadable, refusedPlaces.routes)
   const refusedEndpoints = refusedAmong(unreadable, refusedPlaces.endpoints)
-  const routeKinds = [
-    ...new Set(routesOf(network, service).map((r) => r.origin.kind as string)),
-  ].join(" · ")
+  const routeKinds = [...new Set(routesOf(network, service).map((r) => r.origin.kind as string))]
 
   const scheduled = service.kind === "CronJob" || service.kind === "Job"
   const noAddress =
@@ -129,7 +127,14 @@ export function NetworkingTab({
           <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-public">
             <SectionHeader
               id="net-public"
-              title={<Term detail={routeKinds || "Ingress"}>{t("net.publicTitle")}</Term>}
+              title={
+                <span className="inline-flex flex-wrap items-baseline gap-1.5">
+                  {t("net.publicTitle")}
+                  {(routeKinds.length > 0 ? routeKinds : ["Ingress"]).map((kind) => (
+                    <TermDetail key={kind}>{kind}</TermDetail>
+                  ))}
+                </span>
+              }
               count={routes.length > 0 ? routes.length : undefined}
               description={t("net.publicAbout")}
               action={

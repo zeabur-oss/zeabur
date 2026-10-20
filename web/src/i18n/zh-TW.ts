@@ -535,7 +535,7 @@ export const zhTW: Messages = {
     "寫進磁碟區的檔案，在副本重新啟動或移到其他節點後仍會保留；容器裡其他地方的檔案，重新啟動後就會消失。",
   "storage.emptyTitle": (name) => `${name} 沒有磁碟區`,
   "storage.emptyBody":
-    "如果應用程式要保存檔案，例如使用者上傳的檔案或資料庫的資料，就新增一個磁碟區。",
+    "應用程式要長期儲存檔案時（例如使用者上傳的檔案或資料庫），就新增一個磁碟區。",
   "storage.emptyJob": "要替 Job 新增磁碟區，請編輯它的 YAML。",
   "storage.bound": "就緒",
   "storage.pending": "等待儲存空間",

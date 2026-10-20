@@ -32,7 +32,7 @@ import { Input } from "@zeabur/design-system/components/input"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Select } from "@zeabur/design-system/components/select"
 import { Spinner } from "@zeabur/design-system/components/spinner"
-import { Term } from "@zeabur/design-system/components/term"
+import { TermDetail } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import type { Edge } from "@/model/connections"
@@ -181,7 +181,7 @@ export function VariablesTab({
       ...fromObjects.map(({ env }) => env.source.kind),
       ...imported.map(({ imported: i }) => i.source.kind),
     ]),
-  ].join(" · ")
+  ]
   const clusterKinds = [
     ...new Set(
       fromCluster.map(({ env }) =>
@@ -192,7 +192,7 @@ export function VariablesTab({
             : env.source.kind,
       ),
     ),
-  ].join(" · ")
+  ]
 
   const revealButtons =
     secretNames.length > 0 ? (
@@ -351,7 +351,7 @@ export function VariablesTab({
       ) : (
         <div className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
           {literal.length > 0 || adding ? (
-            <VarGroup label={t("vars.direct")} detail="env.value">
+            <VarGroup label={t("vars.direct")} details={["env.value"]}>
               {adding ? (
                 <DraftRow
                   draft={draft}
@@ -457,7 +457,7 @@ export function VariablesTab({
           ) : null}
 
           {fromObjects.length + imported.length > 0 ? (
-            <VarGroup label={t("vars.fromObjects")} detail={objectKinds} action={revealButtons}>
+            <VarGroup label={t("vars.fromObjects")} details={objectKinds} action={revealButtons}>
               <ul className="flex flex-col divide-y">
                 {fromObjects.map(sourceRow)}
                 {imported.map(({ container, imported: i }) => (
@@ -488,7 +488,7 @@ export function VariablesTab({
           ) : null}
 
           {fromCluster.length > 0 ? (
-            <VarGroup label={t("vars.fromCluster")} detail={clusterKinds}>
+            <VarGroup label={t("vars.fromCluster")} details={clusterKinds}>
               <ul className="flex flex-col divide-y">{fromCluster.map(sourceRow)}</ul>
             </VarGroup>
           ) : null}
@@ -513,20 +513,23 @@ export function VariablesTab({
 
 function VarGroup({
   label,
-  detail,
+  details,
   action,
   children,
 }: {
   label: string
-  detail?: string
+  details: string[]
   action?: ReactNode
   children: ReactNode
 }) {
   return (
     <section className="flex flex-col px-5 pt-3 pb-1">
       <div className="flex flex-wrap items-center gap-2 pb-1">
-        <h3 className="type-meta font-medium text-secondary">
-          <Term detail={detail || undefined}>{label}</Term>
+        <h3 className="flex flex-wrap items-baseline gap-1.5 type-meta font-medium text-secondary">
+          {label}
+          {details.map((detail) => (
+            <TermDetail key={detail}>{detail}</TermDetail>
+          ))}
         </h3>
         {action ? <span className="ml-auto">{action}</span> : null}
       </div>
