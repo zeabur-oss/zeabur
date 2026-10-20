@@ -13,6 +13,7 @@ import TrashIcon from "~icons/ph/trash"
 
 import type { Schemas } from "@/api/client"
 import { projectQuery } from "@/api/queries"
+import { Freshness } from "@/routes/project/page"
 import { CopyButton } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { describeDraft, DraftProvider, useDraftState, type Draft } from "@/components/plan/draft"
@@ -116,6 +117,7 @@ function ServiceView({
   const mine = eventsFor(events, service)
   const tab = search.tab ?? "status"
   const view = search.view ?? "logs"
+  const fresh = useQuery(projectQuery(project))
   const go = (place: ServicePlace, pod?: string) =>
     void navigate(serviceLink(project, service, { tab: place, pod }))
   const setTab = (next: ServiceSection) =>
@@ -189,6 +191,9 @@ function ServiceView({
                   </span>
                   {service.created ? (
                     <span>{t("service.created", formatDate(service.created, locale))}</span>
+                  ) : null}
+                  {fresh.isRefetchError ? (
+                    <Freshness updatedAt={fresh.dataUpdatedAt} failed />
                   ) : null}
                 </div>
               </div>

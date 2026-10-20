@@ -13,6 +13,8 @@ import GlobeIcon from "~icons/ph/globe"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import MoonIcon from "~icons/ph/moon"
 import PuzzlePieceIcon from "~icons/ph/puzzle-piece"
+import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
+import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import TranslateIcon from "~icons/ph/translate"
 
@@ -25,7 +27,7 @@ import { addressOf, objectKey } from "@/lib/objects"
 import { serviceLink, usePlace } from "@/lib/place"
 import { palette, recent, remember } from "@/lib/stores"
 import { cn } from "@/lib/utils"
-import { domainsOf, serviceId, statusOf } from "@/model/service"
+import { domainsOf, isTask, serviceId, statusOf, type Service } from "@/model/service"
 import { cycleTheme } from "@/theme"
 
 interface Item {
@@ -33,6 +35,8 @@ interface Item {
   group: string
   label: string
   hint?: string
+  /** Words it also answers to in any language, such as a verb's English name. */
+  keywords?: string
   icon?: Icon
   node?: ReactNode
   href?: string
@@ -85,15 +89,46 @@ export function PaletteBody() {
   const currentKey = place.service
   const currentProject = views.find((v) => v.data?.namespace === place.project)?.data
   const current = currentProject?.services.find((s) => serviceId(s) === currentKey)
-  if (current && place.project) {
-    items.push({
-      id: "action:logs",
+  // Verbs for the service on screen; for the others, they show once the query names them.
+  const verbs = (project: string, s: Service, prefix: string) => [
+    {
+      id: `${prefix}:logs`,
+      keywords: `logs log ${s.name}`,
       group: g.actions,
-      label: t("palette.openLogs", current.name),
+      label: t("palette.openLogs", s.name),
       icon: TextAlignLeftIcon,
-      href: href(place.project, current, { tab: "logs" }),
-    })
-  }
+      href: href(project, s, { tab: "logs" }),
+    },
+    ...(isTask(s.kind)
+      ? []
+      : [
+          {
+            id: `${prefix}:terminal`,
+            keywords: `terminal shell exec ${s.name}`,
+            group: g.actions,
+            label: t("palette.openTerminal", s.name),
+            icon: TerminalWindowIcon,
+            href: href(project, s, { tab: "terminal" }),
+          },
+        ]),
+    {
+      id: `${prefix}:variables`,
+      keywords: `variables env ${s.name}`,
+      group: g.actions,
+      label: t("palette.openVariables", s.name),
+      icon: SlidersHorizontalIcon,
+      href: href(project, s, { tab: "variables" }),
+    },
+    {
+      id: `${prefix}:changes`,
+      keywords: `changes releases history rollback ${s.name}`,
+      group: g.actions,
+      label: t("palette.openChanges", s.name),
+      icon: ClockCounterClockwiseIcon,
+      href: href(project, s, { tab: "changes" }),
+    },
+  ]
+  if (current && place.project) items.push(...verbs(place.project, current, "action"))
 
   for (const p of projects.data?.items ?? [])
     items.push({
@@ -124,6 +159,8 @@ export function PaletteBody() {
         ),
         href: serviceHref,
       })
+      if (query && s !== current)
+        items.push(...verbs(data.namespace, s, `verb:${data.namespace}/${serviceId(s)}`))
       for (const pod of s.pods)
         items.push({
           id: `pod:${data.namespace}/${pod.name}`,
@@ -188,7 +225,10 @@ export function PaletteBody() {
   const needle = query.trim().toLowerCase()
   const shown = needle
     ? items
-        .filter((item) => `${item.label} ${item.hint ?? ""}`.toLowerCase().includes(needle))
+        .filter((item) => {
+          const text = `${item.label} ${item.hint ?? ""} ${item.keywords ?? ""}`.toLowerCase()
+          return needle.split(/\s+/).every((word) => text.includes(word))
+        })
         .slice(0, 40)
     : items
         .filter(

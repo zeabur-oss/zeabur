@@ -15,12 +15,13 @@ import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { toProblem } from "@/api/client"
 import { followUrl, logsQuery, type LogOptions } from "@/api/queries"
-import { Histogram } from "@/components/bits"
+import { Ago, Histogram } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
+import { Spinner } from "@zeabur/design-system/components/spinner"
 import { Toggle } from "@zeabur/design-system/components/toggle"
 import { useI18n, useT } from "@/i18n"
 import { parseAnsi } from "@/lib/ansi"
@@ -318,7 +319,12 @@ function Snapshot({
   )
 }
 
-function Followed({ url, ...props }: { url: string } & ViewProps) {
+function Followed(props: { url: string } & ViewProps) {
+  const [attempt, setAttempt] = useState(0)
+  return <Stream key={attempt} {...props} onResume={() => setAttempt((n) => n + 1)} />
+}
+
+function Stream({ url, onResume, ...props }: { url: string; onResume: () => void } & ViewProps) {
   const t = useT()
   const stream = useLogStream(url)
   return (
@@ -330,7 +336,20 @@ function Followed({ url, ...props }: { url: string } & ViewProps) {
         status={
           <output className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             {stream.ended ? (
-              t("logs.ended")
+              <>
+                <StatusDot health="idle" />
+                {t("logs.ended")}
+                {stream.endedAt ? <Ago iso={stream.endedAt} /> : null}
+                <Button variant="ghost" size="xs" onClick={onResume}>
+                  <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("logs.resume")}
+                </Button>
+              </>
+            ) : !stream.open ? (
+              <>
+                <Spinner />
+                {t("logs.connecting")}
+              </>
             ) : (
               <>
                 <span
