@@ -1,7 +1,5 @@
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
-import type { ReactNode } from "react"
-import CaretDownIcon from "~icons/ph/caret-down"
 
 import type { Schemas } from "@/api/client"
 import { nodesQuery, releasesQuery } from "@/api/queries"
@@ -17,17 +15,47 @@ import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { FormField, quantity } from "@/components/form-field"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { healthChecksSection } from "@/lib/stores"
+import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { useReviewWord } from "@/components/plan/draft"
 
 const probeKinds = ["readiness", "liveness", "startup"] as const
 type ProbeKind = (typeof probeKinds)[number]
 
-export function SettingsTab({
+/** Replicas and each container's CPU and memory. */
+export function ComputeSection({ project, service }: { project: string; service: Service }) {
+  const t = useT()
+  const planner = usePlanner(project)
+  const managed = service.provenance.tool
+  return (
+    <section aria-labelledby="compute-title" className="flex flex-col gap-3">
+      <SectionHeader
+        id="compute-title"
+        title={t("form.compute")}
+        description={t("form.computeHint")}
+      />
+      {service.kind === "Job" ? (
+        <p className="text-sm text-muted-foreground">{t("form.jobs")}</p>
+      ) : (
+        <Compute
+          service={service}
+          disabled={!!managed}
+          onPlan={(changes) => planner.plan({ title: t("title.compute", service.name), changes })}
+          workload={{ kind: service.kind, name: service.name }}
+          refused={planner.fields}
+        />
+      )}
+      {sections(service).map(({ module, Section: Module }) => (
+        <Module key={module} project={project} service={service} plan={planner.plan} />
+      ))}
+      {planner.dialog}
+    </section>
+  )
+}
+
+const sections = (service: Service) => serviceSettingsSections.filter((s) => s.applies(service))
+
+/** The traffic, restart and startup checks of the service's first container. */
+export function HealthChecksSection({
   project,
   service,
   network,
@@ -38,68 +66,24 @@ export function SettingsTab({
 }) {
   const t = useT()
   const planner = usePlanner(project)
-  const workload = { kind: service.kind, name: service.name }
-  const managed = service.provenance.tool
-  const sections = serviceSettingsSections.filter((s) => s.applies(service))
-  const editable = service.kind !== "Job"
-  const healthOpen = healthChecksSection.useValue()
-
+  if (service.kind === "Job" || service.kind === "CronJob") return null
   return (
-    <div className="flex max-w-3xl flex-col gap-8">
-      {managed ? (
-        <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
-          {t("common.managedByDetail", managed)}
-        </p>
-      ) : null}
-      {editable ? (
-        <>
-          <Section title={t("form.compute")}>
-            <Compute
-              service={service}
-              disabled={!!managed}
-              onPlan={(changes) =>
-                planner.plan({ title: t("title.compute", service.name), changes })
-              }
-              workload={workload}
-              refused={planner.fields}
-            />
-          </Section>
-          <Collapsible open={healthOpen} onOpenChange={(open) => healthChecksSection.set(open)}>
-            <CollapsibleTrigger variant="section">
-              {t("form.health")}
-              <CaretDownIcon aria-hidden="true" />
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="pt-3">
-                <Probes
-                  project={project}
-                  service={service}
-                  endpoints={endpointsOf(network, service)}
-                  disabled={!!managed}
-                  onPlan={(change) =>
-                    planner.plan({ title: t("title.probe", service.name), changes: [change] })
-                  }
-                />
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground">{t("form.jobs")}</p>
-      )}
-      {sections.map(({ module, Section: Module }) => (
-        <Module key={module} project={project} service={service} plan={planner.plan} />
-      ))}
+    <section aria-labelledby="health-title" className="flex flex-col gap-3">
+      <SectionHeader
+        id="health-title"
+        title={t("form.health")}
+        description={t("form.healthHint")}
+      />
+      <Probes
+        project={project}
+        service={service}
+        endpoints={endpointsOf(network, service)}
+        disabled={!!service.provenance.tool}
+        onPlan={(change) =>
+          planner.plan({ title: t("title.probe", service.name), changes: [change] })
+        }
+      />
       {planner.dialog}
-    </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium">{title}</h2>
-      {children}
     </section>
   )
 }
@@ -172,6 +156,7 @@ function Compute({
       if (changes.length > 0) onPlan(changes)
     },
   })
+  const review = useReviewWord()
   const amount = ({ value }: { value: string }) =>
     value.trim() === "" || quantity.test(value.trim()) ? undefined : t("form.badQuantity")
 
@@ -210,7 +195,6 @@ function Compute({
           )}
         </form.Field>
       ) : null}
-      <p className="max-w-prose type-meta text-muted-foreground">{t("form.computeHint")}</p>
       {containers.map((container, index) => (
         <fieldset key={container.name} className="flex flex-col gap-2">
           <legend className="mb-1 font-mono text-xs" translate="no">
@@ -271,7 +255,7 @@ function Compute({
               className="ml-auto"
               disabled={disabled || !canSubmit || !dirty}
             >
-              {t("edit.review")}
+              {review}
             </Button>
           )}
         </form.Subscribe>
@@ -308,6 +292,25 @@ function currentProbe(template: unknown, container: string, kind: ProbeKind): Pr
   }
 }
 
+const summaryHandler = {
+  HTTP: "HTTPGet",
+  TCP: "TCPSocket",
+  gRPC: "GRPC",
+  exec: "Exec",
+} as const
+
+/** The probe as the project document sums it up, for a workload with no release to read. */
+function summaryProbe(probe: Schemas["ProbeSummary"] | null | undefined): ProbeValues {
+  return {
+    handler: probe ? summaryHandler[probe.handler] : "none",
+    path: probe?.path ?? "",
+    port: probe?.port ?? "",
+    command: "",
+    periodSeconds: "",
+    failureThreshold: "",
+  }
+}
+
 function Probes({
   project,
   service,
@@ -336,7 +339,11 @@ function Probes({
         <ProbeForm
           key={`${kind}-${releases.dataUpdatedAt}`}
           kind={kind}
-          current={currentProbe(template, container.name, kind)}
+          current={
+            template
+              ? currentProbe(template, container.name, kind)
+              : summaryProbe(container.probes?.[kind])
+          }
           preset={port === undefined ? undefined : String(port)}
           disabled={disabled}
           onPlan={(set) =>
@@ -386,6 +393,7 @@ function ProbeForm({
       })
     },
   })
+  const review = useReviewWord()
   const positive = ({ value }: { value: string }) =>
     value.trim() === "" || /^[1-9]\d*$/.test(value.trim()) ? undefined : t("form.badNumber")
   return (
@@ -540,7 +548,7 @@ function ProbeForm({
               className="ml-auto"
               disabled={disabled || !canSubmit || !dirty}
             >
-              {t("edit.review")}
+              {review}
             </Button>
           )}
         </form.Subscribe>

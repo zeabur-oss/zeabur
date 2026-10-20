@@ -13,6 +13,7 @@ import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 import TreeStructureIcon from "~icons/ph/tree-structure"
 
+import { ReviewWord } from "@/components/plan/draft"
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { configMapsQuery } from "@/api/queries"
 import { CopyButton, Hint, Segmented } from "@/components/bits"
@@ -653,7 +654,7 @@ function DraftRow({
         <form.Subscribe selector={(s) => nameRule.test(s.values.name.trim())}>
           {(valid) => (
             <Button type="submit" size="xs" disabled={!valid}>
-              {t("edit.review")}
+              <ReviewWord />
             </Button>
           )}
         </form.Subscribe>

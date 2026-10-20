@@ -24,29 +24,31 @@ import { NotFound } from "@/components/not-found"
 import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind } from "@/model/service"
 import {
-  validateArchitectureSearch,
+  formerPlace,
+  servicePlace,
   validateComponentsSearch,
   validateObjectsSearch,
-  validateOverviewSearch,
+  validateProjectSearch,
   validateServiceSearch,
-  validateServicesSearch,
 } from "@/routes/search"
 
 // Routes are defined in code; each page's component loads on first visit, so the first page load
 // carries only the shell (scripts/ui-budget.sh).
 //
-//   /                                          Home: status, what needs attention, projects,
-//                                              recent warnings
+//   /                                          Home: what needs you, grouped by where it comes
+//                                              from, then the projects
 //   /cluster                                   the cluster: version, attention, nodes, warnings
 //   /cluster/components                        installed components and the catalogue
 //   /projects                                  every project and namespace
-//   /projects/$project                         Overview: what is broken, evidence, next step
-//   /projects/$project/architecture            Architecture: how the services relate
-//   /projects/$project/services                Services: search, filter, compare
+//   /projects/$project                         the project: its problems, then its services as a
+//                                              map or a list (?view=map|list, ?service=… quick look)
+//   /projects/$project/architecture, /services moved: redirect to the project with that view
 //   /projects/$project/settings                Settings: the project's details, adopted or not
 //   /projects/$project/objects                 Objects: every object by kind, ?object=… opens
 //                                              its YAML
-//   /projects/$project/services/$kind/$name    one service, ?tab=…&pod=…
+//   /projects/$project/services/$kind/$name    one service: ?tab=status|changes|configure|inspect,
+//                                              Inspect's ?view=…, Configure's parts as #anchors;
+//                                              a former ?tab=logs… redirects to its place
 //   /settings                                  preferences, the signed-in person, About
 //   /settings/components                       moved: redirects to /cluster/components
 //   /problems/$kind                            what one kind of problem means, and what to do
@@ -114,31 +116,42 @@ const projectsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/projects"), "ProjectsPage"),
 })
 
-const overviewRoute = createRoute({
+const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project",
-  validateSearch: validateOverviewSearch,
+  validateSearch: validateProjectSearch,
   loader: ({ params }) => loadProject(params.project),
   remountDeps: ({ params }) => params.project,
-  component: lazyRouteComponent(() => import("@/routes/project/overview"), "OverviewPage"),
+  component: lazyRouteComponent(() => import("@/routes/project/page"), "ProjectPage"),
 })
 
+// Architecture and Services were pages of their own; old links still arrive.
 const architectureRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/architecture",
-  validateSearch: validateArchitectureSearch,
-  loader: ({ params }) => loadProject(params.project),
-  remountDeps: ({ params }) => params.project,
-  component: lazyRouteComponent(() => import("@/routes/project/architecture"), "ArchitecturePage"),
+  validateSearch: validateProjectSearch,
+  beforeLoad: ({ params, search }) => {
+    throw redirect({
+      to: "/projects/$project",
+      params,
+      search: { ...search, view: "map" },
+      replace: true,
+    })
+  },
 })
 
 const servicesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/services",
-  validateSearch: validateServicesSearch,
-  loader: ({ params }) => load(ensure(projectQuery(params.project))),
-  remountDeps: ({ params }) => params.project,
-  component: lazyRouteComponent(() => import("@/routes/project/services"), "ServicesPage"),
+  validateSearch: validateProjectSearch,
+  beforeLoad: ({ params, search }) => {
+    throw redirect({
+      to: "/projects/$project",
+      params,
+      search: { ...search, view: "list" },
+      replace: true,
+    })
+  },
 })
 
 // Objects reads a dozen or so kinds when it opens and more on demand, so its loader does not wait
@@ -164,13 +177,15 @@ const serviceRoute = createRoute({
   path: "/projects/$project/services/$kind/$name",
   validateSearch: validateServiceSearch,
   // `deployment/worker`, as kubectl prints it, opens `Deployment/worker`.
-  beforeLoad: ({ params, search }) => {
+  beforeLoad: ({ params, search, location }) => {
     const kind = canonicalKind(params.kind)
-    if (kind !== params.kind) {
+    const former = formerPlace(new URLSearchParams(location.searchStr).get("tab"))
+    if (kind !== params.kind || former) {
       throw redirect({
         to: "/projects/$project/services/$kind/$name",
         params: { ...params, kind },
         search,
+        hash: servicePlace(former).hash ?? location.hash,
         replace: true,
       })
     }
@@ -215,7 +230,7 @@ export const router = createRouter({
     homeRoute,
     clusterRoute,
     projectsRoute,
-    overviewRoute,
+    projectRoute,
     architectureRoute,
     servicesRoute,
     objectsRoute,

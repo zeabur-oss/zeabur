@@ -10,6 +10,7 @@ import PlugsIcon from "~icons/ph/plugs"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 
+import { ReviewWord } from "@/components/plan/draft"
 import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
 import { usePlanner } from "@/components/plan/planner"
@@ -496,7 +497,7 @@ function HostForm({
       <form.Subscribe selector={(s) => isHost(s.values.host)}>
         {(valid) => (
           <Button type="submit" size="xs" disabled={!valid}>
-            {t("edit.review")}
+            <ReviewWord />
           </Button>
         )}
       </form.Subscribe>

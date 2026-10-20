@@ -36,7 +36,8 @@ export function plainReason(t: Translate, reason: string | undefined, task: bool
 export function useStatusWord() {
   const t = useT()
   return (status: Status) =>
-    plainReason(t, status.reason, status.task ?? false) ?? t(`status.${status.word}`)
+    plainReason(t, status.reason, status.task ?? false) ??
+    (status.unchecked ? t("status.readyUnchecked") : t(`status.${status.word}`))
 }
 
 export function useStatusFacts() {
@@ -104,7 +105,7 @@ export function ServiceStatus({
   )
 }
 
-export function FactsPill({
+function FactsPill({
   health,
   size,
   dot,

@@ -8,6 +8,7 @@ import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 import XIcon from "~icons/ph/x"
 
+import { ReviewWord } from "@/components/plan/draft"
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { configMapsQuery, objectQuery, projectQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
@@ -99,13 +100,15 @@ export function DataEditor({
   const planner = usePlanner(project, onClose)
   const form = useForm({
     defaultValues: blank,
-    onSubmit: ({ value }) =>
-      planner.plan({
+    onSubmit: ({ value }) => {
+      const staged = planner.plan({
         title: t("title.data", kind, name),
         changes: [{ op: "data", kind, name, changes: changesOf(value) }],
         restartAfter: value.restartAfter,
         service,
-      }),
+      })
+      if (staged) onClose()
+    },
   })
   const scrollTo = useScrollOnce<HTMLLIElement>()
 
@@ -370,7 +373,7 @@ export function DataEditor({
                   disabled={count === 0 || Boolean(managed)}
                   onClick={() => void form.handleSubmit()}
                 >
-                  {t("edit.review")}
+                  <ReviewWord />
                 </Button>
               </span>
             )}

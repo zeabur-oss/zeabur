@@ -105,6 +105,8 @@ export interface Status {
   ready?: number
   desired?: number
   pod?: PodFacts
+  /** Ready, but no container has a readiness probe: started, not shown to answer. */
+  unchecked?: boolean
 }
 
 export interface PodFacts {
@@ -182,7 +184,15 @@ export function statusOf(service: Service): Status {
     task: isTask(service.kind),
     ...counts,
     ...(pod ? { pod: podFacts(pod) } : {}),
+    ...(word === "ready" && !hasReadinessCheck(service) ? { unchecked: true } : {}),
   }
+}
+
+/** Whether a long-running service's readiness is checked by a probe; a task's always counts. */
+function hasReadinessCheck(service: Service): boolean {
+  if (isTask(service.kind)) return true
+  const main = service.containers.filter((c) => !c.init)
+  return main.length === 0 || main.some((c) => !!c.probes?.readiness)
 }
 
 /** Must agree with `worstHealth` over the same services. */

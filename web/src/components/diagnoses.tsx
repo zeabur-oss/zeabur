@@ -1,17 +1,23 @@
+import { Link } from "@tanstack/react-router"
+import FileTextIcon from "~icons/ph/file-text"
+import TerminalWindowIcon from "~icons/ph/terminal-window"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
 import type { Schemas } from "@/api/client"
+import { CopyText } from "@/components/copy-text"
+import { OriginChips } from "@/components/origin"
 import { Layers, Raw, type RawRow } from "@/components/problem"
-import { Button } from "@zeabur/design-system/components/button"
-import { useSentence, useT, type Translate } from "@/i18n"
-import type { Service } from "@/model/service"
-import type { ServiceTab } from "@/routes/search"
-import { healthChecksSection } from "@/lib/stores"
+import { buttonVariants } from "@zeabur/design-system/components/button"
+import { useSentence, useT, type Sentence, type Translate } from "@/i18n"
+import { serviceLink } from "@/lib/place"
+import { originOf } from "@/model/origin"
+import { isTask, type Service } from "@/model/service"
+import type { ServicePlace } from "@/routes/search"
 
 export type Diagnosis = Schemas["Diagnosis"]
 
 export interface DiagnosisAction {
-  tab: ServiceTab
+  tab: ServicePlace
   label:
     | "diagnosis.action.logs"
     | "diagnosis.action.memory"
@@ -23,8 +29,6 @@ export interface DiagnosisAction {
     | "diagnosis.action.variables"
     | "diagnosis.action.storage"
   pod?: string
-  /** A folded section of that tab to open. */
-  opens?: "healthChecks"
 }
 
 export function diagnosisAction(d: Diagnosis): DiagnosisAction {
@@ -35,18 +39,18 @@ export function diagnosisAction(d: Diagnosis): DiagnosisAction {
     case "runFailed":
       return { tab: "logs", label: "diagnosis.action.logs", pod }
     case "outOfMemory":
-      return { tab: "settings", label: "diagnosis.action.memory" }
+      return { tab: "compute", label: "diagnosis.action.memory" }
     case "probeFailure":
-      return { tab: "settings", label: "diagnosis.action.healthChecks", opens: "healthChecks" }
+      return { tab: "health-checks", label: "diagnosis.action.healthChecks" }
     case "unreachable":
       return cause.endsWith(".noReadyEndpoints")
         ? { tab: "events", label: "diagnosis.action.events" }
         : { tab: "networking", label: "diagnosis.action.networking" }
     case "quotaBlocked":
-      return { tab: "settings", label: "diagnosis.action.replicas" }
+      return { tab: "compute", label: "diagnosis.action.replicas" }
     case "unschedulable":
       return cause.endsWith(".cpu") || cause.endsWith(".memory")
-        ? { tab: "settings", label: "diagnosis.action.reservation" }
+        ? { tab: "compute", label: "diagnosis.action.reservation" }
         : { tab: "events", label: "diagnosis.action.events", pod }
     case "configMissing":
       return cause.endsWith(".volume")
@@ -86,18 +90,41 @@ function rawRows(t: Translate, d: Diagnosis, service?: Service): RawRow[] {
   ]
 }
 
+/** The diagnosis as plain text, for a ticket or a chat with whoever can fix it. */
+function diagnosisText(
+  t: Translate,
+  write: (s: Sentence) => string,
+  d: Diagnosis,
+  service: Service,
+  project: string,
+): string {
+  const { origin, fixer } = originOf(d)
+  return [
+    `${project}/${service.kind}/${service.name}`,
+    write(d.cause),
+    write(d.why),
+    `${t("problem.whatToDo")}${t("common.colon")}${write(d.fix)}`,
+    `${t(`origin.${origin}`)}${t("common.sep")}${t(`fixer.${fixer}`)}`,
+    ...rawRows(t, d, service).map(([label, value]) => `${label}: ${value}`),
+    ...d.evidence.map((e) => `${t("diagnosis.evidence")}: ${e.kind} ${e.name}`),
+    ...(d.lastSeen ? [`${t("diagnosis.lastSeen")}: ${d.lastSeen}`] : []),
+  ].join("\n")
+}
+
 export function Diagnoses({
   diagnoses,
   service,
-  onAction,
+  project,
 }: {
   diagnoses?: Diagnosis[]
-  service?: Service
-  onAction?: (tab: ServiceTab, pod?: string) => void
+  service: Service
+  project: string
 }) {
   const t = useT()
   const write = useSentence()
   if (!diagnoses || diagnoses.length === 0) return null
+  const button = buttonVariants({ variant: "outline", size: "sm" })
+  const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
   return (
     <section
       aria-labelledby="diagnoses-title"
@@ -110,6 +137,7 @@ export function Diagnoses({
         {diagnoses.map((d) => {
           const action = diagnosisAction(d)
           const raw = rawRows(t, d, service)
+          const pod = action.pod ?? d.pods[0]
           return (
             <li
               key={`${d.kind}/${d.container ?? ""}/${d.cause.key}`}
@@ -120,23 +148,44 @@ export function Diagnoses({
                 aria-hidden="true"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <p className="font-medium">{write(d.cause)}</p>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <p className="font-medium">{write(d.cause)}</p>
+                  <OriginChips {...originOf(d)} />
+                </div>
                 <Layers
                   why={write(d.why)}
                   fix={write(d.fix)}
                   action={
-                    onAction ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (action.opens === "healthChecks") healthChecksSection.set(true)
-                          onAction(action.tab, action.pod)
-                        }}
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <Link
+                        {...serviceLink(project, service, { tab: action.tab, pod: action.pod })}
+                        className={button}
                       >
                         {t(action.label)}
-                      </Button>
-                    ) : null
+                      </Link>
+                      {action.tab === "logs" ? null : (
+                        <Link
+                          {...serviceLink(project, service, { tab: "logs", pod })}
+                          className={button}
+                        >
+                          <FileTextIcon aria-hidden="true" data-icon="inline-start" />
+                          {t("tab.logs")}
+                        </Link>
+                      )}
+                      {runs ? (
+                        <Link
+                          {...serviceLink(project, service, { tab: "terminal", pod })}
+                          className={button}
+                        >
+                          <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+                          {t("tab.terminal")}
+                        </Link>
+                      ) : null}
+                      <CopyText
+                        value={() => diagnosisText(t, write, d, service, project)}
+                        label={t("diagnosis.copy")}
+                      />
+                    </span>
                   }
                   evidence={d.evidence}
                   lastSeen={d.lastSeen}

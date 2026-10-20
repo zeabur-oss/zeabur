@@ -1,6 +1,7 @@
 import { useForm } from "@tanstack/react-form"
 import CaretRightIcon from "~icons/ph/caret-right"
 
+import { ReviewWord } from "@/components/plan/draft"
 import type { Schemas } from "@/api/client"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
@@ -128,7 +129,7 @@ export function ClaimForm({
               size="xs"
               disabled={disabled || !canSubmit || !dirty}
             >
-              {t("edit.review")}
+              <ReviewWord />
             </Button>
           )}
         </place.Subscribe>
@@ -236,7 +237,7 @@ export function AddVolume({
       <form.Subscribe selector={(s) => [s.canSubmit, s.values.mountPath] as const}>
         {([canSubmit, mountPath]) => (
           <Button type="submit" size="xs" disabled={disabled || !canSubmit || !mountPath}>
-            {t("edit.review")}
+            <ReviewWord />
           </Button>
         )}
       </form.Subscribe>

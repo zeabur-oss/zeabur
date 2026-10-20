@@ -1,10 +1,10 @@
-// Where the person is (the open project, entry, service and tab) for the shell, and the links
-// every page uses to reach a project entry or a service.
+// Where the person is (the open project, entry, service and section) for the shell, and the links
+// every page uses to reach a project entry or a place on a service.
 import { useMatches, type RegisteredRouter, type RouteIds } from "@tanstack/react-router"
 
-import type { ServiceTab } from "@/routes/search"
+import { servicePlace, type ServicePlace, type ServiceSection } from "@/routes/search"
 
-export type ProjectEntry = "overview" | "architecture" | "services" | "objects" | "settings"
+export type ProjectEntry = "overview" | "objects" | "settings"
 
 type RouteId = RouteIds<RegisteredRouter["routeTree"]>
 
@@ -13,15 +13,13 @@ export interface Place {
   route: RouteId
   project?: string
   entry?: ProjectEntry
-  /** `Kind/name` of the service on the service page, or in the Architecture quick look. */
+  /** `Kind/name` of the service on the service page, or in the project's quick look. */
   service?: string
-  tab?: ServiceTab
+  tab?: ServiceSection
 }
 
 const entries: Partial<Record<RouteId, ProjectEntry>> = {
   "/projects/$project": "overview",
-  "/projects/$project/architecture": "architecture",
-  "/projects/$project/services": "services",
   "/projects/$project/objects": "objects",
   "/projects/$project/settings": "settings",
 }
@@ -43,8 +41,7 @@ export function usePlace(): Place {
         route,
         project: match.params.project,
         entry,
-        service:
-          match.routeId === "/projects/$project/architecture" ? match.search.service : undefined,
+        service: match.routeId === "/projects/$project" ? match.search.service : undefined,
       }
     },
     structuralSharing: true,
@@ -54,16 +51,18 @@ export function usePlace(): Place {
 export function serviceLink(
   project: string,
   service: { kind: string; name: string },
-  search: { tab?: ServiceTab; pod?: string } = {},
+  { tab, pod }: { tab?: ServicePlace; pod?: string } = {},
 ) {
+  const place = servicePlace(tab)
   return {
     to: "/projects/$project/services/$kind/$name" as const,
     params: { project, kind: service.kind, name: service.name },
-    search: { tab: search.tab, pod: search.pod },
+    search: { tab: place.tab, view: place.view, pod },
+    hash: place.hash,
   }
 }
 
-/** The service's Logs tab with one pod chosen. */
+/** The service's logs with one replica chosen. */
 export const podLogsLink = (
   project: string,
   service: { kind: string; name: string },

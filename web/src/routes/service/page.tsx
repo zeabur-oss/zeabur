@@ -1,29 +1,28 @@
 import { useQuery } from "@tanstack/react-query"
-import { getRouteApi } from "@tanstack/react-router"
-import { lazy, Suspense } from "react"
-import BellIcon from "~icons/ph/bell"
-import ChartBarIcon from "~icons/ph/chart-bar"
+import { getRouteApi, Link } from "@tanstack/react-router"
+import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import CodeIcon from "~icons/ph/code"
 import DotsThreeIcon from "~icons/ph/dots-three"
-import GearSixIcon from "~icons/ph/gear-six"
-import GlobeIcon from "~icons/ph/globe"
-import HardDrivesIcon from "~icons/ph/hard-drives"
-import InfoIcon from "~icons/ph/info"
-import KeyIcon from "~icons/ph/key"
+import FileTextIcon from "~icons/ph/file-text"
+import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
+import PulseIcon from "~icons/ph/pulse"
+import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
-import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import TrashIcon from "~icons/ph/trash"
 
 import type { Schemas } from "@/api/client"
 import { projectQuery } from "@/api/queries"
 import { CopyButton } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
+import { describeDraft, DraftProvider, useDraftState, type Draft } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
-import { refusedAmong, refusedElsewhere, RefusedKinds, RefusedSome } from "@/components/refused"
+import { refusedElsewhere, RefusedSome } from "@/components/refused"
 import { ServiceIcon } from "@/components/service-icon"
-import { Button } from "@zeabur/design-system/components/button"
+import { ServiceStatus } from "@/components/status"
+import { Button, buttonVariants } from "@zeabur/design-system/components/button"
+import { DraftBar } from "@zeabur/design-system/components/draft-bar"
 import {
   Menu,
   MenuContent,
@@ -31,7 +30,6 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "@zeabur/design-system/components/menu"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useT } from "@/i18n"
@@ -39,62 +37,26 @@ import type { Icon } from "@/lib/icon"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
-import { eventsFor, serviceId, type Project, type Service } from "@/model/service"
-import { inServiceTabs, refusedPlaces, useProjectEvents } from "@/routes/project/data"
-import type { ServiceTab } from "@/routes/search"
-import { EventsTab } from "@/routes/service/events"
-import { MetricsTab } from "@/routes/service/metrics"
-import { NetworkingTab } from "@/routes/service/networking"
-import { OverviewTab } from "@/routes/service/overview"
-import { ReleasesTab } from "@/routes/service/releases"
-import { StorageTab } from "@/routes/service/storage"
-import { VariablesTab } from "@/routes/service/variables"
-import { YamlTab } from "@/routes/service/yaml"
+import { serviceLink } from "@/lib/place"
+import { eventsFor, isTask, serviceId, statusOf, type Project, type Service } from "@/model/service"
+import { inServiceTabs, useProjectEvents } from "@/routes/project/data"
+import {
+  serviceSections,
+  type InspectView,
+  type ServicePlace,
+  type ServiceSection,
+} from "@/routes/search"
+import { ChangesSection } from "@/routes/service/changes"
+import { ConfigureSection } from "@/routes/service/configure"
+import { InspectSection } from "@/routes/service/inspect"
+import { StatusSection } from "@/routes/service/status"
 
-const tabIcons: Record<ServiceTab, Icon> = {
-  overview: InfoIcon,
-  logs: TextAlignLeftIcon,
-  variables: KeyIcon,
-  metrics: ChartBarIcon,
-  networking: GlobeIcon,
-  storage: HardDrivesIcon,
-  settings: GearSixIcon,
-  events: BellIcon,
-  releases: ClockCounterClockwiseIcon,
-  terminal: TerminalWindowIcon,
-  yaml: CodeIcon,
+const sectionIcons: Record<ServiceSection, Icon> = {
+  status: PulseIcon,
+  changes: ClockCounterClockwiseIcon,
+  configure: SlidersHorizontalIcon,
+  inspect: MagnifyingGlassIcon,
 }
-
-const everydayTabs: readonly ServiceTab[] = [
-  "overview",
-  "logs",
-  "variables",
-  "metrics",
-  "networking",
-  "storage",
-  "settings",
-]
-const openedTabs: readonly ServiceTab[] = ["terminal", "yaml"]
-
-export function serviceTabs(
-  service: Pick<Service, "kind">,
-  { events, open }: { events: number; open: ServiceTab },
-): ServiceTab[] {
-  const tabs = [...everydayTabs]
-  if (events > 0 || open === "events") tabs.push("events")
-  if (service.kind !== "Job" && service.kind !== "CronJob") tabs.push("releases")
-  else if (open === "releases") tabs.push("releases")
-  if (openedTabs.includes(open)) tabs.push(open)
-  return tabs
-}
-
-const LogsTab = lazy(() => import("@/routes/service/logs").then((m) => ({ default: m.LogsTab })))
-const TerminalTab = lazy(() =>
-  import("@/routes/service/terminal").then((m) => ({ default: m.TerminalTab })),
-)
-const SettingsTab = lazy(() =>
-  import("@/routes/service/settings").then((m) => ({ default: m.SettingsTab })),
-)
 
 const route = getRouteApi("/projects/$project/services/$kind/$name")
 
@@ -152,217 +114,258 @@ function ServiceView({
   const events = useProjectEvents(project)
   const edges = edgesOf(data)
   const mine = eventsFor(events, service)
-  const tab = search.tab ?? "overview"
-  const setTab = (next: ServiceTab, pod?: string) =>
+  const tab = search.tab ?? "status"
+  const view = search.view ?? "logs"
+  const go = (place: ServicePlace, pod?: string) =>
+    void navigate(serviceLink(project, service, { tab: place, pod }))
+  const setTab = (next: ServiceSection) =>
     void navigate({
       search: (previous) => ({
         ...previous,
-        tab: next === "overview" ? undefined : next,
-        pod:
-          pod ??
-          (next === "logs" || next === "terminal" || next === "events" ? previous.pod : undefined),
+        tab: next === "status" ? undefined : next,
+        view: next === "inspect" ? previous.view : undefined,
+        pod: next === "inspect" ? previous.pod : undefined,
       }),
+      hash: "",
     })
+  const setView = (next: InspectView) =>
+    void navigate({ search: (previous) => ({ ...previous, tab: "inspect", view: next }) })
   const setPod = (pod?: string) =>
     void navigate({ search: (previous) => ({ ...previous, pod: pod || undefined }), replace: true })
-  const tabs = serviceTabs(service, { events: mine.length, open: tab })
   const unreadable = data.unreadable
   const restartable =
     service.kind === "Deployment" || service.kind === "StatefulSet" || service.kind === "DaemonSet"
+  const draft = useDraftState()
+  const reviewer = usePlanner(project, draft.applied, true)
   const planner = usePlanner(project)
   const deleter = usePlanner(
     project,
-    () => void navigate({ to: "/projects/$project/services", params: { project }, search: {} }),
+    () => void navigate({ to: "/projects/$project", params: { project }, search: {} }),
   )
   const planDeletion = () =>
     deleter.plan({
       title: t("title.delete", service.kind, service.name),
       changes: [{ op: "delete", resource: workloadResource[service.kind], name: service.name }],
     })
+  const restart = restartable
+    ? () =>
+        planner.plan({
+          title: t("title.restart", service.name),
+          changes: [{ op: "restart", workload: { kind: service.kind, name: service.name } }],
+        })
+    : undefined
   const id = `${service.kind}/${service.name}`
-  const wide = tab === "logs" || tab === "terminal"
+  const wide = tab === "inspect" && (view === "logs" || view === "terminal")
+  const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
+  const quick = buttonVariants({ variant: "outline", size: "sm" })
 
   return (
-    <Tabs
-      value={tab}
-      onValueChange={(value) => setTab(value as ServiceTab)}
-      variant="page"
-      className="flex min-h-0 flex-1 flex-col"
-    >
-      <header className="shrink-0 px-4 md:px-8">
-        <div className="mx-auto flex w-full max-w-content flex-col">
-          <div className="flex items-start gap-x-3 py-4 md:py-6">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-main bg-card">
-              <ServiceIcon service={service} size="lg" />
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <h1 className="min-w-0 truncate type-name" translate="no">
-                {service.displayName ?? service.name}
-              </h1>
-              <div className="flex min-w-0 flex-col gap-0.5 text-xs text-secondary">
-                {service.created ? (
-                  <span>{t("service.created", formatDate(service.created, locale))}</span>
-                ) : null}
-                <span className="flex min-w-0 items-center gap-1">
-                  <span className="truncate font-mono" translate="no">
-                    {id}
+    <DraftProvider draft={draft}>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as ServiceSection)}
+        variant="page"
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <header className="shrink-0 px-4 md:px-8">
+          <div className="mx-auto flex w-full max-w-content flex-col">
+            <div className="flex flex-wrap items-start gap-x-3 gap-y-3 py-4 md:py-6">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-main bg-card">
+                <ServiceIcon service={service} size="lg" />
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <h1 className="min-w-0 truncate type-name" translate="no">
+                    {service.displayName ?? service.name}
+                  </h1>
+                  <ServiceStatus status={statusOf(service)} counts />
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-secondary">
+                  <span className="flex min-w-0 items-center gap-1">
+                    <span className="truncate font-mono" translate="no">
+                      {id}
+                    </span>
+                    <CopyButton value={id} />
                   </span>
-                  <CopyButton value={id} />
-                </span>
+                  {service.created ? (
+                    <span>{t("service.created", formatDate(service.created, locale))}</span>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Link {...serviceLink(project, service, { tab: "logs" })} className={quick}>
+                  <FileTextIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("tab.logs")}
+                </Link>
+                {runs ? (
+                  <Link
+                    {...serviceLink(project, service, { tab: "terminal" })}
+                    className={cn(quick, "max-sm:hidden")}
+                  >
+                    <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+                    {t("tab.terminal")}
+                  </Link>
+                ) : null}
+                <Menu>
+                  <MenuTrigger
+                    render={
+                      <Button variant="outline" size="icon-sm" aria-label={t("service.more")} />
+                    }
+                  >
+                    <DotsThreeIcon aria-hidden="true" />
+                  </MenuTrigger>
+                  <MenuContent>
+                    {restart ? (
+                      <MenuItem onClick={restart}>
+                        <ArrowClockwiseIcon aria-hidden="true" />
+                        {t("ops.restart")}
+                      </MenuItem>
+                    ) : null}
+                    <MenuItem onClick={() => go("terminal")}>
+                      <TerminalWindowIcon aria-hidden="true" />
+                      {t("service.openTerminal")}
+                    </MenuItem>
+                    <MenuItem onClick={() => go("yaml")}>
+                      <CodeIcon aria-hidden="true" />
+                      {t("service.viewYaml")}
+                    </MenuItem>
+                    <MenuSeparator />
+                    {service.provenance.tool ? (
+                      <Tooltip content={t("common.managedByDetail", service.provenance.tool)}>
+                        <MenuItem disabled>
+                          <TrashIcon aria-hidden="true" />
+                          {t("service.delete")}
+                        </MenuItem>
+                      </Tooltip>
+                    ) : (
+                      <MenuItem onClick={planDeletion}>
+                        <TrashIcon aria-hidden="true" />
+                        {t("service.delete")}
+                      </MenuItem>
+                    )}
+                  </MenuContent>
+                </Menu>
               </div>
             </div>
-            <Menu>
-              <MenuTrigger
-                render={<Button variant="outline" size="icon-sm" aria-label={t("service.more")} />}
-              >
-                <DotsThreeIcon aria-hidden="true" />
-              </MenuTrigger>
-              <MenuContent>
-                <MenuItem onClick={() => setTab("terminal")}>
-                  <TerminalWindowIcon aria-hidden="true" />
-                  {t("service.openTerminal")}
-                </MenuItem>
-                <MenuItem onClick={() => setTab("yaml")}>
-                  <CodeIcon aria-hidden="true" />
-                  {t("service.viewYaml")}
-                </MenuItem>
-                <MenuSeparator />
-                {service.provenance.tool ? (
-                  <Tooltip content={t("common.managedByDetail", service.provenance.tool)}>
-                    <MenuItem disabled>
-                      <TrashIcon aria-hidden="true" />
-                      {t("service.delete")}
-                    </MenuItem>
-                  </Tooltip>
-                ) : (
-                  <MenuItem onClick={planDeletion}>
-                    <TrashIcon aria-hidden="true" />
-                    {t("service.delete")}
-                  </MenuItem>
-                )}
-              </MenuContent>
-            </Menu>
+            <RefusedSome unreadable={refusedElsewhere(unreadable, inServiceTabs)} />
+            <div className="pt-1 pb-3">
+              <TabsList aria-label={t("service.tabs")} className="w-full">
+                {serviceSections.map((value) => {
+                  const SectionIcon = sectionIcons[value]
+                  return (
+                    <TabsTrigger key={value} value={value} className="flex-1">
+                      <SectionIcon aria-hidden="true" />
+                      {t(`section.${value}`)}
+                      {value === "configure" && draft.count > 0 ? (
+                        <span className="tabular-nums text-progress-strong">{draft.count}</span>
+                      ) : null}
+                    </TabsTrigger>
+                  )
+                })}
+              </TabsList>
+            </div>
           </div>
-          <RefusedSome unreadable={refusedElsewhere(unreadable, inServiceTabs)} />
-          <div className="pt-1 pb-3">
-            <TabsList aria-label={t("service.tabs")} className="w-full">
-              {tabs.map((value) => {
-                const TabIcon = tabIcons[value]
-                return (
-                  <TabsTrigger key={value} value={value} className="flex-1">
-                    <TabIcon aria-hidden="true" />
-                    {t(`tab.${value}`)}
-                  </TabsTrigger>
-                )
-              })}
-            </TabsList>
-          </div>
-        </div>
-      </header>
-      <div className={cn("flex min-h-0 flex-1 flex-col px-4 md:px-8", wide ? "pb-4" : "pb-16")}>
-        <div
-          className={cn(
-            "mx-auto flex w-full max-w-content flex-col pt-3",
-            wide && "min-h-0 flex-1",
-          )}
-        >
-          <TabsContent value="overview">
-            <OverviewTab
-              project={project}
-              service={service}
-              services={data.services}
-              network={data}
-              edges={edges}
-              events={mine}
-              onTab={setTab}
-              onRestart={
-                restartable
-                  ? () =>
-                      planner.plan({
-                        title: t("title.restart", service.name),
-                        changes: [
-                          { op: "restart", workload: { kind: service.kind, name: service.name } },
-                        ],
-                      })
-                  : undefined
-              }
-            />
-          </TabsContent>
-          <TabsContent value="logs" className="flex min-h-0 flex-1 flex-col">
-            {tab === "logs" ? (
-              <Suspense fallback={<Skeleton variant="card" className="min-h-96 w-full flex-1" />}>
-                <LogsTab
+        </header>
+        <div className={cn("flex min-h-0 flex-1 flex-col px-4 md:px-8", wide ? "pb-4" : "pb-16")}>
+          <div
+            className={cn(
+              "mx-auto flex w-full max-w-content flex-col pt-3",
+              wide && "min-h-0 flex-1",
+            )}
+          >
+            <TabsContent value="status">
+              <StatusSection
+                project={project}
+                service={service}
+                services={data.services}
+                network={data}
+                edges={edges}
+                events={mine}
+                onTab={go}
+                onRestart={restart}
+              />
+            </TabsContent>
+            <TabsContent value="changes">
+              {tab === "changes" ? (
+                <ChangesSection
                   project={project}
                   service={service}
-                  pod={search.pod}
-                  onPodChange={setPod}
+                  events={mine}
+                  onEvents={() => go("events")}
                 />
-              </Suspense>
-            ) : null}
-          </TabsContent>
-          <TabsContent value="terminal" className="flex min-h-0 flex-1 flex-col">
-            {tab === "terminal" ? (
-              <Suspense fallback={<Skeleton variant="card" className="min-h-96 w-full flex-1" />}>
-                <TerminalTab
+              ) : null}
+            </TabsContent>
+            <TabsContent value="configure">
+              {tab === "configure" ? (
+                <ConfigureSection
                   project={project}
                   service={service}
-                  pod={search.pod}
-                  onPodChange={setPod}
+                  services={data.services}
+                  network={data}
+                  edges={edges}
+                  reachability={data.extensions?.networkPolicy ?? undefined}
+                  unreadable={unreadable}
                 />
-              </Suspense>
+              ) : null}
+            </TabsContent>
+            <TabsContent
+              value="inspect"
+              className={wide ? "flex min-h-0 flex-1 flex-col" : undefined}
+            >
+              {tab === "inspect" ? (
+                <InspectSection
+                  project={project}
+                  service={service}
+                  view={view}
+                  pod={search.pod}
+                  events={mine}
+                  unreadable={unreadable}
+                  onView={setView}
+                  onPod={setPod}
+                />
+              ) : null}
+            </TabsContent>
+            {draft.count > 0 ? (
+              <PendingChanges
+                draft={draft}
+                onReview={() =>
+                  reviewer.plan({
+                    title: t("draft.title", service.name),
+                    changes: draft.changes,
+                    restartAfter: draft.restartAfter || undefined,
+                    service: { kind: service.kind, name: service.name },
+                  })
+                }
+              />
             ) : null}
-          </TabsContent>
-          <TabsContent value="variables">
-            <VariablesTab
-              project={project}
-              service={service}
-              edges={edges.filter((e) => e.from === serviceId(service))}
-              refused={refusedAmong(unreadable, refusedPlaces.config)}
-            />
-          </TabsContent>
-          <TabsContent value="networking">
-            <NetworkingTab
-              project={project}
-              service={service}
-              services={data.services}
-              network={data}
-              reachability={data.extensions?.networkPolicy ?? undefined}
-              unreadable={unreadable}
-            />
-          </TabsContent>
-          <TabsContent value="storage">
-            <div className="flex flex-col gap-4">
-              <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.claims)} />
-              <StorageTab project={project} service={service} />
-            </div>
-          </TabsContent>
-          <TabsContent value="metrics">
-            {tab === "metrics" ? <MetricsTab project={project} service={service} /> : null}
-          </TabsContent>
-          <TabsContent value="settings">
-            {tab === "settings" ? (
-              <Suspense fallback={<LoadingRows label={t("common.loading")} rows={6} />}>
-                <SettingsTab project={project} service={service} network={data} />
-              </Suspense>
-            ) : null}
-          </TabsContent>
-          <TabsContent value="events">
-            <div className="flex flex-col gap-4">
-              <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.events)} />
-              <EventsTab events={mine} pod={search.pod} onClearPod={() => setPod(undefined)} />
-            </div>
-          </TabsContent>
-          <TabsContent value="releases">
-            {tab === "releases" ? <ReleasesTab project={project} service={service} /> : null}
-          </TabsContent>
-          <TabsContent value="yaml">
-            {tab === "yaml" ? <YamlTab project={project} service={service} /> : null}
-          </TabsContent>
+          </div>
         </div>
-      </div>
-      {planner.dialog}
-      {deleter.dialog}
-    </Tabs>
+        {planner.dialog}
+        {deleter.dialog}
+        {reviewer.dialog}
+      </Tabs>
+    </DraftProvider>
+  )
+}
+
+function PendingChanges({ draft, onReview }: { draft: Draft; onReview: () => void }) {
+  const t = useT()
+  return (
+    <DraftBar
+      className="mt-6"
+      label={t("draft.count", draft.count)}
+      detail={describeDraft(t, draft)}
+      actions={
+        <>
+          <Button variant="ghost" size="sm" onClick={draft.discard}>
+            {t("draft.discard")}
+          </Button>
+          <Button size="sm" onClick={onReview}>
+            {t("draft.review")}
+          </Button>
+        </>
+      }
+    />
   )
 }
 

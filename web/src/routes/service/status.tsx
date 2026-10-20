@@ -6,25 +6,23 @@ import ArrowRightIcon from "~icons/ph/arrow-right"
 import ArrowUpRightIcon from "~icons/ph/arrow-up-right"
 import CaretDownIcon from "~icons/ph/caret-down"
 import CaretRightIcon from "~icons/ph/caret-right"
-import CodeIcon from "~icons/ph/code"
 import CubeIcon from "~icons/ph/cube"
-import FileTextIcon from "~icons/ph/file-text"
 import GitBranchIcon from "~icons/ph/git-branch"
 import GlobeIcon from "~icons/ph/globe"
-import TerminalWindowIcon from "~icons/ph/terminal-window"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
-import { clusterQuery } from "@/api/queries"
+import { clusterQuery, releasesQuery } from "@/api/queries"
 import { Ago, CopyButton } from "@/components/bits"
 import { Diagnoses } from "@/components/diagnoses"
 import { EventList } from "@/components/events"
 import { replicaCounts } from "@/components/pods"
+import { RouteTrace } from "@/components/route-trace"
 import { ServiceIcon } from "@/components/service-icon"
 import { plainReason, StatusDot, useStatusFacts, useStatusWord } from "@/components/status"
-import { ActionTile } from "@zeabur/design-system/components/action-tile"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
 import { Container } from "@zeabur/design-system/components/container"
+import { Meter } from "@zeabur/design-system/components/meter"
 import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
 import {
   SummaryCard,
@@ -44,9 +42,11 @@ import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
+import { privateTrace, publicTrace } from "@/model/trace"
 import {
-  domainsOf,
+  endpointsOf,
   hostUrl,
+  publicRoutesOf,
   imageTag,
   isHealthy,
   isTask,
@@ -59,12 +59,12 @@ import {
   type Network,
   type Service,
 } from "@/model/service"
-import type { ServiceTab } from "@/routes/search"
+import type { ServicePlace } from "@/routes/search"
 import { UsageGlance } from "@/routes/service/usage"
 
-type OnTab = (tab: ServiceTab, pod?: string) => void
+type OnTab = (place: ServicePlace, pod?: string) => void
 
-export function OverviewTab({
+export function StatusSection({
   project,
   service,
   services,
@@ -89,7 +89,10 @@ export function OverviewTab({
   return (
     <div className="flex flex-col gap-5">
       {diagnosed ? (
-        <Diagnoses diagnoses={service.diagnoses} service={service} onAction={onTab} />
+        <Diagnoses diagnoses={service.diagnoses} service={service} project={project} />
+      ) : null}
+      {service.status.health === "progress" && !isTask(service.kind) ? (
+        <Rollout project={project} service={service} />
       ) : null}
       <Summary
         project={project}
@@ -99,35 +102,50 @@ export function OverviewTab({
         onRestart={onRestart}
       />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
-        <DomainsCard network={network} service={service} onTab={onTab} />
-        <div className="grid grid-cols-3 gap-2 lg:gap-3">
-          <ActionTile onClick={() => onTab("logs")}>
-            <FileTextIcon aria-hidden="true" />
-            {t("tab.logs")}
-          </ActionTile>
-          <ActionTile onClick={() => onTab("terminal")}>
-            <TerminalWindowIcon aria-hidden="true" />
-            {t("tab.terminal")}
-          </ActionTile>
-          <ActionTile onClick={() => onTab("yaml")}>
-            <CodeIcon aria-hidden="true" />
-            {t("tab.yaml")}
-          </ActionTile>
+        <Reachability project={project} network={network} service={service} onTab={onTab} />
+        <div className="flex min-w-0 flex-col gap-4 lg:gap-5">
+          {warnings.length > 0 ? (
+            <Container
+              title={t("overview.warnings")}
+              titleAction={<More onClick={() => onTab("events")}>{t("common.all")}</More>}
+              variant="list"
+            >
+              <div className="px-4">
+                <EventList events={warnings} limit={3} compact />
+              </div>
+            </Container>
+          ) : null}
+          <ConnectionsCard project={project} service={service} services={services} edges={edges} />
         </div>
-        {warnings.length > 0 ? (
-          <Container
-            title={t("overview.warnings")}
-            titleAction={<More onClick={() => onTab("events")}>{t("common.all")}</More>}
-            variant="list"
-          >
-            <div className="px-4">
-              <EventList events={warnings} limit={3} compact />
-            </div>
-          </Container>
-        ) : null}
-        <ConnectionsCard project={project} service={service} services={services} edges={edges} />
       </div>
     </div>
+  )
+}
+
+/** How far the newest release has come, from its own replicas; done only when all are ready. */
+function Rollout({ project, service }: { project: string; service: Service }) {
+  const t = useT()
+  const releases = useQuery(releasesQuery(project, service.kind, service.name))
+  const current = releases.data?.items.find((r) => r.current)
+  const desired = service.replicas?.desired ?? 0
+  if (!current || desired === 0) return null
+  const ready = Math.min(current.pods.ready, desired)
+  const older = (releases.data?.items ?? [])
+    .filter((r) => !r.current)
+    .reduce((n, r) => n + r.pods.total, 0)
+  return (
+    <section
+      aria-label={t("rollout.title")}
+      className="flex flex-col gap-2 rounded-lg border border-progress/30 bg-progress-soft/30 px-4 py-3"
+    >
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+        <span className="font-medium">{t("rollout.release", current.revision)}</span>
+        <span className="text-secondary tabular-nums">{t("rollout.ready", ready, desired)}</span>
+        {older > 0 ? <span className="text-secondary">{t("rollout.older", older)}</span> : null}
+        <Ago iso={current.created} className="ml-auto type-meta text-tertiary" />
+      </div>
+      <Meter value={ready / desired} label={t("rollout.ready", ready, desired)} />
+    </section>
   )
 }
 
@@ -187,6 +205,12 @@ function Summary({
           <p className="mt-1 text-sm text-secondary">{facts}</p>
         ) : null}
         {!isHealthy(status) && !diagnosed ? <Exceptions service={service} /> : null}
+        {status.unchecked ? (
+          <p className="mt-2 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
+            {t("status.uncheckedWhy")}
+            <More onClick={() => onTab("health-checks")}>{t("status.addTrafficCheck")}</More>
+          </p>
+        ) : null}
         <SummaryCardFacts>
           {service.image ? (
             <SummaryCardFact label={t("overview.source")}>
@@ -333,49 +357,77 @@ function Replicas({ service, onTab }: { service: Service; onTab: OnTab }) {
   )
 }
 
-function DomainsCard({
+function Reachability({
+  project,
   network,
   service,
   onTab,
 }: {
+  project: string
   network: Network
   service: Service
   onTab: OnTab
 }) {
   const t = useT()
-  const domains = domainsOf(network, service)
-  if (domains.length === 0) return null
+  const routes = publicRoutesOf(network, service).filter((r) => r.host)
+  const endpoints = endpointsOf(network, service)
+  if (isTask(service.kind) && routes.length === 0 && endpoints.length === 0) return null
   return (
     <Container
-      title={t("common.domains")}
+      title={t("status.reach")}
       titleAction={<More onClick={() => onTab("networking")}>{t("overview.manage")}</More>}
       variant="list"
     >
-      {domains.map((domain) => (
-        <a
-          key={domain.host}
-          href={hostUrl(domain)}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="flex w-full items-center gap-3 px-4 py-3 transition-colors hover:bg-v2-surface-hover"
-        >
-          <span className="min-w-0 flex-1 truncate text-sm font-medium" translate="no">
-            {domain.host}
-          </span>
-          {domain.https ? (
-            <Tooltip content={t("domains.https")}>
-              <Badge variant="ok" translate="no">
-                HTTPS
-              </Badge>
-            </Tooltip>
-          ) : (
-            <Badge variant="secondary" translate="no">
-              HTTP
-            </Badge>
-          )}
-          <ArrowUpRightIcon className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
-        </a>
-      ))}
+      {routes.length === 0 && endpoints.length === 0 ? (
+        <p className="px-4 py-3 text-sm text-secondary">{t("status.reachNone")}</p>
+      ) : null}
+      {routes.map((route) => {
+        const trace = publicTrace(route, endpoints, service)
+        const url = hostUrl({ host: route.host ?? "", https: route.https })
+        return (
+          <div key={trace.id} className="flex flex-col gap-2 px-4 py-3">
+            <a
+              href={`${url}${route.path && route.path !== "/" ? route.path : ""}`}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="flex min-w-0 items-center gap-2 text-sm font-medium hover:underline"
+              translate="no"
+            >
+              <span className="truncate">
+                {route.host}
+                {route.path && route.path !== "/" ? route.path : ""}
+              </span>
+              {route.https ? (
+                <Badge variant="ok" translate="no">
+                  HTTPS
+                </Badge>
+              ) : (
+                <Badge variant="secondary" translate="no">
+                  HTTP
+                </Badge>
+              )}
+              <ArrowUpRightIcon className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
+              <span className="sr-only"> {t("common.newTab")}</span>
+            </a>
+            <RouteTrace trace={trace} />
+          </div>
+        )
+      })}
+      {endpoints.map((endpoint) => {
+        const address = `${endpoint.name}.${project}.svc.cluster.local${endpoint.ports[0] ? `:${endpoint.ports[0].port}` : ""}`
+        return (
+          <div key={endpoint.name} className="flex flex-col gap-2 px-4 py-3">
+            <span className="flex min-w-0 items-center gap-1.5 text-sm">
+              <span className="shrink-0 text-secondary">{t("status.private")}</span>
+              <span className="truncate font-mono text-xs" translate="no" title={address}>
+                {address}
+              </span>
+              <CopyButton value={address} />
+            </span>
+            <RouteTrace trace={privateTrace(endpoint, service)} />
+          </div>
+        )
+      })}
     </Container>
   )
 }

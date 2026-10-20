@@ -3,6 +3,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react"
 
 import type { Schemas } from "@/api/client"
+import { useDraft } from "@/components/plan/draft"
 import { fallback, next, type Open } from "@/components/plan/fallback"
 
 const PlanDialog = lazy(() =>
@@ -18,7 +19,9 @@ export interface PlanAsk {
   service?: Schemas["WorkloadRef"]
 }
 
-export function usePlanner(project: string, onApplied?: () => void) {
+/** Inside a service's Configure page, an edit waits in its draft instead; `direct` plans at once. */
+export function usePlanner(project: string, onApplied?: () => void, direct = false) {
+  const draft = useDraft()
   const [open, setOpen] = useState<Open | null>(null)
   const [fields, setFields] = useState<Schemas["FieldCause"][]>([])
   const mounted = useRef(false)
@@ -28,11 +31,17 @@ export function usePlanner(project: string, onApplied?: () => void) {
       mounted.current = false
     }
   }, [])
-  const plan = (ask: PlanAsk) => {
+  const show = (ask: PlanAsk) => {
     setFields([])
     setOpen(next(project, ask))
   }
-  const reopen = (ask: PlanAsk) => (mounted.current ? plan(ask) : fallback.open(project, ask))
+  /** True when the ask waits in the draft instead of opening the dialog. */
+  const plan = (ask: PlanAsk): boolean => {
+    if (!direct && draft?.stage(ask)) return true
+    show(ask)
+    return false
+  }
+  const reopen = (ask: PlanAsk) => (mounted.current ? show(ask) : fallback.open(project, ask))
   const dialog = open ? (
     <Suspense fallback={null}>
       <PlanDialog
