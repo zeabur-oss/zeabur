@@ -69,6 +69,7 @@ fn deployment_in(
 ) -> Deployment {
     from(json!({
         "metadata": {"name": name, "namespace": namespace, "generation": 3,
+            "creationTimestamp": created(name),
             "labels": {"app.kubernetes.io/name": name, "app.kubernetes.io/part-of": namespace}},
         "spec": {"replicas": replicas, "selector": {"matchLabels": {"app": name}},
             "template": {"metadata": {"labels": {"app": name}}, "spec": {"containers": [{
@@ -97,7 +98,7 @@ fn stateful_set_in(
     env: &Value,
 ) -> StatefulSet {
     from(json!({
-        "metadata": {"name": name, "namespace": namespace,
+        "metadata": {"name": name, "namespace": namespace, "creationTimestamp": created(name),
             "labels": {"app.kubernetes.io/name": name, "app.kubernetes.io/component": "database"}},
         "spec": {"replicas": 1, "serviceName": name, "selector": {"matchLabels": {"app": name}},
             "template": {"metadata": {"labels": {"app": name}}, "spec": {"containers": [{
@@ -945,6 +946,12 @@ fn state() -> State {
 const VERSION: &str = "v1.34.10+k3s1";
 
 /// `minutes` before now, as an event time.
+/// When a workload was created: a few weeks ago, a different day for each name.
+fn created(name: &str) -> String {
+    let days = name.bytes().map(i64::from).sum::<i64>() % 60 + 14;
+    minutes_ago(days * 24 * 60)
+}
+
 fn minutes_ago(minutes: i64) -> String {
     let now = Timestamp::now();
     now.checked_sub(SignedDuration::from_mins(minutes))
