@@ -18,6 +18,10 @@ description: Write or revise any text people read in Zeabur — interface string
    「進行」 padding and full stops on labels. Use `common.colon` instead of a literal colon.
 4. **Empty states and absences say what is missing and what to do**, never a bare 「沒有。」/
    "None." A section that has nothing is usually hidden or says why and offers the action.
+   Section titles name their content (公開網域, 私有網路), not their position (「在這裡設定」).
+   Show the real value with a copy button (`api.shop.svc.cluster.local:8080`), not a description
+   of it. Kubernetes terms go in the design system's `Term` tag, never a made-up middle word
+   (內部位址).
 5. **States in progress** read 「正在…」/ "Restarting…"; results say what changed.
 6. **Errors**: what happened, in the user's terms, then what they can do. Keep the raw cause
    available (details, copy) but out of the headline.
