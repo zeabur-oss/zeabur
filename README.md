@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/cover-dark.avif">
-  <img alt="Zeabur: run your services on your own Kubernetes; a service that keeps crashing, explained in plain words with what to do" src="docs/images/cover-light.avif">
+  <img alt="Zeabur: run your services on your own Kubernetes; a namespace's objects shown as a project's services, one of them flagged as crashing" src="docs/images/cover-light.avif">
 </picture>
 
 # Zeabur
