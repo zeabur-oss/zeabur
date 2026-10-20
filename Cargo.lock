@@ -456,259 +456,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "zeabur"
-version = "0.0.1"
-dependencies = [
- "axum",
- "clap",
- "zeabur-api",
- "zeabur-auth",
- "zeabur-core",
- "zeabur-kube",
- "zeabur-plan",
- "zeabur-ui",
- "form_urlencoded",
- "http-body-util",
- "secrecy",
- "serde_json",
- "tokio",
- "tower",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "zeabur-adapters"
-version = "0.0.1"
-dependencies = [
- "zeabur-core",
- "k8s-openapi",
- "serde_json",
-]
-
-[[package]]
-name = "zeabur-api"
-version = "0.0.1"
-dependencies = [
- "axum",
- "zeabur-adapters",
- "zeabur-core",
- "zeabur-gaps",
- "zeabur-graph",
- "zeabur-kube",
- "zeabur-model",
- "zeabur-modules",
- "zeabur-plan",
- "zeabur-catalog",
- "zeabur-test-support",
- "zeabur-ui",
- "form_urlencoded",
- "futures-util",
- "http-body-util",
- "kube",
- "serde",
- "serde-saphyr",
- "serde_json",
- "tokio",
- "tokio-tungstenite",
- "tower",
- "utoipa",
- "utoipa-axum",
-]
-
-[[package]]
-name = "zeabur-auth"
-version = "0.0.1"
-dependencies = [
- "axum",
- "base64",
- "bytes",
- "zeabur-core",
- "form_urlencoded",
- "http",
- "http-body-util",
- "hyper",
- "hyper-rustls",
- "hyper-util",
- "rustls",
- "rustls-platform-verifier",
- "secrecy",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "zeabur-core"
-version = "0.0.1"
-dependencies = [
- "aws-lc-rs",
- "http",
- "serde",
- "serde_json",
- "thiserror",
- "utoipa",
-]
-
-[[package]]
-name = "zeabur-gaps"
-version = "0.0.1"
-dependencies = [
- "zeabur-core",
- "zeabur-graph",
- "zeabur-model",
- "zeabur-test-support",
- "k8s-openapi",
- "serde-saphyr",
- "serde_json",
-]
-
-[[package]]
-name = "zeabur-graph"
-version = "0.0.1"
-dependencies = [
- "zeabur-adapters",
- "zeabur-model",
- "zeabur-test-support",
- "k8s-openapi",
- "proptest",
- "serde",
- "serde-saphyr",
- "serde_json",
-]
-
-[[package]]
-name = "zeabur-kube"
-version = "0.0.1"
-dependencies = [
- "zeabur-core",
- "zeabur-kube",
- "zeabur-test-support",
- "futures-util",
- "http",
- "k8s-openapi",
- "kube",
- "secrecy",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "zeabur-mcp"
-version = "0.0.1"
-dependencies = [
- "zeabur-core",
- "zeabur-modules",
- "form_urlencoded",
- "rmcp",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "zeabur-model"
-version = "0.0.1"
-dependencies = [
- "zeabur-core",
- "serde",
- "utoipa",
-]
-
-[[package]]
-name = "zeabur-modules"
-version = "0.0.1"
-dependencies = [
- "zeabur-adapters",
- "zeabur-kube",
- "zeabur-model",
- "zeabur-test-support",
- "k8s-openapi",
- "schemars",
- "serde",
- "serde_json",
- "utoipa",
-]
-
-[[package]]
-name = "zeabur-plan"
-version = "0.0.1"
-dependencies = [
- "base64",
- "zeabur-adapters",
- "zeabur-core",
- "zeabur-graph",
- "zeabur-model",
- "zeabur-test-support",
- "k8s-openapi",
- "proptest",
- "serde",
- "serde-saphyr",
- "serde_json",
- "thiserror",
- "utoipa",
-]
-
-[[package]]
-name = "zeabur-catalog"
-version = "0.0.1"
-dependencies = [
- "zeabur-kube",
- "serde",
- "serde-saphyr",
- "serde_json",
- "thiserror",
- "utoipa",
-]
-
-[[package]]
-name = "zeabur-test-support"
-version = "0.0.1"
-dependencies = [
- "zeabur-core",
- "zeabur-kube",
- "kube",
- "serde",
- "serde-saphyr",
- "serde_json",
- "thiserror",
- "tokio",
-]
-
-[[package]]
-name = "zeabur-ui"
-version = "0.0.1"
-dependencies = [
- "axum",
- "zeabur-core",
- "tokio",
-]
-
-[[package]]
-name = "zeaburctl"
-version = "0.0.1"
-dependencies = [
- "axum",
- "clap",
- "zeabur-api",
- "zeabur-core",
- "zeabur-kube",
- "zeabur-mcp",
- "zeabur-test-support",
- "zeabur-ui",
- "kube",
- "rmcp",
- "serde",
- "serde-saphyr",
- "serde_json",
- "tokio",
- "tower",
-]
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2573,6 +2320,259 @@ name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
+
+[[package]]
+name = "zeabur"
+version = "0.0.1"
+dependencies = [
+ "axum",
+ "clap",
+ "form_urlencoded",
+ "http-body-util",
+ "secrecy",
+ "serde_json",
+ "tokio",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "zeabur-api",
+ "zeabur-auth",
+ "zeabur-core",
+ "zeabur-kube",
+ "zeabur-plan",
+ "zeabur-ui",
+]
+
+[[package]]
+name = "zeabur-adapters"
+version = "0.0.1"
+dependencies = [
+ "k8s-openapi",
+ "serde_json",
+ "zeabur-core",
+]
+
+[[package]]
+name = "zeabur-api"
+version = "0.0.1"
+dependencies = [
+ "axum",
+ "form_urlencoded",
+ "futures-util",
+ "http-body-util",
+ "kube",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
+ "tower",
+ "utoipa",
+ "utoipa-axum",
+ "zeabur-adapters",
+ "zeabur-catalog",
+ "zeabur-core",
+ "zeabur-gaps",
+ "zeabur-graph",
+ "zeabur-kube",
+ "zeabur-model",
+ "zeabur-modules",
+ "zeabur-plan",
+ "zeabur-test-support",
+ "zeabur-ui",
+]
+
+[[package]]
+name = "zeabur-auth"
+version = "0.0.1"
+dependencies = [
+ "axum",
+ "base64",
+ "bytes",
+ "form_urlencoded",
+ "http",
+ "http-body-util",
+ "hyper",
+ "hyper-rustls",
+ "hyper-util",
+ "rustls",
+ "rustls-platform-verifier",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "zeabur-core",
+]
+
+[[package]]
+name = "zeabur-catalog"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "thiserror",
+ "utoipa",
+ "zeabur-kube",
+]
+
+[[package]]
+name = "zeabur-core"
+version = "0.0.1"
+dependencies = [
+ "aws-lc-rs",
+ "http",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "utoipa",
+]
+
+[[package]]
+name = "zeabur-gaps"
+version = "0.0.1"
+dependencies = [
+ "k8s-openapi",
+ "serde-saphyr",
+ "serde_json",
+ "zeabur-core",
+ "zeabur-graph",
+ "zeabur-model",
+ "zeabur-test-support",
+]
+
+[[package]]
+name = "zeabur-graph"
+version = "0.0.1"
+dependencies = [
+ "k8s-openapi",
+ "proptest",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "zeabur-adapters",
+ "zeabur-model",
+ "zeabur-test-support",
+]
+
+[[package]]
+name = "zeabur-kube"
+version = "0.0.1"
+dependencies = [
+ "futures-util",
+ "http",
+ "k8s-openapi",
+ "kube",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "zeabur-core",
+ "zeabur-kube",
+ "zeabur-test-support",
+]
+
+[[package]]
+name = "zeabur-mcp"
+version = "0.0.1"
+dependencies = [
+ "form_urlencoded",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "zeabur-core",
+ "zeabur-modules",
+]
+
+[[package]]
+name = "zeabur-model"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "utoipa",
+ "zeabur-core",
+]
+
+[[package]]
+name = "zeabur-modules"
+version = "0.0.1"
+dependencies = [
+ "k8s-openapi",
+ "schemars",
+ "serde",
+ "serde_json",
+ "utoipa",
+ "zeabur-adapters",
+ "zeabur-kube",
+ "zeabur-model",
+ "zeabur-test-support",
+]
+
+[[package]]
+name = "zeabur-plan"
+version = "0.0.1"
+dependencies = [
+ "base64",
+ "k8s-openapi",
+ "proptest",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "thiserror",
+ "utoipa",
+ "zeabur-adapters",
+ "zeabur-core",
+ "zeabur-graph",
+ "zeabur-model",
+ "zeabur-test-support",
+]
+
+[[package]]
+name = "zeabur-test-support"
+version = "0.0.1"
+dependencies = [
+ "kube",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "zeabur-core",
+ "zeabur-kube",
+]
+
+[[package]]
+name = "zeabur-ui"
+version = "0.0.1"
+dependencies = [
+ "axum",
+ "tokio",
+ "zeabur-core",
+]
+
+[[package]]
+name = "zeaburctl"
+version = "0.0.1"
+dependencies = [
+ "axum",
+ "clap",
+ "kube",
+ "rmcp",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "tokio",
+ "tower",
+ "zeabur-api",
+ "zeabur-core",
+ "zeabur-kube",
+ "zeabur-mcp",
+ "zeabur-test-support",
+ "zeabur-ui",
+]
 
 [[package]]
 name = "zerocopy"
