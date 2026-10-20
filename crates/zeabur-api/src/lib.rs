@@ -7,7 +7,7 @@
 //! | Method and path | Returns |
 //! |---|---|
 //! | `GET /api/v1/whoami` | who the cluster says you are |
-//! | `GET /api/v1/session` | how you are signed in to zeabur: signing out, admin rights in use |
+//! | `GET /api/v1/session` | how you are signed in to Zeabur: signing out, admin rights in use |
 //! | `GET /api/v1/cluster` | the cluster: its Kubernetes version and distribution |
 //! | `GET /api/v1/cluster/upgrades` | end of life, version skew and newer versions from Plans |
 //! | `GET /api/v1/cluster/nodes` | nodes, with requests against allocatable |

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Fails if crates/zeabur-catalog/bundle differs from the recommendations catalogue at the commit
-# pinned in its PINNED file. Reads the catalogue from RECS_DIR (a local clone) when set, otherwise
+# Fails if crates/zeabur-catalog/bundle differs from Zeabur Catalog at the commit
+# pinned in its PINNED file. Reads it from RECS_DIR (a local clone) when set, otherwise
 # from GitHub.
 set -euo pipefail
 
@@ -17,11 +17,11 @@ if [[ -n "${RECS_DIR:-}" ]]; then
 else
   curl --fail --silent --show-error --location --proto '=https' \
     "https://codeload.github.com/zeabur/catalog/tar.gz/$commit" |
-    tar -xz -C "$tmp/upstream" --strip-components=1 "recommendations-$commit/capabilities" \
-      "recommendations-$commit/LICENSE"
+    tar -xz -C "$tmp/upstream" --strip-components=1 "catalog-$commit/capabilities" \
+      "catalog-$commit/LICENSE"
 fi
 if ! diff -r --exclude PINNED "$bundle" "$tmp/upstream" >&2; then
-  echo "error: crates/zeabur-catalog/bundle differs from recommendations $commit" >&2
+  echo "error: crates/zeabur-catalog/bundle differs from Zeabur Catalog $commit" >&2
   exit 1
 fi
-echo "crates/zeabur-catalog/bundle matches recommendations $commit"
+echo "crates/zeabur-catalog/bundle matches Zeabur Catalog $commit"

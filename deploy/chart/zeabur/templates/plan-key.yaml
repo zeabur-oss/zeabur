@@ -5,7 +5,7 @@
 {{- if and $existing (index ($existing.data | default dict) .Values.planKey.key) }}
 {{- $key = index $existing.data .Values.planKey.key }}
 {{- else }}
-{{- /* 32 random bytes, which is what zeabur reads (`--plan-key-file`); `randBytes` returns them
+{{- /* 32 random bytes, which is what Zeabur reads (`--plan-key-file`); `randBytes` returns them
        Base64-encoded, as `data` holds them. Helm's `lookup` sees nothing under `helm template`
        or a client-side dry run, so those print a fresh key each time; a real upgrade keeps it. */}}
 {{- $key = randBytes 32 }}

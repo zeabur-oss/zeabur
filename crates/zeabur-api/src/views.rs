@@ -280,7 +280,7 @@ pub struct RevealedSecret {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CapabilityList {
-    /// The recommendations catalogue's commit.
+    /// Zeabur Catalog's commit.
     pub catalogue_commit: String,
     /// Each capability, sorted by name: existing (with evidence) or not (with what to install).
     pub items: Vec<zeabur_catalog::Capability>,

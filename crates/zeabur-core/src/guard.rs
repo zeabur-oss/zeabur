@@ -9,7 +9,7 @@
 //!
 //! 1. **Fetch Metadata.** `Sec-Fetch-Site`, which browsers set and pages cannot, must be
 //!    `same-origin`; OWASP calls it the primary signal [owasp-csrf] ("Fetch Metadata headers").
-//!    `same-site` is refused too: a sibling host of the same site is not zeabur, and every port of
+//!    `same-site` is refused too: a sibling host of the same site is not Zeabur, and every port of
 //!    `127.0.0.1` is the same site.
 //! 2. **`Origin`, when Fetch Metadata is absent** (older browsers), must name one of the server's
 //!    origins exactly; OWASP makes this fallback mandatory, and a missing or `null` `Origin` is not
@@ -19,8 +19,8 @@
 //!    Custom Request Headers for AJAX/API"). This also covers a browser that sends neither header
 //!    above.
 //!
-//! **`Host` must name zeabur** on every request, safe ones included: a page that points a DNS
-//! name of its own at zeabur (DNS rebinding) reaches it with another `Host`, and is refused
+//! **`Host` must name Zeabur** on every request, safe ones included: a page that points a DNS
+//! name of its own at Zeabur (DNS rebinding) reaches it with another `Host`, and is refused
 //! [jackson2007] (§5.3). Health checks from the kubelet carry the pod's address as `Host`, so
 //! the in-cluster server mounts `/api/healthz` outside this guard.
 //!

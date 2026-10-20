@@ -15,7 +15,7 @@ pub mod versions;
 
 pub use installed::{ComponentUpgrade, InstallSource, Installation};
 
-/// The commit of the recommendations catalogue this build carries.
+/// The commit of Zeabur Catalog this build carries.
 pub const CATALOGUE_COMMIT: &str = "a0e1cb1d0f5e857459351133d7922cd057a2d19d";
 
 /// One component of the catalogue: an upstream project that provides a capability.

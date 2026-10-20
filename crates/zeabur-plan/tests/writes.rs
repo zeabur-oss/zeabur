@@ -52,7 +52,7 @@ mod tests {
         ("helm-controller", Tool::Flux),
     ];
 
-    /// Managers whose fields a person may change: zeabur, kubectl's verbs and controllers.
+    /// Managers whose fields a person may change: `zeabur`, kubectl's verbs and controllers.
     const OTHERS: [&str; 6] = [
         "zeabur",
         "kubectl",

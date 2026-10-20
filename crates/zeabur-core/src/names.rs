@@ -8,7 +8,7 @@ pub const DOMAIN: &str = "zeabur.com";
 pub const FIELD_MANAGER: &str = "zeabur";
 
 /// Label on a namespace that makes it an Zeabur project. Adopting a namespace adds only this
-/// label; removing it (or zeabur) leaves the namespace as it was.
+/// label; removing it (or Zeabur) leaves the namespace as it was.
 pub const LABEL_PROJECT: &str = "zeabur.com/project";
 
 /// Label on a workload that names its group within a project.

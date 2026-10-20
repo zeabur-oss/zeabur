@@ -30,7 +30,7 @@ spec:
     spec:
       serviceAccountName: {{ include "zeabur.fullname" . }}
       automountServiceAccountToken: false
-      # No Service environment variables: zeabur reads none, and they grow with the namespace.
+      # No Service environment variables: Zeabur reads none, and they grow with the namespace.
       enableServiceLinks: false
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

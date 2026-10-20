@@ -1,4 +1,4 @@
-//! Embeds the vendored recommendations catalogue (`bundle/capabilities/<capability>/<id>.yaml`)
+//! Embeds the vendored Zeabur Catalog (`bundle/capabilities/<capability>/<id>.yaml`)
 //! as a sorted table of `include_str!` entries, so the binary carries the catalogue it was built
 //! with and reads nothing at run time.
 

@@ -313,7 +313,7 @@ mod tests {
         );
         // A loser is told the object moved on (409, whether kube-apiserver answered 409 or a
         // failed JSON Patch test, 422). 429 is allowed too: kube-apiserver's API Priority and
-        // Fairness may turn some of 64 simultaneous requests from one person away, and zeabur
+        // Fairness may turn some of 64 simultaneous requests from one person away, and Zeabur
         // passes that answer on with its Retry-After rather than guessing an outcome.
         assert!(
             statuses.iter().all(|s| matches!(

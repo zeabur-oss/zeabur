@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# zeabur in a cluster, end to end: a k3d cluster whose kube-apiserver trusts Zeabur Identity, Zeabur Identity and
-# zeabur installed from their images (zeabur with its Helm chart), both behind the cluster's
+# Zeabur in a cluster, end to end: a k3d cluster whose kube-apiserver trusts Zeabur Identity, Zeabur Identity and
+# Zeabur installed from their images (Zeabur with its Helm chart), both behind the cluster's
 # Traefik over HTTPS, and a browser (web/e2e/l2) that enrols a passkey, signs in, confirms a
 # terminal with the passkey again, runs a command, then reads and changes with admin rights. Then,
-# from the outside: zeabur's service account can do nothing a fresh one cannot, the idle pod
+# from the outside: Zeabur's service account can do nothing a fresh one cannot, the idle pod
 # stays within its memory budget, and `helm uninstall` leaves the cluster as it was.
 #
 # Run inside `nix develop` on Linux with Docker; it uses this machine's port 443. It creates the
@@ -24,7 +24,7 @@ authn_volume="$cluster-authn"
 out="$root/target/e2e-l2"
 zeabur_identity_host=identity.localhost
 zeabur_host=zeabur.localhost
-namespace=zeabur             # zeabur's release
+namespace=zeabur             # Zeabur's release
 project=zeabur-e2e           # the project the browser opens (web/e2e/manifests/talker.yaml)
 zeabur_identity_image=docker.io/library/zeabur-identity:e2e-l2
 zeabur_image=docker.io/library/zeabur:e2e-l2
@@ -133,7 +133,7 @@ done
 retry 300 "Traefik to be installed" kubectl -n kube-system get deployment/traefik
 kubectl -n kube-system rollout status deployment/traefik --timeout=300s
 
-# Both host names resolve to Traefik inside the cluster too, so zeabur reaches Zeabur Identity at its
+# Both host names resolve to Traefik inside the cluster too, so Zeabur reaches Zeabur Identity at its
 # public URL. k3s's CoreDNS imports `*.override` from the `coredns-custom` ConfigMap into its
 # main server block (https://docs.k3s.io/networking/networking-services#coredns);
 # `answer auto` names the answer as asked (https://coredns.io/plugins/rewrite/).
@@ -215,7 +215,7 @@ docker exec -i "$node" sh -c 'cat >/etc/rancher/k3s/zeabur-identity/.authn.yaml.
 reloaded() { (($(reloads) > before)); }
 retry 180 "kube-apiserver to load Zeabur Identity's configuration" reloaded
 
-# zeabur's client: confidential, may ask for elevation, gets tokens kube-apiserver accepts.
+# Zeabur's client: confidential, may ask for elevation, gets tokens kube-apiserver accepts.
 "$zeabur_identityctl" client create zeabur --type confidential --allow-elevation --audience kubernetes \
   --redirect-uri "https://$zeabur_host/auth/callback" 2>"$out/client.err" | kubectl apply -f -
 client_secret=$(tail -n 1 "$out/client.err")
@@ -240,7 +240,7 @@ snapshot() {
 }
 snapshot >"$out/before.txt"
 
-# --- zeabur, from the chart ---------------------------------------------------------------------
+# --- Zeabur, from the chart ---------------------------------------------------------------------
 kubectl create namespace "$namespace"
 printf %s "$client_secret" |
   kubectl -n "$namespace" create secret generic zeabur-oidc --from-file=client-secret=/dev/stdin
@@ -273,7 +273,7 @@ restarted=$(kubectl -n "$project" get deployment/talker \
   -o jsonpath='{.spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt}')
 [[ -n "$restarted" ]] || { echo "error: deployment/talker was not restarted" >&2; exit 1; }
 
-# --- zeabur's own rights: none beyond what any service account has -----------------------------------
+# --- Zeabur's own rights: none beyond what any service account has -----------------------------------
 # kubectl adds no groups to --as; these are the ones a service account's token carries. A name
 # no object has stands for a fresh service account, to which only the cluster's defaults apply.
 groups=(--as-group=system:serviceaccounts "--as-group=system:serviceaccounts:$namespace"
@@ -282,13 +282,13 @@ as_zeabur=("--as=system:serviceaccount:$namespace:zeabur" "${groups[@]}")
 as_fresh=("--as=system:serviceaccount:$namespace:zeabur-e2e-fresh" "${groups[@]}")
 impersonate=$(kubectl auth can-i impersonate users "${as_zeabur[@]}" || true)
 if [[ "$impersonate" != no ]]; then
-  echo "error: zeabur's service account may impersonate users ($impersonate)" >&2
+  echo "error: Zeabur's service account may impersonate users ($impersonate)" >&2
   exit 1
 fi
 for scope in "$namespace" default "$project" kube-system; do
   if ! diff <(kubectl auth can-i --list -n "$scope" "${as_zeabur[@]}") \
     <(kubectl auth can-i --list -n "$scope" "${as_fresh[@]}"); then
-    echo "error: zeabur's service account has rights a fresh one lacks (namespace $scope)" >&2
+    echo "error: Zeabur's service account has rights a fresh one lacks (namespace $scope)" >&2
     exit 1
   fi
 done

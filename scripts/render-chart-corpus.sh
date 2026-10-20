@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Renders the chart corpus in fixtures/charts/ from the recommendations catalogue
+# Renders the chart corpus in fixtures/charts/ from Zeabur Catalog
 # (github.com/zeabur/catalog): every component's single-node profile, rendered by
 # the catalogue's own `recs render` (helm template with the release values, the profile, CI
 # test inputs and contributions; `urls` releases downloaded, `manifests` releases as written),
@@ -17,7 +17,7 @@
 # script fails if the two renders differ, so the corpus contains no random values.
 set -euo pipefail
 
-: "${RECS_DIR:?set RECS_DIR to the recommendations checkout}"
+: "${RECS_DIR:?set RECS_DIR to a Zeabur Catalog checkout}"
 : "${RECS_COMMIT:?set RECS_COMMIT to the pinned commit}"
 PROFILE=single-node
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -160,7 +160,7 @@ total=$(cat "$out_dir"/*.yaml | wc -c)
 
 Rendered Kubernetes manifests of real Helm charts, used to measure how much of real-world
 input the projection covers. One file per component of the
-[recommendations catalogue](https://github.com/zeabur/catalog), named
+[Zeabur Catalog](https://github.com/zeabur/catalog), named
 \`<capability>__<component>.yaml\`, each holding every release of the component in install
 order as one multi-document YAML stream.
 

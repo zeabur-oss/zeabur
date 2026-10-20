@@ -1,6 +1,6 @@
 # zeabur-catalog
 
-Reads the recommendations catalogue and tells, for each capability (ingress, certificates,
+Reads Zeabur Catalog and tells, for each capability (ingress, certificates,
 backups, …), whether the cluster already has it; for a missing one it lists what could be
 installed, and writes the install as a `helm` command, a Flux `HelmRelease`, an Argo CD
 `Application` or a k3s `HelmChart` (`tests/golden/` holds each form for a few components). It

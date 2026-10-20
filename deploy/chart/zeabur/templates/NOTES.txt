@@ -1,4 +1,4 @@
-zeabur is starting in {{ .Release.Namespace }}:
+Zeabur is starting in {{ .Release.Namespace }}:
 
   kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "zeabur.fullname" . }}
 

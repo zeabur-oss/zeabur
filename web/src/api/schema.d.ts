@@ -32,7 +32,7 @@ export interface paths {
       cookie?: never
     }
     /**
-     * Which capabilities the cluster has, by the recommendations catalogue, with the version of
+     * Which capabilities the cluster has, by Zeabur Catalog, with the version of
      *     each installed component.
      * @description Detection reads cluster-wide objects (CRDs, ingress classes, workloads in every namespace) as
      *     the person. If any of those reads is refused, the answer would show installed components as
@@ -579,7 +579,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** How you are signed in to zeabur: whether you can sign out, and admin rights in use. */
+    /** How you are signed in to Zeabur: whether you can sign out, and admin rights in use. */
     get: operations["getSession"]
     put?: never
     post?: never
@@ -758,7 +758,7 @@ export interface components {
     }
     /** @description Which capabilities the cluster has. */
     CapabilityList: {
-      /** @description The recommendations catalogue's commit. */
+      /** @description Zeabur Catalog's commit. */
       catalogueCommit: string
       /** @description Each capability, sorted by name: existing (with evidence) or not (with what to install). */
       items: components["schemas"]["Capability"][]

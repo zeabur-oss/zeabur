@@ -133,7 +133,7 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<Cluster>, ApiErr
     }))
 }
 
-/// Which capabilities the cluster has, by the recommendations catalogue, with the version of
+/// Which capabilities the cluster has, by Zeabur Catalog, with the version of
 /// each installed component.
 ///
 /// Detection reads cluster-wide objects (CRDs, ingress classes, workloads in every namespace) as

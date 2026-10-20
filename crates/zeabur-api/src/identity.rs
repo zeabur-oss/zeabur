@@ -81,7 +81,7 @@ where
     }
 }
 
-/// How you are signed in to zeabur: whether you can sign out, and admin rights in use.
+/// How you are signed in to Zeabur: whether you can sign out, and admin rights in use.
 #[utoipa::path(get, path = "/api/v1/session", tag = "identity", operation_id = "getSession",
     responses((status = 200, body = SessionView),
               (status = 401, body = Problem, content_type = PROBLEM)))]

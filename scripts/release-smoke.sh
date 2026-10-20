@@ -111,7 +111,7 @@ if [[ -n "$image" ]]; then
 fi
 
 # The chart as people install it: its default values but the required ones, which name hosts
-# that do not resolve. zeabur starts without its issuer and asks again at sign-in.
+# that do not resolve. Zeabur starts without its issuer and asks again at sign-in.
 kubectl create namespace "$namespace"
 kubectl -n "$namespace" create secret generic zeabur-oidc --from-literal=client-secret=release-smoke
 helm install zeabur "$chart" --namespace "$namespace" --wait --timeout 5m \

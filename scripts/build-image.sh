@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds zeabur's container image for this machine's architecture: a static musl binary in an
+# Builds Zeabur's container image for this machine's architecture: a static musl binary in an
 # otherwise empty image (Containerfile). Run on Linux inside `nix develop`; needs docker.
 #   scripts/build-image.sh zeabur:dev
 set -euo pipefail

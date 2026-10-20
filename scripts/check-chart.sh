@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks the Helm chart without a cluster: `helm lint`, then what the chart promises in every
-# rendering (no rights for zeabur itself, no service account token, one replica, a locked-down container),
-# and that values.schema.json refuses values that would install a broken zeabur.
+# rendering (no rights for Zeabur itself, no service account token, one replica, a locked-down container),
+# and that values.schema.json refuses values that would install a broken Zeabur.
 # Run inside `nix develop`.
 #   scripts/check-chart.sh
 set -euo pipefail
@@ -35,8 +35,8 @@ for values in "$chart"/ci/*-values.yaml; do
   helm lint --strict --quiet "$chart" -f "$values" >/dev/null || fail "$name: helm lint failed"
   out=$(render -f "$values")
 
-  # zeabur has no rights of its own: no ClusterRole, no binding to a ServiceAccount, and no token
-  # in the pod. The one Role the chart may render lets people read zeabur's settings: `get` on
+  # Zeabur has no rights of its own: no ClusterRole, no binding to a ServiceAccount, and no token
+  # in the pod. The one Role the chart may render lets people read Zeabur's settings: `get` on
   # the ConfigMap zeabur-settings, nothing else.
   expect "$name" "$out" '[select(.kind == "ClusterRole" or .kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "RoleBinding") | .subjects[] | select(.kind == "ServiceAccount")] | length' 0
@@ -63,10 +63,10 @@ for values in "$chart"/ci/*-values.yaml; do
     /api/healthz,/api/healthz
   # The secrets reach the process as files, never as environment values.
   expect "$name" "$out" "[$container | .env[] | select(.valueFrom.secretKeyRef)] | length" 0
-  # Every variable the chart sets is one zeabur reads (crates/zeabur/src/config.rs).
+  # Every variable the chart sets is one Zeabur reads (crates/zeabur/src/config.rs).
   for env in $(query "$out" "$container | .env[].name"); do
     grep -q "env = \"$env\"" "$root/crates/zeabur/src/config.rs" ||
-      fail "$name: zeabur does not read $env"
+      fail "$name: Zeabur does not read $env"
   done
   # ZEABUR_ELEVATION is parsed as a bool: exactly true or false.
   expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_ELEVATION\") | .value | test(\"^(true|false)$\")" true

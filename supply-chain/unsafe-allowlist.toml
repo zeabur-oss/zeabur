@@ -1099,5 +1099,5 @@ approved = "2026-10-16"
 [[crate]]
 name = "futures-executor"
 kind = "unsafe"
-reason = "Enabled by rmcp's default `futures` features (and unified with kube's futures). An UnparkMutex (unsafe Send/Sync and UnsafeCell access guarded by its atomic state) used by its thread pool and local executor; zeabur runs on tokio and calls neither"
+reason = "Enabled by rmcp's default `futures` features (and unified with kube's futures). An UnparkMutex (unsafe Send/Sync and UnsafeCell access guarded by its atomic state) used by its thread pool and local executor; Zeabur runs on tokio and calls neither"
 approved = "2026-10-16"

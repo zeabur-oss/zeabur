@@ -13,7 +13,7 @@
 //! - **Kind and name are two segments**, not `kind.name`: Kubernetes names are DNS subdomains and
 //!   may contain dots.
 //! - **The kind is part of the name** because a Deployment and a StatefulSet may share a name.
-//! - **`name` stays the Kubernetes name.** AIP-122 reserves `name` for the resource name; zeabur
+//! - **`name` stays the Kubernetes name.** AIP-122 reserves `name` for the resource name; Zeabur
 //!   keeps `name` as the Kubernetes field people know, and puts the path into `id`.
 //!
 //! Names are not escaped: every segment is a Kubernetes name (DNS label or subdomain), which

@@ -14,8 +14,8 @@
 //!   there is one), joining the workload's other edits so one object gets one write.
 //! - **A new object** (an Ingress or HTTPRoute for a new domain, a claim for a new volume) is
 //!   created whole with `POST`, which fails if an object of that name exists by then.
-//! - Both are sent with `fieldManager=zeabur` [k8s-field-manager], so `managedFields` names zeabur
-//!   as the one that changed those fields, after a dry run with `fieldValidation=Strict`.
+//! - Both are sent with `fieldManager=zeabur` [k8s-field-manager], so `managedFields` names
+//!   `zeabur` as the one that changed those fields, after a dry run with `fieldValidation=Strict`.
 //!   Server-side apply is not used: it can only remove a field the applier owns, and Ingress
 //!   `rules` and `HTTPRoute` `hostnames` are atomic lists, so applying one entry would take the
 //!   whole list from its owner.

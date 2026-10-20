@@ -2,7 +2,7 @@
 
 Rendered Kubernetes manifests of real Helm charts, used to measure how much of real-world
 input the projection covers. One file per component of the
-[recommendations catalogue](https://github.com/zeabur/catalog), named
+[Zeabur Catalog](https://github.com/zeabur/catalog), named
 `<capability>__<component>.yaml`, each holding every release of the component in install
 order as one multi-document YAML stream.
 

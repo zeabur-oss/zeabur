@@ -6,7 +6,7 @@
 //! `Status` reason [api-conventions], so the meaning is the cluster's, not Zeabur's guess.
 //!
 //! Problem types are relative URI references under `/problems/` [rfc9457] (§3.1.1): they
-//! identify the category and resolve against whatever origin serves zeabur, so no domain has to
+//! identify the category and resolve against whatever origin serves Zeabur, so no domain has to
 //! host them. Where Zeabur serves its web interface, each resolves to a page of it, the
 //! human-readable documentation the RFC asks a type URI to lead to.
 //!

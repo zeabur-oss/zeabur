@@ -234,7 +234,7 @@ fn selects(policy: &NetworkPolicy, labels: &BTreeMap<String, String>) -> bool {
         .is_some_and(|s| s.pod_selector.as_ref().is_none_or(|p| matches(p, labels)))
 }
 
-/// How far a rule's peers admit `pod`, evaluated in `namespace` (the policy's). A selector zeabur
+/// How far a rule's peers admit `pod`, evaluated in `namespace` (the policy's). A selector Zeabur
 /// cannot evaluate (unknown labels) gives [`Access::Limited`].
 fn peer_access(peers: Option<&Vec<NetworkPolicyPeer>>, namespace: &str, pod: &Pod<'_>) -> Access {
     let Some(peers) = peers.filter(|p| !p.is_empty()) else {

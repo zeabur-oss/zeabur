@@ -34,7 +34,7 @@ pub struct Finding {
 pub struct Module {
     /// Its id (`metrics-server`), the provider's own name.
     pub id: &'static str,
-    /// The capability it provides, as the recommendations catalogue names it (`metrics`).
+    /// The capability it provides, as Zeabur Catalog names it (`metrics`).
     pub capability: &'static str,
     /// The Kubernetes resources it reads.
     pub reads: &'static [Read],

@@ -16,7 +16,7 @@ use crate::error::ApiError;
 pub struct AppState {
     /// How each request reaches the cluster as its person.
     pub access: Arc<dyn ClusterAccess>,
-    /// The embedded recommendations catalogue.
+    /// The embedded Zeabur Catalog.
     pub catalogue: Arc<Vec<zeabur_catalog::Component>>,
     /// The key plan tokens are sealed with; `None` when none could be made.
     pub plan_key: Option<Arc<zeabur_plan::token::PlanKey>>,

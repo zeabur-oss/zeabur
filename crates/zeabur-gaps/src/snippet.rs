@@ -2,7 +2,7 @@
 //! it into their manifests (or into the object's YAML editor) and adjusts the values.
 //!
 //! Each snippet is the smallest fragment that fixes the gap, in the shape `kubectl apply` and a
-//! Helm chart's templates use, with a comment naming the object it belongs to. Values zeabur
+//! Helm chart's templates use, with a comment naming the object it belongs to. Values Zeabur
 //! cannot know (how much memory a container needs, which path answers health checks) are
 //! starting points marked as such.
 

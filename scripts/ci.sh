@@ -161,7 +161,7 @@ case "$job" in
     fi
     ./scripts/build-image.sh zeabur:ci
     ;;
-  # zeabur in a cluster with Zeabur Identity, from their images and zeabur's chart, through a browser:
+  # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
   # passkey sign-in, elevation, terminal, rights, memory, removal.
   kubernetes-l2) K3S_IMAGE="$k3s_image" ./scripts/e2e-l2.sh ;;
 esac
