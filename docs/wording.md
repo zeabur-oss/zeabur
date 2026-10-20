@@ -147,7 +147,7 @@ why. Add a row before introducing a new concept.
 | credential | 認證資訊 | 凭证 | zh-TW 憑證 is a certificate |
 | certificate | 憑證 | 证书 | |
 | token | 權杖 | 令牌 | |
-| passkey | 通行密鑰 | 通行密钥 | As Zeabur Identity's sign-in pages write it |
+| passkey | 通行密鑰 | 通行密钥 | Apple's name in the system dialog that asks for it (Google's zh-TW wording differs; not verified); chosen over the dashboard's Latin "Passkey" so the page and that dialog match |
 | sign in / sign out | 登入／登出 | 登录／退出登录 | |
 | deploy, roll out | 部署 | 部署 | |
 | releases (a service's revisions) | 發布紀錄 | 发布记录 | |
