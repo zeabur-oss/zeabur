@@ -431,7 +431,7 @@ function ExposeHint({ command }: { command?: string }) {
     <div className="mt-2 flex w-full flex-col gap-1.5">
       <span className="type-meta text-muted-foreground">{t("net.exposeHint")}</span>
       <span className="flex max-w-full min-w-0 items-center gap-1 self-start rounded-md bg-muted px-2 py-1">
-        <code className="truncate font-mono text-xs" translate="no">
+        <code className="min-w-0 font-mono text-xs break-all" translate="no">
           {command}
         </code>
         <CopyButton value={command} />
