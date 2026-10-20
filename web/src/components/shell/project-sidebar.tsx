@@ -308,13 +308,15 @@ function OtherObjects({ project, data }: { project: string; data: Project }) {
       icon={<StackIcon aria-hidden="true" />}
       label={t("column.other")}
       badge={
-        unused > 0 ? (
-          <StatusPill health="warn" size="sm" dot={false}>
-            {t("resource.unusedCount", unused)}
-          </StatusPill>
-        ) : (
-          <span className="type-nano text-tertiary">{data.resources.length}</span>
-        )
+        <span className="flex shrink-0 items-center gap-1.5 type-nano text-tertiary">
+          {data.resources.length}
+          {unused > 0 ? (
+            <span title={t("resource.unusedCount", unused)} className="flex">
+              <StatusDot health="warn" />
+              <span className="sr-only">{t("resource.unusedCount", unused)}</span>
+            </span>
+          ) : null}
+        </span>
       }
     >
       {data.resources.map((r) => (
