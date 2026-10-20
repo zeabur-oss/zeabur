@@ -172,13 +172,13 @@ test("the cluster page shows the cluster itself, and its components on their own
     nodes.getByRole("list", { name: "Nodes" }).getByRole("listitem").first(),
   ).toContainText(/Ready|Not ready|Cordoned|Pressure|Unknown/)
   await expect(nodes.getByRole("img", { name: /^CPU/ }).first()).toBeVisible()
-  await expect(page.getByRole("region", { name: "Warnings, last hour" })).toBeVisible()
+  await expect(page.getByRole("region", { name: "Warnings in the last hour" })).toBeVisible()
 
   await page.getByRole("tab", { name: "Components" }).click()
   await expect(page).toHaveURL(/\/cluster\/components$/)
   const installed = page.getByRole("region", { name: "Installed" })
   await expect(installed.getByRole("listitem").first()).toBeVisible()
-  await expect(page.getByRole("region", { name: "Catalogue" })).toBeVisible()
+  await expect(page.getByRole("region", { name: "Catalog" })).toBeVisible()
   await page.goBack()
   await expect(page).toHaveURL(/\/cluster$/)
 
