@@ -21,7 +21,7 @@
     "@codemirror/language": "6.13.1",
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.14",
-    "@zeabur/design-system": "github:zeabur/design-system#a18960c1d488d70dab7abcd75cae18329973025d",
+    "@zeabur/design-system": "github:zeabur/design-system#d5ef81dbd9de89250914722005e97887bcd9c615",
     "@lezer/highlight": "1.2.5",
     "@tanstack/react-form": "1.33.5",
     "@tanstack/react-query": "5.104.1",
