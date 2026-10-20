@@ -28,8 +28,9 @@ rereading; they do not decide it.
 6. **Limits where they bite.** Warn only before an uncommon or irreversible action, and state the
    real consequence. Whether deleting a PVC deletes data depends on its reclaim policy; say what
    is known.
-7. **Empty states give the next step**, with a button or link where one exists. Nothing the
-   reader needs may live only in text that disappears once the list fills.
+7. **Empty states say what would appear and how to get it**, with a button or link where one
+   exists; never a bare "None." (see "Empty states"). Nothing the reader needs may live only in
+   text that disappears once the list fills.
 8. **A setting's label says what "on" does.** Link to a setting rather than describe where it is.
 9. **Ordinary words.** Reread *just, simply, easy, please, in order to, desired, via, leverage,
    allows you to*, and needless *there is* / *you can*; keep one only when it carries meaning.
@@ -46,6 +47,41 @@ Reread inflated words (*delve, underscore, showcase, highlight, crucial, compreh
 seamless, pivotal, notably, additionally*), participle tails (", ensuring…"), *serves as* for
 *is*, and nominalisations ("performs validation of" → "validates") [R3][R5]. These are review
 flags, not bans.
+
+### Empty states
+
+An empty state is temporary, and the reader meets it before they know the feature; it is the
+place to say what the feature is for and how to start [A1][N1].
+
+- **One empty state per view, not one per category.** A section with nothing in it is hidden
+  when another section on the page has content; when the whole view is empty, one empty state
+  replaces all of its sections. No titled card whose body is "None." / 「沒有。」.
+- **Title: what is missing, in the reader's words**: "No environment variables yet",
+  「api 還沒有公開網域」. Description, when it adds something: one sentence on why one would
+  want it or why there is none. Action: the verb that fixes it ("Add variable").
+- **Say when nothing is needed.** A worker that only makes outgoing connections needs no
+  address; a scheduled job receives no traffic. Say so instead of offering an action that does
+  not apply.
+- **A result is not an empty state.** "No warnings in the last hour." reports a check that
+  passed; keep it as a line of text, without an illustration.
+- Use the design system's `Empty` (`size="inline"` inside a section, the default size for a whole
+  page) so every empty state has the same shape.
+
+### Section titles and terms
+
+- **A section title names its content** as the reader would ask for it ("Public domains",
+  "Private network"), not its position or source in Zeabur ("Set here", "From other objects")
+  and not a bare adjective (「公開」). Titles read as an outline of the page [F1].
+- **One always-visible sentence under a title** says what the section holds when the term is new
+  to a beginner. It stays when the section fills, so it is not lost with the empty state [A1].
+- **Plain term first, Kubernetes term second.** The plain term is the label; the exact kind or
+  field follows as muted code (the design system's `Term` and `TermDetail`), in a tooltip, or
+  behind a "Kubernetes details" disclosure: 「私有網路 `Service`」. Do not invent a middle word
+  that is neither (「內部位址」); a professional searches for the kind, a beginner for the plain
+  word [M2][N2][U1]. A tooltip never holds the only copy of something the reader must act on [N3].
+- **Explain a term in one short sentence where the reader first meets it**, then use it bare.
+- **Show the real value** (`api.shop.svc.cluster.local:8080`, with copy) rather than describe
+  it; when there is none, say how to get one.
 
 ## Chinese
 
@@ -83,7 +119,8 @@ Source text, not a CSS transform. Product, API and code names keep their exact c
 | Buttons and menu items | Sentence case, the action or destination, no period: `Delete service`, `Open logs` | The action, no final punctuation, no 請 |
 | Dialog and alert titles, section headings | Sentence case, the situation or the object, no period: `Restart api`, `Needs attention` | Same; ？ only for a real question |
 | Body, helper text, error details, tooltips | Full sentences end with a period | Full sentences end with 。 |
-| Empty states and one-line notes | A sentence, ending with a period: `No volumes.` | Ends with 。 |
+| Empty state titles | Sentence case, no period: `No volumes yet` | No final 。 |
+| One-line notes, empty state descriptions | A sentence, ending with a period | Ends with 。 |
 | Inline fragments (a word that continues a value or another string: `250Mi requested`, `, required`) | Lower case, no period | No punctuation |
 | Progress | `Saving…` (one … character) | 「正在儲存…」／「正在保存…」 |
 | Placeholders | An example value, not an instruction: `app.example.com` | Same |
@@ -162,12 +199,19 @@ why. Add a row before introducing a new concept.
 | read-only | 唯讀 | 只读 | |
 | view (compact action) | 檢視 | 查看 | |
 | jobs (Jobs and CronJobs together) | 批次工作 | 批处理任务 | One-off Jobs are not scheduled |
-| scheduled job | 排程工作 | 定时任务 | | A CronJob |
+| scheduled job | 排程工作 | 定时任务 | A CronJob |
 | background job | 背景工作 | 后台任务 | |
 | health check | 健康檢查 | 健康检查 | |
 | traffic check (readiness) | 就緒檢查 | 就绪检查 | |
 | restart check (liveness) | 存活檢查 | 存活检查 | |
 | light / dark theme | 淺色／深色 | 亮色／暗色 | |
+| public domain | 公開網域 | 公开域名 | An Ingress or HTTPRoute host; the dashboard's 公有網路 names the network, not the address |
+| private network | 私有網路 | 私有网络 | Reaching a service from inside the cluster through its `Service`; the dashboard says 內網 |
+| private address | 私有位址 | 私有地址 | A `Service` DNS name and port; never 內部位址 |
+| private service (reachable only inside the cluster) | 私有服務 | 私有服务 | Replaces "internal" (內部) as a role |
+| connection rules | 連線規則 | 连接规则 | `NetworkPolicy`; 政策 stays for policies in general |
+| sends to (a route's backend) | 轉送到 | 转发到 | |
+| storage class | 儲存類別 | 存储类 | `StorageClass` |
 
 ## Examples
 
@@ -194,9 +238,15 @@ same facts, limits and conditions. `bun run typecheck`, `bun run test` and
 
 - [A1] Apple, "Writing," *Human Interface Guidelines*. https://developer.apple.com/design/human-interface-guidelines/writing
 - [A6] K. Coon and J. Bush, "Writing for interfaces," WWDC22, session 10037. https://developer.apple.com/videos/play/wwdc2022/10037/
+- [F1] Microsoft, "Content design," *Fluent 2 Design System*. https://fluent2.microsoft.design/content-design
 - [G2] Google, "Highlights," *Google developer documentation style guide*. https://developers.google.com/style/highlights
 - [M1] Microsoft, "Top 10 tips for Microsoft style and voice." https://learn.microsoft.com/en-us/style-guide/top-10-tips-style-voice
+- [M2] Microsoft, "Use technical terms carefully," *Microsoft Writing Style Guide*. https://learn.microsoft.com/en-us/style-guide/word-choice/use-technical-terms-carefully
 - [M4] Microsoft, *Chinese (Traditional) Localization Style Guide*, 2024. https://download.microsoft.com/download/2/9/3/293e6d41-ba40-451b-a41e-94bdb6242ae3/zho-twn-StyleGuide.pdf
 - [M5] Microsoft, *Chinese (Simplified) Localization Style Guide*, 2024. https://download.microsoft.com/download/1/5/9/159cb91c-b61b-4385-97ca-80ccc7ff1fa0/zho-chn-StyleGuide.pdf
+- [N1] "Designing Empty States in Complex Applications," Nielsen Norman Group. https://www.nngroup.com/articles/empty-state-interface-design/
+- [N2] "Plain Language Is for Everyone, Even Experts," Nielsen Norman Group. https://www.nngroup.com/articles/plain-language-experts/
+- [N3] "Tooltip Guidelines," Nielsen Norman Group. https://www.nngroup.com/articles/tooltip-guidelines/
 - [R3] A. Reinhart et al., "Do LLMs write like humans?," *PNAS* 122(8), 2025. https://pmc.ncbi.nlm.nih.gov/articles/PMC11874169/
 - [R5] WikiProject AI Cleanup, "Wikipedia:Signs of AI writing." https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing
+- [U1] GOV.UK, "Clear language," *Writing to GOV.UK standards*. https://guidance.publishing.service.gov.uk/writing-to-gov-uk-standards/writing-guidelines/clear-language/
