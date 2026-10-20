@@ -184,7 +184,7 @@ export function PaletteBody() {
       items.push({
         id: `action:locale:${value}`,
         group: g.actions,
-        label: `${t("settings.language")}: ${localeNames[value]}`,
+        label: `${t("settings.language")}${t("common.colon")}${localeNames[value]}`,
         icon: TranslateIcon,
         run: () => setLocale(value),
       })

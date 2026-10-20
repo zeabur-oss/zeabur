@@ -90,6 +90,8 @@ export const en = {
   "theme.dark": "Dark",
 
   // Common
+  // Between a label and what follows it ("What to do: …")
+  "common.colon": ": ",
   "common.loading": "Loading…",
   "common.retry": "Try again",
   "common.all": "All",
@@ -103,7 +105,7 @@ export const en = {
   "common.list": (items: string[]) => new Intl.ListFormat("en").format(items),
   "common.domains": "Domains",
   "common.newTab": "(opens in a new tab)",
-  "common.notFound": "This page does not exist.",
+  "common.notFound": "This page doesn't exist",
   "common.backToProjects": "Back to projects",
   "common.managedBy": (tool: string) => `Managed by ${tool}`,
   "common.managedByDetail": (tool: string) =>
@@ -364,7 +366,7 @@ export const en = {
 
   // Overview
   "attention.title": "Needs attention",
-  "attention.none": "All services healthy",
+  "attention.none": "All services are healthy.",
   "attention.ready": (ready: number, desired: number) => `${ready}/${desired} ready`,
   "attention.logsOf": (pod: string) => `Logs of ${pod}`,
   "attention.eventsOf": (pod: string) => `Events of ${pod}`,
@@ -422,7 +424,7 @@ export const en = {
   "edge.env": (variable: string) => variable,
   "canvas.zoomIn": "Zoom in",
   "canvas.zoomOut": "Zoom out",
-  "canvas.fit": "Fit",
+  "canvas.fit": "Fit to screen",
   "canvas.legend": "About the lines",
   "canvas.legendHint":
     "Drawn from Kubernetes objects and variable values, not from traffic. Declared: an Ingress or a shared Secret or ConfigMap. Inferred: a variable's value names the Service.",
@@ -566,7 +568,7 @@ export const en = {
 
   // Palette
   "palette.title": "Command palette",
-  "palette.search": "Jump to a project, service, replica or domain",
+  "palette.search": "Jump to a project, service, replica, or domain",
   "palette.recent": "Recent",
   "palette.actions": "Actions",
   "palette.openLogs": (name: string) => `Open logs of ${name}`,

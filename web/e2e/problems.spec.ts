@@ -228,5 +228,5 @@ test("each problem type has a page that explains its rule", async ({ page }) => 
     "https://kubernetes.io/docs/concepts/policy/resource-quotas/",
   )
   await page.goto("/problems/no-such-kind")
-  await expect(page.getByText("This page does not exist.")).toBeVisible()
+  await expect(page.getByText("This page doesn't exist")).toBeVisible()
 })

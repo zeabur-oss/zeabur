@@ -161,7 +161,8 @@ why. Add a row before introducing a new concept.
 | remove from Zeabur | 移除 | 移除 | |
 | read-only | 唯讀 | 只读 | |
 | view (compact action) | 檢視 | 查看 | |
-| scheduled job | 排程工作 | 定时任务 | |
+| jobs (Jobs and CronJobs together) | 批次工作 | 批处理任务 | One-off Jobs are not scheduled |
+| scheduled job | 排程工作 | 定时任务 | | A CronJob |
 | background job | 背景工作 | 后台任务 | |
 | health check | 健康檢查 | 健康检查 | |
 | traffic check (readiness) | 就緒檢查 | 就绪检查 | |
