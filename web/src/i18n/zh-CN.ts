@@ -272,6 +272,7 @@ export const zhCN: Messages = {
   "cluster.used": (used) => `已使用 ${used}`,
   "cluster.limits": (limits) => `上限 ${limits}`,
   "cluster.podsOf": (placed, room) => `${placed}/${room} 个 Pod`,
+  "cluster.pods": "Pod",
   "cluster.notReady": "未就绪",
   "cluster.cordoned": "已停止调度",
   "cluster.worker": "worker",

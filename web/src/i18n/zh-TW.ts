@@ -272,6 +272,7 @@ export const zhTW: Messages = {
   "cluster.used": (used) => `已使用 ${used}`,
   "cluster.limits": (limits) => `上限 ${limits}`,
   "cluster.podsOf": (placed, room) => `${placed}/${room} 個 Pod`,
+  "cluster.pods": "Pod",
   "cluster.notReady": "未就緒",
   "cluster.cordoned": "已停止排程",
   "cluster.worker": "worker",

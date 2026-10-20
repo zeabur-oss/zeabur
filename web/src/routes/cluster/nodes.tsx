@@ -155,7 +155,7 @@ export function NodesSection() {
               format={memory}
             />
             <Total
-              title={t("pod.pods")}
+              title={t("cluster.pods")}
               allocatable={data.totals.allocatable.pods ?? 0}
               requests={data.totals.requests?.pods ?? undefined}
               format={plain}

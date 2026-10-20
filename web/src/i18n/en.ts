@@ -305,6 +305,7 @@ export const en = {
   "cluster.used": (used: string) => `${used} used`,
   "cluster.limits": (limits: string) => `${limits} maximum`,
   "cluster.podsOf": (placed: string, room: string) => `${placed} of ${room} pods`,
+  "cluster.pods": "Pods",
   "cluster.notReady": "Not ready",
   "cluster.cordoned": "Cordoned",
   "cluster.worker": "worker",
