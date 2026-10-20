@@ -6,8 +6,8 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-# The brackets keep this line from matching itself.
-if git grep -n -I -i -E '[e]ngawa|[g]enkan'; then
+# The brackets keep these lines from matching themselves. `gk` was the old resource short-name prefix.
+if git grep -n -I -i -E '[e]ngawa|[g]enkan' || git grep -n -I -w -E '[g]k(user|cred|grant|invite|client)s?'; then
   echo "error: the project is Zeabur; rename the lines above" >&2
   exit 1
 fi
