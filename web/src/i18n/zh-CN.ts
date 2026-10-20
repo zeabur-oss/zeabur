@@ -389,7 +389,7 @@ export const zhCN: Messages = {
   "canvas.fit": "适应画面",
   "canvas.legend": "连线说明",
   "canvas.legendHint":
-    "根据 Kubernetes 对象和变量值绘制，不是根据实际流量。声明：Ingress，或共用的 Secret、ConfigMap。推断：变量值提到了该 Service。",
+    "根据 Kubernetes 对象和环境变量值绘制，不是根据实际流量。声明：Ingress，或共用的 Secret、ConfigMap。推断：环境变量值提到了该 Service。",
   "architecture.edges": (n) => `${n} 条连线`,
   "quickLook.label": (name) => `快速查看：${name}`,
   "quickLook.open": "打开服务页面",
@@ -499,7 +499,7 @@ export const zhCN: Messages = {
   "vars.none": "无。",
 
   "net.path": "路径",
-  "net.via": "经由",
+  "net.via": "路由",
   "net.target": "目标",
   "net.dns": "DNS 名称",
   "net.ports": "端口",
@@ -577,7 +577,7 @@ export const zhCN: Messages = {
   "cap.vulnerability-scanning": "漏洞扫描",
   // 对象与 YAML
   "project.entry.objects": "对象",
-  // 项目的命名空间：纳入、移出、详细信息
+  // 项目的 Namespace：纳入、移出、详细信息
   "project.entry.settings": "设置",
   "action.adopt": "纳入",
   "action.unadopt": "不再显示为项目",
@@ -767,7 +767,7 @@ export const zhCN: Messages = {
   "confirm.isolates": (name) => `${name} 之后只收发这条和其他策略允许的流量，其余流量集群会拦截。`,
   "confirm.delete": (name: string) => `删除 ${name}。删除后无法恢复。`,
   "action.restart": "重启",
-  "action.saveVariables": "保存变量",
+  "action.saveVariables": "保存环境变量",
   "action.saveValues": "保存值",
   "action.saveAndRestart": "保存并重启",
   "action.addDomain": "添加域名",
@@ -875,7 +875,7 @@ export const zhCN: Messages = {
   "edit.edit": (name: string) => `编辑 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
   "edit.undo": (name: string) => `保留 ${name}`,
-  "vars.add": "添加变量",
+  "vars.add": "添加环境变量",
   "vars.name": "名称",
   "vars.value": "值",
   "vars.container": "容器",
@@ -913,7 +913,7 @@ export const zhCN: Messages = {
   "fix.isolateProject": (project: string) => `隔离 ${project} 的服务`,
   "gap.unreadable": "部分检查需要你没有的权限。",
   "install.title": "安装",
-  "install.note": "Zeabur 不会执行这些内容。自己执行，或提交到 GitOps 仓库。",
+  "install.note": "Zeabur 不会运行这些内容。自己运行，或提交到 GitOps 仓库。",
   "install.profile": "安装方式",
   "install.singleNode": "单节点",
   "install.multiNode": "多节点",
@@ -976,7 +976,7 @@ export const zhCN: Messages = {
   "backups.veleroVolumesNeedSnapshots": "卷数据需配合快照",
   "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有备份计划`,
 
-  // 使用量与历史（request 称“预留量”，limit 称“上限”；Kubernetes 原文写在说明里）
+  // 用量与历史（request 称“预留量”，limit 称“上限”；Kubernetes 原文写在说明里）
   "usage.title": "当前用量",
   "usage.history": "历史",
   "usage.live": "实时",
@@ -1333,10 +1333,10 @@ export const zhCN: Messages = {
     `没有任何 Gateway 接受 HTTPRoute ${p.route}${p.reason ? `（${p.reason}）` : ""}，所以它收不到任何流量。`,
   "sentence.gap.blockedConnection": (p) =>
     p.at === "egress"
-      ? `${p.from} 的变量指向 ${p.to}，但 ${p.from} 的 NetworkPolicy 不允许连出。`
+      ? `${p.from} 的环境变量指向 ${p.to}，但 ${p.from} 的 NetworkPolicy 不允许连出。`
       : p.at === "both"
-        ? `${p.from} 的变量指向 ${p.to}，但两端的 NetworkPolicy 都拦截了这条连接。`
-        : `${p.from} 的变量指向 ${p.to}，但 ${p.to} 的 NetworkPolicy 不允许 ${p.from} 连入。`,
+        ? `${p.from} 的环境变量指向 ${p.to}，但两端的 NetworkPolicy 都拦截了这条连接。`
+        : `${p.from} 的环境变量指向 ${p.to}，但 ${p.to} 的 NetworkPolicy 不允许 ${p.from} 连入。`,
   "sentence.gap.noNetworkPolicy": (p) => {
     const blocked = cuts(
       p,

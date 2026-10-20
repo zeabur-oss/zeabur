@@ -546,7 +546,7 @@ export const en = {
 
   // Networking
   "net.path": "Path",
-  "net.via": "Via",
+  "net.via": "Route",
   "net.target": "Target",
   "net.dns": "DNS name",
   "net.ports": "Ports",

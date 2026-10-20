@@ -389,7 +389,7 @@ export const zhTW: Messages = {
   "canvas.fit": "符合畫面大小",
   "canvas.legend": "連線說明",
   "canvas.legendHint":
-    "根據 Kubernetes 物件和變數值畫出，不是根據實際流量。宣告：Ingress，或共用的 Secret、ConfigMap。推測：變數值提到了這個 Service。",
+    "根據 Kubernetes 物件和環境變數值畫出，不是根據實際流量。宣告：Ingress，或共用的 Secret、ConfigMap。推測：環境變數值提到了這個 Service。",
   "architecture.edges": (n) => `${n} 條連線`,
   "quickLook.label": (name) => `快速檢視：${name}`,
   "quickLook.open": "開啟服務頁面",
@@ -500,7 +500,7 @@ export const zhTW: Messages = {
   "vars.none": "沒有。",
 
   "net.path": "路徑",
-  "net.via": "經由",
+  "net.via": "路由",
   "net.target": "目標",
   "net.dns": "DNS 名稱",
   "net.ports": "連接埠",
@@ -578,7 +578,7 @@ export const zhTW: Messages = {
   "cap.vulnerability-scanning": "弱點掃描",
   // 物件與 YAML
   "project.entry.objects": "物件",
-  // 專案的命名空間：納入、移出、詳細資料
+  // 專案的 Namespace：納入、移出、詳細資料
   "project.entry.settings": "設定",
   "action.adopt": "納入",
   "action.unadopt": "不再顯示為專案",
@@ -768,7 +768,7 @@ export const zhTW: Messages = {
   "confirm.isolates": (name) => `${name} 之後只收發這條和其他政策允許的流量，其餘流量叢集會擋下。`,
   "confirm.delete": (name: string) => `刪除 ${name}。刪除後無法復原。`,
   "action.restart": "重新啟動",
-  "action.saveVariables": "儲存變數",
+  "action.saveVariables": "儲存環境變數",
   "action.saveValues": "儲存值",
   "action.saveAndRestart": "儲存並重新啟動",
   "action.addDomain": "新增網域",
@@ -876,7 +876,7 @@ export const zhTW: Messages = {
   "edit.edit": (name: string) => `編輯 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
   "edit.undo": (name: string) => `保留 ${name}`,
-  "vars.add": "新增變數",
+  "vars.add": "新增環境變數",
   "vars.name": "名稱",
   "vars.value": "值",
   "vars.container": "容器",
@@ -977,7 +977,7 @@ export const zhTW: Messages = {
   "backups.veleroVolumesNeedSnapshots": "磁碟區資料需搭配快照",
   "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有排程`,
 
-  // 使用量與歷史（request 稱「保留量」，limit 稱「上限」；Kubernetes 原文寫在說明裡）
+  // 用量與歷史（request 稱「保留量」，limit 稱「上限」；Kubernetes 原文寫在說明裡）
   "usage.title": "目前用量",
   "usage.history": "歷史紀錄",
   "usage.live": "即時",
@@ -1337,10 +1337,10 @@ export const zhTW: Messages = {
     `沒有任何 Gateway 接受 HTTPRoute ${p.route}${p.reason ? `（${p.reason}）` : ""}，所以它收不到任何流量。`,
   "sentence.gap.blockedConnection": (p) =>
     p.at === "egress"
-      ? `${p.from} 的變數指向 ${p.to}，但 ${p.from} 的 NetworkPolicy 不允許連出。`
+      ? `${p.from} 的環境變數指向 ${p.to}，但 ${p.from} 的 NetworkPolicy 不允許連出。`
       : p.at === "both"
-        ? `${p.from} 的變數指向 ${p.to}，但兩端的 NetworkPolicy 都封鎖了這條連線。`
-        : `${p.from} 的變數指向 ${p.to}，但 ${p.to} 的 NetworkPolicy 不允許 ${p.from} 連入。`,
+        ? `${p.from} 的環境變數指向 ${p.to}，但兩端的 NetworkPolicy 都封鎖了這條連線。`
+        : `${p.from} 的環境變數指向 ${p.to}，但 ${p.to} 的 NetworkPolicy 不允許 ${p.from} 連入。`,
   "sentence.gap.noNetworkPolicy": (p) => {
     const blocked = cuts(
       p,
