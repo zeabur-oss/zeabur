@@ -205,6 +205,10 @@ why. Add a row before introducing a new concept.
 | traffic check (readiness) | 就緒檢查 | 就绪检查 | |
 | restart check (liveness) | 存活檢查 | 存活检查 | |
 | light / dark theme | 淺色／深色 | 亮色／暗色 | |
+| Status / Changes / Configure / Inspect (a service's sections) | 狀態／變更／設定／檢查 | 状态／变更／配置／检查 | Inspect holds logs, terminal, metrics, objects and YAML |
+| suggestion (a gap to close) | 建議 | 建议 | |
+| in the app / in its settings / in the cluster (where a problem comes from) | 應用程式本身／服務設定／叢集 | 应用本身／服务配置／集群 | A label beside the problem, never a verdict on its own |
+| you can fix this / needs a cluster admin (who can fix it) | 你可以修正／需要叢集管理員 | 你可以修复／需要集群管理员 | |
 | public domain | 公開網域 | 公开域名 | An Ingress or HTTPRoute host; the dashboard's 公有網路 names the network, not the address |
 | private network | 私有網路 | 私有网络 | Reaching a service from inside the cluster through its `Service`; the dashboard says 內網 |
 | private address | 私有位址 | 私有地址 | A `Service` DNS name and port; never 內部位址 |

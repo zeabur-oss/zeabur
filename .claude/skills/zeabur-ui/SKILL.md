@@ -31,9 +31,14 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   its own name, `~icons/ph/warning-fill`), built at build time from `@iconify-json/ph` by
   unplugin-icons (its JSX compiler, through svgr); decorative ones with `aria-hidden`.
 - **Design.** The frame is the design system's (`AppFrame`, `FrameSidebar`, `Sidebar` with
-  `SidebarPicker`, `SidebarSearch`, `SidebarMenu`, `SidebarCopyPill`), with no top bar; inside a
-  project its own sidebar (`components/shell/project-sidebar.tsx`) replaces the global one. A
-  service page is a header and the segmented `Tabs` in `max-w-content`; projects are cards
+  `SidebarSearch`, `SidebarMenu`, `SidebarCopyPill`, and `ContextChip` at the foot for the
+  cluster, the person and admin rights), with no top bar; inside a project its own sidebar
+  (`components/shell/project-sidebar.tsx`) replaces the global one. Home is "What needs you"
+  (incidents, then problems by origin, each with cause, fixer and fix). A project is one page:
+  Needs attention, then its map or list (`?view`) with Activity, gaps behind "N suggestions". A
+  service page is a header and four segmented `Tabs` (Status, Changes, Configure, Inspect) in
+  `max-w-content`; Configure is one page with a `SectionNav` whose edits collect in a `DraftBar`;
+  an old `?tab=` must keep redirecting (`routes/search.ts`). Projects are cards
   (`components/project-card.tsx`); settings are `SectionLabel` over `Card variant="list"` of
   `CardRow`s. No underline tabs, no "More" menu. Tokens, layout, shell and banned styles are in
   `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including focus rings).

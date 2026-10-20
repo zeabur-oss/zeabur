@@ -17,15 +17,15 @@ than you have, and keeps no state of its own: no database, no custom resources.
 > on few clusters. Do not point it at a cluster you cannot afford to break.
 
 <p align="center">
-  <img src="docs/images/home.png" alt="Home: what needs attention across all projects, and each project's health as Zeabur's project cards" width="900">
+  <img src="docs/images/home.png" alt="Home: what needs you across all projects, grouped by where each problem comes from, then each project's health" width="900">
 </p>
 
 | | |
 | --- | --- |
-| ![A project's architecture: domains, services and data, with what each depends on](docs/images/architecture.png) | ![A service that keeps crashing, explained in plain words with what to do](docs/images/crash-loop.png) |
-| **Architecture** of a project, from the objects it has. | **Diagnoses** in plain words, with the fix and the evidence. |
-| ![The confirmation before a restart, in one plain sentence](docs/images/plan.png) | |
-| **Every change is a plan** you confirm; the details are one click away. | |
+| ![A project on one page: what needs attention, the map of its domains, services and data, and its recent activity](docs/images/architecture.png) | ![A service that keeps crashing: its Status says why in plain words, where the problem comes from and what to do](docs/images/crash-loop.png) |
+| **One page per project**: a map or a list, with what needs attention and what happened. | **Diagnoses** in plain words, with the fix and the evidence. |
+| ![The confirmation before a restart: what restarts, whether it fits the cluster, in plain sentences](docs/images/plan.png) | |
+| **Every change is a plan** you confirm: what restarts, whether it fits, what data it removes. | |
 
 <sub>Screenshots of the built-in demo data (`cargo run -p zeabur-api --example demo`).</sub>
 
