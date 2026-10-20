@@ -1357,4 +1357,9 @@ export const zhTW: Messages = {
   },
   "sentence.gap.volumeWithoutBackup": (p) => `磁碟區 ${p.claim} 沒有備份排程。`,
   "sentence.gap.databaseWithoutBackup": (p) => `資料庫 ${p.database} 沒有備份排程。`,
+  "sentence.page.noAnswer": () => "Zeabur 沒有回應。",
+  "sentence.page.status": (p) => `請求失敗，HTTP 狀態碼 ${p.status}。`,
+  "sentence.page.reload": () => "確認 Zeabur 仍在執行，再重新整理頁面。",
+  "sentence.page.followFailed": () => "無法持續追蹤日誌。",
+  "sentence.page.followOff": () => "關閉「持續追蹤」，快照會顯示叢集的回應。",
 }

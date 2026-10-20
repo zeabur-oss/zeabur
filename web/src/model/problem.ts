@@ -70,13 +70,16 @@ export function isKind(kind: string): kind is Kind {
 
 export function problemText(t: Translate, locale: Locale, problem: Problem): ProblemText {
   const kind = problem.kind
-  // A problem made in this page (no answer, a proxy's error) or a kind newer than this page.
+  // A problem made in this page (no answer, a proxy's error), written from its keys, or a kind
+  // newer than this page, shown as it came.
   if (!isKind(kind) || !problem.type.startsWith("/problems/"))
     return {
-      headline: problem.title,
+      headline:
+        (problem.type === "about:blank" ? writeSentence(t, problem.summary) : undefined) ??
+        problem.title,
       why: problem.detail,
       whyInEnglish: locale !== "en",
-      fix: problem.fix,
+      fix: (problem.fixKey ? writeSentence(t, problem.fixKey) : undefined) ?? problem.fix,
       folded: [],
     }
   const headline =

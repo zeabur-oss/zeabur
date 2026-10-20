@@ -62,8 +62,10 @@ export function useLogStream(url: string): LogStream {
       } else if (!opened) {
         // A refused request carries no body EventSource can read; the snapshot shows the answer.
         problem = {
-          ...localProblem(0, "The log could not be followed."),
-          fix: "Turn Follow off: the snapshot shows the cluster's answer.",
+          ...localProblem(0, "The log stream closed before it opened."),
+          summary: { key: "page.followFailed" },
+          fix: "Turn off Follow; the snapshot shows the cluster's answer.",
+          fixKey: { key: "page.followOff" },
         }
       }
       if (frame) cancelAnimationFrame(frame)

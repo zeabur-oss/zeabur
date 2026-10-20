@@ -1354,4 +1354,9 @@ export const zhCN: Messages = {
   },
   "sentence.gap.volumeWithoutBackup": (p) => `卷 ${p.claim} 没有备份计划。`,
   "sentence.gap.databaseWithoutBackup": (p) => `数据库 ${p.database} 没有备份计划。`,
+  "sentence.page.noAnswer": () => "Zeabur 没有响应。",
+  "sentence.page.status": (p) => `请求失败，HTTP 状态码 ${p.status}。`,
+  "sentence.page.reload": () => "确认 Zeabur 仍在运行，然后刷新页面。",
+  "sentence.page.followFailed": () => "无法实时跟踪日志。",
+  "sentence.page.followOff": () => "关闭“实时跟踪”，快照会显示集群的响应。",
 }

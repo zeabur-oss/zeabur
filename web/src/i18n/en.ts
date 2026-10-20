@@ -1474,6 +1474,12 @@ export const en = {
   },
   "sentence.gap.volumeWithoutBackup": (p: P) => `Volume ${p.claim} has no backup schedule.`,
   "sentence.gap.databaseWithoutBackup": (p: P) => `Database ${p.database} has no backup schedule.`,
+  // Problems this page makes itself: no answer, a proxy's error, a log it could not follow
+  "sentence.page.noAnswer": () => "Zeabur didn't answer.",
+  "sentence.page.status": (p: P) => `The request failed with HTTP ${p.status}.`,
+  "sentence.page.reload": () => "Check that Zeabur is still running, then reload the page.",
+  "sentence.page.followFailed": () => "Unable to follow the log.",
+  "sentence.page.followOff": () => "Turn off Follow; the snapshot shows the cluster's answer.",
 }
 
 export type Messages = typeof en

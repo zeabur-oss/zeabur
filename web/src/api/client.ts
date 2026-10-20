@@ -54,14 +54,19 @@ function isProblem(value: unknown): value is Problem {
 /** A problem for answers that carry none (a proxy error, a dropped connection). */
 export function localProblem(status: number, detail: string): Problem {
   const kind = status === 0 ? "unavailable" : status >= 500 ? "internal" : "bad-request"
+  // The English `title` and `fix` are for logs; the page writes the keyed `summary` and `fixKey`.
   return {
     type: "about:blank",
-    title: status === 0 ? "No answer" : `HTTP ${status}`,
+    title: status === 0 ? "Zeabur didn't answer" : `HTTP ${status}`,
     status,
     detail,
     fix: "Check that Zeabur is still running, then reload the page.",
+    fixKey: { key: "page.reload" },
     kind,
-    summary: { key: `problem.summary.${kind}` },
+    summary:
+      status === 0
+        ? { key: "page.noAnswer" }
+        : { key: "page.status", params: { status: String(status) } },
   }
 }
 

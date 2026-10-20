@@ -114,7 +114,7 @@ function PhoneBar() {
       >
         <ListIcon aria-hidden="true" />
       </Button>
-      <Link to="/" className="flex h-7 items-center rounded-md outline-none" aria-label="zeabur">
+      <Link to="/" className="flex h-7 items-center rounded-md outline-none" aria-label="Zeabur">
         <Logo className="h-5" aria-hidden="true" />
       </Link>
       <Button

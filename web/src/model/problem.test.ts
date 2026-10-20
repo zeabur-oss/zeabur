@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 
-import type { Problem } from "@/api/client"
+import { localProblem, type Problem } from "@/api/client"
 import { translator } from "@/i18n"
 import { en } from "@/i18n/en"
 import { zhCN } from "@/i18n/zh-CN"
@@ -127,18 +127,20 @@ describe("problem text", () => {
     expect(refusedField([{ field: "spec.replicasMax" }], "spec.replicas")).toBe(undefined)
   })
 
-  test("a problem made on this page or of a newer kind is shown as it came", () => {
-    const local: Problem = {
-      type: "about:blank",
+  test("a problem made on this page is written from its keys; a newer kind is shown as it came", () => {
+    const local = localProblem(0, "Failed to fetch")
+    const written = problemText(translator(zhTW), "zh-TW", local)
+    expect(written.headline).toBe(zhTW["sentence.page.noAnswer"]())
+    expect(written.fix).toBe(zhTW["sentence.page.reload"]())
+    expect(written.why).toBe("Failed to fetch")
+    const newer = {
+      ...local,
+      type: "/problems/new",
+      kind: "new",
       title: "No answer",
-      status: 0,
-      detail: "Failed to fetch",
-      fix: "Reload.",
-      kind: "unavailable",
-      summary: { key: "problem.summary.unavailable" },
-    }
-    expect(problemText(translator(zhTW), "zh-TW", local).headline).toBe("No answer")
-    const newer = { ...local, type: "/problems/new", kind: "new" } as unknown as Problem
+      summary: { key: "problem.summary.new" },
+    } as unknown as Problem
+    expect(problemText(translator(zhTW), "zh-TW", newer).headline).toBe("No answer")
     const text = problemText(translator(zhTW), "zh-TW", newer)
     expect(text.why).toBe("Failed to fetch")
     expect(text.whyInEnglish).toBe(true)
