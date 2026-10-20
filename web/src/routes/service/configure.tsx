@@ -149,10 +149,11 @@ export function ConfigureSection({
 }
 
 function Part({ id, children }: { id: ConfigurePart; children: ReactNode }) {
+  const t = useT()
   return (
-    <div id={id} className="scroll-mt-14 lg:scroll-mt-6">
+    <section id={id} aria-label={t(partTitle[id])} className="scroll-mt-14 lg:scroll-mt-6">
       {children}
-    </div>
+    </section>
   )
 }
 

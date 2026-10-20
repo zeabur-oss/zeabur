@@ -84,6 +84,8 @@ export interface ServiceSearch {
   range?: Range
   /** Per replica when absent. */
   split?: Split
+  /** A `?tab=` from before the four sections, kept until the route redirects to its place. */
+  former?: ServicePlace
 }
 
 export function validateServiceSearch(search: Record<string, unknown>): ServiceSearch {
@@ -94,6 +96,7 @@ export function validateServiceSearch(search: Record<string, unknown>): ServiceS
     pod: str(search.pod),
     range: oneOf(ranges, search.range),
     split: oneOf(splits, search.split),
+    former: formerPlace(search.tab) ?? oneOf(places, search.former),
   }
 }
 

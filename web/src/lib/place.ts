@@ -2,7 +2,7 @@
 // every page uses to reach a project entry or a place on a service.
 import { useMatches, type RegisteredRouter, type RouteIds } from "@tanstack/react-router"
 
-import { servicePlace, type ServicePlace, type ServiceSection } from "@/routes/search"
+import { servicePlace, type ServicePlace } from "@/routes/search"
 
 export type ProjectEntry = "overview" | "objects" | "settings"
 
@@ -15,7 +15,8 @@ export interface Place {
   entry?: ProjectEntry
   /** `Kind/name` of the service on the service page, or in the project's quick look. */
   service?: string
-  tab?: ServiceSection
+  /** The section, or the view of Inspect, that a link to another service keeps. */
+  tab?: ServicePlace
 }
 
 const entries: Partial<Record<RouteId, ProjectEntry>> = {
@@ -33,7 +34,13 @@ export function usePlace(): Place {
       const route = match.routeId
       if (match.routeId === "/projects/$project/services/$kind/$name") {
         const { project, kind, name } = match.params
-        return { route, project, service: `${kind}/${name}`, tab: match.search.tab }
+        const { tab, view } = match.search
+        return {
+          route,
+          project,
+          service: `${kind}/${name}`,
+          tab: tab === "inspect" && view ? view : tab,
+        }
       }
       const entry = entries[route]
       if (!entry || !("project" in match.params)) return { route }

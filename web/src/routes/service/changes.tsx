@@ -95,7 +95,7 @@ export function ChangesSection({
         {timeline.data?.truncated ? (
           <p className="type-meta text-muted-foreground">{t("timeline.truncated")}</p>
         ) : null}
-        <Timeline>
+        <Timeline aria-labelledby="changes-title">
           {entries.map((entry) => (
             <Entry
               key={entryKey(entry)}

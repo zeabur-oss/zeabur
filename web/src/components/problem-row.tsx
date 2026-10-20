@@ -90,7 +90,7 @@ export function ProblemRow({
         <Link
           {...serviceLink(project, service, { tab: "logs", pod: action?.pod ?? pod?.name })}
           className={button}
-          aria-label={t("attention.logsOf", service.name)}
+          aria-label={t("attention.logsOf", action?.pod ?? pod?.name ?? service.name)}
         >
           <FileTextIcon aria-hidden="true" data-icon="inline-start" />
           {t("tab.logs")}

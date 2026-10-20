@@ -24,7 +24,6 @@ import { NotFound } from "@/components/not-found"
 import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind } from "@/model/service"
 import {
-  formerPlace,
   servicePlace,
   validateComponentsSearch,
   validateObjectsSearch,
@@ -179,12 +178,12 @@ const serviceRoute = createRoute({
   // `deployment/worker`, as kubectl prints it, opens `Deployment/worker`.
   beforeLoad: ({ params, search, location }) => {
     const kind = canonicalKind(params.kind)
-    const former = formerPlace(new URLSearchParams(location.searchStr).get("tab"))
+    const former = search.former
     if (kind !== params.kind || former) {
       throw redirect({
         to: "/projects/$project/services/$kind/$name",
         params: { ...params, kind },
-        search,
+        search: { ...search, former: undefined },
         hash: servicePlace(former).hash ?? location.hash,
         replace: true,
       })

@@ -42,7 +42,7 @@ function Line({ health, children }: { health: Health; children: ReactNode }) {
   )
 }
 
-/** What applying the plan does to running pods, whether they fit, and what is lost. */
+/** What the plan does to running pods beyond one plain roll, which its sentences already say. */
 export function PlanPreview({
   preview,
   warnedClaims = [],
@@ -65,7 +65,8 @@ export function PlanPreview({
         : String(value)
   return (
     <div className="flex flex-col gap-3">
-      {rollouts.length > 0 ? (
+      {rollouts.length > 1 ||
+      rollouts.some((r) => r.downtime || r.actions.some((action) => action !== "roll")) ? (
         <section aria-label={t("preview.restarts")} className="flex flex-col gap-1.5">
           <h3 className="type-meta font-medium text-muted-foreground">{t("preview.restarts")}</h3>
           <ul className="flex flex-col gap-1.5">
