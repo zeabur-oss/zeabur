@@ -268,6 +268,9 @@ pub struct WorkloadSummary {
     /// The first container's image, as a quick identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image: Option<String>,
+    /// When the workload was created, in RFC 3339.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created: Option<String>,
     /// The tool that manages the workload, if any.
     pub provenance: Provenance,
     /// The workload object.

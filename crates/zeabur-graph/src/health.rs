@@ -194,6 +194,7 @@ mod tests {
                 phase,
                 replicas: replicas.map(|(ready, desired)| Replicas { ready, desired }),
                 image: None,
+                created: None,
                 provenance: Provenance {
                     tool: None,
                     managed_by: None,

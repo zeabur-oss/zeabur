@@ -450,6 +450,11 @@ pub fn summarise(snapshot: &Snapshot, workload: Workload<'_>) -> WorkloadSummary
             .pod_spec()
             .and_then(|spec| spec.containers.first())
             .and_then(|container| container.image.clone()),
+        created: workload
+            .meta()
+            .creation_timestamp
+            .as_ref()
+            .map(|time| time.0.to_string()),
         provenance: provenance(workload.meta()),
         origin: Origin::object(workload.kind().as_str(), workload.name()),
     }

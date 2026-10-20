@@ -6126,6 +6126,11 @@ components:
         - provenance
         - origin
         properties:
+          created:
+            type:
+            - string
+            - "null"
+            description: When the workload was created, in RFC 3339.
           image:
             type:
             - string

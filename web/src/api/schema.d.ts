@@ -3225,6 +3225,8 @@ export interface components {
     }
     /** @description A workload as lists show it. */
     WorkloadSummary: components["schemas"]["Classification"] & {
+      /** @description When the workload was created, in RFC 3339. */
+      created?: string | null
       /** @description The first container's image, as a quick identifier. */
       image?: string | null
       /** @description The workload's kind. */
