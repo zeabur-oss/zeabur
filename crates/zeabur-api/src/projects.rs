@@ -211,6 +211,7 @@ pub(crate) struct ProjectRead {
     pub(crate) document: ProjectDocument,
     pub(crate) snapshot: Snapshot,
     pub(crate) http_routes: Vec<serde_json::Value>,
+    pub(crate) events: Vec<zeabur_gaps::Event>,
 }
 
 pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectRead, ApiError> {
@@ -257,6 +258,7 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
         },
         snapshot,
         http_routes,
+        events,
     })
 }
 

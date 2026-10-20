@@ -24,9 +24,11 @@
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}` | one service, cut from the document |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/releases` | its releases, newest first |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/trace` | every way to it, hop by hop from DNS to a ready pod, and where each stops |
+//! | `GET /api/v1/projects/{p}/services/{kind}/{name}/timeline` | what changed in it and what went wrong, newest first, with the plan that reverts its running release |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/history` | its pods' CPU, memory and restarts over a range, from the metrics store |
 //! | `GET /api/v1/projects/{p}/usage` | what each pod uses now, from metrics-server |
 //! | `GET /api/v1/projects/{p}/gaps` | what the project is missing, with citations and fixes |
+//! | `GET /api/v1/projects/{p}/timeline` | the same for every service of the project |
 //! | `GET /api/v1/projects/{p}/incidents` | the cluster incidents that reach the project, with the services they break |
 //! | `GET /api/v1/projects/{p}/objects` | every object of every namespaced kind, by kind |
 //! | `GET /api/v1/projects/{p}/objects/{group}/{version}/{resource}/{name}` | one object as YAML (`core` for the empty group) |
@@ -82,6 +84,7 @@ pub mod resolve;
 pub mod resources;
 pub mod services;
 pub mod settings;
+pub mod timeline;
 pub mod views;
 
 use std::sync::Arc;
@@ -171,6 +174,8 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(pods::exec::exec))
         .routes(routes!(services::releases::releases))
         .routes(routes!(services::trace::trace))
+        .routes(routes!(timeline::service))
+        .routes(routes!(timeline::project))
         .routes(routes!(projects::writes::plan))
         .routes(routes!(projects::writes::apply))
         .routes(routes!(projects::backups::get))

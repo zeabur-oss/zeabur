@@ -1044,6 +1044,42 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/timeline":
+    get:
+      tags:
+      - services
+      summary: |-
+        What changed in one service and what went wrong, newest first, each release that runs now with
+        the plan that returns to the one before it.
+      operationId: serviceTimeline
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: deployment, statefulset, daemonset, job or cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeline"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/services/{kind}/{name}/trace":
     get:
       tags:
@@ -1076,6 +1112,32 @@ paths:
               schema:
                 $ref: "#/components/schemas/ServiceTrace"
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/timeline":
+    get:
+      tags:
+      - projects
+      summary: |-
+        What changed in a project and what went wrong, newest first: releases, each field manager's
+        last write, warnings folded by reason and containers that stopped, for every workload.
+      operationId: projectTimeline
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Timeline"
+        "403":
           content:
             application/problem+json:
               schema:
@@ -2600,6 +2662,14 @@ components:
           - string
           - "null"
           description: The Service type, such as `ClusterIP`.
+    EntryKind:
+      type: string
+      description: What an entry records.
+      enum:
+      - release
+      - write
+      - warning
+      - termination
     EnvEdit:
       type: object
       description: One requested change to a container's environment.
@@ -3420,6 +3490,18 @@ components:
         name:
           type: string
           description: The resource's name.
+    ManagerTool:
+      type: string
+      description: The tool behind a field manager, by its name.
+      enum:
+      - zeabur
+      - helm
+      - argoCd
+      - flux
+      - kubectl
+      - autoscaler
+      - controller
+      - other
     Message:
       type: object
       description: |-
@@ -5580,6 +5662,35 @@ components:
         released:
           type: string
           description: Its first release.
+    ReleaseRef:
+      type: object
+      description: A release, as an entry names it.
+      required:
+      - revision
+      - name
+      - images
+      - current
+      properties:
+        changeCause:
+          type:
+          - string
+          - "null"
+          description: "`kubernetes.io/change-cause`."
+        current:
+          type: boolean
+          description: It runs now.
+        images:
+          type: array
+          items:
+            type: string
+          description: Its images.
+        name:
+          type: string
+          description: The `ReplicaSet` or `ControllerRevision`.
+        revision:
+          type: integer
+          format: int64
+          description: Its number.
     Removal:
       type: object
       description: A field the plan removes.
@@ -6448,6 +6559,86 @@ components:
           - string
           - "null"
           description: Its value.
+    Timeline:
+      type: object
+      description: A timeline.
+      required:
+      - id
+      - items
+      - truncated
+      - unreadable
+      properties:
+        id:
+          type: string
+          description: "`projects/<project>/timeline` or `projects/<project>/services/<kind>/<name>/timeline`."
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimelineEntry"
+          description: Newest first, at most 200.
+        truncated:
+          type: boolean
+          description: Older entries were left out.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Reads the person was refused; their entries are missing.
+    TimelineEntry:
+      type: object
+      description: One thing that happened.
+      required:
+      - at
+      - kind
+      - workload
+      - message
+      properties:
+        at:
+          type: string
+          description: "When, RFC 3339: the release's creation, the write, the last event, the termination."
+        count:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: How many times, for warnings.
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: "The objects and fields it rests on: the events, the pod's container status."
+        fields:
+          type: array
+          items:
+            type: string
+          description: The fields the manager owns, for a write.
+        kind:
+          $ref: "#/components/schemas/EntryKind"
+          description: What it records.
+        message:
+          $ref: "#/components/schemas/Message"
+          description: |-
+            What happened, in one sentence: `timeline.release`, `timeline.write.<tool>`,
+            `timeline.warning.<crashLoop|evicted|unschedulable|imagePull|probe|quota|other>`,
+            `timeline.termination.<oomKilled|exited>`.
+        release:
+          oneOf:
+          - $ref: "#/components/schemas/ReleaseRef"
+            description: The release.
+          - type: "null"
+        revert:
+          oneOf:
+          - $ref: "#/components/schemas/PlanRequest"
+            description: The changes that undo it, to send to `plan`.
+          - type: "null"
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
+        writer:
+          oneOf:
+          - $ref: "#/components/schemas/Writer"
+            description: Who wrote, for a write.
+          - type: "null"
     Tool:
       type: string
       description: A deployment tool that would revert a direct edit on its next sync or upgrade.
@@ -6803,6 +6994,29 @@ components:
               description: Ready and desired replicas; absent for a CronJob, which has no meaningful ratio.
             - type: "null"
       description: A workload as lists show it.
+    Writer:
+      type: object
+      description: Who wrote, as far as `managedFields` say.
+      required:
+      - manager
+      - tool
+      properties:
+        manager:
+          type: string
+          description: The field manager.
+        operation:
+          type:
+          - string
+          - "null"
+          description: "`Apply` or `Update`."
+        subresource:
+          type:
+          - string
+          - "null"
+          description: The subresource written, such as `scale`.
+        tool:
+          $ref: "#/components/schemas/ManagerTool"
+          description: The tool it is.
 tags:
 - name: identity
   description: Who you are

@@ -11,6 +11,7 @@ mod incidents;
 mod namespace;
 mod preview;
 mod releases;
+mod timeline;
 mod trace;
 mod usage;
 mod writes;
