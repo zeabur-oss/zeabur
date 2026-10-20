@@ -30,12 +30,17 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
 - **Icons.** Phosphor only, one import per icon: `import XIcon from "~icons/ph/x"` (a weight is
   its own name, `~icons/ph/warning-fill`), built at build time from `@iconify-json/ph` by
   unplugin-icons (its JSX compiler, through svgr); decorative ones with `aria-hidden`.
-- **Design.** agent-playground's and lymeno's language (Linear's: near-hueless greys, 0.5px
-  hairlines, faint shadows, Inter 13px at 450, controls rounded 8 and popups 12, no focus rings)
-  with Zeabur's lime and ink as the accent, in agent-playground's frame (the design
-  system's `AppFrame`, `Sidebar`, `PanelHeader`). Build from the design system's components and
-  their variants rather than look-alikes. Tokens, button and frame rules and banned styles are in
-  `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including focus rings).
+- **Design.** Zeabur's dashboard (reference: its `NavigationDrawer`, project sidebar,
+  `ServiceHeader` and `ProjectCard`): the navigation drawer (`AppFrame`, `FrameSidebar`,
+  `Sidebar` with `SidebarPicker`, `SidebarSearch`, `SidebarMenu`, `SidebarCopyPill`) and no top
+  bar; inside a project its own sidebar (`components/shell/project-sidebar.tsx`) replaces the
+  global one; a service page is a header and the segmented `Tabs` across the 960px column
+  (`max-w-content`); projects are cards (`components/project-card.tsx`); settings are
+  `SectionLabel` over `Card variant="list"` of `CardRow`s. Tabs are only the segmented switcher:
+  no underline tabs, no "More" menu; leave out what does not apply. Build from the design
+  system's components and their variants rather than look-alikes. Tokens, layout, shell and
+  banned styles are in `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including
+  focus rings).
 - **Lint.** `bun run lint` includes [shadcn/lint](https://github.com/shadcn-ui/lint) (rules in
   `web/.oxlintrc.json`, which recognises the design system's components by `componentImports`;
   conventions in `web/DESIGN.md`, "Lint"). Pages pass only layout classes to a component: a

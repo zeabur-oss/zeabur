@@ -12,7 +12,7 @@ than you have, and keeps no state of its own: no database, no custom resources.
 > on few clusters. Do not point it at a cluster you cannot afford to break.
 
 <p align="center">
-  <img src="docs/images/home.png" alt="Home: what needs attention across all projects, and each project's replicas" width="900">
+  <img src="docs/images/home.png" alt="Home: what needs attention across all projects, and each project's health as Zeabur's project cards" width="900">
 </p>
 
 | | |

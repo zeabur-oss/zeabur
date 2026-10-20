@@ -35,7 +35,7 @@ design system's tokens:
   CJK face for the locale; `text-autospace` spaces it from Latin and digits. 500 for emphasis
   (labels, buttons, sidebar rows), 600 for titles. Figures are tabular everywhere.
 - **Motion**: the sidebar folds with Linear's easing; active markers slide (`slide`: segmented
-  controls, the tabs' underline); popups fade and grow a little from their trigger; panels come in
+  controls, the tabs' pill); popups fade and grow a little from their trigger; panels come in
   from their edge (the quick look `enter-from-right`, a `panel` or `sheet` dialog); toasts slide in;
   `prefers-reduced-motion` turns it off.
 - **Buttons** are the design system's: 13px at 500, sentence case. Default is lime with ink text,
@@ -49,7 +49,13 @@ design system's tokens:
   text colour, filled in blue at 70%, orange near a limit, grey for what is reserved. No bar of
   its own.
 - **Segmented** switches show the choice on a white thumb in a grey groove (a lighter grey in
-  dark mode).
+  dark mode). Tabs are the same: the dashboard's TabSwitcher (`Tabs`), the only tab style; a
+  service's tabs fill its column, each with its icon, no counts, and scroll sideways when they do
+  not fit. Vertical tabs are drawn as sidebar rows.
+- **Columns**: a service's header, tabs and content sit in Zeabur's 960px column
+  (`max-w-content`), centred; Home, Projects and the project's lists in a wider one
+  (`max-w-6xl`); project settings in the dashboard's settings column (`max-w-4xl`); the
+  Architecture canvas takes the whole pane.
 - **Pages** follow cloud consoles (GCP, Volcengine): every page starts with the design system's
   `PageHeader` (one title size; a pill or version beside the title, actions or meta such as
   "Updated" at the end of its row). An overview puts its key figures right under it in a
@@ -103,21 +109,22 @@ Zeabur has depth. A person new to it does most of what they came for (is it runn
 logs, change a variable, scale it, give it a domain) on a few plain pages; what takes knowing
 Kubernetes is one deliberate step further. Decide a feature's layer before its place:
 
-| Layer         | For                        | Global         | Project                      | Service                                                           |
-| ------------- | -------------------------- | -------------- | ---------------------------- | ----------------------------------------------------------------- |
-| **Everyday**  | everyone                   | Home, Projects | Overview, Services, Settings | Overview, Logs, Variables, Networking, Settings' Compute          |
-| **Adjusting** | digging in, tuning         |                | Architecture                 | Events, Releases (and rollback), Storage, Settings' Health checks |
-| **Expert**    | people who know Kubernetes | Cluster        | Objects                      | Terminal, YAML                                                    |
+| Layer         | For                        | Global         | Project                      | Service                                                                    |
+| ------------- | -------------------------- | -------------- | ---------------------------- | -------------------------------------------------------------------------- |
+| **Everyday**  | everyone                   | Home, Projects | Overview, Services, Settings | Overview, Logs, Variables, Metrics, Networking, Storage, Settings' Compute |
+| **Adjusting** | digging in, tuning         |                | Architecture                 | Events, Releases (and rollback), Settings' Health checks                   |
+| **Expert**    | people who know Kubernetes | Cluster        | Objects                      | Terminal, YAML                                                             |
 
 - **Everyday comes first and alone.** The sidebar leads with Home and Projects; Cluster and
-  Settings are in a Manage group at its end. The project column lists Overview, Services,
-  Architecture and Settings, with Objects under Advanced. A service shows five tabs; the rest
-  are under More (the design system's `TabsMore`). In a form, an adjusting part is a folding
-  section (Collapsible `section`).
+  Settings are in a Manage group after them. A project's sidebar lists Overview, Architecture
+  and Settings, then its services, with Objects under Advanced. A service shows seven tabs, then
+  Events while it has any and Releases where they apply; Terminal and YAML open from the header's
+  menu. There is no "More" menu (Zeabur's dashboard has none): what does not apply is left out.
+  In a form, an adjusting part is a folding section (Collapsible `section`).
 - **Fold, never hide.** Every deeper page stays one press away: a folded group remembers being
   opened (`remembered` in `lib/stores.ts`), a group that holds the page shown opens itself, and
-  a link straight to a deeper page (`?tab=yaml`, a toast's View) shows it in place, as a tab of
-  its own while it is open.
+  a link straight to a deeper page (`?tab=yaml`, a toast's View, the header menu's View YAML)
+  shows it in place, as a tab of its own while it is open.
 - **One current row.** The deepest place the page is has the selected fill; the rows it is under are
   ancestors (label in the text colour). Navigation links match their path exactly.
 
@@ -126,18 +133,19 @@ Kubernetes is one deliberate step further. Decide a feature's layer before its p
 Find the problem first, then let the person choose to dig into a service or to understand how the
 project fits together. Workflow, comparison and relationships each have their own entry.
 
-| URL                                 | Page                                                                                                                                                                                                                                                                                                                                                                                                    |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                                 | **Home**: key figures (services healthy, failing, not ready, rolling out; the cluster's version, nodes ready and upgrade pill, linking to `/cluster`), needs attention (every unhealthy service across projects with its Logs and Events), projects failing first (services healthy out of all with what needs attention in a pill, warnings of the last hour, domain; 20 shown), recent warnings (5).  |
-| `/cluster`                          | **Cluster**, tab Overview: version with an upgrade pill, needs attention, nodes with requests against allocatable (usage when metrics-server is there), the last hour's warnings about the cluster itself (no namespace, a Node, or a `kube-` namespace). Projects are Home's. Each section loads alone; a section the person may not read names the missing rule and copies a ClusterRole.             |
-| `/cluster/components`               | **Cluster**, tab Components: installed components with their versions against the tested ones, then the catalogue. Reading it takes an administrator's rights; anyone else sees the missing rules and a ClusterRole to copy.                                                                                                                                                                            |
-| `/projects`                         | Projects and other namespaces.                                                                                                                                                                                                                                                                                                                                                                          |
-| `/projects/:p`                      | **Overview** (default): name and health, key figures, Failing (failing pod → its Logs and Events), services table (failures first; live CPU and memory when metrics-server answers), events (`?events=all`), domains, storage.                                                                                                                                                                          |
-| `/projects/:p/architecture`         | **Architecture**: layered canvas, declared (solid) and inferred (dashed) edges, PVCs under cards; a card opens a quick look (`?service=Kind/name`).                                                                                                                                                                                                                                                     |
-| `/projects/:p/services`             | **Services**: full table; `?q`, `?status=attention\|healthy`, `?kind`, `?sort`, `?desc`. A name opens the service; a replica's square opens that pod's logs.                                                                                                                                                                                                                                            |
-| `/projects/:p/objects`              | **Objects**: kinds first. The usual kinds and pinned kinds are read on open; every other served kind (custom resources too) is a row read on click; Scan all kinds reads the rest; kinds without access are marked; answers kept 45 s, Refresh re-reads, never polled; generated (`?generated`) and empty (`?empty`) kinds folded; `?q`; a name opens its YAML (`?object=group/version/resource/name`). |
-| `/projects/:p/services/:kind/:name` | **Service**: tabs Overview, Logs, Variables, Networking, Settings; under More, Events, Releases, Storage, Terminal, YAML (`?tab`, `?pod`). Overview's Usage (live, per replica) and History (`?range`, `?split`).                                                                                                                                                                                       |
-| `/settings`                         | Preferences, the metrics store usage history is read from, the signed-in person and About. `/settings/components` redirects to `/cluster/components`.                                                                                                                                                                                                                                                   |
+| URL                                 | Page                                                                                                                                                                                                                                                                                                                                                                                                         |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/`                                 | **Home**: key figures (services healthy, failing, not ready, rolling out; the cluster's version, nodes ready and upgrade pill, linking to `/cluster`), needs attention (every unhealthy service across projects with its Logs and Events), projects failing first (services healthy out of all with what needs attention in a pill, warnings of the last hour, domain; 20 shown), recent warnings (5).       |
+| `/cluster`                          | **Cluster**, tab Overview: version with an upgrade pill, needs attention, nodes with requests against allocatable (usage when metrics-server is there), the last hour's warnings about the cluster itself (no namespace, a Node, or a `kube-` namespace). Projects are Home's. Each section loads alone; a section the person may not read names the missing rule and copies a ClusterRole.                  |
+| `/cluster/components`               | **Cluster**, tab Components: installed components with their versions against the tested ones, then the catalogue. Reading it takes an administrator's rights; anyone else sees the missing rules and a ClusterRole to copy.                                                                                                                                                                                 |
+| `/projects`                         | Projects as Zeabur's project cards (namespace, services' health, domain; failing first), or as a list (remembered), then the other namespaces.                                                                                                                                                                                                                                                               |
+| `/projects/:p`                      | **Overview** (default): name and health, key figures, Failing (failing pod → its Logs and Events), services table (failures first; live CPU and memory when metrics-server answers), events (`?events=all`), domains, storage.                                                                                                                                                                               |
+| `/projects/:p/architecture`         | **Architecture**: layered canvas, declared (solid) and inferred (dashed) edges, PVCs under cards; a card opens a quick look (`?service=Kind/name`).                                                                                                                                                                                                                                                          |
+| `/projects/:p/services`             | **Services**: full table; `?q`, `?status=attention\|healthy`, `?kind`, `?sort`, `?desc`. A name opens the service; a replica's square opens that pod's logs.                                                                                                                                                                                                                                                 |
+| `/projects/:p/objects`              | **Objects**: kinds first. The usual kinds and pinned kinds are read on open; every other served kind (custom resources too) is a row read on click; Scan all kinds reads the rest; kinds without access are marked; answers kept 45 s, Refresh re-reads, never polled; generated (`?generated`) and empty (`?empty`) kinds folded; `?q`; a name opens its YAML (`?object=group/version/resource/name`).      |
+| `/projects/:p/services/:kind/:name` | **Service**: header (icon, name, status, created, `Kind/name`, image, Restart and a menu with Open terminal, View YAML, Delete), then tabs Overview, Logs, Variables, Metrics, Networking, Storage, Settings, with Events while there are any and Releases for workloads that keep them; Terminal and YAML while open (`?tab`, `?pod`). Metrics: Usage (live, per replica) and History (`?range`, `?split`). |
+| `/projects/:p/settings`             | **Project settings** (their own sidebar: Back, General): Basic information (icon, name, description), Kubernetes namespace (name, shown as a project or Adopt), Batch actions (pause or restart every service, one plan each), Danger zone (Remove from Zeabur).                                                                                                                                             |
+| `/settings`                         | Preferences, the metrics store usage history is read from, the signed-in person and About. `/settings/components` redirects to `/cluster/components`.                                                                                                                                                                                                                                                        |
 
 Everything a person picks (tab, filter, sort, selected service, pod) is in the URL: links are
 shareable and Back works. The Architecture viewport is kept per project for the visit, so coming
@@ -145,23 +153,26 @@ back from a service page finds the canvas as it was.
 
 ## Shell
 
-The frame is agent-playground's, from the design system (`AppFrame`, `Sidebar`): the sidebar sits
-on the window ground and the page is one panel inset by 8px, rounded 12.
+The frame is Zeabur's dashboard, from the design system (`AppFrame`, `FrameSidebar`, `Sidebar`):
+the navigation drawer (224px) beside the page, which scrolls on its own. There is no top bar and no
+breadcrumb: the sidebar says where the page is, and ⌘K jumps anywhere.
 
-- **Sidebar** (folds to the panel's gap from the top bar's toggle or ⌘\, remembered): the logo
-  with search beside it (the ⌘K palette), then Home, Cluster, Projects and Settings; the adopted
-  projects with their health in a section that folds; the person (a menu, where people sign in),
-  language and theme at the bottom. Rows are 28px, a 14px icon and a 13px label at 500 in every
-  language; the current one has the selected fill.
-- **Project column**, a pane at the left of the panel inside a project: the project's name (a link
-  to its Overview) with a switcher, then Overview, Architecture, Services, Objects and Settings,
-  then the services grouped by `part-of` or by role (Web, Internal, Workers, Jobs, Data) in
-  sections with a status dot each, then the other objects folded. It stays in place on every
-  project and service page.
-- **Top bar**, the panel's header: the sidebar's toggle; breadcrumb `Cluster / shop ▾ / worker ▾`:
-  each crumb a link, each ▾ a separate switcher.
-- **Phones** (< 768 px): the sidebar and the project column move into a sheet behind the top bar's
-  toggle; the project's four entries also show as tabs under the top bar.
+- **Sidebar**: the logo; where the dashboard has its workspace picker, the cluster (its name, a
+  link to `/cluster`, `SidebarPicker`); the search row (`SidebarSearch`, ⌘K); Home and Projects,
+  then Cluster and Settings under Manage; at the foot, "Admin until 14:05" while admin rights are
+  in use, and the person's menu (`SidebarPicker` as a menu trigger): who is signed in, Use or Drop
+  admin rights, the language, the theme, and Sign out where people sign in. Rows are 32px, a 14px
+  icon and a 13px label at 500; the current one is raised on the white pill.
+- **Project sidebar**, which replaces the global one on every project page: back to Projects, the
+  project's name (with its icon and a switcher) and description, the search row, Overview,
+  Architecture and Settings, then the services under a Services label (its action opens the full
+  Services table), grouped by `part-of` or by role (Web, Internal, Workers, Jobs, Data) as folding
+  rows (`SidebarMenu`) with each service on the tree rail and a status dot; one group is listed
+  flat. Objects and the objects that belong to no service are under Advanced, folded. The
+  namespace is in a pill to copy at the foot (`SidebarCopyPill`). On the settings pages the
+  sidebar is their navigation instead: Back, the title, General.
+- **Phones** (< 768 px): the dashboard's header (menu, logo, search) above the page; the menu opens
+  the sidebar (global or the project's) in a sheet from the left.
 - **⌘K palette**: projects, services, pods (their logs), domains, a few actions, recent items.
   Enter while an IME is composing does nothing.
 
