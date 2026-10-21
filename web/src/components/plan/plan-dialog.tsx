@@ -251,8 +251,8 @@ function PlanBody({
           <CaretRightIcon aria-hidden="true" />
           {t("plan.details")}
         </CollapsibleTrigger>
-        <CollapsibleContent className="-mx-1">
-          <div className="flex flex-col gap-4 px-1 pt-3 pb-1">
+        <CollapsibleContent>
+          <div className="flex flex-col gap-4 pt-3">
             {plan.objects.map((object) => (
               <PlannedObject
                 key={`${object.target.kind}/${object.target.name}`}

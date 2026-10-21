@@ -165,8 +165,8 @@ export function Refused({
           ) : null}
         </div>
         {details ? (
-          <CollapsibleContent className="-mx-1">
-            <div className="flex flex-col gap-3 px-1 pt-3 pb-1">
+          <CollapsibleContent>
+            <div className="flex flex-col gap-3 pt-3">
               <dl className="grid grid-cols-pairs gap-x-4 gap-y-1 font-mono text-xs">
                 {rules.length > 0 ? (
                   <>

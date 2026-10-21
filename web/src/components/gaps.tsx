@@ -106,8 +106,8 @@ function GapRow({ gap, onPlan }: { gap: Gap; onPlan?: () => void }) {
             <CaretRightIcon aria-hidden="true" />
             {t("gap.snippet")}
           </CollapsibleTrigger>
-          <CollapsibleContent className="-mx-1">
-            <div className="px-1 pt-2 pb-1">
+          <CollapsibleContent>
+            <div className="pt-2">
               <YamlBlock yaml={gap.snippet} label={t("gap.snippet")} />
             </div>
           </CollapsibleContent>

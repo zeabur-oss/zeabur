@@ -313,8 +313,7 @@ its utilities and components, not `transition-*` classes of your own. Here that 
 
 - Popups, dialogs, sheets, tooltips, toasts and collapsibles move as the design system's
   components do. A disclosure is `CollapsibleTrigger variant="disclosure"`, not a chevron of its
-  own. Its panel clips (`collapse-motion`), so one that holds a field, a button or a code block
-  takes `-mx-1` and its content `px-1 pb-1`, room for the focus outline.
+  own.
 - An element Base UI does not mount takes `usePresence`, so its exit plays: the quick look
   (`sheet-motion-end`) and the draft bar (`overlay-motion`). The palette keeps its body mounted
   through the close, is anchored to the top so typing never moves it, and its fallback has its

@@ -205,6 +205,7 @@ test.describe("with reduced motion", () => {
     expect([...properties(opening)]).toEqual(["opacity"])
     const closing = await frames(page, quickLook, () => page.keyboard.press("Escape"))
     expect([...properties(closing)]).toEqual(["opacity"])
+    expect(longest(closing)).toBeLessThanOrEqual(150)
     expect(closing.at(-1)!.present).toBe(false)
 
     await page.goto(`${project}/services/Deployment/${failing}`)
