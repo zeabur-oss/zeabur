@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { getRouteApi } from "@tanstack/react-router"
+import { getRouteApi, useBlocker } from "@tanstack/react-router"
 import { useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
@@ -26,6 +26,12 @@ import { refusedAmong, refusedElsewhere, RefusedSome } from "@/components/refuse
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@zeabur/design-system/components/dialog"
 import { DraftBar } from "@zeabur/design-system/components/draft-bar"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { usePresence } from "@zeabur/design-system/components/presence"
@@ -163,8 +169,15 @@ function ServiceView({
   const restartable =
     service.kind === "Deployment" || service.kind === "StatefulSet" || service.kind === "DaemonSet"
   const draft = useDraftState()
-  const pending = usePresence<HTMLDivElement>(draft.count > 0)
+  const pending = usePresence<HTMLDivElement>(draft.count > 0 || draft.held !== undefined)
   const reviewer = usePlanner(project, draft.applied, true)
+  const unsaved = draft.count > 0
+  // Tabs change only the search; leaving the service is what loses the edits.
+  const leaving = useBlocker({
+    shouldBlockFn: ({ current, next }) => unsaved && current.pathname !== next.pathname,
+    enableBeforeUnload: () => unsaved,
+    withResolver: true,
+  })
   const planner = usePlanner(project)
   const deleter = usePlanner(
     project,
@@ -398,7 +411,7 @@ function ServiceView({
               onReview={() =>
                 reviewer.plan({
                   title: t("draft.title", service.name),
-                  changes: draft.changes,
+                  changes: draft.withHeld(),
                   restartAfter: draft.restartAfter || undefined,
                   service: { kind: service.kind, name: service.name },
                 })
@@ -409,6 +422,9 @@ function ServiceView({
         {planner.dialog}
         {deleter.dialog}
         {reviewer.dialog}
+        {leaving.status === "blocked" ? (
+          <LeaveDialog count={draft.count} onStay={leaving.reset} onLeave={leaving.proceed} />
+        ) : null}
       </Tabs>
     </DraftProvider>
   )
@@ -426,27 +442,66 @@ function PendingChanges({
   const t = useT()
   const detail = describeDraft(t, draft)
   // While it fades out after Discard or Apply, it keeps saying what it held.
-  const [shown, setShown] = useState({ count: draft.count, detail })
-  if (draft.count > 0 && (draft.count !== shown.count || detail !== shown.detail))
-    setShown({ count: draft.count, detail })
+  const editing = draft.held !== undefined
+  const [shown, setShown] = useState({ count: draft.count, detail, editing })
+  if (
+    (draft.count > 0 || editing) &&
+    (draft.count !== shown.count || detail !== shown.detail || editing !== shown.editing)
+  )
+    setShown({ count: draft.count, detail, editing })
   // The wrapper sticks in the bar's place, so it can fade the bar in and out.
   return (
     <div {...presence} className="sticky bottom-3 z-10 mt-6 overlay-motion">
       <DraftBar
-        label={t("draft.count", shown.count)}
-        detail={shown.detail}
+        label={shown.editing && shown.count === 0 ? t("draft.none") : t("draft.count", shown.count)}
+        detail={shown.count > 0 ? shown.detail : undefined}
+        blocked={draft.held?.blocked}
         actions={
           <>
             <Button variant="ghost" size="sm" onClick={draft.discard}>
-              {t("draft.discard")}
+              {shown.editing && shown.count === 0 ? t("edit.cancel") : t("draft.discard")}
             </Button>
-            <Button size="sm" onClick={onReview}>
-              {t("draft.review")}
+            <Button
+              size="sm"
+              onClick={onReview}
+              disabled={draft.count === 0 || draft.held?.blocked !== undefined}
+            >
+              {shown.editing ? t("draft.save") : t("draft.review")}
             </Button>
           </>
         }
       />
     </div>
+  )
+}
+
+function LeaveDialog({
+  count,
+  onStay,
+  onLeave,
+}: {
+  count: number
+  onStay: () => void
+  onLeave: () => void
+}) {
+  const t = useT()
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : onStay())}>
+      <DialogContent variant="compact">
+        <div className="flex flex-col gap-2 px-5 pt-4 pb-3">
+          <DialogTitle>{t("draft.leaveTitle")}</DialogTitle>
+          <DialogDescription>{t("draft.leaveBody", count)}</DialogDescription>
+        </div>
+        <div className="flex justify-end gap-2 border-t px-5 py-3">
+          <Button variant="ghost" size="sm" onClick={onStay}>
+            {t("draft.stay")}
+          </Button>
+          <Button variant="destructive" size="sm" onClick={onLeave}>
+            {t("draft.leave")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

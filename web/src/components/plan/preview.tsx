@@ -42,6 +42,9 @@ function Line({ health, children }: { health: Health; children: ReactNode }) {
   )
 }
 
+/** A variable removed by name, which the plan's sentence already names. */
+const envEntry = /\.env\[name=[^\]]+\]/
+
 /** What the plan does to running pods beyond one plain roll, which its sentences already say. */
 export function PlanPreview({
   preview,
@@ -53,7 +56,8 @@ export function PlanPreview({
 }) {
   const t = useT()
   const { cores, memory } = useQuantityFormat()
-  const { rollouts, fit, removals } = preview
+  const { rollouts, fit } = preview
+  const removals = preview.removals.filter((r) => r.leftOutOfEdit || !envEntry.test(r.path))
   const dataLoss = preview.dataLoss.filter(
     (loss) => !(loss.kind === "claimDeleted" && loss.claim && warnedClaims.includes(loss.claim)),
   )

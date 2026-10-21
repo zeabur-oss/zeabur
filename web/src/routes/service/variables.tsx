@@ -1,24 +1,31 @@
-import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
-import { lazy, Suspense, useState, type ReactElement, type ReactNode } from "react"
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type ReactElement,
+  type ReactNode,
+} from "react"
+import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import EyeIcon from "~icons/ph/eye"
 import EyeSlashIcon from "~icons/ph/eye-slash"
-import FileTextIcon from "~icons/ph/file-text"
 import KeyIcon from "~icons/ph/key"
 import ListBulletsIcon from "~icons/ph/list-bullets"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
-import TreeStructureIcon from "~icons/ph/tree-structure"
 
-import { ReviewWord } from "@/components/plan/draft"
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { configMapsQuery } from "@/api/queries"
 import { CopyButton, Hint, Segmented } from "@/components/bits"
-import { FormField } from "@/components/form-field"
+import { KubeDetails } from "@/components/kube-details"
+import { useDraft } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { RefusedKinds } from "@/components/refused"
@@ -26,6 +33,7 @@ import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -35,12 +43,26 @@ import { Input } from "@zeabur/design-system/components/input"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Select } from "@zeabur/design-system/components/select"
 import { Spinner } from "@zeabur/design-system/components/spinner"
-import { TermDetail } from "@zeabur/design-system/components/term"
+import { Textarea } from "@zeabur/design-system/components/textarea"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
-import { useT } from "@/i18n"
+import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
 import type { Edge } from "@/model/connections"
+import {
+  changesOf,
+  editedCount,
+  fromDotenv,
+  parseDotenv,
+  pastedLines,
+  pasteInto,
+  problemsOf,
+  quote,
+  rowState,
+  toDotenv,
+  type EnvRow,
+  type RowProblem,
+} from "@/model/env-edit"
 import { configObjectsOf, type Service } from "@/model/service"
 
 const DataEditor = lazy(() =>
@@ -49,21 +71,13 @@ const DataEditor = lazy(() =>
 
 type Revealed = Record<string, Schemas["SecretValue"]>
 
-interface Draft {
-  container: string
-  name: string
-  value: string
-  was?: string
-}
-
-/** Kubernetes also accepts dots and dashes, which a shell cannot read. */
-const nameRule = /^[-._a-zA-Z][-._a-zA-Z0-9]*$/
-
 interface SecretState {
   values?: Revealed
   pending?: boolean
   problem?: ProblemBody
 }
+
+type Source = Schemas["ValueSource"]
 
 export function VariablesTab({
   project,
@@ -80,20 +94,15 @@ export function VariablesTab({
   // Revealed values never go into the query cache or storage.
   const [secrets, setSecrets] = useState<Record<string, SecretState>>({})
   const [raw, setRaw] = useState(false)
-  const [draft, setDraft] = useState<Draft>()
   const [editor, setEditor] = useState<{
     kind: "ConfigMap" | "Secret"
     name: string
     key?: string
   }>()
+  const draft = useDraft()
   const planner = usePlanner(project)
   const managed = service.provenance.tool ?? undefined
   const workload = { kind: service.kind, name: service.name }
-  const planEnv = (container: string, changes: Schemas["EnvEdit"][]) =>
-    planner.plan({
-      title: t("title.env", service.name),
-      changes: [{ op: "env", workload, container, changes }],
-    })
   const configMapList = useQuery(configMapsQuery(project))
   const configMaps = new Map((configMapList.data?.items ?? []).map((c) => [c.origin.name, c.data]))
   const named = new Map<string, string[]>()
@@ -103,6 +112,32 @@ export function VariablesTab({
         const key = `${evidence.container}/${evidence.variable}`
         named.set(key, [...(named.get(key) ?? []), evidence.service])
       }
+
+  const containers = service.containers
+  const literal = containers.flatMap((c) =>
+    c.env.filter((e) => e.source.kind === "Literal").map((e) => ({ container: c.name, env: e })),
+  )
+  const referenced = containers.flatMap((c) =>
+    c.env.filter((e) => e.source.kind !== "Literal").map((e) => ({ container: c.name, env: e })),
+  )
+  const imported = containers.flatMap((c) =>
+    c.importedEnv.map((i) => ({ container: c.name, imported: i })),
+  )
+  const secretNames = configObjectsOf(service)
+    .filter((o) => o.kind === "Secret")
+    .map((o) => o.name)
+  const multi = containers.length > 1
+  const [editing, setEditing] = useState<{ rows: EnvRow[]; text?: string }>()
+  const nextId = useRef(0)
+  const newId = () => `new-${nextId.current++}`
+  const blankRow = (container = containers[0]?.name ?? ""): EnvRow => ({
+    id: newId(),
+    container,
+    name: "",
+    value: "",
+    removed: false,
+  })
+  const [focus, setFocus] = useState<string>()
 
   const reveal = async (name: string) => {
     setSecrets((previous) => ({ ...previous, [name]: { pending: true } }))
@@ -125,21 +160,6 @@ export function VariablesTab({
       return next
     })
 
-  const containers = service.containers
-  const literal = containers.flatMap((c) =>
-    c.env.filter((e) => e.source.kind === "Literal").map((e) => ({ container: c.name, env: e })),
-  )
-  const referenced = containers.flatMap((c) =>
-    c.env.filter((e) => e.source.kind !== "Literal").map((e) => ({ container: c.name, env: e })),
-  )
-  const imported = containers.flatMap((c) =>
-    c.importedEnv.map((i) => ({ container: c.name, imported: i })),
-  )
-  const secretNames = configObjectsOf(service)
-    .filter((o) => o.kind === "Secret")
-    .map((o) => o.name)
-  const multi = containers.length > 1
-
   const valueOf = (env: Schemas["EnvVar"]): string | undefined => {
     const source = env.source
     if (source.kind === "Literal") return env.value ?? ""
@@ -154,7 +174,7 @@ export function VariablesTab({
     ...literal.map(({ env }) => `${env.name}=${quote(env.value ?? "")}`),
     ...referenced.map(({ env }) => {
       const value = valueOf(env)
-      return `${env.name}=${value === undefined ? (env.source.kind === "Secret" ? "••••••••" : `# ${describe(env.source)}`) : quote(value)}`
+      return `${env.name}=${value === undefined ? (env.source.kind === "Secret" ? "••••••••" : `# ${sourceWords(t, env.source)}`) : quote(value)}`
     }),
     ...imported.flatMap(({ imported: i }) => {
       const name = i.source.name ?? ""
@@ -166,7 +186,7 @@ export function VariablesTab({
             )
       return entries.length
         ? entries.map(([k, v]) => `${i.prefix ?? ""}${k}=${quote(v)}`)
-        : [`# ${i.source.kind} ${name}: ${t("vars.keys", i.keyCount ?? 0)}`]
+        : [`# ${sourceWords(t, i.source, true)}: ${t("vars.keys", i.keyCount ?? 0)}`]
     }),
   ].join("\n")
 
@@ -189,24 +209,94 @@ export function VariablesTab({
     literal.length +
     referenced.length +
     imported.reduce((n, i) => n + (i.imported.keyCount ?? 0), 0)
-  const adding = draft !== undefined && draft.was === undefined
-  const objectKinds = [
-    ...new Set([
-      ...fromObjects.map(({ env }) => env.source.kind),
-      ...imported.map(({ imported: i }) => i.source.kind),
-    ]),
-  ]
-  const clusterKinds = [
-    ...new Set(
-      fromCluster.map(({ env }) =>
-        env.source.kind === "PodField"
-          ? "fieldRef"
-          : env.source.kind === "ResourceField"
-            ? "resourceFieldRef"
-            : env.source.kind,
-      ),
-    ),
-  ]
+
+  // The editor starts from the cluster with the variables the draft already holds applied.
+  const startEditing = (add: boolean) => {
+    let rows: EnvRow[] = literal.map(({ container, env }) => ({
+      id: `${container}/${env.name}`,
+      container,
+      name: env.name,
+      value: env.value ?? "",
+      was: { name: env.name, value: env.value ?? "" },
+      removed: false,
+    }))
+    for (const change of draft?.changes ?? [])
+      if (
+        change.op === "env" &&
+        change.workload.kind === workload.kind &&
+        change.workload.name === workload.name
+      ) {
+        const container = change.container ?? containers[0]?.name ?? ""
+        for (const edit of change.changes) {
+          const at = rows.findIndex((r) => r.container === container && r.was?.name === edit.name)
+          if (edit.op === "remove")
+            rows = rows.map((r, i) => (i === at ? { ...r, removed: true } : r))
+          else if (at !== -1)
+            rows = rows.map((r, i) => (i === at ? { ...r, value: edit.value ?? "" } : r))
+          else
+            rows = [...rows, { ...blankRow(container), name: edit.name, value: edit.value ?? "" }]
+        }
+      }
+    const blank = add || rows.length === 0 ? blankRow() : undefined
+    const all = blank ? [...rows, blank] : rows
+    setEditing(raw && !multi ? { rows, text: toDotenv(rows) } : { rows: all })
+    setFocus(blank?.id)
+  }
+
+  const taken = new Map<string, Set<string>>()
+  for (const { container, env } of referenced)
+    taken.set(container, new Set([...(taken.get(container) ?? []), env.name]))
+  const parsed = editing?.text === undefined ? undefined : parseDotenv(editing.text)
+  const effective =
+    editing && parsed
+      ? fromDotenv(editing.rows, containers[0]?.name ?? "", parsed.entries)
+      : (editing?.rows ?? [])
+  const problems = problemsOf(effective, taken)
+  const blocked =
+    parsed && parsed.unread.length > 0
+      ? t("vars.unread", parsed.unread)
+      : problems.size > 0
+        ? t("vars.blocked", problems.size)
+        : undefined
+  const held = editing
+    ? changesOf(effective).map(({ container, changes }): Schemas["Change"] => ({
+        op: "env",
+        workload,
+        container,
+        changes,
+      }))
+    : undefined
+  const heldKey = JSON.stringify([held, blocked])
+  const hold = draft?.hold
+  useEffect(() => {
+    hold?.(held ? { workload, changes: held, blocked } : undefined)
+    // `heldKey` stands for `held` and `blocked`; the workload is the tab's.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [hold, heldKey])
+  useEffect(() => () => hold?.(undefined), [hold])
+
+  const setRows = (change: (rows: EnvRow[]) => EnvRow[]) =>
+    setEditing((previous) => (previous ? { ...previous, rows: change(previous.rows) } : previous))
+  const switchView = (next: "list" | "raw") => {
+    if (!editing) {
+      setRaw(next === "raw")
+      return
+    }
+    if (next === "raw" && editing.text === undefined)
+      setEditing({ rows: editing.rows, text: toDotenv(editing.rows) })
+    if (next === "list" && editing.text !== undefined) {
+      setEditing({ rows: effective })
+      setRaw(false)
+      return
+    }
+    setRaw(next === "raw")
+  }
+  const paste = (row: EnvRow, event: ClipboardEvent<HTMLInputElement>) => {
+    const lines = pastedLines(event.clipboardData.getData("text"))
+    if (!lines) return
+    event.preventDefault()
+    setRows((rows) => pasteInto(rows, row.id, lines, newId))
+  }
 
   const revealButtons =
     secretNames.length > 0 ? (
@@ -269,8 +359,7 @@ export function VariablesTab({
         </span>
         <span className="flex items-center justify-end gap-1">
           {env.pendingRestart ? <PendingMark pending={env.pendingRestart} /> : null}
-          <SourceChip source={env.source} />
-          <EditSource
+          <SourceLink
             source={env.source}
             onOpen={(kind, name) => setEditor({ kind, name, key: env.source.key ?? undefined })}
           />
@@ -278,6 +367,66 @@ export function VariablesTab({
       </li>
     )
   }
+
+  const kubeFacts: [ReactNode, ReactNode][] = [
+    ...(literal.length > 0 ? [[t("vars.direct"), "env[].value"] as [ReactNode, ReactNode]] : []),
+    ...(fromObjects.length > 0
+      ? [
+          [
+            t("vars.fromObjects"),
+            [
+              ...new Set(
+                fromObjects.map(({ env }) =>
+                  env.source.kind === "Secret"
+                    ? "env[].valueFrom.secretKeyRef"
+                    : "env[].valueFrom.configMapKeyRef",
+                ),
+              ),
+            ].join(", "),
+          ] as [ReactNode, ReactNode],
+        ]
+      : []),
+    ...(imported.length > 0 ? [[t("vars.imported"), "envFrom"] as [ReactNode, ReactNode]] : []),
+    ...(fromCluster.length > 0
+      ? [
+          [
+            t("vars.fromCluster"),
+            [
+              ...new Set(
+                fromCluster.map(({ env }) =>
+                  env.source.kind === "ResourceField"
+                    ? "env[].valueFrom.resourceFieldRef"
+                    : "env[].valueFrom.fieldRef",
+                ),
+              ),
+            ].join(", "),
+          ] as [ReactNode, ReactNode],
+        ]
+      : []),
+  ]
+
+  const viewOptions = [
+    {
+      value: "list" as const,
+      label: (
+        <>
+          <ListBulletsIcon className="size-3.5" aria-hidden="true" />
+          {t("vars.list")}
+        </>
+      ),
+    },
+    {
+      value: "raw" as const,
+      label: (
+        <>
+          <BracketsCurlyIcon className="size-3.5" aria-hidden="true" />
+          .env
+        </>
+      ),
+    },
+  ]
+  const showRaw = editing ? editing.text !== undefined : raw
+  const edited = editing ? editedCount(effective) : 0
 
   return (
     <div className="flex flex-col gap-4">
@@ -287,47 +436,27 @@ export function VariablesTab({
         description={t("vars.about")}
         action={
           <>
-            {total > 0 ? (
+            {(editing && !multi) || (!editing && total > 0) ? (
               <Segmented
                 label={t("vars.view")}
-                value={raw ? "raw" : "list"}
-                onChange={(value) => setRaw(value === "raw")}
-                options={[
-                  {
-                    value: "list",
-                    label: (
-                      <>
-                        <ListBulletsIcon className="size-3.5" aria-hidden="true" />
-                        {t("vars.list")}
-                      </>
-                    ),
-                  },
-                  {
-                    value: "raw",
-                    label: (
-                      <>
-                        <BracketsCurlyIcon className="size-3.5" aria-hidden="true" />
-                        .env
-                      </>
-                    ),
-                  },
-                ]}
+                value={showRaw ? "raw" : "list"}
+                onChange={switchView}
+                options={viewOptions}
               />
             ) : null}
-            <ManagedTip tool={managed}>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={Boolean(managed) || draft !== undefined}
-                onClick={() => {
-                  setRaw(false)
-                  setDraft({ container: containers[0]?.name ?? "", name: "", value: "" })
-                }}
-              >
-                <PlusIcon aria-hidden="true" data-icon="inline-start" />
-                {t("vars.add")}
-              </Button>
-            </ManagedTip>
+            {editing || !draft ? null : (
+              <ManagedTip tool={managed}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={Boolean(managed)}
+                  onClick={() => startEditing(literal.length === 0)}
+                >
+                  <PencilSimpleIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("vars.edit")}
+                </Button>
+              </ManagedTip>
+            )}
           </>
         }
       />
@@ -362,7 +491,31 @@ export function VariablesTab({
         ) : null,
       )}
 
-      {total === 0 && !adding ? (
+      {editing && editing.text !== undefined ? (
+        <div className="flex flex-col gap-2">
+          <Textarea
+            mono
+            size="sm"
+            aria-label={t("vars.dotenv")}
+            aria-invalid={blocked !== undefined}
+            rows={Math.max(6, editing.text.split("\n").length + 1)}
+            value={editing.text}
+            onChange={(event) => setEditing({ rows: editing.rows, text: event.target.value })}
+          />
+          <p className="text-xs text-secondary">{t("vars.dotenvHint")}</p>
+          {[...problems].map(([id, problem]) => {
+            const row = effective.find((r) => r.id === id)
+            return row ? (
+              <p key={id} className="text-xs text-fail-strong">
+                <span className="font-mono" translate="no">
+                  {row.name || "="}
+                </span>{" "}
+                {problemText(t, problem)}
+              </p>
+            ) : null
+          })}
+        </div>
+      ) : total === 0 && !editing ? (
         <Empty variant="outline" size="inline">
           <EmptyMedia variant="glyph">
             <KeyIcon aria-hidden="true" />
@@ -371,8 +524,23 @@ export function VariablesTab({
             <EmptyTitle>{t("vars.emptyTitle")}</EmptyTitle>
             <EmptyDescription>{t("vars.emptyBody")}</EmptyDescription>
           </EmptyHeader>
+          {draft ? (
+            <EmptyContent>
+              <ManagedTip tool={managed}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={Boolean(managed)}
+                  onClick={() => startEditing(true)}
+                >
+                  <PlusIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("vars.add")}
+                </Button>
+              </ManagedTip>
+            </EmptyContent>
+          ) : null}
         </Empty>
-      ) : raw ? (
+      ) : raw && !editing ? (
         <>
           {revealButtons}
           <div className="relative rounded-lg border bg-muted/30">
@@ -384,117 +552,96 @@ export function VariablesTab({
         </>
       ) : (
         <div className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
-          {literal.length > 0 || adding ? (
-            <VarGroup label={t("vars.direct")} details={["env.value"]}>
-              {adding ? (
-                <DraftRow
-                  draft={draft}
-                  containers={containers.map((c) => c.name)}
-                  onCancel={() => setDraft(undefined)}
-                  onReview={(done) => {
-                    planEnv(done.container, [
-                      { name: done.name.trim(), op: "set", value: done.value },
-                    ])
-                    setDraft(undefined)
+          {editing ? (
+            <VarGroup
+              label={t("vars.direct")}
+              action={
+                edited > 0 ? (
+                  <span className="type-meta text-secondary">{t("vars.edited", edited)}</span>
+                ) : undefined
+              }
+            >
+              <ul className="flex flex-col divide-y">
+                {editing.rows.map((row) => (
+                  <EditRow
+                    key={row.id}
+                    row={row}
+                    containers={multi ? containers.map((c) => c.name) : undefined}
+                    problem={problems.get(row.id)}
+                    focus={focus === row.id}
+                    onChange={(next) =>
+                      setRows((rows) => rows.map((r) => (r.id === row.id ? next : r)))
+                    }
+                    onDrop={() => setRows((rows) => rows.filter((r) => r.id !== row.id))}
+                    onPaste={(event) => paste(row, event)}
+                  />
+                ))}
+              </ul>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    const row = blankRow()
+                    setRows((rows) => [...rows, row])
+                    setFocus(row.id)
                   }}
-                />
-              ) : null}
-              {literal.length > 0 ? (
-                <ul className="flex flex-col divide-y">
-                  {literal.map(({ container, env }) => {
-                    const targets = named.get(`${container}/${env.name}`) ?? []
-                    if (draft?.was === env.name && draft.container === container)
-                      return (
-                        <li key={`${container}/${env.name}`} className="py-2">
-                          <DraftRow
-                            draft={draft}
-                            containers={[container]}
-                            onCancel={() => setDraft(undefined)}
-                            onReview={(done) => {
-                              planEnv(container, [{ name: env.name, op: "set", value: done.value }])
-                              setDraft(undefined)
-                            }}
-                          />
-                        </li>
-                      )
-                    return (
-                      <li
-                        key={`${container}/${env.name}`}
-                        className={cn(
-                          "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions",
-                          entrance(createdKey.env(workload, env.name)),
-                        )}
+                >
+                  <PlusIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("vars.addRow")}
+                </Button>
+                <span className="text-xs text-tertiary">{t("vars.pasteHint")}</span>
+              </div>
+            </VarGroup>
+          ) : literal.length > 0 ? (
+            <VarGroup label={t("vars.direct")}>
+              <ul className="flex flex-col divide-y">
+                {literal.map(({ container, env }) => {
+                  const targets = named.get(`${container}/${env.name}`) ?? []
+                  return (
+                    <li
+                      key={`${container}/${env.name}`}
+                      className={cn(
+                        "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable",
+                        entrance(createdKey.env(workload, env.name)),
+                      )}
+                    >
+                      <span
+                        className="flex items-center gap-1.5 font-mono text-xs font-medium"
+                        translate="no"
                       >
+                        {env.name}
+                        {multi ? (
+                          <span className="font-normal text-muted-foreground">{container}</span>
+                        ) : null}
+                      </span>
+                      <span className="flex min-w-0 items-center gap-2">
                         <span
-                          className="flex items-center gap-1.5 font-mono text-xs font-medium"
+                          className="truncate font-mono text-xs"
                           translate="no"
+                          title={env.value ?? ""}
                         >
-                          {env.name}
-                          {multi ? (
-                            <span className="font-normal text-muted-foreground">{container}</span>
-                          ) : null}
+                          {env.value}
                         </span>
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span
-                            className="truncate font-mono text-xs"
-                            translate="no"
-                            title={env.value ?? ""}
-                          >
-                            {env.value}
-                          </span>
-                          <CopyButton value={env.value ?? ""} />
-                          {targets.map((target) => (
-                            <Tooltip key={target} content={t("vars.names", target)}>
-                              <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
-                                <ArrowRightIcon className="size-3" aria-hidden="true" />
-                                {target}
-                              </span>
-                            </Tooltip>
-                          ))}
-                        </span>
-                        <span className="flex items-center justify-end gap-0.5">
-                          <ManagedTip tool={managed}>
-                            <Button
-                              variant="muted"
-                              size="icon-xs"
-                              disabled={Boolean(managed) || draft !== undefined}
-                              aria-label={t("edit.edit", env.name)}
-                              title={t("edit.edit", env.name)}
-                              onClick={() =>
-                                setDraft({
-                                  container,
-                                  name: env.name,
-                                  value: env.value ?? "",
-                                  was: env.name,
-                                })
-                              }
-                            >
-                              <PencilSimpleIcon aria-hidden="true" />
-                            </Button>
-                          </ManagedTip>
-                          <ManagedTip tool={managed}>
-                            <Button
-                              variant="muted"
-                              size="icon-xs"
-                              disabled={Boolean(managed)}
-                              aria-label={t("edit.remove", env.name)}
-                              title={t("edit.remove", env.name)}
-                              onClick={() => planEnv(container, [{ name: env.name, op: "remove" }])}
-                            >
-                              <TrashIcon aria-hidden="true" />
-                            </Button>
-                          </ManagedTip>
-                        </span>
-                      </li>
-                    )
-                  })}
-                </ul>
-              ) : null}
+                        <CopyButton value={env.value ?? ""} />
+                        {targets.map((target) => (
+                          <Tooltip key={target} content={t("vars.names", target)}>
+                            <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
+                              <ArrowRightIcon className="size-3" aria-hidden="true" />
+                              {target}
+                            </span>
+                          </Tooltip>
+                        ))}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
             </VarGroup>
           ) : null}
 
           {fromObjects.length + imported.length > 0 ? (
-            <VarGroup label={t("vars.fromObjects")} details={objectKinds} action={revealButtons}>
+            <VarGroup label={t("vars.fromObjects")} action={revealButtons}>
               <ul className="flex flex-col divide-y">
                 {fromObjects.map(sourceRow)}
                 {imported.map(({ container, imported: i }) => (
@@ -513,9 +660,9 @@ export function VariablesTab({
                     </span>
                     <span className="flex items-center justify-end gap-1">
                       {i.pendingRestart ? <PendingMark pending={i.pendingRestart} /> : null}
-                      <SourceChip source={i.source} />
-                      <EditSource
+                      <SourceLink
                         source={i.source}
+                        whole
                         onOpen={(kind, name) => setEditor({ kind, name })}
                       />
                     </span>
@@ -526,12 +673,13 @@ export function VariablesTab({
           ) : null}
 
           {fromCluster.length > 0 ? (
-            <VarGroup label={t("vars.fromCluster")} details={clusterKinds}>
+            <VarGroup label={t("vars.fromCluster")}>
               <ul className="flex flex-col divide-y">{fromCluster.map(sourceRow)}</ul>
             </VarGroup>
           ) : null}
         </div>
       )}
+      <KubeDetails facts={kubeFacts} />
       {editor ? (
         <Suspense fallback={null}>
           <DataEditor
@@ -549,6 +697,128 @@ export function VariablesTab({
   )
 }
 
+function EditRow({
+  row,
+  containers,
+  problem,
+  focus,
+  onChange,
+  onDrop,
+  onPaste,
+}: {
+  row: EnvRow
+  /** The containers a new row can go in, when there are several. */
+  containers?: string[]
+  problem?: RowProblem
+  focus: boolean
+  onChange: (row: EnvRow) => void
+  onDrop: () => void
+  onPaste: (event: ClipboardEvent<HTMLInputElement>) => void
+}) {
+  const t = useT()
+  const state = rowState(row)
+  const label = row.was?.name || row.name
+  if (state === "removed")
+    return (
+      <li className="grid grid-cols-2 items-center gap-x-3 gap-y-1 py-2 sm:grid-cols-variable-edit">
+        <span
+          className="col-span-2 truncate font-mono text-xs text-tertiary line-through sm:col-span-1"
+          translate="no"
+        >
+          {row.was?.name}
+        </span>
+        <span
+          className="col-span-2 truncate font-mono text-xs text-tertiary line-through sm:col-span-1"
+          translate="no"
+        >
+          {row.was?.value}
+        </span>
+        <span className="type-meta text-fail-strong">{t("vars.state.removed")}</span>
+        <Button
+          variant="ghost"
+          size="xs"
+          className="justify-self-end sm:justify-self-auto"
+          onClick={() => onChange({ ...row, removed: false })}
+        >
+          <ArrowCounterClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+          {t("vars.undo")}
+        </Button>
+      </li>
+    )
+  const problemId = `${row.id}-problem`
+  return (
+    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-1 py-2 sm:grid-cols-variable-edit">
+      <span className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
+        {containers && !row.was ? (
+          <Select
+            size="sm"
+            value={row.container}
+            onValueChange={(container) => onChange({ ...row, container })}
+            aria-label={t("vars.container")}
+            items={containers.map((name) => ({ value: name, label: name }))}
+          />
+        ) : null}
+        <Input
+          size="sm"
+          mono
+          placeholder={t("vars.namePlaceholder")}
+          aria-label={t("vars.name")}
+          aria-invalid={problem !== undefined}
+          aria-describedby={problem ? problemId : undefined}
+          value={row.name}
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- the row was added on request, to be typed in
+          autoFocus={focus}
+          onChange={(event) => onChange({ ...row, name: event.target.value })}
+          onPaste={onPaste}
+        />
+        {problem ? (
+          <span id={problemId} className="text-xs text-fail-strong">
+            {problemText(t, problem)}
+          </span>
+        ) : containers && row.was ? (
+          <span className="text-xs text-tertiary" translate="no">
+            {row.container}
+          </span>
+        ) : null}
+      </span>
+      <Input
+        size="sm"
+        mono
+        className="col-span-2 sm:col-span-1"
+        aria-label={t("vars.valueOf", label || t("vars.name"))}
+        value={row.value}
+        onChange={(event) => onChange({ ...row, value: event.target.value })}
+      />
+      <span
+        className={cn(
+          "self-center type-meta sm:self-start sm:pt-1",
+          state === "added" ? "text-ok-strong" : state === "changed" ? "text-warn-strong" : "",
+        )}
+      >
+        {state === "added" && (row.name || row.value)
+          ? t("vars.state.added")
+          : state === "changed"
+            ? t("vars.state.changed")
+            : null}
+      </span>
+      <Button
+        variant="muted"
+        size="icon-xs"
+        className="justify-self-end sm:justify-self-auto"
+        aria-label={t("edit.remove", label)}
+        title={t("edit.remove", label)}
+        onClick={() => (row.was ? onChange({ ...row, removed: true }) : onDrop())}
+      >
+        <TrashIcon aria-hidden="true" />
+      </Button>
+    </li>
+  )
+}
+
+function problemText(t: Translate, problem: RowProblem): string {
+  return t(`vars.problem.${problem}`)
+}
+
 function PendingMark({ pending }: { pending: Schemas["PendingRestart"] }) {
   const t = useT()
   return (
@@ -563,24 +833,17 @@ function PendingMark({ pending }: { pending: Schemas["PendingRestart"] }) {
 
 function VarGroup({
   label,
-  details,
   action,
   children,
 }: {
   label: string
-  details: string[]
   action?: ReactNode
   children: ReactNode
 }) {
   return (
     <section className="flex flex-col px-5 pt-3 pb-1">
       <div className="flex flex-wrap items-center gap-2 pb-1">
-        <h3 className="flex flex-wrap items-baseline gap-1.5 type-meta font-medium text-secondary">
-          {label}
-          {details.map((detail) => (
-            <TermDetail key={detail}>{detail}</TermDetail>
-          ))}
-        </h3>
+        <h3 className="type-meta font-medium text-secondary">{label}</h3>
         {action ? <span className="ml-auto">{action}</span> : null}
       </div>
       {children}
@@ -598,157 +861,66 @@ function ManagedTip({ tool, children }: { tool?: string; children: ReactElement 
   )
 }
 
-function EditSource({
+/** Where a value comes from, in words; for a config file or secret, a link to edit it there. */
+function SourceLink({
   source,
+  whole = false,
   onOpen,
 }: {
-  source: Schemas["ValueSource"]
+  source: Source
+  whole?: boolean
   onOpen: (kind: "ConfigMap" | "Secret", name: string) => void
 }) {
   const t = useT()
+  const words = sourceWords(t, source, whole)
   const kind = source.kind
   const name = source.name
-  if ((kind !== "ConfigMap" && kind !== "Secret") || !name) return null
+  if ((kind !== "ConfigMap" && kind !== "Secret") || !name)
+    return <span className="truncate text-xs text-secondary">{words}</span>
   return (
-    <Button
-      variant="muted"
-      size="icon-xs"
-      aria-label={t("vars.editIn", kind, name)}
-      title={t("vars.editIn", kind, name)}
-      onClick={() => onOpen(kind, name)}
-    >
-      <PencilSimpleIcon aria-hidden="true" />
-    </Button>
+    <Tooltip content={t("vars.editThere")}>
+      <Button variant="link" size="xs" className="min-w-0" onClick={() => onOpen(kind, name)}>
+        <span className="truncate">{words}</span>
+      </Button>
+    </Tooltip>
   )
 }
 
-function DraftRow({
-  draft,
-  containers,
-  onCancel,
-  onReview,
-}: {
-  draft: Draft
-  containers: string[]
-  onCancel: () => void
-  onReview: (draft: Draft) => void
-}) {
-  const t = useT()
-  const form = useForm({
-    defaultValues: draft,
-    onSubmit: ({ value }) => {
-      if (nameRule.test(value.name.trim())) onReview(value)
-    },
-  })
-  return (
-    <form
-      className="flex flex-col gap-2 pb-2 sm:flex-row sm:items-center"
-      onSubmit={(event) => {
-        event.preventDefault()
-        void form.handleSubmit()
-      }}
-    >
-      {draft.was === undefined && containers.length > 1 ? (
-        <form.Field name="container">
-          {(f) => (
-            <FormField label={t("vars.container")} hideLabel className="sm:w-32">
-              <Select
-                size="sm"
-                value={f.state.value}
-                onValueChange={(name) => f.handleChange(name)}
-                className="w-full"
-                items={containers.map((name) => ({ value: name, label: name }))}
-              />
-            </FormField>
-          )}
-        </form.Field>
-      ) : null}
-      <form.Field name="name">
-        {(f) => (
-          <FormField label={t("vars.name")} hideLabel className="sm:w-56">
-            <Input
-              size="sm"
-              mono
-              placeholder={t("vars.name")}
-              value={f.state.value}
-              readOnly={draft.was !== undefined}
-              // oxlint-disable-next-line jsx-a11y/no-autofocus -- the row opens on request, to be typed in
-              autoFocus={draft.was === undefined}
-              onChange={(event) => f.handleChange(event.target.value)}
-              onBlur={f.handleBlur}
-            />
-          </FormField>
-        )}
-      </form.Field>
-      <form.Field name="value">
-        {(f) => (
-          <FormField label={t("vars.value")} hideLabel className="flex-1">
-            <Input
-              size="sm"
-              mono
-              placeholder={t("vars.value")}
-              value={f.state.value}
-              // oxlint-disable-next-line jsx-a11y/no-autofocus -- the row opens on request, to be typed in
-              autoFocus={draft.was !== undefined}
-              onChange={(event) => f.handleChange(event.target.value)}
-              onBlur={f.handleBlur}
-            />
-          </FormField>
-        )}
-      </form.Field>
-      <span className="flex shrink-0 items-center gap-1.5">
-        <Button type="button" variant="ghost" size="xs" onClick={onCancel}>
-          {t("edit.cancel")}
-        </Button>
-        <form.Subscribe selector={(s) => nameRule.test(s.values.name.trim())}>
-          {(valid) => (
-            <Button type="submit" size="xs" disabled={!valid}>
-              <ReviewWord />
-            </Button>
-          )}
-        </form.Subscribe>
-      </span>
-    </form>
-  )
-}
+const fieldWords = {
+  "metadata.name": "vars.field.podName",
+  "metadata.namespace": "vars.field.namespace",
+  "status.podIP": "vars.field.podIP",
+  "status.hostIP": "vars.field.hostIP",
+  "spec.nodeName": "vars.field.nodeName",
+  "spec.serviceAccountName": "vars.field.serviceAccount",
+  "limits.cpu": "vars.field.cpuLimit",
+  "limits.memory": "vars.field.memoryLimit",
+  "requests.cpu": "vars.field.cpuRequest",
+  "requests.memory": "vars.field.memoryRequest",
+} as const
 
-function quote(value: string): string {
-  return /[\s#"']/.test(value) ? JSON.stringify(value) : value
-}
+type FieldKey = (typeof fieldWords)[keyof typeof fieldWords]
 
-function describe(source: Schemas["ValueSource"]): string {
-  return [source.kind, source.name, source.key ?? source.fieldPath].filter(Boolean).join(" ")
-}
-
-function SourceChip({
-  source,
-}: {
-  source: Schemas["ValueSource"] | Schemas["ImportedEnv"]["source"]
-}) {
-  const icon =
-    source.kind === "Secret" ? (
-      <KeyIcon className="size-3" aria-hidden="true" />
-    ) : source.kind === "ConfigMap" ? (
-      <FileTextIcon className="size-3" aria-hidden="true" />
-    ) : (
-      <TreeStructureIcon className="size-3" aria-hidden="true" />
-    )
-  const detail =
-    "key" in source && source.key
-      ? source.key
-      : "fieldPath" in source && source.fieldPath
-        ? source.fieldPath
-        : ""
-  return (
-    <span
-      className="inline-flex w-fit max-w-full items-center gap-1 type-meta text-muted-foreground"
-      translate="no"
-      title={`${source.kind} ${source.name ?? ""} ${detail}`.trim()}
-    >
-      {icon}
-      <span>{source.kind}</span>
-      <span className="truncate font-mono text-foreground/80">{source.name ?? ""}</span>
-      {detail ? <span className="truncate font-mono">{detail}</span> : null}
-    </span>
-  )
+function sourceWords(t: Translate, source: Source, whole = false): string {
+  const name = source.name ?? ""
+  switch (source.kind) {
+    case "Secret":
+      return whole || !source.key
+        ? t("vars.allOfSecret", name)
+        : t("vars.inSecret", name, source.key)
+    case "ConfigMap":
+      return whole || !source.key
+        ? t("vars.allOfConfig", name)
+        : t("vars.inConfig", name, source.key)
+    case "PodField":
+    case "ResourceField": {
+      const path = source.fieldPath ?? ""
+      const key = (fieldWords as Record<string, FieldKey | undefined>)[path]
+      return key ? t(key) : t("vars.field.other", path)
+    }
+    case "File":
+      return t("vars.fromFile", source.fieldPath ?? name)
+    case "Literal":
+      return ""
+  }
 }
