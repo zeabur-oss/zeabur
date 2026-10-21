@@ -102,7 +102,7 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex h-5 items-center justify-between gap-x-3">
       <span className="shrink-0 text-xs font-medium text-secondary">{label}</span>
-      <div className="flex min-w-0 justify-end">{children}</div>
+      <div className="flex min-w-0 flex-1 justify-end">{children}</div>
     </div>
   )
 }

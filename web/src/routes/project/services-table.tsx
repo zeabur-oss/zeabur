@@ -14,6 +14,7 @@ import { ServiceStatus, useStatusWord } from "@/components/status"
 import { Select } from "@zeabur/design-system/components/select"
 import { useT } from "@/i18n"
 import { usageQuery } from "@/api/queries"
+import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { serviceLink } from "@/lib/place"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
@@ -74,8 +75,11 @@ export function ServicesTable({
   const search = route.useSearch()
   const navigate = useNavigate({ from: "/projects/$project" })
   const f = useQuantityFormat()
-  const usage = useQuery(usageQuery(project)).data
-  const live = usage?.state === "available"
+  const usageRead = useQuery(usageQuery(project))
+  const usage = usageRead.data
+  // The columns are held while metrics-server answers, so they do not push the rest aside.
+  const measuring = usageRead.isPending
+  const live = measuring || usage?.state === "available"
   const [query, setQuery] = useState(typed)
   const set = (patch: Partial<ProjectSearch>) =>
     void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
@@ -186,8 +190,8 @@ export function ServicesTable({
               {sortable("restarts", t("table.restarts"), "text-right")}
               {live ? (
                 <>
-                  <th className={cn(head, "text-right")}>{t("resources.cpu")}</th>
-                  <th className={cn(head, "text-right")}>{t("resources.memory")}</th>
+                  <th className={cn(head, "w-24 text-right")}>{t("resources.cpu")}</th>
+                  <th className={cn(head, "w-24 text-right")}>{t("resources.memory")}</th>
                 </>
               ) : null}
               <th className={head}>{t("table.domain")}</th>
@@ -251,7 +255,13 @@ export function ServicesTable({
                   {live ? (
                     <>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {used?.cpu !== undefined ? f.cpu(used.cpu) : "—"}
+                        {measuring ? (
+                          <Skeleton className="ml-auto h-4 w-10" />
+                        ) : used?.cpu !== undefined ? (
+                          f.cpu(used.cpu)
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td
                         className={cn(
@@ -259,7 +269,13 @@ export function ServicesTable({
                           used?.nearLimit && "font-medium text-warn-strong",
                         )}
                       >
-                        {used?.memory !== undefined ? f.memory(used.memory) : "—"}
+                        {measuring ? (
+                          <Skeleton className="ml-auto h-4 w-10" />
+                        ) : used?.memory !== undefined ? (
+                          f.memory(used.memory)
+                        ) : (
+                          "—"
+                        )}
                         {used?.nearLimit ? (
                           <span className="sr-only">{` ${t("usage.note.nearLimit")}`}</span>
                         ) : null}

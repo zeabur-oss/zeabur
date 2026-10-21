@@ -64,13 +64,17 @@ export function HomePage() {
         <PageHeader title={t("home.title")} />
         <StateLine adopted={adopted} loaded={projects.isSuccess} problems={problems} />
       </div>
-      <ProblemsSection problems={problems} />
-      <ProjectsSection
-        adopted={adopted}
-        pending={projects.isPending}
-        error={projects.isError ? projects.error : null}
-      />
-      <WarningsSection adopted={adopted} />
+      {/* Problems come in after the projects; showing both at once keeps them from pushing the
+          projects down. */}
+      {projects.isPending || problems.pending ? (
+        <LoadingRows label={t("common.loading")} rows={4} />
+      ) : (
+        <>
+          <ProblemsSection problems={problems} />
+          <ProjectsSection adopted={adopted} error={projects.isError ? projects.error : null} />
+          <WarningsSection adopted={adopted} />
+        </>
+      )}
     </div>
   )
 }
@@ -210,7 +214,6 @@ function ClusterFacts() {
 
 function ProblemsSection({ problems }: { problems: Problems }) {
   const t = useT()
-  if (problems.pending) return <LoadingRows label={t("common.loading")} rows={2} />
   if (problems.count === 0 && problems.rolling.length === 0)
     return problems.notices > 0 ? <Notices count={problems.notices} /> : null
   return (
@@ -304,15 +307,7 @@ function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
   return rank(a) - rank(b) || a.name.localeCompare(b.name)
 }
 
-function ProjectsSection({
-  adopted,
-  pending,
-  error,
-}: {
-  adopted: ProjectItem[]
-  pending: boolean
-  error: Error | null
-}) {
+function ProjectsSection({ adopted, error }: { adopted: ProjectItem[]; error: Error | null }) {
   const t = useT()
   const shown = adopted.toSorted(byProjectHealth).slice(0, PROJECTS_SHOWN)
   return (
@@ -321,9 +316,7 @@ function ProjectsSection({
         <h2 id="home-projects" className="type-heading">
           {t("shell.projects")}
         </h2>
-        {pending || error ? null : (
-          <span className="type-meta text-muted-foreground">{adopted.length}</span>
-        )}
+        {error ? null : <span className="type-meta text-muted-foreground">{adopted.length}</span>}
         <div className="ml-auto flex items-center gap-3">
           <Link to="/projects" className="type-meta text-secondary hover:text-main">
             {t("home.allProjects")}
@@ -331,9 +324,7 @@ function ProjectsSection({
           <ProjectViewSwitch />
         </div>
       </div>
-      {pending ? (
-        <LoadingRows label={t("common.loading")} rows={3} />
-      ) : error ? (
+      {error ? (
         isStatus(error, 403) ? (
           <Forbidden
             error={error}

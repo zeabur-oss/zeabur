@@ -143,6 +143,7 @@ export default function HistoryChart({
           ))}
           <ChartTooltip
             cursor
+            isAnimationActive={false}
             content={
               <ChartTooltipContent
                 indicator="line"

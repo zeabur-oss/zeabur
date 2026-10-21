@@ -13,16 +13,19 @@ import {
   eventsQuery,
   namespaceQuery,
   nodesQuery,
+  projectGapsQuery,
+  projectIncidentsQuery,
   projectQuery,
   projectsQuery,
   queryClient,
   recentWarningsQuery,
+  rolloutQuery,
   upgradesQuery,
 } from "@/api/queries"
 import { AppShell } from "@/components/app-shell"
 import { NotFound } from "@/components/not-found"
 import { RouteError, RoutePending } from "@/components/route-states"
-import { canonicalKind } from "@/model/service"
+import { canonicalKind, isTask } from "@/model/service"
 import {
   servicePlace,
   validateComponentsSearch,
@@ -119,7 +122,13 @@ const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project",
   validateSearch: validateProjectSearch,
-  loader: ({ params }) => loadProject(params.project),
+  // Incidents and suggestions add to the header and the top of the page, so they are read first.
+  loader: ({ params }) =>
+    load(
+      loadProject(params.project),
+      ensure(projectIncidentsQuery(params.project)),
+      ensure(projectGapsQuery(params.project)),
+    ),
   remountDeps: ({ params }) => params.project,
   component: lazyRouteComponent(() => import("@/routes/project/page"), "ProjectPage"),
 })
@@ -189,7 +198,15 @@ const serviceRoute = createRoute({
       })
     }
   },
-  loader: ({ params }) => loadProject(params.project),
+  // The rollout and the cluster's name are in the status at the top, so they are read first.
+  loader: ({ params }) =>
+    load(
+      loadProject(params.project),
+      ensure(clusterQuery),
+      ...(isTask(params.kind)
+        ? []
+        : [ensure(rolloutQuery(params.project, params.kind, params.name))]),
+    ),
   remountDeps: ({ params }) => `${params.project}/${params.kind}/${params.name}`,
   component: lazyRouteComponent(() => import("@/routes/service/page"), "ServicePage"),
 })

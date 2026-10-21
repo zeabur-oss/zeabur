@@ -141,7 +141,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
   )
 }
 
-/** Live CPU and memory beside the service's status; nothing until metrics-server answers. */
+/** Live CPU and memory beside the service's status; its place is kept while metrics-server answers. */
 export function UsageGlance({
   project,
   service,
@@ -153,11 +153,13 @@ export function UsageGlance({
 }) {
   const t = useT()
   const usage = useQuery(usageQuery(project))
-  if (usage.data?.state !== "available") return null
+  const pending = usage.isPending && service.pods.some((pod) => pod.ready)
+  if (!pending && usage.data?.state !== "available") return null
   const { requests, limits } = templateAmounts(service)
-  const sum = sumUsage(measured(service, usage.data))
-  if (sum.pods === 0) return null
-  const scale = (value?: number) => (value === undefined ? undefined : value * sum.pods)
+  const sum = usage.data ? sumUsage(measured(service, usage.data)) : undefined
+  if (!pending && !sum?.pods) return null
+  const pods = sum?.pods ?? service.pods.length
+  const scale = (value?: number) => (value === undefined ? undefined : value * pods)
   const replicas = service.pods.length
   return (
     <SummaryCardAside>
@@ -172,13 +174,14 @@ export function UsageGlance({
         <TotalBlock
           key={kind}
           title={t(kind === "cpu" ? "resources.cpu" : "resources.memory")}
-          used={sum[kind]}
+          used={sum?.[kind]}
           request={scale(requests[kind])}
           limit={scale(limits[kind])}
           kind={kind}
           replicas={replicas}
-          measuredPods={sum.pods}
+          measuredPods={pods}
           showUsage
+          pending={pending}
         />
       ))}
     </SummaryCardAside>
@@ -227,6 +230,7 @@ function TotalBlock({
   replicas,
   measuredPods,
   showUsage,
+  pending = false,
 }: {
   title: string
   used?: number
@@ -236,6 +240,7 @@ function TotalBlock({
   replicas: number
   measuredPods: number
   showUsage: boolean
+  pending?: boolean
 }) {
   const t = useT()
   const f = useFormat()
@@ -256,7 +261,11 @@ function TotalBlock({
           {title}
           {replicas > 1 ? ` ${t("usage.acrossPods", replicas)}` : ""}
         </span>
-        {showUsage && used !== undefined ? (
+        {pending ? (
+          <span key="pending" className="type-figure">
+            <Skeleton className="inline-block h-5 w-16" />
+          </span>
+        ) : showUsage && used !== undefined ? (
           <span className="flex items-baseline gap-1.5">
             <span className="type-figure tabular-nums">{fmt(used)}</span>
             {share !== undefined ? (
@@ -267,7 +276,12 @@ function TotalBlock({
           </span>
         ) : null}
       </div>
-      <UsageBar used={showUsage ? used : undefined} request={request} limit={limit} label={label} />
+      <UsageBar
+        used={showUsage ? used : undefined}
+        request={pending ? undefined : request}
+        limit={limit}
+        label={label}
+      />
       <span className="flex flex-wrap gap-x-3 type-meta text-muted-foreground tabular-nums">
         <span>
           {request !== undefined ? t("usage.reservedWord", fmt(request)) : t("usage.noReserved")}
