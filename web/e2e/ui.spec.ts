@@ -446,6 +446,36 @@ test("the services search box follows the URL on Back and Forward", async ({ pag
   await expect(box).toHaveValue("")
 })
 
+test("Refresh next to the update time asks the cluster again, also after a failed read", async ({
+  page,
+}) => {
+  await page.clock.install()
+  await page.goto(project)
+  const header = page.locator("main header").first()
+  const status = header.getByRole("status")
+  await expect(status).toContainText("Updated just now")
+
+  const document = new RegExp(`/api/v1/projects/${namespace}$`)
+  await page.route(document, (route) => route.abort())
+  await page.clock.fastForward("03:00")
+  // The failed read is retried a few times before it counts.
+  await expect(async () => {
+    await page.clock.runFor(10_000)
+    await expect(status).toContainText("Couldn't refresh", { timeout: 500 })
+  }).toPass()
+  await expect(status).toContainText("Updated 3m ago")
+
+  await page.unroute(document)
+  const refresh = status.getByRole("button", { name: "Refresh" })
+  const asked = page.waitForResponse(document)
+  await refresh.click()
+  await expect(refresh).toBeDisabled()
+  await asked
+  await expect(status).toContainText("Updated just now")
+  await expect(status).not.toContainText("Couldn't refresh")
+  await expect(refresh).toBeEnabled()
+})
+
 // The writes touch only `editor` and its ConfigMap, so the tests above see the same project.
 // They expect a fresh namespace: scripts/e2e-ui.sh recreates it before a run.
 const editor = "editor"

@@ -12,6 +12,7 @@ import PushPinFillIcon from "~icons/ph/push-pin-fill"
 import type { Schemas } from "@/api/client"
 import { objectsQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
+import { UpdatedAt } from "@/components/freshness"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import {
@@ -280,9 +281,8 @@ function ObjectList({
         <span className="ml-auto flex items-center gap-2 type-meta text-muted-foreground tabular-nums">
           {t("objects.count", total)}
           {updated ? (
-            <span className="ml-1 flex items-center gap-1">
-              {t("objects.updated")}
-              <Ago iso={updated} />
+            <span className="ml-1">
+              <UpdatedAt at={Date.parse(updated)} />
             </span>
           ) : null}
           <Button
@@ -296,7 +296,7 @@ function ObjectList({
           >
             <ArrowClockwiseIcon
               aria-hidden="true"
-              className={cn(refreshing && "motion-safe:animate-spin")}
+              className={cn(refreshing && "motion-safe:animate-spin motion-reduce:animate-pulse")}
             />
           </Button>
         </span>

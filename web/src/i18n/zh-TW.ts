@@ -334,7 +334,6 @@ export const zhTW: Messages = {
   "attention.ready": (ready, desired) => `${ready}/${desired} 就緒`,
   "attention.logsOf": (pod) => `${pod} 的日誌`,
   "attention.eventsOf": (pod) => `${pod} 的事件`,
-  "overview.updated": "更新於",
   "overview.healthy": "正常",
   "overview.failingCount": (n) => `${n} 個失敗`,
   "overview.degradedCount": (n) => `${n} 個未就緒`,
@@ -687,7 +686,6 @@ export const zhTW: Messages = {
   "objects.scan": "掃描全部種類",
   "objects.scanning": "正在掃描…",
   "objects.scanned": "已讀取全部種類",
-  "objects.updated": "更新於",
   "objects.refresh": "重新整理",
   "objects.load": (kind: string) => `讀取 ${kind}`,
   "objects.unread": "未讀取",
@@ -1532,7 +1530,10 @@ export const zhTW: Messages = {
   "project.next.command": "用範例網頁伺服器試試看",
   "project.next.after": "用 kubectl 執行，或套用你自己的 YAML。頁面會自動更新。",
   "freshness.failed": "無法更新",
-  "freshness.lastRead": "最後讀取",
+  "freshness.justNow": "剛剛更新",
+  "freshness.ago": (count, unit) =>
+    `${count} ${unit === "minute" ? "分鐘" : unit === "hour" ? "小時" : "天"}前更新`,
+  "freshness.refresh": "重新整理",
   "home.state.fine": (services, projects) =>
     `${projects} 個專案中的 ${services} 個服務都在正常執行。`,
   "home.state.problems": (n) => `有 ${n} 個問題需要處理。`,

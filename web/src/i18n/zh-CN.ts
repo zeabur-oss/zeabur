@@ -334,7 +334,6 @@ export const zhCN: Messages = {
   "attention.ready": (ready, desired) => `${ready}/${desired} 就绪`,
   "attention.logsOf": (pod) => `${pod} 的日志`,
   "attention.eventsOf": (pod) => `${pod} 的事件`,
-  "overview.updated": "更新于",
   "overview.healthy": "正常",
   "overview.failingCount": (n) => `${n} 个异常`,
   "overview.degradedCount": (n) => `${n} 个未就绪`,
@@ -685,7 +684,6 @@ export const zhCN: Messages = {
   "objects.scan": "扫描全部类型",
   "objects.scanning": "正在扫描…",
   "objects.scanned": "已读取全部类型",
-  "objects.updated": "更新于",
   "objects.refresh": "刷新",
   "objects.load": (kind: string) => `读取 ${kind}`,
   "objects.unread": "未读取",
@@ -1524,7 +1522,10 @@ export const zhCN: Messages = {
   "project.next.command": "用示例 Web 服务器试试",
   "project.next.after": "用 kubectl 运行，或应用你自己的 YAML。页面会自动更新。",
   "freshness.failed": "无法刷新",
-  "freshness.lastRead": "最后读取",
+  "freshness.justNow": "刚刚更新",
+  "freshness.ago": (count, unit) =>
+    `${count} ${unit === "minute" ? "分钟" : unit === "hour" ? "小时" : "天"}前更新`,
+  "freshness.refresh": "刷新",
   "home.state.fine": (services, projects) =>
     `${projects} 个项目中的 ${services} 个服务都在正常运行。`,
   "home.state.problems": (n) => `有 ${n} 个问题需要处理。`,

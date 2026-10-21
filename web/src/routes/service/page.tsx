@@ -16,7 +16,7 @@ import TrashIcon from "~icons/ph/trash"
 
 import type { Schemas } from "@/api/client"
 import { evidenceQuery, projectQuery, queryClient } from "@/api/queries"
-import { Freshness } from "@/routes/project/page"
+import { Freshness } from "@/components/freshness"
 import { CopyButton } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { describeDraft, DraftProvider, useDraftState, type Draft } from "@/components/plan/draft"
@@ -234,9 +234,11 @@ function ServiceView({
                   {service.created ? (
                     <span>{t("service.created", formatDate(service.created, locale))}</span>
                   ) : null}
-                  {fresh.isRefetchError ? (
-                    <Freshness updatedAt={fresh.dataUpdatedAt} failed />
-                  ) : null}
+                  <Freshness
+                    project={project}
+                    updatedAt={fresh.dataUpdatedAt}
+                    failed={fresh.isRefetchError}
+                  />
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-1.5">

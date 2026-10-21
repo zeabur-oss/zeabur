@@ -377,7 +377,6 @@ export const en = {
   "attention.ready": (ready: number, desired: number) => `${ready}/${desired} ready`,
   "attention.logsOf": (pod: string) => `Logs of ${pod}`,
   "attention.eventsOf": (pod: string) => `Events of ${pod}`,
-  "overview.updated": "Updated",
   "overview.healthy": "Healthy",
   "overview.failingCount": (n: number) => `${n} failing`,
   "overview.degradedCount": (n: number) => `${n} not ready`,
@@ -755,7 +754,6 @@ export const en = {
   "objects.scan": "Scan all kinds",
   "objects.scanning": "Scanning…",
   "objects.scanned": "All kinds read",
-  "objects.updated": "updated",
   "objects.refresh": "Refresh",
   "objects.load": (kind: string) => `Read ${kind}`,
   "objects.unread": "Not read",
@@ -1672,7 +1670,10 @@ export const en = {
   "project.next.command": "Try it with a sample web server",
   "project.next.after": "Run it with kubectl, or apply your own YAML. The page updates by itself.",
   "freshness.failed": "Couldn't refresh",
-  "freshness.lastRead": "Last read",
+  "freshness.justNow": "Updated just now",
+  "freshness.ago": (count: number, unit: "minute" | "hour" | "day") =>
+    `Updated ${count}${unit === "minute" ? "m" : unit === "hour" ? "h" : "d"} ago`,
+  "freshness.refresh": "Refresh",
   "home.state.fine": (services: number, projects: number) =>
     `All ${services} services in ${plural(projects, "project", "projects")} are running.`,
   "home.state.problems": (n: number) =>

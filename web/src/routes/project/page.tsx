@@ -7,13 +7,14 @@ import TreeStructureIcon from "~icons/ph/tree-structure"
 
 import type { Schemas } from "@/api/client"
 import { projectGapsQuery, projectIncidentsQuery, projectQuery } from "@/api/queries"
-import { Ago, Segmented } from "@/components/bits"
+import { Segmented } from "@/components/bits"
 import { CopyText } from "@/components/copy-text"
+import { Freshness } from "@/components/freshness"
 import { GapList } from "@/components/gaps"
 import { IncidentRow, isTakenDown, takenDown } from "@/components/incident"
 import { ProblemRow } from "@/components/problem-row"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
-import { StatusDot, StatusPill } from "@/components/status"
+import { StatusPill } from "@/components/status"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
 import { Drawer } from "@zeabur/design-system/components/drawer"
@@ -135,7 +136,11 @@ function Header({ project, data, view }: { project: string; data: Project; view?
           }
           actions={
             <span className="flex flex-wrap items-center gap-3">
-              <Freshness updatedAt={document.dataUpdatedAt} failed={document.isRefetchError} />
+              <Freshness
+                project={project}
+                updatedAt={document.dataUpdatedAt}
+                failed={document.isRefetchError}
+              />
               <Suggestions project={project} data={data} />
               {view ? (
                 <Segmented
@@ -185,28 +190,6 @@ function HealthPill({ data }: { data: Project }) {
   if (summary.health === "progress")
     return <StatusPill health="progress">{t("status.rollingOut")}</StatusPill>
   return <StatusPill health="ok">{t("overview.healthy")}</StatusPill>
-}
-
-/** When the page last heard from the cluster; a failed refresh says so instead of looking current. */
-export function Freshness({ updatedAt, failed }: { updatedAt: number; failed: boolean }) {
-  const t = useT()
-  if (!updatedAt) return null
-  const at = <Ago iso={new Date(updatedAt).toISOString()} />
-  if (failed)
-    return (
-      <span role="status" className="flex items-center gap-1.5 type-meta text-warn-strong">
-        <StatusDot health="warn" />
-        {t("freshness.failed")}
-        <span className="text-muted-foreground">
-          {t("freshness.lastRead")} {at}
-        </span>
-      </span>
-    )
-  return (
-    <span className="type-meta text-muted-foreground">
-      {t("overview.updated")} {at}
-    </span>
-  )
 }
 
 function Suggestions({ project, data }: { project: string; data: Project }) {

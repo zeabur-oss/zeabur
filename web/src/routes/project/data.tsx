@@ -31,7 +31,8 @@ export function ProjectData({
         <LoadingRows label={t("common.loading")} rows={6} />
       </PageColumn>
     )
-  if (view.isError)
+  // A failed refresh keeps what was read; the header's freshness says it failed.
+  if (!view.data)
     return (
       <PageColumn className="my-6">
         <Problem error={view.error} />

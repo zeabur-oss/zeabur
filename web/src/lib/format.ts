@@ -1,3 +1,5 @@
+import type { Translate } from "@/i18n"
+
 export function formatTime(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
@@ -24,4 +26,13 @@ export function formatDate(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(date)
+}
+
+/** "Updated just now", "Updated 3m ago": how long ago the page last heard from the cluster. */
+export function updatedWords(t: Translate, updatedAt: number, now: number): string {
+  const seconds = Math.max(0, Math.floor((now - updatedAt) / 1000))
+  if (seconds < 60) return t("freshness.justNow")
+  if (seconds < 3_600) return t("freshness.ago", Math.floor(seconds / 60), "minute")
+  if (seconds < 86_400) return t("freshness.ago", Math.floor(seconds / 3_600), "hour")
+  return t("freshness.ago", Math.floor(seconds / 86_400), "day")
 }
