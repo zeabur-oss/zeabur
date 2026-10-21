@@ -29,6 +29,7 @@ import { bounds, layout, type LaidEdge, type LaidNode, type Lane } from "@/model
 import {
   claimOf,
   domainsOf,
+  imageTag,
   serviceId,
   statusOf,
   volumesOf,
@@ -509,15 +510,14 @@ function ServiceCard({
             <span className="truncate text-sm leading-tight font-semibold" translate="no">
               {service.displayName ?? service.name}
             </span>
-            <span
-              className={cn(
-                "truncate type-micro leading-tight text-muted-foreground",
-                host && "font-mono",
-              )}
-              translate="no"
-            >
-              {host ?? service.kind}
-            </span>
+            {host || service.image ? (
+              <span
+                className="truncate font-mono type-micro leading-tight text-muted-foreground"
+                translate="no"
+              >
+                {host ?? imageTag(service.image)}
+              </span>
+            ) : null}
           </span>
           {first ? (
             <Badge variant="fail" className="shrink-0">
