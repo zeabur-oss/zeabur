@@ -111,6 +111,7 @@ export function Layers({
   quote,
   also,
   fix,
+  fixLead,
   action,
   evidence,
   fields,
@@ -123,6 +124,8 @@ export function Layers({
   /** What else the problem takes down, said where its cause is. */
   also?: ReactNode
   fix: string
+  /** Who must act, when it is not the reader, in place of "What to do". */
+  fixLead?: string
   action?: ReactNode
   evidence?: Schemas["Origin"][]
   fields?: Schemas["FieldCause"][]
@@ -147,8 +150,7 @@ export function Layers({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <div className="min-w-0 flex-1 basis-60 text-foreground">
           <span className="font-medium">
-            {t("problem.whatToDo")}
-            {t("common.colon")}
+            {fixLead ?? `${t("problem.whatToDo")}${t("common.colon")}`}
           </span>
           {fix}
         </div>

@@ -218,8 +218,8 @@ why. Add a row before introducing a new concept.
 | retrying (an event's `BackOff`) | 重試等待中 | 重试等待中 | An event's reason follows its plain word in a `Term` |
 | check failed (an event's `Unhealthy`) | 檢查未通過 | 检查未通过 | |
 | suggestion (a gap to close) | 建議 | 建议 | |
-| in the app / in its settings / in the cluster (where a problem comes from) | 應用程式本身／服務設定／叢集 | 应用本身／服务配置／集群 | A label beside the problem, never a verdict on its own |
-| you can fix this / needs a cluster admin (who can fix it) | 你可以修正／需要叢集管理員 | 你可以修复／需要集群管理员 | |
+| errors in the app / settings to change / caused by the cluster (where a problem comes from, as a group title) | 應用程式出錯／需要調整設定／叢集造成的問題 | 应用出错／需要调整配置／集群造成的问题 | Group titles on Home; beside a single problem, a cause outside the service is a sentence, and the reader's own is not said |
+| this needs a cluster administrator (who must act, when it is not the reader) | 這需要叢集管理員處理 | 这需要集群管理员处理 | Leads the fix, with 複製診斷 as the primary action; never said when the reader can fix it |
 | public domain | 公開網域 | 公开域名 | An Ingress or HTTPRoute host; the dashboard's 公有網路 names the network, not the address |
 | private network | 私有網路 | 私有网络 | Reaching a service from inside the cluster through its `Service`; the dashboard says 內網 |
 | private address | 私有位址 | 私有地址 | A `Service` DNS name and port; never 內部位址 |

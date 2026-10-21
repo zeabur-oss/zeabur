@@ -9,9 +9,12 @@ import { useT } from "@/i18n"
 export function CopyText({
   value,
   label,
+  primary = false,
 }: {
   value: () => string | Promise<string>
   label: string
+  /** The one thing the reader can do, such as handing a cluster's problem to its administrator. */
+  primary?: boolean
 }) {
   const t = useT()
   const [copied, setCopied] = useState(false)
@@ -25,7 +28,12 @@ export function CopyText({
     }
   }
   return (
-    <Button variant="ghost" size="sm" onClick={() => void copy()} aria-live="polite">
+    <Button
+      variant={primary ? "default" : "ghost"}
+      size="sm"
+      onClick={() => void copy()}
+      aria-live="polite"
+    >
       {copied ? (
         <CheckIcon aria-hidden="true" data-icon="inline-start" />
       ) : (

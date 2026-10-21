@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import FileTextIcon from "~icons/ph/file-text"
 
 import { diagnosisAction, DiagnosisLine } from "@/components/diagnoses"
-import { OriginChips } from "@/components/origin"
+import { FixerLine } from "@/components/origin"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus } from "@/components/status"
 import { buttonVariants } from "@zeabur/design-system/components/button"
@@ -73,7 +73,7 @@ export function ProblemRow({
         {first ? (
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
             <DiagnosisLine diagnoses={service.diagnoses} />
-            <OriginChips {...originOf(first)} />
+            <FixerLine fixer={originOf(first).fixer} />
           </div>
         ) : null}
         {children}

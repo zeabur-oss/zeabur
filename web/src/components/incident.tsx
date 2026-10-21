@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router"
 
 import type { Schemas } from "@/api/client"
 import { Ago } from "@/components/bits"
-import { OriginChips } from "@/components/origin"
+import { fixLead } from "@/components/origin"
 import { StatusDot } from "@/components/status"
 import { useSentence, useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
@@ -46,11 +46,11 @@ export function IncidentRow({
     <li className="flex flex-wrap items-start gap-x-3 gap-y-1 border-t border-rule px-4 py-3 first:border-t-0">
       <StatusDot health="fail" className="mt-1.5" />
       <div className="flex min-w-60 flex-1 flex-col gap-1">
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <span className="font-medium">{write(incident.cause)}</span>
-          <OriginChips origin={incident.fault.origin} fixer={incident.fault.fixer} />
-        </div>
-        <span className="type-meta text-muted-foreground">{write(incident.fix)}</span>
+        <span className="font-medium">{write(incident.cause)}</span>
+        <span className="type-meta text-muted-foreground">
+          {fixLead(t, incident.fault.fixer)}
+          {write(incident.fix)}
+        </span>
         {incident.services.length > 0 ? (
           <span className="type-meta text-muted-foreground">
             {t("home.affects")}

@@ -56,9 +56,9 @@ test("Home names the failing service across projects and lists the project", asy
   // The kubelet reports `CrashLoopBackOff`, `Error`, or briefly "Running" with its last exit.
   await expect(row).toContainText("Keeps crashing")
   await expect(row).toContainText(/CrashLoopBackOff|Error|last exit 1/)
-  // Where it comes from and who can fix it.
-  await expect(row).toContainText("In the app")
-  await expect(row).toContainText("You can fix this")
+  // Grouped by where it comes from; who fixes it is said only when it is not the reader.
+  await expect(attention).toContainText("Errors in the app")
+  await expect(row).not.toContainText("cluster administrator")
   if (!namespace.startsWith("kube-")) {
     // Failing projects sort first.
     const projects = page.getByRole("list", { name: "Projects" })
@@ -297,7 +297,11 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
   const header = page.locator("main header").first()
   await header.getByRole("button", { name: "More", exact: true }).click()
   // The menu holds actions; the views are in their tabs.
-  await expect(page.getByRole("menuitem")).toHaveText(["Copy diagnosis", "Delete service"])
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Copy diagnosis",
+    "Copy name for kubectl",
+    "Delete service",
+  ])
   await page.keyboard.press("Escape")
   await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true")
   const overview = page.getByRole("tabpanel", { name: "Overview" })
@@ -313,7 +317,7 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
     "href",
     "/projects",
   )
-  await expect(header.getByText(`Deployment/${healthy}`, { exact: true })).toHaveCount(1)
+  await expect(header.getByText(`Deployment/${healthy}`, { exact: true })).toHaveCount(0)
   await expect(header.getByText(/^Namespace/)).toHaveCount(0)
 
   await tabs.getByRole("tab", { name: "Logs" }).click()
@@ -818,7 +822,7 @@ test("a crash-looping service says why, with its fix and evidence", async ({ pag
   await expect(diagnosis).toContainText(/Pod\//)
   await diagnosis.getByRole("button", { name: "Details for Kubernetes users" }).first().click()
   await expect(diagnosis).toContainText("Exit code")
-  await expect(diagnosis).toContainText("In the app")
+  await expect(diagnosis).toContainText("What to do")
   await diagnosis.getByRole("link", { name: "Open logs" }).first().click()
   await expect(page).toHaveURL(tabUrl("logs"))
   await expect(logsPod(page)).toHaveAccessibleName(new RegExp(`^Replica ${failing}`))

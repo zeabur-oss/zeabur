@@ -1,19 +1,24 @@
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
-import { useT } from "@/i18n"
+import { useT, type Translate } from "@/i18n"
 import type { Fixer, Origin } from "@/model/origin"
 
-/** Where a problem comes from and who can fix it, as two quiet tags. */
-export function OriginChips({ origin, fixer }: { origin: Origin; fixer: Fixer }) {
+/** Where a cause lies when it is not the reader's own service, as one sentence. */
+export function originSentence(t: Translate, origin: Origin): string | undefined {
+  return origin === "code" || origin === "configuration" || origin === "unknown"
+    ? undefined
+    : t(`origin.${origin}.hint`)
+}
+
+/** Who must act when it is not the reader, as the words before the fix. */
+export function fixLead(t: Translate, fixer: Fixer): string | undefined {
+  return fixer === "clusterAdmin" || fixer === "componentOwner"
+    ? t(`fixer.${fixer}.lead`)
+    : undefined
+}
+
+/** Who must act in a row, when it is not the reader; nothing when the reader can fix it. */
+export function FixerLine({ fixer }: { fixer: Fixer }) {
   const t = useT()
-  return (
-    <span className="flex flex-wrap items-center gap-1">
-      <Tooltip content={t(`origin.${origin}.hint`)}>
-        <Badge variant="outline">{t(`origin.${origin}`)}</Badge>
-      </Tooltip>
-      {fixer === "unknown" ? null : (
-        <Badge variant={fixer === "you" ? "secondary" : "warn"}>{t(`fixer.${fixer}`)}</Badge>
-      )}
-    </span>
-  )
+  return fixer === "clusterAdmin" || fixer === "componentOwner" ? (
+    <span className="type-meta text-secondary">{t(`fixer.${fixer}`)}</span>
+  ) : null
 }

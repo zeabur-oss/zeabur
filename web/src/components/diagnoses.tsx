@@ -8,7 +8,7 @@ import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 import type { Schemas } from "@/api/client"
 import { evidenceQuery, projectIncidentsQuery, queryClient } from "@/api/queries"
 import { CopyText } from "@/components/copy-text"
-import { OriginChips } from "@/components/origin"
+import { fixLead, originSentence } from "@/components/origin"
 import { Layers, Raw, type RawRow } from "@/components/problem"
 import { buttonVariants } from "@zeabur/design-system/components/button"
 import { useSentence, useT, writeSentence, type Sentence, type Translate } from "@/i18n"
@@ -128,9 +128,9 @@ function diagnosisText(
   return [
     `${project}/${service.kind}/${service.name}`,
     write(d.cause),
+    ...[originSentence(t, origin)].filter((s) => s !== undefined),
     write(d.why),
-    `${t("problem.whatToDo")}${t("common.colon")}${write(d.fix)}`,
-    `${t(`origin.${origin}`)}${t("common.sep")}${t(`fixer.${fixer}`)}`,
+    `${fixLead(t, fixer) ?? `${t("problem.whatToDo")}${t("common.colon")}`}${write(d.fix)}`,
     ...rawRows(t, d, service).map(([label, value]) => `${label}: ${value}`),
     ...d.evidence.map((e) => `${t("diagnosis.evidence")}: ${e.kind} ${e.name}`),
     ...(d.lastSeen ? [`${t("diagnosis.lastSeen")}: ${d.lastSeen}`] : []),
@@ -172,6 +172,25 @@ export function Diagnoses({
           const action = diagnosisAction(d)
           const raw = rawRows(t, d, service)
           const pod = action.pod ?? d.pods[0]
+          const { origin, fixer } = originOf(d)
+          const lead = fixLead(t, fixer)
+          const where = lead ? undefined : originSentence(t, origin)
+          const copy = (
+            <CopyText
+              primary={lead !== undefined}
+              value={async () => {
+                try {
+                  const bundle = await queryClient.fetchQuery(
+                    evidenceQuery(project, service.kind, service.name),
+                  )
+                  return writeBundle(bundle.markdown, (sentence) => writeSentence(t, sentence))
+                } catch {
+                  return diagnosisText(t, write, d, service, project)
+                }
+              }}
+              label={t("diagnosis.copy")}
+            />
+          )
           return (
             <li
               key={`${d.kind}/${d.container ?? ""}/${d.cause.key}`}
@@ -185,17 +204,17 @@ export function Diagnoses({
                 aria-hidden="true"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-                  <p className="font-medium">{write(d.cause)}</p>
-                  <OriginChips {...originOf(d)} />
-                </div>
+                <p className="font-medium">{write(d.cause)}</p>
+                {where ? <p className="text-secondary">{where}</p> : null}
                 {d.incident ? <IncidentCause project={project} id={d.incident} /> : null}
                 <Layers
                   why={write(d.why)}
                   also={i === 0 ? also : undefined}
                   fix={write(d.fix)}
+                  fixLead={lead}
                   action={
                     <span className="flex flex-wrap items-center gap-1.5">
+                      {lead ? copy : null}
                       <Link
                         {...serviceLink(project, service, { tab: action.tab, pod: action.pod })}
                         className={button}
@@ -220,21 +239,7 @@ export function Diagnoses({
                           {t("tab.terminal")}
                         </Link>
                       ) : null}
-                      <CopyText
-                        value={async () => {
-                          try {
-                            const bundle = await queryClient.fetchQuery(
-                              evidenceQuery(project, service.kind, service.name),
-                            )
-                            return writeBundle(bundle.markdown, (sentence) =>
-                              writeSentence(t, sentence),
-                            )
-                          } catch {
-                            return diagnosisText(t, write, d, service, project)
-                          }
-                        }}
-                        label={t("diagnosis.copy")}
-                      />
+                      {lead ? null : copy}
                     </span>
                   }
                   evidence={d.evidence}
