@@ -19,7 +19,7 @@ export function store<T>(initial: T) {
   }
 }
 
-function load(key: string): string | null {
+export function load(key: string): string | null {
   try {
     return window.localStorage.getItem(key)
   } catch {
@@ -27,7 +27,7 @@ function load(key: string): string | null {
   }
 }
 
-function save(key: string, value: string) {
+export function save(key: string, value: string) {
   try {
     window.localStorage.setItem(key, value)
   } catch {

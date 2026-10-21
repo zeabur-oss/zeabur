@@ -1,6 +1,4 @@
 import { lazy, Suspense, type ReactNode } from "react"
-import TerminalWindowIcon from "~icons/ph/terminal-window"
-import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import type { Schemas } from "@/api/client"
 import { Segmented } from "@/components/bits"
@@ -13,9 +11,6 @@ import { serviceModes, type ServiceMode, type ServiceTab } from "@/routes/search
 import { EventsTab } from "@/routes/service/events"
 
 const LogsTab = lazy(() => import("@/routes/service/logs").then((m) => ({ default: m.LogsTab })))
-const TerminalTab = lazy(() =>
-  import("@/routes/service/terminal").then((m) => ({ default: m.TerminalTab })),
-)
 
 const frame = (child: ReactNode) => (
   <Suspense fallback={<Skeleton variant="card" className="min-h-96 w-full flex-1" />}>
@@ -26,7 +21,6 @@ const frame = (child: ReactNode) => (
 type ModeTab = (typeof serviceModes)[ServiceMode]
 
 const modeOf: Record<ModeTab, ServiceMode> = {
-  logs: "terminal",
   deployments: "events",
   settings: "yaml",
 }
@@ -45,7 +39,6 @@ export function ModeSwitch({
 }) {
   const t = useT()
   const other = modeOf[tab]
-  const icons = tab === "logs"
   return (
     <div className="flex flex-wrap items-center gap-3">
       <Segmented
@@ -55,21 +48,11 @@ export function ModeSwitch({
         options={[
           {
             value: tab as ServiceTab | ServiceMode,
-            label: (
-              <>
-                {icons ? <TextAlignLeftIcon aria-hidden="true" /> : null}
-                {t(`tab.${tab}`)}
-              </>
-            ),
+            label: t(`tab.${tab}`),
           },
           {
             value: other,
-            label: (
-              <>
-                {icons ? <TerminalWindowIcon aria-hidden="true" /> : null}
-                {t(`tab.${other}`)}
-              </>
-            ),
+            label: t(`tab.${other}`),
           },
         ]}
       />
@@ -81,25 +64,17 @@ export function ModeSwitch({
 export function Logs({
   project,
   service,
-  mode,
   pod,
   onPodChange,
 }: {
   project: string
   service: Service
-  mode?: ServiceMode
   pod?: string
   onPodChange: (pod?: string) => void
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {mode === "terminal"
-        ? frame(
-            <TerminalTab project={project} service={service} pod={pod} onPodChange={onPodChange} />,
-          )
-        : frame(
-            <LogsTab project={project} service={service} pod={pod} onPodChange={onPodChange} />,
-          )}
+      {frame(<LogsTab project={project} service={service} pod={pod} onPodChange={onPodChange} />)}
     </div>
   )
 }

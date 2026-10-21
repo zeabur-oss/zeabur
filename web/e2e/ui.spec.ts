@@ -298,6 +298,7 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
   await header.getByRole("button", { name: "More", exact: true }).click()
   // The menu holds actions; the views are in their tabs.
   await expect(page.getByRole("menuitem")).toHaveText([
+    "Open terminal",
     "Copy diagnosis",
     "Copy name for kubectl",
     "Delete service",
@@ -332,9 +333,11 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
     timeout: 30_000,
   })
 
+  // The terminal opens in the dock under the page; Logs stays.
   const logs = page.getByRole("tabpanel", { name: "Logs" })
-  await logs.getByRole("group", { name: "Views" }).getByRole("button", { name: "Terminal" }).click()
-  await expect(page).toHaveURL(modeUrl("logs", "terminal"))
+  await logs.getByRole("button", { name: "Terminal", exact: true }).click()
+  await expect(page.getByRole("region", { name: "Terminal" })).toBeVisible()
+  await expect(page).toHaveURL(tabUrl("logs"))
   await expect(tabs.getByRole("tab", { name: "Logs" })).toHaveAttribute("aria-selected", "true")
 
   await tabs.getByRole("tab", { name: "Settings" }).click()
@@ -350,7 +353,9 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
 
   // Links from before the seven tabs still lead to their place.
   await page.goto(`${project}/services/Deployment/${healthy}?tab=terminal`)
-  await expect(page).toHaveURL(modeUrl("logs", "terminal"))
+  await expect(page).toHaveURL(
+    (url) => url.searchParams.get("tab") === "logs" && !url.searchParams.has("mode"),
+  )
   await page.goto(`${project}/services/Deployment/${healthy}?tab=events`)
   await expect(page).toHaveURL(modeUrl("deployments", "events"))
   await page.goto(`${project}/services/Deployment/${healthy}?tab=yaml`)
@@ -934,13 +939,18 @@ const noShell = env("ZEABUR_E2E_NO_SHELL")
 
 test("a service without a shell opens a debug terminal through a plan", async ({ page }) => {
   test.skip(!noShell, "ZEABUR_E2E_NO_SHELL is not set")
-  await page.goto(`${project}/services/Deployment/${noShell}?tab=terminal`)
-  await expect(page.getByText("This container has no shell")).toBeVisible({ timeout: 20_000 })
-  await page.getByRole("button", { name: "Open debug terminal" }).click()
+  await page.goto(`${project}/services/Deployment/${noShell}?tab=logs`)
+  await page
+    .getByRole("tabpanel", { name: "Logs" })
+    .getByRole("button", { name: "Terminal", exact: true })
+    .click()
+  const dock = page.getByRole("region", { name: "Terminal" })
+  await expect(dock.getByText("This container has no shell")).toBeVisible({ timeout: 20_000 })
+  await dock.getByRole("button", { name: "Open debug terminal" }).click()
   const dialog = page.getByRole("dialog", { name: "Open debug terminal" })
   await expect(dialog).toContainText("Adds a debug container with a shell")
   await dialog.getByRole("button", { name: "Open debug terminal" }).click()
-  await expect(page.getByText("Connected to the debug container")).toBeVisible({ timeout: 30_000 })
+  await expect(dock.getByText("Connected to the debug container")).toBeVisible({ timeout: 30_000 })
 })
 
 test("Networking leads with the short address; the Service sits behind one disclosure", async ({

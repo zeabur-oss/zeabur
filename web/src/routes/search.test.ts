@@ -17,7 +17,7 @@ describe("service places", () => {
   test("links from the four sections lead to the tab that holds them now", () => {
     expect(formerPlace("status")).toEqual({})
     expect(formerPlace("changes")).toEqual({ tab: "deployments" })
-    expect(formerPlace("inspect", "terminal")).toEqual({ tab: "logs", mode: "terminal" })
+    expect(formerPlace("inspect", "terminal")).toEqual({ tab: "logs", terminal: true })
     expect(formerPlace("inspect", "metrics")).toEqual({ tab: "usage" })
     expect(formerPlace("inspect")).toEqual({ tab: "logs" })
     expect(formerPlace("configure", undefined, "networking")).toEqual({ tab: "networking" })
@@ -29,7 +29,7 @@ describe("service places", () => {
   })
 
   test("a view that was a tab of its own opens inside the tab that holds it", () => {
-    expect(formerPlace("terminal")).toEqual({ tab: "logs", mode: "terminal" })
+    expect(formerPlace("terminal")).toEqual({ tab: "logs", terminal: true })
     expect(formerPlace("events")).toEqual({ tab: "deployments", mode: "events" })
     expect(formerPlace("yaml")).toEqual({ tab: "settings", mode: "yaml" })
     expect(validateServiceSearch({ tab: "usage" })).toMatchObject({
@@ -49,11 +49,13 @@ describe("service places", () => {
       tab: undefined,
       former: "terminal",
     })
+    // Logs' terminal view is the dock now: the link opens Logs with the dock.
     expect(validateServiceSearch({ tab: "logs", mode: "terminal" })).toMatchObject({
       tab: "logs",
-      mode: "terminal",
+      mode: undefined,
+      former: "terminal",
     })
-    expect(validateServiceSearch({ tab: "settings", mode: "terminal" })).toMatchObject({
+    expect(validateServiceSearch({ tab: "settings", mode: "events" })).toMatchObject({
       tab: "settings",
       mode: undefined,
     })

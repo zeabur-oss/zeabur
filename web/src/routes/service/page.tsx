@@ -10,6 +10,7 @@ import DotsThreeIcon from "~icons/ph/dots-three"
 import GearSixIcon from "~icons/ph/gear-six"
 import GlobeIcon from "~icons/ph/globe"
 import InfoIcon from "~icons/ph/info"
+import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import CopyIcon from "~icons/ph/copy"
 import TrashIcon from "~icons/ph/trash"
@@ -48,9 +49,10 @@ import type { Icon } from "@/lib/icon"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
+import { openShell } from "@/lib/dock"
 import { serviceLink } from "@/lib/place"
 import { writeBundle } from "@/model/bundle"
-import { eventsFor, serviceId, statusOf, type Project, type Service } from "@/model/service"
+import { eventsFor, isTask, serviceId, statusOf, type Project, type Service } from "@/model/service"
 import { inServiceTabs, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import {
   serviceTabs,
@@ -275,6 +277,15 @@ function ServiceView({
                     <DotsThreeIcon aria-hidden="true" />
                   </MenuTrigger>
                   <MenuContent>
+                    {isTask(service.kind) ? null : (
+                      <>
+                        <MenuItem onClick={() => openShell(project, service, search.pod)}>
+                          <TerminalWindowIcon aria-hidden="true" />
+                          {t("service.openTerminal")}
+                        </MenuItem>
+                        <MenuSeparator />
+                      </>
+                    )}
                     <MenuItem onClick={() => void copyDiagnosis()}>
                       <CopyIcon aria-hidden="true" />
                       {t("diagnosis.copy")}
@@ -336,16 +347,7 @@ function ServiceView({
             className={tab === "logs" ? "flex min-h-0 flex-col" : undefined}
           >
             {tab === "logs" ? (
-              <div className="flex min-h-0 flex-1 flex-col gap-3">
-                <ModeSwitch tab="logs" mode={mode} onMode={setMode} />
-                <Logs
-                  project={project}
-                  service={service}
-                  mode={mode}
-                  pod={search.pod}
-                  onPodChange={setPod}
-                />
-              </div>
+              <Logs project={project} service={service} pod={search.pod} onPodChange={setPod} />
             ) : null}
           </TabsContent>
           <TabsContent value="deployments">

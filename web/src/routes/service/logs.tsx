@@ -11,6 +11,7 @@ import ClockIcon from "~icons/ph/clock"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import DownloadSimpleIcon from "~icons/ph/download-simple"
 import FunnelIcon from "~icons/ph/funnel"
+import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { toProblem } from "@/api/client"
@@ -25,8 +26,9 @@ import { Spinner } from "@zeabur/design-system/components/spinner"
 import { Toggle } from "@zeabur/design-system/components/toggle"
 import { useI18n, useT } from "@/i18n"
 import { parseAnsi } from "@/lib/ansi"
+import { openShell } from "@/lib/dock"
 import { cn } from "@/lib/utils"
-import { podHealth, podReason, worstPod, type Service } from "@/model/service"
+import { isTask, podHealth, podReason, worstPod, type Service } from "@/model/service"
 import { useLogStream } from "@/routes/service/log-stream"
 import {
   Empty,
@@ -220,6 +222,12 @@ export function LogsTab({
           {t("logs.follow")}
         </Toggle>
       </div>
+      {isTask(service.kind) ? null : (
+        <Button variant="outline" size="sm" onClick={() => openShell(project, service, pod.name)}>
+          <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+          {t("tab.terminal")}
+        </Button>
+      )}
     </div>
   )
 

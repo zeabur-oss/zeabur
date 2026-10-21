@@ -7,10 +7,10 @@ import GearSixIcon from "~icons/ph/gear-six"
 import InfoIcon from "~icons/ph/info"
 import SquaresFourIcon from "~icons/ph/squares-four"
 import StackIcon from "~icons/ph/stack"
-import TerminalWindowIcon from "~icons/ph/terminal-window"
 
-import { projectQuery, toolsQuery } from "@/api/queries"
+import { projectQuery } from "@/api/queries"
 import { RoleIcon, ServiceIcon } from "@/components/service-icon"
+import { DockToggle } from "@/components/shell/dock-slot"
 import { ContextMenu } from "@/components/shell/user-menu"
 import { ProjectGlyph } from "@/components/shell/project-glyph"
 import { SearchRow } from "@/components/shell/search-row"
@@ -96,6 +96,7 @@ function SettingsSidebar({ project }: { project: string }) {
       </SidebarContent>
       <SidebarCopyPill label={t("column.namespace")} value={project} copyLabel={t("common.copy")} />
       <SidebarFooter>
+        <DockToggle />
         <ContextMenu />
       </SidebarFooter>
     </Sidebar>
@@ -109,8 +110,7 @@ function ProjectNav({ project }: { project: string }) {
   const data = view.data
   const summary = useProjectSummary(project)
   const advancedOpen = advancedSection.useValue()
-  const advancedHolds = place.entry === "objects" || place.entry === "terminal"
-  const tools = useQuery(toolsQuery(project))
+  const advancedHolds = place.entry === "objects"
 
   const pageRow = ({ entry, to, icon: EntryIcon }: Entry) => (
     <SidebarItem
@@ -181,13 +181,6 @@ function ProjectNav({ project }: { project: string }) {
             to: "/projects/$project/objects",
             icon: CubeIcon,
           })}
-          {tools.data?.available
-            ? pageRow({
-                entry: "terminal",
-                to: "/projects/$project/terminal",
-                icon: TerminalWindowIcon,
-              })
-            : null}
           {data && data.resources.length > 0 ? (
             <OtherObjects project={project} data={data} />
           ) : null}
@@ -195,6 +188,7 @@ function ProjectNav({ project }: { project: string }) {
       </SidebarContent>
       <SidebarCopyPill label={t("column.namespace")} value={project} copyLabel={t("common.copy")} />
       <SidebarFooter>
+        <DockToggle />
         <ContextMenu />
       </SidebarFooter>
     </Sidebar>

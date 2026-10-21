@@ -181,6 +181,36 @@ test("the quick look slides in from the edge and back out before it goes", async
   expect(closing.at(-1)!.present).toBe(false)
 })
 
+const dockShown = '[data-slot="dock"]:not([hidden])'
+
+/** The sidebar's toggle, after the dock has opened and closed once (its code loads on first use). */
+async function dockToggle(page: Page) {
+  await page.goto(`${project}/services/Deployment/${healthy}`)
+  await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible()
+  const toggle = page
+    .getByRole("navigation", { name: "Project sections" })
+    .getByRole("button", { name: "Terminal" })
+  await toggle.click()
+  await expect(page.locator(dockShown)).toBeVisible()
+  await page.keyboard.press("Control+Backquote")
+  await expect(page.locator(dockShown)).toHaveCount(0)
+  return toggle
+}
+
+test("the dock rises from the bottom and sinks back before it hides", async ({ page }) => {
+  const toggle = await dockToggle(page)
+  const opening = await frames(page, dockShown, () => toggle.click())
+  expect(timings(opening)).toEqual(
+    expect.arrayContaining([`opacity 350 ${curve}`, `translate 350 ${curve}`]),
+  )
+  const closing = await frames(page, dockShown, () => page.keyboard.press("Control+Backquote"))
+  expect(timings(closing)).toEqual(
+    expect.arrayContaining([`opacity 250 ${curve}`, `translate 250 ${curve}`]),
+  )
+  expect(closing.filter((f) => f.present).length).toBeGreaterThanOrEqual(6)
+  expect(closing.at(-1)!.present).toBe(false)
+})
+
 test("a popover and a disclosure move on the popup and collapse timings", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${healthy}`)
   const replicas = page.getByRole("button", { name: /^Replicas \d+\/\d+$/ })
@@ -323,6 +353,18 @@ test.describe("with reduced motion", () => {
     expect(longest(opening)).toBeLessThanOrEqual(150)
     const closing = await frames(page, palette, () => page.keyboard.press("Escape"))
     expect([...properties(closing)]).toEqual(["opacity"])
+    expect(closing.filter((f) => f.present && f.opacity < 1).length).toBeGreaterThanOrEqual(1)
+    expect(closing.at(-1)!.present).toBe(false)
+  })
+
+  test("the dock only fades, within 150ms, and its close still waits", async ({ page }) => {
+    const toggle = await dockToggle(page)
+    const opening = await frames(page, dockShown, () => toggle.click())
+    expect([...properties(opening)]).toEqual(["opacity"])
+    expect(longest(opening)).toBeLessThanOrEqual(150)
+    const closing = await frames(page, dockShown, () => page.keyboard.press("Control+Backquote"))
+    expect([...properties(closing)]).toEqual(["opacity"])
+    expect(longest(closing)).toBeLessThanOrEqual(150)
     expect(closing.filter((f) => f.present && f.opacity < 1).length).toBeGreaterThanOrEqual(1)
     expect(closing.at(-1)!.present).toBe(false)
   })

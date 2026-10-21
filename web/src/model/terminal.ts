@@ -22,9 +22,13 @@ export type TerminalState =
   | { phase: "error"; problem: Problem }
   | { phase: "closed"; why: "expired" | "idle" | "lost" }
 
-export type TerminalEvent = { type: "frame"; frame: ServerFrame } | { type: "close"; code: number }
+export type TerminalEvent =
+  | { type: "connect" }
+  | { type: "frame"; frame: ServerFrame }
+  | { type: "close"; code: number }
 
 export function nextState(state: TerminalState, event: TerminalEvent): TerminalState {
+  if (event.type === "connect") return { phase: "connecting" }
   if (event.type === "frame") {
     const frame = event.frame
     switch (frame.type) {
@@ -80,6 +84,27 @@ export function terminalUrl(
   const scheme = location.protocol === "https:" ? "wss:" : "ws:"
   const query = container ? `?${new URLSearchParams({ container })}` : ""
   return `${scheme}//${location.host}/api/v1/projects/${encodeURIComponent(project)}/pods/${encodeURIComponent(pod)}/exec${query}`
+}
+
+export function toolsTerminalUrl(
+  location: Pick<Location, "protocol" | "host">,
+  project: string,
+  name: string,
+): string {
+  const scheme = location.protocol === "https:" ? "wss:" : "ws:"
+  return `${scheme}//${location.host}/api/v1/projects/${encodeURIComponent(project)}/tools/${encodeURIComponent(name)}/terminal`
+}
+
+/** The soonest of the credentials the open terminals were opened with: the first to close. */
+export function nearestExpiry(expiries: Iterable<string | null | undefined>): string | undefined {
+  let nearest: { at: number; iso: string } | undefined
+  for (const iso of expiries) {
+    if (!iso) continue
+    const at = Date.parse(iso)
+    if (Number.isNaN(at)) continue
+    if (!nearest || at < nearest.at) nearest = { at, iso }
+  }
+  return nearest?.iso
 }
 
 /** Both verbs on `pods/exec`: a WebSocket handshake is a GET (RFC 6455 §4.1), so RBAC checks `get`

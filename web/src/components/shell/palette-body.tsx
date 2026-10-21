@@ -24,6 +24,7 @@ import { StatusDot } from "@/components/status"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { addressOf, objectKey } from "@/lib/objects"
+import { dock, openKubectl, openShell, toggleDock } from "@/lib/dock"
 import { serviceLink, usePlace } from "@/lib/place"
 import { palette, recent, remember } from "@/lib/stores"
 import { cn } from "@/lib/utils"
@@ -109,7 +110,7 @@ export function PaletteBody() {
             group: g.actions,
             label: t("palette.openTerminal", s.name),
             icon: TerminalWindowIcon,
-            href: href(project, s, { tab: "terminal" }),
+            run: () => openShell(project, s),
           },
         ]),
     {
@@ -130,17 +131,15 @@ export function PaletteBody() {
     },
   ]
   if (current && place.project) items.push(...verbs(place.project, current, "action"))
-  if (place.project && tools.data?.available)
+  const project = place.project
+  if (project && tools.data?.available)
     items.push({
       id: "action:tools",
       keywords: "kubectl helm terminal shell",
       group: g.actions,
       label: t("action.openToolsTerminal"),
       icon: TerminalWindowIcon,
-      href: router.buildLocation({
-        to: "/projects/$project/terminal",
-        params: { project: place.project },
-      }).href,
+      run: () => openKubectl(project),
     })
 
   for (const p of projects.data?.items ?? [])
@@ -211,6 +210,14 @@ export function PaletteBody() {
     }
   }
 
+  items.push({
+    id: "action:dock",
+    keywords: "terminal shell dock console",
+    group: g.actions,
+    label: dock.get().open ? t("dock.hide") : t("dock.show"),
+    icon: TerminalWindowIcon,
+    run: toggleDock,
+  })
   items.push({
     id: "action:theme",
     group: g.actions,

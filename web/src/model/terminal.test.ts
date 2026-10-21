@@ -3,10 +3,12 @@ import { describe, test, expect } from "bun:test"
 import type { Problem } from "@/api/client"
 import {
   execRole,
+  nearestExpiry,
   nextState,
   parseFrame,
   reconnectsWithRights,
   terminalUrl,
+  toolsTerminalUrl,
   type TerminalEvent,
   type TerminalState,
 } from "@/model/terminal"
@@ -118,5 +120,32 @@ describe("terminal address and access", () => {
     expect(yaml).toMatch(/namespace: shop/)
     expect(yaml).toMatch(/name: "alice@example.com"/)
     expect(yaml).not.toMatch(/ClusterRole/)
+  })
+})
+
+describe("the dock", () => {
+  test("a reconnect starts over from connecting", () => {
+    const closed = run({ type: "close", code: 4000 })
+    expect(closed).toStrictEqual({ phase: "closed", why: "expired" })
+    expect(nextState(closed, { type: "connect" })).toStrictEqual({ phase: "connecting" })
+  })
+
+  test("the nearest expiry is the soonest, skipping the ones without", () => {
+    expect(nearestExpiry([])).toBeUndefined()
+    expect(nearestExpiry([null, undefined, "not a date"])).toBeUndefined()
+    expect(
+      nearestExpiry([
+        "2026-10-21T15:34:00Z",
+        null,
+        "2026-10-21T15:04:00+00:00",
+        "2026-10-21T16:00:00Z",
+      ]),
+    ).toBe("2026-10-21T15:04:00+00:00")
+  })
+
+  test("a kubectl terminal's address", () => {
+    expect(toolsTerminalUrl({ protocol: "https:", host: "z.example" }, "shop", "tools-ada")).toBe(
+      "wss://z.example/api/v1/projects/shop/tools/tools-ada/terminal",
+    )
   })
 })

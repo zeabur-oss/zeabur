@@ -416,6 +416,7 @@ export const en = {
 
   // Service page
   "service.tabs": "Service sections",
+  "service.openTerminal": "Open terminal",
   "service.copyName": "Copy name for kubectl",
   "service.more": "More",
   "service.views": "Views",
@@ -501,6 +502,16 @@ export const en = {
   "logs.unavailableFix.removed":
     "Wait a moment and refresh. To keep logs past restarts, send them to a log store.",
   "logs.currentRun": "Show current run",
+  "dock.label": "Terminal",
+  "dock.show": "Show terminal",
+  "dock.hide": "Hide terminal",
+  "dock.resize": "Terminal height",
+  "dock.close": (name: string) => `Close ${name}`,
+  "dock.count": (count: number) => (count === 1 ? "1 terminal" : `${count} terminals`),
+  "dock.expires": (time: string) => `Credential expires at ${time}`,
+  "dock.emptyTitle": "No terminal open",
+  "dock.emptyBody": "Open one from a service's Logs tab or More menu, or from search.",
+  "dock.gone": "This service is no longer in the project.",
   "terminal.label": "Terminal",
   "terminal.noPodsBody":
     "A terminal opens inside a running replica. One can open once a replica starts.",
@@ -516,8 +527,8 @@ export const en = {
   "terminal.debugEnded": "The debug container has ended. Open another to continue.",
   "terminal.debugOpen": "Connected to the debug container",
   "terminal.failed": "The container runtime ended the session.",
-  "terminal.expired": "The session expired. Reconnect to continue.",
-  "terminal.adminEnded": "Admin rights ended. Reconnect to continue with your own rights.",
+  "terminal.adminEnded":
+    "Admin rights ended, so the terminal closed. Reopen it to continue with your own rights.",
   "terminal.idle": "Closed after 15 minutes without input or output.",
   "terminal.lost": "Connection lost.",
   "terminal.rbac":
@@ -669,7 +680,6 @@ export const en = {
   // Objects and YAML
   "project.entry.objects": "Objects",
   // A project's namespace
-  "project.entry.terminal": "kubectl terminal",
   "project.entry.settings": "Settings",
   "action.adopt": "Adopt",
   "action.unadopt": "Stop showing as a project",

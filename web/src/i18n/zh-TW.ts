@@ -376,6 +376,7 @@ export const zhTW: Messages = {
   "quickLook.noDownstream": "這個服務沒有連到其他服務。",
 
   "service.tabs": "服務頁面",
+  "service.openTerminal": "開啟終端機",
   "service.copyName": "複製 kubectl 用的名稱",
   "service.more": "更多",
   "service.views": "檢視方式",
@@ -457,6 +458,16 @@ export const zhTW: Messages = {
   "logs.currentRun": "看這次執行",
   "logs.count": (n) => `${n} 行`,
   "logs.of": (n) => `共 ${n} 行`,
+  "dock.label": "終端機",
+  "dock.show": "顯示終端機",
+  "dock.hide": "隱藏終端機",
+  "dock.resize": "終端機高度",
+  "dock.close": (name) => `關閉 ${name}`,
+  "dock.count": (count) => `${count} 個終端機`,
+  "dock.expires": (time) => `認證資訊 ${time} 到期`,
+  "dock.emptyTitle": "沒有開啟的終端機",
+  "dock.emptyBody": "從服務的「日誌」分頁或「更多」選單開啟，也可以用搜尋。",
+  "dock.gone": "這個服務已經不在專案裡。",
   "terminal.label": "終端機",
   "terminal.noPodsBody": "終端機要在執行中的副本裡開啟；副本啟動後就能使用。",
   "terminal.pod": "副本",
@@ -471,8 +482,7 @@ export const zhTW: Messages = {
   "terminal.debugEnded": "除錯容器已結束。再開一個即可繼續。",
   "terminal.debugOpen": "已連線到除錯容器",
   "terminal.failed": "容器執行環境結束了這個工作階段。",
-  "terminal.expired": "工作階段已過期。重新連線即可繼續。",
-  "terminal.adminEnded": "管理員權限已結束。重新連線後會改用你自己的權限。",
+  "terminal.adminEnded": "管理員權限已結束，終端機已關閉。重新開啟後會改用你自己的權限。",
   "terminal.idle": "15 分鐘沒有輸入或輸出，已關閉。",
   "terminal.lost": "連線中斷。",
   "terminal.rbac":
@@ -614,7 +624,6 @@ export const zhTW: Messages = {
   // 物件與 YAML
   "project.entry.objects": "物件",
   // 專案的 Namespace
-  "project.entry.terminal": "kubectl 終端機",
   "project.entry.settings": "設定",
   "action.adopt": "納入",
   "action.unadopt": "不再顯示為專案",

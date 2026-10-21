@@ -376,6 +376,7 @@ export const zhCN: Messages = {
   "quickLook.noDownstream": "这个服务没有连到其他服务。",
 
   "service.tabs": "服务页面",
+  "service.openTerminal": "打开终端",
   "service.copyName": "复制 kubectl 用的名称",
   "service.more": "更多",
   "service.views": "查看方式",
@@ -456,6 +457,16 @@ export const zhCN: Messages = {
   "logs.currentRun": "看本次运行",
   "logs.count": (n) => `${n} 行`,
   "logs.of": (n) => `共 ${n} 行`,
+  "dock.label": "终端",
+  "dock.show": "显示终端",
+  "dock.hide": "隐藏终端",
+  "dock.resize": "终端高度",
+  "dock.close": (name) => `关闭 ${name}`,
+  "dock.count": (count) => `${count} 个终端`,
+  "dock.expires": (time) => `凭证 ${time} 到期`,
+  "dock.emptyTitle": "没有打开的终端",
+  "dock.emptyBody": "从服务的“日志”标签页或“更多”菜单打开，也可以用搜索。",
+  "dock.gone": "这个服务已经不在项目中。",
   "terminal.label": "终端",
   "terminal.noPodsBody": "终端要在运行中的副本里打开；副本启动后就能使用。",
   "terminal.pod": "副本",
@@ -470,8 +481,7 @@ export const zhCN: Messages = {
   "terminal.debugEnded": "调试容器已结束。再打开一个即可继续。",
   "terminal.debugOpen": "已连接到调试容器",
   "terminal.failed": "容器运行时结束了这个会话。",
-  "terminal.expired": "会话已过期。重新连接即可继续。",
-  "terminal.adminEnded": "管理员权限已结束。重新连接后将改用你自己的权限。",
+  "terminal.adminEnded": "管理员权限已结束，终端已关闭。重新打开后将改用你自己的权限。",
   "terminal.idle": "15 分钟没有输入或输出，已关闭。",
   "terminal.lost": "连接已断开。",
   "terminal.rbac":
@@ -612,7 +622,6 @@ export const zhCN: Messages = {
   // 对象与 YAML
   "project.entry.objects": "对象",
   // 项目的 Namespace
-  "project.entry.terminal": "kubectl 终端",
   "project.entry.settings": "设置",
   "action.adopt": "纳入",
   "action.unadopt": "不再显示为项目",

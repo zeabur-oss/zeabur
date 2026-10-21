@@ -24,10 +24,12 @@ import {
   queryClient,
   recentWarningsQuery,
   rolloutQuery,
+  toolsQuery,
   upgradesQuery,
 } from "@/api/queries"
 import { AppShell } from "@/components/app-shell"
 import { NotFound } from "@/components/not-found"
+import { openKubectl, openShell, showDock } from "@/lib/dock"
 import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind, isTask } from "@/model/service"
 import {
@@ -52,11 +54,12 @@ import {
 //   /projects/$project/settings                Settings: the project's details, adopted or not
 //   /projects/$project/objects                 Objects: every object by kind, ?object=… opens
 //                                              its YAML
-//   /projects/$project/terminal                a kubectl terminal acting as the person, and
-//                                              their running ones
+//   /projects/$project/terminal                moved: the project, with its kubectl terminal in
+//                                              the dock
 //   /projects/$project/services/$kind/$name    one service: ?tab=logs|deployments|networking|
 //                                              variables|settings (Overview when absent), or a
-//                                              view from its menu (usage, events, terminal, yaml);
+//                                              view from its menu (events, yaml); a former
+//                                              terminal view opens Logs with the dock;
 //                                              Settings' parts as #anchors; a former ?tab=status…
 //                                              redirects to its place
 //   /settings                                  preferences, the signed-in person, About
@@ -188,11 +191,19 @@ const projectSettingsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/project/settings"), "ProjectSettingsPage"),
 })
 
+// The kubectl terminal was a page; it is a tab of the dock under every page now.
 const toolsTerminalRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/terminal",
-  remountDeps: ({ params }) => params.project,
-  component: lazyRouteComponent(() => import("@/routes/project/terminal"), "ToolsTerminalPage"),
+  beforeLoad: async ({ params, preload }) => {
+    if (!preload) {
+      // Where Zeabur runs on the person's computer there is no kubectl terminal: the dock opens empty.
+      const tools = await ensure(toolsQuery(params.project)).catch(() => undefined)
+      if (tools?.available) openKubectl(params.project, { ask: false })
+      else showDock(true)
+    }
+    throw redirect({ to: "/projects/$project", params, replace: true })
+  },
 })
 
 const serviceRoute = createRoute({
@@ -200,11 +211,13 @@ const serviceRoute = createRoute({
   path: "/projects/$project/services/$kind/$name",
   validateSearch: validateServiceSearch,
   // `deployment/worker`, as kubectl prints it, opens `Deployment/worker`.
-  beforeLoad: ({ params, search, location }) => {
+  beforeLoad: ({ params, search, location, preload }) => {
     const kind = canonicalKind(params.kind)
     const former = search.former
     if (kind !== params.kind || former) {
       const place = former ? formerPlace(former, search.view, location.hash) : undefined
+      if (place?.terminal && !preload)
+        openShell(params.project, { kind, name: params.name }, search.pod)
       throw redirect({
         to: "/projects/$project/services/$kind/$name",
         params: { ...params, kind },

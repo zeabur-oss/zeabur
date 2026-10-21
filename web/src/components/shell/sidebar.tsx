@@ -5,6 +5,7 @@ import HardDrivesIcon from "~icons/ph/hard-drives"
 import HouseIcon from "~icons/ph/house"
 
 import { SearchRow } from "@/components/shell/search-row"
+import { DockToggle } from "@/components/shell/dock-slot"
 import { ContextMenu } from "@/components/shell/user-menu"
 import { useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
@@ -75,6 +76,7 @@ export function Sidebar() {
         <SidebarSection title={t("shell.manage")}>{manage.map(navItem)}</SidebarSection>
       </SidebarContent>
       <SidebarFooter>
+        <DockToggle />
         <ContextMenu />
       </SidebarFooter>
     </SidebarRoot>

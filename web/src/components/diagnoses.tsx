@@ -10,8 +10,9 @@ import { evidenceQuery, projectIncidentsQuery, queryClient } from "@/api/queries
 import { CopyText } from "@/components/copy-text"
 import { fixLead, originSentence } from "@/components/origin"
 import { Layers, Raw, type RawRow } from "@/components/problem"
-import { buttonVariants } from "@zeabur/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { useSentence, useT, writeSentence, type Sentence, type Translate } from "@/i18n"
+import { openShell } from "@/lib/dock"
 import { serviceLink } from "@/lib/place"
 import { writeBundle } from "@/model/bundle"
 import { originOf } from "@/model/origin"
@@ -231,13 +232,14 @@ export function Diagnoses({
                         </Link>
                       )}
                       {runs ? (
-                        <Link
-                          {...serviceLink(project, service, { tab: "terminal", pod })}
-                          className={button}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openShell(project, service, pod)}
                         >
                           <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
                           {t("tab.terminal")}
-                        </Link>
+                        </Button>
                       ) : null}
                       {lead ? null : copy}
                     </span>

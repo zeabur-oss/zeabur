@@ -13,7 +13,7 @@ export const serviceTabs = [
 export type ServiceTab = (typeof serviceTabs)[number]
 
 /** Views for people who know Kubernetes, each a second view of a tab, in `?mode=`. */
-export const serviceModes = { terminal: "logs", events: "deployments", yaml: "settings" } as const
+export const serviceModes = { events: "deployments", yaml: "settings" } as const
 export type ServiceMode = keyof typeof serviceModes
 const modes = Object.keys(serviceModes) as ServiceMode[]
 
@@ -26,7 +26,7 @@ export type DraftPart = "variables" | "networking" | SettingsPart
 
 /**
  * Names `?tab=` had before: Status, Changes, Configure and Inspect, the tabs before them, and the
- * views that were tabs of their own.
+ * views that were tabs of their own. The terminal, a view of Logs, is in the dock now.
  */
 const formerTabs = [
   "status",
@@ -35,6 +35,7 @@ const formerTabs = [
   "inspect",
   "releases",
   "metrics",
+  "terminal",
   ...modes,
 ] as const
 type FormerTab = (typeof formerTabs)[number]
@@ -42,11 +43,13 @@ type FormerTab = (typeof formerTabs)[number]
 /** A place on a service's page: a tab, a view, a part of Settings, or a former tab's name. */
 export type ServicePlace = ServiceTab | ServiceMode | SettingsPart | FormerTab
 
-/** Where a place is: the tab, its view, and the part of Settings (the hash). */
+/** Where a place is: the tab, its view, the part of Settings (the hash), and whether the
+ * service's terminal opens in the dock. */
 export function servicePlace(place?: ServicePlace): {
   tab?: ServiceTab
   mode?: ServiceMode
   hash?: SettingsPart
+  terminal?: true
 } {
   switch (place) {
     case undefined:
@@ -63,6 +66,7 @@ export function servicePlace(place?: ServicePlace): {
     case "metrics":
       return { tab: "usage" }
     case "terminal":
+      return { tab: "logs", terminal: true }
     case "events":
     case "yaml":
       return { tab: serviceModes[place], mode: place }
@@ -85,7 +89,11 @@ export function formerPlace(
   hash?: string,
 ): ReturnType<typeof servicePlace> {
   if (tab === "inspect" && view === "metrics") return { tab: "usage" }
-  if (tab === "inspect" && view && [...serviceTabs, ...modes].includes(view as ServiceTab))
+  if (
+    tab === "inspect" &&
+    view &&
+    [...serviceTabs, ...modes, "terminal"].includes(view as ServiceTab)
+  )
     return servicePlace(view as ServicePlace)
   if (tab === "configure" && hash) {
     if (hash === "variables" || hash === "networking") return { tab: hash }
@@ -123,7 +131,9 @@ export function validateServiceSearch(search: Record<string, unknown>): ServiceS
   const former =
     tab && !known && [...formerTabs, ...settingsParts].includes(tab as FormerTab)
       ? tab
-      : str(search.former)
+      : search.mode === "terminal"
+        ? "terminal"
+        : str(search.former)
   const mode = oneOf(modes, search.mode)
   return {
     tab: known === "overview" ? undefined : known,

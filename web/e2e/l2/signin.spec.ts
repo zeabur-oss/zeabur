@@ -116,13 +116,10 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     await expect(page.getByRole("heading", { level: 1, name: service })).toBeVisible()
     await page.getByRole("button", { name: "More actions" }).click()
     await page.getByRole("menuitem", { name: "Open terminal" }).click()
-    await expect(
-      page
-        .getByRole("tablist", { name: "Service sections" })
-        .getByRole("tab", { name: "Terminal" }),
-    ).toHaveAttribute("aria-selected", "true")
-    // Scoped to the tab: refused Secrets elsewhere on the page also offer admin rights.
-    const panel = page.getByRole("tabpanel", { name: "Terminal" })
+    const dock = page.getByRole("region", { name: "Terminal" })
+    await expect(dock.getByRole("tab", { name: service })).toHaveAttribute("aria-selected", "true")
+    // Scoped to the dock: refused Secrets elsewhere on the page also offer admin rights.
+    const panel = dock.getByRole("tabpanel", { name: service })
     await expect(panel.getByText("Opening a terminal needs admin rights.")).toBeVisible({
       timeout: 30_000,
     })
@@ -142,8 +139,8 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
       expect(new URL(popup.url()).pathname).toBe("/auth/callback")
       await popup.close()
     }
-    const terminal = page.getByRole("group", { name: "Terminal" })
-    await expect(page.getByRole("status").filter({ hasText: "Connected" })).toBeVisible({
+    const terminal = dock.getByRole("group", { name: "Terminal" })
+    await expect(dock.getByRole("status").filter({ hasText: "Connected" })).toBeVisible({
       timeout: 30_000,
     })
     await terminal.click()
