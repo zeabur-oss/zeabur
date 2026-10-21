@@ -183,6 +183,22 @@ Kubernetes objects in, the expected result out. Each crate keeps its own under
 `crates/<crate>/fixtures/`, loaded with `zeabur-fixtures`; [`fixtures/`](../fixtures) holds the
 format and the chart corpus.
 
+## Packaging the pure crates
+
+The pure crates and `zeabur-fixtures` are `publish = true`; nothing has been published yet. A
+crate can only be published after the crates it depends on, dev-dependencies included, so the
+order is:
+
+1. `zeabur-kernel`, `zeabur-fixtures`
+2. `zeabur-model`, `zeabur-adapters`
+3. `zeabur-graph`
+4. `zeabur-gaps`, `zeabur-plan`
+
+`cargo package -p zeabur-kernel -p zeabur-fixtures -p zeabur-model -p zeabur-adapters -p
+zeabur-graph -p zeabur-gaps -p zeabur-plan` builds all of them at once against each other. Each
+workspace dependency on them in `Cargo.toml` names the workspace version, which must move with
+`[workspace.package] version`.
+
 ## References
 
 - A. Kladov, "Large Rust Workspaces," Aug. 22, 2021.

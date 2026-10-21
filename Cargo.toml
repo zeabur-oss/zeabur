@@ -7,6 +7,8 @@ version = "0.0.1"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
+repository = "https://github.com/zeabur/zeabur"
+# Only the pure crates and their fixture loader are published ([workspace.metadata.pure]).
 publish = false
 
 # Lint policy (see CONTRIBUTING.md).
@@ -55,23 +57,24 @@ crates = [
 ]
 
 [workspace.dependencies]
-# Workspace crates, levelled from the bottom up.
-zeabur-kernel = { path = "crates/zeabur-kernel" }
+# Workspace crates, levelled from the bottom up. A published crate's entry carries the workspace
+# version too, which a package needs; keep it equal to [workspace.package] version.
+zeabur-kernel = { path = "crates/zeabur-kernel", version = "0.0.1" }
 zeabur-core = { path = "crates/zeabur-core" }
-zeabur-model = { path = "crates/zeabur-model" }
+zeabur-model = { path = "crates/zeabur-model", version = "0.0.1" }
 zeabur-kube = { path = "crates/zeabur-kube" }
-zeabur-adapters = { path = "crates/zeabur-adapters" }
-zeabur-graph = { path = "crates/zeabur-graph" }
-zeabur-gaps = { path = "crates/zeabur-gaps" }
+zeabur-adapters = { path = "crates/zeabur-adapters", version = "0.0.1" }
+zeabur-graph = { path = "crates/zeabur-graph", version = "0.0.1" }
+zeabur-gaps = { path = "crates/zeabur-gaps", version = "0.0.1" }
 zeabur-catalog = { path = "crates/zeabur-catalog" }
 zeabur-modules = { path = "crates/zeabur-modules" }
-zeabur-plan = { path = "crates/zeabur-plan" }
+zeabur-plan = { path = "crates/zeabur-plan", version = "0.0.1" }
 zeabur-api = { path = "crates/zeabur-api" }
 zeabur-mcp = { path = "crates/zeabur-mcp" }
 zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
-zeabur-fixtures = { path = "crates/zeabur-fixtures" }
+zeabur-fixtures = { path = "crates/zeabur-fixtures", version = "0.0.1" }
 
 # Third-party crates.
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }

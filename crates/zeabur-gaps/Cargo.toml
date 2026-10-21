@@ -5,7 +5,11 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-publish.workspace = true
+publish = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["kubernetes", "zeabur", "diagnostics"]
+categories = ["development-tools::debugging"]
 # Reads the chart corpus at the repository root, which the package does not carry.
 exclude = ["tests/corpus.rs"]
 

@@ -232,7 +232,7 @@ pub(crate) fn find_container<'a>(workload: Workload<'a>, name: &str) -> Option<C
 /// resource, is shown under the cluster's name when it holds the data, and goes to the
 /// `databases` group. An operator's own Deployment goes to `operators`. The explicit group
 /// label wins over both; otherwise the labels decide
-/// ([`resolve_group`]).
+/// ([`resolve_group`](zeabur_adapters::group::resolve_group)).
 #[must_use]
 pub fn classify(workload: Workload<'_>) -> Classification {
     classify_with(workload, &Conventions::ZEABUR)
