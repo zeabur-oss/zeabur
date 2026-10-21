@@ -18,6 +18,8 @@ test.beforeAll(() => {
 const dock = (page: Page) => page.getByRole("region", { name: "Terminal" })
 const screen = (page: Page) => dock(page).getByRole("group", { name: "Terminal" })
 const connected = (page: Page) => dock(page).getByRole("status").filter({ hasText: "Connected" })
+const toggle = (page: Page) =>
+  page.getByRole("navigation").getByRole("button", { name: /^Terminal( \d+)?$/ })
 const inTerminal = (page: Page) => page.evaluate(() => !!document.activeElement?.closest(".xterm"))
 
 async function openShell(page: Page, service = healthy) {
@@ -120,7 +122,7 @@ test("the dock folds to a bar with Ctrl+`, keeps Escape for the shell, and resiz
 
   // The height is the viewer's own, kept for the next visit.
   await page.reload()
-  await page.getByRole("button", { name: "Terminal", exact: true }).first().click()
+  await toggle(page).click()
   await expect(dock(page).getByRole("separator", { name: "Terminal height" })).toHaveAttribute(
     "aria-valuenow",
     String(before + 72),
@@ -200,7 +202,7 @@ test("the kubectl terminal opens through a review the first time and reuses its 
     await search(page, "kubectl")
     await expect(page.getByRole("option", { name: "Open kubectl terminal" })).toHaveCount(0)
     await page.keyboard.press("Escape")
-    await page.getByRole("button", { name: "Terminal", exact: true }).first().click()
+    await toggle(page).click()
     await expect(dock(page)).toContainText("No terminal open")
     await expect(dock(page).getByRole("button", { name: "Open kubectl terminal" })).toHaveCount(0)
     return

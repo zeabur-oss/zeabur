@@ -47,7 +47,7 @@ export function DockToggle() {
       trailing={
         <>
           {tabs.length > 0 ? <span>{tabs.length}</span> : null}
-          <Kbd keys={dockShortcut} className="max-md:hidden" />
+          <Kbd keys={dockShortcut} aria-hidden="true" className="max-md:hidden" />
         </>
       }
       aria-expanded={open}
