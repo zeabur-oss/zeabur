@@ -25,9 +25,10 @@ pub(crate) fn not_installed(namespace: &str) -> ApiError {
         Kind::NotFound,
         format!("Zeabur Identity is not installed in this cluster (no users in {namespace})."),
     );
+    problem.summary = Message::new("members.notInstalled");
     problem.fix_for_occasion(
         "Install Zeabur Identity, or start Zeabur with the namespace it runs in.",
-        Message::new("members.fix.notInstalled"),
+        Message::new("members.notInstalled.fix"),
     );
     ApiError::from(problem)
 }
@@ -38,7 +39,7 @@ pub(crate) fn issuer_of(links: &SetupLinks) -> Result<String, ApiError> {
         refuse(
             "Zeabur does not know Zeabur Identity's address, so it cannot make a link.",
             "Start Zeabur with --issuer-url, or let it read the zeabur-identity Deployment.",
-            "members.fix.noIssuer",
+            "members.noIssuer",
         )
     })
 }
@@ -205,7 +206,7 @@ pub(crate) async fn setup_link(
             return Err(refuse(
                 "You cannot reset your own account: it would remove the passkey you are using.",
                 "Add a passkey from your account instead, or ask another admin.",
-                "members.fix.resetSelf",
+                "members.resetSelf",
             ));
         }
         clear(cluster.as_ref(), namespace, &directory, &username).await?;
@@ -240,7 +241,7 @@ pub(crate) fn check_removal(
             "This is your only passkey. Admin rights need a passkey, so removing it would lock you \
              out.",
             "Add another passkey first, then remove this one.",
-            "account.fix.lastPasskey",
+            "account.lastPasskey",
         ));
     }
     Ok(())
@@ -315,7 +316,7 @@ pub(crate) async fn remove(
         return Err(refuse(
             "You cannot remove yourself.",
             "Ask another admin to remove you.",
-            "members.fix.removeSelf",
+            "members.removeSelf",
         ));
     }
     let Some(user) = directory.user(&username) else {

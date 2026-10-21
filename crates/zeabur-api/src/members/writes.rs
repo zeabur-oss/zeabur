@@ -98,10 +98,12 @@ pub(crate) fn bad(detail: impl Into<String>) -> ApiError {
     ApiError::from(Problem::new(Kind::BadRequest, detail))
 }
 
-/// A refusal to change `what` that Zeabur makes itself, with the sentence the interface words.
+/// A change Zeabur refuses itself: the summary is the sentence `key` and the fix `key.fix`, so the
+/// interface words both.
 pub(crate) fn refuse(detail: &str, fix: &str, key: &str) -> ApiError {
     let mut problem = Problem::new(Kind::Conflict, detail);
-    problem.fix_for_occasion(fix, Message::new(key));
+    problem.summary = Message::new(key);
+    problem.fix_for_occasion(fix, Message::new(&format!("{key}.fix")));
     ApiError::from(problem)
 }
 

@@ -274,7 +274,8 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
-        assert_eq!(body["fixKey"]["key"], "members.fix.resetSelf");
+        assert_eq!(body["summary"]["key"], "members.resetSelf");
+        assert_eq!(body["fixKey"]["key"], "members.resetSelf.fix");
     }
 
     #[tokio::test]
@@ -282,7 +283,8 @@ mod tests {
         let cluster = signed_in("zeabur:ada");
         let (status, body) = call(&cluster, "DELETE", "/api/v1/account/passkeys/ada-1", None).await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
-        assert_eq!(body["fixKey"]["key"], "account.fix.lastPasskey");
+        assert_eq!(body["summary"]["key"], "account.lastPasskey");
+        assert_eq!(body["fixKey"]["key"], "account.lastPasskey.fix");
         assert_eq!(writes(&cluster).len(), 0);
         let (status, body) = call(
             &cluster,
@@ -403,7 +405,8 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
-        assert_eq!(body["fixKey"]["key"], "members.fix.noIssuer");
+        assert_eq!(body["summary"]["key"], "members.noIssuer");
+        assert_eq!(body["fixKey"]["key"], "members.noIssuer.fix");
         assert_eq!(writes(&cluster).len(), 0);
     }
 }
