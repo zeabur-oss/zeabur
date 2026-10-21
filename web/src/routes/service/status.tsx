@@ -35,6 +35,7 @@ import {
   SummaryCardStatus,
   SummaryCardWord,
 } from "@zeabur/design-system/components/summary-card"
+import { SwapText } from "@zeabur/design-system/components/swap-text"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useSentence, useT } from "@/i18n"
 import { LoadingRows } from "@/components/page"
@@ -140,12 +141,16 @@ function Rollout({ project, service }: { project: string; service: Service }) {
       className={cn("flex flex-col gap-2 rounded-lg border px-4 py-3", rolloutTone[data.status])}
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-        <span className="font-medium">{write(data.message)}</span>
+        <span className="font-medium">
+          <SwapText>{write(data.message)}</SwapText>
+        </span>
         {data.revision ? (
           <span className="text-secondary">{t("changes.release", data.revision)}</span>
         ) : null}
         <span className="text-secondary tabular-nums">
-          {t("rollout.ready", data.updatedReady, data.desired)}
+          <SwapText variant="number">
+            {t("rollout.ready", data.updatedReady, data.desired)}
+          </SwapText>
         </span>
         {data.old > 0 ? (
           <span className="text-secondary">{t("rollout.older", data.old)}</span>
@@ -219,7 +224,9 @@ function Summary({
     <SummaryCard aria-label={t("common.status")}>
       <SummaryCardMain>
         <SummaryCardStatus tone={status.health}>
-          <SummaryCardWord>{word(status)}</SummaryCardWord>
+          <SummaryCardWord>
+            <SwapText>{word(status)}</SwapText>
+          </SummaryCardWord>
           {status.desired !== undefined ? <Replicas service={service} onTab={onTab} /> : null}
         </SummaryCardStatus>
         {since ? (
@@ -329,7 +336,7 @@ function Replicas({ service, onTab }: { service: Service; onTab: OnTab }) {
       <PopoverTrigger
         render={<SummaryCardCount aria-label={t("overview.replicas", ready, desired)} />}
       >
-        {ready}/{desired}
+        <SwapText variant="number">{`${ready}/${desired}`}</SwapText>
         <CaretDownIcon aria-hidden="true" />
       </PopoverTrigger>
       <PopoverContent>

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { Badge } from "@zeabur/design-system/components/badge"
+import { SwapText } from "@zeabur/design-system/components/swap-text"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { formatAgo } from "@/lib/format"
@@ -84,21 +85,25 @@ export function ServiceStatus({
   status,
   size = "md",
   counts = false,
+  swap = false,
   className,
 }: {
   status: Status
   size?: "sm" | "md"
   counts?: boolean
+  /** Fades in a new word or count; for one service's own status, not rows that poll. */
+  swap?: boolean
   className?: string
 }) {
   const word = useStatusWord()
   const facts = useStatusFacts()(status.reason, status.pod)
+  const count = `${status.ready}/${status.desired}`
   return (
     <FactsPill health={status.health} size={size} facts={facts} className={className}>
-      {word(status)}
+      {swap ? <SwapText>{word(status)}</SwapText> : word(status)}
       {counts && status.desired !== undefined && status.ready !== undefined ? (
         <span className="opacity-70">
-          {status.ready}/{status.desired}
+          {swap ? <SwapText variant="number">{count}</SwapText> : count}
         </span>
       ) : null}
     </FactsPill>
