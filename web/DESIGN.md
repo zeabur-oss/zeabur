@@ -22,8 +22,8 @@ look-alikes; `src/styles/app.css` imports it and adds only this interface's layo
   that pod's logs.
 - **Bars** are `Meter` (a value on a track, a request as a mark) or `MeterStack` (parts of a
   whole); no bar of its own.
-- **Tabs** are the segmented `Tabs`, the only tab style; a service's six tabs fill its column,
-  each with its icon (none on a phone, where the tabs also tighten so six short labels fit; a row
+- **Tabs** are the segmented `Tabs`, the only tab style; a service's seven tabs fill its column,
+  each with its icon (none on a phone, where the tabs also tighten so seven short labels fit; a row
   that still overflows scrolls with its far edge faded), no counts. Vertical tabs are sidebar rows; a long page's parts are a
   `SectionNav` beside it.
 - **Columns**: a service's page in `max-w-content`; Home, Projects and the project's lists in
@@ -78,26 +78,26 @@ Kubernetes is one deliberate step further. Decide a feature's layer before its p
 
 | Layer         | For                        | Global         | Project                         | Service                                                                                  |
 | ------------- | -------------------------- | -------------- | ------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Everyday**  | everyone                   | Home, Projects | Overview (map or list)          | Overview, Logs, Deployments, Networking, Variables, Settings (Compute, Storage)          |
-| **Adjusting** | digging in, tuning         |                | Suggestions, Activity, Settings | Settings' Health checks, Deployments' compare and roll back, the menu's Usage and Events |
-| **Expert**    | people who know Kubernetes | Cluster        | Objects                         | The menu's Terminal and YAML                                                             |
+| **Everyday**  | everyone                   | Home, Projects | Overview (map or list)          | Overview, Logs, Deployments, Usage, Networking, Variables, Settings (Compute, Storage)   |
+| **Adjusting** | digging in, tuning         |                | Suggestions, Activity, Settings | Settings' Health checks, Deployments' compare and roll back and its Events               |
+| **Expert**    | people who know Kubernetes | Cluster        | Objects                         | Logs' Terminal and Settings' YAML                                                        |
 
 - **Everyday comes first and alone.** The sidebar leads with Home and Projects; Cluster and
   Settings are in a Manage group after them. A project's sidebar lists Overview and Settings,
-  then its services, with Objects under Advanced. A service has six tabs under the names hosted Zeabur uses:
-  Overview (is it working, and if not why), Logs, Deployments (what changed), Networking,
-  Variables and Settings. A tab is never also a header button. The header's one "More" menu
-  (⋯) holds the views only people who know Kubernetes open (Usage, Events, Terminal, YAML) and
-  Delete; a view shows in place of the tabs with Close. This menu replaced a fourth section,
-  Inspect: people looked for logs and settings under the names they knew, and an expert view does
-  not earn a tab. Nothing else goes in it; what does not apply is left out.
+  then its services, with Objects under Advanced. A service has seven tabs under the names hosted Zeabur uses:
+  Overview (is it working, and if not why), Logs, Deployments (what changed), Usage, Networking,
+  Variables and Settings. A tab is never also a header button. A view only people who know
+  Kubernetes open is a second segment in the tab it belongs to (`?mode=`): Logs' Terminal,
+  Deployments' Events, Settings' YAML; people look for them under the names they know, and an
+  expert view does not earn a tab. The header's one "More" menu (⋯) holds actions only (Copy
+  diagnosis, Delete), never a view; what does not apply is left out.
   In a form, an adjusting part is a folding section (Collapsible `section`). There is no
   beginner or expert switch: explanations attach to problems and first encounters, and nothing
   folds more than twice.
 - **Fold, never hide.** Every deeper page stays one press away: a folded group remembers being
   opened (`remembered` in `lib/stores.ts`), a group that holds the page shown opens itself, and
-  a link straight to a deeper page (`?tab=yaml`, a toast's View, the header menu's YAML) shows
-  it in place.
+  a link straight to a deeper page (`?tab=settings&mode=yaml`, a toast's View, an old `?tab=yaml`)
+  shows it in place.
 - **One current row.** The deepest place the page is has the selected fill; the rows it is under are
   ancestors (label in the text colour). Navigation links match their path exactly.
 
@@ -325,7 +325,12 @@ its utilities and components, not `transition-*` classes of your own. Here that 
 - `SwapText` for one service's own status word and counts (the service header, the quick look,
   the status card, a rollout's progress); never for rows in a list or table.
 - A row this tab just created (a variable, a domain, a volume) enters once (`lib/created.ts`);
-  rows that load or poll in, logs, charts, the map, tab panels and route changes do not move.
+  rows that load or poll in, logs, charts and the map do not move.
+- A move to another page (another service, opening a project) fades the main panel in with the
+  router's `page` view transition (`pageViewTransition`, or `usePageTransition` where the browser
+  has no typed view transitions); the sidebar stays. A change of search only (a tab, a filter)
+  is no page move: a tab panel fades in (`TabsContent`), nothing slides.
+- Hovering a link to a service or project preloads it, so the transition shows a loaded page.
 - Pages do not shift as they load: a route's loader reads what sits at the top of its page, a
   skeleton has the size of what replaces it, and a part that arrives later goes below the rest or
   holds its place.

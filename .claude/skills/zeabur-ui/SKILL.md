@@ -36,12 +36,13 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   (`components/shell/project-sidebar.tsx`) replaces the global one. Home is "What needs you"
   (incidents, then problems by origin, each with cause, fixer and fix). A project is one page:
   Needs attention, then its map or list (`?view`) with Activity, gaps behind "N suggestions". A
-  service page is a header and six segmented `Tabs` named as hosted Zeabur names them (Overview,
-  Logs, Deployments, Networking, Variables, Settings) in `max-w-content`; Settings is one page with
-  a `SectionNav`, and edits in Networking, Variables and Settings collect in one `DraftBar`. The
-  header's ⋯ menu holds the expert views (Usage, Events, Terminal, YAML) and Delete, nothing
-  else; a tab is never also a header button. An old `?tab=` must keep redirecting
-  (`routes/search.ts`). Overview leads with one sentence each: health, then each domain
+  service page is a header and seven segmented `Tabs` named as hosted Zeabur names them (Overview,
+  Logs, Deployments, Usage, Networking, Variables, Settings) in `max-w-content`; Settings is one
+  page with a `SectionNav`, and edits in Networking, Variables and Settings collect in one
+  `DraftBar`. The Kubernetes view of a tab is a second segment inside it (`?mode=`: Logs'
+  Terminal, Deployments' Events, Settings' YAML). The header's ⋯ menu holds actions only (Copy
+  diagnosis, Delete), never a view; a tab is never also a header button. An old `?tab=` must keep
+  redirecting (`routes/search.ts`). Overview leads with one sentence each: health, then each domain
   reachable, not reachable with its fix, waiting on the cause above, or not verified (never red
   for a hop Zeabur could not check); each cause is said once, with what it also takes down inside
   it (`model/overview.ts`). Projects are cards (`components/project-card.tsx`); settings are `SectionLabel` over
