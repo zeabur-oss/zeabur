@@ -62,6 +62,29 @@ pub(crate) struct Args {
     /// people choose. Empty: settings cannot be changed.
     #[arg(long, env = "ZEABUR_NAMESPACE", default_value = "")]
     pub(crate) namespace: String,
+    /// The image of a debug container, for a terminal in a container without a shell; it needs
+    /// `sh`. Empty: busybox, pinned by digest.
+    #[arg(long, env = "ZEABUR_DEBUG_IMAGE", default_value = "")]
+    pub(crate) debug_image: String,
+    /// The image of a tools pod; it needs `sh`, `sleep`, `kubectl` and `helm`. Empty:
+    /// `alpine/k8s`, pinned by digest.
+    #[arg(long, env = "ZEABUR_TOOLS_IMAGE", default_value = "")]
+    pub(crate) tools_image: String,
+    /// The namespace tools pods go in. Empty: the project's.
+    #[arg(long, env = "ZEABUR_TOOLS_NAMESPACE", default_value = "")]
+    pub(crate) tools_namespace: String,
+    /// Minutes a tools pod may run at most.
+    #[arg(long, env = "ZEABUR_TOOLS_DEADLINE_MINUTES", default_value_t = 30)]
+    pub(crate) tools_deadline_minutes: u32,
+    /// Seconds after its last terminal closes that a tools pod is deleted.
+    #[arg(long, env = "ZEABUR_TOOLS_GRACE_SECONDS", default_value_t = 60)]
+    pub(crate) tools_grace_seconds: u32,
+    /// The tools container's requests, as `cpu=10m,memory=64Mi`. Empty: these.
+    #[arg(long, env = "ZEABUR_TOOLS_REQUESTS", default_value = "")]
+    pub(crate) tools_requests: String,
+    /// The tools container's limits, as `cpu=1,memory=512Mi`. Empty: these.
+    #[arg(long, env = "ZEABUR_TOOLS_LIMITS", default_value = "")]
+    pub(crate) tools_limits: String,
 }
 
 /// The configuration, checked.
@@ -124,6 +147,7 @@ impl Args {
             }
             settings.namespace = Some(self.namespace.clone());
         }
+        terminal(self, &mut settings.terminal)?;
         if self.session_idle_minutes == 0 || self.session_max_hours == 0 {
             return Err(
                 "--session-idle-minutes and --session-max-hours must be at least 1".to_owned(),
@@ -145,6 +169,87 @@ impl Args {
             settings,
         })
     }
+}
+
+/// The terminal's settings from `args`.
+fn terminal(
+    args: &Args,
+    terminal: &mut zeabur_api::settings::TerminalSettings,
+) -> Result<(), String> {
+    for (flag, image, setting) in [
+        (
+            "--debug-image",
+            &args.debug_image,
+            &mut terminal.debug_image,
+        ),
+        (
+            "--tools-image",
+            &args.tools_image,
+            &mut terminal.tools_image,
+        ),
+    ] {
+        if image.chars().any(char::is_whitespace) {
+            return Err(format!("{flag}: {image:?} is not an image reference"));
+        }
+        if !image.is_empty() {
+            image.clone_into(setting);
+        }
+    }
+    if !args.tools_namespace.is_empty() {
+        if !zeabur_plan::checks::is_dns_label(&args.tools_namespace) {
+            return Err(format!(
+                "--tools-namespace: {:?} is not a namespace's name",
+                args.tools_namespace
+            ));
+        }
+        terminal.tools_namespace = Some(args.tools_namespace.clone());
+    }
+    if args.tools_deadline_minutes == 0 {
+        return Err("--tools-deadline-minutes must be at least 1".to_owned());
+    }
+    terminal.tools_deadline_seconds = i64::from(args.tools_deadline_minutes) * 60;
+    terminal.tools_grace = std::time::Duration::from_secs(u64::from(args.tools_grace_seconds));
+    for (flag, text, section) in [
+        (
+            "--tools-requests",
+            &args.tools_requests,
+            &mut terminal.tools_resources.requests,
+        ),
+        (
+            "--tools-limits",
+            &args.tools_limits,
+            &mut terminal.tools_resources.limits,
+        ),
+    ] {
+        if !text.is_empty() {
+            *section = quantities(text).map_err(|e| format!("{flag}: {e}"))?;
+        }
+    }
+    let resources = serde_json::json!({
+        "requests": terminal.tools_resources.requests,
+        "limits": terminal.tools_resources.limits,
+    });
+    zeabur_plan::checks::validate_resources(&resources).map_err(|_refused| {
+        "--tools-requests, --tools-limits: a quantity is not valid, or a request is above \
+             its limit"
+            .to_owned()
+    })
+}
+
+/// `cpu=10m,memory=64Mi` as quantities by resource.
+fn quantities(text: &str) -> Result<std::collections::BTreeMap<String, String>, String> {
+    text.split(',')
+        .map(|pair| {
+            let (name, value) = pair
+                .trim()
+                .split_once('=')
+                .filter(|(n, v)| zeabur_plan::checks::COMPUTE.contains(n) && !v.is_empty())
+                .ok_or_else(|| {
+                    format!("{pair:?} is not resource=quantity (cpu, memory or ephemeral-storage)")
+                })?;
+            Ok((name.to_owned(), value.to_owned()))
+        })
+        .collect()
 }
 
 fn read(path: &Path, flag: &str) -> Result<Vec<u8>, String> {
@@ -259,6 +364,43 @@ mod tests {
         assert!(error.starts_with("--metrics-service:"), "{error}");
         let error = args(&files, &["--namespace", "Default"]).unwrap_err();
         assert!(error.starts_with("--namespace:"), "{error}");
+        let error = args(&files, &["--tools-namespace", "Tools"]).unwrap_err();
+        assert!(error.starts_with("--tools-namespace:"), "{error}");
+        let error = args(&files, &["--tools-requests", "gpu=1"]).unwrap_err();
+        assert!(error.starts_with("--tools-requests:"), "{error}");
+        let error = args(&files, &["--tools-requests", "memory=1Gi"]).unwrap_err();
+        assert!(error.contains("above"), "{error}");
+        let error = args(&files, &["--tools-deadline-minutes", "0"]).unwrap_err();
+        assert!(error.contains("at least 1"), "{error}");
+    }
+
+    #[test]
+    fn the_terminal_images_namespace_and_limits_can_be_chosen() {
+        let files = Files::new("terminal");
+        let config = args(
+            &files,
+            &[
+                "--debug-image",
+                "registry.example.com/busybox:1",
+                "--tools-namespace",
+                "zeabur-tools",
+                "--tools-deadline-minutes",
+                "10",
+                "--tools-grace-seconds",
+                "5",
+                "--tools-limits",
+                "cpu=500m,memory=256Mi",
+            ],
+        )
+        .unwrap();
+        let terminal = &config.settings.terminal;
+        assert_eq!(terminal.debug_image, "registry.example.com/busybox:1");
+        assert_eq!(terminal.tools_image, zeabur_api::settings::TOOLS_IMAGE);
+        assert_eq!(terminal.tools_namespace.as_deref(), Some("zeabur-tools"));
+        assert_eq!(terminal.tools_deadline_seconds, 600);
+        assert_eq!(terminal.tools_grace, std::time::Duration::from_secs(5));
+        assert_eq!(terminal.tools_resources.limits["memory"], "256Mi");
+        assert_eq!(terminal.tools_resources.requests["cpu"], "10m");
     }
 
     #[test]

@@ -107,12 +107,30 @@ pub struct State {
     pub without_shell: BTreeSet<String>,
     /// Every terminal size a [`Cluster::exec`] session was given, in order.
     pub terminal_sizes: Vec<TerminalSize>,
+    /// Every command [`Cluster::run`] ran, in order, with what it was given on standard input.
+    pub runs: Vec<Run>,
+    /// The `ephemeralcontainers` subresource is not served (`404`), as on a cluster that has
+    /// ephemeral containers turned off.
+    pub without_ephemeral_containers: bool,
     /// What each Service answers through the service proxy, by `namespace/name:port`; a Service
     /// not here does not exist (`404`).
     pub proxied: BTreeMap<String, ProxyAnswer>,
     /// Every path and query asked of a Service through the proxy, as
     /// `namespace/name:port/path?query`, in order.
     pub proxy_requests: Vec<String>,
+}
+
+/// A command [`Cluster::run`] ran.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Run {
+    /// `namespace/pod`.
+    pub pod: String,
+    /// The container.
+    pub container: String,
+    /// The command.
+    pub command: Vec<String>,
+    /// What it read on standard input.
+    pub input: Vec<u8>,
 }
 
 /// How a Service answers a `GET` through the service proxy: from the path and query, its JSON,
@@ -692,6 +710,47 @@ impl Cluster for MemoryCluster {
         })
     }
 
+    /// Records the run ([`State::runs`]); refused as `exec` is, and `sh` is the only command found.
+    fn run<'a>(
+        &'a self,
+        namespace: &'a str,
+        pod: &'a str,
+        container: &'a str,
+        command: &'a [String],
+        input: &'a [u8],
+    ) -> Answer<'a, ExitStatus> {
+        Box::pin(async move {
+            let key = format!("{namespace}/{pod}");
+            let mut state = self.allowed(Some(namespace))?;
+            if state.exec_refused.contains(&key) {
+                return Err(forbidden(&format!("pods/exec {key}")));
+            }
+            let exists = state.objects.get(namespace).is_some_and(|objects| {
+                objects
+                    .pods
+                    .iter()
+                    .any(|p| p.metadata.name.as_deref() == Some(pod))
+            });
+            if !exists {
+                return Err(not_found(&key));
+            }
+            state.runs.push(Run {
+                pod: key,
+                container: container.to_owned(),
+                command: command.to_vec(),
+                input: input.to_vec(),
+            });
+            drop(state);
+            Ok(
+                if matches!(command.first().map(String::as_str), Some("/bin/sh" | "sh")) {
+                    ExitStatus::Exited(0)
+                } else {
+                    ExitStatus::CommandNotFound
+                },
+            )
+        })
+    }
+
     fn reveal_secret<'a>(
         &'a self,
         namespace: &'a str,
@@ -973,11 +1032,21 @@ impl Cluster for MemoryCluster {
                     )));
                 }
                 (WriteBody::Create(body), None) => created(target, body)?,
-                (WriteBody::JsonPatch(_), None) => {
+                (WriteBody::EphemeralContainers(_), _)
+                    if state.without_ephemeral_containers || target.kind != "Pod" =>
+                {
+                    return Err(not_found(
+                        "the server could not find the requested resource",
+                    ));
+                }
+                (WriteBody::JsonPatch(_) | WriteBody::EphemeralContainers(_), None) => {
                     return Err(not_found(&format!("{} \"{}\"", target.plural, target.name)));
                 }
                 (WriteBody::JsonPatch(operations), Some(current)) => {
                     patched(target, current, operations)?
+                }
+                (WriteBody::EphemeralContainers(operations), Some(current)) => {
+                    with_ephemeral_containers(current, operations)?
                 }
             };
             if request.dry_run {
@@ -1213,6 +1282,61 @@ fn patched(
         && let Some(value) = generation.as_i64()
     {
         *generation = Value::from(value.saturating_add(1));
+    }
+    Ok(object)
+}
+
+/// `current` with the ephemeral containers the JSON Patch `operations` make, as the
+/// `ephemeralcontainers` subresource keeps them [k8s-pod-strategy]: every other change is
+/// dropped, and `422` when the patch does not apply, a container already there changes or goes,
+/// or a new one has no image or a name another container of the pod has.
+///
+/// [k8s-pod-strategy]: https://github.com/kubernetes/kubernetes/blob/master/pkg/registry/core/pod/strategy.go
+fn with_ephemeral_containers(current: &Value, operations: &Value) -> Result<Value, ClusterError> {
+    let operations = operations.as_array().map_or(&[][..], Vec::as_slice);
+    let patched = apply_patch(current, operations).map_err(|_not_applied| not_applied())?;
+    let list = |object: &Value, path: &str| -> Vec<Value> {
+        object
+            .pointer(path)
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default()
+    };
+    let before = list(current, "/spec/ephemeralContainers");
+    let after = list(&patched, "/spec/ephemeralContainers");
+    if after.len() < before.len() || after.iter().zip(&before).any(|(a, b)| a != b) {
+        return Err(invalid(
+            "spec.ephemeralContainers: Forbidden: existing ephemeral containers may not be \
+             changed",
+        ));
+    }
+    let mut names: BTreeSet<String> = ["/spec/containers", "/spec/initContainers"]
+        .iter()
+        .flat_map(|path| list(current, path))
+        .chain(before.iter().cloned())
+        .filter_map(|c| c.get("name")?.as_str().map(str::to_owned))
+        .collect();
+    for added in after.iter().skip(before.len()) {
+        let name = added.get("name").and_then(Value::as_str).unwrap_or("");
+        if name.is_empty() || !names.insert(name.to_owned()) {
+            return Err(invalid(&format!(
+                "spec.ephemeralContainers[].name: Duplicate value: {name:?}"
+            )));
+        }
+        if added
+            .get("image")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+        {
+            return Err(invalid("spec.ephemeralContainers[].image: Required value"));
+        }
+    }
+    let mut object = current.clone();
+    if let Some(spec) = object.get_mut("spec").and_then(Value::as_object_mut) {
+        spec.insert("ephemeralContainers".to_owned(), Value::Array(after));
+    }
+    if let Some(field) = unknown_field("Pod", &object) {
+        return Err(invalid(&field));
     }
     Ok(object)
 }

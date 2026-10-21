@@ -77,6 +77,32 @@ spec:
             - name: ZEABUR_METRICS_SERVICE
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.terminal }}
+            {{- with .debugImage }}
+            - name: ZEABUR_DEBUG_IMAGE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .toolsImage }}
+            - name: ZEABUR_TOOLS_IMAGE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .toolsNamespace }}
+            - name: ZEABUR_TOOLS_NAMESPACE
+              value: {{ . | quote }}
+            {{- end }}
+            - name: ZEABUR_TOOLS_DEADLINE_MINUTES
+              value: {{ .toolsDeadlineMinutes | int | quote }}
+            - name: ZEABUR_TOOLS_GRACE_SECONDS
+              value: {{ .toolsGraceSeconds | int | quote }}
+            {{- with .toolsResources.requests }}
+            - name: ZEABUR_TOOLS_REQUESTS
+              value: {{ include "zeabur.quantities" . | quote }}
+            {{- end }}
+            {{- with .toolsResources.limits }}
+            - name: ZEABUR_TOOLS_LIMITS
+              value: {{ include "zeabur.quantities" . | quote }}
+            {{- end }}
+            {{- end }}
             {{- if $issuer.caBundle.configMap }}
             - name: ZEABUR_ISSUER_CA_FILE
               value: /etc/zeabur/issuer-ca/{{ $issuer.caBundle.key }}

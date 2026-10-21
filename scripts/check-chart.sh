@@ -96,6 +96,13 @@ expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
 expect "everyoneReads=false" "$(render -f "$chart/ci/minimal-values.yaml" --set metricsStore.everyoneReads=false)" \
   '[select(.kind == "Role" or .kind == "RoleBinding")] | length' 0
 
+# The terminal settings reach Zeabur as its flags; empty images stay Zeabur's pinned defaults.
+terminal_env='select(.kind == "Deployment") | .spec.template.spec.containers[0].env[] | select(.name | test("^ZEABUR_(DEBUG|TOOLS)_")) | .name + "=" + .value'
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "[$terminal_env] | join(\" \")" \
+  "ZEABUR_TOOLS_DEADLINE_MINUTES=30 ZEABUR_TOOLS_GRACE_SECONDS=60 ZEABUR_TOOLS_REQUESTS=cpu=10m,memory=64Mi ZEABUR_TOOLS_LIMITS=cpu=1,memory=512Mi"
+expect full "$(render -f "$chart/ci/full-values.yaml")" "[$terminal_env] | join(\" \")" \
+  "ZEABUR_DEBUG_IMAGE=registry.example.test/busybox:1.37.0 ZEABUR_TOOLS_IMAGE=registry.example.test/k8s:1.36.5 ZEABUR_TOOLS_NAMESPACE=zeabur-tools ZEABUR_TOOLS_DEADLINE_MINUTES=15 ZEABUR_TOOLS_GRACE_SECONDS=30 ZEABUR_TOOLS_REQUESTS=cpu=20m,memory=96Mi ZEABUR_TOOLS_LIMITS=cpu=500m,memory=256Mi"
+
 # Values that must be refused before anything is installed.
 refuse() { # $1 = why, $@ = helm arguments
   local why="$1"
@@ -111,6 +118,9 @@ refuse "no client secret" --set issuer.clientSecret.existingSecret=
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm
 refuse "an unknown value" --set replicas=2
+refuse "a tools pod without a deadline" --set terminal.toolsDeadlineMinutes=0
+refuse "a tools namespace that is not a name" --set terminal.toolsNamespace=Tools
+refuse "a tools resource Zeabur does not set" --set terminal.toolsResources.limits.gpu=1
 refuse "an image digest without its algorithm" --set image.digest="$(printf '%064d' 0)"
 if render >/dev/null 2>&1; then fail "accepted no values at all"; fi
 

@@ -491,6 +491,47 @@ impl Cluster for UserClient {
         })
     }
 
+    /// Closing standard input reaches the process as end of file through the `v5.channel.k8s.io`
+    /// close signal [kep-4006], which kube sends when the writer is dropped.
+    ///
+    /// [kep-4006]: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/4006-transition-spdy-to-websockets/README.md
+    fn run<'a>(
+        &'a self,
+        namespace: &'a str,
+        pod: &'a str,
+        container: &'a str,
+        command: &'a [String],
+        input: &'a [u8],
+    ) -> Answer<'a, ExitStatus> {
+        Box::pin(async move {
+            use tokio::io::AsyncWriteExt as _;
+            names::namespace(namespace)?;
+            names::name(pod)?;
+            let params = AttachParams::default()
+                .container(container)
+                .stdin(true)
+                .stdout(false)
+                .stderr(false);
+            let mut process = Api::<Pod>::namespaced(self.kube().clone(), namespace)
+                .exec(pod, command.to_vec(), &params)
+                .await?;
+            let status = process
+                .take_status()
+                .ok_or_else(|| ClusterError::Decode("the exec stream has no status".to_owned()))?;
+            let mut stdin = process
+                .stdin()
+                .ok_or_else(|| ClusterError::Decode("the exec stream has no stdin".to_owned()))?;
+            stdin
+                .write_all(input)
+                .await
+                .map_err(|e| ClusterError::Transport(e.to_string()))?;
+            drop(stdin);
+            let status = status.await;
+            drop(process);
+            Ok(exit_status(status))
+        })
+    }
+
     fn reveal_secret<'a>(
         &'a self,
         namespace: &'a str,

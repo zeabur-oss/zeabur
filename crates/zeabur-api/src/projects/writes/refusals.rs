@@ -24,7 +24,13 @@ pub(super) async fn refused(
     write: &WriteRequest,
     error: ClusterError,
 ) -> Problem {
-    if let (ClusterError::Status(status), WriteBody::JsonPatch(operations)) = (&error, &write.body)
+    if matches!(write.body, WriteBody::EphemeralContainers(_)) && error.is_not_found() {
+        return ephemeral_containers_off(cluster, project, target).await;
+    }
+    if let (
+        ClusterError::Status(status),
+        WriteBody::JsonPatch(operations) | WriteBody::EphemeralContainers(operations),
+    ) = (&error, &write.body)
         && status.code == 422
     {
         let (group, version) = target
@@ -51,6 +57,34 @@ pub(super) async fn refused(
         write_problem(error, target, write),
     )
     .await
+}
+
+/// The problem for a `404` to a pod's `ephemeralcontainers`: the pod is gone, or kube-apiserver
+/// does not serve the subresource (before Kubernetes 1.23 it is behind the `EphemeralContainers`
+/// feature gate [k8s-ephemeral]).
+///
+/// [k8s-ephemeral]: https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/
+async fn ephemeral_containers_off(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    target: &zeabur_plan::Target,
+) -> Problem {
+    let pods = zeabur_kube::ResourceRef::new("", "v1", "pods", "Pod");
+    let found = zeabur_kube::ClusterExt::find_object(cluster, &pods, Some(namespace), &target.name);
+    if found.await == Ok(None) {
+        return moved_on(target);
+    }
+    let mut problem = Problem::new(
+        Kind::Invalid,
+        "This cluster does not accept debug containers: kube-apiserver does not serve the \
+         ephemeral containers of a pod.",
+    );
+    problem.fix_for_occasion(
+        "Ask a cluster administrator to turn on ephemeral containers (on by default since \
+         Kubernetes 1.23), or use an image with a shell.",
+        zeabur_core::message::Message::new("problem.invalid.fix.ephemeralContainers"),
+    );
+    problem
 }
 
 /// Whether every `test` operation of a JSON Patch holds on `object`: the value at its path equals
@@ -128,15 +162,19 @@ pub(super) fn write_problem(
 
 /// `write` as kube-apiserver's authorizers see it [k8s-authz]: a creation is a `create` of the
 /// collection, which names no object; a JSON Patch is a `patch` of the object, a deletion a
-/// `delete` of it. A cluster-scoped object (the project's Namespace) names no namespace.
+/// `delete` of it, and a debug container a `patch` of the pod's `ephemeralcontainers`
+/// subresource. A cluster-scoped object (the project's Namespace) names no namespace.
 ///
 /// [k8s-authz]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb
 pub(super) fn denied(write: &WriteRequest) -> Denied {
     let target = &write.target;
-    let (verb, name) = match write.body {
-        WriteBody::Create(_) => ("create", None),
-        WriteBody::JsonPatch(_) => ("patch", Some(target.name.clone())),
-        WriteBody::Delete(_) => ("delete", Some(target.name.clone())),
+    let (verb, name, subresource) = match write.body {
+        WriteBody::Create(_) => ("create", None, ""),
+        WriteBody::JsonPatch(_) => ("patch", Some(target.name.clone()), ""),
+        WriteBody::EphemeralContainers(_) => {
+            ("patch", Some(target.name.clone()), "/ephemeralcontainers")
+        }
+        WriteBody::Delete(_) => ("delete", Some(target.name.clone()), ""),
     };
     Denied {
         verb: verb.to_owned(),
@@ -145,7 +183,7 @@ pub(super) fn denied(write: &WriteRequest) -> Denied {
             .rsplit_once('/')
             .map_or("", |(group, _)| group)
             .to_owned(),
-        resource: target.plural.clone(),
+        resource: format!("{}{subresource}", target.plural),
         name,
         namespace: (!target.namespace.is_empty()).then(|| target.namespace.clone()),
     }

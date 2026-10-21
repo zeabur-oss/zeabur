@@ -28,3 +28,12 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- define "zeabur.planKeySecret" -}}
 {{- .Values.planKey.existingSecret | default (printf "%s-plan-key" (include "zeabur.fullname" .)) -}}
 {{- end -}}
+
+{{/* Quantities by resource as `cpu=10m,memory=64Mi` (ZEABUR_TOOLS_REQUESTS, ZEABUR_TOOLS_LIMITS). */}}
+{{- define "zeabur.quantities" -}}
+{{- $pairs := list -}}
+{{- range $name, $quantity := . -}}
+{{- $pairs = append $pairs (printf "%s=%v" $name $quantity) -}}
+{{- end -}}
+{{- join "," $pairs -}}
+{{- end -}}

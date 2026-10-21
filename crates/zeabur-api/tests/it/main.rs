@@ -14,6 +14,7 @@ mod namespace;
 mod preview;
 mod releases;
 mod rollout;
+mod terminal;
 mod timeline;
 mod trace;
 mod usage;

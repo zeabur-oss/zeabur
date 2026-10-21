@@ -4,6 +4,8 @@
 //!
 //! - **A change** is a `PATCH` with `application/json-patch+json` [rfc6902]; its `test` operations
 //!   make it all-or-nothing against what the plan read.
+//! - **A debug container** is the same `PATCH` of a Pod's `ephemeralcontainers` subresource
+//!   [k8s-ephemeral], the only way to add one.
 //! - **A new object** is a `POST` to its collection.
 //! - **A deletion** is kube's `Api::delete` with `DeleteOptions` in its body [k8s-delete-options]:
 //!   `propagationPolicy: Background`, as `kubectl delete` does by default, so kube-apiserver
@@ -18,6 +20,7 @@
 //!   persisting [k8s-dry-run].
 //!
 //! [rfc6902]: https://www.rfc-editor.org/rfc/rfc6902
+//! [k8s-ephemeral]: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#update-ephemeralcontainers-of-the-specified-pod
 //! [k8s-field-manager]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
 //! [k8s-validation]: https://kubernetes.io/docs/reference/using-api/api-concepts/#field-validation
 //! [k8s-dry-run]: https://kubernetes.io/docs/reference/using-api/api-concepts/#dry-run
@@ -132,6 +135,15 @@ pub(crate) async fn write(
         WriteBody::JsonPatch(operations) => (
             http::Request::patch(format!(
                 "{}?{}",
+                object_path(&request.target),
+                query(request)
+            )),
+            "application/json-patch+json",
+            operations,
+        ),
+        WriteBody::EphemeralContainers(operations) => (
+            http::Request::patch(format!(
+                "{}/ephemeralcontainers?{}",
                 object_path(&request.target),
                 query(request)
             )),

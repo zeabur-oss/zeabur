@@ -19,7 +19,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Parser;
-use secrecy::ExposeSecret as _;
+use secrecy::{ExposeSecret as _, SecretString};
 use zeabur_auth::client::{ClientConfig, OAuthClient};
 use zeabur_auth::flow::FlowKey;
 use zeabur_auth::session::{Bind, Clock, Sessions};
@@ -77,7 +77,10 @@ fn clock() -> Clock {
 fn connect(endpoint: ClusterEndpoint) -> Bind<Connection> {
     Arc::new(move |token| {
         UserClient::with_token(&endpoint, &UserToken::new(token.expose_secret()))
-            .map(|client| -> Connection { Arc::new(client) })
+            .map(|client| Connection {
+                cluster: Arc::new(client),
+                token: Arc::new(SecretString::from(token.expose_secret().to_owned())),
+            })
             .map_err(|e| e.to_string())
     })
 }

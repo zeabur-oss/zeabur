@@ -2361,6 +2361,7 @@ dependencies = [
  "futures-util",
  "http-body-util",
  "kube",
+ "secrecy",
  "serde",
  "serde-saphyr",
  "serde_json",

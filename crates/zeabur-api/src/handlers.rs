@@ -29,6 +29,8 @@ pub struct AppState {
     pub settings: Arc<crate::settings::Settings>,
     /// How domains are looked up for a route's trace ([`crate::resolve`]).
     pub resolver: Arc<dyn crate::resolve::Resolve>,
+    /// The open terminals of tools pods (see [`crate::tools`]).
+    pub tools: Arc<crate::tools::Sessions>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -75,6 +77,26 @@ where
     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
         let state = AppState::from_ref(state);
         std::future::ready(state.access.everyday(parts).map(Self).map_err(ApiError))
+    }
+}
+
+/// The person's token as the session holds it now, where Zeabur holds one (see
+/// [`ClusterAccess::handoff`]); only for a tools pod.
+pub(crate) struct Credential(pub(crate) Option<crate::access::Handoff>);
+
+impl<S> FromRequestParts<S> for Credential
+where
+    S: Send + Sync,
+    AppState: FromRef<S>,
+{
+    type Rejection = std::convert::Infallible;
+
+    fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        let state = AppState::from_ref(state);
+        std::future::ready(Ok(Self(state.access.handoff(parts))))
     }
 }
 

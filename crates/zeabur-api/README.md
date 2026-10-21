@@ -33,6 +33,9 @@ the in-cluster server a client per request, tests an in-memory cluster.
   missing.
 - **Logs follow over Server-Sent Events.** One `data` line per log line, an `error` event with a
   problem when the stream breaks; no WebSocket dependency for a one-way stream [whatwg-sse].
+- **A terminal's container is a plan first.** A debug container and a tools pod are applied
+  like any plan, alone in it; `tools` is the only place the person's token leaves Zeabur, and
+  only through exec stdin into the person's own tools pod (`docs/architecture.md`, Terminals).
 
 ## Place in the workspace
 

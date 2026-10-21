@@ -12,6 +12,9 @@
 
 #[cfg(test)]
 mod common;
+#[cfg(test)]
+#[path = "kubernetes/terminal.rs"]
+mod terminal;
 
 #[cfg(test)]
 mod tests {
@@ -1356,6 +1359,7 @@ mod tests {
             metrics_store: zeabur_api::settings::parse_service_port(&format!("{ns}/vm:8428"))
                 .unwrap(),
             namespace: None,
+            ..zeabur_api::Settings::default()
         };
         let app = app_with(&person, settings);
 

@@ -144,6 +144,19 @@ pub trait Cluster: Send + Sync {
         request: &'a ExecRequest,
     ) -> Answer<'a, ExecSession>;
 
+    /// Runs `command` in `container` without a terminal (`pods/exec` over a WebSocket, like
+    /// `kubectl exec -i`), writes `input` to its standard input, closes it, and waits for the
+    /// process to end. What it writes is discarded: `input` reaches the process through the
+    /// stream alone, never through its command line, environment or any object.
+    fn run<'a>(
+        &'a self,
+        namespace: &'a str,
+        pod: &'a str,
+        container: &'a str,
+        command: &'a [String],
+        input: &'a [u8],
+    ) -> Answer<'a, ExitStatus>;
+
     /// A Secret's values. Only on an explicit request from the person; never cached or logged.
     fn reveal_secret<'a>(
         &'a self,
@@ -450,6 +463,13 @@ pub enum WriteBody {
     ///
     /// [rfc6902]: https://www.rfc-editor.org/rfc/rfc6902
     JsonPatch(serde_json::Value),
+    /// An RFC 6902 JSON Patch of a Pod's `ephemeralcontainers` subresource
+    /// [k8s-ephemeral]: kube-apiserver keeps only the change to `spec.ephemeralContainers` and
+    /// refuses one that changes or removes a container already there. RBAC sees a `patch` of
+    /// `pods/ephemeralcontainers`.
+    ///
+    /// [k8s-ephemeral]: https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/
+    EphemeralContainers(serde_json::Value),
     /// A deletion, `DELETE` of the object with background propagation and these
     /// [`Preconditions`]; refused (`409 Conflict`) when the object no longer meets them.
     Delete(Preconditions),

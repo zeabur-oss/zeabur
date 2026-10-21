@@ -40,6 +40,10 @@
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs` | a log snapshot |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs/follow` | a log as Server-Sent Events |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/exec` | a terminal in a container, over a WebSocket (see the `pods::exec` module) |
+//! | `GET /api/v1/projects/{p}/pods/{pod}/debug` | its debug container for a container (the `debugContainer` change adds one) and why it does not start |
+//! | `GET /api/v1/projects/{p}/tools` | your tools pods (the `clusterTools` change starts one); deletes those that have stopped (see the `tools` module) |
+//! | `GET /api/v1/projects/{p}/tools/{name}/terminal` | a terminal with `kubectl` and `helm` acting as you, over a WebSocket |
+//! | `DELETE /api/v1/projects/{p}/tools/{name}` | deletes your tools pod |
 //! | `POST /api/v1/projects/{p}/plan` | the writes a change needs, what they do (pods replaced, fit, data and fields removed), and a token; writes nothing |
 //! | `POST /api/v1/projects/{p}/apply` | carries out a plan by its token |
 //!
@@ -87,6 +91,7 @@ pub mod resources;
 pub mod services;
 pub mod settings;
 pub mod timeline;
+pub mod tools;
 pub mod views;
 
 use std::sync::Arc;
@@ -174,6 +179,10 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(pods::logs::logs))
         .routes(routes!(pods::logs::follow_logs))
         .routes(routes!(pods::exec::exec))
+        .routes(routes!(pods::debug::get))
+        .routes(routes!(tools::status))
+        .routes(routes!(tools::delete))
+        .routes(routes!(tools::terminal))
         .routes(routes!(services::releases::releases))
         .routes(routes!(services::trace::trace))
         .routes(routes!(timeline::service))
@@ -302,6 +311,7 @@ fn build_with(
         terminal_idle,
         settings: Arc::new(settings),
         resolver,
+        tools: Arc::new(tools::Sessions::default()),
     };
     let (router, api) = routes().split_for_parts();
     let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());

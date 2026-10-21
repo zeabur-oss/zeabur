@@ -438,6 +438,28 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/pods/{pod}/debug": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Whether the pod has a debug container of Zeabur's for a container, and its state.
+     * @description Poll it after applying a `debugContainer` plan until `container.state` is `running`, then
+     *     open the terminal with `container` set to its name. `problem` says, in plain words, when its
+     *     image cannot be pulled or it cannot start.
+     */
+    get: operations["getDebugContainer"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/pods/{pod}/exec": {
     parameters: {
       query?: never
@@ -685,6 +707,68 @@ export interface paths {
      *     last write, warnings folded by reason and containers that stopped, for every workload.
      */
     get: operations["projectTimeline"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/tools": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The person's tools pods in the project's tools namespace, deleting those that are done with. */
+    get: operations["listToolsPods"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/tools/{name}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Deletes a tools pod of the person's, as long as it is the one they read (`uid` and
+     *     `resourceVersion` preconditions); its terminals end with it.
+     */
+    delete: operations["deleteToolsPod"]
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/tools/{name}/terminal": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * A terminal in a tools pod of the person's, over a WebSocket.
+     * @description The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
+     *     and `4001`). Before the shell starts, Zeabur writes the person's current credential into the
+     *     pod (see the module documentation); `ready` names the container `tools`. Failures arrive as an
+     *     `error` frame: a pod that is not the person's (`404`), one not running yet (`409`), local mode
+     *     (`400`), or `pods/exec` refused (`403`). The pod is deleted a minute (by default) after its
+     *     last terminal closes.
+     */
+    get: operations["toolsTerminal"]
     put?: never
     post?: never
     delete?: never
@@ -1129,6 +1213,18 @@ export interface components {
           /** @enum {string} */
           op: "details"
         }
+      | {
+          /** @description The container whose processes it shares; by default the pod's default container. */
+          container?: string | null
+          /** @enum {string} */
+          op: "debugContainer"
+          /** @description The pod. */
+          pod: string
+        }
+      | {
+          /** @enum {string} */
+          op: "clusterTools"
+        }
     /** @description A public source a rule rests on. */
     Citation: {
       /** @description The document's title. */
@@ -1415,6 +1511,31 @@ export interface components {
      * @enum {string}
      */
     DataStore: "postgres" | "mysql" | "redis" | "mongo" | "queue" | "search" | "other"
+    /** @description A debug container of Zeabur's. */
+    DebugContainerStatus: {
+      /** @description Its image. */
+      image: string
+      /** @description Its name: the terminal's `container`. */
+      name: string
+      /** @description The kubelet's reason (`ErrImagePull`, `Completed`, …). */
+      reason?: string | null
+      /** @description Its state. */
+      state: components["schemas"]["DebugState"]
+    }
+    /**
+     * @description The state of a debug container.
+     * @enum {string}
+     */
+    DebugState: "running" | "waiting" | "terminated" | "unknown"
+    /** @description A pod's debug container for one of its containers. */
+    DebugStatus: {
+      container?: components["schemas"]["DebugContainerStatus"] | null
+      /** @description The pod. */
+      pod: string
+      problem?: components["schemas"]["Problem"] | null
+      /** @description The container it shares processes with. */
+      target: string
+    }
     /**
      * @description The request kube-apiserver refused with `403`, as Zeabur made it.
      *
@@ -2552,6 +2673,77 @@ export interface components {
           /** @description The policy. */
           policy: string
         }
+      | {
+          /** @enum {string} */
+          code: "debugContainerStays"
+          /** @description The debug container. */
+          container: string
+          /** @description Its image. */
+          image: string
+          /** @description The pod. */
+          pod: string
+          /** @description The container whose processes it shares. */
+          target: string
+        }
+      | {
+          /** @enum {string} */
+          code: "debugContainerReused"
+          /** @description The debug container. */
+          container: string
+          /** @description The pod. */
+          pod: string
+          /** @description The container whose processes it shares. */
+          target: string
+        }
+      | {
+          /** @enum {string} */
+          code: "rightsMissing"
+          /** @description Each right, as kube-apiserver would name it in a refusal. */
+          rights: components["schemas"]["Denied"][]
+        }
+      | {
+          /** @description Whether they act with the administrator's credential, which the person holds now. */
+          admin: boolean
+          /** @enum {string} */
+          code: "toolsPod"
+          /**
+           * @description When the credential written into the pod expires, RFC 3339; `kubectl` is refused
+           *     from then until a terminal opens again with a fresh one.
+           */
+          credentialExpiresAt?: string | null
+          /**
+           * Format: int64
+           * @description The pod stops this long after it starts, whatever happens (`activeDeadlineSeconds`).
+           */
+          deadlineSeconds: number
+          /**
+           * Format: int64
+           * @description It is deleted this long after its last terminal closes.
+           */
+          graceSeconds: number
+          /** @description Its image. */
+          image: string
+          /** @description Its namespace. */
+          namespace: string
+          /** @description Who `kubectl` and `helm` act as: the person's user name. */
+          person: string
+          /** @description Its name. */
+          pod: string
+        }
+      | {
+          /** @enum {string} */
+          code: "toolsCredentialExposed"
+          /** @description The pod's namespace, whose `pods/exec` grants decide who that is. */
+          namespace: string
+        }
+      | {
+          /** @enum {string} */
+          code: "toolsPodReused"
+          /** @description Its namespace. */
+          namespace: string
+          /** @description Its name. */
+          pod: string
+        }
     /** @description One object a plan writes. */
     PlannedObject: {
       /** @description The object as it will be, the same way; absent when the write deletes it. */
@@ -2600,6 +2792,12 @@ export interface components {
           type: "delete"
           /** @description The object's `metadata.uid`. */
           uid?: string | null
+        }
+      | {
+          /** @description The operations. */
+          operations: Record<string, never>[]
+          /** @enum {string} */
+          type: "ephemeralContainers"
         }
     /**
      * @description How much of the pods were read for the requests. An open set.
@@ -3663,6 +3861,42 @@ export interface components {
      * @enum {string}
      */
     Tool: "Helm" | "Argo CD" | "Flux"
+    /** @description A tools pod of the person's. */
+    ToolsPodStatus: {
+      /** @description Its image. */
+      image: string
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace. */
+      namespace: string
+      /** @description The pod's phase: `Pending`, `Running`, `Succeeded`, `Failed`. */
+      phase: string
+      problem?: components["schemas"]["Problem"] | null
+      /** @description The project it was opened from. */
+      project?: string | null
+      /** @description Whether a terminal can open in it now. */
+      ready: boolean
+      /** @description When it started, RFC 3339. */
+      startedAt?: string | null
+      /** @description When it stops whatever happens (`activeDeadlineSeconds` after it started), RFC 3339. */
+      stopsAt?: string | null
+      /** @description How many terminals are open in it on this server. */
+      terminals: number
+    }
+    /** @description The person's tools pods. */
+    ToolsStatus: {
+      /**
+       * @description Whether Zeabur can open a tools terminal here; `false` in local mode, which holds no
+       *     token to hand over.
+       */
+      available: boolean
+      /** @description The tools pods that had stopped or outlived their deadline and were deleted now. */
+      deleted: string[]
+      /** @description The namespace tools pods of this project go in. */
+      namespace: string
+      /** @description The person's tools pods there that have not stopped, oldest first. */
+      pods: components["schemas"]["ToolsPodStatus"][]
+    }
     /**
      * @description Why a container's log cannot be read, from the kubelet's answer.
      * @enum {string}
@@ -4611,6 +4845,47 @@ export interface operations {
       }
     }
   }
+  getDebugContainer: {
+    parameters: {
+      query?: {
+        /** @description The container it shares processes with; by default the pod's default container. */
+        container?: string
+      }
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["DebugStatus"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
   exec: {
     parameters: {
       query?: {
@@ -5040,6 +5315,117 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["Timeline"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listToolsPods: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ToolsStatus"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  deleteToolsPod: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Deleted */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  toolsTerminal: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Switched to the terminal's WebSocket */
+      101: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
         }
       }
       403: {

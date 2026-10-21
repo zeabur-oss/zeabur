@@ -136,6 +136,17 @@ in the process's memory, because their refresh tokens must not rest in etcd: a s
 would not know them. A restart therefore signs everyone out; signing in again takes one passkey
 touch.
 
+### Terminals
+
+A terminal in a container without a shell adds a debug container to the pod (busybox, pinned
+by digest; `terminal.debugImage`). A tools terminal starts a short-lived pod with `kubectl` and
+`helm` (`alpine/k8s`, pinned by digest; `terminal.toolsImage`) that acts with the token of the
+person who opened it. Both are created as that person, so they need `patch` on
+`pods/ephemeralcontainers`, or `create` and `delete` on `pods`, plus `get` on `pods/exec`.
+With `terminal.toolsNamespace`, tools pods go in a namespace of their own instead of the
+project's; give people those rights there, and nobody else `pods/exec` in it.
+`terminal.toolsDeadlineMinutes` and `terminal.toolsResources` bound each tools pod.
+
 ### An image of your own
 
 To run a build of your own instead, build the image on a Linux machine with Docker

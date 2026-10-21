@@ -16,6 +16,21 @@
       "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
       "maxLength": 253
     },
+    "image": {
+      "description": "An image reference, or empty for Zeabur's pinned default.",
+      "type": "string",
+      "pattern": "^[^\\s]*$"
+    },
+    "quantities": {
+      "description": "Quantities by resource, as in a container's resources.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu": { "type": ["string", "number"] },
+        "memory": { "type": "string" },
+        "ephemeral-storage": { "type": "string" }
+      }
+    },
     "key": {
       "description": "A Secret or ConfigMap key.",
       "type": "string",
@@ -97,6 +112,30 @@
       "properties": {
         "existingSecret": { "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }] },
         "key": { "$ref": "#/definitions/key" }
+      }
+    },
+    "terminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "debugImage": { "$ref": "#/definitions/image" },
+        "toolsImage": { "$ref": "#/definitions/image" },
+        "toolsNamespace": {
+          "anyOf": [
+            { "const": "" },
+            { "type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 63 }
+          ]
+        },
+        "toolsDeadlineMinutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
+        "toolsGraceSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 },
+        "toolsResources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requests": { "$ref": "#/definitions/quantities" },
+            "limits": { "$ref": "#/definitions/quantities" }
+          }
+        }
       }
     },
     "service": {

@@ -43,6 +43,8 @@ pub struct Settings {
     /// The namespace whose `zeabur-settings` ConfigMap keeps people's choices; `None` when
     /// Zeabur runs on a person's computer, where they cannot be changed.
     pub namespace: Option<String>,
+    /// The debug container's and the tools pod's images and limits.
+    pub terminal: TerminalSettings,
 }
 
 impl Default for Settings {
@@ -50,6 +52,45 @@ impl Default for Settings {
         Self {
             metrics_store: default_metrics_store(),
             namespace: None,
+            terminal: TerminalSettings::default(),
+        }
+    }
+}
+
+/// The busybox 1.37.0 image index (`linux/amd64`, `linux/arm64` and others), by digest.
+pub const DEBUG_IMAGE: &str = "docker.io/library/busybox:1.37.0@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e";
+
+/// The `alpine/k8s` 1.36.5 image index (`linux/amd64`, `linux/arm64`), by digest: `kubectl`
+/// 1.36.5, `helm` and a busybox shell on Alpine.
+pub const TOOLS_IMAGE: &str = "docker.io/alpine/k8s:1.36.5@sha256:094adf64cdc4827377cdbe7ea5747472ce115f9fbc64a4e35970ec66777f9a00";
+
+/// What the debug container and the tools pod are made from (see `zeabur_plan::terminal` and the
+/// `tools` module), from the chart's `terminal` values.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminalSettings {
+    /// The debug container's image; it needs `sh`.
+    pub debug_image: String,
+    /// The tools pod's image; it needs `sh`, `sleep`, `kubectl` and `helm`.
+    pub tools_image: String,
+    /// The namespace tools pods go in; `None`: the project's.
+    pub tools_namespace: Option<String>,
+    /// How long a tools pod may run at most, in seconds (`activeDeadlineSeconds`).
+    pub tools_deadline_seconds: i64,
+    /// How long after its last terminal closes a tools pod is deleted, for a reconnect.
+    pub tools_grace: std::time::Duration,
+    /// The tools container's requests and limits.
+    pub tools_resources: zeabur_plan::terminal::ToolsResources,
+}
+
+impl Default for TerminalSettings {
+    fn default() -> Self {
+        Self {
+            debug_image: DEBUG_IMAGE.to_owned(),
+            tools_image: TOOLS_IMAGE.to_owned(),
+            tools_namespace: None,
+            tools_deadline_seconds: 30 * 60,
+            tools_grace: std::time::Duration::from_mins(1),
+            tools_resources: zeabur_plan::terminal::ToolsResources::default(),
         }
     }
 }
@@ -426,7 +467,9 @@ pub(crate) mod store {
         if let Some(body) = body {
             let verb = match &body {
                 WriteBody::Create(_) => "create",
-                WriteBody::JsonPatch(_) | WriteBody::Delete(_) => "patch",
+                WriteBody::JsonPatch(_)
+                | WriteBody::Delete(_)
+                | WriteBody::EphemeralContainers(_) => "patch",
             };
             let request = WriteRequest {
                 target,

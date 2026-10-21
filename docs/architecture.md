@@ -121,6 +121,47 @@ the person's rights, and names the objects and fields it rests on:
 What cannot be read is named (`unreadable`), and a check that cannot be made is `unknown`, never
 `ok`.
 
+## Terminals
+
+A terminal is `pods/exec` as the person, relayed over a WebSocket. Two plans prepare one, each
+applied like any other plan and alone in it:
+
+- **A debug container** (`debugContainer`), for a container without a shell: an ephemeral
+  container written through `pods/ephemeralcontainers`, with a pinned busybox image, `stdin`
+  and `tty`, `targetContainerName` set so it shares the target's process namespace, and the
+  target's user with every capability dropped. Kubernetes keeps it until the pod is replaced;
+  the preview says so. Zeabur's earlier one is reused, matched by its name prefix
+  `zeabur-debug-`.
+- **A tools pod** (`clusterTools`): `kubectl` and `helm` acting as the person, for what Zeabur
+  has no page for.
+
+The tools pod holds the person's Zeabur Identity token, which Zeabur otherwise never lets out of
+its process. So:
+
+- **Created as the person**, in the project's namespace or one the chart names, after a plan
+  that says what runs, where, as whom, with or without admin rights, until when, and that it is
+  deleted on close or at the deadline.
+- **Nothing of Zeabur's in it**: `automountServiceAccountToken: false`, no service links.
+- **Locked down**: non-root, read-only root filesystem, no privilege escalation, every
+  capability dropped, seccomp `RuntimeDefault`; small requests and limits;
+  `activeDeadlineSeconds` (30 minutes by default); labels naming it Zeabur's and whose it is.
+- **The token never rests in the API**: not in the pod spec, an environment variable, a
+  ConfigMap or a Secret. Each terminal writes a kubeconfig through exec stdin into an
+  `emptyDir` with `medium: Memory` at `/home/user/.kube`, readable only by the pod's user.
+  The kubeconfig reaches kube-apiserver at `kubernetes.default.svc` with the cluster CA from
+  `kube-root-ca.crt`.
+- **Bounded by the token**: Zeabur Identity's tokens live minutes and cannot be revoked. The
+  terminal closes when the person's token expires; `kubectl` and `helm` refuse with a plain
+  message after that time; reopening writes a fresh token.
+- **Gone after use**: when the last terminal closes, the kubeconfig is removed, and the pod is
+  deleted after a grace for reconnects (60 seconds by default). Pods left behind (Zeabur
+  restarted, the token expired before the deletion) stop at their deadline, and the person's
+  next tools request deletes them.
+
+What remains: until the token expires, anyone who may exec into pods in that namespace, or who
+administers its node, can use it. The plan says this in one sentence; a namespace of its own for
+tools pods narrows who that is.
+
 ## Web interface
 
 The interface's sources live in [`web/`](../web) (React, TanStack Router and Query, shadcn/ui on
