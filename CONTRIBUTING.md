@@ -217,3 +217,6 @@ To try a design-system change here before it is pushed, link a checkout next to 
 `bun link` (see its README), and run `bun install` afterwards to return to the pin.
 
 A release binary embeds the built interface; see the `zeabur-ui` crate documentation.
+
+Motion work follows the `zeabur-ui` skill and the transitions.dev skills that `skills-lock.json`
+pins; install those with `npx skills experimental_install` (they are not kept in this repository).
