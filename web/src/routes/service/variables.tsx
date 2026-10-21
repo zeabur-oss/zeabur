@@ -15,6 +15,7 @@ import TrashIcon from "~icons/ph/trash"
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { configMapsQuery } from "@/api/queries"
 import { CopyButton, Hint, ManagedTip, Segmented } from "@/components/bits"
+import { FilterField } from "@/components/filter-field"
 import { KubeDetails } from "@/components/kube-details"
 import { useDraft, useHold } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
@@ -54,6 +55,7 @@ import {
   type EnvRow,
   type RowProblem,
 } from "@/model/env-edit"
+import { isLongList } from "@/model/lists"
 import { configObjectsOf, type Service } from "@/model/service"
 
 const DataEditor = lazy(() =>
@@ -200,6 +202,23 @@ export function VariablesTab({
     literal.length +
     referenced.length +
     imported.reduce((n, i) => n + (i.imported.keyCount ?? 0), 0)
+  const [query, setQuery] = useState("")
+  const long = isLongList(literal.length + referenced.length + imported.length)
+  const needle = long ? query.trim().toLowerCase() : ""
+  const matches = (...texts: (string | null | undefined)[]) =>
+    !needle || texts.some((text) => text?.toLowerCase().includes(needle))
+  const shownLiteral = literal.filter(({ env }) => matches(env.name, env.value))
+  const shownObjects = fromObjects.filter(({ env }) => matches(env.name, env.source.name))
+  const shownImported = imported.filter(({ imported: i }) => matches(i.prefix, i.source.name))
+  const shownCluster = fromCluster.filter(({ env }) => matches(env.name))
+  const elsewhere = [
+    ...(fromObjects.length + imported.length > 0
+      ? [{ id: "vars-objects", text: t("vars.alsoObjects", fromObjects.length + imported.length) }]
+      : []),
+    ...(fromCluster.length > 0
+      ? [{ id: "vars-cluster", text: t("vars.alsoCluster", fromCluster.length) }]
+      : []),
+  ]
 
   // The editor starts from the cluster with the variables the draft already holds applied.
   const startEditing = (add: boolean) => {
@@ -538,133 +557,173 @@ export function VariablesTab({
           </div>
         </>
       ) : (
-        <div className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
-          {editing ? (
-            <VarGroup
-              label={t("vars.direct")}
-              action={
-                edited > 0 ? (
-                  <span className="type-meta text-secondary">{t("vars.edited", edited)}</span>
-                ) : undefined
-              }
-            >
-              <ul className="flex flex-col divide-y">
-                {editing.rows.map((row) => (
-                  <EditRow
-                    key={row.id}
-                    row={row}
-                    containers={multi ? containers.map((c) => c.name) : undefined}
-                    problem={problems.get(row.id)}
-                    focus={focus === row.id}
-                    onChange={(next) =>
-                      setRows((rows) => rows.map((r) => (r.id === row.id ? next : r)))
-                    }
-                    onDrop={() => setRows((rows) => rows.filter((r) => r.id !== row.id))}
-                    onPaste={(event) => paste(row, event)}
-                  />
-                ))}
-              </ul>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => {
-                    const row = blankRow()
-                    setRows((rows) => [...rows, row])
-                    setFocus(row.id)
-                  }}
-                >
-                  <PlusIcon aria-hidden="true" data-icon="inline-start" />
-                  {t("vars.addRow")}
-                </Button>
-                <span className="text-xs text-tertiary">{t("vars.pasteHint")}</span>
-              </div>
-            </VarGroup>
-          ) : literal.length > 0 ? (
-            <VarGroup label={t("vars.direct")}>
-              <ul className="flex flex-col divide-y">
-                {literal.map(({ container, env }) => {
-                  const targets = named.get(`${container}/${env.name}`) ?? []
-                  return (
+        <>
+          {long && !editing ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <FilterField value={query} onChange={setQuery} label={t("vars.filter")} slash />
+              {literal.length > 0 && elsewhere.length > 0 ? (
+                <p className="type-meta text-secondary">
+                  {t("vars.also")}
+                  {elsewhere.map((part, i) => (
+                    <span key={part.id}>
+                      {i > 0 ? t("common.sep") : null}
+                      <Button
+                        variant="link"
+                        size="xs"
+                        onClick={() =>
+                          document.getElementById(part.id)?.scrollIntoView({ block: "start" })
+                        }
+                      >
+                        {part.text}
+                      </Button>
+                    </span>
+                  ))}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
+            {editing ? (
+              <VarGroup
+                label={t("vars.direct")}
+                action={
+                  edited > 0 ? (
+                    <span className="type-meta text-secondary">{t("vars.edited", edited)}</span>
+                  ) : undefined
+                }
+              >
+                <ul className="flex flex-col divide-y">
+                  {editing.rows.map((row) => (
+                    <EditRow
+                      key={row.id}
+                      row={row}
+                      containers={multi ? containers.map((c) => c.name) : undefined}
+                      problem={problems.get(row.id)}
+                      focus={focus === row.id}
+                      onChange={(next) =>
+                        setRows((rows) => rows.map((r) => (r.id === row.id ? next : r)))
+                      }
+                      onDrop={() => setRows((rows) => rows.filter((r) => r.id !== row.id))}
+                      onPaste={(event) => paste(row, event)}
+                    />
+                  ))}
+                </ul>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => {
+                      const row = blankRow()
+                      setRows((rows) => [...rows, row])
+                      setFocus(row.id)
+                    }}
+                  >
+                    <PlusIcon aria-hidden="true" data-icon="inline-start" />
+                    {t("vars.addRow")}
+                  </Button>
+                  <span className="text-xs text-tertiary">{t("vars.pasteHint")}</span>
+                </div>
+              </VarGroup>
+            ) : literal.length > 0 ? (
+              <VarGroup label={t("vars.direct")} count={long ? literal.length : undefined}>
+                <div className={cn(long && "max-h-90 overflow-y-auto")}>
+                  {long ? (
+                    <div
+                      aria-hidden="true"
+                      className="sticky top-0 z-raised grid grid-cols-variable gap-x-4 border-b bg-card py-1.5 type-meta text-muted-foreground max-sm:hidden"
+                    >
+                      <span>{t("vars.name")}</span>
+                      <span>{t("vars.value")}</span>
+                    </div>
+                  ) : null}
+                  {shownLiteral.length === 0 ? (
+                    <p className="py-2 text-xs text-muted-foreground">{t("vars.noMatch")}</p>
+                  ) : null}
+                  <ul className="flex flex-col divide-y">
+                    {shownLiteral.map(({ container, env }) => {
+                      const targets = named.get(`${container}/${env.name}`) ?? []
+                      return (
+                        <li
+                          key={`${container}/${env.name}`}
+                          className={cn(
+                            "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable",
+                            entrance(createdKey.env(workload, env.name)),
+                          )}
+                        >
+                          <span
+                            className="flex items-center gap-1.5 font-mono text-xs font-medium"
+                            translate="no"
+                          >
+                            {env.name}
+                            {multi ? (
+                              <span className="font-normal text-muted-foreground">{container}</span>
+                            ) : null}
+                          </span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span
+                              className="truncate font-mono text-xs"
+                              translate="no"
+                              title={env.value ?? ""}
+                            >
+                              {env.value}
+                            </span>
+                            <CopyButton value={env.value ?? ""} />
+                            {targets.map((target) => (
+                              <Tooltip key={target} content={t("vars.names", target)}>
+                                <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
+                                  <ArrowRightIcon className="size-3" aria-hidden="true" />
+                                  {target}
+                                </span>
+                              </Tooltip>
+                            ))}
+                          </span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              </VarGroup>
+            ) : null}
+
+            {shownObjects.length + shownImported.length > 0 ? (
+              <VarGroup id="vars-objects" label={t("vars.fromObjects")} action={revealButtons}>
+                <ul className="flex flex-col divide-y">
+                  {shownObjects.map(sourceRow)}
+                  {shownImported.map(({ container, imported: i }) => (
                     <li
-                      key={`${container}/${env.name}`}
-                      className={cn(
-                        "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable",
-                        entrance(createdKey.env(workload, env.name)),
-                      )}
+                      key={`${container}/${i.origin.fieldPath ?? i.source.name}`}
+                      className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
                     >
                       <span
-                        className="flex items-center gap-1.5 font-mono text-xs font-medium"
+                        className="font-mono text-xs font-medium text-muted-foreground"
                         translate="no"
                       >
-                        {env.name}
-                        {multi ? (
-                          <span className="font-normal text-muted-foreground">{container}</span>
-                        ) : null}
+                        {i.prefix ? `${i.prefix}*` : t("vars.allKeys")}
                       </span>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span
-                          className="truncate font-mono text-xs"
-                          translate="no"
-                          title={env.value ?? ""}
-                        >
-                          {env.value}
-                        </span>
-                        <CopyButton value={env.value ?? ""} />
-                        {targets.map((target) => (
-                          <Tooltip key={target} content={t("vars.names", target)}>
-                            <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
-                              <ArrowRightIcon className="size-3" aria-hidden="true" />
-                              {target}
-                            </span>
-                          </Tooltip>
-                        ))}
+                      <span className="text-xs text-muted-foreground">
+                        {t("vars.keys", i.keyCount ?? 0)}
+                      </span>
+                      <span className="flex items-center justify-end gap-1">
+                        {i.pendingRestart ? <PendingMark pending={i.pendingRestart} /> : null}
+                        <SourceLink
+                          source={i.source}
+                          whole
+                          onOpen={(kind, name) => setEditor({ kind, name })}
+                        />
                       </span>
                     </li>
-                  )
-                })}
-              </ul>
-            </VarGroup>
-          ) : null}
+                  ))}
+                </ul>
+              </VarGroup>
+            ) : null}
 
-          {fromObjects.length + imported.length > 0 ? (
-            <VarGroup label={t("vars.fromObjects")} action={revealButtons}>
-              <ul className="flex flex-col divide-y">
-                {fromObjects.map(sourceRow)}
-                {imported.map(({ container, imported: i }) => (
-                  <li
-                    key={`${container}/${i.origin.fieldPath ?? i.source.name}`}
-                    className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
-                  >
-                    <span
-                      className="font-mono text-xs font-medium text-muted-foreground"
-                      translate="no"
-                    >
-                      {i.prefix ? `${i.prefix}*` : t("vars.allKeys")}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {t("vars.keys", i.keyCount ?? 0)}
-                    </span>
-                    <span className="flex items-center justify-end gap-1">
-                      {i.pendingRestart ? <PendingMark pending={i.pendingRestart} /> : null}
-                      <SourceLink
-                        source={i.source}
-                        whole
-                        onOpen={(kind, name) => setEditor({ kind, name })}
-                      />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </VarGroup>
-          ) : null}
-
-          {fromCluster.length > 0 ? (
-            <VarGroup label={t("vars.fromCluster")}>
-              <ul className="flex flex-col divide-y">{fromCluster.map(sourceRow)}</ul>
-            </VarGroup>
-          ) : null}
-        </div>
+            {shownCluster.length > 0 ? (
+              <VarGroup id="vars-cluster" label={t("vars.fromCluster")}>
+                <ul className="flex flex-col divide-y">{shownCluster.map(sourceRow)}</ul>
+              </VarGroup>
+            ) : null}
+          </div>
+        </>
       )}
       <KubeDetails facts={kubeFacts} />
       {editor ? (
@@ -819,18 +878,27 @@ function PendingMark({ pending }: { pending: Schemas["PendingRestart"] }) {
 }
 
 function VarGroup({
+  id,
   label,
+  count,
   action,
   children,
 }: {
+  id?: string
   label: string
+  count?: number
   action?: ReactNode
   children: ReactNode
 }) {
   return (
-    <section className="flex flex-col px-5 pt-3 pb-1">
+    <section id={id} className="flex scroll-mt-4 flex-col px-5 pt-3 pb-1">
       <div className="flex flex-wrap items-center gap-2 pb-1">
-        <h3 className="type-meta font-medium text-secondary">{label}</h3>
+        <h3 className="type-meta font-medium text-secondary">
+          {label}
+          {count !== undefined ? (
+            <span className="ml-1.5 text-muted-foreground">{count}</span>
+          ) : null}
+        </h3>
         {action ? <span className="ml-auto">{action}</span> : null}
       </div>
       {children}
