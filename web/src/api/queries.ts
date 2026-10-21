@@ -163,12 +163,16 @@ export const nodesQuery = queryOptions({
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/nodes", { signal })),
   refetchInterval: CLUSTER_POLL,
   refetchIntervalInBackground: false,
+  // Home and Cluster wait on these reads while they are pending; a refused read retried on every
+  // mount would unmount the section that mounted it, again and again. The poll still retries.
+  retryOnMount: false,
 })
 
 export const upgradesQuery = queryOptions({
   queryKey: ["cluster", "upgrades"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/upgrades", { signal })),
   staleTime: 5 * 60_000,
+  retryOnMount: false,
 })
 
 export const clusterWarningsQuery = queryOptions({
@@ -210,6 +214,7 @@ export const capabilitiesQuery = queryOptions({
   queryKey: ["cluster", "capabilities"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/capabilities", { signal })),
   staleTime: 60_000,
+  retryOnMount: false,
 })
 
 export const projectGapsQuery = (project: string) =>
