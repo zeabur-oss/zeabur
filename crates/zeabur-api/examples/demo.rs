@@ -1650,6 +1650,15 @@ async fn main() -> std::io::Result<()> {
         });
     }
     cluster.update(|s| {
+        // A debug container's patch tests the pod's uid.
+        for (namespace, objects) in &mut s.objects {
+            for pod in &mut objects.pods {
+                let name = pod.metadata.name.clone().unwrap_or_default();
+                pod.metadata
+                    .uid
+                    .get_or_insert_with(|| format!("{namespace}-{name}"));
+            }
+        }
         s.without_shell
             .extend(["shop/web-7c9d8-abcde", "shop/web-7c9d8-fghij"].map(str::to_owned));
     });
