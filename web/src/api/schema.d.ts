@@ -3976,7 +3976,10 @@ export interface components {
       deleted: string[]
       /** @description The namespace tools pods of this project go in. */
       namespace: string
-      /** @description The person's tools pods there that have not stopped, oldest first. */
+      /**
+       * @description The person's tools pods there that have not stopped and are not being deleted, oldest
+       *     first.
+       */
       pods: components["schemas"]["ToolsPodStatus"][]
     }
     /**

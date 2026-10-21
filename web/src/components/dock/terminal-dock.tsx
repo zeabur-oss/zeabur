@@ -233,7 +233,14 @@ function NoTerminals() {
   const t = useT()
   const place = usePlace()
   const project = place.project
-  const tools = useQuery({ ...toolsQuery(project ?? ""), enabled: !!project })
+  const tools = useQuery({
+    ...toolsQuery(project ?? ""),
+    enabled: !!project,
+    refetchInterval: (query) => {
+      const pods = query.state.data?.pods ?? []
+      return pods.some((p) => !p.ready) ? 1500 : pods.length > 0 ? 15_000 : false
+    },
+  })
   const view = useQuery({ ...projectQuery(project ?? "", { poll: false }), enabled: !!project })
   const service = view.data?.services.find((s) => serviceId(s) === place.service)
   const pods = tools.data?.pods ?? []

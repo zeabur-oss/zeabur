@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
-import { api, unwrap } from "@/api/client"
+import { api, isStatus, unwrap } from "@/api/client"
 import { debugQuery, projectQuery, queryClient, toolsQuery } from "@/api/queries"
 import { Session } from "@/components/dock/session"
 import { LoadingRows } from "@/components/page"
@@ -275,12 +275,18 @@ export function ToolsPods({
   const t = useT()
   const { locale } = useI18n()
   const stop = useMutation({
-    mutationFn: async (name: string) =>
-      unwrap(
-        await api.DELETE("/api/v1/projects/{project}/tools/{name}", {
-          params: { path: { project, name } },
-        }),
-      ),
+    mutationFn: async (name: string) => {
+      try {
+        unwrap(
+          await api.DELETE("/api/v1/projects/{project}/tools/{name}", {
+            params: { path: { project, name } },
+          }),
+        )
+      } catch (error) {
+        // Already gone: deleted once its terminals closed, or at its deadline.
+        if (!isStatus(error, 404)) throw error
+      }
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: toolsQuery(project).queryKey }),
   })
   return (

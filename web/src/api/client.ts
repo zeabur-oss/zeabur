@@ -69,9 +69,10 @@ export function localProblem(status: number, detail: string): Problem {
 export function unwrap<T>(result: { data?: T; error?: unknown; response: Response }): T {
   if (result.data !== undefined && result.response.ok) return result.data
   const status = result.response.status
+  const reason = result.response.statusText
   const problem = isProblem(result.error)
     ? result.error
-    : localProblem(status, `The server answered ${status} ${result.response.statusText}.`)
+    : localProblem(status, `The server answered ${reason ? `${status} ${reason}` : status}.`)
   if (problem.kind === "signed-out") goToSignIn()
   // RFC 6585, section 4; RFC 9110, section 15.6.4. Else kube-apiserver's Status retry hint.
   const retryAfter =

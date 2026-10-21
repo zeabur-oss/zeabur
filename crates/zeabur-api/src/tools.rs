@@ -5,7 +5,7 @@
 //!
 //! | Method and path | What it does |
 //! |---|---|
-//! | `GET /api/v1/projects/{p}/tools` | the person's tools pods and how they are doing; deletes those that have stopped |
+//! | `GET /api/v1/projects/{p}/tools` | the person's tools pods and how they are doing; deletes those that have stopped or whose terminals closed |
 //! | `GET /api/v1/projects/{p}/tools/{name}/terminal` | a terminal in it, over a WebSocket, as `pods/exec` (see `pods::exec`) |
 //! | `DELETE /api/v1/projects/{p}/tools/{name}` | deletes it |
 //!
@@ -26,8 +26,9 @@
 //!
 //! When the last terminal of a pod closes, Zeabur deletes the kubeconfig at once, and the pod
 //! after a grace period (a minute by default, for a reconnect), with the person's credential of
-//! that terminal. If that fails (the server restarted, the token expired), the pod still stops at
-//! its `activeDeadlineSeconds`, and the next status request deletes it.
+//! that terminal. If that fails, as it does once that token has expired, the next status request
+//! past the grace period deletes it with its own. If the server restarted meanwhile, the pod still
+//! stops at its `activeDeadlineSeconds`, and the next status request deletes it.
 //!
 //! # Who else can use the token
 //!
@@ -84,40 +85,55 @@ struct Open {
     /// Bumped each time the last terminal closes, so a deletion scheduled then is dropped once
     /// another terminal has opened and closed meanwhile.
     closings: u64,
+    /// When the last terminal closed, while none is open.
+    idle_since: Option<Timestamp>,
 }
 
 impl Sessions {
     fn opened(&self, key: &str) {
         if let Ok(mut open) = self.open.lock() {
-            open.entry(key.to_owned()).or_default().terminals += 1;
+            let entry = open.entry(key.to_owned()).or_default();
+            entry.terminals += 1;
+            entry.idle_since = None;
         }
     }
 
-    /// One terminal closed; the closing's number when it was the last.
-    fn closed(&self, key: &str) -> Option<u64> {
+    /// One terminal closed at `now`; the closing's number when it was the last.
+    fn closed(&self, key: &str, now: Timestamp) -> Option<u64> {
         let mut open = self.open.lock().ok()?;
         let entry = open.get_mut(key)?;
         entry.terminals = entry.terminals.saturating_sub(1);
         let last = (entry.terminals == 0).then(|| {
             entry.closings += 1;
+            entry.idle_since = Some(now);
             entry.closings
         });
         drop(open);
         last
     }
 
-    /// Whether no terminal opened since `closing`; forgets the pod if so.
+    /// Whether no terminal opened since `closing`.
     fn still_closed(&self, key: &str, closing: u64) -> bool {
-        let Ok(mut open) = self.open.lock() else {
-            return false;
-        };
-        let idle = open
-            .get(key)
-            .is_some_and(|o| o.terminals == 0 && o.closings == closing);
-        if idle {
+        self.open.lock().is_ok_and(|open| {
+            open.get(key)
+                .is_some_and(|o| o.terminals == 0 && o.closings == closing)
+        })
+    }
+
+    /// Whether the pod's last terminal closed more than `grace` before `now`, none open since.
+    fn idle_past(&self, key: &str, grace: std::time::Duration, now: Timestamp) -> bool {
+        let grace = i64::try_from(grace.as_secs()).unwrap_or(i64::MAX);
+        self.open.lock().is_ok_and(|open| {
+            open.get(key)
+                .and_then(|o| o.idle_since.filter(|_| o.terminals == 0))
+                .is_some_and(|since| now.as_second() >= since.as_second().saturating_add(grace))
+        })
+    }
+
+    fn forget(&self, key: &str) {
+        if let Ok(mut open) = self.open.lock() {
             open.remove(key);
         }
-        idle
     }
 
     fn terminals(&self, key: &str) -> usize {
@@ -168,7 +184,8 @@ pub struct ToolsStatus {
     /// Whether Zeabur can open a tools terminal here; `false` in local mode, which holds no
     /// token to hand over.
     pub available: bool,
-    /// The person's tools pods there that have not stopped, oldest first.
+    /// The person's tools pods there that have not stopped and are not being deleted, oldest
+    /// first.
     pub pods: Vec<ToolsPodStatus>,
     /// The tools pods that had stopped or outlived their deadline and were deleted now.
     pub deleted: Vec<String>,
@@ -295,17 +312,23 @@ pub(crate) async fn status(
             continue;
         }
         let name = text(&pod, "/metadata/name").unwrap_or_default().to_owned();
-        if finished(&pod, now)
-            && state.tools.terminals(&format!("{namespace}/{name}")) == 0
-            && pod.pointer("/metadata/deletionTimestamp").is_none()
-        {
-            if cluster
+        let key = format!("{namespace}/{name}");
+        if pod.pointer("/metadata/deletionTimestamp").is_some() {
+            continue;
+        }
+        let closed = state
+            .tools
+            .idle_past(&key, state.settings.terminal.tools_grace, now);
+        // One the person may not delete now (their admin rights ended) stays listed.
+        if (closed || finished(&pod, now))
+            && state.tools.terminals(&key) == 0
+            && cluster
                 .write(&delete_request(&namespace, &pod))
                 .await
                 .is_ok()
-            {
-                deleted.push(name);
-            }
+        {
+            state.tools.forget(&key);
+            deleted.push(name);
             continue;
         }
         pods.push(pod_status(&pod, &state.tools));
@@ -555,8 +578,18 @@ fn after_close(
             )
             .await;
         tokio::time::sleep(grace).await;
-        if sessions.still_closed(&key, closing) {
-            let _gone = cluster.write(&delete_request(&namespace, &pod)).await;
+        if !sessions.still_closed(&key, closing) {
+            return;
+        }
+        let Ok(current) = read_pod(cluster.as_ref(), &namespace, &name).await else {
+            return;
+        };
+        if cluster
+            .write(&delete_request(&namespace, &current))
+            .await
+            .is_ok()
+        {
+            sessions.forget(&key);
         }
     });
 }
@@ -605,7 +638,7 @@ async fn run(
             if exec::send_frame(&mut socket, &ready).await {
                 exec::relay(socket, session, terminal.expires_in, terminal.idle).await;
             }
-            if let Some(closing) = state.tools.closed(&key) {
+            if let Some(closing) = state.tools.closed(&key, (state.clock)()) {
                 after_close(
                     Arc::clone(&state.tools),
                     Arc::clone(&terminal.cluster),
@@ -617,7 +650,7 @@ async fn run(
             }
         }
         Err(problem) => {
-            let _last = state.tools.closed(&key);
+            let _last = state.tools.closed(&key, (state.clock)());
             let elevation: Elevation = terminal.elevation;
             let frame = ServerFrame::Error {
                 problem: Box::new(offer_elevation(*problem.0, elevation)),
@@ -636,15 +669,32 @@ mod tests {
     #[test]
     fn a_pod_is_deleted_only_when_no_terminal_opened_since_the_last_closed() {
         let sessions = Sessions::default();
+        let now = Timestamp::UNIX_EPOCH;
         sessions.opened("ns/p");
         sessions.opened("ns/p");
-        assert_eq!(sessions.closed("ns/p"), None);
-        let first = sessions.closed("ns/p").unwrap();
+        assert_eq!(sessions.closed("ns/p", now), None);
+        let first = sessions.closed("ns/p", now).unwrap();
         sessions.opened("ns/p");
-        let second = sessions.closed("ns/p").unwrap();
+        let second = sessions.closed("ns/p", now).unwrap();
         assert!(!sessions.still_closed("ns/p", first));
         assert!(sessions.still_closed("ns/p", second));
         assert_eq!(sessions.terminals("ns/p"), 0);
+    }
+
+    #[test]
+    fn a_pod_is_idle_past_the_grace_period_only_while_no_terminal_is_open() {
+        let sessions = Sessions::default();
+        let at = |s: i64| Timestamp::from_second(s).unwrap();
+        let grace = std::time::Duration::from_secs(60);
+        sessions.opened("ns/p");
+        assert!(!sessions.idle_past("ns/p", grace, at(1000)));
+        let _last = sessions.closed("ns/p", at(0));
+        assert!(!sessions.idle_past("ns/p", grace, at(59)));
+        assert!(sessions.idle_past("ns/p", grace, at(60)));
+        sessions.opened("ns/p");
+        assert!(!sessions.idle_past("ns/p", grace, at(120)));
+        sessions.forget("ns/p");
+        assert!(!sessions.idle_past("ns/p", grace, at(120)));
     }
 
     #[test]

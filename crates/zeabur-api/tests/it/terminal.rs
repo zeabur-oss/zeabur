@@ -467,6 +467,18 @@ mod tests {
             ));
             pods.push(tools_pod("zeabur-tools-old", "alice@example.com", "Failed"));
             pods.push(tools_pod("zeabur-tools-bobs", "bob@example.com", "Running"));
+            let mut going = tools_pod("zeabur-tools-going", "alice@example.com", "Running");
+            going.metadata.deletion_timestamp =
+                serde_json::from_value(json!("2026-10-21T00:10:00Z")).ok();
+            pods.push(going);
+            pods.push(tools_pod(
+                "zeabur-tools-kept",
+                "alice@example.com",
+                "Failed",
+            ));
+            state
+                .forbidden_writes
+                .insert("Pod/zeabur-tools-kept".to_owned());
         });
         let app = signed(&cluster, None);
         let (_, listed) = send(&app, "GET", "/api/v1/projects/shop/tools", None).await;
@@ -478,7 +490,7 @@ mod tests {
             .iter()
             .map(|p| p["name"].as_str().unwrap())
             .collect();
-        assert_eq!(names, ["zeabur-tools-mine"]);
+        assert_eq!(names, ["zeabur-tools-mine", "zeabur-tools-kept"]);
         assert!(stored_pod(&cluster, "shop", "zeabur-tools-old").is_none());
 
         let (status, _) = send(

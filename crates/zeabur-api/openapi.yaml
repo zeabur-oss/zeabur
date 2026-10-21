@@ -7496,7 +7496,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ToolsPodStatus"
-          description: The person's tools pods there that have not stopped, oldest first.
+          description: |-
+            The person's tools pods there that have not stopped and are not being deleted, oldest
+            first.
     UnavailableLog:
       type: string
       description: Why a container's log cannot be read, from the kubelet's answer.
