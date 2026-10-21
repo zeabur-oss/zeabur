@@ -13,6 +13,19 @@ issuer:
     configMap: zeabur-identity-ca
 elevation:
   enabled: false
+terminal:
+  debugImage: registry.example.test/busybox:1.37.0
+  toolsImage: registry.example.test/k8s:1.36.5
+  toolsNamespace: zeabur-tools
+  toolsDeadlineMinutes: 15
+  toolsGraceSeconds: 30
+  toolsResources:
+    requests:
+      cpu: 20m
+      memory: 96Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
 planKey:
   existingSecret: zeabur-plan-key
 ingress:
