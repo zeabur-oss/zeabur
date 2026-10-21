@@ -107,7 +107,7 @@ export function Hint({ children, label }: { children: ReactNode; label: string }
       <button
         type="button"
         aria-label={label}
-        className="inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-md align-[calc(0.4em-8px)] text-muted-foreground outline-none hover:text-foreground"
+        className="inline-flex size-4 shrink-0 cursor-help items-center justify-center rounded-md align-glyph-middle text-muted-foreground outline-none hover:text-foreground"
       >
         <InfoIcon className="size-3.5" aria-hidden="true" />
       </button>

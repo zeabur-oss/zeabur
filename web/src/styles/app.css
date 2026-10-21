@@ -29,6 +29,11 @@
 @utility flex-side {
   flex: 1 1 18.75rem;
 }
+/* Centres a size-4 inline box on 0.4em above the baseline: the middle of both the ideographic
+   em box and Latin capitals, where `middle` (half the x-height) sits low beside Chinese. */
+@utility align-glyph-middle {
+  vertical-align: calc(0.4em - var(--spacing) * 2);
+}
 
 /* Sonner inserts its own <style> after this sheet, so these rules carry one more type selector. */
 html [data-sonner-toaster] {
