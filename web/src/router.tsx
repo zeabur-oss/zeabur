@@ -5,6 +5,10 @@ import {
   lazyRouteComponent,
   redirect,
 } from "@tanstack/react-router"
+import {
+  pageViewTransition,
+  viewTransitionTypes,
+} from "@zeabur/design-system/components/page-transition"
 
 import {
   capabilitiesQuery,
@@ -267,6 +271,7 @@ export const router = createRouter({
   ]),
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
+  defaultViewTransition: viewTransitionTypes() ? pageViewTransition : false,
   defaultPendingComponent: RoutePending,
   defaultErrorComponent: RouteError,
   scrollRestoration: true,

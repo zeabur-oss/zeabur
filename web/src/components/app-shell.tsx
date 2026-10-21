@@ -1,4 +1,4 @@
-import { Link, Outlet } from "@tanstack/react-router"
+import { Link, Outlet, useLocation } from "@tanstack/react-router"
 import { lazy, Suspense } from "react"
 import ListIcon from "~icons/ph/list"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
@@ -18,6 +18,7 @@ import { Logo } from "@zeabur/design-system/components/brand"
 import { Button } from "@zeabur/design-system/components/button"
 import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
 import { AppFrame, FramePanel, FrameSidebar } from "@zeabur/design-system/components/frame"
+import { usePageTransition } from "@zeabur/design-system/components/page-transition"
 import { TooltipProvider } from "@zeabur/design-system/components/tooltip"
 
 // Lazy: Sonner stays out of the first page load (scripts/ui-budget.sh).
@@ -35,6 +36,8 @@ export function AppShell() {
   const mobileOpen = mobileNav.useValue()
   const elevating = elevation.useValue()
   const theme = useTheme()
+  const pathname = useLocation({ select: (location) => location.pathname })
+  const content = usePageTransition<HTMLElement>(pathname)
   const nav = place.project ? <ProjectSidebar project={place.project} /> : <Sidebar />
 
   return (
@@ -50,9 +53,10 @@ export function AppShell() {
         <FramePanel>
           <PhoneBar />
           <main
+            ref={content}
             id="content"
             tabIndex={-1}
-            className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain outline-none"
+            className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain outline-none page-transition"
           >
             <Outlet />
           </main>
