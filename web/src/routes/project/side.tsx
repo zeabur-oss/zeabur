@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
+import CaretRightIcon from "~icons/ph/caret-right"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 import LockSimpleOpenIcon from "~icons/ph/lock-simple-open"
 
@@ -11,6 +12,13 @@ import { projectTimelineQuery } from "@/api/queries"
 import { Ago, Segmented } from "@/components/bits"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusDot, StatusPill } from "@/components/status"
+import { Button } from "@zeabur/design-system/components/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@zeabur/design-system/components/collapsible"
+import { Drawer } from "@zeabur/design-system/components/drawer"
 import { Timeline, TimelineItem } from "@zeabur/design-system/components/timeline"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import {
@@ -26,17 +34,24 @@ import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
   claimsOf,
+  healthRank,
   hostUrl,
   isWarning,
   serviceId,
   statusOf,
   summarise,
+  type Claim,
+  type Domain,
   type Event,
   type Project,
   type Service,
 } from "@/model/service"
 import { refusedPlaces } from "@/routes/project/data"
+import { FilterBox } from "@/routes/project/filter-box"
 import { MeterStack, meterPartTone } from "@zeabur/design-system/components/meter"
+
+/** Rows a side block lists before it says "Show all". */
+const SIDE_ROWS = 5
 
 function Heading({
   id,
@@ -85,77 +100,108 @@ export const writerOf = (t: Translate, writer: Entry["writer"]) =>
 
 const isTrouble = (entry: Entry) => entry.kind === "warning" || entry.kind === "termination"
 
-/** What happened in the project, newest first: releases, writes and who made them, warnings and
- * crashes. Before the timeline loads, or where it cannot be read, the events stand in. */
+/** How many warnings, and how many entries in all, Activity lists. */
+function useActivityCounts(project: string, events: Event[]) {
+  const items = useQuery(projectTimelineQuery(project)).data?.items
+  return {
+    trouble: items ? items.filter(isTrouble).length : events.filter(isWarning).length,
+    total: items ? items.length : events.length,
+  }
+}
+
+/**
+ * What happened in the project, newest first: releases, writes and who made them, warnings and
+ * crashes. Before the timeline loads, or where it cannot be read, the events stand in. `framed`
+ * holds the list in a frame of its own height; `bare` leaves out the heading, for a drawer.
+ */
 export function Activity({
   project,
   services,
   events,
   unreadable,
+  framed = false,
+  bare = false,
 }: {
   project: string
   services: Service[]
   events: Event[]
   unreadable: Schemas["UnreadableView"][]
+  framed?: boolean
+  bare?: boolean
 }) {
   const t = useT()
   const timeline = useQuery(projectTimelineQuery(project))
   const [all, setAll] = useState(false)
   const items = timeline.data?.items
-  const trouble = items ? items.filter(isTrouble).length : events.filter(isWarning).length
-  const total = items ? items.length : events.length
+  const { trouble, total } = useActivityCounts(project, events)
+  const limit = all || framed || bare ? undefined : ACTIVITY_SHOWN
+  const control = (
+    <Segmented
+      label={t("events.show")}
+      value={all ? "all" : "warnings"}
+      onChange={(value) => setAll(value === "all")}
+      options={[
+        { value: "warnings", label: counted(t("events.warnings"), trouble) },
+        { value: "all", label: counted(t("common.all"), total) },
+      ]}
+    />
+  )
+  const list = items ? (
+    <TimelineEntries
+      project={project}
+      services={services}
+      entries={(all ? items : items.filter(isTrouble)).slice(0, limit)}
+      empty={all ? t("timeline.empty") : t("events.noWarnings")}
+    />
+  ) : (
+    <EventEntries
+      project={project}
+      services={services}
+      events={(all ? events : events.filter(isWarning)).slice(0, limit)}
+      empty={all ? t("events.empty") : t("events.noWarnings")}
+    />
+  )
   return (
-    <section aria-labelledby="project-activity" className="flex flex-col gap-3">
-      <Heading id="project-activity" title={t("project.activity")}>
-        <Segmented
-          label={t("events.show")}
-          value={all ? "all" : "warnings"}
-          onChange={(value) => setAll(value === "all")}
-          options={[
-            { value: "warnings", label: counted(t("events.warnings"), trouble) },
-            { value: "all", label: counted(t("common.all"), total) },
-          ]}
-        />
-      </Heading>
-      <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.events)} line />
-      {items ? (
-        <TimelineEntries
-          project={project}
-          services={services}
-          entries={(all ? items : items.filter(isTrouble)).slice(
-            0,
-            all ? undefined : ACTIVITY_SHOWN,
-          )}
-          empty={all ? t("timeline.empty") : t("events.noWarnings")}
-        />
+    <section
+      aria-labelledby={bare ? undefined : "project-activity"}
+      className="flex flex-col gap-3"
+    >
+      {bare ? (
+        <div className="flex">{control}</div>
       ) : (
-        <EventEntries
-          project={project}
-          services={services}
-          events={(all ? events : events.filter(isWarning)).slice(
-            0,
-            all ? undefined : ACTIVITY_SHOWN,
-          )}
-          empty={all ? t("events.empty") : t("events.noWarnings")}
-        />
+        <Heading id="project-activity" title={t("project.activity")}>
+          {control}
+        </Heading>
+      )}
+      <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.events)} line />
+      {framed ? (
+        <div className="max-h-120 overflow-y-auto rounded-xl border border-v2-border bg-card px-4 py-3">
+          {list}
+        </div>
+      ) : (
+        list
       )}
     </section>
   )
 }
 
-/** Timeline entries as a list; also the service's Changes. */
+/** Whether a sentence already names the workload, so its line under it need not. */
+const names = (entry: Entry) =>
+  Object.values(entry.message.params ?? {}).some(
+    (value) => typeof value === "string" && value.includes(entry.workload.name),
+  )
+
+/** Timeline entries as a list. */
 function TimelineEntries({
   project,
   services,
   entries,
   empty,
-  actions,
 }: {
   project: string
-  services?: Service[]
+  services: Service[]
   entries: Entry[]
   empty: string
-  actions?: (entry: Entry) => ReactNode
 }) {
   const t = useT()
   const write = useSentence()
@@ -169,10 +215,11 @@ function TimelineEntries({
   return (
     <Timeline>
       {entries.map((entry, i) => {
-        const service = services?.find(
+        const service = services.find(
           (s) => s.kind === entry.workload.kind && s.name === entry.workload.name,
         )
         const who = writerOf(t, entry.writer)
+        const named = names(entry)
         return (
           <TimelineItem
             key={`${entry.at}/${entry.kind}/${entry.workload.name}/${i}`}
@@ -187,9 +234,9 @@ function TimelineEntries({
               </span>
             }
             meta={
-              services ? (
+              named && !who ? undefined : (
                 <span className="flex flex-wrap items-center gap-x-1.5">
-                  {service ? (
+                  {named ? null : service ? (
                     <Link
                       {...serviceLink(project, service)}
                       className="hover:text-foreground hover:underline"
@@ -202,11 +249,8 @@ function TimelineEntries({
                   )}
                   {who ? <span>{t("timeline.by", who)}</span> : null}
                 </span>
-              ) : who ? (
-                t("timeline.by", who)
-              ) : undefined
+              )
             }
-            actions={actions?.(entry)}
           />
         )
       })}
@@ -291,67 +335,294 @@ function counted(label: string, count: number) {
 
 const sideRow = "flex items-center gap-2.5 border-t border-rule py-2.75"
 
+/** The rows a side block shows: all of a few, else the first `SIDE_ROWS`. */
+const firstRows = <T,>(list: T[]) => (list.length > SIDE_ROWS + 1 ? list.slice(0, SIDE_ROWS) : list)
+
+/** "Show all N" under a side block, opening every row in a drawer with a filter. */
+function ShowAll({
+  count,
+  title,
+  filterLabel,
+  children,
+}: {
+  count: number
+  title: string
+  filterLabel: string
+  children: (needle: string) => ReactNode
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState("")
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="xs"
+        className="-ml-2.5 self-start"
+        onClick={() => setOpen(true)}
+      >
+        {t("services.showAll", count)}
+      </Button>
+      <Drawer
+        open={open}
+        onOpenChange={setOpen}
+        title={title}
+        closeLabel={t("common.close")}
+        size="xl"
+      >
+        <div className="flex flex-col gap-3">
+          <FilterBox value={query} onChange={setQuery} label={filterLabel} className="sm:w-64" />
+          {children(query.trim().toLowerCase())}
+        </div>
+      </Drawer>
+    </>
+  )
+}
+
+const domainRank = (d: Domain) => (d.https ? 10 : 0) + healthRank[statusOf(d.service).health]
+
+/** Domains without HTTPS, then those of failing services, then the rest by host. */
+const byException = (domains: Domain[]) =>
+  domains.toSorted((a, b) => domainRank(a) - domainRank(b) || a.host.localeCompare(b.host))
+
+function DomainRow({ project, domain }: { project: string; domain: Domain }) {
+  const t = useT()
+  const Lock = domain.https ? LockSimpleIcon : LockSimpleOpenIcon
+  return (
+    <li className={sideRow}>
+      <Tooltip content={domain.https ? t("domains.https") : "HTTP"}>
+        <Lock
+          aria-hidden="true"
+          className={cn("size-3.5 shrink-0", domain.https ? "text-ok" : "text-muted-foreground")}
+        />
+      </Tooltip>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {domain.https ? <span className="sr-only">{t("domains.https")}</span> : null}
+        <a
+          href={hostUrl(domain)}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="truncate type-mono hover:underline"
+          translate="no"
+        >
+          {domain.host}
+          <span className="sr-only"> {t("common.newTab")}</span>
+        </a>
+        <span className="flex min-w-0 items-center gap-1.5 type-meta text-muted-foreground">
+          <ArrowRightIcon className="size-3 shrink-0" aria-hidden="true" />
+          <Link
+            {...serviceLink(project, domain.service, { tab: "networking" })}
+            className="truncate hover:text-foreground hover:underline"
+            translate="no"
+          >
+            {domain.service.name}
+          </Link>
+          <StatusDot health={statusOf(domain.service).health} className="size-1.5" />
+        </span>
+      </div>
+    </li>
+  )
+}
+
+/** Every domain, filtered by host or service. */
+function DomainList({
+  project,
+  domains,
+  needle = "",
+}: {
+  project: string
+  domains: Domain[]
+  needle?: string
+}) {
+  const t = useT()
+  const rows = domains.filter(
+    (d) => !needle || `${d.host} ${d.service.name}`.toLowerCase().includes(needle),
+  )
+  if (rows.length === 0)
+    return <p className="type-meta text-muted-foreground">{t("domains.noMatch")}</p>
+  return (
+    <ul className="flex flex-col">
+      {rows.map((domain) => (
+        <DomainRow key={domain.host} project={project} domain={domain} />
+      ))}
+    </ul>
+  )
+}
+
 export function Domains({
   project,
   data,
   refused,
+  bare = false,
 }: {
   project: string
   data: Project
   refused: Schemas["UnreadableView"][]
+  /** Every domain with a filter, without the heading: in a drawer. */
+  bare?: boolean
 }) {
   const t = useT()
-  const domains = summarise(data).domains
+  const [query, setQuery] = useState("")
+  const domains = byException(summarise(data).domains)
   if (domains.length === 0 && refused.length === 0) return null
+  if (bare)
+    return (
+      <div className="flex flex-col gap-3">
+        <RefusedKinds unreadable={refused} line />
+        <FilterBox value={query} onChange={setQuery} label={t("domains.filter")} />
+        <DomainList project={project} domains={domains} needle={query.trim().toLowerCase()} />
+      </div>
+    )
+  const shown = firstRows(domains)
+  const insecure = domains.filter((d) => !d.https).length
   return (
     <section aria-labelledby="project-domains" className="flex flex-col gap-1">
       <Heading id="project-domains" title={t("common.domains")} count={domains.length} />
       <RefusedKinds unreadable={refused} line />
-      {domains.length === 0 ? null : (
-        <ul className="flex flex-col">
-          {domains.map((domain) => {
-            const Lock = domain.https ? LockSimpleIcon : LockSimpleOpenIcon
-            return (
-              <li key={domain.host} className={sideRow}>
-                <Tooltip content={domain.https ? t("domains.https") : "HTTP"}>
-                  <Lock
-                    aria-hidden="true"
-                    className={cn(
-                      "size-3.5 shrink-0",
-                      domain.https ? "text-ok" : "text-muted-foreground",
-                    )}
-                  />
-                </Tooltip>
-                <div className="flex min-w-0 flex-1 flex-col">
-                  {domain.https ? <span className="sr-only">{t("domains.https")}</span> : null}
-                  <a
-                    href={hostUrl(domain)}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="truncate type-mono hover:underline"
-                    translate="no"
-                  >
-                    {domain.host}
-                    <span className="sr-only"> {t("common.newTab")}</span>
-                  </a>
-                  <span className="flex items-center gap-1.5 type-meta text-muted-foreground">
-                    <ArrowRightIcon className="size-3" aria-hidden="true" />
-                    <Link
-                      {...serviceLink(project, domain.service, { tab: "networking" })}
-                      className="hover:text-foreground hover:underline"
-                      translate="no"
-                    >
-                      {domain.service.name}
-                    </Link>
-                    <StatusDot health={statusOf(domain.service).health} className="size-1.5" />
-                  </span>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      {shown.length < domains.length && insecure > 0 ? (
+        <p className="flex items-center gap-1.5 pb-1.5 type-meta text-muted-foreground">
+          <LockSimpleOpenIcon className="size-3.5" aria-hidden="true" />
+          {t("domains.withoutHttps", insecure)}
+        </p>
+      ) : null}
+      {domains.length === 0 ? null : <DomainList project={project} domains={shown} />}
+      {shown.length < domains.length ? (
+        <ShowAll
+          count={domains.length}
+          title={t("common.domains")}
+          filterLabel={t("domains.filter")}
+        >
+          {(needle) => <DomainList project={project} domains={domains} needle={needle} />}
+        </ShowAll>
+      ) : null}
     </section>
+  )
+}
+
+/** The largest volumes get a colour each; the rest share the last, as "Other volumes". */
+const METER_PARTS = 3
+
+interface Sized {
+  claim: Claim
+  bytes?: number
+  /** Its part of the meter. */
+  part: number
+}
+
+function useVolumes(data: Project) {
+  const claims = claimsOf(data)
+  const largest = claims
+    .filter((c) => c.sizeBytes)
+    .toSorted((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))
+    .map((c) => c.name)
+  const sized: Sized[] = claims
+    .map((claim) => {
+      const rank = largest.indexOf(claim.name)
+      return {
+        claim,
+        bytes: claim.sizeBytes ?? undefined,
+        part: rank < 0 ? -1 : Math.min(rank, METER_PARTS),
+      }
+    })
+    // Unused first, then the largest.
+    .toSorted(
+      (a, b) =>
+        Number(b.claim.services.length === 0) - Number(a.claim.services.length === 0) ||
+        (b.bytes ?? 0) - (a.bytes ?? 0) ||
+        a.claim.name.localeCompare(b.claim.name),
+    )
+  const parts = Array.from({ length: METER_PARTS + 1 }, (_, part) =>
+    sized.filter((s) => s.part === part).reduce((sum, s) => sum + (s.bytes ?? 0), 0),
+  )
+  return {
+    sized,
+    parts,
+    total: sized.reduce((sum, c) => sum + (c.bytes ?? 0), 0),
+    known: sized.some((c) => c.bytes !== undefined),
+    unused: sized.filter((s) => s.claim.services.length === 0).length,
+  }
+}
+
+function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
+  const t = useT()
+  const { memoryParts } = useQuantityFormat()
+  const { claim, bytes, part } = volume
+  const [value, unit] = bytes !== undefined ? memoryParts(bytes) : [undefined, undefined]
+  return (
+    <li className={sideRow}>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "size-2 shrink-0",
+          part >= 0 ? meterPartTone(part) : "hairline-ring ring-idle ring-inset",
+        )}
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate type-mono" translate="no">
+          {claim.name}
+        </span>
+        {claim.services.length > 0 ? (
+          <span className="truncate type-meta text-muted-foreground">
+            {claim.services.map((service, j) => (
+              <span key={serviceId(service)}>
+                {j > 0 ? ", " : ""}
+                <Link
+                  {...serviceLink(project, service, { tab: "storage" })}
+                  className="hover:text-foreground hover:underline"
+                  translate="no"
+                >
+                  {service.name}
+                </Link>
+              </span>
+            ))}
+          </span>
+        ) : null}
+      </div>
+      {claim.services.length === 0 ? (
+        <Tooltip content={t("storage.notMounted")}>
+          <span className="flex shrink-0">
+            <StatusPill health="warn" size="sm" dot={false}>
+              {t("resource.unused")}
+            </StatusPill>
+          </span>
+        </Tooltip>
+      ) : value ? (
+        <span className="shrink-0">
+          {value} <span className="type-meta text-muted-foreground">{unit}</span>
+        </span>
+      ) : (
+        <span className="shrink-0 text-muted-foreground">{claim.size ?? "—"}</span>
+      )}
+    </li>
+  )
+}
+
+function VolumeList({
+  project,
+  volumes,
+  needle = "",
+}: {
+  project: string
+  volumes: Sized[]
+  needle?: string
+}) {
+  const t = useT()
+  const rows = volumes.filter(
+    (v) =>
+      !needle ||
+      [v.claim.name, ...v.claim.services.map((s) => s.name)]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle),
+  )
+  if (rows.length === 0)
+    return <p className="type-meta text-muted-foreground">{t("storage.noMatch")}</p>
+  return (
+    <ul className="flex flex-col">
+      {rows.map((volume) => (
+        <VolumeRow key={volume.claim.name} project={project} volume={volume} />
+      ))}
+    </ul>
   )
 }
 
@@ -359,94 +630,81 @@ export function Storage({
   project,
   data,
   refused,
+  bare = false,
 }: {
   project: string
   data: Project
   refused: Schemas["UnreadableView"][]
+  /** Every volume with a filter, without the heading: in a drawer. */
+  bare?: boolean
 }) {
   const t = useT()
   const { memoryParts } = useQuantityFormat()
-  const claims = claimsOf(data)
-  const sized = claims.map((claim) => ({ claim, bytes: claim.sizeBytes ?? undefined }))
-  const total = sized.reduce((sum, c) => sum + (c.bytes ?? 0), 0)
-  const anyKnown = sized.some((c) => c.bytes !== undefined)
+  const [query, setQuery] = useState("")
+  const { sized, parts, total, known, unused } = useVolumes(data)
   const [totalValue, totalUnit] = memoryParts(total)
-  if (claims.length === 0 && refused.length === 0) return null
+  if (sized.length === 0 && refused.length === 0) return null
+  const size = `${totalValue} ${totalUnit}`
+  const meter = total > 0 ? <MeterStack parts={parts} className="my-1.5" /> : null
+  if (bare)
+    return (
+      <div className="flex flex-col gap-3">
+        <RefusedKinds unreadable={refused} line />
+        {known ? (
+          <p className="type-meta text-muted-foreground">
+            {t("storage.onVolumes", size, sized.length)}
+          </p>
+        ) : null}
+        {meter}
+        <FilterBox value={query} onChange={setQuery} label={t("storage.filter")} />
+        <VolumeList project={project} volumes={sized} needle={query.trim().toLowerCase()} />
+      </div>
+    )
+  const shown = firstRows(sized)
+  const many = shown.length < sized.length
+  const count = many
+    ? [known ? t("storage.onVolumes", size, sized.length) : String(sized.length)]
+        .concat(unused > 0 ? [t("resource.unusedCount", unused)] : [])
+        .join(t("common.sep"))
+    : known
+      ? t("storage.requestedTotal", size)
+      : undefined
   return (
     <section aria-labelledby="project-storage" className="flex flex-col gap-1">
-      <Heading
-        id="project-storage"
-        title={t("tab.storage")}
-        count={anyKnown ? t("storage.requestedTotal", `${totalValue} ${totalUnit}`) : undefined}
-      />
+      <Heading id="project-storage" title={t("tab.storage")} count={count} />
       <RefusedKinds unreadable={refused} line />
-      {claims.length === 0 ? null : (
+      {sized.length === 0 ? null : (
         <>
-          {total > 0 ? (
-            <div className="my-1.5">
-              <MeterStack parts={sized.map((c) => c.bytes ?? 0)} />
-            </div>
+          {meter}
+          <VolumeList project={project} volumes={shown} />
+          {many ? (
+            <ShowAll
+              count={sized.length}
+              title={t("tab.storage")}
+              filterLabel={t("storage.filter")}
+            >
+              {(needle) => <VolumeList project={project} volumes={sized} needle={needle} />}
+            </ShowAll>
           ) : null}
-          <ul className="flex flex-col">
-            {sized.map(({ claim, bytes }, i) => {
-              const [value, unit] =
-                bytes !== undefined ? memoryParts(bytes) : [undefined, undefined]
-              return (
-                <li key={claim.name} className={sideRow}>
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "size-2 shrink-0",
-                      bytes ? meterPartTone(i) : "hairline-ring ring-idle ring-inset",
-                    )}
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate type-mono" translate="no">
-                      {claim.name}
-                    </span>
-                    {claim.services.length > 0 ? (
-                      <span className="truncate type-meta text-muted-foreground">
-                        {claim.services.map((service, j) => (
-                          <span key={serviceId(service)}>
-                            {j > 0 ? ", " : ""}
-                            <Link
-                              {...serviceLink(project, service, { tab: "storage" })}
-                              className="hover:text-foreground hover:underline"
-                              translate="no"
-                            >
-                              {service.name}
-                            </Link>
-                          </span>
-                        ))}
-                      </span>
-                    ) : null}
-                  </div>
-                  {claim.services.length === 0 ? (
-                    <Tooltip content={t("storage.notMounted")}>
-                      <span className="flex shrink-0">
-                        <StatusPill health="warn" size="sm" dot={false}>
-                          {t("resource.unused")}
-                        </StatusPill>
-                      </span>
-                    </Tooltip>
-                  ) : value ? (
-                    <span className="shrink-0">
-                      {value} <span className="type-meta text-muted-foreground">{unit}</span>
-                    </span>
-                  ) : (
-                    <span className="shrink-0 text-muted-foreground">{claim.size ?? "—"}</span>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
         </>
       )}
     </section>
   )
 }
 
-export function Backups({ project }: { project: string }) {
+/** Backed-up volumes out of all of them, or undefined before the answer or without volumes. */
+function useBackupCount(project: string) {
+  const data = useBackups(project).data
+  if (!data) return undefined
+  const targets = data.coverage.filter((c) => c.target.kind !== "namespace")
+  if (targets.length === 0) return undefined
+  return {
+    scheduled: targets.filter((c) => c.scheduledBy.length > 0).length,
+    total: targets.length,
+  }
+}
+
+export function Backups({ project, bare = false }: { project: string; bare?: boolean }) {
   const t = useT()
   const backups = useBackups(project)
   const data = backups.data
@@ -454,6 +712,41 @@ export function Backups({ project }: { project: string }) {
   const targets = data.coverage.filter((c) => c.target.kind !== "namespace")
   if (targets.length === 0) return null
   const scheduled = targets.filter((c) => c.scheduledBy.length > 0).length
+  const missing = targets.length - scheduled
+  const rows = shownCoverage(data.coverage)
+  const list = (
+    <ul className="flex flex-col">
+      {rows.map((c) => (
+        <CoverageRow key={`${c.target.kind}/${c.target.name}`} coverage={c} />
+      ))}
+    </ul>
+  )
+  // Two or more volumes without a schedule are one sentence, not a row each saying so.
+  const summarised = missing > 1 || rows.length > SIDE_ROWS + 1
+  const body = (
+    <>
+      {missing > 1 ? (
+        <p className="flex items-center gap-2 py-1.5 text-sm">
+          <StatusDot health="warn" />
+          {t("backups.unbacked", missing, targets.length)}
+        </p>
+      ) : null}
+      {summarised && !bare ? (
+        <Collapsible>
+          <CollapsibleTrigger variant="disclosure">
+            <CaretRightIcon aria-hidden="true" />
+            {t("backups.volumes", rows.length)}
+          </CollapsibleTrigger>
+          <CollapsibleContent>{list}</CollapsibleContent>
+        </Collapsible>
+      ) : (
+        list
+      )}
+      <ProviderNotes data={data} />
+      <BackupDetails data={data} />
+    </>
+  )
+  if (bare) return <div className="flex flex-col gap-1">{body}</div>
   return (
     <section aria-labelledby="project-backups" className="flex flex-col gap-1">
       <Heading
@@ -461,13 +754,77 @@ export function Backups({ project }: { project: string }) {
         title={t("backups.title")}
         count={t("backups.scheduledOf", scheduled, targets.length)}
       />
-      <ul className="flex flex-col">
-        {shownCoverage(data.coverage).map((c) => (
-          <CoverageRow key={`${c.target.kind}/${c.target.name}`} coverage={c} />
-        ))}
-      </ul>
-      <ProviderNotes data={data} />
-      <BackupDetails data={data} />
+      {body}
     </section>
+  )
+}
+
+/**
+ * On a phone with many services: Activity, Domains, Storage and Backups as one row of buttons,
+ * each opening its section in a drawer.
+ */
+export function SectionChips({
+  project,
+  data,
+  events,
+  unreadable,
+}: {
+  project: string
+  data: Project
+  events: Event[]
+  unreadable: Schemas["UnreadableView"][]
+}) {
+  const t = useT()
+  const [open, setOpen] = useState<"activity" | "domains" | "storage" | "backups">()
+  const { trouble } = useActivityCounts(project, events)
+  const domains = summarise(data).domains.length
+  const volumes = claimsOf(data).length
+  const backups = useBackupCount(project)
+  const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
+  const chip = (key: NonNullable<typeof open>, label: string, count: ReactNode) => (
+    <Button key={key} variant="outline" size="sm" onClick={() => setOpen(key)}>
+      {label}
+      <span className="font-normal text-muted-foreground tabular-nums">{count}</span>
+    </Button>
+  )
+  const titles = {
+    activity: t("project.activity"),
+    domains: t("common.domains"),
+    storage: t("tab.storage"),
+    backups: t("backups.title"),
+  }
+  return (
+    <nav aria-label={t("project.sections")} className="flex flex-wrap gap-2">
+      {chip("activity", t("project.activity"), t("events.warningsCount", trouble))}
+      {domains > 0 ? chip("domains", t("common.domains"), domains) : null}
+      {volumes > 0 ? chip("storage", t("tab.storage"), volumes) : null}
+      {backups
+        ? chip("backups", t("backups.title"), `${backups.scheduled}/${backups.total}`)
+        : null}
+      <Drawer
+        open={open !== undefined}
+        onOpenChange={(next) => {
+          if (!next) setOpen(undefined)
+        }}
+        title={open ? titles[open] : undefined}
+        closeLabel={t("common.close")}
+      >
+        {open === "activity" ? (
+          <Activity
+            project={project}
+            services={data.services}
+            events={events}
+            unreadable={unreadable}
+            bare
+          />
+        ) : open === "domains" ? (
+          <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} bare />
+        ) : open === "storage" ? (
+          <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} bare />
+        ) : open === "backups" ? (
+          <Backups project={project} bare />
+        ) : null}
+      </Drawer>
+    </nav>
   )
 }

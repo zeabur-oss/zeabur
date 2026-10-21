@@ -12,7 +12,7 @@ import { CopyText } from "@/components/copy-text"
 import { Freshness } from "@/components/freshness"
 import { GapList } from "@/components/gaps"
 import { IncidentRow, isTakenDown, takenDown } from "@/components/incident"
-import { ProblemRow } from "@/components/problem-row"
+import { ProblemGroupRow } from "@/routes/project/problem-group"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusPill } from "@/components/status"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
@@ -31,29 +31,28 @@ import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { useT } from "@/i18n"
 import { useHistoryIndex, useLocationText } from "@/lib/history"
+import { PHONE, useMedia, WIDE } from "@/lib/media"
 import { useProjectSummary } from "@/lib/project-name"
 import { projectView } from "@/lib/stores"
+import { groupProblems } from "@/model/attention"
+import { edgesOf } from "@/model/connections"
+import { layout, mapReadable } from "@/model/layout"
 import { suggestionsOf } from "@/model/overview"
 import { projectTitle } from "@/model/project"
-import {
-  byHealth,
-  needsAttention,
-  serviceId,
-  statusOf,
-  summarise,
-  type Project,
-  type Service,
-} from "@/model/service"
+import { needsAttention, statusOf, summarise, type Project, type Service } from "@/model/service"
 import { ProjectMap } from "@/routes/project/architecture"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import { ServicesTable } from "@/routes/project/services-table"
-import { Activity, Backups, Domains, Storage } from "@/routes/project/side"
+import { Activity, Backups, Domains, SectionChips, Storage } from "@/routes/project/side"
 import { validateProjectSearch, type ProjectView } from "@/routes/search"
 
 const route = getRouteApi("/projects/$project")
 
-/** Past this many services the map is too dense to read first. */
-const MAP_LIMIT = 12
+/** Up to this many services a phone shows each section inline rather than behind a button. */
+const FEW = 4
+/** Groups Needs attention lists before "Show all". */
+const PROBLEMS_SHOWN = 5
+const PROBLEMS_SHOWN_PHONE = 3
 
 export function ProjectPage() {
   const { project } = route.useParams()
@@ -68,13 +67,26 @@ export function ProjectPage() {
   )
 }
 
-function useView(data: Project): ProjectView {
+/** The canvas the map would get on this screen, before it is drawn. */
+function mapCanvas(): [number, number] {
+  const main = document.querySelector("main")
+  const width = main?.clientWidth ?? window.innerWidth
+  const aside = window.matchMedia(WIDE).matches ? 320 : 0
+  return [width - aside, Math.max(560, window.innerHeight - 160)]
+}
+
+/**
+ * The map when it can be read fitted to the screen, else the list. The view chosen last in this
+ * project stands only where the map is readable; `?view` always does.
+ */
+function useView(project: string, data: Project): ProjectView {
   const search = route.useSearch()
-  const remembered = projectView.useValue()
-  const [narrow] = useState(() => window.matchMedia("(max-width: 47.99rem)").matches)
-  if (search.view) return search.view
-  if (remembered) return remembered
-  return narrow || data.services.length > MAP_LIMIT ? "list" : "map"
+  const [initial] = useState<ProjectView>(() => {
+    if (window.matchMedia(PHONE).matches) return "list"
+    if (!mapReadable(layout(data.services, edgesOf(data)), ...mapCanvas())) return "list"
+    return projectView.get(project) ?? "map"
+  })
+  return search.view ?? initial
 }
 
 function ProjectBody({
@@ -86,7 +98,7 @@ function ProjectBody({
   data: Project
   unreadable: Schemas["UnreadableView"][]
 }) {
-  const view = useView(data)
+  const view = useView(project, data)
   const refused = refusedAmong(unreadable, refusedPlaces.services)
   const empty = data.services.length === 0 && refused.length === 0
   return (
@@ -109,7 +121,7 @@ function Header({ project, data, view }: { project: string; data: Project; view?
   const document = useQuery(projectQuery(project))
   const details = useProjectSummary(project)
   const choose = (next: ProjectView) => {
-    projectView.set(next)
+    projectView.set(project, next)
     void navigate({
       search: (previous) => ({ ...previous, view: next, service: undefined }),
       replace: true,
@@ -185,7 +197,16 @@ function HealthPill({ data }: { data: Project }) {
   const count = (health: string) =>
     data.services.filter((s) => statusOf(s).health === health).length
   if (summary.health === "fail")
-    return <StatusPill health="fail">{t("overview.failingCount", count("fail"))}</StatusPill>
+    return (
+      <StatusPill health="fail">
+        {count("warn") > 0
+          ? [
+              t("overview.failingCount", count("fail")),
+              t("overview.degradedCount", count("warn")),
+            ].join(t("common.sep"))
+          : t("overview.failingCount", count("fail"))}
+      </StatusPill>
+    )
   if (summary.health === "warn")
     return <StatusPill health="warn">{t("overview.degradedCount", count("warn"))}</StatusPill>
   if (summary.health === "progress")
@@ -223,12 +244,15 @@ function Suggestions({ project, data }: { project: string; data: Project }) {
 
 function Problems({ project, services }: { project: string; services: Service[] }) {
   const t = useT()
+  const phone = useMedia(PHONE)
+  const [all, setAll] = useState(false)
   const incidents = useQuery(projectIncidentsQuery(project)).data?.items ?? []
   const down = takenDown(incidents)
-  const broken = services
-    .filter((s) => needsAttention(statusOf(s)) && !isTakenDown(down, project, s))
-    .toSorted(byHealth)
-  if (broken.length === 0 && incidents.length === 0) return null
+  const groups = groupProblems(services.filter((s) => !isTakenDown(down, project, s)))
+  const broken = groups.reduce((sum, g) => sum + g.services.length, 0)
+  if (groups.length === 0 && incidents.length === 0) return null
+  const limit = phone ? PROBLEMS_SHOWN_PHONE : PROBLEMS_SHOWN
+  const shown = all || groups.length <= limit + 1 ? groups : groups.slice(0, limit)
   return (
     <section aria-labelledby="project-problems">
       <Card variant="list">
@@ -238,7 +262,7 @@ function Problems({ project, services }: { project: string; services: Service[] 
               {t("attention.title")}
             </h2>
             <span className="ml-2.5 type-meta font-normal text-muted-foreground">
-              {broken.length + incidents.length}
+              {broken + incidents.length}
             </span>
           </CardTitle>
         </CardHeader>
@@ -247,10 +271,17 @@ function Problems({ project, services }: { project: string; services: Service[] 
             {incidents.map((incident) => (
               <IncidentRow key={incident.id} incident={incident} showProject={false} />
             ))}
-            {broken.map((service) => (
-              <ProblemRow key={serviceId(service)} project={project} service={service} />
+            {shown.map((group) => (
+              <ProblemGroupRow key={group.key} project={project} group={group} />
             ))}
           </ul>
+          {shown.length < groups.length || all ? (
+            <div className="border-t border-rule px-2 py-1.5">
+              <Button variant="ghost" size="xs" onClick={() => setAll(!all)}>
+                {all ? t("services.showFewer") : t("services.showAll", groups.length)}
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </section>
@@ -269,9 +300,19 @@ function MapView({
   const search = route.useSearch()
   const navigate = route.useNavigate()
   const events = useProjectEvents(project)
+  const wide = useMedia(WIDE)
   const select = (id?: string) =>
     void navigate({ search: (previous) => ({ ...previous, service: id }) })
   const broken = data.services.some((s) => needsAttention(statusOf(s)))
+  const activity = (
+    <Activity
+      project={project}
+      services={data.services}
+      events={events}
+      unreadable={unreadable}
+      framed={!wide}
+    />
+  )
   return (
     <>
       {broken ? (
@@ -281,15 +322,13 @@ function MapView({
       ) : null}
       <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.services)} />
       <ProjectMap project={project} data={data} selected={search.service} onSelect={select}>
-        <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-main px-5 py-5 xl:block">
-          <Activity
-            project={project}
-            services={data.services}
-            events={events}
-            unreadable={unreadable}
-          />
-        </aside>
+        {wide ? (
+          <aside className="w-80 shrink-0 overflow-y-auto border-l border-main px-5 py-5">
+            {activity}
+          </aside>
+        ) : null}
       </ProjectMap>
+      {wide ? null : <PageColumn className="mt-6 mb-12 shrink-0">{activity}</PageColumn>}
     </>
   )
 }
@@ -307,29 +346,53 @@ function ListView({
   const entry = useHistoryIndex()
   const typed = useLocationText((search) => validateProjectSearch(search).q ?? "")
   const events = useProjectEvents(project)
+  const phone = useMedia(PHONE)
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
+  const activity = (
+    <Activity
+      project={project}
+      services={data.services}
+      events={events}
+      unreadable={unreadable}
+      framed
+    />
+  )
+  const services = (
+    <div className="flex flex-col gap-3">
+      <RefusedKinds unreadable={refused(refusedPlaces.services)} />
+      <ServicesTable key={entry} project={project} data={data} typed={typed} />
+    </div>
+  )
+  const side = (
+    <>
+      <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} />
+      <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} />
+      <Backups project={project} />
+    </>
+  )
+  if (phone)
+    return (
+      <PageColumn gap="md" className="mb-12">
+        <Problems project={project} services={data.services} />
+        {services}
+        {data.services.length > FEW ? (
+          <SectionChips project={project} data={data} events={events} unreadable={unreadable} />
+        ) : (
+          <>
+            {side}
+            {activity}
+          </>
+        )}
+      </PageColumn>
+    )
   return (
     <PageColumn gap="md" className="mb-12">
       <Problems project={project} services={data.services} />
-      <div className="flex flex-col gap-3">
-        <RefusedKinds unreadable={refused(refusedPlaces.services)} />
-        <ServicesTable key={entry} project={project} data={data} typed={typed} />
-      </div>
       <div className="flex flex-wrap items-start gap-x-8 gap-y-7">
-        <div className="flex min-w-0 flex-main flex-col gap-7">
-          <Activity
-            project={project}
-            services={data.services}
-            events={events}
-            unreadable={unreadable}
-          />
-        </div>
-        <div className="flex min-w-0 flex-side flex-col gap-7 empty:hidden">
-          <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} />
-          <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} />
-          <Backups project={project} />
-        </div>
+        <div className="flex min-w-0 flex-main flex-col">{services}</div>
+        <div className="flex min-w-0 flex-side flex-col gap-7 empty:hidden">{side}</div>
       </div>
+      {activity}
     </PageColumn>
   )
 }

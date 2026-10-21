@@ -33,8 +33,7 @@ describe("a service's role", () => {
   })
 
   test("places a data store in the canvas's data lane", () => {
-    const network = { endpoints: [], routes: [] }
-    const laid = layout(network, [service("api"), service("db", { dataStore: "postgres" })], [])
+    const laid = layout([service("api"), service("db", { dataStore: "postgres" })], [])
     const lanes = Object.fromEntries(laid.nodes.map((node) => [node.id, node.lane]))
     expect(lanes).toStrictEqual({
       "Deployment/api": "workers",

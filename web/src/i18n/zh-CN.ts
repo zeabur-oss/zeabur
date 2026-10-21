@@ -358,8 +358,30 @@ export const zhCN: Messages = {
   "services.allKinds": "所有类型",
   "services.count": (shown, total) => (shown === total ? `${total} 个服务` : `${shown} / ${total}`),
   "services.noMatch": "没有匹配的服务。",
+  "services.showAll": (n) => `显示全部 ${n} 个`,
+  "services.showFewer": "收起",
+  "attention.services": (n) => `${n} 个服务`,
+  "attention.eachOne": "各个服务",
+  "attention.more": (n) => `+${n}`,
+  "attention.moreOf": (n) => `再显示 ${n} 个服务`,
+  "events.warningsCount": (n) => `${n} 个警告`,
+  "domains.withoutHttps": (n) => `${n} 个没有 HTTPS`,
+  "domains.filter": "筛选域名",
+  "domains.noMatch": "没有匹配的域名。",
+  "storage.onVolumes": (size, n) => `${n} 个卷共 ${size}`,
+  "storage.other": "其他卷",
+  "storage.filter": "筛选卷",
+  "storage.noMatch": "没有匹配的卷。",
+  "storage.size": "大小",
+  "storage.usedBy": "使用的服务",
+  "backups.unbacked": (missing, total) =>
+    missing === total
+      ? total === 1
+        ? "这个卷没有备份。"
+        : `${total} 个卷都没有备份。`
+      : `${total} 个卷中有 ${missing} 个没有备份。`,
+  "backups.volumes": (n) => `${n} 个卷`,
 
-  "lane.domains": "域名",
   "lane.web": "Web",
   "lane.internal": "私有服务",
   "lane.workers": "后台与批处理任务",

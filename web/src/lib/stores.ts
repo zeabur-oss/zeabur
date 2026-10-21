@@ -52,22 +52,16 @@ export function remembered(key: string, initial: boolean) {
 
 export const projectsAsList = remembered("zeabur.projects.list", true)
 
-const viewKey = "zeabur.project.view"
+const viewKey = (project: string) => `zeabur.project.view.${project}`
 
-/** The project view last chosen, map or list; absent until the person picks one. */
-export const projectView = (() => {
-  const saved = load(viewKey)
-  const value = store<"map" | "list" | undefined>(
-    saved === "map" || saved === "list" ? saved : undefined,
-  )
-  return {
-    ...value,
-    set: (view: "map" | "list") => {
-      value.set(view)
-      save(viewKey, view)
-    },
-  }
-})()
+/** The view last chosen for a project, map or list; absent until the person picks one there. */
+export const projectView = {
+  get: (project: string): "map" | "list" | undefined => {
+    const saved = load(viewKey(project))
+    return saved === "map" || saved === "list" ? saved : undefined
+  },
+  set: (project: string, view: "map" | "list") => save(viewKey(project), view),
+}
 
 export interface Recent {
   id: string
