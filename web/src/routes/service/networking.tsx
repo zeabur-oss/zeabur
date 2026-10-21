@@ -17,6 +17,7 @@ import { usePlanner } from "@/components/plan/planner"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusPill } from "@/components/status"
 import { FormField } from "@/components/form-field"
+import { KubeDetails } from "@/components/kube-details"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Empty,
@@ -28,7 +29,6 @@ import {
 } from "@zeabur/design-system/components/empty"
 import { Input } from "@zeabur/design-system/components/input"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Term, TermDetail } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
@@ -94,7 +94,6 @@ export function NetworkingTab({
   const canWrite = endpoints.length > 0 && !managed
   const refusedRoutes = refusedAmong(unreadable, refusedPlaces.routes)
   const refusedEndpoints = refusedAmong(unreadable, refusedPlaces.endpoints)
-  const routeKinds = [...new Set(routesOf(network, service).map((r) => r.origin.kind as string))]
 
   const scheduled = service.kind === "CronJob" || service.kind === "Job"
   const noAddress =
@@ -130,14 +129,7 @@ export function NetworkingTab({
           <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-public">
             <SectionHeader
               id="net-public"
-              title={
-                <span className="inline-flex flex-wrap items-baseline gap-1.5">
-                  {t("net.publicTitle")}
-                  {(routeKinds.length > 0 ? routeKinds : ["Ingress"]).map((kind) => (
-                    <TermDetail key={kind}>{kind}</TermDetail>
-                  ))}
-                </span>
-              }
+              title={t("net.publicTitle")}
               count={routes.length > 0 ? routes.length : undefined}
               description={t("net.publicAbout")}
               action={
@@ -254,12 +246,11 @@ export function NetworkingTab({
                             className="size-3 shrink-0 text-muted-foreground"
                             aria-hidden="true"
                           />
-                          <span className="font-mono whitespace-nowrap" translate="no">
-                            {route.backend}:{route.port ?? "?"}
+                          <span className="whitespace-nowrap">
+                            {route.port
+                              ? t("net.port", portNumber(endpoints, route))
+                              : t("net.anyPort")}
                           </span>
-                          <TermDetail>
-                            {routeOf(route).kind} {route.ingress}
-                          </TermDetail>
                         </span>
                       </td>
                       <td className={cell}>
@@ -320,12 +311,18 @@ export function NetworkingTab({
                 </tbody>
               </Table>
             )}
+            <KubeDetails
+              facts={routes.map((route) => [
+                route.host ?? t("net.anyHost"),
+                `${routeOf(route).kind}/${route.ingress} → Service/${route.backend}:${route.port ?? "?"}`,
+              ])}
+            />
           </section>
 
           <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-private">
             <SectionHeader
               id="net-private"
-              title={<Term detail="Service">{t("net.privateTitle")}</Term>}
+              title={t("net.privateTitle")}
               description={t("net.privateAbout")}
             />
             <RefusedKinds unreadable={refusedEndpoints} />
@@ -349,6 +346,16 @@ export function NetworkingTab({
                 ))}
               </ul>
             )}
+            <KubeDetails
+              facts={endpoints.map((e) => [
+                e.name,
+                `Service/${e.name} ${e.type ?? "ClusterIP"}${
+                  e.clusterIP && e.clusterIP !== "None" ? ` ${e.clusterIP}` : ""
+                }${e.ports
+                  .map((p) => ` ${p.name ? `${p.name}=` : ""}${p.port}→${p.targetPort ?? p.port}`)
+                  .join("")}`,
+              ])}
+            />
           </section>
         </>
       )}
@@ -371,23 +378,20 @@ function PrivateAddress({ endpoint: e, namespace }: { endpoint: Endpoint; namesp
   const t = useT()
   const fqdn = `${e.name}.${namespace}.svc.cluster.local`
   const ports = e.ports.length > 0 ? e.ports : [undefined]
-  const first = e.ports[0]?.port
+  const only = e.ports.length === 1 ? e.ports[0]?.port : undefined
+  const full = only === undefined ? fqdn : `${fqdn}:${only}`
   return (
-    <li className="flex flex-col gap-2 px-4 py-3">
+    <li className="flex flex-col gap-1.5 px-4 py-3">
       <ul className="flex flex-col gap-1">
         {ports.map((p) => {
-          const address = p ? `${fqdn}:${p.port}` : fqdn
+          const address = p ? `${e.name}:${p.port}` : e.name
           return (
             <li
               key={p ? `${p.port}/${p.protocol}` : "none"}
               className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5"
             >
               <span className="flex min-w-0 items-center gap-1">
-                <span
-                  className="truncate font-mono text-xs font-medium"
-                  translate="no"
-                  title={address}
-                >
+                <span className="truncate font-mono text-sm font-medium" translate="no">
                   {address}
                 </span>
                 <CopyButton value={address} />
@@ -397,8 +401,7 @@ function PrivateAddress({ endpoint: e, namespace }: { endpoint: Endpoint; namesp
                   className="flex items-center gap-1.5 font-mono type-meta text-muted-foreground"
                   translate="no"
                 >
-                  {p.name ? <span>{p.name}</span> : null}
-                  {p.targetPort && p.targetPort !== String(p.port) ? (
+                  {p.targetPort && /^\d+$/.test(p.targetPort) && p.targetPort !== String(p.port) ? (
                     <Tooltip content={t("net.forwardsTo", p.targetPort)}>
                       <span>→ {p.targetPort}</span>
                     </Tooltip>
@@ -410,21 +413,24 @@ function PrivateAddress({ endpoint: e, namespace }: { endpoint: Endpoint; namesp
           )
         })}
       </ul>
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 type-meta text-muted-foreground">
-        {t("net.shortForm")}
-        <code className="rounded bg-muted px-1 font-mono text-foreground" translate="no">
-          {first === undefined ? e.name : `${e.name}:${first}`}
-        </code>
-        <span className="ml-auto flex flex-wrap items-center gap-1.5">
-          <TermDetail>Service {e.name}</TermDetail>
-          <TermDetail>
-            {e.type ?? "ClusterIP"}
-            {e.clusterIP && e.clusterIP !== "None" ? ` ${e.clusterIP}` : ""}
-          </TermDetail>
+      <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 type-meta text-muted-foreground">
+        {t("net.fullForm")}
+        <span className="flex min-w-0 items-center gap-1">
+          <code className="truncate font-mono text-foreground" translate="no" title={full}>
+            {full}
+          </code>
+          <CopyButton value={full} />
         </span>
       </p>
     </li>
   )
+}
+
+/** A route's Service port as a number, where it names the port. */
+function portNumber(endpoints: Endpoint[], route: PublicRoute): string {
+  const port = route.port ?? ""
+  const named = endpoints.find((e) => e.name === route.backend)?.ports.find((p) => p.name === port)
+  return named ? String(named.port) : port
 }
 
 function ExposeHint({ command }: { command?: string }) {

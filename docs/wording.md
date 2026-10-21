@@ -74,11 +74,15 @@ place to say what the feature is for and how to start [A1][N1].
   and not a bare adjective (「公開」). Titles read as an outline of the page [F1].
 - **One always-visible sentence under a title** says what the section holds when the term is new
   to a beginner. It stays when the section fills, so it is not lost with the empty state [A1].
-- **Plain term first, Kubernetes term second.** The plain term is the label; the exact kind or
-  field follows as muted code (the design system's `Term` and `TermDetail`), in a tooltip, or
-  behind a "Kubernetes details" disclosure: 「私有網路 `Service`」. Do not invent a middle word
-  that is neither (「內部位址」); a professional searches for the kind, a beginner for the plain
-  word [M2][N2][U1]. A tooltip never holds the only copy of something the reader must act on [N3].
+- **Plain term first, Kubernetes term behind a disclosure.** The plain term is the label; the
+  exact kinds and fields of a section go under one 「給 Kubernetes 使用者的細節」 disclosure at
+  its end (`KubeDetails`), never as kind tags (`Ingress`, `Service`, `ClusterIP`,
+  `PersistentVolumeClaim`) beside titles, rows or values. A kind shows by default only when the
+  reader must act on that object (the command or YAML they are told to apply) or when the plain
+  word alone is ambiguous, and then once per section. A section has at most one disclosure. Do
+  not invent a middle word that is neither (「內部位址」); a professional searches for the kind,
+  a beginner for the plain word [M2][N2][U1]. A tooltip never holds the only copy of something
+  the reader must act on [N3].
 - **Explain a term in one short sentence where the reader first meets it**, then use it bare.
 - **Show the real value** (`api.shop.svc.cluster.local:8080`, with copy) rather than describe
   it; when there is none, say how to get one.
@@ -223,6 +227,10 @@ why. Add a row before introducing a new concept.
 | connection rules | 連線規則 | 连接规则 | `NetworkPolicy`; 政策 stays for policies in general |
 | sends to (a route's backend) | 轉送到 | 转发到 | |
 | storage class | 儲存類別 | 存储类 | `StorageClass` |
+| debug container (a shell added beside a container that has none) | 除錯容器 | 调试容器 | An ephemeral container; it stays until the replica is replaced |
+| kubectl terminal (a shell with kubectl and helm in the cluster) | kubectl 終端機 | kubectl 终端 | Runs as the signed-in user |
+| scratch space (an `emptyDir`) | 暫存空間 | 临时空间 | Emptied when the replica is replaced |
+| Details for Kubernetes users (the one disclosure of a section) | 給 Kubernetes 使用者的細節 | 给 Kubernetes 用户的细节 | Holds the section's kinds and fields |
 
 ## Examples
 

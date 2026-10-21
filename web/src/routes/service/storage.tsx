@@ -4,6 +4,7 @@ import HardDriveIcon from "~icons/ph/hard-drive"
 
 import { Panel } from "@/components/bits"
 import { VolumeBackups } from "@/components/backups"
+import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import {
@@ -14,11 +15,10 @@ import {
   EmptyTitle,
 } from "@zeabur/design-system/components/empty"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Term } from "@zeabur/design-system/components/term"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { claimOf, volumesOf, type Service } from "@/model/service"
+import type { Schemas } from "@/api/client"
 
 const ClaimForm = lazy(() =>
   import("@/routes/service/storage-forms").then((m) => ({ default: m.ClaimForm })),
@@ -47,7 +47,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
   return (
     <div className="flex flex-col gap-4">
       <SectionHeader
-        title={<Term detail="PersistentVolumeClaim">{t("storage.title")}</Term>}
+        title={t("storage.title")}
         count={volumes.length > 0 ? volumes.length : undefined}
         description={t("storage.about")}
       />
@@ -74,20 +74,16 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                 title={
                   <span className="flex items-center gap-2">
                     <HardDriveIcon className="size-4 text-muted-foreground" aria-hidden="true" />
-                    <Tooltip content="PersistentVolumeClaim">
-                      <span className="font-mono type-body leading-4.5" translate="no">
-                        {name}
-                      </span>
-                    </Tooltip>
+                    <span className="font-mono type-body leading-4.5" translate="no">
+                      {m.mountPath}
+                    </span>
                   </span>
                 }
                 action={
                   m.status ? (
-                    <Tooltip content={`PersistentVolumeClaim ${m.status}`}>
-                      <StatusPill health={m.status === "Bound" ? "ok" : "warn"} size="sm">
-                        {phaseWord(m.status, t)}
-                      </StatusPill>
-                    </Tooltip>
+                    <StatusPill health={m.status === "Bound" ? "ok" : "warn"} size="sm">
+                      {phaseWord(m.status, t)}
+                    </StatusPill>
                   ) : undefined
                 }
               >
@@ -96,18 +92,6 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                     <span className="text-2xl font-semibold tabular-nums">{m.size ?? "—"}</span>
                     <span className="text-sm text-muted-foreground">{t("storage.requested")}</span>
                   </div>
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                    <dt className="text-muted-foreground">{t("storage.mountPath")}</dt>
-                    <dd className="text-right font-mono" translate="no">
-                      {m.mountPath}
-                    </dd>
-                    <dt className="text-muted-foreground">{t("storage.accessMode")}</dt>
-                    <dd className="text-right font-mono">{m.accessModes?.join(", ") ?? "—"}</dd>
-                    <dt className="text-muted-foreground">{t("storage.class")}</dt>
-                    <dd className="text-right font-mono">
-                      {m.storageClass ?? t("storage.defaultClass")}
-                    </dd>
-                  </dl>
                   {editable ? (
                     <Suspense fallback={null}>
                       <ClaimForm
@@ -185,16 +169,36 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                 className="flex items-center gap-2 py-2 text-xs"
               >
                 <FileTextIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                <span className="font-mono">{mount.mountPath}</span>
-                <span className="text-muted-foreground">{mount.kind}</span>
-                <span className="ml-auto font-mono text-muted-foreground">
-                  {mount.object ? `${mount.object.kind}/${mount.object.name}` : mount.name}
+                <span className="font-mono" translate="no">
+                  {mount.mountPath}
                 </span>
+                <span className="ml-auto text-muted-foreground">{mountWords(t, mount)}</span>
               </li>
             ))}
           </ul>
         </Panel>
       ) : null}
+      <KubeDetails
+        facts={[
+          ...volumes.map((m): [string, string] => [
+            m.mountPath,
+            [
+              `PersistentVolumeClaim/${claimOf(m)}`,
+              m.status,
+              m.accessModes?.join(","),
+              m.storageClass ? `storageClassName: ${m.storageClass}` : undefined,
+            ]
+              .filter(Boolean)
+              .join(" "),
+          ]),
+          ...other.map(({ mount }): [string, string] => [
+            mount.mountPath,
+            mount.object
+              ? `${mount.object.kind}/${mount.object.name}`
+              : `${mount.kind} ${mount.name}`,
+          ]),
+        ]}
+      />
       <VolumeBackups project={project} claims={volumes.map(claimOf)} />
       {planner.dialog}
     </div>
@@ -206,4 +210,22 @@ function phaseWord(phase: string, t: Translate): string {
   if (phase === "Pending") return t("storage.pending")
   if (phase === "Lost") return t("storage.lost")
   return phase
+}
+
+function mountWords(t: Translate, mount: Schemas["Mount"]): string {
+  const name = mount.object?.name ?? mount.name
+  switch (mount.kind) {
+    case "ConfigMap":
+      return t("storage.fromConfig", name)
+    case "Secret":
+      return t("storage.fromSecret", name)
+    case "EmptyDir":
+    case "Ephemeral":
+      return t("storage.scratch")
+    case "DownwardAPI":
+    case "Projected":
+      return t("storage.fromCluster")
+    default:
+      return mount.name
+  }
 }

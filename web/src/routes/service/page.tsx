@@ -17,7 +17,6 @@ import TrashIcon from "~icons/ph/trash"
 import type { Schemas } from "@/api/client"
 import { evidenceQuery, projectQuery, queryClient } from "@/api/queries"
 import { Freshness } from "@/components/freshness"
-import { CopyButton } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { describeDraft, DraftProvider, useDraftState, type Draft } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
@@ -202,6 +201,11 @@ function ServiceView({
   const wide = tab === "logs"
   const pendingIn = new Set(draft.parts.map((part) => tabOfPart[part]))
   const kept = (value: Page) => editing.includes(value) && opened.includes(value)
+  const copyName = () =>
+    navigator.clipboard.writeText(id.toLowerCase()).then(
+      () => toast.success(t("common.copied")),
+      () => undefined,
+    )
   const copyDiagnosis = async () => {
     try {
       const bundle = await queryClient.fetchQuery(
@@ -245,12 +249,6 @@ function ServiceView({
                   ) : null}
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-secondary">
-                  <span className="flex min-w-0 items-center gap-1">
-                    <span className="truncate font-mono" translate="no">
-                      {id}
-                    </span>
-                    <CopyButton value={id} />
-                  </span>
                   {service.created ? (
                     <span>{t("service.created", formatDate(service.created, locale))}</span>
                   ) : null}
@@ -280,6 +278,10 @@ function ServiceView({
                     <MenuItem onClick={() => void copyDiagnosis()}>
                       <CopyIcon aria-hidden="true" />
                       {t("diagnosis.copy")}
+                    </MenuItem>
+                    <MenuItem onClick={() => void copyName()}>
+                      <CopyIcon aria-hidden="true" />
+                      {t("service.copyName")}
                     </MenuItem>
                     <MenuSeparator />
                     {service.provenance.tool ? (

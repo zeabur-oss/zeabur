@@ -8,7 +8,6 @@ import { usePlanner } from "@/components/plan/planner"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
-import { Term } from "@zeabur/design-system/components/term"
 import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { serviceSettingsSections } from "@/modules/service-settings"
@@ -225,7 +224,7 @@ function Compute({
                 >
                   {(f) => (
                     <FormField
-                      label={<Term detail={paths[key]}>{label}</Term>}
+                      label={label}
                       hint={f.state.value.trim() === "" ? hint : undefined}
                       errors={[
                         ...f.state.meta.errors,

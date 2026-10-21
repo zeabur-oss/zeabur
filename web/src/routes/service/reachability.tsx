@@ -12,7 +12,6 @@ import type { Health } from "@/model/service"
 import type { Service } from "@/model/service"
 import type { PlanAsk } from "@/components/plan/planner"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Term } from "@zeabur/design-system/components/term"
 
 type Access = Schemas["NetworkPolicyAccess"]
 
@@ -75,7 +74,7 @@ export function Reachability({
     <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-rules">
       <SectionHeader
         id="net-rules"
-        title={<Term detail="NetworkPolicy">{t("reach.title")}</Term>}
+        title={t("reach.title")}
         description={t("reach.about")}
         action={
           <Menu>
@@ -121,7 +120,7 @@ export function Reachability({
         <div className={row}>
           <span className="w-28 shrink-0 text-muted-foreground max-sm:w-full">{t("reach.in")}</span>
           <span className="flex items-center gap-1.5">
-            <Term detail="ingress controller">{t("reach.fromDomains")}</Term>
+            {t("reach.fromDomains")}
             <AccessPill access={reach.fromIngressController} />
           </span>
           <span className="flex items-center gap-1.5">
@@ -142,7 +141,7 @@ export function Reachability({
             {t("reach.out")}
           </span>
           <span className="flex items-center gap-1.5">
-            <Term detail="DNS">{t("reach.dns")}</Term>
+            {t("reach.dns")}
             <AccessPill access={reach.toDns} />
           </span>
           <span className="flex items-center gap-1.5">
