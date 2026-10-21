@@ -317,6 +317,7 @@ export const en = {
   "cluster.partialPods": (n: number) => `Reserved amounts count the first ${n} pods only.`,
   "cluster.unscheduled": (n: number) => `${n} pods waiting for a node`,
   "cluster.warnings": "Warnings in the last hour",
+  "home.showWarnings": (n: number) => `Show ${plural(n, "warning", "warnings")}`,
   "cluster.noWarnings": "No warnings in the last hour.",
   "cluster.moreWarnings": (n: number) => `${n} more`,
   "cluster.partialEvents": "Only the newest 5,000 events were read.",
@@ -427,13 +428,16 @@ export const en = {
 
   // Service page
   "service.tabs": "Service sections",
-  "service.more": "More actions",
+  "service.more": "More",
   "service.delete": "Delete service",
   "service.notFound": "This service does not exist.",
   "service.created": (date: string) => `Created ${date}`,
-  "service.openTerminal": "Open terminal",
-  "service.viewYaml": "View YAML",
+  "tab.overview": "Overview",
   "tab.logs": "Logs",
+  "tab.deployments": "Deployments",
+  "tab.networking": "Networking",
+  "tab.variables": "Variables",
+  "tab.settings": "Settings",
   "tab.terminal": "Terminal",
   "tab.storage": "Storage",
   "tab.events": "Events",
@@ -472,6 +476,9 @@ export const en = {
   "logs.noPods": "No replica is running",
   "logs.noPodsBody": "Logs come from a running replica. They appear here once one starts.",
   "logs.podOf": (pod: string) => `Replica ${pod}`,
+  "logs.replaced": (old: string, current: string) => `${old} was replaced; showing ${current}.`,
+  "logs.gone": (pod: string) =>
+    `${pod} no longer exists; looking for the replica that took its place.`,
   "logs.container": "Container",
   "logs.previous": "Previous",
   "logs.timestamps": "Timestamps",
@@ -485,7 +492,7 @@ export const en = {
   "logs.info": "Info",
   "logs.download": "Download",
   "logs.lines": "Log lines",
-  "logs.empty": "The log is empty.",
+  "logs.empty": "This replica hasn't written anything yet.",
   "logs.noMatch": "No lines match.",
   "logs.jump": "Jump to latest",
   "logs.ended": "Stream ended",
@@ -598,7 +605,7 @@ export const en = {
   "palette.openLogs": (name: string) => `Open logs of ${name}`,
   "palette.openTerminal": (name: string) => `Open a terminal in ${name}`,
   "palette.openVariables": (name: string) => `Edit variables of ${name}`,
-  "palette.openChanges": (name: string) => `See changes to ${name}`,
+  "palette.openChanges": (name: string) => `See deployments of ${name}`,
   "palette.toggleTheme": "Switch theme",
   "palette.components": "Components",
   "palette.empty": "Nothing found.",
@@ -918,7 +925,7 @@ export const en = {
   "title.expand": (claim: string, size: string) => `Grow ${claim} to ${size}`,
   "title.mount": (path: string) => `Change mount ${path}`,
   "title.addVolume": (path: string) => `Add a volume at ${path}`,
-  "releases.none": "No earlier releases yet.",
+  "releases.none": "Each time the image or a setting changes, a new deployment shows up here.",
   "releases.noneTask": "Jobs and CronJobs keep no releases.",
   "releases.current": "Running",
   "releases.compare": "Compare",
@@ -1532,28 +1539,33 @@ export const en = {
   "fixer.unknown": "Fixer unknown",
   "diagnosis.copy": "Copy diagnosis",
   "diagnosis.lastSeen": "Last seen",
-  "trace.title": "Path of a request",
+  "trace.title": "Connection checks",
+  "trace.reachable": "Reachable",
+  "trace.unreachable": "Not reachable",
+  "trace.unverified": "Not verified from inside the cluster",
+  "trace.howToFix": "How to fix",
+  "trace.showChecks": "Show connection checks",
+  "trace.hop.ok": "Passed",
+  "trace.hop.failed": "Failed",
+  "trace.hop.unknown": "Not checked",
   "status.uncheckedWhy": "Its containers started, but nothing checks that it answers requests.",
   "status.addTrafficCheck": "Add a traffic check",
-  "status.reach": "How it's reached",
-  "status.reachNone":
-    "Nothing reaches this service: it has no public domain and no private address.",
   "status.private": "Private",
   "rollout.title": "Rollout",
   "rollout.ready": (ready: number, desired: number) => `${ready} of ${desired} new replicas ready`,
   "rollout.older": (n: number) =>
     plural(n, "old replica still running", "old replicas still running"),
-  "changes.title": "What changed",
+  "changes.title": "Deployment history",
   "changes.description":
     "Each release of the service and the warnings around it. Compare a release with the current one, or roll back to it.",
-  "changes.none": "No changes yet",
+  "changes.none": "No deployments yet",
   "changes.release": (revision: number) => `Release #${revision}`,
-  "configure.sections": "Settings of this service",
-  "configure.variables": "Variables",
-  "configure.networking": "Domains and addresses",
-  "configure.storage": "Storage",
-  "configure.compute": "Compute",
-  "configure.health-checks": "Health checks",
+  "settings.sections": "Settings of this service",
+  "part.variables": "Variables",
+  "part.networking": "Networking",
+  "part.storage": "Storage",
+  "part.compute": "Compute",
+  "part.health-checks": "Health checks",
   "form.healthHint":
     "Checks the cluster runs on each replica: whether it takes traffic, whether to restart it, and when it has started.",
   "draft.add": "Add to changes",
@@ -1562,11 +1574,6 @@ export const en = {
   "draft.review": "Review",
   "draft.discard": "Discard",
   "draft.title": (name: string) => `Change ${name}`,
-  "section.status": "Status",
-  "section.changes": "Changes",
-  "section.configure": "Configure",
-  "section.inspect": "Inspect",
-  "inspect.views": "What to inspect",
   "project.view": "View",
   "project.viewMap": "Map",
   "project.viewList": "List",
@@ -1627,7 +1634,6 @@ export const en = {
   "trace.saw": "Found",
   "trace.fix": "Fix it",
   "trace.fixTitle": (address: string) => `Fix the way to ${address}`,
-  "trace.someUnknown": "Some hops could not be checked; hover one to see why.",
   "rollout.rollBack": (name: string) => `Roll back ${name}`,
   "rollout.rollBackButton": "Roll back",
   "sentence.incident.componentDown.cause.ingressController": (p: P) =>
@@ -1662,7 +1668,7 @@ export const en = {
     `Check the machine behind ${p.node}: whether it is on, its network, and its node agent (kubelet). If it won't come back, drain it and replace it.`,
   "sentence.trace.dns.ok": (p: P) => `${p.host} resolves.`,
   "sentence.trace.dns.notFound": (p: P) =>
-    `${p.host} doesn't resolve from where Zeabur runs; DNS elsewhere may answer differently.`,
+    `${p.host} doesn't resolve from inside the cluster; DNS elsewhere may still answer, so Zeabur can't tell.`,
   "sentence.trace.dns.unknown": (p: P) =>
     `${p.host} wasn't looked up, or the lookup didn't answer in time.`,
   "sentence.trace.address.noStatus": (p: P) =>
@@ -1698,7 +1704,7 @@ export const en = {
   "sentence.trace.certificate.notChecked": (p: P) =>
     `Secret ${p.secret} holds the certificate for ${p.host}; Zeabur doesn't check it further.`,
   "sentence.trace.certificate.secretMissing": (p: P) =>
-    `${p.route} reads the certificate for ${p.host} from secret ${p.secret}, which doesn't exist; the controller serves its default certificate, which browsers refuse.`,
+    `${p.route} reads the certificate for ${p.host} from secret ${p.secret}, which isn't in the project; the controller may serve a default certificate that Zeabur can't check.`,
   "sentence.trace.route.noStatus": (p: P) =>
     `Nothing has written ${p.route}'s status yet, so whether it is taken up is unknown.`,
   "sentence.trace.route.ok": (p: P) =>
@@ -1728,12 +1734,6 @@ export const en = {
   "sentence.trace.ready.ok": (p: P) => `${p.service} has ${p.ready}/${p.pods} replicas ready.`,
   "sentence.trace.ready.starting": (p: P) => `${p.service} is starting; no replica is ready yet.`,
   "sentence.trace.ready.noneReady": (p: P) => `No replica of ${p.service} is ready.`,
-  "sentence.diagnosis.unreachable.cause.dnsNotFound": (p: P) =>
-    `Requests to ${p.host} don't reach ${p.service}: the domain doesn't resolve.`,
-  "sentence.diagnosis.unreachable.why.dnsNotFound": () =>
-    "A browser first looks a domain up in DNS. Zeabur looked it up from where it runs; DNS elsewhere may answer differently.",
-  "sentence.diagnosis.unreachable.fix.dnsNotFound": (p: P) =>
-    `Add a DNS record for ${p.host} that points to the cluster's ingress controller.`,
   "sentence.diagnosis.unreachable.cause.ingressClassMissing": (p: P) =>
     `Requests to the domain of ${p.route} don't reach ${p.service}: it asks for IngressClass ${p.class}, which the cluster doesn't have.`,
   "sentence.diagnosis.unreachable.why.ingressClassMissing": () =>
@@ -1746,12 +1746,6 @@ export const en = {
     "The ingress controller brings requests for a domain into the cluster; while none of its replicas is ready, nothing answers them.",
   "sentence.diagnosis.unreachable.fix.controllerDown": (p: P) =>
     `Check why ${p.workload}${p.namespace ? ` in ${p.namespace}` : ""} has no ready replica; its events and logs say why.`,
-  "sentence.diagnosis.unreachable.cause.certificateMissing": (p: P) =>
-    `HTTPS to ${p.host} fails: secret ${p.secret}, which should hold its certificate, doesn't exist.`,
-  "sentence.diagnosis.unreachable.why.certificateMissing": (p: P) =>
-    `Without the secret ${p.route} names, the controller serves its default certificate, which browsers refuse.`,
-  "sentence.diagnosis.unreachable.fix.certificateMissing": (p: P) =>
-    `Add secret ${p.secret} with the certificate for ${p.host}, or have cert-manager issue it.`,
   "sentence.diagnosis.unreachable.cause.certificateNotReady": (p: P) =>
     `HTTPS to ${p.host} fails: certificate ${p.certificate} isn't issued${p.reason ? ` (${p.reason})` : ""}.`,
   "sentence.diagnosis.unreachable.why.certificateNotReady": (p: P) =>

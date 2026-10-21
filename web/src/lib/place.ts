@@ -15,7 +15,7 @@ export interface Place {
   entry?: ProjectEntry
   /** `Kind/name` of the service on the service page, or in the project's quick look. */
   service?: string
-  /** The section, or the view of Inspect, that a link to another service keeps. */
+  /** The tab or view that a link to another service keeps. */
   tab?: ServicePlace
 }
 
@@ -34,13 +34,7 @@ export function usePlace(): Place {
       const route = match.routeId
       if (match.routeId === "/projects/$project/services/$kind/$name") {
         const { project, kind, name } = match.params
-        const { tab, view } = match.search
-        return {
-          route,
-          project,
-          service: `${kind}/${name}`,
-          tab: tab === "inspect" && view ? view : tab,
-        }
+        return { route, project, service: `${kind}/${name}`, tab: match.search.tab }
       }
       const entry = entries[route]
       if (!entry || !("project" in match.params)) return { route }
@@ -64,7 +58,7 @@ export function serviceLink(
   return {
     to: "/projects/$project/services/$kind/$name" as const,
     params: { project, kind: service.kind, name: service.name },
-    search: { tab: place.tab, view: place.view, pod },
+    search: { tab: place.tab, pod },
     hash: place.hash,
   }
 }

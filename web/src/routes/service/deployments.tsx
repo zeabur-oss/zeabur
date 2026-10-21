@@ -30,7 +30,7 @@ import { imageTag, isTask, type Event, type Service } from "@/model/service"
 
 type Release = Schemas["WorkloadRelease"]
 
-export function ChangesSection({
+export function DeploymentsTab({
   project,
   service,
   events,

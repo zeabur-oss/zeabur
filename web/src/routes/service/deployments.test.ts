@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server"
 import { releasesQuery, serviceTimelineQuery } from "@/api/queries"
 import { changesOf } from "@/model/changes"
 import type { Event, Service } from "@/model/service"
-import { ChangesSection } from "@/routes/service/changes"
+import { DeploymentsTab } from "@/routes/service/deployments"
 
 function emptyTab(kind: string, name: string): string {
   const client = new QueryClient()
@@ -23,15 +23,15 @@ function emptyTab(kind: string, name: string): string {
     createElement(
       QueryClientProvider,
       { client },
-      createElement(ChangesSection, { project: "shop", service, events: [], onEvents: () => {} }),
+      createElement(DeploymentsTab, { project: "shop", service, events: [], onEvents: () => {} }),
     ),
   )
 }
 
-describe("An empty Changes section", () => {
-  test("says a Deployment has no earlier release yet", () => {
+describe("An empty Deployments tab", () => {
+  test("says where a Deployment's deployments will show", () => {
     const html = emptyTab("Deployment", "worker")
-    expect(html).toMatch(/No earlier releases yet\./)
+    expect(html).toMatch(/a new deployment shows up here\./)
     expect(html).not.toMatch(/Jobs and CronJobs/)
   })
 

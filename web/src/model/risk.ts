@@ -185,7 +185,13 @@ export function awaitsName(changes: readonly Change[], typed: string): boolean {
 }
 
 /** The service page tab a change is seen on. */
-type Tab = "variables" | "networking" | "storage" | "settings" | "releases"
+type Tab =
+  | "variables"
+  | "networking"
+  | "deployments"
+  | "settings#compute"
+  | "settings#health-checks"
+  | "settings#storage"
 
 /** Where to look at what a plan changed, as a path and query: the service page tab for a
  * workload's change, the object on the Objects page for anything else. `service` is the service
@@ -214,13 +220,14 @@ export function destinationOf(
   switch (change.op) {
     case "restart":
     case "rollback":
-      return tab(change.workload, "releases")
+      return tab(change.workload, "deployments")
     case "env":
       return tab(change.workload, "variables")
     case "scale":
     case "resources":
+      return tab(change.workload, "settings#compute")
     case "probe":
-      return tab(change.workload, "settings")
+      return tab(change.workload, "settings#health-checks")
     case "addDomain":
       return tab(change.workload, "networking")
     case "renameDomain":
@@ -228,9 +235,9 @@ export function destinationOf(
       return tab(service, "networking")
     case "addVolume":
     case "editMount":
-      return tab(change.workload, "storage")
+      return tab(change.workload, "settings#storage")
     case "expandVolume":
-      return tab(service, "storage") ?? object()
+      return tab(service, "settings#storage") ?? object()
     case "create":
       return isRecord(change.object) && change.object.kind === "NetworkPolicy" && service
         ? tab(service, "networking")

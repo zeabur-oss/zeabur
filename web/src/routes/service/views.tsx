@@ -3,16 +3,16 @@ import BellIcon from "~icons/ph/bell"
 import ChartBarIcon from "~icons/ph/chart-bar"
 import CodeIcon from "~icons/ph/code"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
-import TextAlignLeftIcon from "~icons/ph/text-align-left"
+import XIcon from "~icons/ph/x"
 
 import type { Schemas } from "@/api/client"
-import { Segmented } from "@/components/bits"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
+import { Button } from "@zeabur/design-system/components/button"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { useT } from "@/i18n"
 import type { Event, Service } from "@/model/service"
 import { refusedPlaces } from "@/routes/project/data"
-import type { InspectView } from "@/routes/search"
+import type { ServiceView } from "@/routes/search"
 import { EventsTab } from "@/routes/service/events"
 import { MetricsTab } from "@/routes/service/metrics"
 import { YamlTab } from "@/routes/service/yaml"
@@ -22,80 +22,74 @@ const TerminalTab = lazy(() =>
   import("@/routes/service/terminal").then((m) => ({ default: m.TerminalTab })),
 )
 
-const viewIcon = {
-  logs: TextAlignLeftIcon,
-  terminal: TerminalWindowIcon,
+export const viewIcon = {
   usage: ChartBarIcon,
-  yaml: CodeIcon,
   events: BellIcon,
+  terminal: TerminalWindowIcon,
+  yaml: CodeIcon,
 } as const
 
-const viewLabel: Record<
-  InspectView,
-  "tab.logs" | "tab.terminal" | "tab.metrics" | "tab.yaml" | "tab.events"
+export const viewLabel: Record<
+  ServiceView,
+  "tab.metrics" | "tab.events" | "tab.terminal" | "tab.yaml"
 > = {
-  logs: "tab.logs",
-  terminal: "tab.terminal",
   usage: "tab.metrics",
-  yaml: "tab.yaml",
   events: "tab.events",
+  terminal: "tab.terminal",
+  yaml: "tab.yaml",
 }
 
-/** The raw views of a running service: logs, a shell, usage, its YAML and its events. */
-export function InspectSection({
+const frame = (child: ReactNode) => (
+  <Suspense fallback={<Skeleton variant="card" className="min-h-96 w-full flex-1" />}>
+    {child}
+  </Suspense>
+)
+
+export function Logs(props: {
+  project: string
+  service: Service
+  pod?: string
+  onPodChange: (pod: string) => void
+}) {
+  return <div className="flex min-h-0 flex-1 flex-col">{frame(<LogsTab {...props} />)}</div>
+}
+
+/** A view from the header's menu, under its own title, with the way back to the tabs. */
+export function ServiceViewPanel({
   project,
   service,
   view,
   pod,
   events,
   unreadable,
-  onView,
   onPod,
+  onClose,
 }: {
   project: string
   service: Service
-  view: InspectView
+  view: ServiceView
   pod?: string
   events: Event[]
   unreadable: Schemas["UnreadableView"][]
-  onView: (view: InspectView) => void
   onPod: (pod?: string) => void
+  onClose: () => void
 }) {
   const t = useT()
-  const views: InspectView[] = ["logs", "terminal", "usage", "yaml", "events"]
-  const wide = view === "logs" || view === "terminal"
-  const frame = (child: ReactNode) => (
-    <Suspense fallback={<Skeleton variant="card" className="min-h-96 w-full flex-1" />}>
-      {child}
-    </Suspense>
-  )
+  const Icon = viewIcon[view]
+  const wide = view === "terminal"
   return (
-    <div className={wide ? "flex min-h-0 flex-1 flex-col gap-3" : "flex flex-col gap-4"}>
-      <div className="flex min-w-0 overflow-x-auto">
-        <Segmented
-          label={t("inspect.views")}
-          value={view}
-          onChange={onView}
-          options={views.map((value) => {
-            const Icon = viewIcon[value]
-            return {
-              value,
-              label: (
-                <>
-                  <Icon aria-hidden="true" />
-                  {t(viewLabel[value])}
-                  {value === "events" && events.length > 0 ? (
-                    <span className="tabular-nums opacity-60">{events.length}</span>
-                  ) : null}
-                </>
-              ),
-            }
-          })}
-        />
+    <section
+      aria-label={t(viewLabel[view])}
+      className={wide ? "flex min-h-0 flex-1 flex-col gap-3" : "flex flex-col gap-4"}
+    >
+      <div className="flex items-center gap-2">
+        <Icon className="size-4 text-secondary" aria-hidden="true" />
+        <h2 className="type-heading">{t(viewLabel[view])}</h2>
+        <Button variant="ghost" size="sm" className="ml-auto" onClick={onClose}>
+          <XIcon aria-hidden="true" data-icon="inline-start" />
+          {t("common.close")}
+        </Button>
       </div>
-      {view === "logs"
-        ? frame(<LogsTab project={project} service={service} pod={pod} onPodChange={onPod} />)
-        : null}
       {view === "terminal"
         ? frame(<TerminalTab project={project} service={service} pod={pod} onPodChange={onPod} />)
         : null}
@@ -107,6 +101,6 @@ export function InspectSection({
           <EventsTab events={events} pod={pod} onClearPod={() => onPod(undefined)} />
         </div>
       ) : null}
-    </div>
+    </section>
   )
 }

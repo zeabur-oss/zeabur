@@ -121,11 +121,11 @@ export function PaletteBody() {
     },
     {
       id: `${prefix}:changes`,
-      keywords: `changes releases history rollback ${s.name}`,
+      keywords: `deployments changes releases history rollback ${s.name}`,
       group: g.actions,
       label: t("palette.openChanges", s.name),
       icon: ClockCounterClockwiseIcon,
-      href: href(project, s, { tab: "changes" }),
+      href: href(project, s, { tab: "deployments" }),
     },
   ]
   if (current && place.project) items.push(...verbs(place.project, current, "action"))

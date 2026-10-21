@@ -27,7 +27,7 @@ import { NotFound } from "@/components/not-found"
 import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind, isTask } from "@/model/service"
 import {
-  servicePlace,
+  formerPlace,
   validateComponentsSearch,
   validateObjectsSearch,
   validateProjectSearch,
@@ -48,9 +48,11 @@ import {
 //   /projects/$project/settings                Settings: the project's details, adopted or not
 //   /projects/$project/objects                 Objects: every object by kind, ?object=… opens
 //                                              its YAML
-//   /projects/$project/services/$kind/$name    one service: ?tab=status|changes|configure|inspect,
-//                                              Inspect's ?view=…, Configure's parts as #anchors;
-//                                              a former ?tab=logs… redirects to its place
+//   /projects/$project/services/$kind/$name    one service: ?tab=logs|deployments|networking|
+//                                              variables|settings (Overview when absent), or a
+//                                              view from its menu (usage, events, terminal, yaml);
+//                                              Settings' parts as #anchors; a former ?tab=status…
+//                                              redirects to its place
 //   /settings                                  preferences, the signed-in person, About
 //   /settings/components                       moved: redirects to /cluster/components
 //   /problems/$kind                            what one kind of problem means, and what to do
@@ -189,11 +191,17 @@ const serviceRoute = createRoute({
     const kind = canonicalKind(params.kind)
     const former = search.former
     if (kind !== params.kind || former) {
+      const place = former ? formerPlace(former, search.view, location.hash) : undefined
       throw redirect({
         to: "/projects/$project/services/$kind/$name",
         params: { ...params, kind },
-        search: { ...search, former: undefined },
-        hash: servicePlace(former).hash ?? location.hash,
+        search: {
+          ...search,
+          tab: place ? place.tab : search.tab,
+          former: undefined,
+          view: undefined,
+        },
+        hash: place ? place.hash : location.hash,
         replace: true,
       })
     }

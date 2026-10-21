@@ -1,37 +1,41 @@
 import { ranges, splits, type Range, type Split } from "@/model/usage"
 
-export const serviceSections = ["status", "changes", "configure", "inspect"] as const
-export type ServiceSection = (typeof serviceSections)[number]
+/** A service's tabs, in their order. */
+export const serviceTabs = [
+  "overview",
+  "logs",
+  "deployments",
+  "networking",
+  "variables",
+  "settings",
+] as const
+export type ServiceTab = (typeof serviceTabs)[number]
 
-const inspectViews = ["logs", "terminal", "usage", "yaml", "events"] as const
-export type InspectView = (typeof inspectViews)[number]
+/** Views for people who know Kubernetes, opened from the header's menu rather than a tab. */
+export const serviceViews = ["usage", "events", "terminal", "yaml"] as const
+export type ServiceView = (typeof serviceViews)[number]
 
-const configureParts = ["variables", "networking", "storage", "compute", "health-checks"] as const
-export type ConfigurePart = (typeof configureParts)[number]
+/** What `?tab=` shows. */
+export type ServicePage = ServiceTab | ServiceView
 
-/** The names `?tab=` had when every part of a service was a tab of its own. */
-const formerTabs = ["overview", "releases", "metrics", "settings"] as const
+/** The parts of Settings, each an anchor. */
+const settingsParts = ["storage", "compute", "health-checks"] as const
+export type SettingsPart = (typeof settingsParts)[number]
 
-/** A place on a service's page: a section, a view of Inspect or a part of Configure. */
-export type ServicePlace =
-  | ServiceSection
-  | InspectView
-  | ConfigurePart
-  | (typeof formerTabs)[number]
+/** The parts a pending edit can belong to. */
+export type DraftPart = "variables" | "networking" | SettingsPart
 
-const places: readonly ServicePlace[] = [
-  ...serviceSections,
-  ...inspectViews,
-  ...configureParts,
-  ...formerTabs,
-]
+/** Names `?tab=` had before: Status, Changes, Configure and Inspect, and the tabs before them. */
+const formerTabs = ["status", "changes", "configure", "inspect", "releases", "metrics"] as const
+type FormerTab = (typeof formerTabs)[number]
 
-/** Where a place is: its section, the view of Inspect, and the part of Configure (the hash). */
-export function servicePlace(place?: ServicePlace): {
-  tab?: ServiceSection
-  view?: InspectView
-  hash?: ConfigurePart
-} {
+/** A place on a service's page: a tab or view, a part of Settings, or a former tab's name. */
+export type ServicePlace = ServicePage | SettingsPart | FormerTab
+
+const pages: readonly string[] = [...serviceTabs, ...serviceViews]
+
+/** Where a place is: the tab or view, and the part of Settings (the hash). */
+export function servicePlace(place?: ServicePlace): { tab?: ServicePage; hash?: SettingsPart } {
   switch (place) {
     case undefined:
     case "overview":
@@ -39,27 +43,39 @@ export function servicePlace(place?: ServicePlace): {
       return {}
     case "changes":
     case "releases":
-      return { tab: "changes" }
+      return { tab: "deployments" }
     case "configure":
+      return { tab: "variables" }
     case "inspect":
-      return { tab: place }
-    case "settings":
-      return { tab: "configure", hash: "compute" }
+      return { tab: "logs" }
     case "metrics":
-      return { tab: "inspect", view: "usage" }
-    case "variables":
-    case "networking":
+      return { tab: "usage" }
     case "storage":
     case "compute":
     case "health-checks":
-      return { tab: "configure", hash: place }
-    case "logs":
-    case "terminal":
-    case "usage":
-    case "yaml":
-    case "events":
-      return { tab: "inspect", view: place }
+      return { tab: "settings", hash: place }
+    default:
+      return { tab: place }
   }
+}
+
+/**
+ * Where a link from before the six tabs leads: `?tab=inspect&view=…`, `?tab=configure#part`, a
+ * former section, or a part of Settings named as a tab.
+ */
+export function formerPlace(
+  tab: string,
+  view?: string,
+  hash?: string,
+): { tab?: ServicePage; hash?: SettingsPart } {
+  if (tab === "inspect" && view === "metrics") return { tab: "usage" }
+  if (tab === "inspect" && view && pages.includes(view)) return { tab: view as ServicePage }
+  if (tab === "configure" && hash) {
+    if (hash === "variables" || hash === "networking") return { tab: hash }
+    if ((settingsParts as readonly string[]).includes(hash))
+      return { tab: "settings", hash: hash as SettingsPart }
+  }
+  return servicePlace(tab as ServicePlace)
 }
 
 const str = (value: unknown) => (typeof value === "string" && value ? value : undefined)
@@ -68,35 +84,34 @@ const oneOf = <T extends string>(values: readonly T[], value: unknown): T | unde
     ? (value as T)
     : undefined
 
-/** A `?tab=` from before the four sections, to redirect from. */
-export const formerPlace = (tab: unknown): ServicePlace | undefined => {
-  const place = oneOf(places, tab)
-  return place && !(serviceSections as readonly string[]).includes(place) ? place : undefined
-}
-
 export interface ServiceSearch {
-  /** Status when absent. */
-  tab?: ServiceSection
-  /** Inspect's view; Logs when absent. */
-  view?: InspectView
+  /** Overview when absent. */
+  tab?: ServicePage
   pod?: string
   /** `1h` when absent. */
   range?: Range
   /** Per replica when absent. */
   split?: Split
-  /** A `?tab=` from before the four sections, kept until the route redirects to its place. */
-  former?: ServicePlace
+  /** A `?tab=` from before the six tabs, kept until the route redirects to its place. */
+  former?: string
+  /** Inspect's `?view=`, read only to redirect. */
+  view?: string
 }
 
 export function validateServiceSearch(search: Record<string, unknown>): ServiceSearch {
-  const place = servicePlace(oneOf(places, search.tab))
+  const tab = str(search.tab)
+  const known = oneOf(pages as readonly ServicePage[], tab)
+  const former =
+    tab && !known && [...formerTabs, ...settingsParts].includes(tab as FormerTab)
+      ? tab
+      : str(search.former)
   return {
-    tab: place.tab,
-    view: oneOf(inspectViews, search.view) ?? place.view,
+    tab: known === "overview" ? undefined : known,
     pod: str(search.pod),
     range: oneOf(ranges, search.range),
     split: oneOf(splits, search.split),
-    former: formerPlace(search.tab) ?? oneOf(places, search.former),
+    former,
+    view: former ? str(search.view) : undefined,
   }
 }
 

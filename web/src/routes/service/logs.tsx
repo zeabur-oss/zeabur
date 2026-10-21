@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
@@ -14,7 +14,7 @@ import FunnelIcon from "~icons/ph/funnel"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { toProblem } from "@/api/client"
-import { followUrl, logsQuery, type LogOptions } from "@/api/queries"
+import { followUrl, logsQuery, projectQuery, type LogOptions } from "@/api/queries"
 import { Ago, Histogram } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
@@ -93,6 +93,7 @@ export function LogsTab({
   const t = useT()
   const pods = service.pods
   const pod = pods.find((p) => p.name === selectedPod) ?? worstPod(service)
+  const replaced = selectedPod && pod && pod.name !== selectedPod ? selectedPod : undefined
   const containerNames =
     pod && pod.containers.length > 0 ? pod.containers : service.containers.map((c) => c.name)
   const [container, setContainer] = useState<string>()
@@ -234,10 +235,17 @@ export function LogsTab({
   return (
     <div className="flex min-h-105 flex-1 flex-col gap-3">
       {toolbar}
+      {replaced ? (
+        <p role="status" className="text-sm text-secondary">
+          {t("logs.replaced", replaced, pod.name)}
+        </p>
+      ) : null}
       {follow ? (
         <Followed
           key={followUrl(project, pod.name, options)}
           url={followUrl(project, pod.name, options)}
+          project={project}
+          pod={pod.name}
           {...viewProps}
         />
       ) : (
@@ -274,6 +282,7 @@ function Snapshot({
   if (logs.isPending) return <Skeleton variant="card" className="min-h-80 w-full flex-1" />
   if (logs.isError) {
     const problem = toProblem(logs.error)
+    if (problem.status === 404) return <Gone project={project} pod={pod} />
     if (!problem.unavailableLog) return <Problem problem={problem} />
     // The kubelet had no log: a container state, not an error.
     const reason = problem.unavailableLog
@@ -319,14 +328,38 @@ function Snapshot({
   )
 }
 
-function Followed(props: { url: string } & ViewProps) {
+/** The replica went away between the list and its log; the list is read again, which picks another. */
+function Gone({ project, pod }: { project: string; pod: string }) {
+  const t = useT()
+  const client = useQueryClient()
+  useEffect(() => {
+    void client.invalidateQueries({ queryKey: projectQuery(project).queryKey })
+  }, [client, project, pod])
+  return (
+    <p
+      role="status"
+      className="rounded-xl border border-dashed p-8 text-center text-sm text-secondary"
+    >
+      {t("logs.gone", pod)}
+    </p>
+  )
+}
+
+function Followed(props: { url: string; project: string; pod: string } & ViewProps) {
   const [attempt, setAttempt] = useState(0)
   return <Stream key={attempt} {...props} onResume={() => setAttempt((n) => n + 1)} />
 }
 
-function Stream({ url, onResume, ...props }: { url: string; onResume: () => void } & ViewProps) {
+function Stream({
+  url,
+  project,
+  pod,
+  onResume,
+  ...props
+}: { url: string; project: string; pod: string; onResume: () => void } & ViewProps) {
   const t = useT()
   const stream = useLogStream(url)
+  if (stream.problem?.status === 404) return <Gone project={project} pod={pod} />
   return (
     <>
       {stream.problem ? <Problem problem={stream.problem} /> : null}

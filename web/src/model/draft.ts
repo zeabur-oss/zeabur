@@ -1,11 +1,11 @@
-// Edits gathered on a service's Configure page before one plan: which part each belongs to, and
-// how a later edit of the same thing replaces an earlier one.
+// Edits gathered on a service's Networking, Variables and Settings tabs before one plan: which
+// part each belongs to, and how a later edit of the same thing replaces an earlier one.
 import type { Schemas } from "@/api/client"
-import type { ConfigurePart } from "@/routes/search"
+import type { DraftPart } from "@/routes/search"
 
 type Change = Schemas["Change"]
 
-export function partOf(change: Change): ConfigurePart | undefined {
+export function partOf(change: Change): DraftPart | undefined {
   switch (change.op) {
     case "env":
     case "data":

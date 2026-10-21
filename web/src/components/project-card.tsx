@@ -124,11 +124,13 @@ function ProjectCard({ project, document, documentPending }: CardProps) {
       <span className="mt-2 block h-4 truncate text-xs text-tertiary">{project.description}</span>
       <span className="min-h-2 flex-1" />
       <span className="flex flex-col gap-y-2.5">
-        <InfoRow label={t("column.namespace")}>
-          <span className="truncate font-mono text-xs text-main" translate="no">
-            {project.name}
-          </span>
-        </InfoRow>
+        {project.displayName && project.displayName !== project.name ? (
+          <InfoRow label={t("column.namespace")}>
+            <span className="truncate font-mono text-xs text-main" translate="no">
+              {project.name}
+            </span>
+          </InfoRow>
+        ) : null}
         <InfoRow label={t("metric.services")}>
           <ServicesHealth project={project} />
         </InfoRow>

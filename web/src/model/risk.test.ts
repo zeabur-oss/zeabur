@@ -222,13 +222,13 @@ describe("destinationOf", () => {
   const service = "/projects/shop/services/Deployment/api"
   test("a workload's change goes to its tab", () => {
     expect(destinationOf("shop", [{ op: "restart", workload: api }], undefined)).toBe(
-      `${service}?tab=releases`,
+      `${service}?tab=deployments`,
     )
     expect(destinationOf("shop", [{ op: "env", workload: api, changes: [] }], undefined)).toBe(
       `${service}?tab=variables`,
     )
     expect(destinationOf("shop", [{ op: "scale", workload: api, replicas: 2 }], undefined)).toBe(
-      `${service}?tab=settings`,
+      `${service}?tab=settings#compute`,
     )
   })
 

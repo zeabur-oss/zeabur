@@ -1,6 +1,7 @@
 import { useQueries, useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
+import CaretRightIcon from "~icons/ph/caret-right"
 
 import { isStatus, type Schemas } from "@/api/client"
 import {
@@ -20,6 +21,11 @@ import { ProblemRow } from "@/components/problem-row"
 import { StatusDot, StatusPill } from "@/components/status"
 import { buttonVariants } from "@zeabur/design-system/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@zeabur/design-system/components/collapsible"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
@@ -403,80 +409,91 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
           {t("cluster.noWarnings")}
         </p>
       ) : (
-        <ul className="flex flex-col">
-          {rows.map((row) => {
-            const regarding = row.event.regarding
-            const service =
-              row.namespace && regarding && workloadKinds.has(regarding.kind)
-                ? services.get(`${row.namespace}/${regarding.kind}/${regarding.name}`)
-                : undefined
-            return (
-              <li
-                key={row.key}
-                className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 border-t border-rule py-2.5 md:grid md:grid-cols-warning"
-              >
-                <span className="flex min-w-0 items-center gap-1.5">
-                  <StatusDot health="warn" className="shrink-0" />
-                  {row.namespace ? (
-                    <>
-                      <Link
-                        to="/projects/$project"
-                        params={{ project: row.namespace }}
-                        search={{ events: "all" }}
-                        className="max-w-1/2 min-w-0 truncate type-meta text-muted-foreground hover:text-foreground hover:underline"
-                        translate="no"
-                        title={row.namespace}
-                      >
-                        {row.namespace}
-                      </Link>
-                      <span aria-hidden="true" className="shrink-0 type-meta text-muted-foreground">
-                        /
+        <Collapsible>
+          <CollapsibleTrigger variant="disclosure">
+            <CaretRightIcon aria-hidden="true" />
+            {t("home.showWarnings", rows.length)}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <ul className="mt-2 flex flex-col">
+              {rows.map((row) => {
+                const regarding = row.event.regarding
+                const service =
+                  row.namespace && regarding && workloadKinds.has(regarding.kind)
+                    ? services.get(`${row.namespace}/${regarding.kind}/${regarding.name}`)
+                    : undefined
+                return (
+                  <li
+                    key={row.key}
+                    className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 border-t border-rule py-2.5 md:grid md:grid-cols-warning"
+                  >
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <StatusDot health="warn" className="shrink-0" />
+                      {row.namespace ? (
+                        <>
+                          <Link
+                            to="/projects/$project"
+                            params={{ project: row.namespace }}
+                            search={{ events: "all" }}
+                            className="max-w-1/2 min-w-0 truncate type-meta text-muted-foreground hover:text-foreground hover:underline"
+                            translate="no"
+                            title={row.namespace}
+                          >
+                            {row.namespace}
+                          </Link>
+                          <span
+                            aria-hidden="true"
+                            className="shrink-0 type-meta text-muted-foreground"
+                          >
+                            /
+                          </span>
+                        </>
+                      ) : null}
+                      {service && row.namespace ? (
+                        <Link
+                          {...serviceLink(row.namespace, service, { tab: "events" })}
+                          className="min-w-0 truncate font-medium hover:underline"
+                          translate="no"
+                          title={regarding?.name}
+                        >
+                          {regarding?.name}
+                        </Link>
+                      ) : (
+                        <span
+                          className="min-w-0 truncate font-medium"
+                          translate="no"
+                          title={regarding?.name}
+                        >
+                          {regarding?.name}
+                        </span>
+                      )}
+                      {regarding ? (
+                        <span
+                          className="shrink-0 whitespace-nowrap type-meta text-muted-foreground"
+                          translate="no"
+                        >
+                          {regarding.kind}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 truncate" title={row.event.note}>
+                      <span className="font-semibold" translate="no">
+                        {row.event.reason}
                       </span>
-                    </>
-                  ) : null}
-                  {service && row.namespace ? (
-                    <Link
-                      {...serviceLink(row.namespace, service, { tab: "events" })}
-                      className="min-w-0 truncate font-medium hover:underline"
-                      translate="no"
-                      title={regarding?.name}
-                    >
-                      {regarding?.name}
-                    </Link>
-                  ) : (
-                    <span
-                      className="min-w-0 truncate font-medium"
-                      translate="no"
-                      title={regarding?.name}
-                    >
-                      {regarding?.name}
+                      {row.count > 1 ? (
+                        <span className="type-meta text-muted-foreground"> ×{row.count}</span>
+                      ) : null}
+                      {row.event.note ? (
+                        <span className="text-muted-foreground"> {row.event.note}</span>
+                      ) : null}
                     </span>
-                  )}
-                  {regarding ? (
-                    <span
-                      className="shrink-0 whitespace-nowrap type-meta text-muted-foreground"
-                      translate="no"
-                    >
-                      {regarding.kind}
-                    </span>
-                  ) : null}
-                </span>
-                <span className="min-w-0 truncate" title={row.event.note}>
-                  <span className="font-semibold" translate="no">
-                    {row.event.reason}
-                  </span>
-                  {row.count > 1 ? (
-                    <span className="type-meta text-muted-foreground"> ×{row.count}</span>
-                  ) : null}
-                  {row.event.note ? (
-                    <span className="text-muted-foreground"> {row.event.note}</span>
-                  ) : null}
-                </span>
-                <Ago iso={row.event.lastSeen} className="type-meta text-muted-foreground" />
-              </li>
-            )
-          })}
-        </ul>
+                    <Ago iso={row.event.lastSeen} className="type-meta text-muted-foreground" />
+                  </li>
+                )
+              })}
+            </ul>
+          </CollapsibleContent>
+        </Collapsible>
       )}
     </section>
   )

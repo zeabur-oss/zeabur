@@ -1,20 +1,40 @@
 import { describe, expect, test } from "bun:test"
 
-import { formerPlace, servicePlace } from "@/routes/search"
+import { formerPlace, servicePlace, validateServiceSearch } from "@/routes/search"
 
 describe("service places", () => {
-  test("the tabs from before the four sections land in their section", () => {
-    expect(servicePlace("variables")).toEqual({ tab: "configure", hash: "variables" })
-    expect(servicePlace("settings")).toEqual({ tab: "configure", hash: "compute" })
-    expect(servicePlace("releases")).toEqual({ tab: "changes" })
-    expect(servicePlace("logs")).toEqual({ tab: "inspect", view: "logs" })
-    expect(servicePlace("metrics")).toEqual({ tab: "inspect", view: "usage" })
+  test("a place names its tab, and a part of Settings its anchor", () => {
+    expect(servicePlace("variables")).toEqual({ tab: "variables" })
+    expect(servicePlace("compute")).toEqual({ tab: "settings", hash: "compute" })
+    expect(servicePlace("releases")).toEqual({ tab: "deployments" })
+    expect(servicePlace("metrics")).toEqual({ tab: "usage" })
     expect(servicePlace("overview")).toEqual({})
   })
 
-  test("a section is not a former place to redirect from", () => {
-    expect(formerPlace("configure")).toBeUndefined()
-    expect(formerPlace("networking")).toBe("networking")
-    expect(formerPlace("nonsense")).toBeUndefined()
+  test("links from the four sections lead to the tab that holds them now", () => {
+    expect(formerPlace("status")).toEqual({})
+    expect(formerPlace("changes")).toEqual({ tab: "deployments" })
+    expect(formerPlace("inspect", "terminal")).toEqual({ tab: "terminal" })
+    expect(formerPlace("inspect", "metrics")).toEqual({ tab: "usage" })
+    expect(formerPlace("inspect")).toEqual({ tab: "logs" })
+    expect(formerPlace("configure", undefined, "networking")).toEqual({ tab: "networking" })
+    expect(formerPlace("configure", undefined, "health-checks")).toEqual({
+      tab: "settings",
+      hash: "health-checks",
+    })
+    expect(formerPlace("configure")).toEqual({ tab: "variables" })
+  })
+
+  test("a former tab is kept for the redirect; an unknown one is dropped", () => {
+    expect(validateServiceSearch({ tab: "inspect", view: "yaml" })).toMatchObject({
+      tab: undefined,
+      former: "inspect",
+      view: "yaml",
+    })
+    expect(validateServiceSearch({ tab: "logs" })).toMatchObject({ tab: "logs", former: undefined })
+    expect(validateServiceSearch({ tab: "nonsense" })).toMatchObject({
+      tab: undefined,
+      former: undefined,
+    })
   })
 })

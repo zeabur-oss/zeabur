@@ -32,11 +32,10 @@ test.beforeAll(() => {
 })
 
 const logsPod = (page: Page) =>
-  page.getByRole("tabpanel", { name: "Inspect" }).getByRole("button", { name: /^Replica / })
+  page.getByRole("tabpanel", { name: "Logs" }).getByRole("button", { name: /^Replica / })
 
-/** The URL of a view of Inspect: `?tab=inspect&view=<view>`, in either order. */
-const inspectView = (view: string) =>
-  new RegExp(`tab=inspect.*view=${view}|view=${view}.*tab=inspect`)
+/** The URL of a tab or a view from the menu: `?tab=<tab>`. */
+const tabUrl = (tab: string) => new RegExp(`[?&]tab=${tab}(&|#|$)`)
 
 test("Home names the failing service across projects and lists the project", async ({ page }) => {
   await page.goto("/")
@@ -71,9 +70,9 @@ test("Home names the failing service across projects and lists the project", asy
 
   await row.getByRole("link", { name: new RegExp(`^Logs of ${failing}`) }).click()
   await expect(page).toHaveURL(
-    new RegExp(`/services/Deployment/${failing}\\?.*tab=inspect.*view=logs`),
+    new RegExp(`/services/Deployment/${failing}\\?.*tab=logs`),
   )
-  await expect(page.getByRole("tab", { name: "Inspect" })).toHaveAttribute("aria-selected", "true")
+  await expect(page.getByRole("tab", { name: "Logs" })).toHaveAttribute("aria-selected", "true")
 
   await page.goto("/projects")
   if (namespace.startsWith("kube-")) {
@@ -201,9 +200,9 @@ test("the project page puts the failing service first, with a link to its failin
   expect(failingPod.startsWith(failing)).toBe(true)
   await logs.click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?`))
-  await expect(page).toHaveURL(inspectView("logs"))
+  await expect(page).toHaveURL(tabUrl("logs"))
   await expect(page).toHaveURL(new RegExp(`pod=${failingPod}`))
-  await expect(page.getByRole("tab", { name: "Inspect" })).toHaveAttribute("aria-selected", "true")
+  await expect(page.getByRole("tab", { name: "Logs" })).toHaveAttribute("aria-selected", "true")
   await expect(logsPod(page)).toHaveAccessibleName(`Replica ${failingPod}`)
 
   await page.goto(`${project}?view=list`)
@@ -263,44 +262,58 @@ test("the services list filters, sorts, and leads from a pod to its logs", async
   await expect(table.getByRole("row").nth(1)).toContainText(failing)
 
   await table.getByRole("link", { name: `Logs of ${pod}` }).click()
-  await expect(page).toHaveURL(inspectView("logs"))
+  await expect(page).toHaveURL(tabUrl("logs"))
   await expect(page).toHaveURL(new RegExp(`pod=${pod}`))
   await expect(logsPod(page)).toHaveAccessibleName(`Replica ${pod}`)
 })
 
-test("the service page has four sections, and Inspect follows a pod's logs", async ({ page }) => {
+test("the service page has six tabs and its views in the menu, and Logs follows a pod", async ({
+  page,
+}) => {
   await page.goto(`${project}/services/Deployment/${healthy}`)
   await expect(page.getByRole("heading", { level: 1, name: healthy })).toBeVisible()
   const tabs = page.getByRole("tablist", { name: "Service sections" })
   const names = await tabs.getByRole("tab").allInnerTexts()
-  expect(names.map((n) => n.trim())).toEqual(["Status", "Changes", "Configure", "Inspect"])
-  await page.getByRole("button", { name: "More actions" }).click()
+  expect(names.map((n) => n.trim())).toEqual([
+    "Overview",
+    "Logs",
+    "Deployments",
+    "Networking",
+    "Variables",
+    "Settings",
+  ])
+  const header = page.locator("main header").first()
+  await header.getByRole("button", { name: "More", exact: true }).click()
   await expect(page.getByRole("menuitem")).toHaveText([
-    "Restart",
-    "Open terminal",
-    "View YAML",
+    "Usage",
+    "Events",
+    "Terminal",
+    "YAML",
     "Delete service",
   ])
   await page.keyboard.press("Escape")
-  await expect(tabs.getByRole("tab", { name: "Status" })).toHaveAttribute("aria-selected", "true")
-  const status = page.getByRole("tabpanel", { name: "Status" })
-  await expect(status.getByRole("region", { name: "Status" })).toContainText("Source")
-  await status.getByRole("button", { name: /^Replicas \d+\/\d+$/ }).click()
+  await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  )
+  const overview = page.getByRole("tabpanel", { name: "Overview" })
+  await expect(overview.getByRole("region", { name: "Status" })).toContainText("Source")
+  await overview.getByRole("button", { name: /^Replicas \d+\/\d+$/ }).click()
   await expect(page.getByRole("dialog")).toContainText(pod)
   await page.keyboard.press("Escape")
-  await expect(page.getByRole("link", { name: "Logs", exact: true })).toBeVisible()
-  await expect(status.getByRole("button", { name: "Restart" })).toBeEnabled()
+  // A tab is never a header button too.
+  await expect(header.getByRole("link", { name: "Logs", exact: true })).toHaveCount(0)
+  await expect(header.getByRole("button", { name: "Restart" })).toBeEnabled()
   const sections = page.getByRole("navigation", { name: "Project sections" })
   await expect(sections.getByRole("link", { name: "Projects" })).toHaveAttribute(
     "href",
     "/projects",
   )
-  const header = page.locator("main header").first()
   await expect(header.getByText(`Deployment/${healthy}`, { exact: true })).toHaveCount(1)
   await expect(header.getByText(/^Namespace/)).toHaveCount(0)
 
-  await tabs.getByRole("tab", { name: "Inspect" }).click()
-  await expect(page).toHaveURL(/tab=inspect/)
+  await tabs.getByRole("tab", { name: "Logs" }).click()
+  await expect(page).toHaveURL(tabUrl("logs"))
   await logsPod(page).click()
   await page.getByRole("button", { name: new RegExp(`^${pod}`) }).click()
   await expect(logsPod(page)).toHaveAccessibleName(`Replica ${pod}`)
@@ -311,22 +324,27 @@ test("the service page has four sections, and Inspect follows a pod's logs", asy
     timeout: 30_000,
   })
 
-  await page.getByRole("button", { name: "More actions" }).click()
-  await page.getByRole("menuitem", { name: "View YAML" }).click()
-  await expect(page).toHaveURL(inspectView("yaml"))
-  await expect(tabs.getByRole("tab", { name: "Inspect" })).toHaveAttribute("aria-selected", "true")
-  await tabs.getByRole("tab", { name: "Configure" }).click()
-  await expect(page).toHaveURL(/tab=configure/)
+  await header.getByRole("button", { name: "More", exact: true }).click()
+  await page.getByRole("menuitem", { name: "YAML" }).click()
+  await expect(page).toHaveURL(tabUrl("yaml"))
+  await expect(page.getByRole("region", { name: "YAML" })).toBeVisible()
+  await expect(tabs.getByRole("tab", { selected: true })).toHaveCount(0)
+  await tabs.getByRole("tab", { name: "Settings" }).click()
+  await expect(page).toHaveURL(tabUrl("settings"))
   await page.goBack()
-  await expect(page).toHaveURL(inspectView("yaml"))
+  await expect(page).toHaveURL(tabUrl("yaml"))
 
-  // The tabs from before the four sections still lead to their place.
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=logs`)
-  await expect(page).toHaveURL(inspectView("logs"))
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
-  await expect(page).toHaveURL(/tab=configure#networking$/)
+  // Links from before the six tabs still lead to their place.
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=inspect&view=logs`)
+  await expect(page).toHaveURL(tabUrl("logs"))
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=configure#networking`)
+  await expect(page).toHaveURL(tabUrl("networking"))
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=compute`)
+  await expect(page).toHaveURL(/tab=settings#compute$/)
   await page.goto(`${project}/services/Deployment/${healthy}?tab=releases`)
-  await expect(page).toHaveURL(/tab=changes/)
+  await expect(page).toHaveURL(tabUrl("deployments"))
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=status`)
+  await expect(page).toHaveURL(new RegExp(`/services/Deployment/${healthy}$`))
   await page.goto(`${project}/architecture`)
   await expect(page).toHaveURL(new RegExp(`${project}\\?view=map$`))
 })
@@ -368,11 +386,11 @@ test("a Secret's values appear only when revealed; they and the log filter stay 
   await page.getByRole("textbox", { name: "Filter lines" }).fill("zeabur-e2e-nothing-matches")
   await column.getByRole("link", { name: new RegExp(`^${failing}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?`))
-  await expect(page).toHaveURL(inspectView("logs"))
+  await expect(page).toHaveURL(tabUrl("logs"))
   await expect(page.getByRole("textbox", { name: "Filter lines" })).toHaveValue("")
 
   await page.goto(`${project}/services/Deployment/${healthy}?tab=variables`)
-  const panel = page.getByRole("region", { name: "Variables" })
+  const panel = page.getByRole("tabpanel", { name: "Variables" })
   await expect(panel).not.toContainText(secretValue)
   await panel.getByRole("button", { name: `Show values in ${secret}` }).click()
   await expect(panel).toContainText(secretValue)
@@ -381,9 +399,9 @@ test("a Secret's values appear only when revealed; they and the log filter stay 
   await panel.getByRole("button", { name: `Show values in ${secret}` }).click()
   await expect(panel).toContainText(secretValue)
   await column.getByRole("link", { name: new RegExp(`^${failing}\\b`) }).click()
-  await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=configure`))
+  await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=variables`))
   await column.getByRole("link", { name: new RegExp(`^${healthy}\\b`) }).click()
-  await expect(page).toHaveURL(new RegExp(`/services/Deployment/${healthy}\\?.*tab=configure`))
+  await expect(page).toHaveURL(new RegExp(`/services/Deployment/${healthy}\\?.*tab=variables`))
   await expect(panel).not.toContainText(secretValue)
 })
 
@@ -456,7 +474,7 @@ test("YAML never shows a Secret's values", async ({ page }) => {
   await expect(yaml).toContainText("greeting")
   await expect(yaml).not.toContainText(secretValue)
 
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=inspect&view=yaml`)
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=yaml`)
   const workload = page.getByRole("figure", { name: `YAML of ${healthy}` })
   await expect(workload).toContainText("kind: Deployment")
   await expect(workload).toContainText(secret)
@@ -515,7 +533,7 @@ async function applyNow(page: Page, change: Record<string, unknown>) {
 
 test("a variable is added through a plan", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
-  const panel = page.getByRole("region", { name: "Variables" })
+  const panel = page.getByRole("tabpanel", { name: "Variables" })
   await panel.getByRole("button", { name: "Add variable" }).click()
   await panel.getByRole("textbox", { name: "Name" }).fill("E2E_ADDED")
   await panel.getByRole("textbox", { name: "Value" }).fill("added-1")
@@ -529,7 +547,7 @@ test("a variable is added through a plan", async ({ page }) => {
 
 test("a ConfigMap value is edited where it lives, its key highlighted", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
-  const panel = page.getByRole("region", { name: "Variables" })
+  const panel = page.getByRole("tabpanel", { name: "Variables" })
   await panel.getByRole("button", { name: "Edit in ConfigMap editor-config" }).click()
   const sheet = page.getByRole("dialog").filter({ hasText: "editor-config" })
   await expect(sheet.locator("li[data-highlight]")).toContainText("mode")
@@ -546,10 +564,7 @@ test("a ConfigMap value is edited where it lives, its key highlighted", async ({
 
 test("restart of a single pod is confirmed in full, then reported in a toast", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}`)
-  await page
-    .getByRole("tabpanel", { name: "Status" })
-    .getByRole("button", { name: "Restart" })
-    .click()
+  await page.locator("main header").first().getByRole("button", { name: "Restart" }).click()
   const dialog = page.getByRole("dialog", { name: `Restart ${editor}` })
   await expect(dialog.getByRole("note")).toContainText(
     `${editor} has one replica, so it may be down for a few seconds while it restarts.`,
@@ -560,14 +575,14 @@ test("restart of a single pod is confirmed in full, then reported in a toast", a
   const applied = await confirmPlan(page, `Restart ${editor}`, "Restart")
   await expect(applied).toContainText(`Restart ${editor}`)
   await applied.getByRole("button", { name: "View" }).click()
-  await expect(page).toHaveURL(/tab=changes/)
+  await expect(page).toHaveURL(tabUrl("deployments"))
 })
 
 test("a change made meanwhile is refused in a toast, and Review again plans it afresh", async ({
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
-  const panel = page.getByRole("region", { name: "Variables" })
+  const panel = page.getByRole("tabpanel", { name: "Variables" })
   await panel.getByRole("button", { name: "Add variable" }).click()
   await panel.getByRole("textbox", { name: "Name" }).fill("E2E_REVIEWED")
   await panel.getByRole("textbox", { name: "Value" }).fill("reviewed-1")
@@ -651,12 +666,12 @@ test("a volume is added and its claim edited under Storage", async ({ page }) =>
   await expect(panel.getByRole("textbox", { name: /^Mount path/ }).first()).toHaveValue("/e2e-data")
 })
 
-test("Changes lists the releases and rolls back to one through a plan", async ({ page }) => {
-  await page.goto(`${project}/services/Deployment/${editor}?tab=changes`)
+test("Deployments lists the releases and rolls back to one through a plan", async ({ page }) => {
+  await page.goto(`${project}/services/Deployment/${editor}?tab=deployments`)
   // Guarantees a second template to roll back to.
   await applyNow(page, { op: "restart", workload: { kind: "Deployment", name: editor } })
-  const panel = page.getByRole("tabpanel", { name: "Changes" })
-  const list = panel.getByRole("list", { name: "What changed" })
+  const panel = page.getByRole("tabpanel", { name: "Deployments" })
+  const list = panel.getByRole("list", { name: "Deployment history" })
   // The Deployment controller writes the new ReplicaSet a moment after the apply.
   await expect(async () => {
     await page.reload()
@@ -696,7 +711,7 @@ test("an object's YAML is edited and planned", async ({ page }) => {
 test("a crash-looping service says why, with its fix and evidence", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${failing}`)
   const diagnosis = page
-    .getByRole("tabpanel", { name: "Status" })
+    .getByRole("tabpanel", { name: "Overview" })
     .getByRole("region", { name: "What's wrong" })
   await expect(diagnosis).toContainText(`${failing} keeps crashing and restarting.`, {
     timeout: 60_000,
@@ -712,7 +727,7 @@ test("a crash-looping service says why, with its fix and evidence", async ({ pag
   await expect(diagnosis).toContainText("Exit code")
   await expect(diagnosis).toContainText("In the app")
   await diagnosis.getByRole("link", { name: "Open logs" }).first().click()
-  await expect(page).toHaveURL(inspectView("logs"))
+  await expect(page).toHaveURL(tabUrl("logs"))
   await expect(logsPod(page)).toHaveAccessibleName(new RegExp(`^Replica ${failing}`))
 })
 
@@ -758,7 +773,7 @@ test("Networking shows who may reach a service, and a ready-made policy isolates
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=networking`)
-  const panel = page.getByRole("region", { name: "Domains and addresses" })
+  const panel = page.getByRole("tabpanel", { name: "Networking" })
   await expect(panel.getByRole("heading", { name: /^Connection rules/ })).toBeVisible()
   await expect(panel).toContainText("NetworkPolicy")
   await expect(panel).toContainText("network plugin (CNI)")
@@ -780,7 +795,7 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
   const policy = `zeabur-allow-ingress-${editor}`
   const allowIngress = async () => {
     await page.goto(`${project}/services/Deployment/${editor}?tab=networking`)
-    const panel = page.getByRole("region", { name: "Domains and addresses" })
+    const panel = page.getByRole("tabpanel", { name: "Networking" })
     await panel.getByRole("button", { name: "Add rule" }).click()
     await page.getByRole("menuitem", { name: "Allow traffic from public domains" }).click()
     const applied = await confirmPlan(page, `Let public domains reach ${editor}`, "Allow")

@@ -1,9 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
 import ArrowRightIcon from "~icons/ph/arrow-right"
-import ArrowUpRightIcon from "~icons/ph/arrow-up-right"
 import CaretDownIcon from "~icons/ph/caret-down"
 import CaretRightIcon from "~icons/ph/caret-right"
 import CubeIcon from "~icons/ph/cube"
@@ -16,17 +14,15 @@ import { Ago, CopyButton } from "@/components/bits"
 import { Diagnoses } from "@/components/diagnoses"
 import { EventList } from "@/components/events"
 import { replicaCounts } from "@/components/pods"
-import { RouteTrace } from "@/components/route-trace"
+import { RouteLine } from "@/components/route-trace"
 import { ServiceIcon } from "@/components/service-icon"
 import { plainReason, StatusDot, useStatusFacts, useStatusWord } from "@/components/status"
-import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
 import { Container } from "@zeabur/design-system/components/container"
 import { Meter } from "@zeabur/design-system/components/meter"
 import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
 import {
   SummaryCard,
-  SummaryCardActions,
   SummaryCardCount,
   SummaryCardFact,
   SummaryCardFacts,
@@ -36,6 +32,7 @@ import {
   SummaryCardWord,
 } from "@zeabur/design-system/components/summary-card"
 import { SwapText } from "@zeabur/design-system/components/swap-text"
+import { TermDetail } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useSentence, useT } from "@/i18n"
 import { LoadingRows } from "@/components/page"
@@ -63,14 +60,14 @@ import { UsageGlance } from "@/routes/service/usage"
 
 type OnTab = (place: ServicePlace, pod?: string) => void
 
-export function StatusSection({
+/** Health first, then what needs doing, then how the service is reached and what it talks to. */
+export function OverviewTab({
   project,
   service,
   services,
   edges,
   events,
   onTab,
-  onRestart,
 }: {
   project: string
   service: Service
@@ -78,26 +75,19 @@ export function StatusSection({
   edges: Edge[]
   events: Event[]
   onTab: OnTab
-  onRestart?: () => void
 }) {
   const t = useT()
   const diagnosed = (service.diagnoses?.length ?? 0) > 0
   const warnings = events.filter(isWarning)
   return (
     <div className="flex flex-col gap-5">
+      <Summary project={project} service={service} diagnosed={diagnosed} onTab={onTab} />
       {diagnosed ? (
         <Diagnoses diagnoses={service.diagnoses} service={service} project={project} />
       ) : null}
       {isTask(service.kind) ? null : <Rollout project={project} service={service} />}
-      <Summary
-        project={project}
-        service={service}
-        diagnosed={diagnosed}
-        onTab={onTab}
-        onRestart={onRestart}
-      />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
-        <Reachability project={project} service={service} onTab={onTab} />
+        <Reachability project={project} service={service} diagnosed={diagnosed} onTab={onTab} />
         <div className="flex min-w-0 flex-col gap-4 lg:gap-5">
           {warnings.length > 0 ? (
             <Container
@@ -200,20 +190,19 @@ function Summary({
   service,
   diagnosed,
   onTab,
-  onRestart,
 }: {
   project: string
   service: Service
   diagnosed: boolean
   onTab: OnTab
-  onRestart?: () => void
 }) {
   const t = useT()
   const { locale } = useI18n()
   const word = useStatusWord()
   const cluster = useQuery(clusterQuery).data?.name || undefined
   const status = statusOf(service)
-  const facts = useStatusFacts()(status.reason, status.pod)
+  const facts = useStatusFacts()(undefined, status.pod)
+  const term = status.pod?.running ? undefined : status.reason
   const started = service.pods
     .map((pod) => pod.created)
     .filter((created): created is string => !!created)
@@ -236,8 +225,11 @@ function Summary({
             </Tooltip>
           </SummaryCardSince>
         ) : null}
-        {facts && !isHealthy(status) ? (
-          <p className="mt-1 text-sm text-secondary">{facts}</p>
+        {(facts || term) && !isHealthy(status) ? (
+          <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm text-secondary">
+            {facts}
+            {term ? <TermDetail translate="no">{term}</TermDetail> : null}
+          </p>
         ) : null}
         {!isHealthy(status) && !diagnosed ? <Exceptions service={service} /> : null}
         {status.unchecked ? (
@@ -273,20 +265,12 @@ function Summary({
             </SummaryCardFact>
           ) : null}
         </SummaryCardFacts>
-        {onRestart ? (
-          <SummaryCardActions>
-            <Button variant="outline" size="sm" onClick={onRestart}>
-              <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-              {t("ops.restart")}
-            </Button>
-          </SummaryCardActions>
-        ) : null}
       </SummaryCardMain>
       {isTask(service.kind) ? null : (
         <UsageGlance
           project={project}
           service={service}
-          action={<More onClick={() => onTab("metrics")}>{t("tab.metrics")}</More>}
+          action={<More onClick={() => onTab("usage")}>{t("tab.metrics")}</More>}
         />
       )}
     </SummaryCard>
@@ -384,7 +368,7 @@ function Replicas({ service, onTab }: { service: Service; onTab: OnTab }) {
         )}
         {scalable ? (
           <div className="mt-1 border-t border-v2-border px-2 pt-2 pb-1">
-            <More onClick={() => onTab("settings")}>{t("overview.replicaSettings")}</More>
+            <More onClick={() => onTab("compute")}>{t("overview.replicaSettings")}</More>
           </div>
         ) : null}
       </PopoverContent>
@@ -395,20 +379,22 @@ function Replicas({ service, onTab }: { service: Service; onTab: OnTab }) {
 function Reachability({
   project,
   service,
+  diagnosed,
   onTab,
 }: {
   project: string
   service: Service
+  diagnosed: boolean
   onTab: OnTab
 }) {
   const t = useT()
   const trace = useQuery(traceQuery(project, service.kind, service.name))
   const planner = usePlanner(project)
   const routes = trace.data?.routes ?? []
-  if (isTask(service.kind) && trace.isSuccess && routes.length === 0) return null
+  if (trace.isSuccess && routes.length === 0) return null
   return (
     <Container
-      title={t("status.reach")}
+      title={t("tab.networking")}
       titleAction={<More onClick={() => onTab("networking")}>{t("overview.manage")}</More>}
       variant="list"
     >
@@ -420,55 +406,31 @@ function Reachability({
         <div className="px-4 py-3">
           <Problem error={trace.error} />
         </div>
-      ) : routes.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-secondary">{t("status.reachNone")}</p>
       ) : null}
       {routes.map((route) => {
-        const secure = route.hops.some((h) => h.step === "certificate" && h.status === "ok")
         const fix = route.fix
         return (
-          <div key={`${route.kind}/${route.address}`} className="flex flex-col gap-2 px-4 py-3">
-            {route.kind === "domain" ? (
-              <a
-                href={`${secure ? "https" : "http"}://${route.address}`}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="flex min-w-0 items-center gap-2 text-sm font-medium hover:underline"
-                translate="no"
-              >
-                <span className="truncate">{route.address}</span>
-                {secure ? (
-                  <Badge variant="ok" translate="no">
-                    HTTPS
-                  </Badge>
-                ) : null}
-                <ArrowUpRightIcon className="size-4 shrink-0 text-tertiary" aria-hidden="true" />
-                <span className="sr-only"> {t("common.newTab")}</span>
-              </a>
-            ) : (
-              <span className="flex min-w-0 items-center gap-1.5 text-sm">
-                <span className="shrink-0 text-secondary">{t("status.private")}</span>
-                <span className="truncate font-mono text-xs" translate="no" title={route.address}>
-                  {route.address}
-                </span>
-                <CopyButton value={route.address} />
-              </span>
-            )}
-            <RouteTrace
-              route={route}
-              onFix={
-                fix
-                  ? () =>
-                      void planner.plan({
-                        title: t("trace.fixTitle", route.address),
-                        changes: fix.changes,
-                        restartAfter: fix.restartAfter,
-                        service: { kind: service.kind, name: service.name },
-                      })
-                  : undefined
-              }
-            />
-          </div>
+          <RouteLine
+            key={`${route.kind}/${route.address}`}
+            route={route}
+            fix={
+              // A replica that isn't ready is the service's own diagnosis, already above.
+              diagnosed && route.hops.some((h) => h.step === "ready" && h.status === "failed")
+                ? undefined
+                : trace.data?.diagnoses.find((d) => d.cause.params?.address === route.address)?.fix
+            }
+            onFix={
+              fix
+                ? () =>
+                    void planner.plan({
+                      title: t("trace.fixTitle", route.address),
+                      changes: fix.changes,
+                      restartAfter: fix.restartAfter,
+                      service: { kind: service.kind, name: service.name },
+                    })
+                : undefined
+            }
+          />
         )
       })}
       {planner.dialog}

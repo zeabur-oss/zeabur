@@ -4,13 +4,13 @@ import type { Schemas } from "@/api/client"
 import type { PlanAsk } from "@/components/plan/planner"
 import { useT, type Translate } from "@/i18n"
 import { draftable, editCount, mergeChanges, partOf } from "@/model/draft"
-import type { ConfigurePart } from "@/routes/search"
+import type { DraftPart } from "@/routes/search"
 
 export interface Draft {
   changes: Schemas["Change"][]
   restartAfter: boolean
   count: number
-  parts: ConfigurePart[]
+  parts: DraftPart[]
   /** Changes when the draft is applied or discarded, so forms start again from the cluster. */
   generation: number
   /** Whether the ask waited in the draft; otherwise the caller plans it at once. */
@@ -32,7 +32,7 @@ export function useDraftState(): Draft {
     setRestartAfter(false)
     setGeneration((g) => g + 1)
   }
-  const parts = [...new Set(changes.map(partOf).filter((p): p is ConfigurePart => p !== undefined))]
+  const parts = [...new Set(changes.map(partOf).filter((p): p is DraftPart => p !== undefined))]
   return {
     changes,
     restartAfter,
@@ -64,17 +64,11 @@ export function ReviewWord() {
   return useReviewWord()
 }
 
-/** The parts of Configure the draft changes, in their order there. */
+/** The parts the draft changes, in the order of the tabs. */
 export const describeDraft = (t: Translate, draft: Pick<Draft, "parts">) =>
   t(
     "common.list",
-    configureOrder.filter((p) => draft.parts.includes(p)).map((p) => t(`configure.${p}`)),
+    partOrder.filter((p) => draft.parts.includes(p)).map((p) => t(`part.${p}`)),
   )
 
-const configureOrder: ConfigurePart[] = [
-  "variables",
-  "networking",
-  "storage",
-  "compute",
-  "health-checks",
-]
+const partOrder: DraftPart[] = ["networking", "variables", "compute", "health-checks", "storage"]
