@@ -7,7 +7,8 @@ workload or roll it back to an earlier release, scale it, set a probe or its res
 grow a volume and move a mount, replace an object with edited YAML, create a ready-made object
 ([`CREATABLE`]), delete one, adopt a namespace or let it go, and set a project's details.
 A plan token binds the request, the resource versions it was computed against and the person,
-so an apply carries out exactly what was confirmed, or nothing.
+so an apply carries out exactly what was confirmed, or nothing; this crate defines the claims,
+`zeabur-api` seals them.
 
 ## Hides
 

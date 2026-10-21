@@ -16,7 +16,6 @@ openapi = ["dep:utoipa", "zeabur-kernel/openapi", "zeabur-model/openapi"]
 
 [dependencies]
 zeabur-adapters.workspace = true
-zeabur-core.workspace = true
 zeabur-kernel.workspace = true
 zeabur-graph.workspace = true
 zeabur-model.workspace = true

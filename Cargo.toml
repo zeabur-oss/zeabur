@@ -41,6 +41,18 @@ zeabur-test-support = 6
 crates = ["zeabur-modules"]
 composers = ["zeabur-api", "zeabur-mcp", "zeabur", "zeaburctl"]
 
+# Crates with no I/O and no key, packageable on their own and built for WebAssembly, also checked
+# by scripts/check-levels.sh: a pure crate depends only on pure workspace crates.
+[workspace.metadata.pure]
+crates = [
+  "zeabur-kernel",
+  "zeabur-model",
+  "zeabur-adapters",
+  "zeabur-graph",
+  "zeabur-gaps",
+  "zeabur-plan",
+]
+
 [workspace.dependencies]
 # Workspace crates, levelled from the bottom up.
 zeabur-kernel = { path = "crates/zeabur-kernel" }

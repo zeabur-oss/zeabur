@@ -16,13 +16,13 @@ mod tests {
     use serde_json::{Value, json};
     use tower::ServiceExt as _;
     use zeabur_api::access::{Access, ClusterAccess, Elevation, SingleCluster};
+    use zeabur_api::plan_token::LIFETIME_SECONDS;
     use zeabur_core::problem::Problem;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Cluster, Identity, NamespaceObjects, WriteBody};
-    use zeabur_plan::token::LIFETIME_SECONDS;
 
     use crate::common::{app, send};
 
@@ -487,7 +487,7 @@ mod tests {
                 elevated: elevated.cloned(),
                 offered: true,
             }),
-            zeabur_plan::token::PlanKey::from_bytes([7; 32]),
+            zeabur_api::plan_token::PlanKey::from_bytes([7; 32]),
             zeabur_api::Settings::default(),
         )
     }

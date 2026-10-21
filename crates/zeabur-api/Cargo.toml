@@ -21,11 +21,13 @@ zeabur-modules.workspace = true
 zeabur-plan = { workspace = true, features = ["openapi"] }
 zeabur-catalog.workspace = true
 axum.workspace = true
+base64.workspace = true
 form_urlencoded.workspace = true
 futures-util.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 secrecy.workspace = true
+thiserror.workspace = true
 tokio.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true

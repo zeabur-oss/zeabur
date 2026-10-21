@@ -6,10 +6,10 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use secrecy::SecretString;
+use zeabur_api::plan_token::PlanKey;
 use zeabur_auth::client::ExtraRoots;
 use zeabur_auth::session::Limits;
 use zeabur_auth::url::BaseUrl;
-use zeabur_plan::token::PlanKey;
 
 /// Kubernetes made simple and secure by default: the in-cluster server.
 ///

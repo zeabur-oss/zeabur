@@ -61,11 +61,11 @@ use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, Preconditions, WriteBody, WriteRequest};
-use zeabur_plan::token::{self, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
 use zeabur_plan::{Change, ErrorKind, GatewayRef, Input, Plan, PlanError, PlanRequest, Write};
 
 use crate::error::{ApiError, project_read, read_problem};
 use crate::handlers::{AppState, Credential, Everyday, Person};
+use crate::plan_token::{self as token, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
 use crate::projects::snapshot;
 
 /// A plan and the token that applies it.

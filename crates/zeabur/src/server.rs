@@ -40,6 +40,7 @@ use axum::routing::{delete, get, post};
 use secrecy::SecretString;
 use zeabur_api::ApiError;
 use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
+use zeabur_api::plan_token::PlanKey;
 use zeabur_auth::client::{AuthError, OAuthClient};
 use zeabur_auth::cookie;
 use zeabur_auth::flow::{FlowKey, LIFETIME_SECONDS, Pending, Purpose, return_path};
@@ -49,7 +50,6 @@ use zeabur_core::guard::{self, Origins, Refusal};
 use zeabur_core::problem::{Kind, Problem};
 use zeabur_kube::Cluster;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
-use zeabur_plan::token::PlanKey;
 
 use crate::pages::{self, Elevated, SignInProblem};
 

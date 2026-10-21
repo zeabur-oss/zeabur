@@ -58,6 +58,10 @@ The code is split into small crates in one flat `crates/` directory:
   Only the composing crates (`zeabur-api`, `zeabur-mcp`, the binaries) may depend on a module
   crate (`[workspace.metadata.modules]`, also checked by `scripts/check-levels.sh`), so the core
   never knows which integrations exist.
+- **The rules are pure crates**: `zeabur-kernel`, `zeabur-model`, `zeabur-adapters`,
+  `zeabur-graph`, `zeabur-gaps` and `zeabur-plan` perform no I/O and hold no key, depend only on
+  each other (`[workspace.metadata.pure]`, also checked by `scripts/check-levels.sh`), build for
+  WebAssembly and can be packaged on their own.
 
 ```mermaid
 flowchart BT

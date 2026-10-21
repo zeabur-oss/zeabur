@@ -13,6 +13,7 @@ use http_body_util::BodyExt as _;
 use secrecy::{ExposeSecret as _, SecretString};
 use serde_json::{Value, json};
 use tower::ServiceExt as _;
+use zeabur_api::plan_token::PlanKey;
 use zeabur_auth::client::{ClientConfig, ExtraRoots, OAuthClient};
 use zeabur_auth::flow::FlowKey;
 use zeabur_auth::session::{Limits, Sessions};
@@ -21,7 +22,6 @@ use zeabur_auth::url::BaseUrl;
 use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
 use zeabur_kube::memory::{MemoryCluster, State};
 use zeabur_kube::{Identity, NamespaceObjects};
-use zeabur_plan::token::PlanKey;
 
 use super::{Auth, Connection, app};
 
