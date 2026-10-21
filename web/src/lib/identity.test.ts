@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { clusterNameOf, formatClock, personOf } from "@/lib/identity"
+import { formatClock, personOf } from "@/lib/identity"
 
 describe("identity", () => {
   test("an OIDC prefix is not the person", () => {
@@ -10,16 +10,6 @@ describe("identity", () => {
     expect(personOf("system:serviceaccount:zeabur:zeabur")).toBe(
       "system:serviceaccount:zeabur:zeabur",
     )
-  })
-
-  test("an in-cluster address is no cluster name", () => {
-    expect(clusterNameOf("10.43.0.1")).toBe(undefined)
-    expect(clusterNameOf("[fd00::1]")).toBe(undefined)
-    expect(clusterNameOf("kubernetes.default.svc")).toBe(undefined)
-    expect(clusterNameOf("kubernetes")).toBe(undefined)
-    expect(clusterNameOf("k3d-zeabur")).toBe("k3d-zeabur")
-    expect(clusterNameOf("api.prod.example.com")).toBe("api.prod.example.com")
-    expect(clusterNameOf(undefined)).toBe(undefined)
   })
 
   test("a time of day is 24-hour in every language", () => {

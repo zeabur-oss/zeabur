@@ -29,7 +29,14 @@ export const zhTW: Messages = {
   "shell.home": "首頁",
   "shell.projects": "專案",
   "shell.settings": "設定",
-  "shell.thisCluster": "這個叢集",
+  "shell.nameFrom.setting": "名稱來自設定",
+  "shell.nameFrom.install": "名稱來自安裝設定",
+  "shell.nameFrom.kubeconfig": "名稱來自 kubeconfig",
+  "shell.nameFrom.address": "名稱來自網址",
+  "shell.nameFrom.node": "名稱來自控制平面節點",
+  "shell.nameFrom.provider": (provider) => `名稱來自 ${provider}`,
+  "shell.nameFrom.distributionNode": (distribution) => `名稱來自 ${distribution} 控制平面節點`,
+  "shell.renameCluster": "在設定中重新命名",
   "shell.cluster": "叢集",
   "shell.search": "搜尋",
   "shell.jumpTo": "前往…",
@@ -1175,6 +1182,13 @@ export const zhTW: Messages = {
   "usage.loadingChart": "正在載入圖表…",
 
   // 設定：metrics 儲存服務
+  "settings.clusterName": "叢集名稱",
+  "settings.clusterNameLabel": "名稱",
+  "settings.clusterNameHint":
+    "顯示在側邊欄和 Zeabur 的頁面上，讓管理多個叢集的人一眼分辨。叢集本身不會有任何變更。",
+  "settings.clusterNameReset": "改用預設名稱",
+  "settings.clusterNameChange": "重新命名叢集",
+  "settings.clusterNameLocal": "Zeabur 在這台電腦上執行，不保存設定：名稱沿用 kubeconfig 的名稱。",
   "settings.metricsStore": "用量歷史",
   "settings.store": "歷史資料來源",
   "settings.storeHint":

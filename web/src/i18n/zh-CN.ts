@@ -29,7 +29,14 @@ export const zhCN: Messages = {
   "shell.home": "首页",
   "shell.projects": "项目",
   "shell.settings": "设置",
-  "shell.thisCluster": "此集群",
+  "shell.nameFrom.setting": "名称来自设置",
+  "shell.nameFrom.install": "名称来自安装配置",
+  "shell.nameFrom.kubeconfig": "名称来自 kubeconfig",
+  "shell.nameFrom.address": "名称来自网址",
+  "shell.nameFrom.node": "名称来自控制平面节点",
+  "shell.nameFrom.provider": (provider) => `名称来自 ${provider}`,
+  "shell.nameFrom.distributionNode": (distribution) => `名称来自 ${distribution} 控制平面节点`,
+  "shell.renameCluster": "在设置中重命名",
   "shell.cluster": "集群",
   "shell.search": "搜索",
   "shell.jumpTo": "跳转到…",
@@ -1173,6 +1180,14 @@ export const zhCN: Messages = {
   "usage.loadingChart": "正在加载图表…",
 
   // 设置：metrics 存储服务
+  "settings.clusterName": "集群名称",
+  "settings.clusterNameLabel": "名称",
+  "settings.clusterNameHint":
+    "显示在侧边栏和 Zeabur 的页面上，方便管理多个集群的人一眼区分。集群本身不会有任何变更。",
+  "settings.clusterNameReset": "改用默认名称",
+  "settings.clusterNameChange": "重命名集群",
+  "settings.clusterNameLocal":
+    "Zeabur 在这台电脑上运行，不保存设置：名称沿用 kubeconfig 中的名称。",
   "settings.metricsStore": "用量历史",
   "settings.store": "历史数据来源",
   "settings.storeHint":

@@ -8,6 +8,7 @@ import SunIcon from "~icons/ph/sun"
 import { api, unwrap, type Schemas } from "@/api/client"
 import {
   capabilitiesQuery,
+  clusterNameQuery,
   clusterQuery,
   metricsStoreQuery,
   queryClient,
@@ -21,6 +22,7 @@ import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
+import { nameSourceOf } from "@/lib/cluster-name"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
@@ -79,6 +81,8 @@ export function SettingsPage() {
         </Rows>
       </Panel>
 
+      <ClusterNamePanel />
+
       <MetricsStorePanel />
 
       <Panel title={t("settings.about")}>
@@ -110,6 +114,134 @@ export function SettingsPage() {
         </Rows>
       </Panel>
     </PageColumn>
+  )
+}
+
+type NameSetting = Schemas["ClusterNameSetting"]
+
+function ClusterNamePanel() {
+  const t = useT()
+  const setting = useQuery(clusterNameQuery)
+  const cluster = useQuery(clusterQuery)
+  return (
+    <Panel id="settings-cluster-name" title={t("settings.clusterName")}>
+      {setting.data && cluster.data ? (
+        <NameForm
+          key={`${setting.data.name ?? ""}/${cluster.data.name}`}
+          setting={setting.data}
+          cluster={cluster.data}
+        />
+      ) : setting.isError || cluster.isError ? (
+        <Problem error={setting.error ?? cluster.error} />
+      ) : (
+        <p className="text-sm text-muted-foreground">…</p>
+      )}
+    </Panel>
+  )
+}
+
+function NameForm({ setting, cluster }: { setting: NameSetting; cluster: Schemas["Cluster"] }) {
+  const t = useT()
+  const inputId = useId()
+  const [draft, setDraft] = useState(cluster.name)
+  const save = useMutation({
+    mutationFn: async (name: string | null) =>
+      unwrap(await api.PUT("/api/v1/settings/cluster-name", { body: { name } })),
+    onSuccess: (next) => {
+      queryClient.setQueryData(clusterNameQuery.queryKey, next)
+      void queryClient.invalidateQueries({ queryKey: clusterQuery.queryKey, exact: true })
+      toast.success(t("settings.storeSaved"))
+    },
+  })
+  const keeps = Boolean(setting.storedIn)
+  const editable = keeps && setting.canChange !== "denied"
+  const elevation = useHintOffersElevation(setting.canChange)
+  const changed = draft.trim() !== "" && draft.trim() !== cluster.name
+  const source = <span className="text-xs text-muted-foreground">{nameSourceOf(cluster, t)}</span>
+  const who =
+    keeps && !editable && elevation ? null : (
+      <p id={`${inputId}-who`} className="text-xs text-muted-foreground">
+        {setting.storedIn ? t("settings.storeWho") : t("settings.clusterNameLocal")}
+        {keeps && !editable ? ` ${t("settings.storeDenied")}` : ""}
+        {setting.storedIn ? (
+          <Hint label={t("settings.storeWhereLabel")}>
+            {t("settings.storeWhere", setting.storedIn.namespace ?? "")}
+          </Hint>
+        ) : null}
+      </p>
+    )
+  const label = (
+    <>
+      {editable ? (
+        <label htmlFor={inputId}>{t("settings.clusterNameLabel")}</label>
+      ) : (
+        t("settings.clusterNameLabel")
+      )}
+      <Hint label={t("settings.clusterName")}>{t("settings.clusterNameHint")}</Hint>
+    </>
+  )
+  return (
+    <Rows>
+      <Row label={label}>
+        {editable ? (
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              save.mutate(draft.trim())
+            }}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id={inputId}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                disabled={save.isPending}
+                autoComplete="off"
+                maxLength={63}
+                className="min-w-64 flex-1"
+                aria-describedby={`${inputId}-who`}
+                translate="no"
+              />
+              {source}
+              <Button type="submit" size="sm" disabled={!changed || save.isPending}>
+                {t("settings.storeSave")}
+              </Button>
+              {setting.name ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={save.isPending}
+                  onClick={() => save.mutate(null)}
+                >
+                  {t("settings.clusterNameReset")}
+                </Button>
+              ) : null}
+            </div>
+            {who}
+            {save.isError ? <Problem error={save.error} what={t("settings.clusterName")} /> : null}
+          </form>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              <span className="break-all" translate="no">
+                {cluster.name}
+              </span>
+              {source}
+            </span>
+            {keeps ? (
+              <RefusedHint
+                hint={setting.canChange}
+                what={t("settings.clusterNameChange")}
+                missing={[permission("patch", "configmaps")]}
+              />
+            ) : null}
+            {who}
+          </div>
+        )}
+      </Row>
+    </Rows>
   )
 }
 

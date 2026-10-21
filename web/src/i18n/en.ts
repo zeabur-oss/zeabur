@@ -37,7 +37,15 @@ export const en = {
   "shell.home": "Home",
   "shell.projects": "Projects",
   "shell.settings": "Settings",
-  "shell.thisCluster": "This cluster",
+  "shell.nameFrom.setting": "Name from Settings",
+  "shell.nameFrom.install": "Name from the installation",
+  "shell.nameFrom.kubeconfig": "Name from kubeconfig",
+  "shell.nameFrom.address": "Name from the URL",
+  "shell.nameFrom.node": "Name from the control plane node",
+  "shell.nameFrom.provider": (provider: string) => `Name from ${provider}`,
+  "shell.nameFrom.distributionNode": (distribution: string) =>
+    `Name from the ${distribution} control plane node`,
+  "shell.renameCluster": "Rename in Settings",
   "shell.cluster": "Cluster",
   "shell.search": "Search",
   "shell.jumpTo": "Jump to…",
@@ -1272,6 +1280,15 @@ export const en = {
     "Zeabur asks only for this project's replicas. The store itself is not split by project: anyone allowed to open it can read every project's metrics.",
   "usage.loadingChart": "Loading chart…",
 
+  // Settings: the cluster's name
+  "settings.clusterName": "Cluster name",
+  "settings.clusterNameLabel": "Name",
+  "settings.clusterNameHint":
+    "Shown in the sidebar and on Zeabur's pages, so people with several clusters can tell this one apart. Nothing in the cluster changes.",
+  "settings.clusterNameReset": "Use the default name",
+  "settings.clusterNameChange": "Renaming the cluster",
+  "settings.clusterNameLocal":
+    "Zeabur runs on this computer and keeps no settings: the name is your kubeconfig's.",
   // Settings: the metrics store
   "settings.metricsStore": "Usage history",
   "settings.store": "History source",

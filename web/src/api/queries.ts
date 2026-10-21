@@ -479,6 +479,11 @@ export const historyQuery = (
     refetchIntervalInBackground: false,
   })
 
+export const clusterNameQuery = queryOptions({
+  queryKey: ["settings", "cluster-name"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/settings/cluster-name", { signal })),
+})
+
 export const metricsStoreQuery = queryOptions({
   queryKey: ["settings", "metrics-store"],
   queryFn: async ({ signal }) =>

@@ -200,13 +200,16 @@ function ClusterFacts() {
     <span className="flex flex-wrap items-center gap-2 type-meta text-muted-foreground">
       <Link
         to="/cluster"
-        className="type-mono hover:text-foreground hover:underline"
-        translate="no"
+        className="font-medium text-foreground hover:underline"
+        translate={cluster.data ? "no" : undefined}
       >
-        {version
-          ? `${cluster.data?.distribution ? `${cluster.data.distribution} ` : ""}${version}`
-          : t("shell.cluster")}
+        {cluster.data?.name ?? t("shell.cluster")}
       </Link>
+      {version ? (
+        <span className="type-mono" translate="no">
+          {`${cluster.data?.distribution ? `${cluster.data.distribution} ` : ""}${version}`}
+        </span>
+      ) : null}
       {items && items.length > 0 ? (
         <span>{t("home.nodesReady", ready ?? 0, items.length)}</span>
       ) : null}

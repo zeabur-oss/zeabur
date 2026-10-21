@@ -38,7 +38,6 @@ import { useI18n, useSentence, useT } from "@/i18n"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { usePlanner } from "@/components/plan/planner"
-import { clusterNameOf } from "@/lib/identity"
 import { formatAgo, formatTime } from "@/lib/format"
 import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
@@ -318,7 +317,7 @@ function Summary({
   const t = useT()
   const { locale } = useI18n()
   const word = useStatusWord()
-  const cluster = clusterNameOf(useQuery(clusterQuery).data?.name)
+  const cluster = useQuery(clusterQuery).data?.name
   const status = statusOf(service)
   const facts = useStatusFacts()(undefined, status.pod)
   const term = status.pod?.running ? undefined : status.reason

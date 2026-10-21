@@ -1,19 +1,22 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
+import { useEffect } from "react"
 import CheckIcon from "~icons/ph/check"
 import DesktopIcon from "~icons/ph/desktop"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 import MoonIcon from "~icons/ph/moon"
+import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import ShieldCheckIcon from "~icons/ph/shield-check"
 import ShieldSlashIcon from "~icons/ph/shield-slash"
 import SignOutIcon from "~icons/ph/sign-out"
 import SunIcon from "~icons/ph/sun"
 
-import { clusterQuery, sessionQuery, whoamiQuery } from "@/api/queries"
+import { clusterNameQuery, clusterQuery, sessionQuery, whoamiQuery } from "@/api/queries"
 import { dropElevation, retryAsAdmin } from "@/auth/elevation"
 import { signOut } from "@/auth/session"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
-import { clusterNameOf, formatClock, personOf } from "@/lib/identity"
+import { nameSourceOf } from "@/lib/cluster-name"
+import { formatClock, personOf } from "@/lib/identity"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
 import { Avatar } from "@zeabur/design-system/components/avatar"
 import {
@@ -45,10 +48,12 @@ export function ContextMenu() {
   const groups = whoami.data?.groups.join(", ")
   const until = session?.elevation === "active" ? session.elevatedUntil : undefined
   const time = until ? formatClock(until, locale) : undefined
-  const named = clusterNameOf(cluster?.name)
-  const place = named ?? t("shell.thisCluster")
-  const address = cluster?.name && cluster.name !== named ? cluster.name : undefined
+  const place = cluster?.name ?? ""
+  const source = cluster ? nameSourceOf(cluster, t) : undefined
   const who = name || t("shell.whoamiUnknown")
+  useEffect(() => {
+    if (place) document.title = `${place} – Zeabur`
+  }, [place])
 
   return (
     <Menu>
@@ -56,7 +61,7 @@ export function ContextMenu() {
         render={
           <ContextChip
             place={
-              <span translate={named ? "no" : undefined} title={address ?? place}>
+              <span translate="no" title={source ? `${place}\n${source}` : place || undefined}>
                 {place}
               </span>
             }
@@ -88,15 +93,14 @@ export function ContextMenu() {
         </div>
         <MenuItem render={<Link to="/cluster" />}>
           <HardDrivesIcon aria-hidden="true" />
-          <span className="flex-1 truncate" translate={named ? "no" : undefined}>
-            {place}
-          </span>
-          {address ? (
-            <span className="truncate font-mono text-xs text-tertiary" translate="no">
-              {address}
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate" translate="no">
+              {place}
             </span>
-          ) : null}
+            {source ? <span className="truncate text-xs text-tertiary">{source}</span> : null}
+          </span>
         </MenuItem>
+        <RenameCluster />
         {session?.elevation === "active" || session?.elevation === "available" ? (
           <>
             <MenuSeparator />
@@ -145,5 +149,18 @@ export function ContextMenu() {
         ) : null}
       </MenuContent>
     </Menu>
+  )
+}
+
+/** A way to rename the cluster, for those who may. */
+function RenameCluster() {
+  const t = useT()
+  const setting = useQuery(clusterNameQuery).data
+  if (!setting?.storedIn || setting.canChange !== "allowed") return null
+  return (
+    <MenuItem render={<Link to="/settings" hash="settings-cluster-name" />}>
+      <PencilSimpleIcon aria-hidden="true" />
+      {t("shell.renameCluster")}
+    </MenuItem>
   )
 }

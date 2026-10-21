@@ -55,6 +55,11 @@ function Heading() {
       title={t("cluster.title")}
       badges={
         <>
+          {cluster.data ? (
+            <span className="font-medium text-main" translate="no">
+              {cluster.data.name}
+            </span>
+          ) : null}
           {version ? (
             <span className="type-mono text-muted-foreground" translate="no">
               {cluster.data?.distribution && !version.includes(cluster.data.distribution)
