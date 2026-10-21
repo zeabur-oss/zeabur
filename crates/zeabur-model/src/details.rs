@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use zeabur_kernel::names::{ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON};
+use zeabur_kernel::names::Conventions;
 
 /// The longest display name, in characters: a name, not a sentence.
 pub const DISPLAY_NAME_MAX: usize = 64;
@@ -126,6 +126,15 @@ impl ProjectDetails {
     /// The details a namespace's annotations hold.
     #[must_use]
     pub fn from_annotations(annotations: Option<&BTreeMap<String, String>>) -> Self {
+        Self::from_annotations_with(annotations, &Conventions::ZEABUR)
+    }
+
+    /// [`Self::from_annotations`] under the annotation keys of `conventions`.
+    #[must_use]
+    pub fn from_annotations_with(
+        annotations: Option<&BTreeMap<String, String>>,
+        conventions: &Conventions,
+    ) -> Self {
         let text = |key: &str| {
             annotations
                 .and_then(|a| a.get(key))
@@ -134,15 +143,17 @@ impl ProjectDetails {
                 .map(str::to_owned)
         };
         Self {
-            display_name: text(ANNOTATION_DISPLAY_NAME),
-            description: text(ANNOTATION_DESCRIPTION),
-            icon: text(ANNOTATION_ICON).and_then(|v| ProjectIcon::parse(&v)),
+            display_name: text(&conventions.display_name_annotation),
+            description: text(&conventions.description_annotation),
+            icon: text(&conventions.icon_annotation).and_then(|v| ProjectIcon::parse(&v)),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use zeabur_kernel::names::{ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON};
+
     use super::*;
 
     #[test]

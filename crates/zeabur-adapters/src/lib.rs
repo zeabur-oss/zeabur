@@ -8,6 +8,8 @@ pub mod operators;
 pub mod provenance;
 pub mod selector;
 
+/// The label and annotation keys and the field manager, Zeabur's by default.
+pub use zeabur_kernel::names::Conventions;
 /// The field manager (`fieldManager`) Zeabur's writes are recorded under in `managedFields`.
 pub use zeabur_kernel::names::FIELD_MANAGER;
 

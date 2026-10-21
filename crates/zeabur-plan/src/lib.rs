@@ -21,8 +21,8 @@ pub use change::{
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use plan::{
     CREATABLE, ErrorKind, Fetched, Input, PlanError, RESTARTED_AT, StorageClassInfo, creatable,
-    plan, versions,
+    plan, plan_with, versions,
 };
 pub use releases::{Release, ReleasePods};
 pub use rules::{EnvEdit, EnvValueFrom, FieldChange};
-pub use zeabur_kernel::names::GatewayRef;
+pub use zeabur_kernel::names::{Conventions, GatewayRef};

@@ -21,6 +21,9 @@ pub use health::{failing, pod_health, status};
 pub use mounts::mounts;
 pub use network::{port_protocol, ports};
 pub use pods::pods_of;
-pub use project::{endpoint, project, provenance};
+pub use project::{endpoint, project, project_with, provenance};
 pub use snapshot::Snapshot;
-pub use workload::{Workload, classify, deployment_phase, phase, replicas, summarise, workloads};
+pub use workload::{
+    Workload, classify, classify_with, deployment_phase, phase, replicas, summarise,
+    summarise_with, workloads,
+};

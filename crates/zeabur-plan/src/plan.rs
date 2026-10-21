@@ -37,7 +37,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use zeabur_adapters::provenance::{Tool, detect_tool};
 use zeabur_graph::{Snapshot, Workload, workloads};
-use zeabur_kernel::names::GatewayRef;
+use zeabur_kernel::names::{Conventions, GatewayRef};
 use zeabur_model::{HttpRoute, Project, SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{
@@ -203,6 +203,7 @@ pub(crate) struct Working {
 
 pub(crate) struct Planner<'a> {
     pub(crate) input: Input<'a>,
+    pub(crate) conventions: &'a Conventions,
     pub(crate) project: Project,
     pub(crate) objects: Vec<Working>,
     pub(crate) restarts: BTreeSet<WorkloadRef>,
@@ -217,6 +218,19 @@ pub(crate) struct Planner<'a> {
 /// When a change names something that does not exist, edits an object Helm, Argo CD or Flux
 /// manages, touches a field one of them owns, or is not valid.
 pub fn plan(input: Input<'_>, request: &PlanRequest) -> Result<Plan, PlanError> {
+    plan_with(input, request, &Conventions::ZEABUR)
+}
+
+/// [`plan`] under the labels, annotations and field manager of `conventions`.
+///
+/// # Errors
+///
+/// As [`plan`].
+pub fn plan_with(
+    input: Input<'_>,
+    request: &PlanRequest,
+    conventions: &Conventions,
+) -> Result<Plan, PlanError> {
     if request.changes.is_empty() {
         return Err(error(
             ErrorKind::BadRequest,
@@ -239,7 +253,8 @@ pub fn plan(input: Input<'_>, request: &PlanRequest) -> Result<Plan, PlanError> 
     }
     let mut planner = Planner {
         input,
-        project: zeabur_graph::project(input.snapshot),
+        conventions,
+        project: zeabur_graph::project_with(input.snapshot, conventions),
         objects: Vec::new(),
         restarts: BTreeSet::new(),
         impact: BTreeSet::new(),

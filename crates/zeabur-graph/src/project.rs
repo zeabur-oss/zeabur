@@ -7,6 +7,7 @@ use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use zeabur_adapters::Conventions;
 use zeabur_adapters::provenance::{detect_tool, managed_by};
 use zeabur_model::{
     Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin,
@@ -20,7 +21,7 @@ use crate::env::{env, env_from_in, key_count};
 use crate::mounts::mounts_in;
 use crate::network::{ports, route_rules};
 use crate::snapshot::{ByName, Snapshot, name_of};
-use crate::workload::{Workload, containers, summarise, workloads};
+use crate::workload::{Workload, containers, summarise_with, workloads};
 
 /// Which tool manages an object, from its labels and annotations.
 ///
@@ -47,12 +48,18 @@ pub fn provenance(meta: &ObjectMeta) -> Provenance {
 /// names, their containers' variables and mounts, and each resource's owners.
 #[must_use]
 pub fn project(snapshot: &Snapshot) -> Project {
+    project_with(snapshot, &Conventions::ZEABUR)
+}
+
+/// [`project`] under the labels and field manager of `conventions`.
+#[must_use]
+pub fn project_with(snapshot: &Snapshot, conventions: &Conventions) -> Project {
     let all = workloads(snapshot);
     let attribution = attribution_of(snapshot, &all, &relations_of(snapshot, &all));
     let index = Index::new(snapshot, &attribution);
     let services: Vec<Service> = all
         .into_iter()
-        .map(|workload| service(snapshot, &attribution, &index, workload))
+        .map(|workload| service(snapshot, &attribution, &index, workload, conventions))
         .collect();
     let owned = |owners: Option<&Attribution>| owners.is_some_and(|a| !a.owners.is_empty());
     let endpoints = snapshot
@@ -195,6 +202,7 @@ fn service(
     attribution: &NamespaceAttribution,
     index: &Index<'_>,
     workload: Workload<'_>,
+    conventions: &Conventions,
 ) -> Service {
     // Ephemeral containers belong to running pods, not to the workload's template.
     let mut projected: Vec<Container> = workload
@@ -209,7 +217,13 @@ fn service(
                 image: view.image.map(str::to_owned),
                 init: view.is_init(),
                 env: env(workload, name)?,
-                imported_env: env_from_in(snapshot, &index.objects, workload, name)?,
+                imported_env: env_from_in(
+                    snapshot,
+                    &index.objects,
+                    workload,
+                    name,
+                    &conventions.field_manager,
+                )?,
                 mounts: mounts_in(&index.objects, attribution, workload, name)?,
                 resources: view.resources.and_then(container_resources),
                 probes: probes(view.probes),
@@ -219,7 +233,7 @@ fn service(
         .collect();
     crate::restart::mark(snapshot, &index.objects, workload, &mut projected);
     let me = workload.reference();
-    let summary = summarise(snapshot, workload);
+    let summary = summarise_with(snapshot, workload, conventions);
     let pods = crate::pods::pods_of(snapshot, workload);
     let mut service = Service {
         id: zeabur_model::id::service(&snapshot.namespace, me.kind, &me.name),

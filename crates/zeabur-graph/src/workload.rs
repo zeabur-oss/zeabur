@@ -7,7 +7,10 @@ use k8s_openapi::api::core::v1::{
     VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_adapters::group::{DATABASES_GROUP, OPERATORS_GROUP, explicit_group, resolve_group};
+use zeabur_adapters::Conventions;
+use zeabur_adapters::group::{
+    DATABASES_GROUP, OPERATORS_GROUP, explicit_group_with, resolve_group_with,
+};
 use zeabur_adapters::operators::{database_cluster, is_operator};
 use zeabur_model::{
     Classification, ManagedBy, Origin, Phase, Replicas, WorkloadKind, WorkloadRef, WorkloadSummary,
@@ -232,9 +235,15 @@ pub(crate) fn find_container<'a>(workload: Workload<'a>, name: &str) -> Option<C
 /// ([`resolve_group`]).
 #[must_use]
 pub fn classify(workload: Workload<'_>) -> Classification {
+    classify_with(workload, &Conventions::ZEABUR)
+}
+
+/// [`classify`] with the group label of `conventions`.
+#[must_use]
+pub fn classify_with(workload: Workload<'_>, conventions: &Conventions) -> Classification {
     let meta = workload.meta();
     let labels = meta.labels.as_ref();
-    let explicit = explicit_group(labels);
+    let explicit = explicit_group_with(labels, conventions);
     if let Some(cluster) = database_cluster(meta) {
         return Classification {
             group: explicit.unwrap_or(DATABASES_GROUP).to_owned(),
@@ -259,7 +268,7 @@ pub fn classify(workload: Workload<'_>) -> Classification {
         group: if operator {
             OPERATORS_GROUP
         } else {
-            resolve_group(labels)
+            resolve_group_with(labels, conventions)
         }
         .to_owned(),
         display_name: None,
@@ -435,6 +444,16 @@ pub fn replicas(workload: Workload<'_>) -> Option<Replicas> {
 /// The workload as lists show it.
 #[must_use]
 pub fn summarise(snapshot: &Snapshot, workload: Workload<'_>) -> WorkloadSummary {
+    summarise_with(snapshot, workload, &Conventions::ZEABUR)
+}
+
+/// [`summarise`] with the group label of `conventions`.
+#[must_use]
+pub fn summarise_with(
+    snapshot: &Snapshot,
+    workload: Workload<'_>,
+    conventions: &Conventions,
+) -> WorkloadSummary {
     WorkloadSummary {
         kind: workload.kind(),
         name: workload.name().to_owned(),
@@ -443,7 +462,7 @@ pub fn summarise(snapshot: &Snapshot, workload: Workload<'_>) -> WorkloadSummary
             .namespace
             .clone()
             .unwrap_or_else(|| snapshot.namespace.clone()),
-        classification: classify(workload),
+        classification: classify_with(workload, conventions),
         phase: phase(workload),
         replicas: replicas(workload),
         image: workload
