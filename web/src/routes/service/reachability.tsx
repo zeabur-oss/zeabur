@@ -1,30 +1,47 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
+import CaretRightIcon from "~icons/ph/caret-right"
+import CaretUpDownIcon from "~icons/ph/caret-up-down"
 import ShieldPlusIcon from "~icons/ph/shield-plus"
 
 import type { Schemas } from "@/api/client"
 import { networkPresetsQuery, queryClient } from "@/api/queries"
+import { FilterField } from "@/components/filter-field"
 import { StatusPill } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
+import { Drawer } from "@zeabur/design-system/components/drawer"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
-import { useT } from "@/i18n"
-import type { Health } from "@/model/service"
-import type { Service } from "@/model/service"
-import type { PlanAsk } from "@/components/plan/planner"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { useT, type Translate } from "@/i18n"
+import { cn } from "@/lib/utils"
+import type { PlanAsk } from "@/components/plan/planner"
+import {
+  filterPeers,
+  leadOf,
+  namesShown,
+  reachSummary,
+  type Lead,
+  type Peer,
+  type PeerGroup,
+} from "@/model/reach"
+import type { Health, Service } from "@/model/service"
 
 type Access = Schemas["NetworkPolicyAccess"]
 
 const health: Record<Access, Health> = { allowed: "ok", limited: "warn", blocked: "fail" }
 
-function AccessPill({ access }: { access: Access }) {
+function AccessPill({ access, children }: { access: Access; children?: ReactNode }) {
   const t = useT()
   return (
     <StatusPill health={health[access]} size="sm">
       {t(`reach.${access}`)}
+      {children}
     </StatusPill>
   )
 }
+
+/** Below `sm` a group opens in a drawer rather than in place. */
+const narrow = () => window.matchMedia("(max-width: 39.99rem)").matches
 
 export function Reachability({
   project,
@@ -43,7 +60,10 @@ export function Reachability({
 }) {
   const t = useT()
   const [problem, setProblem] = useState<string>()
-  const name = (id: string) => services.find((s) => s.id === id)?.name ?? id.split("/").pop()
+  const [open, setOpen] = useState<Access>()
+  const [drawer, setDrawer] = useState<"rules" | "pick" | Access>()
+  const name = (id: string) => services.find((s) => s.id === id)?.name ?? id.split("/").pop() ?? id
+  const summary = reachSummary(reach, name)
   const choose = async (kind: string, from?: string) => {
     setProblem(undefined)
     try {
@@ -52,13 +72,14 @@ export function Reachability({
       )
       const preset = presets.items.find((p) => p.kind === kind && (p.from ?? undefined) === from)
       if (!preset) return
+      setDrawer(undefined)
       plan({
         title:
           kind === "isolate"
             ? t("reach.planIsolate", service.name)
             : kind === "allow-from-ingress-controller"
               ? t("reach.planAllowIngress", service.name)
-              : t("reach.planAllowFrom", name(from ?? "") ?? "", service.name),
+              : t("reach.planAllowFrom", name(from ?? ""), service.name),
         changes: [{ op: "create", object: preset.object }],
         service: { kind: service.kind, name: service.name },
       })
@@ -66,16 +87,31 @@ export function Reachability({
       setProblem(error instanceof Error ? error.message : String(error))
     }
   }
-  const others = services.filter((s) => s.id !== service.id)
+  const allow = (peer: Peer) => void choose("allow-from-service", peer.id)
+  const closed = summary.groups.filter((g) => g.access !== "allowed").flatMap((g) => g.peers)
+  const rules = reach.selectedBy
   const row =
-    "flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-rule py-2 first:border-t-0"
+    "flex flex-wrap items-start gap-x-3 gap-y-1.5 border-t border-rule py-2.5 first:border-t-0"
+  const label = "w-28 shrink-0 pt-0.5 text-muted-foreground max-sm:w-full"
+  const toggle = (access: Access) => {
+    if (narrow()) setDrawer(access)
+    else setOpen((was) => (was === access ? undefined : access))
+  }
+  const shown = drawer && drawer !== "rules" && drawer !== "pick" ? drawer : undefined
 
   return (
     <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-rules">
       <SectionHeader
         id="net-rules"
         title={t("reach.title")}
-        description={t("reach.about")}
+        count={rules.length > 0 ? t("reach.rulesApply", rules.length) : undefined}
+        description={
+          summary.open
+            ? policies.length === 0
+              ? t("reach.noPolicies")
+              : t("reach.noneSelect")
+            : leadSentence(t, service.name, leadOf(reach))
+        }
         action={
           <Menu>
             <MenuTrigger render={<Button variant="outline" size="xs" />}>
@@ -88,70 +124,291 @@ export function Reachability({
               <MenuItem onClick={() => void choose("allow-from-ingress-controller")}>
                 {t("reach.allowIngress")}
               </MenuItem>
-              {others.map((other) => (
-                <MenuItem
-                  key={other.id}
-                  onClick={() => void choose("allow-from-service", other.id)}
-                >
-                  {t("reach.allowFrom", other.name)}
-                </MenuItem>
-              ))}
+              {closed.length > 0 ? (
+                <MenuItem onClick={() => setDrawer("pick")}>{t("reach.allowFromPick")}</MenuItem>
+              ) : null}
             </MenuContent>
           </Menu>
         }
       />
-      <div className="rounded-xl border border-v2-border bg-card px-4 py-1 text-sm">
-        <div className={row}>
-          <span className="w-28 shrink-0 text-muted-foreground max-sm:w-full">
-            {t("reach.policies")}
-          </span>
-          {reach.selectedBy.length === 0 ? (
-            <span className="text-muted-foreground">
-              {policies.length === 0 ? t("reach.noPolicies") : t("reach.noneSelect")}
+      {summary.open ? null : (
+        <div className="rounded-xl border border-v2-border bg-card px-4 py-1 text-sm">
+          <div className={row}>
+            <span className={cn(label, "max-sm:hidden")}>{t("reach.policies")}</span>
+            <span className="flex min-w-0 flex-1 flex-wrap gap-1.5 max-sm:hidden">
+              {rules.map((policy) => (
+                <code
+                  key={policy}
+                  className="rounded bg-muted px-1 font-mono text-xs"
+                  translate="no"
+                >
+                  {policy}
+                </code>
+              ))}
             </span>
-          ) : (
-            reach.selectedBy.map((policy) => (
-              <code key={policy} className="rounded bg-muted px-1 font-mono text-xs" translate="no">
-                {policy}
-              </code>
-            ))
-          )}
-        </div>
-        <div className={row}>
-          <span className="w-28 shrink-0 text-muted-foreground max-sm:w-full">{t("reach.in")}</span>
-          <span className="flex items-center gap-1.5">
-            {t("reach.fromDomains")}
-            <AccessPill access={reach.fromIngressController} />
-          </span>
-          <span className="flex items-center gap-1.5">
-            {t("reach.otherProjects")}
-            <AccessPill access={reach.fromOtherNamespaces} />
-          </span>
-          {reach.fromServices.map((peer) => (
-            <span key={peer.service} className="flex items-center gap-1.5">
-              <span className="font-mono text-xs" translate="no">
-                {name(peer.service)}
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2 text-left outline-none sm:hidden"
+              onClick={() => setDrawer("rules")}
+            >
+              {t("reach.rules", rules.length)}
+              <CaretRightIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
+            </button>
+          </div>
+          <div className={row}>
+            <span className={label}>{t("reach.in")}</span>
+            <div className="flex min-w-0 flex-1 flex-col gap-1">
+              {summary.groups.map((group) =>
+                summary.few ? (
+                  <FewGroup key={group.access} group={group} />
+                ) : (
+                  <div key={group.access} className="flex flex-col gap-2">
+                    <GroupButton
+                      group={group}
+                      expanded={open === group.access}
+                      onClick={() => toggle(group.access)}
+                    />
+                    {open === group.access ? (
+                      <GroupTable
+                        group={group}
+                        onAllow={group.access === "allowed" ? undefined : allow}
+                      />
+                    ) : null}
+                  </div>
+                ),
+              )}
+              <span className="flex flex-wrap items-center gap-x-4 gap-y-1.5 py-1">
+                <span className="flex items-center gap-1.5">
+                  {t("reach.fromDomains")}
+                  <AccessPill access={reach.fromIngressController} />
+                </span>
+                <span className="flex items-center gap-1.5">
+                  {t("reach.otherProjects")}
+                  <AccessPill access={reach.fromOtherNamespaces} />
+                </span>
               </span>
-              <AccessPill access={peer.access} />
+            </div>
+          </div>
+          <div className={row}>
+            <span className={label}>{t("reach.out")}</span>
+            <span className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <span className="flex items-center gap-1.5">
+                {t("reach.dns")}
+                <AccessPill access={reach.toDns} />
+              </span>
+              <span className="flex items-center gap-1.5">
+                {t("reach.outside")}
+                <AccessPill access={reach.toOutside} />
+              </span>
             </span>
-          ))}
+          </div>
         </div>
-        <div className={row}>
-          <span className="w-28 shrink-0 text-muted-foreground max-sm:w-full">
-            {t("reach.out")}
-          </span>
-          <span className="flex items-center gap-1.5">
-            {t("reach.dns")}
-            <AccessPill access={reach.toDns} />
-          </span>
-          <span className="flex items-center gap-1.5">
-            {t("reach.outside")}
-            <AccessPill access={reach.toOutside} />
-          </span>
-        </div>
-      </div>
+      )}
       <p className="type-meta text-muted-foreground">{t("reach.cni")}</p>
       {problem ? <p className="type-meta text-fail">{problem}</p> : null}
+      <Drawer
+        open={drawer !== undefined}
+        onOpenChange={(next) => (next ? undefined : setDrawer(undefined))}
+        size="md"
+        closeLabel={t("common.close")}
+        title={
+          drawer === "rules"
+            ? t("reach.policies")
+            : drawer === "pick"
+              ? t("reach.allowFromPick")
+              : shown
+                ? `${t(`reach.${shown}`)} ${summary.groups.find((g) => g.access === shown)?.peers.length ?? 0}`
+                : undefined
+        }
+      >
+        {drawer === "rules" ? (
+          <ul className="flex flex-col divide-y divide-v2-border">
+            {rules.map((policy) => (
+              <li key={policy} className="truncate py-2.5 font-mono text-sm" translate="no">
+                {policy}
+              </li>
+            ))}
+          </ul>
+        ) : drawer === "pick" ? (
+          <PeerList peers={closed} onAllow={allow} />
+        ) : shown ? (
+          <PeerList
+            peers={summary.groups.find((g) => g.access === shown)?.peers ?? []}
+            onAllow={shown === "allowed" ? undefined : allow}
+          />
+        ) : null}
+      </Drawer>
     </section>
+  )
+}
+
+function leadSentence(t: Translate, name: string, lead: Lead): string {
+  const peers = lead.allowed + lead.limited + lead.blocked
+  const clauses: string[] = []
+  if (peers > 0)
+    clauses.push(
+      lead.allowed === 0
+        ? t("reach.lead.none", name)
+        : lead.allowed === peers
+          ? t("reach.lead.all", name)
+          : t("reach.lead.only", name, lead.allowed),
+    )
+  const by = (access: Access, servicesToo: boolean) => [
+    ...(servicesToo && lead[access] > 0 ? [t("reach.services", lead[access])] : []),
+    ...(lead.otherProjects === access ? [t("reach.lead.otherProjects")] : []),
+    ...(lead.domains === access ? [t("reach.lead.domains")] : []),
+  ]
+  // "1 service is", every other subject is plural.
+  const one = (items: string[], access: Access) =>
+    items.length === 1 && lead[access] === 1 && items[0] === t("reach.services", 1)
+  const blocked = by("blocked", lead.allowed > 0 || lead.limited > 0)
+  const limited = by("limited", true)
+  const allowed = by("allowed", false)
+  if (blocked.length > 0)
+    clauses.push(t("reach.lead.blocked", t("common.list", blocked), one(blocked, "blocked")))
+  if (limited.length > 0)
+    clauses.push(t("reach.lead.limited", t("common.list", limited), one(limited, "limited")))
+  if (allowed.length > 0) clauses.push(t("reach.lead.allowed", t("common.list", allowed), false))
+  return t("reach.lead", clauses, peers === 0)
+}
+
+/** Few peers: the verdict once, then every name. */
+function FewGroup({ group }: { group: PeerGroup }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1">
+      <AccessPill access={group.access} />
+      <span className="min-w-0 font-mono text-xs" translate="no">
+        {group.peers.map((p) => p.name).join(", ")}
+      </span>
+    </span>
+  )
+}
+
+function GroupButton({
+  group,
+  expanded,
+  onClick,
+}: {
+  group: PeerGroup
+  expanded: boolean
+  onClick: () => void
+}) {
+  const t = useT()
+  const { names, more } = namesShown(group)
+  return (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      onClick={onClick}
+      className="-mx-2 flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left outline-none hover:bg-v2-surface-hover aria-expanded:bg-v2-surface-hover"
+    >
+      <AccessPill access={group.access}>
+        <span className="tabular-nums">{group.peers.length}</span>
+      </AccessPill>
+      <span className="flex min-w-0 flex-1 items-baseline gap-1.5 max-sm:hidden">
+        <span className="min-w-0 truncate font-mono text-xs" translate="no">
+          {names.join(", ")}
+        </span>
+        {names.length > 0 && more > 0 ? (
+          <span className="shrink-0 type-meta text-muted-foreground">{t("reach.more", more)}</span>
+        ) : null}
+      </span>
+      <span className="flex-1 sm:hidden" />
+      <CaretRightIcon
+        className={cn(
+          "size-3.5 shrink-0 text-muted-foreground motion-safe:transition-transform",
+          expanded && "sm:rotate-90",
+        )}
+        aria-hidden="true"
+      />
+    </button>
+  )
+}
+
+/** A group opened in place: its peers in a bounded, filterable, sortable table. */
+function GroupTable({ group, onAllow }: { group: PeerGroup; onAllow?: (peer: Peer) => void }) {
+  const t = useT()
+  const [query, setQuery] = useState("")
+  const [descending, setDescending] = useState(false)
+  const peers = filterPeers(group.peers, query)
+  const sorted = descending ? peers.toReversed() : peers
+  return (
+    <div className="mb-2 flex flex-col gap-2">
+      <FilterField value={query} onChange={setQuery} label={t("reach.filter")} />
+      <div className="max-h-90 overflow-y-auto rounded-lg border border-v2-border">
+        <table className="w-full text-sm" aria-label={t(`reach.${group.access}`)}>
+          <thead className="sticky top-0 z-raised border-b border-v2-border bg-card">
+            <tr>
+              <th className="px-3 py-1.5 text-left type-meta font-medium text-muted-foreground">
+                <button
+                  type="button"
+                  aria-pressed={descending}
+                  onClick={() => setDescending((d) => !d)}
+                  className="inline-flex items-center gap-1 rounded outline-none hover:text-foreground"
+                >
+                  {t("reach.service")}
+                  <CaretUpDownIcon className="size-3" aria-hidden="true" />
+                </button>
+              </th>
+              {onAllow ? (
+                <th className="px-3 py-1.5">
+                  <span className="sr-only">{t("table.actions")}</span>
+                </th>
+              ) : null}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-v2-border">
+            {sorted.map((peer) => (
+              <tr key={peer.id}>
+                <td className="max-w-0 truncate px-3 py-1.5 font-mono text-xs" translate="no">
+                  {peer.name}
+                </td>
+                {onAllow ? (
+                  <td className="w-px px-3 py-1 text-right">
+                    <Button variant="ghost" size="xs" onClick={() => onAllow(peer)}>
+                      {t("reach.allow")}
+                    </Button>
+                  </td>
+                ) : null}
+              </tr>
+            ))}
+            {sorted.length === 0 ? (
+              <tr>
+                <td className="px-3 py-2 text-xs text-muted-foreground">{t("reach.noMatch")}</td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/** A drawer's list: a filter, then names, each with Allow when it is not allowed yet. */
+function PeerList({ peers, onAllow }: { peers: Peer[]; onAllow?: (peer: Peer) => void }) {
+  const t = useT()
+  const [query, setQuery] = useState("")
+  const shown = filterPeers(peers, query)
+  return (
+    <div className="flex flex-col gap-3">
+      <FilterField value={query} onChange={setQuery} label={t("reach.filter")} wide />
+      <ul className="flex flex-col divide-y divide-v2-border">
+        {shown.map((peer) => (
+          <li key={peer.id} className="flex min-h-10 items-center gap-2 py-1">
+            <span className="min-w-0 flex-1 truncate font-mono text-sm" translate="no">
+              {peer.name}
+            </span>
+            {onAllow ? (
+              <Button variant="outline" size="xs" onClick={() => onAllow(peer)}>
+                {t("reach.allow")}
+              </Button>
+            ) : null}
+          </li>
+        ))}
+        {shown.length === 0 ? (
+          <li className="py-2 text-sm text-muted-foreground">{t("reach.noMatch")}</li>
+        ) : null}
+      </ul>
+    </div>
   )
 }

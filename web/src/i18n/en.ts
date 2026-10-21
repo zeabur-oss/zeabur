@@ -604,7 +604,6 @@ export const en = {
   "net.scheduledTitle": (name: string) => `${name} doesn't receive traffic`,
   "net.scheduledBody":
     "A job runs and exits, so nothing connects to it. It can still connect to other services and the internet.",
-  "reach.about": "Which connections to and from this service the cluster allows.",
   "reach.fromDomains": "Public domains",
   "net.anyHost": "Any host",
   "net.defaultBackend": "Default backend",
@@ -1172,7 +1171,6 @@ export const en = {
   "reach.addPolicy": "Add rule",
   "reach.isolate": "Isolate this service",
   "reach.allowIngress": "Allow traffic from public domains",
-  "reach.allowFrom": (name: string) => `Allow from ${name}`,
   "reach.planIsolate": (name: string) => `Isolate ${name}`,
   "reach.planAllowIngress": (name: string) => `Let public domains reach ${name}`,
   "reach.planAllowFrom": (from: string, to: string) => `Let ${from} reach ${to}`,
@@ -1190,6 +1188,29 @@ export const en = {
   "reach.blocked": "Blocked",
   "reach.edgeBlocked": "Blocked by a connection rule",
   "reach.edgeLimited": "Only partly allowed by connection rules",
+  "reach.allowFromPick": "Allow from a service…",
+  "reach.rulesApply": (n: number) => plural(n, "rule applies", "rules apply"),
+  "reach.rules": (n: number) => plural(n, "rule", "rules"),
+  "reach.lead": (clauses: string[], capital: boolean) => {
+    const text = clauses.join("; ")
+    return `${capital ? text.charAt(0).toUpperCase() + text.slice(1) : text}.`
+  },
+  "reach.lead.none": (name: string) => `${name} accepts no other service`,
+  "reach.lead.all": (name: string) => `${name} accepts every service in the project`,
+  "reach.lead.only": (name: string, n: number) =>
+    `${name} accepts only ${plural(n, "service", "services")}`,
+  "reach.services": (n: number) => plural(n, "service", "services"),
+  "reach.lead.otherProjects": "other projects",
+  "reach.lead.domains": "public domains",
+  "reach.lead.blocked": (list: string, one: boolean) => `${list} ${one ? "is" : "are"} blocked`,
+  "reach.lead.limited": (list: string, one: boolean) =>
+    `${list} ${one ? "is" : "are"} partly allowed`,
+  "reach.lead.allowed": (list: string, one: boolean) => `${list} ${one ? "is" : "are"} allowed`,
+  "reach.more": (n: number) => `+${n} more`,
+  "reach.filter": "Filter services",
+  "reach.service": "Service",
+  "reach.allow": "Allow",
+  "reach.noMatch": "No service matches.",
   "backups.title": "Backups",
   "backups.namespace": "All objects in the namespace",
   "backups.unscheduled": "No schedule",
