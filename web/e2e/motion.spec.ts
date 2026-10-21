@@ -72,6 +72,43 @@ const properties = (seen: Frame[]) =>
 const longest = (seen: Frame[]) =>
   Math.max(0, ...seen.flatMap((f) => f.animations.map((a) => a.duration)))
 
+/** Every animation the document runs from just before `act` until `ms` after it, view transitions included. */
+async function documentAnimations(page: Page, act: () => Promise<void>, ms = 700) {
+  await page.evaluate((ms) => {
+    const seen = new Set<string>()
+    ;(window as unknown as { documentSeen: Set<string> }).documentSeen = seen
+    const start = performance.now()
+    const tick = () => {
+      for (const animation of document.getAnimations()) {
+        const effect = animation.effect as KeyframeEffect | null
+        if (!(animation instanceof CSSAnimation) || !effect?.pseudoElement) continue
+        seen.add(
+          `${effect.pseudoElement} ${animation.animationName} ${effect.getTiming().duration}`,
+        )
+      }
+      if (performance.now() - start < ms) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+  }, ms)
+  await act()
+  await page.waitForTimeout(ms + 100)
+  return page.evaluate(() => [...(window as unknown as { documentSeen: Set<string> }).documentSeen])
+}
+
+async function openService(page: Page) {
+  await page.goto(`${project}/services/Deployment/${healthy}`)
+  await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible()
+  await page.waitForFunction(() =>
+    document
+      .getAnimations()
+      .every(
+        (a) => !(a.effect as KeyframeEffect | null)?.pseudoElement?.includes("view-transition"),
+      ),
+  )
+  const sections = page.getByRole("navigation", { name: "Project sections" })
+  return sections.getByRole("link", { name: new RegExp(`^${failing}\\b`) })
+}
+
 const palette = '[role="dialog"]'
 const quickLook = 'aside[aria-label^="Quick look"]'
 
@@ -167,6 +204,49 @@ test("a popover and a disclosure move on the popup and collapse timings", async 
   )
 })
 
+test("moving to another service fades the main panel only, on the page timings", async ({
+  page,
+}) => {
+  const other = await openService(page)
+  const seen = await documentAnimations(page, () => other.click())
+  expect(seen).toEqual(
+    expect.arrayContaining([
+      "::view-transition-new(page) page-in 250",
+      "::view-transition-old(page) page-out 150",
+    ]),
+  )
+  // The frame and the sidebar around it stay still.
+  expect(seen.filter((a) => a.includes("(root)"))).toEqual([])
+})
+
+test("a tab swaps its panel with a quick fade and no page transition", async ({ page }) => {
+  await openService(page)
+  const panel = '[role="tabpanel"]:not([hidden])'
+  const tab = page.getByRole("tab", { name: "Deployments" })
+  let swapped: Frame[] = []
+  const seen = await documentAnimations(page, async () => {
+    swapped = await frames(page, panel, () => tab.click(), 400)
+  })
+  expect(seen).toEqual([])
+  expect(timings(swapped)).toEqual(expect.arrayContaining([`opacity 150 ${curve}`]))
+})
+
+test("the service's menu opens on the popup timings", async ({ page }) => {
+  await openService(page)
+  const more = page
+    .locator("main header")
+    .first()
+    .getByRole("button", { name: "More", exact: true })
+  const menu = '[data-slot="menu-content"]'
+  const opening = await frames(page, menu, () => more.click())
+  expect(timings(opening)).toEqual(
+    expect.arrayContaining([`opacity 250 ${curve}`, `scale 250 ${curve}`]),
+  )
+  const closing = await frames(page, menu, () => page.keyboard.press("Escape"))
+  expect(timings(closing)).toEqual(expect.arrayContaining([`opacity 150 ${curve}`]))
+  expect(closing.at(-1)!.present).toBe(false)
+})
+
 test("Home does not shift as it loads", async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as { shifted: number }
@@ -187,6 +267,13 @@ test("Home does not shift as it loads", async ({ page }) => {
 
 test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" })
+
+  test("another service only fades in, within 150ms", async ({ page }) => {
+    const other = await openService(page)
+    const seen = await documentAnimations(page, () => other.click())
+    expect(seen).toEqual(expect.arrayContaining(["::view-transition-new(page) page-fade-in 150"]))
+    expect(seen.some((a) => a.includes(" page-in "))).toBe(false)
+  })
 
   test("the palette only fades, and its close still waits", async ({ page }) => {
     await openPaletteOnce(page)
