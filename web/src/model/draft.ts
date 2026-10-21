@@ -29,6 +29,15 @@ export function partOf(change: Change): DraftPart | undefined {
   }
 }
 
+/** The parts in the order of the tabs. */
+export const partOrder: DraftPart[] = [
+  "networking",
+  "variables",
+  "compute",
+  "health-checks",
+  "storage",
+]
+
 /** Whether every change of an ask waits in the draft rather than being planned at once. */
 export const draftable = (changes: readonly Change[]) =>
   changes.length > 0 && changes.every((c) => partOf(c) !== undefined)

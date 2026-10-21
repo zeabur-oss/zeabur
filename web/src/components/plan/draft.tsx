@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { Schemas } from "@/api/client"
 import type { PlanAsk } from "@/components/plan/planner"
 import { useT, type Translate } from "@/i18n"
-import { draftable, dropChanges, editCount, mergeChanges, partOf } from "@/model/draft"
+import { draftable, dropChanges, editCount, mergeChanges, partOf, partOrder } from "@/model/draft"
 import type { DraftPart } from "@/routes/search"
 
 /** Which staged changes a form's edits stand in for: these ops, of this workload (and probe). */
@@ -135,5 +135,3 @@ export const describeDraft = (t: Translate, draft: Pick<Draft, "parts">) =>
     "common.list",
     partOrder.filter((p) => draft.parts.includes(p)).map((p) => t(`part.${p}`)),
   )
-
-const partOrder: DraftPart[] = ["networking", "variables", "compute", "health-checks", "storage"]

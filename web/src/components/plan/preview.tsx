@@ -45,32 +45,68 @@ function Line({ health, children }: { health: Health; children: ReactNode }) {
 /** A variable removed by name, which the plan's sentence already names. */
 const envEntry = /\.env\[name=[^\]]+\]/
 
-/** What the plan does to running pods beyond one plain roll, which its sentences already say. */
-export function PlanPreview({
-  preview,
-  warnedClaims = [],
-}: {
-  preview: Preview
-  /** Deleted claims a plan warning already describes, with the volume's reclaim policy. */
-  warnedClaims?: string[]
-}) {
+/** Whether a rollout says more than the sentences: a strategy other than one replica at a time. */
+const tellsMore = (r: Rollout) => r.strategy === "Recreate" || r.strategy === "OnDelete"
+
+/** Why the plan's new pods do not fit, one sentence per blocker; empty when they do. */
+export function useBlockers(fit: Schemas["Fit"]): string[] {
   const t = useT()
   const { cores, memory } = useQuantityFormat()
-  const { rollouts, fit } = preview
-  const removals = preview.removals.filter((r) => r.leftOutOfEdit || !envEntry.test(r.path))
-  const dataLoss = preview.dataLoss.filter(
-    (loss) => !(loss.kind === "claimDeleted" && loss.claim && warnedClaims.includes(loss.claim)),
-  )
   const amount = (resource: string, value: number) =>
     resource.endsWith("cpu")
       ? t("preview.cores", cores(value))
       : resource.endsWith("memory")
         ? memory(value)
         : String(value)
+  if (fit.status !== "blocked") return []
+  return (fit.blockers ?? []).map((b) =>
+    t(
+      b.kind === "quota" ? "preview.blockedQuota" : "preview.blockedNodes",
+      b.name ?? "",
+      b.resource,
+      amount(b.resource, b.need),
+      amount(b.resource, b.available),
+    ),
+  )
+}
+
+/** What the plan does to running pods beyond what its sentences or rows already say. */
+export function PlanPreview({
+  preview,
+  warnedClaims = [],
+  said = [],
+  rollouts: showRollouts = true,
+  removals: showRemovals = true,
+}: {
+  preview: Preview
+  /** Deleted claims a plan warning already describes, with the volume's reclaim policy. */
+  warnedClaims?: string[]
+  /** Workloads the sentences already speak of; their plain roll is not said again. */
+  said?: readonly Schemas["WorkloadRef"][]
+  /** False where a table already says what happens to each service. */
+  rollouts?: boolean
+  /** False where the rows already list the removed fields. */
+  removals?: boolean
+}) {
+  const t = useT()
+  const { cores, memory } = useQuantityFormat()
+  const { fit } = preview
+  const isSaid = (r: Rollout) =>
+    said.some((w) => w.kind === r.workload.kind && w.name === r.workload.name)
+  const rollouts = showRollouts
+    ? preview.rollouts
+        .filter((r) => tellsMore(r) || !isSaid(r))
+        .toSorted((a, b) => Number(b.downtime) - Number(a.downtime))
+    : []
+  const removals = showRemovals
+    ? preview.removals.filter((r) => r.leftOutOfEdit || !envEntry.test(r.path))
+    : []
+  const dataLoss = preview.dataLoss.filter(
+    (loss) => !(loss.kind === "claimDeleted" && loss.claim && warnedClaims.includes(loss.claim)),
+  )
   return (
-    <div className="flex flex-col gap-3">
-      {rollouts.length > 1 ||
-      rollouts.some((r) => r.downtime || r.actions.some((action) => action !== "roll")) ? (
+    <div className="flex flex-col gap-3 empty:hidden">
+      {rollouts.length > 0 ? (
         <section aria-label={t("preview.restarts")} className="flex flex-col gap-1.5">
           <h3 className="type-meta font-medium text-muted-foreground">{t("preview.restarts")}</h3>
           <ul className="flex flex-col gap-1.5">
@@ -98,20 +134,6 @@ export function PlanPreview({
               memory(fit.memoryBytes),
             )}
           </Line>
-        </ul>
-      ) : fit.status === "blocked" ? (
-        <ul className="flex flex-col gap-1.5" aria-label={t("preview.blocked")}>
-          {(fit.blockers ?? []).map((b) => (
-            <Line key={`${b.kind}/${b.name ?? ""}/${b.resource}`} health="fail">
-              {t(
-                b.kind === "quota" ? "preview.blockedQuota" : "preview.blockedNodes",
-                b.name ?? "",
-                b.resource,
-                amount(b.resource, b.need),
-                amount(b.resource, b.available),
-              )}
-            </Line>
-          ))}
         </ul>
       ) : fit.status === "unknown" ? (
         <ul>

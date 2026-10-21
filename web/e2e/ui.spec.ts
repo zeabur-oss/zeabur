@@ -653,9 +653,9 @@ test("variables are edited, added by pasting lines, and saved as one plan", asyn
   await page.getByRole("button", { name: "Save", exact: true }).click()
   await confirmPlan(
     page,
-    `Change ${editor}`,
+    `Save changes to ${editor}`,
     "Save variables",
-    `Set NOTE, E2E_ADDED, E2E_QUOTED, and E2E_FIXED on ${editor}.`,
+    `Change NOTE and add E2E_ADDED, E2E_QUOTED, and E2E_FIXED on ${editor}.`,
   )
   await expect(panel).toContainText("E2E_QUOTED", { timeout: 15_000 })
   await expect(panel).toContainText("two words")
@@ -680,9 +680,9 @@ test("variables are removed with an undo and rewritten as .env, in one plan", as
   await page.getByRole("button", { name: "Save", exact: true }).click()
   await confirmPlan(
     page,
-    `Change ${editor}`,
+    `Save changes to ${editor}`,
     "Save variables",
-    `Set E2E_DOTENV and E2E_MULTI and remove E2E_ADDED on ${editor}.`,
+    `Remove E2E_ADDED and add E2E_DOTENV and E2E_MULTI on ${editor}.`,
   )
   await expect(panel).toContainText("E2E_DOTENV", { timeout: 15_000 })
   await expect(panel).not.toContainText("E2E_ADDED")
@@ -714,7 +714,7 @@ test("a ConfigMap value is edited where it lives, its key highlighted", async ({
   await review(page)
   await confirmPlan(
     page,
-    `Change ${editor}`,
+    `Save changes to ${editor}`,
     "Save values",
     `${editor} reads editor-config and keeps the old value until restarted.`,
   )
@@ -747,8 +747,8 @@ test("a change made meanwhile is refused in a toast, and Review again plans it a
   await panel.getByRole("textbox", { name: "Name", exact: true }).last().fill("E2E_REVIEWED")
   await panel.getByRole("textbox", { name: "Value of E2E_REVIEWED" }).fill("reviewed-1")
   await page.getByRole("button", { name: "Save", exact: true }).click()
-  const dialog = page.getByRole("dialog", { name: `Change ${editor}` })
-  await expect(dialog).toContainText("Set E2E_REVIEWED")
+  const dialog = page.getByRole("dialog", { name: `Save changes to ${editor}` })
+  await expect(dialog).toContainText("Add E2E_REVIEWED")
   await applyNow(page, {
     op: "env",
     workload: { kind: "Deployment", name: editor },
@@ -760,7 +760,7 @@ test("a change made meanwhile is refused in a toast, and Review again plans it a
   const refused = toast(page, "changed after you reviewed it")
   await expect(refused).toBeVisible({ timeout: 15_000 })
   await refused.getByRole("button", { name: "Review again" }).click()
-  await confirmPlan(page, `Change ${editor}`, "Save variables", "Set E2E_REVIEWED")
+  await confirmPlan(page, `Save changes to ${editor}`, "Save variables", "Add E2E_REVIEWED")
   await expect(panel).toContainText("E2E_REVIEWED", { timeout: 15_000 })
 })
 
@@ -775,7 +775,7 @@ test("scaling goes through a plan from Compute, and is undone from its toast", a
   await review(page)
   const applied = await confirmPlan(
     page,
-    `Change ${editor}`,
+    `Save changes to ${editor}`,
     `Scale to ${more}`,
     `Scale ${editor} from ${before} to ${more} replicas.`,
   )
@@ -795,7 +795,7 @@ test("a readiness probe is set through a plan", async ({ page }) => {
   await review(page)
   await confirmPlan(
     page,
-    `Change ${editor}`,
+    `Save changes to ${editor}`,
     "Save health checks",
     "A replica gets no traffic until running true succeeds (checked every 10 s).",
   )
@@ -814,7 +814,7 @@ test("volumes are added, changed and removed in one list under Storage", async (
     .last()
     .fill("/e2e-cache")
   await page.getByRole("button", { name: "Save", exact: true }).click()
-  await confirmPlan(page, `Change ${editor}`, "Save volumes", `${editor} gets a new`)
+  await confirmPlan(page, `Save changes to ${editor}`, "Save volumes", `${editor} gets a new`)
   await expect(list.getByText("/e2e-cache")).toBeVisible({ timeout: 15_000 })
 
   await part.getByRole("button", { name: "Edit", exact: true }).click()
@@ -823,7 +823,7 @@ test("volumes are added, changed and removed in one list under Storage", async (
   await list.getByRole("button", { name: "Remove /e2e-cache" }).click()
   await expect(list).toContainText("Removed")
   await page.getByRole("button", { name: "Save", exact: true }).click()
-  await confirmPlan(page, `Change ${editor}`, "Save volumes", "stops mounting /e2e-cache")
+  await confirmPlan(page, `Save changes to ${editor}`, "Save volumes", "stops mounting /e2e-cache")
   await expect(list.getByText("/e2e-cache")).toHaveCount(0, { timeout: 15_000 })
   await expect(list.getByText("/e2e-data")).toBeVisible()
   await expect(list.getByRole("listitem").filter({ hasText: "/e2e-data" })).toContainText(

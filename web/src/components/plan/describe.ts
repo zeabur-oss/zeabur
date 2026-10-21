@@ -1,11 +1,25 @@
 import type { Schemas } from "@/api/client"
 import type { Locale, Translate } from "@/i18n"
+import {
+  bounded,
+  countRows,
+  editGroups,
+  FEW,
+  isBulk,
+  outcomeGroups,
+  type EditGroup,
+  type MountsOf,
+  type OutcomeGroup,
+} from "@/components/plan/groups"
+import { editCount, partOf } from "@/model/draft"
 import { problemText } from "@/model/problem"
-import { isolates, type PodsOf, type Reason } from "@/model/risk"
+import { isolates, undoOf, type PodsOf, type Reason } from "@/model/risk"
 
 type Change = Schemas["Change"]
 type WorkloadRef = Schemas["WorkloadRef"]
-type Plan = Pick<Schemas["PlanResponse"], "objects" | "impact" | "warnings">
+type Plan = Pick<Schemas["PlanResponse"], "objects" | "impact" | "warnings"> & {
+  preview?: Schemas["Preview"]
+}
 
 const workloadKinds = new Set(["Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"])
 
@@ -32,29 +46,60 @@ function rolling(t: Translate, workload: WorkloadRef, podsOf: PodsOf, restart: b
   return restart ? t("confirm.restartNone", workload.name) : t("confirm.rollingNone", workload.name)
 }
 
-export function sentenceOf(t: Translate, change: Change, podsOf: PodsOf): string {
-  const list = (items: string[]) => t("common.list", items)
+/** The plan's field changes of one object. */
+const fieldsOf = (plan: Pick<Plan, "objects"> | undefined, kind: string, name: string) =>
+  plan?.objects.find((o) => o.target.kind === kind && o.target.name === name)?.changes ?? []
+
+/** Whether the plan's fields under an entry (`env[name=A]`, `data.A`) are all new. */
+function isNew(
+  fields: readonly Schemas["FieldChange"][],
+  under: (path: string) => boolean,
+): boolean {
+  const own = fields.filter((f) => under(f.path))
+  return own.length > 0 && own.every((f) => f.before === undefined || f.before === null)
+}
+
+const below = (path: string, entry: string) => path === entry || path.startsWith(`${entry}.`)
+
+/** Removed, added and changed names: the riskiest first. */
+function sorted<E extends { op: string }>(
+  edits: readonly E[],
+  nameOf: (edit: E) => string,
+  added: (name: string) => boolean,
+): [string[], string[], string[]] {
+  const removed = edits.filter((e) => e.op === "remove").map(nameOf)
+  const set = edits.filter((e) => e.op !== "remove").map(nameOf)
+  return [removed, set.filter(added), set.filter((n) => !added(n))]
+}
+
+function sentenceOf(
+  t: Translate,
+  change: Change,
+  podsOf: PodsOf,
+  plan?: Pick<Plan, "objects">,
+): string {
+  const list = (items: string[]) => (items.length > 0 ? t("common.list", items) : "")
   switch (change.op) {
     case "restart":
       return rolling(t, change.workload, podsOf, true)
     case "env": {
-      const set = change.changes.filter((e) => e.op !== "remove").map((e) => e.name)
-      const removed = change.changes.filter((e) => e.op === "remove").map((e) => e.name)
-      const name = change.workload.name
-      if (set.length > 0 && removed.length > 0)
-        return t("confirm.envBoth", list(set), list(removed), name)
-      return removed.length > 0
-        ? t("confirm.envRemove", list(removed), name)
-        : t("confirm.envSet", list(set), name)
+      const fields = fieldsOf(plan, change.workload.kind, change.workload.name)
+      const [removed, added, changed] = sorted(
+        change.changes,
+        (e) => e.name,
+        (name) => isNew(fields, (path) => path.includes(`.env[name=${name}]`)),
+      )
+      return t("confirm.env", list(removed), list(added), list(changed), change.workload.name)
     }
     case "data": {
-      const set = change.changes.filter((e) => e.op !== "remove").map((e) => e.key)
-      const removed = change.changes.filter((e) => e.op === "remove").map((e) => e.key)
-      if (removed.length > 0)
-        return set.length > 0
-          ? t("confirm.dataBoth", list(set), list(removed), change.kind, change.name)
-          : t("confirm.dataRemove", list(removed), change.kind, change.name)
-      return t("confirm.dataSet", list(set), change.kind, change.name)
+      const fields = fieldsOf(plan, change.kind, change.name)
+      const [removed, added, changed] = sorted(
+        change.changes,
+        (e) => e.key,
+        (key) =>
+          isNew(fields, (path) => below(path, `data.${key}`) || below(path, `stringData.${key}`)),
+      )
+      return t("confirm.data", list(removed), list(added), list(changed), change.kind, change.name)
     }
     case "addDomain":
       return t("confirm.addDomain", change.hostname, change.workload.name)
@@ -93,7 +138,12 @@ export function sentenceOf(t: Translate, change: Change, podsOf: PodsOf): string
         : t("confirm.scale", change.workload.name, from, change.replicas)
     }
     case "resources":
-      return resourcesSentence(t, change.requests, change.limits)
+      return resourcesSentence(
+        t,
+        change.requests ?? undefined,
+        change.limits ?? undefined,
+        fieldsOf(plan, change.workload.kind, change.workload.name),
+      )
     case "edit":
       return t("confirm.yamlAsIs")
     case "create": {
@@ -139,20 +189,39 @@ function probeSentence(
   return t(`confirm.probeSet.${probe}`, check, period, failures)
 }
 
+/** Each value set, with what it was ("100m → 250m"); one the change drops, as no longer set. */
 function resourcesSentence(
   t: Translate,
   requests: Record<string, string> = {},
   limits: Record<string, string> = {},
+  fields: readonly Schemas["FieldChange"][] = [],
 ): string {
   const labels: Record<string, [string, string]> = {
     cpu: [t("form.cpuRequest"), t("form.cpuLimit")],
     memory: [t("form.memoryRequest"), t("form.memoryLimit")],
   }
+  const before = (bound: string, resource: string) =>
+    fields.find((f) => f.path.endsWith(`.resources.${bound}.${resource}`))?.before ?? undefined
   const pairs: [string, string][] = []
-  for (const [resource, value] of Object.entries(requests))
-    pairs.push([labels[resource]?.[0] ?? resource, value])
-  for (const [resource, value] of Object.entries(limits))
-    pairs.push([labels[resource]?.[1] ?? resource, value])
+  const shown = (bound: "requests" | "limits", values: Record<string, string>) => {
+    const index = bound === "requests" ? 0 : 1
+    for (const [resource, value] of Object.entries(values)) {
+      const was = before(bound, resource)
+      pairs.push([
+        labels[resource]?.[index] ?? resource,
+        was && was !== value ? `${was} → ${value}` : value,
+      ])
+    }
+    for (const field of fields) {
+      const match = new RegExp(`\\.resources\\.${bound}\\.([^.]+)$`).exec(field.path)
+      const resource = match?.[1]
+      if (!resource || resource in values || typeof field.after === "string") continue
+      if (typeof field.before !== "string") continue
+      pairs.push([labels[resource]?.[index] ?? resource, `${field.before} → ${t("form.notSet")}`])
+    }
+  }
+  shown("requests", requests)
+  shown("limits", limits)
   return t("confirm.resources", pairs)
 }
 
@@ -175,10 +244,27 @@ function consequence(t: Translate, reason: Reason, service?: WorkloadRef): strin
   }
 }
 
+interface Fact {
+  text: string
+  tone?: "ok" | "warn"
+}
+
 export interface Description {
   consequence?: string
+  /** For several changes of high risk: what they put at risk, together. */
+  risk?: string
   lines: string[]
+  /** The full names behind a line's "and N more", by line. */
+  more: Record<string, string[]>
   action: string
+  /** The workloads whose replicas the lines or the facts already speak of. */
+  said: WorkloadRef[]
+  /** What it costs beyond the lines: whether data stays, whether it can be undone. */
+  cost?: string
+  /** For many changes: the conclusion, kept in view above the groups. */
+  facts?: Fact[]
+  edits?: EditGroup[]
+  outcomes?: OutcomeGroup[]
 }
 
 export interface Asked {
@@ -193,33 +279,57 @@ export function describe(
   plan: Plan,
   podsOf: PodsOf,
   reasons: readonly Reason[] = [],
+  mountsOf: MountsOf = () => [],
 ): Description {
-  const list = (items: string[]) => t("common.list", items)
+  const more: Record<string, string[]> = {}
+  const named = (names: string[], sentence: (list: string) => string) => {
+    const { text, rest } = bounded(t, names)
+    const line = sentence(text)
+    if (rest.length > 0) more[line] = names
+    return line
+  }
+  const many = editCount(ask.changes) > FEW
+  const outcomes =
+    many && isBulk(ask.changes) ? outcomeGroups(t, ask.changes, plan, podsOf, mountsOf) : undefined
+  const fields = many && !outcomes ? editGroups(t, plan) : []
+  const edits = fields.length > 0 ? fields : undefined
   const lines: string[] = []
   const said: WorkloadRef[] = []
   const consequences = reasons
     .map((r) => consequence(t, r, ask.service))
     .filter((s): s is string => !!s)
   for (const change of ask.changes) {
-    lines.push(sentenceOf(t, change, podsOf))
     if (change.op === "restart") said.push(change.workload)
+    // Grouped, the rows say what variables, compute and health checks change.
+    if (outcomes) continue
+    const part = partOf(change)
+    if (edits && (part === "variables" || part === "compute" || part === "health-checks")) continue
+    lines.push(sentenceOf(t, change, podsOf, plan))
   }
+  if (edits && ask.service) said.push(ask.service)
   lines.push(...terminalLines(t, plan))
   if (ask.changes.some((c) => c.op === "rollback") && hasWarning(plan, "configNotRolledBack"))
     lines.push(t("confirm.notRolledBack"))
   for (const workload of replaced(plan))
-    if (!said.some((w) => same(w, workload))) lines.push(rolling(t, workload, podsOf, false))
+    if (!said.some((w) => same(w, workload))) {
+      lines.push(rolling(t, workload, podsOf, false))
+      said.push(workload)
+    }
+  for (const change of ask.changes) if (change.op === "scale") said.push(change.workload)
   const waiting = plan.warnings.flatMap((w) => (w.code === "restartNeeded" ? w.workloads : []))
+  said.push(...waiting)
   const data = ask.changes.find((c) => c.op === "data")
   const dataName = data?.op === "data" ? data.name : undefined
-  if (waiting.length > 0) {
-    const names = list(waiting.map((w) => w.name))
+  if (waiting.length > 0)
     lines.push(
-      dataName
-        ? t("confirm.readersKeepOld", names, dataName, waiting.length)
-        : t("confirm.keepsOld", names, waiting.length),
+      named(
+        waiting.map((w) => w.name),
+        (names) =>
+          dataName
+            ? t("confirm.readersKeepOld", names, dataName, waiting.length)
+            : t("confirm.keepsOld", names, waiting.length),
+      ),
     )
-  }
   // A deleted workload gets its own sentence, not an "also affects" one.
   const deleted = ask.changes.flatMap((c) => (c.op === "delete" ? [c.name] : []))
   const others = plan.impact.filter(
@@ -229,19 +339,146 @@ export function describe(
       !replaced(plan).some((r) => same(r, w)) &&
       !waiting.some((r) => same(r, w)),
   )
-  if (others.length > 0 && !ask.changes.some((c) => c.op === "restart" || c.op === "scale")) {
-    const names = list(others.map((w) => w.name))
+  if (others.length > 0 && !ask.changes.some((c) => c.op === "restart" || c.op === "scale"))
     lines.push(
-      dataName
-        ? t("confirm.alsoReads", names, dataName, others.length)
-        : t("confirm.alsoAffects", names),
+      named(
+        others.map((w) => w.name),
+        (names) =>
+          dataName
+            ? t("confirm.alsoReads", names, dataName, others.length)
+            : t("confirm.alsoAffects", names),
+      ),
     )
-  }
   return {
     consequence: consequences.length > 0 ? consequences.join(" ") : undefined,
+    risk: ask.changes.length > 1 ? riskOf(t, reasons, ask, podsOf, named) : undefined,
     lines,
+    more,
     action: actionOf(t, ask, plan),
+    said,
+    cost: costOf(t, ask, plan, podsOf, mountsOf),
+    facts: outcomes
+      ? outcomeFacts(t, outcomes, plan)
+      : edits
+        ? editFacts(t, edits, ask, plan, podsOf)
+        : undefined,
+    edits,
+    outcomes,
   }
+}
+
+type Named = (names: string[], sentence: (list: string) => string) => string
+
+/** What several high-risk changes put at risk, one sentence per reason. */
+function riskOf(
+  t: Translate,
+  reasons: readonly Reason[],
+  ask: Asked,
+  podsOf: PodsOf,
+  named: Named,
+): string | undefined {
+  const sentences = reasons.map((reason) => {
+    switch (reason) {
+      case "fewPods": {
+        const few = ask.changes.flatMap((c) =>
+          c.op === "restart" && (podsOf(c.workload)?.ready ?? 0) < 2 ? [c.workload.name] : [],
+        )
+        return named(few, (names) => t("risk.fewPods", names, few.length))
+      }
+      case "scaleToZero": {
+        const stopped = ask.changes.flatMap((c) =>
+          c.op === "scale" && c.replicas === 0 ? [c.workload.name] : [],
+        )
+        return named(stopped, (names) => t("risk.scaleToZero", names, stopped.length))
+      }
+      case "deletesKeys":
+        return t("risk.deletesKeys")
+      case "rollback":
+        return t("risk.rollback")
+      case "storage":
+        return t("risk.storage")
+      case "yamlEdit":
+        return t("confirm.yamlAsIs")
+      case "removesDomain":
+        return t("risk.removesDomain")
+      case "isolates":
+        return t("confirm.isolates", ask.service?.name ?? "")
+      case "deletes":
+        return t("risk.deletes")
+    }
+  })
+  return sentences.length > 0 ? sentences.join(" ") : undefined
+}
+
+/** Whether data stays and whether it can be undone, where that is not obvious. */
+function costOf(
+  t: Translate,
+  ask: Asked,
+  plan: Plan,
+  podsOf: PodsOf,
+  mountsOf: MountsOf,
+): string | undefined {
+  const parts: string[] = []
+  const touched = ask.changes.flatMap((c) =>
+    c.op === "restart" || c.op === "scale" ? [c.workload] : [],
+  )
+  const keeping = touched.filter((w) => mountsOf(w).length > 0)
+  const [one] = keeping
+  if (one && (plan.preview?.dataLoss.length ?? 0) === 0)
+    parts.push(
+      touched.length === 1
+        ? t("plan.cost.dataStaysOne", one.name, t("common.list", mountsOf(one)))
+        : t("plan.cost.dataStays", keeping.length),
+    )
+  if (undoOf(ask.changes, podsOf)) parts.push(t("plan.cost.undo"))
+  return parts.length > 0 ? parts.join(" ") : undefined
+}
+
+function fitFact(t: Translate, plan: Plan): Fact[] {
+  return plan.preview?.fit.status === "fits" ? [{ text: t("plan.fact.fits"), tone: "ok" }] : []
+}
+
+function outcomeFacts(t: Translate, groups: readonly OutcomeGroup[], plan: Plan): Fact[] {
+  return [
+    ...groups.map((g): Fact => ({
+      text: t(`plan.outcome.${g.outcome}.count`, g.rows.length),
+      tone: g.outcome === "up" || g.outcome === "starts" ? undefined : "warn",
+    })),
+    ...fitFact(t, plan),
+  ]
+}
+
+function editFacts(
+  t: Translate,
+  groups: readonly EditGroup[],
+  ask: Asked,
+  plan: Plan,
+  podsOf: PodsOf,
+): Fact[] {
+  const counts = countRows(groups)
+  const facts: Fact[] = []
+  if (counts.removed > 0) facts.push({ text: t("plan.fact.removed", counts.removed), tone: "warn" })
+  if (counts.changed > 0) facts.push({ text: t("plan.fact.changed", counts.changed) })
+  if (counts.added > 0) facts.push({ text: t("plan.fact.added", counts.added) })
+  const scale = ask.changes.find((c) => c.op === "scale")
+  if (scale?.op === "scale") {
+    const from = podsOf(scale.workload)?.desired
+    if (from !== undefined && from !== scale.replicas)
+      facts.push({ text: t("plan.fact.replicas", from, scale.replicas) })
+  }
+  const service = ask.service
+  const rollout = service
+    ? plan.preview?.rollouts.find((r) => same(r.workload, service))
+    : undefined
+  if (rollout && rollout.actions.some((a) => a === "roll" || a === "scale"))
+    facts.push(
+      rollout.downtime
+        ? { text: t("plan.fact.downBriefly"), tone: "warn" }
+        : rollout.replicas === 0
+          ? { text: t("plan.fact.stops"), tone: "warn" }
+          : { text: t("plan.fact.staysUp") },
+    )
+  return [...facts, ...fitFact(t, plan)]
 }
 
 const minutes = (seconds: number) => Math.max(1, Math.ceil(seconds / 60))
@@ -275,6 +512,17 @@ function hasWarning(plan: Plan, code: Schemas["PlanWarning"]["code"]): boolean {
   return plan.warnings.some((w) => w.code === code)
 }
 
+/** The undo toast's title: the one change's sentence, or what the many do, counted. */
+export function undoTitle(t: Translate, undo: readonly Change[], asked: readonly Change[]): string {
+  const [one] = undo
+  if (one && undo.length === 1) return sentenceOf(t, one, () => undefined)
+  if (undo.every((c) => c.op === "scale"))
+    return asked.every((c) => c.op === "scale" && c.replicas === 0)
+      ? t("undo.scaleUp", undo.length)
+      : t("undo.scaleBack", undo.length)
+  return t("undo.many", undo.length)
+}
+
 const storageOps = new Set<Change["op"]>(["addVolume", "expandVolume", "editMount", "removeVolume"])
 
 export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
@@ -283,14 +531,13 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
   if (!change) return t("plan.apply")
   if (ask.changes.length > 1 && [...ops].every((op) => storageOps.has(op)))
     return t("action.saveVolumes")
-  if (ops.size > 1) {
-    // The compute form: replicas and resources together.
-    if ([...ops].every((op) => op === "scale" || op === "resources")) return t("action.save")
-    return t("plan.apply")
-  }
+  if (ops.size > 1)
+    // A service's draft, as its bar says: Save.
+    return ask.changes.every((c) => partOf(c) !== undefined) ? t("action.save") : t("plan.apply")
+  const count = ask.changes.length
   switch (change.op) {
     case "restart":
-      return t("action.restart")
+      return count > 1 ? t("action.restartMany", count) : t("action.restart")
     case "env":
       return t("action.saveVariables")
     case "data":
@@ -316,7 +563,9 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
     case "probe":
       return t("action.saveHealthChecks")
     case "scale":
-      return t("action.scale", change.replicas)
+      if (ask.changes.every((c) => c.op === "scale" && c.replicas === 0))
+        return count > 1 ? t("action.pauseMany", count) : t("action.pause")
+      return count > 1 ? t("action.scaleMany", count) : t("action.scale", change.replicas)
     case "resources":
       return t("action.saveResources")
     case "edit":

@@ -4,6 +4,7 @@ import type { P } from "@/i18n/sentence-parts"
 import sentences from "@/i18n/generated/en"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** What a refused verb does, in a phrase: `patch` changes, `create` adds. */
 const verbEn: Record<string, string> = {
@@ -89,6 +90,7 @@ export const en = {
   "common.status": "Status",
   "common.sep": ", ",
   "common.list": (items: string[]) => new Intl.ListFormat("en").format(items),
+  "common.more": (n: number) => `${n} more`,
   "common.domains": "Domains",
   "common.newTab": "(opens in a new tab)",
   "common.notFound": "This page doesn't exist",
@@ -847,6 +849,61 @@ export const en = {
   "plan.typeName": (name: string) => `Type ${name} to confirm`,
   "plan.added": "added",
   "plan.removed": "removed",
+  "plan.changed": "changed",
+  "plan.exists": "Exists",
+  "plan.hidden": "hidden",
+  "plan.filter": "Filter changes",
+  "plan.noMatch": "No change matches.",
+  "plan.showAll": (n: number) => `Show all ${n}`,
+  "plan.other": "Other fields",
+  "plan.field.size": "Size",
+  "plan.col.field": "Field",
+  "plan.col.before": "Before",
+  "plan.col.after": "After",
+  "plan.col.service": "Service",
+  "plan.col.replicas": "Replicas",
+  "plan.col.effect": "Effect",
+  "plan.blockedReason": "Doesn't fit in the cluster",
+  "plan.fact.removed": (n: number) => `${n} removed`,
+  "plan.fact.changed": (n: number) => `${n} changed`,
+  "plan.fact.added": (n: number) => `${n} added`,
+  "plan.fact.replicas": (from: number, to: number) =>
+    `${from} → ${plural(to, "replica", "replicas")}`,
+  "plan.fact.staysUp": "stays up",
+  "plan.fact.downBriefly": "down briefly",
+  "plan.fact.stops": "stops serving",
+  "plan.fact.fits": "fits",
+  "plan.outcome.stops.label": "Stop serving",
+  "plan.outcome.stops.count": (n: number) => `${n} stop serving`,
+  "plan.outcome.down.label": "Down while restarting",
+  "plan.outcome.down.count": (n: number) => `${n} down briefly`,
+  "plan.outcome.notReady.label": "Not ready now",
+  "plan.outcome.notReady.count": (n: number) => `${n} not ready now`,
+  "plan.outcome.single.label": "One replica, may be down a few seconds",
+  "plan.outcome.single.count": (n: number) => `${n} on one replica`,
+  "plan.outcome.starts.label": "Start",
+  "plan.outcome.starts.count": (n: number) => `${n} start`,
+  "plan.outcome.up.label": "Stay up",
+  "plan.outcome.up.count": (n: number) => `${n} stay up`,
+  "plan.effect.recreate": "Stops every replica, then starts new ones",
+  "plan.effect.onDelete": "Waits until its replicas are deleted",
+  "plan.effect.dataStays": "Data stays on its volume",
+  "plan.cost.dataStaysOne": (name: string, paths: string) =>
+    `The data of ${name} in ${paths} stays on its volume.`,
+  "plan.cost.dataStays": (n: number) =>
+    n === 1
+      ? "Data on the volume stays."
+      : `Data stays on the volumes of the ${n} services that have one.`,
+  "plan.cost.undo": "Once applied, Undo in the notification scales back.",
+  "risk.fewPods": (names: string, n: number) =>
+    `${names} ${n === 1 ? "has" : "have"} fewer than two ready replicas, so ${n === 1 ? "it" : "each"} may be down for a few seconds.`,
+  "risk.scaleToZero": (names: string, n: number) =>
+    `${names} ${n === 1 ? "stops" : "stop"}: nothing serves ${n === 1 ? "it" : "them"} until scaled up again.`,
+  "risk.deletesKeys": "A deleted value can't be restored here.",
+  "risk.rollback": "Template changes made after that revision are undone.",
+  "risk.storage": "A volume can't shrink, and a new or moved mount replaces the replicas.",
+  "risk.removesDomain": "Requests to a removed domain no longer reach this project.",
+  "risk.deletes": "Deleting can't be undone.",
   "warn.rightsMissing": (rights: string) => `The cluster may refuse this: you lack ${rights}.`,
   "warn.toolsCredentialExposed": (namespace: string) =>
     `Anyone who can run commands in the containers of ${namespace} can use your credential while this terminal's container runs.`,
@@ -891,20 +948,30 @@ export const en = {
   "confirm.restartNone": (name: string) =>
     `No replica of ${name} is ready now; restarting replaces them all.`,
   "confirm.rolling": (name: string, pods: number) =>
-    `${name}'s ${pods} replicas are replaced one at a time, so the service stays up.`,
+    `The ${pods} replicas of ${name} are replaced one at a time, so the service stays up.`,
   "confirm.rollingSingle": (name: string) =>
     `${name} has one replica, so it may be down for a few seconds while it is replaced.`,
   "confirm.rollingNone": (name: string) => `${name}'s replicas are replaced.`,
-  "confirm.envSet": (names: string, service: string) => `Set ${names} on ${service}.`,
-  "confirm.envRemove": (names: string, service: string) => `Remove ${names} from ${service}.`,
-  "confirm.envBoth": (set: string, removed: string, service: string) =>
-    `Set ${set} and remove ${removed} on ${service}.`,
-  "confirm.dataSet": (keys: string, kind: string, name: string) =>
-    `Set ${keys} in ${kind} ${name}.`,
-  "confirm.dataRemove": (keys: string, kind: string, name: string) =>
-    `Delete ${keys} from ${kind} ${name}. The old value can't be restored here.`,
-  "confirm.dataBoth": (set: string, removed: string, kind: string, name: string) =>
-    `Set ${set} and delete ${removed} in ${kind} ${name}. A deleted value can't be restored here.`,
+  "confirm.env": (removed: string, added: string, changed: string, service: string) =>
+    `${sentenceCase(
+      new Intl.ListFormat("en").format(
+        [
+          removed && `remove ${removed}`,
+          changed && `change ${changed}`,
+          added && `add ${added}`,
+        ].filter(Boolean),
+      ),
+    )} on ${service}.`,
+  "confirm.data": (removed: string, added: string, changed: string, kind: string, name: string) =>
+    `${sentenceCase(
+      new Intl.ListFormat("en").format(
+        [
+          removed && `delete ${removed}`,
+          changed && `change ${changed}`,
+          added && `add ${added}`,
+        ].filter(Boolean),
+      ),
+    )} in ${kind} ${name}.${removed ? " A deleted value can't be restored here." : ""}`,
   "confirm.keepsOld": (names: string, count: number) =>
     `${names} ${count === 1 ? "keeps" : "keep"} the old value until restarted.`,
   "confirm.readersKeepOld": (names: string, object: string, count: number) =>
@@ -971,6 +1038,10 @@ export const en = {
   "action.saveVolumes": "Save volumes",
   "action.saveHealthChecks": "Save health checks",
   "action.scale": (replicas: number) => `Scale to ${replicas}`,
+  "action.scaleMany": (n: number) => `Scale ${n} services`,
+  "action.restartMany": (n: number) => `Restart ${n} services`,
+  "action.pause": "Pause",
+  "action.pauseMany": (n: number) => `Pause ${n} services`,
   "action.saveResources": "Save resources",
   "action.save": "Save",
   "action.saveYaml": "Save YAML",
@@ -984,6 +1055,9 @@ export const en = {
   "toast.view": "View",
   "toast.undo": "Undo",
   "toast.undone": "Undone",
+  "undo.scaleUp": (n: number) => `Scale ${n} services back up`,
+  "undo.scaleBack": (n: number) => `Scale ${n} services back`,
+  "undo.many": (n: number) => `Undo ${n} changes`,
   "toast.managed": (tool: string) => `Managed by ${tool}`,
   "toast.managedHelm": "Change it in the chart's values and upgrade the release.",
   "toast.managedGit": (tool: string) => `Change it in the Git repository ${tool} syncs from.`,
@@ -1487,7 +1561,7 @@ export const en = {
   "draft.stay": "Stay",
   "draft.leave": "Discard and leave",
   "draft.discard": "Discard",
-  "draft.title": (name: string) => `Change ${name}`,
+  "draft.title": (name: string) => `Save changes to ${name}`,
   "project.view": "View",
   "project.viewMap": "Map",
   "project.viewList": "List",
@@ -1629,9 +1703,13 @@ export const en = {
     `Fits: it adds ${plural(pods, "pod", "pods")}, ${cpu} and ${memory} at its peak.`,
   "preview.blocked": "Why it does not fit",
   "preview.blockedQuota": (name: string, resource: string, need: string, left: string) =>
-    `Quota ${name} blocks it: ${resource} needs ${need}, ${left} is left.`,
+    resource === "pods"
+      ? `Quota ${name} allows ${left} more pods; this needs ${need}.`
+      : `Quota ${name} allows ${left} more; this needs ${need}.`,
   "preview.blockedNodes": (_name: string, resource: string, need: string, left: string) =>
-    `No node has room: ${resource} needs ${need}, the roomiest node has ${left}.`,
+    resource === "pods"
+      ? `No node has room for ${need} more pods; the roomiest has room for ${left}.`
+      : `No node has ${need} free; the roomiest has ${left}.`,
   "preview.fitUnknown": "Zeabur could not check whether the new pods fit.",
   "preview.dataLoss": "Data this loses",
   "preview.loss.claimDeleted": (claim: string, paths: string) =>

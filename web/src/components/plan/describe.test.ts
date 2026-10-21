@@ -90,7 +90,7 @@ group("describe", () => {
   test("a ConfigMap change names the readers that keep the old value and the others it affects", () => {
     const d = configMapEdit(t)
     expect(d.lines).toStrictEqual([
-      "confirm.dataSet(common.list([mode]), ConfigMap, shop-config)",
+      "confirm.data(, , common.list([mode]), ConfigMap, shop-config)",
       "confirm.readersKeepOld(common.list([api]), shop-config, 1)",
       "confirm.alsoReads(common.list([web, worker]), shop-config, 2)",
     ])
@@ -99,7 +99,7 @@ group("describe", () => {
 
   test("in English, names are joined into a list and counts agree with them", () => {
     expect(configMapEdit(english).lines).toStrictEqual([
-      "Set mode in ConfigMap shop-config.",
+      "Change mode in ConfigMap shop-config.",
       "api reads shop-config and keeps the old value until restarted.",
       "Also affects web and worker (they read shop-config).",
     ])
@@ -124,7 +124,7 @@ group("describe", () => {
       pods({ api: { desired: 2, ready: 2 } }),
     )
     expect(d.lines).toStrictEqual([
-      "confirm.envBoth(common.list([A]), common.list([B]), api)",
+      "confirm.env(common.list([B]), , common.list([A]), api)",
       "confirm.rolling(api, 2)",
     ])
     expect(d.action).toBe("action.saveVariables")
