@@ -56,7 +56,6 @@ export function FilterField({
           }
         }}
         aria-label={label}
-        placeholder={label}
         aria-keyshortcuts={slash ? "/" : undefined}
         className="w-full min-w-0 bg-transparent text-sm outline-none"
       />
