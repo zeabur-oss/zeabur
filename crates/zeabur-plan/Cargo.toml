@@ -29,5 +29,5 @@ thiserror.workspace = true
 utoipa = { workspace = true, optional = true }
 
 [dev-dependencies]
-zeabur-test-support.workspace = true
+zeabur-fixtures.workspace = true
 proptest.workspace = true

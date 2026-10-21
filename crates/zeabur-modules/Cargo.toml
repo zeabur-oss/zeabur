@@ -26,4 +26,4 @@ serde_json.workspace = true
 utoipa.workspace = true
 
 [dev-dependencies]
-zeabur-test-support.workspace = true
+zeabur-fixtures.workspace = true

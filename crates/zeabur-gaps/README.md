@@ -49,7 +49,7 @@ crate never depends on a module.
 ## Hides
 
 The rule set and the sentences. Each rule cites the guidance it rests on and has a test; the
-cases in `fixtures/gaps/` run against both.
+cases in this crate's `fixtures/gaps/` run against both.
 
 ## Place in the workspace
 

@@ -2446,16 +2446,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeabur-fixtures"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "zeabur-gaps"
 version = "0.0.1"
 dependencies = [
  "k8s-openapi",
  "serde-saphyr",
  "serde_json",
+ "zeabur-fixtures",
  "zeabur-graph",
  "zeabur-kernel",
  "zeabur-model",
- "zeabur-test-support",
 ]
 
 [[package]]
@@ -2468,8 +2478,8 @@ dependencies = [
  "serde-saphyr",
  "serde_json",
  "zeabur-adapters",
+ "zeabur-fixtures",
  "zeabur-model",
- "zeabur-test-support",
 ]
 
 [[package]]
@@ -2532,9 +2542,9 @@ dependencies = [
  "serde_json",
  "utoipa",
  "zeabur-adapters",
+ "zeabur-fixtures",
  "zeabur-kube",
  "zeabur-model",
- "zeabur-test-support",
 ]
 
 [[package]]
@@ -2550,10 +2560,10 @@ dependencies = [
  "thiserror",
  "utoipa",
  "zeabur-adapters",
+ "zeabur-fixtures",
  "zeabur-graph",
  "zeabur-kernel",
  "zeabur-model",
- "zeabur-test-support",
 ]
 
 [[package]]
@@ -2562,11 +2572,10 @@ version = "0.0.1"
 dependencies = [
  "kube",
  "serde",
- "serde-saphyr",
  "serde_json",
- "thiserror",
  "tokio",
  "zeabur-core",
+ "zeabur-fixtures",
  "zeabur-kube",
 ]
 

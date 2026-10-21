@@ -102,6 +102,7 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 4 | [`zeabur-api`](../crates/zeabur-api) | the HTTP API and its OpenAPI document |
 | 4 | [`zeabur-mcp`](../crates/zeabur-mcp) | the read-only MCP server: its tools and the API reads behind them |
 | 5 | [`zeabur`](../crates/zeabur), [`zeaburctl`](../crates/zeaburctl) | **binaries** |
+| 0 | [`zeabur-fixtures`](../crates/zeabur-fixtures) | loading the fixture cases (dev-dependency only) |
 | 6 | [`zeabur-test-support`](../crates/zeabur-test-support) | test helpers |
 
 Every crate has a README that is also its crate-level documentation (`cargo doc --open`).
@@ -177,8 +178,10 @@ Base UI with its own theme, Phosphor icons). Its build output is not committed:
 
 ## Fixtures
 
-[`fixtures/`](../fixtures) holds language-neutral test cases for the projection and change
-planning: Kubernetes objects in, the expected result out.
+Language-neutral test cases for the projection, change planning, diagnoses and modules:
+Kubernetes objects in, the expected result out. Each crate keeps its own under
+`crates/<crate>/fixtures/`, loaded with `zeabur-fixtures`; [`fixtures/`](../fixtures) holds the
+format and the chart corpus.
 
 ## References
 

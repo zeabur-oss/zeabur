@@ -17,6 +17,7 @@ publish = false
 # (Levels order crates; the product layers L0-L4 in docs/architecture.md are a different thing.)
 [workspace.metadata.levels]
 zeabur-kernel = 0
+zeabur-fixtures = 0
 zeabur-core = 1
 zeabur-model = 1
 zeabur-adapters = 1
@@ -70,6 +71,7 @@ zeabur-mcp = { path = "crates/zeabur-mcp" }
 zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
+zeabur-fixtures = { path = "crates/zeabur-fixtures" }
 
 # Third-party crates.
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }

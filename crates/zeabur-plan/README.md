@@ -24,5 +24,5 @@ through `zeabur-kube`.
 
 ## Tests
 
-`fixtures/mutation` (`mutation.*` operations, including `mutation.plan`) runs in
+This crate's `fixtures/mutation` (`mutation.*` operations, including `mutation.plan`) runs in
 `tests/fixtures.rs`; `tests/roundtrip.rs` re-projects planned objects.

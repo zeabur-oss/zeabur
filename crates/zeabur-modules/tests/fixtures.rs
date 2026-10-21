@@ -5,9 +5,9 @@ mod tests {
     use std::collections::BTreeMap;
 
     use serde_json::{Value, from_value, to_value};
+    use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_kube::DynamicObject;
     use zeabur_modules::{backups, cloudnative_pg, k8up, network_policy, velero};
-    use zeabur_test_support::fixtures::{Fixture, compare, load};
 
     fn objects(fixture: &Fixture, kind: &str, api_group: &str) -> Vec<DynamicObject> {
         fixture
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn module_fixtures_pass() {
         let mut failures = Vec::new();
-        let cases = load("modules").expect("fixtures load");
+        let cases = load!("modules").expect("fixtures load");
         assert!(!cases.is_empty(), "no modules fixtures");
         for fixture in &cases {
             let actual = match fixture.case.operation.as_str() {

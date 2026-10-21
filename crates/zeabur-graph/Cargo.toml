@@ -6,6 +6,8 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
+# Reads the chart corpus at the repository root, which the package does not carry.
+exclude = ["tests/coverage.rs"]
 
 [lints]
 workspace = true
@@ -20,6 +22,6 @@ serde-saphyr = { workspace = true, features = ["serialize"] }
 serde_json.workspace = true
 
 [dev-dependencies]
-zeabur-test-support.workspace = true
+zeabur-fixtures.workspace = true
 proptest.workspace = true
 serde_json.workspace = true

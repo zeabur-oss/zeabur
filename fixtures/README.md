@@ -7,8 +7,13 @@ result out. Any implementation, in any language, can run them.
 
 ## Layout
 
+Each crate keeps the cases it is tested with, so a packaged crate carries them:
+`crates/zeabur-graph/fixtures/{graph,projection}`, `crates/zeabur-plan/fixtures/mutation`,
+`crates/zeabur-gaps/fixtures/gaps` and `crates/zeabur-modules/fixtures/modules`. This directory
+keeps the format, the operations and the chart corpus (`charts/`).
+
 ```
-fixtures/<area>/<case>/
+crates/<crate>/fixtures/<area>/<case>/
   case.yaml       what is tested
   input.yaml      Kubernetes objects, one YAML document each (optional)
   expected.json   the expected result
@@ -102,5 +107,6 @@ object), so the operator's server-side-apply rules (`mutation.ownedFields`,
 
 ## Running them
 
-`zeabur-test-support` loads every case (`fixtures::load`), and its own test checks that each one
-parses and names a known operation. The crates under test run the cases of their area.
+`zeabur-fixtures` loads a crate's cases (`load!("<area>")`) and compares results with them. The
+crates under test run the cases of their area; `zeabur-test-support`'s test checks that every
+case parses and names a known operation.

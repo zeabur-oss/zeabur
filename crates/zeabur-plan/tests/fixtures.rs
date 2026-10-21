@@ -6,6 +6,7 @@ mod tests {
 
     use k8s_openapi::api::apps::v1::ReplicaSet;
     use serde_json::{Value, from_value, json, to_value};
+    use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_graph::Snapshot;
     use zeabur_model::WorkloadRef;
     use zeabur_plan::checks::{
@@ -14,7 +15,6 @@ mod tests {
     };
     use zeabur_plan::rules::{EnvEdit, diff, route_name, validate_env, validate_hostname};
     use zeabur_plan::{Fetched, GatewayRef, Input, PlanRequest, Release, StorageClassInfo, plan};
-    use zeabur_test_support::fixtures::{Fixture, compare, load};
 
     /// The resource (plural) of a kind, for the fixtures' objects.
     fn plural(kind: &str) -> String {
@@ -240,7 +240,7 @@ mod tests {
     fn mutation_fixtures_pass() {
         let mut failures = Vec::new();
         let mut total = 0;
-        for fixture in load("mutation").unwrap() {
+        for fixture in load!("mutation").unwrap() {
             total += 1;
             let actual = run(&fixture);
             // A mask shown in place of a Secret value is never written.
