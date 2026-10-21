@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @import "@zeabur/design-system";
 
+/* Until src/theme.ts picks a class, the page follows the system, so a dark one never starts white.
+   A stored choice that differs from the system applies once the script runs. */
+:root:not(.light, .dark) {
+  color-scheme: light dark;
+}
+
 /* Markup carries no arbitrary values (shadcn/lint no-arbitrary-values); each variable here makes
    its utility (`grid-cols-settings`). */
 @theme {

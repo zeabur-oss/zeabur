@@ -20,6 +20,7 @@ let choice: ThemeChoice = read()
 function apply() {
   const dark = choice === "dark" || (choice === "system" && query.matches)
   document.documentElement.classList.toggle("dark", dark)
+  document.documentElement.classList.toggle("light", !dark)
 }
 
 export function followSystemTheme() {

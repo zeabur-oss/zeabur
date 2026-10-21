@@ -265,6 +265,47 @@ test("Home does not shift as it loads", async ({ page }) => {
   ).toBeLessThan(0.001)
 })
 
+for (const scheme of ["dark", "light"] as const) {
+  test(`a ${scheme} system's page is ${scheme} from its first frame, and does not fade in`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme })
+    // A slower CPU leaves more frames between the first paint and the app's script.
+    const cdp = await page.context().newCDPSession(page)
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 4 })
+    await page.addInitScript(() => {
+      const w = window as unknown as { backgrounds: string[]; transitions: number }
+      w.backgrounds = []
+      w.transitions = 0
+      const start = document.startViewTransition?.bind(document)
+      if (start)
+        document.startViewTransition = ((update: never) => {
+          w.transitions++
+          return start(update)
+        }) as typeof document.startViewTransition
+      const tick = () => {
+        if (document.body) w.backgrounds.push(getComputedStyle(document.body).backgroundColor)
+        if (performance.now() < 3000) requestAnimationFrame(tick)
+      }
+      requestAnimationFrame(tick)
+    })
+    await page.goto("/")
+    await expect(page.getByRole("list", { name: "Projects" })).toBeVisible()
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 })
+    const { backgrounds, transitions } = await page.evaluate(() => {
+      const w = window as unknown as { backgrounds: string[]; transitions: number }
+      return { backgrounds: w.backgrounds, transitions: w.transitions }
+    })
+    const light = (color: string) => {
+      const [r, g, b] = color.match(/\d+/g)!.map(Number)
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b > 128
+    }
+    expect(backgrounds.length).toBeGreaterThan(0)
+    expect(backgrounds.filter((color) => light(color) !== (scheme === "light"))).toEqual([])
+    expect(transitions).toBe(0)
+  })
+}
+
 test.describe("with reduced motion", () => {
   test.use({ reducedMotion: "reduce" })
 
