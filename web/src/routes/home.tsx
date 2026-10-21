@@ -1,9 +1,9 @@
 import { useQueries, useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
-import type { ReactNode } from "react"
+import { useEffect, type ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
-import { isStatus, type Schemas } from "@/api/client"
+import { isStatus, isUnreachable, type Schemas } from "@/api/client"
 import {
   clusterIncidentsQuery,
   clusterQuery,
@@ -16,10 +16,11 @@ import {
 import { Ago } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { IncidentRow, isTakenDown, takenDown, type Incident } from "@/components/incident"
+import { IncidentGroupRow, isTakenDown, takenDown } from "@/components/incident"
+import { groupIncidents, type IncidentGroup } from "@/model/incidents"
 import { ProblemRow } from "@/components/problem-row"
 import { StatusDot, StatusPill } from "@/components/status"
-import { buttonVariants } from "@zeabur/design-system/components/button"
+import { UnreachableBanner, useReachability } from "@/components/unreachable"
 import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
 import {
   Collapsible,
@@ -28,8 +29,10 @@ import {
 } from "@zeabur/design-system/components/collapsible"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { useT } from "@/i18n"
+import { lastKnown, rememberKnown } from "@/lib/last-known"
 import { serviceLink } from "@/lib/place"
 import { originOf, originRank, type Origin } from "@/model/origin"
+import { otherNamespaces } from "@/model/project"
 import {
   byHealth,
   countsHealth,
@@ -37,21 +40,14 @@ import {
   needsAttention,
   statusOf,
   type Event,
+  type Health,
   type Service,
 } from "@/model/service"
 import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
+import { AttentionRow, useAttention, type ClusterItem } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
-import { useAttention } from "@/routes/cluster/attention"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Illustration } from "@zeabur/design-system/components/illustration"
+import { OtherNamespaces } from "@/routes/projects"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 
@@ -61,17 +57,44 @@ const homeRoute = getRouteApi("/")
 
 const PROJECTS_SHOWN = 9
 const WARNINGS_SHOWN = 5
+/** Namespaces offered for adoption on an empty Home. */
+const OFFERED = 5
 
 export function HomePage() {
   const t = useT()
+  const reach = useReachability()
   const projects = useQuery(projectsQuery)
   const adopted = projects.data?.items.filter((p) => p.adopted) ?? []
   const problems = useProblems(adopted)
+  const shown = adopted.toSorted(byProjectHealth).slice(0, PROJECTS_SHOWN)
+  useEffect(() => {
+    if (projects.data)
+      rememberKnown({
+        projects: projects.data.items
+          .filter((p) => p.adopted)
+          .toSorted(byProjectHealth)
+          .slice(0, PROJECTS_SHOWN),
+      })
+  }, [projects.data])
+  if (reach.down)
+    return (
+      <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
+        <PageHeader title={t("home.title")} />
+        <UnreachableBanner />
+        <LastKnown />
+      </PageColumn>
+    )
+  const empty = projects.isSuccess && adopted.length === 0
   return (
     <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
       <div className="flex flex-col gap-2">
         <PageHeader title={t("home.title")} />
-        <StateLine adopted={adopted} loaded={projects.isSuccess} problems={problems} />
+        <StateLine
+          adopted={adopted}
+          pending={projects.isPending || problems.pending}
+          failed={projects.isError}
+          problems={problems}
+        />
       </div>
       {/* Problems come in after the projects; showing both at once keeps them from pushing the
           projects down. */}
@@ -80,11 +103,58 @@ export function HomePage() {
       ) : (
         <>
           <ProblemsSection problems={problems} />
-          <ProjectsSection adopted={adopted} error={projects.isError ? projects.error : null} />
+          {empty ? (
+            <Offered namespaces={otherNamespaces(projects.data?.items ?? [], false)} />
+          ) : (
+            <ProjectsSection
+              total={adopted.length}
+              shown={shown}
+              error={projects.isError ? projects.error : null}
+            />
+          )}
           <WarningsSection adopted={adopted} />
         </>
       )}
     </PageColumn>
+  )
+}
+
+/** While the cluster does not answer: the projects as this browser last saw them, greyed. */
+function LastKnown() {
+  const t = useT()
+  const search = homeRoute.useSearch()
+  const navigate = useNavigate({ from: "/" })
+  const known = lastKnown()
+  const projects = known.projects ?? []
+  if (projects.length === 0) return null
+  return (
+    <section aria-labelledby="home-projects" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <h2 id="home-projects" className="type-heading">
+          {t("shell.projects")}
+        </h2>
+        <span className="type-meta text-muted-foreground">
+          {t("home.lastKnown")}
+          {known.at ? (
+            <>
+              {t("common.sep")}
+              <Ago iso={new Date(known.at).toISOString()} />
+            </>
+          ) : null}
+        </span>
+      </div>
+      <div className="opacity-60 grayscale">
+        <ProjectCollection
+          projects={projects}
+          label={t("shell.projects")}
+          offline
+          search={search}
+          onSearch={(patch) =>
+            void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
+          }
+        />
+      </div>
+    </section>
   )
 }
 
@@ -96,18 +166,25 @@ interface Found {
 interface Problems {
   /** Still reading the documents of the projects in trouble. */
   pending: boolean
-  incidents: Incident[]
+  incidents: IncidentGroup[]
+  /** Nodes down, full or under pressure, by outcome, that no incident above explains. */
+  nodes: ClusterItem[]
   /** Cluster warnings that take nothing down yet: a count and a link. */
   notices: number
   byOrigin: { origin: Origin; items: Found[] }[]
   rolling: Found[]
   count: number
+  health: Health
+  /** Projects in trouble whose document could not be read: their problems are not listed. */
+  unchecked: number
+  /** The cluster-wide causes could not all be read. */
+  incidentsUnchecked: boolean
 }
 
 /** Every problem once, by where it comes from: a cause in the cluster shows once, with the
  * services it takes down under it. */
 function useProblems(adopted: ProjectItem[]): Problems {
-  const attention = useAttention().filter((i) => i.health === "fail" || i.health === "warn")
+  const attention = useAttention()
   const incidentList = useQuery(clusterIncidentsQuery)
   const incidents = incidentList.data?.items ?? []
   const down = takenDown(incidents)
@@ -138,17 +215,36 @@ function useProblems(adopted: ProjectItem[]): Problems {
   const byOrigin = [...origins.entries()]
     .map(([origin, items]) => ({ origin, items: items.toSorted(byFound) }))
     .toSorted((a, b) => originRank[a.origin] - originRank[b.origin])
-  const explained = new Set(incidents.map((i) => i.id))
-  const notices = attention.filter(
-    (i) => !(i.node && explained.has(`incidents/node/${i.node}`)),
-  ).length
+  const reported = new Set(
+    incidents.filter((i) => i.kind === "nodeNotReady").map((i) => i.cause.params?.node),
+  )
+  const explained = (item: ClusterItem) =>
+    item.nodes.length > 0 && item.nodes.every((node) => reported.has(node))
+  const open = attention.items.filter(
+    (i) => (i.health === "fail" || i.health === "warn") && !explained(i),
+  )
+  const nodes = open.filter((i) => i.problem)
+  const groups = groupIncidents(incidents)
+  const listed = byOrigin.flatMap((g) => g.items)
+  const health: Health =
+    groups.length > 0 ||
+    nodes.some((i) => i.health === "fail") ||
+    listed.some((f) => statusOf(f.service).health === "fail")
+      ? "fail"
+      : "warn"
   return {
-    pending: documents.some((d) => d.isPending) || incidentList.isPending,
-    incidents,
-    notices,
+    pending: documents.some((d) => d.isPending) || incidentList.isPending || attention.pending,
+    incidents: groups,
+    nodes,
+    notices: open.length - nodes.length,
     byOrigin,
     rolling: rolling.toSorted(byFound),
-    count: incidents.length + byOrigin.reduce((n, g) => n + g.items.length, 0),
+    count: groups.length + nodes.length + listed.length,
+    health,
+    unchecked: documents.filter((d) => d.isError).length,
+    incidentsUnchecked:
+      (incidentList.data?.unreadable.length ?? 0) > 0 ||
+      (incidentList.isError && !isUnreachable(incidentList.error)),
   }
 }
 
@@ -159,24 +255,38 @@ const byFound = (a: Found, b: Found) =>
 
 function StateLine({
   adopted,
-  loaded,
+  pending,
+  failed,
   problems,
 }: {
   adopted: ProjectItem[]
-  loaded: boolean
+  pending: boolean
+  failed: boolean
   problems: Problems
 }) {
   const t = useT()
-  if (!loaded || problems.pending) return <Skeleton className="h-5 w-72" />
+  if (pending) return <Skeleton className="h-5 w-72" />
+  // The projects section says why the list could not be read.
+  if (failed) return null
   const services = adopted.reduce((n, p) => n + (p.health?.services ?? 0), 0)
-  const parts =
-    problems.count > 0
-      ? [t("home.state.problems", problems.count)]
-      : problems.rolling.length === 0
-        ? [t("home.state.fine", services, adopted.length)]
-        : []
-  if (problems.rolling.length > 0) parts.push(t("home.state.rolling", problems.rolling.length))
-  const health = problems.count > 0 ? "fail" : problems.rolling.length > 0 ? "progress" : "ok"
+  const only = problems.nodes.length === 1 && problems.count === 1 ? problems.nodes[0] : undefined
+  const parts: string[] = []
+  let health: Health = "ok"
+  if (problems.count > 0) {
+    parts.push(only ? t("home.state.node", only.text) : t("home.state.problems", problems.count))
+    health = problems.health
+  } else if (problems.unchecked > 0) {
+    parts.push(t("home.state.unchecked", problems.unchecked))
+    health = "warn"
+  } else if (adopted.length === 0) {
+    parts.push(t("home.state.empty"))
+    health = "idle"
+  } else if (problems.rolling.length === 0)
+    parts.push(t("home.state.fine", services, adopted.length))
+  if (problems.rolling.length > 0) {
+    parts.push(t("home.state.rolling", problems.rolling.length))
+    if (health === "ok") health = "progress"
+  }
   return (
     <section aria-label={t("home.status")} className="flex flex-wrap items-center gap-x-4 gap-y-1">
       <p className="flex items-center gap-2 font-medium">
@@ -226,8 +336,14 @@ function ClusterFacts() {
 
 function ProblemsSection({ problems }: { problems: Problems }) {
   const t = useT()
+  const unchecked = <Unchecked problems={problems} />
   if (problems.count === 0 && problems.rolling.length === 0)
-    return problems.notices > 0 ? <Notices count={problems.notices} /> : null
+    return problems.notices > 0 || problems.unchecked > 0 || problems.incidentsUnchecked ? (
+      <div className="flex flex-col gap-2">
+        {unchecked}
+        {problems.notices > 0 ? <Notices count={problems.notices} /> : null}
+      </div>
+    ) : null
   return (
     <section aria-labelledby="home-problems" className="flex flex-col gap-3">
       <h2 id="home-problems" className="type-heading">
@@ -239,8 +355,15 @@ function ProblemsSection({ problems }: { problems: Problems }) {
           hint={t("incident.hint")}
           count={problems.incidents.length}
         >
-          {problems.incidents.map((incident) => (
-            <IncidentRow key={incident.id} incident={incident} />
+          {problems.incidents.map((group) => (
+            <IncidentGroupRow key={group.key} group={group} />
+          ))}
+        </Group>
+      ) : null}
+      {problems.nodes.length > 0 ? (
+        <Group title={t("cluster.nodes")} count={problems.nodes.length}>
+          {problems.nodes.map((item) => (
+            <AttentionRow key={item.key} item={item} inset />
           ))}
         </Group>
       ) : null}
@@ -256,6 +379,7 @@ function ProblemsSection({ problems }: { problems: Problems }) {
           ))}
         </Group>
       ))}
+      {unchecked}
       {problems.notices > 0 ? <Notices count={problems.notices} /> : null}
       {problems.rolling.length > 0 ? (
         <Group title={t("home.inProgress")} count={problems.rolling.length}>
@@ -265,6 +389,31 @@ function ProblemsSection({ problems }: { problems: Problems }) {
         </Group>
       ) : null}
     </section>
+  )
+}
+
+/** What Home could not check, so a quiet page is not read as a healthy one. */
+function Unchecked({ problems }: { problems: Problems }) {
+  const t = useT()
+  if (problems.unchecked === 0 && !problems.incidentsUnchecked) return null
+  return (
+    <ul className="flex flex-col gap-1 type-meta text-muted-foreground">
+      {problems.unchecked > 0 ? (
+        <li className="flex items-center gap-2">
+          <StatusDot health="idle" />
+          {t("home.unchecked", problems.unchecked)}
+          <Link to="/projects" className="text-foreground hover:underline">
+            {t("shell.projects")}
+          </Link>
+        </li>
+      ) : null}
+      {problems.incidentsUnchecked ? (
+        <li className="flex items-center gap-2">
+          <StatusDot health="idle" />
+          {t("home.incidentsUnchecked")}
+        </li>
+      ) : null}
+    </ul>
   )
 }
 
@@ -319,18 +468,41 @@ function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
   return rank(a) - rank(b) || a.name.localeCompare(b.name)
 }
 
-function ProjectsSection({ adopted, error }: { adopted: ProjectItem[]; error: Error | null }) {
+/** No project yet: the namespaces that could be one, each with Adopt. */
+function Offered({ namespaces }: { namespaces: ReturnType<typeof otherNamespaces> }) {
+  const t = useT()
+  return (
+    <section aria-labelledby="home-offered" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <h2 id="home-offered" className="type-heading">
+          {t("home.adoptTitle")}
+        </h2>
+        <span className="type-meta text-muted-foreground">{t("cluster.noProjectsBody")}</span>
+      </div>
+      <OtherNamespaces namespaces={namespaces} limit={OFFERED} />
+    </section>
+  )
+}
+
+function ProjectsSection({
+  total,
+  shown,
+  error,
+}: {
+  total: number
+  shown: ProjectItem[]
+  error: Error | null
+}) {
   const t = useT()
   const search = homeRoute.useSearch()
   const navigate = useNavigate({ from: "/" })
-  const shown = adopted.toSorted(byProjectHealth).slice(0, PROJECTS_SHOWN)
   return (
     <section aria-labelledby="home-projects" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
         <h2 id="home-projects" className="type-heading">
           {t("shell.projects")}
         </h2>
-        {error ? null : <span className="type-meta text-muted-foreground">{adopted.length}</span>}
+        {error ? null : <span className="type-meta text-muted-foreground">{total}</span>}
         <div className="ml-auto flex items-center gap-3">
           <Link to="/projects" className="type-meta text-secondary hover:text-main">
             {t("home.allProjects")}
@@ -349,21 +521,6 @@ function ProjectsSection({ adopted, error }: { adopted: ProjectItem[]; error: Er
         ) : (
           <Problem error={error} />
         )
-      ) : shown.length === 0 ? (
-        <Empty size="sm">
-          <EmptyHeader>
-            <EmptyMedia>
-              <Illustration kind="empty" seed="projects" />
-            </EmptyMedia>
-            <EmptyTitle>{t("cluster.noProjects")}</EmptyTitle>
-            <EmptyDescription>{t("cluster.noProjectsBody")}</EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent>
-            <Link to="/projects" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              {t("cluster.openProjects")}
-            </Link>
-          </EmptyContent>
-        </Empty>
       ) : (
         <ProjectCollection
           projects={shown}
@@ -405,7 +562,8 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
   const t = useT()
   const warnings = useQuery(recentWarningsQuery)
   if (warnings.isError && isStatus(warnings.error, 403)) return null
-  const rows = warnings.data ? fold(warnings.data.items).slice(0, WARNINGS_SHOWN) : []
+  const folded = warnings.data ? fold(warnings.data.items) : []
+  const rows = folded.slice(0, WARNINGS_SHOWN)
   const services = new Map(
     adopted.flatMap((p) => (p.services ?? []).map((s) => [`${p.name}/${s.kind}/${s.name}`, s])),
   )
@@ -427,7 +585,9 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
         <Collapsible>
           <CollapsibleTrigger variant="disclosure">
             <CaretRightIcon aria-hidden="true" />
-            {t("home.showWarnings", rows.length)}
+            {folded.length > rows.length
+              ? t("home.showWarningsOf", rows.length, folded.length)
+              : t("home.showWarnings", rows.length)}
           </CollapsibleTrigger>
           <CollapsibleContent>
             <ul className="mt-2 flex flex-col">
@@ -507,6 +667,15 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
                 )
               })}
             </ul>
+            {folded.length > rows.length ? (
+              <Link
+                to="/cluster"
+                hash="cluster-warnings"
+                className="mt-1 inline-block type-meta text-secondary hover:text-main"
+              >
+                {t("home.allWarnings", folded.length)}
+              </Link>
+            ) : null}
           </CollapsibleContent>
         </Collapsible>
       )}

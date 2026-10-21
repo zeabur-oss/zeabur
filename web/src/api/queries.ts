@@ -201,6 +201,9 @@ export const clusterQuery = queryOptions({
   queryKey: ["cluster"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster", { signal })),
   staleTime: 60_000,
+  // The banner waits on this read; when the cluster is away it polls every 15 s anyway.
+  retry: 1,
+  retryOnMount: false,
 })
 
 export const capabilitiesQuery = queryOptions({
@@ -456,6 +459,21 @@ export const usageQuery = (project: string) =>
         }),
       ),
     refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  })
+
+/** How full the project's volumes are; each read asks the kubelets of the nodes they are on. */
+export const volumesQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "volumes"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/volumes", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
   })
 

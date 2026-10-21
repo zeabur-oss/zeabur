@@ -4,6 +4,7 @@ import type { ReactNode } from "react"
 
 import { clusterQuery, upgradesQuery } from "@/api/queries"
 import { StatusPill } from "@/components/status"
+import { UnreachableBanner, useReachability } from "@/components/unreachable"
 import { Tabs, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { useT } from "@/i18n"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
@@ -35,6 +36,7 @@ export function ClusterFrame({ tab, children }: { tab: ClusterTab; children: Rea
         </PageColumn>
       </header>
       <PageColumn gap="lg" className="mt-6 mb-12">
+        <UnreachableBanner />
         {children}
       </PageColumn>
     </Tabs>
@@ -49,15 +51,21 @@ function Heading() {
   const data = upgrades.data
   // Without readable Plans newer versions are unknown.
   const plansRefused = data?.unreadable?.some((u) => u.resource === "plans.upgrade.cattle.io")
+  const name = useReachability().name
   const version = cluster.data?.kubernetesVersion
   return (
     <PageHeader
       title={t("cluster.title")}
       badges={
         <>
-          {cluster.data ? (
-            <span className="font-medium text-main" translate="no">
-              {cluster.data.name}
+          {name ? (
+            <span
+              className={
+                cluster.data ? "font-medium text-main" : "font-medium text-muted-foreground"
+              }
+              translate="no"
+            >
+              {name}
             </span>
           ) : null}
           {version ? (

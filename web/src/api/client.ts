@@ -25,6 +25,17 @@ export class ApiError extends Error {
   }
 }
 
+/** No answer from the cluster or from Zeabur itself, as opposed to a refusal or a bad request. */
+export function isUnreachable(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return error instanceof Error
+  return (
+    error.problem.kind === "unavailable" ||
+    error.status === 0 ||
+    error.status === 502 ||
+    error.status === 504
+  )
+}
+
 /** Seconds or an HTTP-date (RFC 9110, section 10.2.3); a past date is 0. */
 export function retryAfterSeconds(value: string | null, now = Date.now()): number | undefined {
   const text = value?.trim()

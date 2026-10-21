@@ -5,12 +5,14 @@ import { lazy, Suspense, type ReactNode } from "react"
 import { historyQuery, usageQuery } from "@/api/queries"
 import { Hint, Panel, Segmented } from "@/components/bits"
 import { Refused } from "@/components/refused"
+import { useVolumeFills, VolumeFullNote, VolumeUse } from "@/components/volume-use"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { useQuantityFormat as useFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
-import type { Service } from "@/model/service"
+import { claimOf, type Service } from "@/model/service"
+import { claimMounts } from "@/model/volume-use"
 import {
   colours,
   hasValues,
@@ -104,6 +106,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
             showUsage={available}
           />
         </div>
+        <VolumesBlock project={project} service={service} />
         {state === "not-installed" ? (
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-5 py-3 text-sm text-muted-foreground">
             {t("usage.needsMetricsServer")}
@@ -138,6 +141,38 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
         )}
       </div>
     </Panel>
+  )
+}
+
+/** How full each volume the service mounts is, when the kubelets say. */
+function VolumesBlock({ project, service }: { project: string; service: Service }) {
+  const t = useT()
+  const mounts = claimMounts(service)
+  const volumes = useVolumeFills(
+    project,
+    service,
+    mounts.map(({ mount }) => claimOf(mount)),
+  )
+  const filled = mounts.flatMap(({ mount }) => {
+    const fill = volumes.fill(claimOf(mount))
+    return fill ? [{ path: mount.mountPath, fill }] : []
+  })
+  if (filled.length === 0) return null
+  return (
+    <div className="flex flex-col gap-3 border-t px-5 py-4">
+      <span className="type-meta text-muted-foreground">{t("storage.title")}</span>
+      <ul className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
+        {filled.map(({ path, fill }) => (
+          <li key={path} className="flex min-w-0 flex-col gap-1">
+            <span className="truncate font-mono type-body" translate="no" title={path}>
+              {path}
+            </span>
+            <VolumeUse fill={fill} />
+            <VolumeFullNote fill={fill} />
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

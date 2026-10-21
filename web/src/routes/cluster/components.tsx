@@ -21,7 +21,7 @@ import TerminalIcon from "~icons/ph/terminal"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { isStatus, type Schemas } from "@/api/client"
-import { capabilitiesQuery } from "@/api/queries"
+import { capabilitiesQuery, clusterIncidentsQuery } from "@/api/queries"
 import { useCapabilityLabel } from "@/components/capabilities"
 import { Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
@@ -226,6 +226,26 @@ export function ComponentsPage() {
 const isInstalled = (capability: Schemas["Capability"], component: Schemas["Component"]) =>
   capability.installations.some((i) => i.component === component.id)
 
+/** What a component incident names, as the catalogue's capability or `capability/component`. */
+const incidentComponents: Record<string, string> = {
+  "ingress-controller": "ingress",
+  "cert-manager": "certificates",
+  "metrics-server": "metrics/metrics-server",
+}
+
+/** The installed components an incident says are down, by capability or `capability/component`. */
+function useDown() {
+  const incidents = useQuery(clusterIncidentsQuery).data?.items ?? []
+  const down = new Set(
+    incidents
+      .filter((i) => i.kind === "componentDown" && i.fault.component)
+      .map((i) => incidentComponents[i.fault.component ?? ""])
+      .filter((key): key is string => !!key),
+  )
+  return (capability: string, component: string) =>
+    down.has(capability) || down.has(`${capability}/${component}`)
+}
+
 function ComponentCard({
   capability,
   component,
@@ -236,20 +256,22 @@ function ComponentCard({
   const t = useT()
   const capLabel = useCapabilityLabel()
   const CapIcon = icons[capability.name] ?? HardDrivesIcon
+  const isDown = useDown()
   const installed = isInstalled(capability, component)
-  const state = installed ? "installed" : (capability.suggestion ?? "optional")
+  const down = installed && isDown(capability.name, component.id)
+  const state = down ? "down" : installed ? "installed" : (capability.suggestion ?? "optional")
   return (
     <article
       className={cn(
         "flex w-full flex-col gap-3 rounded-xl border border-v2-border bg-card p-4 transition-colors hover:border-foreground/20",
-        installed && "border-ok/30",
+        installed && (down ? "border-fail/30" : "border-ok/30"),
       )}
     >
       <div className="flex items-start gap-3">
         <span
           className={cn(
             "flex size-6 shrink-0 items-center justify-center text-muted-foreground",
-            installed && "text-ok",
+            installed && (down ? "text-fail" : "text-ok"),
           )}
         >
           <CapIcon className="size-5" aria-hidden="true" />
@@ -297,6 +319,12 @@ function ComponentCard({
 
 function StateChip({ state, evidence }: { state: string; evidence: string[] }) {
   const t = useT()
+  if (state === "down")
+    return (
+      <StatusPill health="fail" size="sm" className="shrink-0">
+        {t("status.failing")}
+      </StatusPill>
+    )
   if (state === "installed")
     return (
       <Tooltip
@@ -345,7 +373,7 @@ function UpgradeTag({ installation }: { installation: Schemas["Installation"] })
     case "behind-minor":
     case "behind-patch":
       return (
-        <StatusPill health="progress" size="sm">
+        <StatusPill health="warn" size="sm">
           {t("cluster.tested", tested)}
         </StatusPill>
       )
@@ -379,6 +407,7 @@ function InstalledSection() {
   const t = useT()
   const capLabel = useCapabilityLabel()
   const capabilities = useQuery(capabilitiesQuery)
+  const isDown = useDown()
   const items = capabilities.data?.items ?? []
   const installed = items.flatMap((c) => c.installations.map((i) => ({ capability: c.name, i })))
   return (
@@ -411,7 +440,12 @@ function InstalledSection() {
                 <span className="max-w-40 truncate type-mono sm:w-40" translate="no">
                   {i.version ?? "—"}
                 </span>
-                <span className="flex justify-end sm:w-44">
+                <span className="flex justify-end gap-1.5 sm:w-44">
+                  {isDown(capability, i.component) ? (
+                    <StatusPill health="fail" size="sm">
+                      {t("status.failing")}
+                    </StatusPill>
+                  ) : null}
                   <UpgradeTag installation={i} />
                 </span>
               </span>
