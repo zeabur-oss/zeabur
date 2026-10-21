@@ -141,7 +141,7 @@ export function Layers({
         </blockquote>
       ) : null}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <div className="min-w-0 flex-1 text-foreground">
+        <div className="min-w-0 flex-1 basis-60 text-foreground">
           <span className="font-medium">
             {t("problem.whatToDo")}
             {t("common.colon")}

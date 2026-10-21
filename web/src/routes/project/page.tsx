@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
-import { useState } from "react"
+import { Fragment, useState } from "react"
 import ListBulletsIcon from "~icons/ph/list-bullets"
 import LightbulbIcon from "~icons/ph/lightbulb"
 import TreeStructureIcon from "~icons/ph/tree-structure"
@@ -365,8 +365,13 @@ function NextStep({ project }: { project: string }) {
           <div className="flex w-full flex-col gap-1.5 text-left">
             <span className="type-meta text-muted-foreground">{t("project.next.command")}</span>
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 py-1.5 pr-1.5 pl-3">
-              <code className="min-w-0 flex-1 type-mono break-all" translate="no">
-                {command}
+              <code className="min-w-0 flex-1 type-mono break-words" translate="no">
+                {command.split(" ").map((word, i) => (
+                  <Fragment key={i}>
+                    {i > 0 ? " " : null}
+                    <span className="whitespace-nowrap">{word}</span>
+                  </Fragment>
+                ))}
               </code>
               <CopyText value={() => command} label={t("common.copy")} />
             </div>
