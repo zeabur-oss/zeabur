@@ -1,18 +1,21 @@
 import { useQuery } from "@tanstack/react-query"
+import { toast } from "sonner"
 import { getRouteApi } from "@tanstack/react-router"
 import { useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
+import ChartBarIcon from "~icons/ph/chart-bar"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import DotsThreeIcon from "~icons/ph/dots-three"
 import GearSixIcon from "~icons/ph/gear-six"
 import GlobeIcon from "~icons/ph/globe"
 import InfoIcon from "~icons/ph/info"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
+import CopyIcon from "~icons/ph/copy"
 import TrashIcon from "~icons/ph/trash"
 
 import type { Schemas } from "@/api/client"
-import { projectQuery } from "@/api/queries"
+import { evidenceQuery, projectQuery, queryClient } from "@/api/queries"
 import { Freshness } from "@/routes/project/page"
 import { CopyButton } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
@@ -24,6 +27,7 @@ import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
 import { DraftBar } from "@zeabur/design-system/components/draft-bar"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { usePresence } from "@zeabur/design-system/components/presence"
 import {
   Menu,
@@ -34,41 +38,42 @@ import {
 } from "@zeabur/design-system/components/menu"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
-import { useI18n, useT } from "@/i18n"
+import { useI18n, useT, writeSentence } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
 import { serviceLink } from "@/lib/place"
+import { writeBundle } from "@/model/bundle"
 import { eventsFor, serviceId, statusOf, type Project, type Service } from "@/model/service"
 import { inServiceTabs, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import {
   serviceTabs,
-  serviceViews,
   type DraftPart,
-  type ServicePage as Page,
+  type ServiceMode,
   type ServicePlace,
-  type ServiceTab,
-  type ServiceView as View,
+  type ServiceTab as Page,
 } from "@/routes/search"
 import { DeploymentsTab } from "@/routes/service/deployments"
 import { NetworkingTab } from "@/routes/service/networking"
 import { OverviewTab } from "@/routes/service/overview"
-import { Managed, PendingMark, SettingsTab } from "@/routes/service/settings-tab"
+import { MetricsTab } from "@/routes/service/metrics"
+import { PendingMark, SettingsTab } from "@/routes/service/settings-tab"
 import { VariablesTab } from "@/routes/service/variables"
-import { Logs, ServiceViewPanel, viewIcon, viewLabel } from "@/routes/service/views"
+import { Events, Logs, ModeSwitch } from "@/routes/service/views"
 
-const tabIcons: Record<ServiceTab, Icon> = {
+const tabIcons: Record<Page, Icon> = {
   overview: InfoIcon,
   logs: TextAlignLeftIcon,
   deployments: ClockCounterClockwiseIcon,
+  usage: ChartBarIcon,
   networking: GlobeIcon,
   variables: BracketsCurlyIcon,
   settings: GearSixIcon,
 }
 
 /** The tab that holds each part a pending edit belongs to. */
-const tabOfPart: Record<DraftPart, ServiceTab> = {
+const tabOfPart: Record<DraftPart, Page> = {
   networking: "networking",
   variables: "variables",
   compute: "settings",
@@ -136,7 +141,7 @@ function ServiceView({
   const edges = edgesOf(data)
   const mine = eventsFor(events, service)
   const tab: Page = search.tab ?? "overview"
-  const view = (serviceViews as readonly string[]).includes(tab) ? (tab as View) : undefined
+  const mode = search.mode
   const fresh = useQuery(projectQuery(project))
   const go = (place: ServicePlace, pod?: string) =>
     void navigate(serviceLink(project, service, { tab: place, pod }))
@@ -145,10 +150,13 @@ function ServiceView({
       search: (previous) => ({
         ...previous,
         tab: next === "overview" ? undefined : next,
-        pod: next === "logs" || next === "terminal" || next === "events" ? previous.pod : undefined,
+        mode: undefined,
+        pod: next === "logs" || next === "deployments" ? previous.pod : undefined,
       }),
       hash: "",
     })
+  const setMode = (next?: ServiceMode) =>
+    void navigate({ search: (previous) => ({ ...previous, mode: next }), hash: "" })
   const setPod = (pod?: string) =>
     void navigate({ search: (previous) => ({ ...previous, pod: pod || undefined }), replace: true })
   const unreadable = data.unreadable
@@ -178,9 +186,22 @@ function ServiceView({
         })
     : undefined
   const id = `${service.kind}/${service.name}`
-  const wide = tab === "logs" || tab === "terminal"
+  const wide = tab === "logs"
   const pendingIn = new Set(draft.parts.map((part) => tabOfPart[part]))
   const kept = (value: Page) => editing.includes(value) && opened.includes(value)
+  const copyDiagnosis = async () => {
+    try {
+      const bundle = await queryClient.fetchQuery(
+        evidenceQuery(project, service.kind, service.name),
+      )
+      await navigator.clipboard.writeText(
+        writeBundle(bundle.markdown, (sentence) => writeSentence(t, sentence)),
+      )
+      toast.success(t("common.copied"))
+    } catch {
+      toast.error(t("diagnosis.copyFailed"))
+    }
+  }
 
   return (
     <DraftProvider draft={draft}>
@@ -190,8 +211,8 @@ function ServiceView({
         variant="page"
         className="flex min-h-0 flex-1 flex-col"
       >
-        <header className="shrink-0 px-4 md:px-8">
-          <div className="mx-auto flex w-full max-w-content flex-col">
+        <header className="shrink-0">
+          <PageColumn width="content">
             <div className="flex flex-wrap items-start gap-x-3 gap-y-3 py-4 md:py-6">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-main bg-card">
                 <ServiceIcon service={service} size="lg" />
@@ -234,15 +255,10 @@ function ServiceView({
                     <DotsThreeIcon aria-hidden="true" />
                   </MenuTrigger>
                   <MenuContent>
-                    {serviceViews.map((value) => {
-                      const ViewIcon = viewIcon[value]
-                      return (
-                        <MenuItem key={value} onClick={() => go(value)}>
-                          <ViewIcon aria-hidden="true" />
-                          {t(viewLabel[value])}
-                        </MenuItem>
-                      )
-                    })}
+                    <MenuItem onClick={() => void copyDiagnosis()}>
+                      <CopyIcon aria-hidden="true" />
+                      {t("diagnosis.copy")}
+                    </MenuItem>
                     <MenuSeparator />
                     {service.provenance.tool ? (
                       <Tooltip content={t("common.managedByDetail", service.provenance.tool)}>
@@ -276,121 +292,111 @@ function ServiceView({
                 })}
               </TabsList>
             </div>
-          </div>
+          </PageColumn>
         </header>
-        <div className={cn("flex min-h-0 flex-1 flex-col px-4 md:px-8", wide ? "pb-4" : "pb-16")}>
-          <div
-            className={cn(
-              "mx-auto flex w-full max-w-content flex-col pt-3",
-              wide && "min-h-0 flex-1",
-            )}
+        <PageColumn width="content" className={cn("mt-3", wide ? "mb-4 min-h-0 flex-1" : "mb-16")}>
+          <TabsContent value="overview">
+            {tab === "overview" ? (
+              <OverviewTab
+                project={project}
+                service={service}
+                services={data.services}
+                edges={edges}
+                events={mine}
+                onTab={go}
+              />
+            ) : null}
+          </TabsContent>
+          <TabsContent
+            value="logs"
+            className={tab === "logs" ? "flex min-h-0 flex-col" : undefined}
           >
-            <TabsContent value="overview">
-              {tab === "overview" ? (
-                <OverviewTab
+            {tab === "logs" ? (
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
+                <ModeSwitch tab="logs" mode={mode} onMode={setMode} />
+                <Logs
+                  project={project}
+                  service={service}
+                  mode={mode}
+                  pod={search.pod}
+                  onPodChange={setPod}
+                />
+              </div>
+            ) : null}
+          </TabsContent>
+          <TabsContent value="deployments">
+            {tab === "deployments" ? (
+              <div className="flex flex-col gap-6">
+                <ModeSwitch tab="deployments" mode={mode} onMode={setMode} />
+                {mode === "events" ? (
+                  <Events events={mine} pod={search.pod} unreadable={unreadable} onPod={setPod} />
+                ) : (
+                  <DeploymentsTab
+                    project={project}
+                    service={service}
+                    events={mine}
+                    onEvents={() => go("events")}
+                  />
+                )}
+              </div>
+            ) : null}
+          </TabsContent>
+          <TabsContent value="usage">
+            {tab === "usage" ? <MetricsTab project={project} service={service} /> : null}
+          </TabsContent>
+          <TabsContent value="networking" keepMounted={kept("networking")}>
+            {tab === "networking" || kept("networking") ? (
+              <div key={draft.generation} className="flex flex-col gap-6">
+                <NetworkingTab
                   project={project}
                   service={service}
                   services={data.services}
-                  edges={edges}
-                  events={mine}
-                  onTab={go}
-                />
-              ) : null}
-            </TabsContent>
-            <TabsContent
-              value="logs"
-              className={tab === "logs" ? "flex min-h-0 flex-col" : undefined}
-            >
-              {tab === "logs" ? (
-                <Logs project={project} service={service} pod={search.pod} onPodChange={setPod} />
-              ) : null}
-            </TabsContent>
-            <TabsContent value="deployments">
-              {tab === "deployments" ? (
-                <DeploymentsTab
-                  project={project}
-                  service={service}
-                  events={mine}
-                  onEvents={() => go("events")}
-                />
-              ) : null}
-            </TabsContent>
-            <TabsContent value="networking" keepMounted={kept("networking")}>
-              {tab === "networking" || kept("networking") ? (
-                <div key={draft.generation} className="flex flex-col gap-6">
-                  <Managed tool={service.provenance.tool} />
-                  <NetworkingTab
-                    project={project}
-                    service={service}
-                    services={data.services}
-                    network={data}
-                    reachability={data.extensions?.networkPolicy ?? undefined}
-                    unreadable={unreadable}
-                  />
-                </div>
-              ) : null}
-            </TabsContent>
-            <TabsContent value="variables" keepMounted={kept("variables")}>
-              {tab === "variables" || kept("variables") ? (
-                <div key={draft.generation} className="flex flex-col gap-6">
-                  <Managed tool={service.provenance.tool} />
-                  <VariablesTab
-                    project={project}
-                    service={service}
-                    edges={edges.filter((e) => e.from === serviceId(service))}
-                    refused={refusedAmong(unreadable, refusedPlaces.config)}
-                  />
-                </div>
-              ) : null}
-            </TabsContent>
-            <TabsContent value="settings" keepMounted={kept("settings")}>
-              {tab === "settings" || kept("settings") ? (
-                <SettingsTab
-                  project={project}
-                  service={service}
                   network={data}
+                  reachability={data.extensions?.networkPolicy ?? undefined}
                   unreadable={unreadable}
                 />
-              ) : null}
-            </TabsContent>
-            {serviceViews.map((value) => (
-              <TabsContent
-                key={value}
-                value={value}
-                className={
-                  value === "terminal" && tab === value ? "flex min-h-0 flex-1 flex-col" : undefined
-                }
-              >
-                {view === value ? (
-                  <ServiceViewPanel
-                    project={project}
-                    service={service}
-                    view={value}
-                    pod={search.pod}
-                    events={mine}
-                    unreadable={unreadable}
-                    onPod={setPod}
-                    onClose={() => setTab("overview")}
-                  />
-                ) : null}
-              </TabsContent>
-            ))}
-            {pending.mounted ? (
-              <PendingChanges
-                draft={draft}
-                presence={pending.props}
-                onReview={() =>
-                  reviewer.plan({
-                    title: t("draft.title", service.name),
-                    changes: draft.changes,
-                    restartAfter: draft.restartAfter || undefined,
-                    service: { kind: service.kind, name: service.name },
-                  })
-                }
+              </div>
+            ) : null}
+          </TabsContent>
+          <TabsContent value="variables" keepMounted={kept("variables")}>
+            {tab === "variables" || kept("variables") ? (
+              <div key={draft.generation} className="flex flex-col gap-6">
+                <VariablesTab
+                  project={project}
+                  service={service}
+                  edges={edges.filter((e) => e.from === serviceId(service))}
+                  refused={refusedAmong(unreadable, refusedPlaces.config)}
+                />
+              </div>
+            ) : null}
+          </TabsContent>
+          <TabsContent value="settings" keepMounted={kept("settings")}>
+            {tab === "settings" || kept("settings") ? (
+              <SettingsTab
+                project={project}
+                service={service}
+                network={data}
+                unreadable={unreadable}
+                mode={mode}
+                onMode={setMode}
               />
             ) : null}
-          </div>
-        </div>
+          </TabsContent>
+          {pending.mounted ? (
+            <PendingChanges
+              draft={draft}
+              presence={pending.props}
+              onReview={() =>
+                reviewer.plan({
+                  title: t("draft.title", service.name),
+                  changes: draft.changes,
+                  restartAfter: draft.restartAfter || undefined,
+                  service: { kind: service.kind, name: service.name },
+                })
+              }
+            />
+          ) : null}
+        </PageColumn>
         {planner.dialog}
         {deleter.dialog}
         {reviewer.dialog}
@@ -437,8 +443,8 @@ function PendingChanges({
 
 function Column({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-4 py-6 md:px-8 md:py-8">
-      <div className="mx-auto w-full max-w-content">{children}</div>
-    </div>
+    <PageColumn width="content" className="my-6 md:my-8">
+      {children}
+    </PageColumn>
   )
 }

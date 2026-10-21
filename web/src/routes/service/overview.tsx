@@ -388,7 +388,7 @@ function Summary({
         <UsageGlance
           project={project}
           service={service}
-          action={<More onClick={() => onTab("usage")}>{t("tab.metrics")}</More>}
+          action={<More onClick={() => onTab("usage")}>{t("tab.usage")}</More>}
         />
       )}
     </SummaryCard>

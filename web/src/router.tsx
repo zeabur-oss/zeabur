@@ -202,6 +202,7 @@ const serviceRoute = createRoute({
         search: {
           ...search,
           tab: place ? place.tab : search.tab,
+          mode: place ? place.mode : search.mode,
           former: undefined,
           view: undefined,
         },

@@ -196,49 +196,60 @@ function Compute({
         </form.Field>
       ) : null}
       {containers.map((container, index) => (
-        <fieldset key={container.name} className="flex flex-col gap-2">
-          <legend className="mb-1 font-mono text-xs" translate="no">
-            {container.name}
-          </legend>
-          <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4">
-            {(
+        <fieldset key={container.name} className="flex flex-col gap-3">
+          {containers.length > 1 ? (
+            <legend className="mb-1 type-label text-tertiary" translate="no">
+              {container.name}
+            </legend>
+          ) : (
+            <legend className="sr-only">{container.name}</legend>
+          )}
+          {(
+            [
               [
-                ["cpuRequest", t("form.cpuRequest")],
-                ["memoryRequest", t("form.memoryRequest")],
-                ["cpuLimit", t("form.cpuLimit")],
-                ["memoryLimit", t("form.memoryLimit")],
-              ] as const
-            ).map(([key, label]) => (
-              <form.Field
-                key={key}
-                name={`containers[${index}].${key}`}
-                validators={{ onChange: amount }}
-              >
-                {(f) => (
-                  <FormField
-                    label={<Term detail={paths[key]}>{label}</Term>}
-                    errors={[
-                      ...f.state.meta.errors,
-                      refusedField(
-                        refused,
-                        `spec.template.spec.containers[${index}].resources.${paths[key]}`,
-                      ),
-                    ]}
-                  >
-                    <Input
-                      size="sm"
-                      mono
-                      value={f.state.value}
-                      placeholder={key.startsWith("cpu") ? "250m" : "256Mi"}
-                      onChange={(e) => f.handleChange(e.target.value)}
-                      onBlur={f.handleBlur}
-                      disabled={disabled}
-                    />
-                  </FormField>
-                )}
-              </form.Field>
-            ))}
-          </div>
+                ["cpuRequest", t("form.cpuRequest"), t("form.cpuUnset")],
+                ["cpuLimit", t("form.cpuLimit"), t("form.noLimit")],
+              ],
+              [
+                ["memoryRequest", t("form.memoryRequest"), t("form.memoryUnset")],
+                ["memoryLimit", t("form.memoryLimit"), t("form.noLimit")],
+              ],
+            ] as const
+          ).map((row) => (
+            <div key={row[0][0]} className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
+              {row.map(([key, label, hint]) => (
+                <form.Field
+                  key={key}
+                  name={`containers[${index}].${key}`}
+                  validators={{ onChange: amount }}
+                >
+                  {(f) => (
+                    <FormField
+                      label={<Term detail={paths[key]}>{label}</Term>}
+                      hint={f.state.value.trim() === "" ? hint : undefined}
+                      errors={[
+                        ...f.state.meta.errors,
+                        refusedField(
+                          refused,
+                          `spec.template.spec.containers[${index}].resources.${paths[key]}`,
+                        ),
+                      ]}
+                    >
+                      <Input
+                        size="sm"
+                        mono
+                        value={f.state.value}
+                        placeholder={t("form.notSet")}
+                        onChange={(e) => f.handleChange(e.target.value)}
+                        onBlur={f.handleBlur}
+                        disabled={disabled}
+                      />
+                    </FormField>
+                  )}
+                </form.Field>
+              ))}
+            </div>
+          ))}
         </fieldset>
       ))}
       <div className="flex flex-wrap items-center gap-3">

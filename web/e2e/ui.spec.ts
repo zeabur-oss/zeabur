@@ -36,6 +36,8 @@ const logsPod = (page: Page) =>
 
 /** The URL of a tab or a view from the menu: `?tab=<tab>`. */
 const tabUrl = (tab: string) => new RegExp(`[?&]tab=${tab}(&|#|$)`)
+const modeUrl = (tab: string, mode: string) => (url: URL) =>
+  url.searchParams.get("tab") === tab && url.searchParams.get("mode") === mode
 
 test("Home names the failing service across projects and lists the project", async ({ page }) => {
   await page.goto("/")
@@ -95,7 +97,9 @@ test("a popup pressed before its code arrives opens when it does, by click and b
     })
     return release
   }
-  const language = page.getByRole("button", { name: /^Cluster .*, signed in as / })
+  const language = page.getByRole("button", {
+    name: /^Cluster .*, signed in as /,
+  })
   const english = page.getByRole("menuitem", { name: "English" })
 
   let release = await hold()
@@ -136,7 +140,11 @@ test("the palette jumps to a service by keyboard, and Enter while composing does
   await expect(option).toBeVisible()
   // An IME's Enter (keyCode 229) confirms the composed text, not the highlighted item.
   await search.evaluate((input) => {
-    const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, isComposing: true })
+    const event = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+      isComposing: true,
+    })
     Object.defineProperty(event, "keyCode", { value: 229 })
     Object.defineProperty(event, "which", { value: 229 })
     input.dispatchEvent(event)
@@ -226,7 +234,9 @@ test("the map draws the services; the quick look opens the service page and Back
   await expect(page).toHaveURL(
     new RegExp(`service=Deployment%2F${healthy}|service=Deployment/${healthy}`),
   )
-  const quickLook = page.getByRole("complementary", { name: `Quick look: ${healthy}` })
+  const quickLook = page.getByRole("complementary", {
+    name: `Quick look: ${healthy}`,
+  })
   await expect(quickLook).toBeVisible()
   await quickLook.getByRole("link", { name: "Open service page" }).click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${healthy}$`))
@@ -265,7 +275,7 @@ test("the services list filters, sorts, and leads from a pod to its logs", async
   await expect(logsPod(page)).toHaveAccessibleName(`Replica ${pod}`)
 })
 
-test("the service page has six tabs and its views in the menu, and Logs follows a pod", async ({
+test("the service page has seven tabs and an actions menu, and Logs follows a pod", async ({
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${healthy}`)
@@ -276,19 +286,15 @@ test("the service page has six tabs and its views in the menu, and Logs follows 
     "Overview",
     "Logs",
     "Deployments",
+    "Usage",
     "Networking",
     "Variables",
     "Settings",
   ])
   const header = page.locator("main header").first()
   await header.getByRole("button", { name: "More", exact: true }).click()
-  await expect(page.getByRole("menuitem")).toHaveText([
-    "Usage",
-    "Events",
-    "Terminal",
-    "YAML",
-    "Delete service",
-  ])
+  // The menu holds actions; the views are in their tabs.
+  await expect(page.getByRole("menuitem")).toHaveText(["Copy diagnosis", "Delete service"])
   await page.keyboard.press("Escape")
   await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true")
   const overview = page.getByRole("tabpanel", { name: "Overview" })
@@ -319,17 +325,31 @@ test("the service page has six tabs and its views in the menu, and Logs follows 
     timeout: 30_000,
   })
 
-  await header.getByRole("button", { name: "More", exact: true }).click()
-  await page.getByRole("menuitem", { name: "YAML" }).click()
-  await expect(page).toHaveURL(tabUrl("yaml"))
-  await expect(page.getByRole("region", { name: "YAML" })).toBeVisible()
-  await expect(tabs.getByRole("tab", { selected: true })).toHaveCount(0)
+  const logs = page.getByRole("tabpanel", { name: "Logs" })
+  await logs.getByRole("group", { name: "Views" }).getByRole("button", { name: "Terminal" }).click()
+  await expect(page).toHaveURL(modeUrl("logs", "terminal"))
+  await expect(tabs.getByRole("tab", { name: "Logs" })).toHaveAttribute("aria-selected", "true")
+
   await tabs.getByRole("tab", { name: "Settings" }).click()
   await expect(page).toHaveURL(tabUrl("settings"))
+  const settings = page.getByRole("tabpanel", { name: "Settings" })
+  await settings.getByRole("group", { name: "Views" }).getByRole("button", { name: "YAML" }).click()
+  await expect(page).toHaveURL(modeUrl("settings", "yaml"))
+  await expect(page.getByRole("figure", { name: `YAML of ${healthy}` })).toBeVisible()
   await page.goBack()
-  await expect(page).toHaveURL(tabUrl("yaml"))
+  await expect(page).toHaveURL(
+    (url) => url.searchParams.get("tab") === "settings" && !url.searchParams.has("mode"),
+  )
 
-  // Links from before the six tabs still lead to their place.
+  // Links from before the seven tabs still lead to their place.
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=terminal`)
+  await expect(page).toHaveURL(modeUrl("logs", "terminal"))
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=events`)
+  await expect(page).toHaveURL(modeUrl("deployments", "events"))
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=yaml`)
+  await expect(page).toHaveURL(modeUrl("settings", "yaml"))
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=metrics`)
+  await expect(page).toHaveURL(tabUrl("usage"))
   await page.goto(`${project}/services/Deployment/${healthy}?tab=inspect&view=logs`)
   await expect(page).toHaveURL(tabUrl("logs"))
   await page.goto(`${project}/services/Deployment/${healthy}?tab=configure#networking`)
@@ -404,7 +424,9 @@ test("the services search box follows the URL on Back and Forward", async ({ pag
   await page.goto(`${project}?view=list`)
   const box = page.getByRole("searchbox", { name: "Filter services" })
   const table = page.getByRole("table", { name: "Services" })
-  const healthyRow = table.getByRole("link", { name: new RegExp(`^${healthy}\\b`) })
+  const healthyRow = table.getByRole("link", {
+    name: new RegExp(`^${healthy}\\b`),
+  })
   await box.fill(failing)
   await expect(page).toHaveURL(new RegExp(`q=${failing}`))
   await expect(healthyRow).toHaveCount(0)
@@ -456,7 +478,9 @@ test("Objects reads unusual kinds on click and on a scan", async ({ page }) => {
   await filter.fill("")
   // Reads every served kind, CRDs included: slow on a slow runner.
   await page.getByRole("button", { name: "Scan all kinds" }).click()
-  await expect(page.getByText("All kinds read")).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText("All kinds read")).toBeVisible({
+    timeout: 30_000,
+  })
   await page.getByRole("button", { name: "Refresh" }).click()
   await expect(list.getByRole("button", { name: /^editor-config/ })).toBeVisible()
 })
@@ -663,7 +687,10 @@ test("a volume is added and its claim edited under Storage", async ({ page }) =>
 test("Deployments lists the releases and rolls back to one through a plan", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=deployments`)
   // Guarantees a second template to roll back to.
-  await applyNow(page, { op: "restart", workload: { kind: "Deployment", name: editor } })
+  await applyNow(page, {
+    op: "restart",
+    workload: { kind: "Deployment", name: editor },
+  })
   const panel = page.getByRole("tabpanel", { name: "Deployments" })
   const list = panel.getByRole("list", { name: "Deployment history" })
   // The Deployment controller writes the new ReplicaSet a moment after the apply.
@@ -779,7 +806,9 @@ test("Networking shows who may reach a service, and a ready-made policy isolates
     "Isolate",
     `${editor} then accepts and sends only what this and other policies allow`,
   )
-  await expect(panel).toContainText(`zeabur-isolate-${editor}`, { timeout: 15_000 })
+  await expect(panel).toContainText(`zeabur-isolate-${editor}`, {
+    timeout: 15_000,
+  })
   await expect(panel).toContainText("Blocked")
 })
 
@@ -806,7 +835,9 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
   const address = `networking.k8s.io/v1/networkpolicies/${policy}`
   await page.goto(`${project}/objects?object=${encodeURIComponent(address)}`)
   await page.getByRole("button", { name: "Delete", exact: true }).click()
-  const dialog = page.getByRole("dialog", { name: `Delete NetworkPolicy ${policy}` })
+  const dialog = page.getByRole("dialog", {
+    name: `Delete NetworkPolicy ${policy}`,
+  })
   await expect(dialog).toContainText(`Delete ${policy}. This can't be undone.`)
   const confirm = dialog.getByRole("button", { name: "Delete", exact: true })
   await expect(confirm).toBeDisabled()
@@ -827,7 +858,9 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   const row = page.getByRole("listitem").filter({ hasText: other })
   await row.getByRole("button", { name: "Adopt" }).click()
   await confirmPlan(page, `Adopt ${other}`, "Adopt", "Nothing in it changes.")
-  await expect(row.getByRole("button", { name: "Adopt" })).toHaveCount(0, { timeout: 15_000 })
+  await expect(row.getByRole("button", { name: "Adopt" })).toHaveCount(0, {
+    timeout: 15_000,
+  })
 
   await page.goto(`/projects/${other}/settings`)
   await page.getByRole("textbox", { name: "Project name" }).fill("Adopted in a test")

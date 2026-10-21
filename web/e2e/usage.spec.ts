@@ -8,7 +8,7 @@ const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const service = env("ZEABUR_E2E_SERVICE", "talker")
 const pod = env("ZEABUR_E2E_POD")
-// Usage is a view from the service menu; the old `?tab=metrics` leads there.
+// Usage is a tab; the old `?tab=metrics` leads there.
 const page_ = `/projects/${encodeURIComponent(namespace)}/services/Deployment/${service}?tab=metrics`
 const STORE = "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428"
 const MiB = 2 ** 20
