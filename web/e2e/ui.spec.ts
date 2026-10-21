@@ -69,9 +69,7 @@ test("Home names the failing service across projects and lists the project", asy
   }
 
   await row.getByRole("link", { name: new RegExp(`^Logs of ${failing}`) }).click()
-  await expect(page).toHaveURL(
-    new RegExp(`/services/Deployment/${failing}\\?.*tab=logs`),
-  )
+  await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=logs`))
   await expect(page.getByRole("tab", { name: "Logs" })).toHaveAttribute("aria-selected", "true")
 
   await page.goto("/projects")
@@ -292,10 +290,7 @@ test("the service page has six tabs and its views in the menu, and Logs follows 
     "Delete service",
   ])
   await page.keyboard.press("Escape")
-  await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  )
+  await expect(tabs.getByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true")
   const overview = page.getByRole("tabpanel", { name: "Overview" })
   await expect(overview.getByRole("region", { name: "Status" })).toContainText("Source")
   await overview.getByRole("button", { name: /^Replicas \d+\/\d+$/ }).click()
