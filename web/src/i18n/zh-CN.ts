@@ -1048,6 +1048,7 @@ export const zhCN: Messages = {
   "diagnosis.action.reservation": "调整预留量",
   "diagnosis.action.variables": "变量",
   "diagnosis.action.storage": "存储",
+  "diagnosis.action.yaml": "编辑 YAML",
   "gap.title": "缺少的设置",
   "gap.warning": "警告",
   "gap.advice": "建议",
@@ -1514,6 +1515,16 @@ export const zhCN: Messages = {
   "sentence.rollout.stuck.configMissing": (p) =>
     `${p.name} 的部署卡住了：新副本读取的机密或配置文件不存在。`,
   "sentence.rollout.stuck.runFailed": (p) => `${p.name} 的部署卡住了：新副本运行失败。`,
+  "sentence.fix.multiAttach": (p) =>
+    `旧副本还占着卷，而卷一次只能挂载到一台机器上。在 YAML 中把 ${p.service || "服务"} 的 strategy.type 设为 Recreate，让旧副本先停止；代价是每次部署时，新副本启动的那几秒服务会中断。`,
+  "sentence.fix.outOfMemory": (p) =>
+    `把内存上限调高${p.limit ? `到超过 ${p.limit}` : ""}；“用量”会显示它离上限多近。上限不会预留内存，所以用到时机器上要有空闲的内存。`,
+  "sentence.fix.evicted.disk":
+    "机器磁盘空间不足，停止了这个副本；新副本会自动启动，但旧副本写在自身磁盘上的数据不会保留。把数据放在卷、让日志保持精简，或请集群管理员清理那台机器的磁盘空间。",
+  "sentence.fix.evicted.memory":
+    "机器内存不足，先停止了这个副本。把预留内存设成接近实际用量，它就会最后才被停止；代价是即使空闲，这些内存也会一直为它保留。",
+  "sentence.fix.evicted":
+    "机器资源不足，停止了这个副本；新副本会自动启动。它的事件会说明是哪种资源不足。",
   "sentence.rollout.stuck.deadlineExceeded": (p) =>
     `${p.name} 的部署卡住了：期限（progressDeadlineSeconds）内没有进展。`,
   "sentence.rollout.stuck.replicaFailure": (p) => `${p.name} 的部署卡住了：集群无法创建新副本。`,

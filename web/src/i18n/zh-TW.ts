@@ -1050,6 +1050,7 @@ export const zhTW: Messages = {
   "diagnosis.action.reservation": "調整保留量",
   "diagnosis.action.variables": "環境變數",
   "diagnosis.action.storage": "儲存空間",
+  "diagnosis.action.yaml": "編輯 YAML",
   "gap.title": "缺少的設定",
   "gap.warning": "警告",
   "gap.advice": "建議",
@@ -1516,6 +1517,16 @@ export const zhTW: Messages = {
   "sentence.rollout.stuck.configMissing": (p) =>
     `${p.name} 的部署卡住了：新副本讀取的機密或設定檔不存在。`,
   "sentence.rollout.stuck.runFailed": (p) => `${p.name} 的部署卡住了：新副本執行失敗。`,
+  "sentence.fix.multiAttach": (p) =>
+    `舊副本還占著磁碟區，而磁碟區一次只能掛在一台機器上。在 YAML 把 ${p.service || "服務"} 的 strategy.type 設為 Recreate，讓舊副本先停止；代價是每次部署時，新副本啟動的那幾秒服務會中斷。`,
+  "sentence.fix.outOfMemory": (p) =>
+    `把記憶體上限調高${p.limit ? `到超過 ${p.limit}` : ""}；「用量」會顯示它離上限多近。上限不會預留記憶體，所以用到時機器上要有空出來的記憶體。`,
+  "sentence.fix.evicted.disk":
+    "機器磁碟空間不足，停止了這個副本；新副本會自動啟動，但舊副本寫在自身磁碟上的資料不會保留。把資料放在磁碟區、讓日誌保持精簡，或請叢集管理者清出那台機器的磁碟空間。",
+  "sentence.fix.evicted.memory":
+    "機器記憶體不足，先停止了這個副本。把預留記憶體設成接近實際用量，它就會最後才被停止；代價是即使閒置，這些記憶體也會一直保留給它。",
+  "sentence.fix.evicted":
+    "機器資源不足，停止了這個副本；新副本會自動啟動。它的事件會說明是哪種資源不足。",
   "sentence.rollout.stuck.deadlineExceeded": (p) =>
     `${p.name} 的部署卡住了：期限（progressDeadlineSeconds）內沒有進展。`,
   "sentence.rollout.stuck.replicaFailure": (p) => `${p.name} 的部署卡住了：叢集無法建立新副本。`,

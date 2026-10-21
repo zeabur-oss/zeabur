@@ -1146,6 +1146,7 @@ export const en = {
   "diagnosis.action.reservation": "Change reservation",
   "diagnosis.action.variables": "Variables",
   "diagnosis.action.storage": "Storage",
+  "diagnosis.action.yaml": "Edit YAML",
   "gap.title": "Missing setup",
   "gap.warning": "Warning",
   "gap.advice": "Advice",
@@ -1655,6 +1656,16 @@ export const en = {
     `The rollout of ${p.name} is stuck: a new replica reads a secret or config that doesn't exist.`,
   "sentence.rollout.stuck.runFailed": (p: P) =>
     `The rollout of ${p.name} is stuck: a new replica's run failed.`,
+  "sentence.fix.multiAttach": (p: P) =>
+    `The old replica still holds its volume, and a volume attaches to one machine at a time. In YAML, set ${p.service || "the service"}'s strategy.type to Recreate so the old replica stops first; each release then takes it offline for the seconds the new one needs to start.`,
+  "sentence.fix.outOfMemory": (p: P) =>
+    `Raise the memory maximum${p.limit ? ` above ${p.limit}` : ""}; Usage shows how close it runs. The maximum reserves nothing, so the machine needs that memory free when it is used.`,
+  "sentence.fix.evicted.disk":
+    "The machine ran short of disk and stopped this replica; a new one starts on its own, without what the old one wrote to its own disk. Keep data on a volume and logs small, or have whoever runs the cluster free disk on that machine.",
+  "sentence.fix.evicted.memory":
+    "The machine ran short of memory and stopped this replica first. Reserve memory close to what it uses so it goes last; the reservation is held for it even when idle.",
+  "sentence.fix.evicted":
+    "The machine ran short of resources and stopped this replica; a new one starts on its own. Its events say which resource.",
   "sentence.rollout.stuck.deadlineExceeded": (p: P) =>
     `The rollout of ${p.name} is stuck: it made no progress before its deadline (progressDeadlineSeconds).`,
   "sentence.rollout.stuck.replicaFailure": (p: P) =>
