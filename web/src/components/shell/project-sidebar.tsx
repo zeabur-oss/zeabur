@@ -27,7 +27,6 @@ import { groupServices, serviceId, statusOf, type Project, type Service } from "
 import {
   Sidebar,
   SidebarContent,
-  SidebarCopyPill,
   SidebarFooter,
   SidebarGroup,
   SidebarItem,
@@ -94,7 +93,6 @@ function SettingsSidebar({ project }: { project: string }) {
           </SidebarItem>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarCopyPill label={t("column.namespace")} value={project} copyLabel={t("common.copy")} />
       <SidebarFooter>
         <DockToggle />
         <ContextMenu />
@@ -186,7 +184,6 @@ function ProjectNav({ project }: { project: string }) {
           ) : null}
         </SidebarSection>
       </SidebarContent>
-      <SidebarCopyPill label={t("column.namespace")} value={project} copyLabel={t("common.copy")} />
       <SidebarFooter>
         <DockToggle />
         <ContextMenu />

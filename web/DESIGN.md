@@ -137,7 +137,8 @@ beside the page, which scrolls on its own. There is no top bar and no breadcrumb
   Settings, then the services under a Services label (its action opens them as a list), grouped by `part-of` or by role (Web, Internal, Workers, Jobs, Data) as folding
   rows (`SidebarMenu`) with each service on the tree rail and a status dot; one group is listed
   flat. Objects and the objects that belong to no service are under Advanced, folded. The
-  namespace is in a pill to copy at the foot (`SidebarCopyPill`), above the Terminal row and the context chip. On the settings pages the
+  namespace is not repeated there: it is in project settings (Kubernetes namespace, copyable) and
+  ⋯ Copy name for kubectl. On the settings pages the
   sidebar is their navigation instead: Back, the title, General.
 - **Terminal dock** (`Dock`): the terminals live under the page, beside the sidebar, and outlive
   every page and service change: a terminal keeps its connection and what it printed until its
