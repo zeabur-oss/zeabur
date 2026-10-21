@@ -1,5 +1,5 @@
 import type { Messages } from "@/i18n/en"
-import { cuts, listZh, probeTiming, thingZh, type P, type ProbeTiming } from "@/i18n/sentence-parts"
+import { listZh, thingZh } from "@/i18n/sentence-parts"
 import sentences from "@/i18n/generated/zh-TW"
 
 // A space where Han text meets a Latin word ("檢視 Secrets 需要…").
@@ -17,25 +17,9 @@ const verbZhTW: Record<string, string> = {
   delete: "刪除",
 }
 
-const objectZhTW = (p: P) => (p.object === "Secret" ? `機密 ${p.name}` : `設定檔 ${p.name}`)
-
-/** Who a volume's mount failure stops: the container, else the replica. */
-const mountedZhTW = (p: P) => p.container ?? `副本 ${p.pod}`
-
-/** Seconds in words, whole minutes as minutes. */
-const secondsZh = (s: number) => (s >= 60 && s % 60 === 0 ? `${s / 60} 分鐘` : `${s} 秒`)
-
 /** A wait in its largest unit, rounded up: 90 s is 2 minutes. */
 const waitZh = (s: number) =>
   s < 60 ? `${s} 秒` : s < 3600 ? `${Math.ceil(s / 60)} 分鐘` : `${Math.ceil(s / 3600)} 小時`
-
-/** The sentence, led by "by default" when both values are the defaults, else followed by which one is. */
-const timingZhTW = (t: ProbeTiming, sentence: string) =>
-  t.defaults
-    ? `預設情況下，${sentence}`
-    : `${sentence}${t.periodOnly ? `每 ${secondsZh(t.period)}是預設值。` : ""}${
-        t.thresholdOnly ? `${t.threshold} 次是預設值。` : ""
-      }`
 
 export const zhTW: Messages = {
   ...sentences,
@@ -1130,122 +1114,6 @@ export const zhTW: Messages = {
       ? `減少 ${p.object} 的副本數、調低每個副本的保留量，或請管理員調高上限 ${p.quota}。`
       : `減少要求的量、釋出專案已用的資源，或請管理員調高上限 ${p.quota}。`,
   "sentence.problem.policyDenied.fix.change": () => "修改它指出的地方，或洽詢負責這項政策的人。",
-  "sentence.diagnosis.crashLoop.why.backOff": (p) =>
-    `它已重新啟動 ${p.restarts} 次；叢集每次都會再啟動它，兩次之間等得越來越久，預設最多等 5 分鐘。`,
-  "sentence.diagnosis.crashLoop.why.exitsZero": (p) =>
-    `服務應該持續執行，所以程式一結束，即使是正常結束，叢集也會再啟動它（目前 ${p.restarts} 次）。`,
-  "sentence.diagnosis.runFailed.why.exitCode": (p) =>
-    `程式結束時的結束碼不是 0 就算執行失敗；這次是 ${p.exitCode}。`,
-  "sentence.diagnosis.runFailed.why.gaveUp": (p) =>
-    p.backoffLimit
-      ? p.backoffLimit === "0"
-        ? `這項工作失敗後不會重試；這次的結束碼是 ${p.exitCode}。`
-        : `這項工作已放棄：執行失敗時會重試 ${p.backoffLimit} 次，最後一次的結束碼也是 ${p.exitCode}。`
-      : `這項工作重試後已放棄；最後一次的結束碼是 ${p.exitCode}。`,
-  "sentence.diagnosis.outOfMemory.why.limit": (p) =>
-    `每個副本最多只能用 ${p.limit} 記憶體，用到上限時系統會直接終止它，程式來不及處理。`,
-  "sentence.diagnosis.outOfMemory.why.noLimit": () =>
-    "沒有記憶體上限時，它可以一直用到機器的記憶體不足，這時系統會終止用最多的程式。",
-  "sentence.diagnosis.imagePull.why": () =>
-    "叢集要先下載映像檔才能啟動容器；下載失敗時會一再重試，每次等得更久。",
-  "sentence.diagnosis.probeFailure.why.liveness": (p) => {
-    const t = probeTiming(p)
-    return t
-      ? timingZhTW(
-          t,
-          `叢集每 ${secondsZh(t.period)}檢查一次，連續失敗 ${t.threshold} 次（約 ${secondsZh(t.total)}）就會重新啟動容器。`,
-        )
-      : "存活檢查連續失敗幾次後，叢集就會重新啟動容器。"
-  },
-  "sentence.diagnosis.probeFailure.why.readiness": (p) => {
-    const t = probeTiming(p)
-    return t
-      ? timingZhTW(
-          t,
-          `叢集每 ${secondsZh(t.period)}檢查一次；連續失敗 ${t.threshold} 次（約 ${secondsZh(t.total)}）後，容器就不會從私有位址收到流量，直到再次通過。`,
-        )
-      : "就緒檢查失敗期間，容器不會從私有位址收到流量。"
-  },
-  "sentence.diagnosis.probeFailure.why.startup": (p) => {
-    const t = probeTiming(p)
-    return t
-      ? timingZhTW(
-          t,
-          `容器有 ${t.threshold} × ${secondsZh(t.period)}（${secondsZh(t.total)}）可以通過啟動檢查；超過時叢集就會重新啟動它。`,
-        )
-      : "其他檢查會等啟動檢查通過；如果沒有在時限內通過，叢集就會重新啟動容器。"
-  },
-  "sentence.diagnosis.configMissing.cause.object": (p) =>
-    `${p.container} 無法啟動：${objectZhTW(p)} 不存在。`,
-  "sentence.diagnosis.configMissing.cause.key": (p) =>
-    `${p.container} 無法啟動：${objectZhTW(p)} 裡沒有 ${p.key}。`,
-  "sentence.diagnosis.configMissing.cause.unknown": (p) =>
-    `${p.container} 無法啟動：缺少它讀取的機密或設定檔。`,
-  "sentence.diagnosis.configMissing.cause.volume": (p) =>
-    `${mountedZhTW(p)} 無法啟動：磁碟區 ${p.volume} 取自 ${objectZhTW(p)}，但它不存在。`,
-  "sentence.diagnosis.configMissing.why": () =>
-    "容器讀取的每個機密、設定檔和其中的鍵都存在之後，叢集才會啟動它。",
-  "sentence.diagnosis.configMissing.why.volume": () =>
-    "叢集會先掛載所有磁碟區，再啟動副本的容器；磁碟區如果取自不存在的機密或設定檔，就無法掛載，容器會一直等待。",
-  "sentence.diagnosis.configMissing.fix.object": (p) =>
-    `在專案裡加上 ${objectZhTW(p)}，或不再讀取它。`,
-  "sentence.diagnosis.configMissing.fix.key": (p) =>
-    `在 ${objectZhTW(p)} 加上 ${p.key}，或不再讀取它。`,
-  "sentence.diagnosis.configMissing.fix.unknown": () =>
-    "副本的事件會說缺少什麼；把它加上，或不再讀取它。",
-  "sentence.diagnosis.configMissing.fix.volume": (p) =>
-    `在專案裡加上 ${objectZhTW(p)}，或移除磁碟區 ${p.volume}。`,
-  "sentence.diagnosis.unschedulable.cause.cpu": (p) =>
-    `${p.service} 正在等待可用資源：沒有機器有足夠的 CPU。`,
-  "sentence.diagnosis.unschedulable.cause.memory": (p) =>
-    `${p.service} 正在等待可用資源：沒有機器有足夠的記憶體。`,
-  "sentence.diagnosis.unschedulable.cause.placement": (p) =>
-    `${p.service} 正在等待可以執行它的機器。`,
-  "sentence.diagnosis.unschedulable.cause.other": (p) => `${p.service} 正在等待可以執行的機器。`,
-  "sentence.diagnosis.unschedulable.why": (p) =>
-    `每個副本要放到容得下它保留量的機器上；叢集的說明：${p.message}`,
-  "sentence.diagnosis.unschedulable.fix.cpu": () => "減少保留的 CPU、減少副本數，或加一台機器。",
-  "sentence.diagnosis.unschedulable.fix.memory": () =>
-    "減少保留的記憶體、減少副本數，或加一台機器。",
-  "sentence.diagnosis.unschedulable.fix.placement": () =>
-    "檢查它可以在哪裡執行（node selector、affinity、tolerations）。",
-  "sentence.diagnosis.unschedulable.fix.other": () => "副本事件裡有排程器的完整回應。",
-  "sentence.diagnosis.quotaBlocked.cause": (p) =>
-    `${p.service} 無法再啟動更多副本：已達到專案用量上限 ${p.quota}。`,
-  "sentence.diagnosis.quotaBlocked.why": (p) =>
-    `專案用量上限 ${p.quota} 限制所有服務加起來能保留的量；超過時叢集會拒絕新的副本。`,
-  "sentence.diagnosis.quotaBlocked.fix": () =>
-    "減少副本數、調低每個副本的保留量，或請管理員調高上限。",
-  "sentence.diagnosis.unreachable.cause.noService": (p) =>
-    `叢集裡的其他服務還連不到 ${p.service}：它沒有私有位址（Service）。`,
-  "sentence.diagnosis.unreachable.cause.targetPort": (p) =>
-    `${p.endpoint} 把流量送到連接埠 ${p.targetPort}，${p.service} 的容器卻沒有宣告它${p.ports ? `；容器宣告的是 ${p.ports}` : ""}。`,
-  "sentence.diagnosis.unreachable.cause.noReadyEndpoints": (p) =>
-    `${p.endpoint ?? p.address} 沒有地方可以送流量：${p.service} 沒有任何就緒的副本。`,
-  "sentence.diagnosis.unreachable.cause.routeNotAccepted": (p) =>
-    `送到 ${p.route} 網域的請求到不了 ${p.service}：流量入口回報 ${p.condition} ${p.reason}。`,
-  "sentence.diagnosis.unreachable.why.noService": (p) =>
-    p.from
-      ? `${p.from} 用名稱 ${p.service} 送流量給它，但要有同名的私有位址（Service）才收得到。`
-      : `路由用名稱 ${p.endpoint ?? p.service} 送流量，但要有同名的私有位址（Service）才收得到。`,
-  "sentence.diagnosis.unreachable.why.targetPort": () =>
-    "私有位址會轉送到它指定的連接埠；用名稱指定時，必須是容器宣告的連接埠。",
-  "sentence.diagnosis.unreachable.why.noReadyEndpoints": () =>
-    "私有位址只會把流量送給通過就緒檢查的副本。",
-  "sentence.diagnosis.unreachable.why.routeNotAccepted": () =>
-    "網域的流量入口必須接受這條路由，並找到它指定的位址，請求才會通過。",
-  "sentence.diagnosis.unreachable.fix.noService": () =>
-    "新增私有位址（Service），讓其他服務或網域可以把流量送給它。",
-  "sentence.diagnosis.unreachable.fix.targetPort": () => "讓私有位址指向容器宣告的連接埠。",
-  "sentence.diagnosis.unreachable.fix.noReadyEndpoints": () =>
-    "找出為什麼沒有副本就緒：它的其他問題、就緒檢查、日誌。",
-  "sentence.diagnosis.unreachable.fix.routeNotAccepted": () =>
-    "檢查路由用的流量入口，以及路由指向的位址；路由的狀態會說是哪一個。",
-  "sentence.diagnosis.unexplained.cause": (p) =>
-    p.reason ? `${p.service} 執行失敗（${p.reason}）。` : `${p.service} 執行失敗。`,
-  "sentence.diagnosis.unexplained.why": (p) =>
-    p.reason ? `Zeabur 無法解釋叢集回報的狀態 ${p.reason}。` : "Zeabur 無法解釋叢集回報的狀態。",
-  "sentence.diagnosis.unexplained.fix": () => "它的事件和日誌可能有更多資訊。",
   "sentence.problem.summary.bad-request": () => "這個請求無效。",
   "sentence.problem.summary.unauthenticated": () => "叢集不接受你的登入。",
   "sentence.problem.summary.signed-out": () => "你已登出。",
@@ -1279,118 +1147,6 @@ export const zhTW: Messages = {
       : `專案用量上限 ${p.quota} 已經沒有空間。`,
   "sentence.problem.why.policy-denied": (p) =>
     p.policy ? `政策 ${p.policy} 的回應是：` : "叢集的回應是：",
-  "sentence.diagnosis.crashLoop.cause.exitCode": (p) => `${p.container} 反覆崩潰、重新啟動。`,
-  "sentence.diagnosis.crashLoop.cause.exitsZero": (p) =>
-    `${p.container} 反覆正常結束後又重新啟動。`,
-  "sentence.diagnosis.crashLoop.cause.notExecutable": (p) =>
-    `${p.container} 無法執行它的指令：這個檔案不能執行。`,
-  "sentence.diagnosis.crashLoop.cause.commandNotFound": (p) =>
-    `${p.container} 無法執行它的指令：映像檔裡沒有這個指令。`,
-  "sentence.diagnosis.crashLoop.cause.killed": (p) => `${p.container} 反覆被強制終止、重新啟動。`,
-  "sentence.diagnosis.crashLoop.cause.terminated": (p) =>
-    `${p.container} 反覆收到停止要求後重新啟動。`,
-  "sentence.diagnosis.crashLoop.fix.exitsZero": () =>
-    "服務必須持續執行；一次性的工作改用 Job 執行。",
-  "sentence.diagnosis.crashLoop.fix.command": () => "檢查映像檔的 entrypoint、command 與 args。",
-  "sentence.diagnosis.crashLoop.fix.killed": () => "有東西終止了它：檢查記憶體用量與存活檢查。",
-  "sentence.diagnosis.crashLoop.fix.terminated": () => "檢查存活檢查，以及是什麼讓程式停止。",
-  "sentence.diagnosis.crashLoop.fix.logs": () => "錯誤訊息在重新啟動前那一次的日誌裡。",
-  "sentence.diagnosis.runFailed.fix.logs": () => "錯誤訊息在失敗那次執行的日誌裡。",
-  "sentence.diagnosis.runFailed.cause.exitCode": (p) => `${p.container} 上一次執行失敗。`,
-  "sentence.diagnosis.runFailed.cause.exitsZero": (p) => `${p.container} 上一次執行意外結束。`,
-  "sentence.diagnosis.runFailed.cause.notExecutable": (p) =>
-    `${p.container} 上一次執行無法啟動指令：這個檔案不能執行。`,
-  "sentence.diagnosis.runFailed.cause.commandNotFound": (p) =>
-    `${p.container} 上一次執行在映像檔裡找不到指令。`,
-  "sentence.diagnosis.runFailed.cause.killed": (p) => `${p.container} 上一次執行被強制終止。`,
-  "sentence.diagnosis.runFailed.cause.terminated": (p) =>
-    `${p.container} 上一次執行收到停止要求而結束。`,
-  "sentence.diagnosis.outOfMemory.cause.limit": (p) =>
-    `${p.container} 用完了記憶體，系統終止了它。`,
-  "sentence.diagnosis.outOfMemory.cause.noLimit": (p) =>
-    `機器的記憶體不足，系統終止了 ${p.container}。`,
-  "sentence.diagnosis.outOfMemory.fix.limit": () => "調高記憶體上限，或找出用掉記憶體的地方。",
-  "sentence.diagnosis.outOfMemory.fix.noLimit": () => "依實際用量設定記憶體的保留量與上限。",
-  "sentence.diagnosis.imagePull.cause.notFound": (p) =>
-    `${p.container} 無法下載映像檔 ${p.image ?? ""}：映像檔倉庫裡沒有這個映像檔。`,
-  "sentence.diagnosis.imagePull.cause.notFoundOrPrivate": (p) =>
-    `${p.container} 無法下載映像檔 ${p.image ?? ""}。`,
-  "sentence.diagnosis.imagePull.cause.unauthorized": (p) =>
-    `${p.container} 無法下載映像檔：映像檔倉庫拒絕了登入資訊。`,
-  "sentence.diagnosis.imagePull.cause.rateLimited": (p) =>
-    `${p.container} 無法下載映像檔：超過映像檔倉庫的下載次數限制。`,
-  "sentence.diagnosis.imagePull.cause.unreachable": (p) =>
-    `${p.container} 無法下載映像檔：連不到映像檔倉庫。`,
-  "sentence.diagnosis.imagePull.cause.invalidName": (p) =>
-    `${p.container} 的映像檔名稱 ${p.image ?? ""} 有誤。`,
-  "sentence.diagnosis.imagePull.cause.unknown": (p) =>
-    `${p.container} 無法下載映像檔 ${p.image ?? ""}。`,
-  "sentence.diagnosis.imagePull.fix.notFound": () => "確認映像檔的名稱與版本標籤。",
-  "sentence.diagnosis.imagePull.fix.notFoundOrPrivate": () =>
-    "確認名稱與版本標籤；如果是私有映像檔，替專案加上映像檔倉庫的登入資訊。",
-  "sentence.diagnosis.imagePull.fix.unauthorized": () =>
-    "替專案加上映像檔倉庫的登入資訊（imagePullSecret），或修正現有的。",
-  "sentence.diagnosis.imagePull.fix.rateLimited": () => "登入映像檔倉庫，或改用鏡像站。",
-  "sentence.diagnosis.imagePull.fix.unreachable": () => "檢查機器的網路與 DNS。",
-  "sentence.diagnosis.imagePull.fix.invalidName": () => "修正映像檔名稱。",
-  "sentence.diagnosis.imagePull.fix.unknown": () => "副本事件裡有映像檔倉庫的回應。",
-  "sentence.diagnosis.probeFailure.cause.liveness": (p) =>
-    `${p.container} 的存活檢查失敗 ${p.count} 次${p.output ? `：${p.output}` : "。"}`,
-  "sentence.diagnosis.probeFailure.cause.readiness": (p) =>
-    `${p.container} 的就緒檢查失敗 ${p.count} 次${p.output ? `：${p.output}` : "。"}`,
-  "sentence.diagnosis.probeFailure.cause.startup": (p) => `${p.container} 沒有在時限內完成啟動。`,
-  "sentence.diagnosis.probeFailure.fix.liveness": () =>
-    "到健康檢查確認存活檢查的路徑、連接埠與時間設定。",
-  "sentence.diagnosis.probeFailure.fix.readiness": () =>
-    "到健康檢查確認就緒檢查的路徑、連接埠與時間設定。",
-  "sentence.diagnosis.probeFailure.fix.startup": () =>
-    "如果只是啟動得比較慢，到健康檢查放寬時間；如果早該啟動好了，日誌會說明原因。",
-  "sentence.gap.resourceLimits.none": (p) =>
-    `${p.container} 沒有設定 CPU 與記憶體的 request 或 limit。`,
-  "sentence.gap.resourceLimits.partial": (p) =>
-    `${p.container} 沒有設定 ${(p.missing ?? "").split(",").join("、")}。`,
-  "sentence.gap.healthChecks.none": (p) =>
-    `${p.container} 沒有就緒檢查，還沒準備好就可能收到流量。`,
-  "sentence.gap.healthChecks.livenessOnly": (p) => `${p.container} 有存活檢查，但沒有就緒檢查。`,
-  "sentence.gap.ingressToHttpRoute.retired": (p) =>
-    `Ingress ${p.ingress} 使用 ${p.class}，它的 controller 已停止維護。`,
-  "sentence.gap.ingressToHttpRoute.available": (p) =>
-    `叢集已有 Gateway API，Ingress ${p.ingress} 可以改用 HTTPRoute。`,
-  "sentence.gap.retiredIngressController": (p) =>
-    `IngressClass ${p.class} 的 controller ${p.controller} 已停止維護。`,
-  "sentence.gap.danglingRoute.noService": (p) =>
-    `${p.kind} ${p.route} 指定的 Service ${(p.services ?? "").split(",").join("、")} 不在這個專案裡。`,
-  "sentence.gap.danglingRoute.noGateway": (p) =>
-    `HTTPRoute ${p.route} 指定的 Gateway ${(p.gateways ?? "").split(",").join("、")} 不存在。`,
-  "sentence.gap.danglingRoute.noParent": (p) =>
-    `HTTPRoute ${p.route} 沒有指定 Gateway，所以它收不到任何流量。`,
-  "sentence.gap.danglingRoute.notAccepted": (p) =>
-    `沒有任何 Gateway 接受 HTTPRoute ${p.route}${p.reason ? `（${p.reason}）` : ""}，所以它收不到任何流量。`,
-  "sentence.gap.blockedConnection": (p) =>
-    p.at === "egress"
-      ? `${p.from} 的環境變數指向 ${p.to}，但 ${p.from} 的 NetworkPolicy 不允許連出。`
-      : p.at === "both"
-        ? `${p.from} 的環境變數指向 ${p.to}，但兩端的 NetworkPolicy 都封鎖了這條連線。`
-        : `${p.from} 的環境變數指向 ${p.to}，但 ${p.to} 的 NetworkPolicy 不允許 ${p.from} 連入。`,
-  "sentence.gap.noNetworkPolicy": (p) => {
-    const blocked = cuts(
-      p,
-      {
-        otherNamespaces: "來自其他 Namespace 的連線",
-        outside: "連到叢集外的連線",
-        published: "NodePort 與 LoadBalancer 的流量",
-        connections: "服務之間的一條連線",
-      },
-      (items) => items.join("、"),
-    )
-    return [
-      `沒有 NetworkPolicy 保護 ${(p.services ?? "").split(",").join("、")}：叢集裡任何 Pod 都連得到。`,
-      p.enforcement === "unknown" ? "NetworkPolicy 要網路外掛（CNI）支援才會生效。" : "",
-      blocked ? `隔離後也會封鎖${latinStart(blocked)}${blocked}。` : "",
-    ].join("")
-  },
-  "sentence.gap.volumeWithoutBackup": (p) => `磁碟區 ${p.claim} 沒有備份排程。`,
-  "sentence.gap.databaseWithoutBackup": (p) => `資料庫 ${p.database} 沒有備份排程。`,
   "sentence.page.noAnswer": () => "Zeabur 沒有回應。",
   "sentence.page.status": (p) => `請求失敗，HTTP 狀態碼 ${p.status}。`,
   "sentence.page.reload": () => "確認 Zeabur 仍在執行，再重新整理頁面。",
@@ -1519,130 +1275,6 @@ export const zhTW: Messages = {
   "trace.fixTitle": (address) => `修正通往 ${address} 的路徑`,
   "rollout.rollBack": (name) => `回滾 ${name}`,
   "rollout.rollBackButton": "回滾",
-  "sentence.incident.componentDown.cause.ingressController": (p) =>
-    `Ingress 控制器 ${p.workload} 停擺了：它沒有任何就緒的副本。`,
-  "sentence.incident.componentDown.cause.certManager": (p) =>
-    `cert-manager 停擺了：${p.workload} 沒有任何就緒的副本。`,
-  "sentence.incident.componentDown.cause.clusterDns": (p) =>
-    `叢集 DNS 停擺了：${p.workload} 沒有任何就緒的副本。`,
-  "sentence.incident.componentDown.cause.metricsServer": (p) =>
-    `metrics-server 停擺了：${p.workload} 沒有任何就緒的副本。`,
-  "sentence.incident.componentDown.why.ingressController": (p) =>
-    `公開網域的請求由 Ingress 控制器轉給服務；它停擺時，${p.domains} 個網域和 ${p.services} 個服務收不到叢集外部的請求。`,
-  "sentence.incident.componentDown.why.certManager": (p) =>
-    `cert-manager 負責簽發和更新網域要求的憑證；它停擺時，${p.domains} 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。`,
-  "sentence.incident.componentDown.why.clusterDns": (p) =>
-    `服務之間靠叢集 DNS 用名稱找到彼此；它停擺時，有 ${p.services} 個服務用名稱連線，會連不到對方。`,
-  "sentence.incident.componentDown.why.metricsServer": () =>
-    "metrics-server 負責量測每個副本的用量；它停擺時，看不到用量數字，自動擴縮也會停止。",
-  "sentence.incident.componentDown.fix.ingressController": (p) =>
-    `${p.workload}${p.namespace ? `（${p.namespace}）` : ""}沒有就緒的副本，從它的事件和日誌找出原因。`,
-  "sentence.incident.componentDown.fix.certManager": (p) =>
-    `${p.workload}${p.namespace ? `（${p.namespace}）` : ""}沒有就緒的副本，從它的事件和日誌找出原因。`,
-  "sentence.incident.componentDown.fix.clusterDns": (p) =>
-    `${p.workload}${p.namespace ? `（${p.namespace}）` : ""}沒有就緒的副本，從它的事件和日誌找出原因。`,
-  "sentence.incident.componentDown.fix.metricsServer": (p) =>
-    `${p.workload}${p.namespace ? `（${p.namespace}）` : ""}沒有就緒的副本，從它的事件和日誌找出原因。`,
-  "sentence.incident.nodeNotReady.cause": (p) =>
-    `${p.status === "Unknown" ? `節點 ${p.node} 不再向叢集回報狀態` : `節點 ${p.node} 未就緒`}${p.reason ? `（${p.reason}）` : ""}。`,
-  "sentence.incident.nodeNotReady.why": (p) =>
-    `節點未就緒時不會再啟動新的 Pod；寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 ${p.pods} 個 Pod，${p.services} 個服務有副本在上面。`,
-  "sentence.incident.nodeNotReady.fix": (p) =>
-    `檢查 ${p.node} 背後的機器：是否開機、網路，以及節點代理程式（kubelet）。如果它無法恢復，就清空這個節點並換掉它。`,
-  "sentence.trace.dns.ok": (p) => `${p.host} 可以解析。`,
-  "sentence.trace.dns.notFound": (p) =>
-    `從叢集內解析不到 ${p.host}；其他地方的 DNS 可能仍有回應，所以 Zeabur 無法判斷。`,
-  "sentence.trace.dns.unknown": (p) => `沒有查詢 ${p.host}，或查詢沒有及時回應。`,
-  "sentence.trace.address.noStatus": (p) => `${p.route} 的狀態裡還沒有位址，無法和網域的位址比對。`,
-  "sentence.trace.address.unresolved": (p) => `網域沒有解析出位址，無法和 ${p.route} 的位址比對。`,
-  "sentence.trace.address.ok": (p) => `網域指向 ${p.route} 提供服務的位址。`,
-  "sentence.trace.address.elsewhere": (p) =>
-    `網域指向的位址不屬於 ${p.route}；如果叢集前面有 CDN 或代理伺服器，回應的會是它們的位址。`,
-  "sentence.trace.controller.classesUnreadable": (p) =>
-    `Zeabur 無法讀取叢集的 IngressClass，因此無法判斷哪個控制器負責 ${p.route}。`,
-  "sentence.trace.controller.classMissing": (p) =>
-    `${p.route} 指定的 IngressClass ${p.class} 不在叢集裡。`,
-  "sentence.trace.controller.unreadable": (p) =>
-    `Zeabur 無法讀取叢集的元件，因此無法判斷 ${p.route} 的 Ingress 控制器是否在執行。`,
-  "sentence.trace.controller.notRecognised": (p) =>
-    `Zeabur 認不出負責 ${p.route} 的 Ingress 控制器${p.controller ? ` ${p.controller}` : ""}，因此無法判斷它是否在執行。`,
-  "sentence.trace.controller.ok": (p) => `Ingress 控制器 ${p.workload} 有就緒的副本。`,
-  "sentence.trace.controller.down": (p) =>
-    `Ingress 控制器 ${p.workload} 沒有就緒的副本，所以沒有東西處理 ${p.route}。`,
-  "sentence.trace.certificate.defaultCertificate": (p) =>
-    `${p.route} 為 ${p.host} 啟用 HTTPS，卻沒有指定機密，所以控制器會提供它的預設憑證。`,
-  "sentence.trace.certificate.ok": (p) =>
-    `${p.host} 的憑證已簽發${p.until ? `，有效期限到 ${p.until}` : ""}。`,
-  "sentence.trace.certificate.notReady": (p) =>
-    `${p.host} 的憑證 ${p.certificate} 尚未簽發${p.reason ? `（${p.reason}）` : ""}。`,
-  "sentence.trace.certificate.pending": (p) => `${p.host} 的憑證 ${p.certificate} 還沒有結果。`,
-  "sentence.trace.certificate.unreadable": (p) =>
-    `Zeabur 無法讀取專案的機密，因此無法檢查機密 ${p.secret} 裡 ${p.host} 的憑證。`,
-  "sentence.trace.certificate.notChecked": (p) =>
-    `機密 ${p.secret} 存有 ${p.host} 的憑證；Zeabur 不會進一步檢查。`,
-  "sentence.trace.certificate.secretMissing": (p) =>
-    `${p.route} 從機密 ${p.secret} 讀取 ${p.host} 的憑證，但專案裡沒有這個機密；控制器可能改用預設憑證，Zeabur 無法檢查它。`,
-  "sentence.trace.route.noStatus": (p) =>
-    `還沒有任何元件寫入 ${p.route} 的狀態，無法得知它是否已生效。`,
-  "sentence.trace.route.ok": (p) => `${p.route} 已生效：控制器已在它的狀態裡寫入位址。`,
-  "sentence.trace.route.accepted": (p) => `Gateway 已接受 ${p.route}。`,
-  "sentence.trace.route.notAccepted": (p) =>
-    `${p.route} 的流量入口回報 ${p.condition} ${p.reason}；請求無法通過。`,
-  "sentence.trace.service.unreadable": (p) =>
-    `Zeabur 無法讀取專案的私有位址（Service），因此無法檢查 ${p.endpoint}。`,
-  "sentence.trace.service.missing": (p) => `找不到名為 ${p.endpoint} 的私有位址（Service）。`,
-  "sentence.trace.service.portMissing": (p) => `私有位址 ${p.endpoint} 沒有連接埠 ${p.port}。`,
-  "sentence.trace.service.selectsOther": (p) =>
-    `私有位址 ${p.endpoint} 把流量送到其他副本，而不是 ${p.service} 的副本。`,
-  "sentence.trace.service.ok": (p) => `私有位址 ${p.endpoint} 把流量送到 ${p.service}。`,
-  "sentence.trace.targetPort.unknown": (p) =>
-    `Zeabur 讀不到容器，因此沒有檢查 ${p.endpoint} 轉送到的連接埠。`,
-  "sentence.trace.targetPort.notReached": (p) =>
-    `沒有檢查：流量在到達 ${p.endpoint} 的連接埠之前就停了。`,
-  "sentence.trace.targetPort.mismatch": (p) =>
-    `${p.endpoint} 把流量送到連接埠 ${p.targetPort}，容器卻沒有宣告它${p.ports ? `；容器宣告的是 ${p.ports}` : ""}。`,
-  "sentence.trace.targetPort.undeclared": (p) =>
-    `容器沒有宣告任何連接埠，無法得知它們是否在 ${p.endpoint} 轉送到的連接埠上監聽。`,
-  "sentence.trace.targetPort.ok": (p) => `${p.endpoint} 把流量送到容器宣告的連接埠。`,
-  "sentence.trace.ready.scaledToZero": (p) => `${p.service} 的副本數設為 0。`,
-  "sentence.trace.ready.ok": (p) => `${p.service} 有 ${p.ready}/${p.pods} 個副本就緒。`,
-  "sentence.trace.ready.starting": (p) => `${p.service} 正在啟動，還沒有就緒的副本。`,
-  "sentence.trace.ready.noneReady": (p) => `${p.service} 沒有任何就緒的副本。`,
-  "sentence.diagnosis.unreachable.cause.ingressClassMissing": (p) =>
-    `送到 ${p.route} 網域的請求到不了 ${p.service}：它指定的 IngressClass ${p.class} 不在叢集裡。`,
-  "sentence.diagnosis.unreachable.why.ingressClassMissing": () =>
-    "Ingress 控制器只處理自己類別的 Ingress；沒有這個類別，就沒有控制器處理它。",
-  "sentence.diagnosis.unreachable.fix.ingressClassMissing": (p) =>
-    `把 ${p.route} 改用叢集裡現有的類別，或安裝 ${p.class} 的控制器。`,
-  "sentence.diagnosis.unreachable.cause.controllerDown": (p) =>
-    `送到 ${p.route} 網域的請求到不了 ${p.service}：Ingress 控制器 ${p.workload} 沒有就緒的副本。`,
-  "sentence.diagnosis.unreachable.why.controllerDown": () =>
-    "Ingress 控制器負責把網域的請求帶進叢集；它沒有任何就緒的副本時，就沒有東西回應這些請求。",
-  "sentence.diagnosis.unreachable.fix.controllerDown": (p) =>
-    `${p.workload}${p.namespace ? `（${p.namespace}）` : ""}沒有就緒的副本，從它的事件和日誌找出原因。`,
-  "sentence.diagnosis.unreachable.cause.certificateNotReady": (p) =>
-    `${p.host} 的 HTTPS 連線失敗：憑證 ${p.certificate} 尚未簽發${p.reason ? `（${p.reason}）` : ""}。`,
-  "sentence.diagnosis.unreachable.why.certificateNotReady": (p) =>
-    `cert-manager 簽發憑證後才會把它寫進機密 ${p.secret}；在那之前，控制器會改用預設憑證，瀏覽器會拒絕它。`,
-  "sentence.diagnosis.unreachable.fix.certificateNotReady": (p) =>
-    `憑證 ${p.certificate} 的狀態和事件會說明它為什麼還沒簽發。`,
-  "sentence.diagnosis.unreachable.cause.backendPortMissing": (p) =>
-    `通往 ${p.service} 的路由指定了連接埠 ${p.port}，但它的私有位址 ${p.endpoint} 沒有這個連接埠。`,
-  "sentence.diagnosis.unreachable.why.backendPortMissing": () =>
-    "路由會用編號或名稱把流量送到私有位址的某個連接埠；私有位址沒有的連接埠收不到任何流量。",
-  "sentence.diagnosis.unreachable.fix.backendPortMissing": (p) =>
-    `讓路由指向 ${p.endpoint} 有的連接埠，或在 ${p.endpoint} 加上連接埠 ${p.port}。`,
-  "sentence.diagnosis.unreachable.cause.selectsOther": (p) =>
-    `通往 ${p.service} 的路由把流量送到 ${p.endpoint}，但 ${p.endpoint} 會送到其他副本，而不是 ${p.service} 的副本。`,
-  "sentence.diagnosis.unreachable.why.selectsOther": () =>
-    "私有位址只會把流量送到標籤符合它 selector 的副本。",
-  "sentence.diagnosis.unreachable.fix.selectsOther": (p) =>
-    `修改 ${p.endpoint} 的 selector，讓它符合 ${p.service} 的標籤，或讓路由改指向 ${p.service} 自己的私有位址。`,
-  "sentence.diagnosis.unreachable.cause.scaledToZero": (p) =>
-    `沒有流量到得了 ${p.service}：它的副本數設為 0。`,
-  "sentence.diagnosis.unreachable.why.scaledToZero": () =>
-    "私有位址只會把流量送到執行中的副本，而目前設定不執行任何副本。",
-  "sentence.diagnosis.unreachable.fix.scaledToZero": (p) => `把 ${p.service} 的副本數調到至少 1。`,
   "sentence.timeline.release": (p) =>
     `修訂版本 #${p.revision}${p.images ? ` 使用 ${p.images}` : ""}${p.changeCause ? `（${p.changeCause}）` : ""}。`,
   "sentence.timeline.write.zeabur": (p) =>
@@ -1695,10 +1327,6 @@ export const zhTW: Messages = {
   "sentence.rollout.stuck.deadlineExceeded": (p) =>
     `${p.name} 的部署卡住了：期限（progressDeadlineSeconds）內沒有進展。`,
   "sentence.rollout.stuck.replicaFailure": (p) => `${p.name} 的部署卡住了：叢集無法建立新副本。`,
-  "sentence.gap.ephemeralData.none": (p) =>
-    `${p.container} 把 ${p.software} 資料存在 ${p.path}，但這個路徑不在任何磁碟區上；副本一換掉，資料就不見了。`,
-  "sentence.gap.ephemeralData.ephemeral": (p) =>
-    `${p.container} 把 ${p.software} 資料存在 ${p.path}，但這個磁碟區只跟著副本存在；副本一換掉，資料就不見了。`,
   // ia:start
   "preview.restarts": "會重新啟動的服務",
   "preview.roll.rolling": (name) => `${name} 會逐一替換副本。`,

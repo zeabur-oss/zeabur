@@ -77,11 +77,14 @@ describe("server sentences", () => {
       periodDefault: "true",
       threshold: "3",
       thresholdDefault: "true",
+      total: "30",
     }
     expect(why("liveness", defaults)).toBe(
       "By default, the cluster checks every 10 seconds and restarts the container after 3 failures in a row (about 30 seconds).",
     )
-    expect(why("startup", { ...defaults, threshold: "30", thresholdDefault: "false" })).toBe(
+    expect(
+      why("startup", { ...defaults, threshold: "30", thresholdDefault: "false", total: "300" }),
+    ).toBe(
       "The container has 30 × 10 seconds (5 minutes) to pass the startup check; then the cluster restarts it. Every 10 seconds is the default.",
     )
     expect(why("readiness", { container: "api" })).toBe(

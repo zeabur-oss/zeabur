@@ -41,8 +41,21 @@ const params = new Proxy(
   {},
   { get: (_, key) => (typeof key === "string" ? `<${key}>` : undefined) },
 )
+// The catalogs' sentences as their examples write them, each branch with real values.
+const examples = new Map<string, Set<string>>()
+for (const example of JSON.parse(
+  readFileSync(
+    resolve(import.meta.dirname, "../../crates/zeabur-gaps/messages/examples.json"),
+    "utf8",
+  ),
+) as { key: string; "zh-TW": string }[]) {
+  const key = `sentence.${example.key}`
+  examples.set(key, (examples.get(key) ?? new Set()).add(example["zh-TW"]))
+}
 for (const [key, value] of Object.entries(zhTW)) {
-  if (typeof value === "string") print(key, value)
+  const written = examples.get(key)
+  if (written) written.forEach((text) => print(key, text))
+  else if (typeof value === "string") print(key, value)
   else print(key, key.startsWith("sentence.") ? String(value(params)) : call(value))
 }
 
