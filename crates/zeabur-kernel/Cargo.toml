@@ -1,0 +1,26 @@
+[package]
+name = "zeabur-kernel"
+description = "zeabur: names, quantities, JSON Patch and the values every layer shares; no I/O, no cryptography"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["kubernetes", "zeabur", "json-patch", "quantity"]
+categories = ["parsing"]
+
+[lints]
+workspace = true
+
+[features]
+# `utoipa::ToSchema` for the shared types, for the API's OpenAPI document.
+openapi = ["dep:utoipa"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+utoipa = { workspace = true, optional = true }

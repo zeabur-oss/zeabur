@@ -4,6 +4,7 @@ mod diagnose;
 mod durability;
 mod event;
 mod incident;
+pub mod messages;
 mod rules;
 mod snippet;
 mod trace;
@@ -24,4 +25,4 @@ pub use snippet::snippet;
 pub use trace::{
     Certificates, Resolved, TraceInput, diagnoses as trace_diagnoses, names_to_resolve, trace,
 };
-pub use zeabur_core::names::GatewayRef;
+pub use zeabur_kernel::names::GatewayRef;

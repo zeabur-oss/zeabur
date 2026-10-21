@@ -1664,6 +1664,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha2"
+version = "0.10.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7507d819769d01a365ab707794a4084392c824f54a7a6a7862f8c3d0892b283"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+ "digest",
+]
+
+[[package]]
 name = "sharded-slab"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2349,7 +2360,7 @@ version = "0.0.1"
 dependencies = [
  "k8s-openapi",
  "serde_json",
- "zeabur-core",
+ "zeabur-kernel",
 ]
 
 [[package]]
@@ -2357,6 +2368,7 @@ name = "zeabur-api"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "base64",
  "form_urlencoded",
  "futures-util",
  "http-body-util",
@@ -2365,6 +2377,7 @@ dependencies = [
  "serde",
  "serde-saphyr",
  "serde_json",
+ "thiserror",
  "tokio",
  "tokio-tungstenite",
  "tower",
@@ -2429,6 +2442,17 @@ dependencies = [
  "serde_json",
  "thiserror",
  "utoipa",
+ "zeabur-kernel",
+]
+
+[[package]]
+name = "zeabur-fixtures"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -2438,10 +2462,10 @@ dependencies = [
  "k8s-openapi",
  "serde-saphyr",
  "serde_json",
- "zeabur-core",
+ "zeabur-fixtures",
  "zeabur-graph",
+ "zeabur-kernel",
  "zeabur-model",
- "zeabur-test-support",
 ]
 
 [[package]]
@@ -2454,8 +2478,19 @@ dependencies = [
  "serde-saphyr",
  "serde_json",
  "zeabur-adapters",
+ "zeabur-fixtures",
  "zeabur-model",
- "zeabur-test-support",
+]
+
+[[package]]
+name = "zeabur-kernel"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "utoipa",
 ]
 
 [[package]]
@@ -2494,7 +2529,7 @@ version = "0.0.1"
 dependencies = [
  "serde",
  "utoipa",
- "zeabur-core",
+ "zeabur-kernel",
 ]
 
 [[package]]
@@ -2507,9 +2542,9 @@ dependencies = [
  "serde_json",
  "utoipa",
  "zeabur-adapters",
+ "zeabur-fixtures",
  "zeabur-kube",
  "zeabur-model",
- "zeabur-test-support",
 ]
 
 [[package]]
@@ -2525,10 +2560,10 @@ dependencies = [
  "thiserror",
  "utoipa",
  "zeabur-adapters",
- "zeabur-core",
+ "zeabur-fixtures",
  "zeabur-graph",
+ "zeabur-kernel",
  "zeabur-model",
- "zeabur-test-support",
 ]
 
 [[package]]
@@ -2537,11 +2572,10 @@ version = "0.0.1"
 dependencies = [
  "kube",
  "serde",
- "serde-saphyr",
  "serde_json",
- "thiserror",
  "tokio",
  "zeabur-core",
+ "zeabur-fixtures",
  "zeabur-kube",
 ]
 

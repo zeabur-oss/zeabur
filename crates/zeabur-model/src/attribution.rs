@@ -7,7 +7,8 @@ use serde::{Deserialize, Serialize};
 use crate::workload::WorkloadKind;
 
 /// How many workloads reference a resource, which decides where a client shows it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum Ownership {
     /// Exactly one workload: the resource is shown inside it.
@@ -23,9 +24,8 @@ pub enum Ownership {
 ///
 /// The derived order is kind, then name, as strings: [`WorkloadKind`]'s variants are declared
 /// in alphabetical order.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct WorkloadRef {
     /// The workload's kind.
@@ -35,7 +35,8 @@ pub struct WorkloadRef {
 }
 
 /// The resolved ownership of one resource.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Attribution {
     /// Owned, shared or orphan.
@@ -46,7 +47,8 @@ pub struct Attribution {
 }
 
 /// The attribution of every resource in one namespace, and the workloads it was computed from.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct NamespaceAttribution {
     /// ConfigMaps by name, except the `kube-root-ca.crt` kube-apiserver adds to every namespace.

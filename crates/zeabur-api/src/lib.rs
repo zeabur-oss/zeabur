@@ -83,6 +83,7 @@ mod handlers;
 pub mod identity;
 pub mod incidents;
 pub mod local;
+pub mod plan_token;
 pub mod pods;
 pub mod projects;
 mod query;
@@ -104,9 +105,9 @@ pub use settings::Settings;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
-use zeabur_plan::token::PlanKey;
 
 use crate::access::ClusterAccess;
+use crate::plan_token::PlanKey;
 
 /// The description of the API that is not attached to a route.
 #[derive(OpenApi)]

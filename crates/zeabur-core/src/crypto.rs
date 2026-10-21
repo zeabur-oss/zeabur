@@ -14,6 +14,7 @@
 
 use aws_lc_rs::aead::{AES_256_GCM, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey};
 use aws_lc_rs::constant_time::verify_slices_are_equal;
+pub use zeabur_kernel::digest::hex;
 
 /// The system random number generator failed. aws-lc-rs reports no detail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -38,21 +39,6 @@ pub fn random<const N: usize>() -> Result<[u8; N], RandomError> {
 /// When the random number generator fails.
 pub fn random_token<const N: usize>() -> Result<String, RandomError> {
     Ok(hex(&random::<N>()?))
-}
-
-/// Lower-case hex.
-#[must_use]
-pub fn hex(bytes: &[u8]) -> String {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        for nibble in [byte >> 4, byte & 0x0F] {
-            if let Some(&digit) = DIGITS.get(usize::from(nibble)) {
-                out.push(char::from(digit));
-            }
-        }
-    }
-    out
 }
 
 /// Encrypts and authenticates `plaintext` with AES-256-GCM [sp800-38d] under `key`.

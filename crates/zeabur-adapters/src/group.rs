@@ -3,9 +3,9 @@
 use std::collections::BTreeMap;
 
 /// Zeabur's label naming a workload's group explicitly. It always wins.
-pub use zeabur_core::names::LABEL_GROUP as GROUP_LABEL;
+pub use zeabur_kernel::names::LABEL_GROUP as GROUP_LABEL;
 
-use crate::label;
+use crate::{Conventions, label};
 
 /// The recommended label for a component's role in an application, such as `database`.
 pub const COMPONENT_LABEL: &str = "app.kubernetes.io/component";
@@ -28,7 +28,16 @@ pub const OPERATORS_GROUP: &str = "operators";
 /// Zeabur only reads the component label: it belongs to whichever chart wrote the workload.
 #[must_use]
 pub fn resolve_group(labels: Option<&BTreeMap<String, String>>) -> &str {
-    explicit_group(labels)
+    resolve_group_with(labels, &Conventions::ZEABUR)
+}
+
+/// [`resolve_group`] with the group label of `conventions`.
+#[must_use]
+pub fn resolve_group_with<'a>(
+    labels: Option<&'a BTreeMap<String, String>>,
+    conventions: &Conventions,
+) -> &'a str {
+    explicit_group_with(labels, conventions)
         .or_else(|| label(labels, COMPONENT_LABEL))
         .unwrap_or(DEFAULT_GROUP)
 }
@@ -36,5 +45,14 @@ pub fn resolve_group(labels: Option<&BTreeMap<String, String>>) -> &str {
 /// The group the [`GROUP_LABEL`] names, if it is set.
 #[must_use]
 pub fn explicit_group(labels: Option<&BTreeMap<String, String>>) -> Option<&str> {
-    label(labels, GROUP_LABEL)
+    explicit_group_with(labels, &Conventions::ZEABUR)
+}
+
+/// [`explicit_group`] with the group label of `conventions`.
+#[must_use]
+pub fn explicit_group_with<'a>(
+    labels: Option<&'a BTreeMap<String, String>>,
+    conventions: &Conventions,
+) -> Option<&'a str> {
+    label(labels, &conventions.group_label)
 }

@@ -13,15 +13,12 @@
 //! for any field ([`crate::fields::reapplying_tool`]): the tool would restore it.
 //!
 //! The namespaces Kubernetes keeps for itself (`kube-` prefix,
-//! [`zeabur_core::names::is_system_namespace`]) are never adopted.
+//! [`zeabur_kernel::names::is_system_namespace`]) are never adopted.
 //!
 //! [rfc6902-add]: https://www.rfc-editor.org/rfc/rfc6902#section-4.1
 
 use serde_json::{Value, json};
-use zeabur_core::names::{
-    ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON, LABEL_PROJECT,
-    is_system_namespace,
-};
+use zeabur_kernel::names::is_system_namespace;
 use zeabur_model::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, ProjectIcon};
 
 use crate::change::Target;
@@ -56,12 +53,18 @@ impl Planner<'_> {
     }
 
     fn adopted(&self, index: usize) -> bool {
+        let conventions = self.conventions;
         self.current(index)
-            .pointer(&pointer(&["metadata", "labels", LABEL_PROJECT]))
+            .pointer(&pointer(&[
+                "metadata",
+                "labels",
+                &conventions.project_label,
+            ]))
             .is_some()
     }
 
     pub(crate) fn adopt(&mut self) -> Result<(), PlanError> {
+        let conventions = self.conventions;
         let (index, name) = self.namespace_object()?;
         if is_system_namespace(&name) {
             return Err(error(
@@ -82,16 +85,22 @@ impl Planner<'_> {
         }
         self.claim(
             index,
-            &steps("labels", LABEL_PROJECT),
-            &shown("labels", LABEL_PROJECT),
+            &steps("labels", &conventions.project_label),
+            &shown("labels", &conventions.project_label),
         )?;
-        let operations = set_key(&self.current(index), "labels", LABEL_PROJECT, ADOPTED);
+        let operations = set_key(
+            &self.current(index),
+            "labels",
+            &conventions.project_label,
+            ADOPTED,
+        );
         self.patch(index, operations)
     }
 
     pub(crate) fn unadopt(&mut self) -> Result<(), PlanError> {
+        let conventions = self.conventions;
         let (index, name) = self.namespace_object()?;
-        let path = pointer(&["metadata", "labels", LABEL_PROJECT]);
+        let path = pointer(&["metadata", "labels", &conventions.project_label]);
         let Some(value) = self.current(index).pointer(&path).cloned() else {
             return Err(error(
                 ErrorKind::Conflict,
@@ -101,8 +110,8 @@ impl Planner<'_> {
         };
         self.claim(
             index,
-            &steps("labels", LABEL_PROJECT),
-            &shown("labels", LABEL_PROJECT),
+            &steps("labels", &conventions.project_label),
+            &shown("labels", &conventions.project_label),
         )?;
         self.patch(index, vec![test(&path, value), remove(&path)])
     }
@@ -113,6 +122,7 @@ impl Planner<'_> {
         description: Option<&str>,
         icon: Option<ProjectIcon>,
     ) -> Result<(), PlanError> {
+        let conventions = self.conventions;
         let (index, name) = self.namespace_object()?;
         if !self.adopted(index) {
             return Err(error(
@@ -139,9 +149,12 @@ impl Planner<'_> {
         )?;
         let mut changed = false;
         for (key, value) in [
-            (ANNOTATION_DISPLAY_NAME, display_name),
-            (ANNOTATION_DESCRIPTION, description),
-            (ANNOTATION_ICON, icon.map(ProjectIcon::as_str)),
+            (conventions.display_name_annotation.as_ref(), display_name),
+            (conventions.description_annotation.as_ref(), description),
+            (
+                conventions.icon_annotation.as_ref(),
+                icon.map(ProjectIcon::as_str),
+            ),
         ] {
             let current = self.current(index);
             let path = pointer(&["metadata", "annotations", key]);

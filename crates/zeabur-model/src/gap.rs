@@ -8,21 +8,10 @@ use crate::diagnosis::Message;
 use crate::source::Origin;
 
 /// How much a gap matters.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
-#[schema(as = GapSeverity)]
+#[cfg_attr(feature = "openapi", schema(as = GapSeverity))]
 pub enum Severity {
     /// Likely to cause an outage or data loss.
     Warning,
@@ -31,7 +20,8 @@ pub enum Severity {
 }
 
 /// A public source a rule rests on.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Citation {
     /// The document's title.
@@ -41,19 +31,8 @@ pub struct Citation {
 }
 
 /// How a gap is closed.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum FixKind {
     /// A change Zeabur plans and applies (`id` names the plan template).
@@ -65,7 +44,8 @@ pub enum FixKind {
 }
 
 /// The fix of a gap.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Fix {
     /// How it is closed.
@@ -78,7 +58,8 @@ pub struct Fix {
 }
 
 /// One finding of a rule.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Gap {
     /// The rule's stable id, such as `resource-limits`.

@@ -9,12 +9,12 @@ mod tests {
     use k8s_openapi::api::core::v1::{EnvFromSource, Secret, SecretEnvSource};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use serde_json::{Value, from_value, json, to_value};
+    use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_graph::{
         Snapshot, Workload, attribution, classify, deployment_phase, env, env_from,
         is_machinery_secret, mounts, pods_of, port_protocol, project, provenance, workloads,
     };
     use zeabur_model::WorkloadRef;
-    use zeabur_test_support::fixtures::{Fixture, compare, load};
 
     /// Builds the snapshot a cluster reader would: every input object typed by its kind, and
     /// Secrets stripped to metadata and type.
@@ -126,7 +126,7 @@ mod tests {
         let mut failures = Vec::new();
         let mut total = 0;
         for area in ["graph", "projection"] {
-            for fixture in load(area).unwrap() {
+            for fixture in load!(area).unwrap() {
                 total += 1;
                 let actual = run(&fixture);
                 match compare(&fixture.expected, &actual) {
@@ -235,7 +235,7 @@ mod tests {
     /// under both, and the Service as the n8n Deployment's endpoint, listed once in the project.
     #[test]
     fn project_groups_resources_under_workloads() {
-        let fixture = load("graph")
+        let fixture = load!("graph")
             .unwrap()
             .into_iter()
             .find(|fixture| fixture.name == "graph/attribution-shared-configmap-and-orphan-pvc")

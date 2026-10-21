@@ -1,19 +1,31 @@
-//! Every case in `fixtures/` loads, names a documented operation, and its input objects are
-//! well-formed Kubernetes objects.
+//! Every case in each crate's `fixtures/` loads, names a documented operation, and its input
+//! objects are well-formed Kubernetes objects.
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use serde_json::Value;
-    use zeabur_test_support::fixtures::{AREAS, load};
+    use zeabur_fixtures::load_from;
+
+    /// Each area, and the crate whose `fixtures/` holds it.
+    const AREAS: [(&str, &str); 5] = [
+        ("graph", "zeabur-graph"),
+        ("projection", "zeabur-graph"),
+        ("mutation", "zeabur-plan"),
+        ("gaps", "zeabur-gaps"),
+        ("modules", "zeabur-modules"),
+    ];
 
     #[test]
     fn every_fixture_loads_and_is_well_formed() {
-        let readme =
-            std::fs::read_to_string(zeabur_test_support::fixtures::root().join("README.md"))
-                .expect("fixtures/README.md");
+        let crates = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let readme = std::fs::read_to_string(crates.join("../fixtures/README.md"))
+            .expect("fixtures/README.md");
         let mut total = 0;
-        for area in AREAS {
-            for fixture in load(area).expect("fixtures load") {
+        for (area, owner) in AREAS {
+            let root = crates.join(owner).join("fixtures");
+            for fixture in load_from(&root, area).expect("fixtures load") {
                 total += 1;
                 let name = &fixture.name;
                 assert!(

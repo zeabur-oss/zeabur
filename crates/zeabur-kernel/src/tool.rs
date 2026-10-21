@@ -4,10 +4,10 @@
 //! write names it in its problem.
 
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
 /// A deployment tool that would revert a direct edit on its next sync or upgrade.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Tool {
     /// Helm.
     Helm,

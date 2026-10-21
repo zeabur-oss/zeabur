@@ -11,7 +11,7 @@ this crate.
 
 ## Place in the workspace
 
-Level 1: may depend on `zeabur-core`. Pure functions; no I/O.
+Level 1: may depend on `zeabur-kernel`. Pure functions; no I/O.
 
 ## Design
 

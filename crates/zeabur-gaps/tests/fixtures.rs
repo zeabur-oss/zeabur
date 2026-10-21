@@ -4,12 +4,12 @@
 mod tests {
     use k8s_openapi::jiff::Timestamp;
     use serde_json::{Value, from_value, to_value};
+    use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_gaps::{
         BUILTIN, ClusterTraits, Event, GatewayRef, Input, Namespace, Rule, evaluate, snippet,
     };
     use zeabur_graph::{Snapshot, project};
     use zeabur_model::HttpRoute;
-    use zeabur_test_support::fixtures::{Fixture, compare, load};
 
     /// The snapshot a cluster reader would build, the events and the `HTTPRoutes`, from the
     /// case's objects.
@@ -161,7 +161,7 @@ mod tests {
     #[test]
     fn gaps_fixtures_pass() {
         let mut failures = Vec::new();
-        let fixtures = load("gaps").unwrap();
+        let fixtures = load!("gaps").unwrap();
         assert!(!fixtures.is_empty(), "no fixtures found");
         for fixture in &fixtures {
             let actual = run(fixture);

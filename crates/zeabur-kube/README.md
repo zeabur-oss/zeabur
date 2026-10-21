@@ -37,7 +37,7 @@ feature).
 
 ## Place in the workspace
 
-Level 1: may depend on `zeabur-core`.
+Level 2: may depend on `zeabur-core`.
 
 ## What kube-rs provides, checked against kube-apiserver
 

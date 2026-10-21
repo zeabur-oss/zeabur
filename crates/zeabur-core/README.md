@@ -1,15 +1,16 @@
 # zeabur-core
 
-Primitives every Zeabur crate shares. Nothing here performs I/O.
+What the in-cluster server and `zeaburctl ui` share. Nothing here performs I/O.
 
 ## Hides
 
-The names Zeabur and Kubernetes must agree on: label and annotation keys under
-`zeabur.com/`, the field manager name `zeabur`, and the error categories that the API
-renders as RFC 9457 Problem Details; and which requests a server of Zeabur answers
-(`guard`: its `Host`, and changes only from its own pages), the same rules for the in-cluster
-server and `zeaburctl ui`.
+The error categories that the API renders as RFC 9457 Problem Details; which requests a server of
+Zeabur answers (`guard`: its `Host`, and changes only from its own pages), the same rules for the
+in-cluster server and `zeaburctl ui`; and the cryptography (randomness, AEAD, constant-time
+comparison) through aws-lc-rs.
+
+It re-exports the modules of `zeabur-kernel`, so the server crates name them through one crate.
 
 ## Place in the workspace
 
-Level 0: depends on no other workspace crate. Every other crate may depend on it.
+Level 1: depends on `zeabur-kernel` only.

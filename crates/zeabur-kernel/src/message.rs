@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// Zeabur never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
 /// every interface translates them the same way and a key's meaning is part of the contract.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Message {
     /// The sentence, such as `diagnosis.crashLoop.cause.exitCode`.

@@ -31,8 +31,8 @@ use base64::Engine as _;
 use k8s_openapi::api::core::v1::{Container, PersistentVolumeClaim};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Map, Value, json};
-use zeabur_core::quantity;
 use zeabur_graph::Workload;
+use zeabur_kernel::quantity;
 use zeabur_model::{SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{DataEdit, DataKind, ProbeKind, Target, Warning};

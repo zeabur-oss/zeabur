@@ -5,12 +5,20 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-publish.workspace = true
+publish = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["kubernetes", "zeabur", "projection"]
+categories = ["data-structures"]
 
 [lints]
 workspace = true
 
+[features]
+# `utoipa::ToSchema` for the projected view, for the API's OpenAPI document.
+openapi = ["dep:utoipa", "zeabur-kernel/openapi"]
+
 [dependencies]
-zeabur-core.workspace = true
-utoipa.workspace = true
+zeabur-kernel.workspace = true
 serde.workspace = true
+utoipa = { workspace = true, optional = true }

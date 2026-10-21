@@ -128,10 +128,12 @@ case "$job" in
   cargo-deny) cargo deny --locked check ;;
   unsafe-report) ./scripts/unsafe-report.sh ;;
   levels) ./scripts/check-levels.sh ;;
-  # The web interface: banned styles, lint, unused code, build, unit tests, generated API types up
-  # to date, size budget, and a release build that embeds it.
+  # The web interface: banned styles, generated sentences up to date (before the build regenerates
+  # them), lint, unused code, build, unit tests, generated API types up to date, size budget, and a
+  # release build that embeds it.
   ui)
     ./scripts/check-ui-styles.sh
+    ./scripts/check-messages.sh
     ./scripts/build-ui.sh
     (cd web; bun run lint; bun run knip; bun run test; bun run gen:api)
     git diff --exit-code -- web/src/api/schema.d.ts

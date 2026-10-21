@@ -46,11 +46,17 @@ crate never depends on a module.
 | `ephemeral-data` | an official database image (postgres, mysql, mariadb, mongo, redis, valkey, rabbitmq) whose data directory is on no persistent volume | Kubernetes volumes and persistent volumes, each image's Dockerfile |
 | `ingress-to-httproute` | an Ingress of a retired controller, or one that can move to Gateway API | Kubernetes Ingress, the ingress-nginx retirement notice, Gateway API's migration guide |
 
+## Words
+
+`messages/` holds each sentence's words in English, Traditional and Simplified Chinese, as
+templates; `messages::render` writes a sentence in one of them, and the web generates its
+catalog from the same files. `docs/wording.md` describes the templates and how to change them.
+
 ## Hides
 
 The rule set and the sentences. Each rule cites the guidance it rests on and has a test; the
-cases in `fixtures/gaps/` run against both.
+cases in this crate's `fixtures/gaps/` run against both.
 
 ## Place in the workspace
 
-Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-graph`.
+Level 3: may depend on `zeabur-kernel`, `zeabur-model` and `zeabur-graph`.

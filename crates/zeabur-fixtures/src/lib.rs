@@ -1,8 +1,4 @@
-//! Loads the language-neutral test cases in `fixtures/`.
-//!
-//! A case is a directory holding `case.yaml`, an optional `input.yaml` with Kubernetes objects
-//! and `expected.json`. The format is described in `fixtures/README.md`; this module only reads
-//! it. Objects stay [`serde_json::Value`]s here: the crate under test decides how to type them.
+#![doc = include_str!("../README.md")]
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,8 +6,18 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::Value;
 
-/// The areas under `fixtures/`.
-pub const AREAS: [&str; 5] = ["graph", "projection", "mutation", "gaps", "modules"];
+/// Loads every case of an area from the calling crate's own `fixtures/` directory, sorted by
+/// name: `load!("graph")` reads `<crate>/fixtures/graph`. A [`Result`] of [`Vec<Fixture>`] or
+/// [`LoadError`].
+#[macro_export]
+macro_rules! load {
+    ($area:expr) => {
+        $crate::load_from(
+            &::std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures"),
+            $area,
+        )
+    };
+}
 
 /// One test case.
 #[derive(Debug, Clone)]
@@ -81,22 +87,7 @@ pub enum LoadError {
     },
 }
 
-/// The repository's `fixtures/` directory.
-#[must_use]
-pub fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
-}
-
-/// Loads every case of `area`, sorted by name.
-///
-/// # Errors
-///
-/// When a directory or file cannot be read or parsed.
-pub fn load(area: &str) -> Result<Vec<Fixture>, LoadError> {
-    load_from(&root(), area)
-}
-
-/// [`load`] from another fixtures directory.
+/// Loads every case of `area` under the fixtures directory `root`, sorted by name.
 ///
 /// # Errors
 ///

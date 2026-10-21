@@ -4,10 +4,10 @@
 //! which services are data stores, and clients pick a service's glyph and place from it.
 
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
 
 /// What kind of data store a service is, as far as its image's name tells.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum DataStore {
     /// Postgres, or a database that speaks its protocol (`postgres`, `postgresql`, `cockroach`).

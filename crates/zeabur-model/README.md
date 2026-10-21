@@ -11,7 +11,7 @@ TypeScript client all serialise these types; nothing here knows how they are com
 
 ## Place in the workspace
 
-Level 1: may depend on `zeabur-core`.
+Level 1: may depend on `zeabur-kernel`.
 
 ## Design
 

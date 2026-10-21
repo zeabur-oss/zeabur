@@ -58,24 +58,16 @@
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
-use zeabur_core::crypto::{hex, sha256};
+use zeabur_kernel::digest::{hex, sha256};
+pub use zeabur_kernel::names::{
+    Conventions, DEBUG_PREFIX, TOOLS_LABEL, TOOLS_PERSON_ANNOTATION, TOOLS_PERSON_LABEL,
+    TOOLS_PREFIX, TOOLS_PROJECT_ANNOTATION,
+};
 
 use crate::change::{Plan, PlannedObject, Target, Warning, Write};
 use crate::plan::{ErrorKind, PlanError, error, shown, yaml};
 use crate::rules::diff;
 
-/// The name of every debug container Zeabur adds starts with this.
-pub const DEBUG_PREFIX: &str = "zeabur-debug-";
-/// The name of every tools pod starts with this.
-pub const TOOLS_PREFIX: &str = "zeabur-tools-";
-/// The label every tools pod carries, `"true"`.
-pub const TOOLS_LABEL: &str = "zeabur.com/tools";
-/// The label naming whose tools pod it is: [`person_key`] of their user name.
-pub const TOOLS_PERSON_LABEL: &str = "zeabur.com/tools-person";
-/// The annotation with the person's user name, as the cluster gave it.
-pub const TOOLS_PERSON_ANNOTATION: &str = "zeabur.com/tools-person";
-/// The annotation with the project the pod was opened for.
-pub const TOOLS_PROJECT_ANNOTATION: &str = "zeabur.com/tools-project";
 /// The tools pod's one container.
 pub const TOOLS_CONTAINER: &str = "tools";
 /// The tools container's home directory.
@@ -187,25 +179,32 @@ fn name_of(item: &Value) -> Option<&str> {
 /// Zeabur's debug containers in `pod`, in the order they were added.
 #[must_use]
 pub fn debug_containers(pod: &Value) -> Vec<DebugContainer> {
+    debug_containers_with(pod, &Conventions::ZEABUR)
+}
+
+/// [`debug_containers`], named by the debug prefix of `conventions`.
+#[must_use]
+pub fn debug_containers_with(pod: &Value, conventions: &Conventions) -> Vec<DebugContainer> {
     items(pod, "/spec/ephemeralContainers")
         .filter_map(|container| {
             let name = name_of(container)?;
-            name.starts_with(DEBUG_PREFIX).then(|| DebugContainer {
-                name: name.to_owned(),
-                target: container
-                    .get("targetContainerName")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned),
-                image: container
-                    .get("image")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .to_owned(),
-                state: container_state(
-                    items(pod, "/status/ephemeralContainerStatuses")
-                        .find(|s| name_of(s) == Some(name)),
-                ),
-            })
+            name.starts_with(conventions.debug_prefix.as_ref())
+                .then(|| DebugContainer {
+                    name: name.to_owned(),
+                    target: container
+                        .get("targetContainerName")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
+                    image: container
+                        .get("image")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                        .to_owned(),
+                    state: container_state(
+                        items(pod, "/status/ephemeralContainerStatuses")
+                            .find(|s| name_of(s) == Some(name)),
+                    ),
+                })
         })
         .collect()
 }
@@ -294,6 +293,21 @@ pub fn debug_container(
     image: &str,
     made_at: &str,
 ) -> Result<Plan, PlanError> {
+    debug_container_with(pod, asked, image, made_at, &Conventions::ZEABUR)
+}
+
+/// [`debug_container`], named by the debug prefix of `conventions`.
+///
+/// # Errors
+///
+/// When the pod has no such container, or has stopped.
+pub fn debug_container_with(
+    pod: &Value,
+    asked: Option<&str>,
+    image: &str,
+    made_at: &str,
+    conventions: &Conventions,
+) -> Result<Plan, PlanError> {
     let pod_name = pod
         .pointer("/metadata/name")
         .and_then(Value::as_str)
@@ -310,7 +324,7 @@ pub fn debug_container(
             format!("Pod {pod_name} has stopped, so no container can start in it."),
         ));
     }
-    if let Some(reused) = debug_containers(pod)
+    if let Some(reused) = debug_containers_with(pod, conventions)
         .into_iter()
         .find(|c| c.usable() && c.target.as_deref() == Some(target.as_str()))
     {
@@ -329,7 +343,8 @@ pub fn debug_container(
         .and_then(Value::as_str)
         .unwrap_or_default();
     let digest = sha256(format!("{uid}\n{target}\n{made_at}").as_bytes());
-    let name = format!("{DEBUG_PREFIX}{}", hex(digest.get(..3).unwrap_or_default()));
+    let prefix = &conventions.debug_prefix;
+    let name = format!("{prefix}{}", hex(digest.get(..3).unwrap_or_default()));
     let container = json!({
         "name": name,
         "image": image,
@@ -446,20 +461,34 @@ pub struct ToolsPod<'a> {
 /// Whether `pod` is a tools pod of the person whose [`person_key`] is `key`.
 #[must_use]
 pub fn is_tools_pod_of(pod: &Value, key: &str) -> bool {
+    is_tools_pod_of_with(pod, key, &Conventions::ZEABUR)
+}
+
+/// [`is_tools_pod_of`] by the tools labels of `conventions`.
+#[must_use]
+pub fn is_tools_pod_of_with(pod: &Value, key: &str, conventions: &Conventions) -> bool {
     let label = |name: &str| {
         pod.pointer(&format!("/metadata/labels/{}", name.replace('/', "~1")))
             .and_then(Value::as_str)
     };
-    label(TOOLS_LABEL) == Some("true") && label(TOOLS_PERSON_LABEL) == Some(key)
+    label(&conventions.tools_label) == Some("true")
+        && label(&conventions.tools_person_label) == Some(key)
 }
 
 /// The tools pod `request` describes, as it is created.
 #[must_use]
 pub fn tools_pod_body(request: &ToolsPod<'_>) -> Value {
+    tools_pod_body_with(request, &Conventions::ZEABUR)
+}
+
+/// [`tools_pod_body`] under the names and labels of `conventions`.
+#[must_use]
+pub fn tools_pod_body_with(request: &ToolsPod<'_>, conventions: &Conventions) -> Value {
     let key = person_key(request.person);
     let digest = sha256(format!("{}\n{}", request.person, request.made_at).as_bytes());
     let name = format!(
-        "{TOOLS_PREFIX}{key}-{}",
+        "{}{key}-{}",
+        conventions.tools_prefix,
         hex(digest.get(..3).unwrap_or_default())
     );
     let home = TOOLS_HOME;
@@ -470,14 +499,14 @@ pub fn tools_pod_body(request: &ToolsPod<'_>) -> Value {
             "name": name,
             "namespace": request.namespace,
             "labels": {
-                "app.kubernetes.io/name": "zeabur-tools",
-                "app.kubernetes.io/managed-by": "zeabur",
-                TOOLS_LABEL: "true",
-                TOOLS_PERSON_LABEL: key,
+                "app.kubernetes.io/name": conventions.tools_prefix.trim_end_matches('-'),
+                "app.kubernetes.io/managed-by": conventions.field_manager,
+                (&*conventions.tools_label): "true",
+                (&*conventions.tools_person_label): key,
             },
             "annotations": {
-                TOOLS_PERSON_ANNOTATION: request.person,
-                TOOLS_PROJECT_ANNOTATION: request.project,
+                (&*conventions.tools_person_annotation): request.person,
+                (&*conventions.tools_project_annotation): request.project,
             },
         },
         "spec": {
@@ -541,7 +570,13 @@ pub fn tools_pod_body(request: &ToolsPod<'_>) -> Value {
 /// The plan that creates the tools pod `request` describes.
 #[must_use]
 pub fn tools_pod(request: &ToolsPod<'_>) -> Plan {
-    let body = tools_pod_body(request);
+    tools_pod_with(request, &Conventions::ZEABUR)
+}
+
+/// [`tools_pod`] under the names and labels of `conventions`.
+#[must_use]
+pub fn tools_pod_with(request: &ToolsPod<'_>, conventions: &Conventions) -> Plan {
+    let body = tools_pod_body_with(request, conventions);
     let name = body
         .pointer("/metadata/name")
         .and_then(Value::as_str)
@@ -778,5 +813,37 @@ mod tests {
                 Warning::ToolsCredentialExposed { namespace },
             ] if person == "alice" && namespace == "shop"
         ));
+    }
+
+    #[test]
+    fn other_conventions_name_and_label_their_own_pods_and_containers() {
+        let conventions = Conventions {
+            field_manager: "example".into(),
+            debug_prefix: "example-debug-".into(),
+            tools_prefix: "example-tools-".into(),
+            tools_label: "example.com/tools".into(),
+            tools_person_label: "example.com/tools-person".into(),
+            tools_person_annotation: "example.com/person".into(),
+            tools_project_annotation: "example.com/project".into(),
+            ..Conventions::default()
+        };
+        let body = tools_pod_body_with(&tools("alice", false), &conventions);
+        let meta = &body["metadata"];
+        assert!(meta["name"].as_str().unwrap().starts_with("example-tools-"));
+        assert_eq!(meta["labels"]["app.kubernetes.io/name"], "example-tools");
+        assert_eq!(meta["labels"]["app.kubernetes.io/managed-by"], "example");
+        assert_eq!(meta["labels"]["example.com/tools"], "true");
+        assert_eq!(meta["annotations"]["example.com/person"], "alice");
+        assert!(meta["labels"].get(TOOLS_LABEL).is_none());
+        let key = person_key("alice");
+        assert!(is_tools_pod_of_with(&body, &key, &conventions));
+        assert!(!is_tools_pod_of(&body, &key));
+
+        let plan = debug_container_with(&pod(), None, "b", "t", &conventions).unwrap();
+        let Write::EphemeralContainers { operations } = &plan.objects[0].write else {
+            panic!("{plan:?}")
+        };
+        let name = operations[1]["value"][0]["name"].as_str().unwrap();
+        assert!(name.starts_with("example-debug-"));
     }
 }

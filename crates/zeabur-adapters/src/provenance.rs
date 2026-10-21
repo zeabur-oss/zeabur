@@ -20,7 +20,7 @@ pub const HELM_RELEASE_NAME_ANNOTATION: &str = "meta.helm.sh/release-name";
 /// The `type` of the Secrets Helm's default storage driver keeps release records in.
 pub const HELM_RELEASE_SECRET_TYPE: &str = "helm.sh/release.v1";
 
-pub use zeabur_core::tool::Tool;
+pub use zeabur_kernel::tool::Tool;
 
 /// The tool managing an object, if its marks are present.
 ///

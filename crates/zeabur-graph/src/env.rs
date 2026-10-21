@@ -105,21 +105,29 @@ pub fn env_from(
     workload: Workload<'_>,
     container: &str,
 ) -> Option<Vec<ImportedEnv>> {
-    env_from_in(snapshot, &ByName::new(snapshot), workload, container)
+    env_from_in(
+        snapshot,
+        &ByName::new(snapshot),
+        workload,
+        container,
+        FIELD_MANAGER,
+    )
 }
 
-/// [`env_from`], looking the imported objects up in `objects`.
+/// [`env_from`], looking the imported objects up in `objects`; `field_manager` is the one whose
+/// own writes never make the list read-only.
 pub(crate) fn env_from_in(
     snapshot: &Snapshot,
     objects: &ByName<'_>,
     workload: Workload<'_>,
     container: &str,
+    field_manager: &str,
 ) -> Option<Vec<ImportedEnv>> {
     let view = find_container(workload, container)?;
     let path = view.path(workload);
     let list_manager = list_managers(workload, view.list, view.name)
         .into_iter()
-        .find(|manager| *manager != FIELD_MANAGER);
+        .find(|manager| *manager != field_manager);
     Some(
         view.env_from
             .iter()

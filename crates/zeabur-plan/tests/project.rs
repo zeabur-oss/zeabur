@@ -8,7 +8,9 @@ mod tests {
     use zeabur_graph::Snapshot;
     use zeabur_model::{ProjectIcon, Tool, WorkloadKind, WorkloadRef};
     use zeabur_plan::json::apply_patch;
-    use zeabur_plan::{Change, ErrorKind, Input, Plan, PlanError, PlanRequest, Write, plan};
+    use zeabur_plan::{
+        Change, Conventions, ErrorKind, Input, Plan, PlanError, PlanRequest, Write, plan, plan_with,
+    };
 
     const LABEL: &str = "zeabur.com/project";
 
@@ -296,6 +298,65 @@ mod tests {
         assert_eq!(set, details(Some("Shop"), None, Some(ProjectIcon::Rocket)));
         assert!(
             serde_json::from_value::<Change>(json!({"op": "details", "icon": "unicorn"})).is_err()
+        );
+    }
+
+    #[test]
+    fn other_conventions_adopt_under_their_own_label() {
+        let conventions = Conventions {
+            project_label: "example.com/project".into(),
+            display_name_annotation: "example.com/name".into(),
+            ..Conventions::default()
+        };
+        let snapshot = Snapshot::default();
+        let stored = shop(false);
+        let request = |change| PlanRequest {
+            changes: vec![change],
+            restart_after: false,
+        };
+        let input = Input {
+            storage_classes: None,
+            namespace: Some(&stored),
+            ..Input::new(&snapshot, "2026-10-15T00:00:00Z")
+        };
+        let adopted = plan_with(input, &request(Change::Adopt), &conventions).unwrap();
+        let (after, _) = applied(&adopted, &stored);
+        assert_eq!(after["metadata"]["labels"]["example.com/project"], "true");
+        assert!(after["metadata"]["labels"].get(LABEL).is_none());
+
+        let named = Input {
+            namespace: Some(&after),
+            ..input
+        };
+        let change = details(Some("Shop"), None, None);
+        let set = plan_with(named, &request(change), &conventions).unwrap();
+        let (after, _) = applied(&set, &after);
+        assert_eq!(after["metadata"]["annotations"]["example.com/name"], "Shop");
+        // Zeabur's own label is not a project under these conventions.
+        assert_eq!(
+            plan_with(
+                input,
+                &request(details(Some("Shop"), None, None)),
+                &conventions
+            )
+            .unwrap_err()
+            .code,
+            "not_adopted"
+        );
+        let zeaburs = shop(true);
+        let theirs = Input {
+            namespace: Some(&zeaburs),
+            ..input
+        };
+        assert_eq!(
+            plan_with(
+                theirs,
+                &request(details(Some("Shop"), None, None)),
+                &conventions
+            )
+            .unwrap_err()
+            .code,
+            "not_adopted"
         );
     }
 }

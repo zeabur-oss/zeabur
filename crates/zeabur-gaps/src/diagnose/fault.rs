@@ -137,7 +137,7 @@ mod tests {
             ),
             (
                 DiagnosisKind::Unexplained,
-                "diagnosis.unexplained.cause",
+                "diagnosis.unexplained.cause.waiting",
                 FaultOrigin::Unknown,
             ),
         ];

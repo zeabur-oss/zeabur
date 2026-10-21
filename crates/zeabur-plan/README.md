@@ -7,7 +7,8 @@ workload or roll it back to an earlier release, scale it, set a probe or its res
 grow a volume and move a mount, replace an object with edited YAML, create a ready-made object
 ([`CREATABLE`]), delete one, adopt a namespace or let it go, and set a project's details.
 A plan token binds the request, the resource versions it was computed against and the person,
-so an apply carries out exactly what was confirmed, or nothing.
+so an apply carries out exactly what was confirmed, or nothing; this crate defines the claims,
+`zeabur-api` seals them.
 
 ## Hides
 
@@ -17,11 +18,11 @@ Argo CD or Flux owns: an object one of them manages may be restarted but not edi
 
 ## Place in the workspace
 
-Level 3: may depend on `zeabur-core`, `zeabur-model`, `zeabur-adapters` and `zeabur-graph`. It
+Level 3: may depend on `zeabur-kernel`, `zeabur-model`, `zeabur-adapters` and `zeabur-graph`. It
 computes; `zeabur-api` reads the cluster, asks for the plan, signs it and sends the writes
 through `zeabur-kube`.
 
 ## Tests
 
-`fixtures/mutation` (`mutation.*` operations, including `mutation.plan`) runs in
+This crate's `fixtures/mutation` (`mutation.*` operations, including `mutation.plan`) runs in
 `tests/fixtures.rs`; `tests/roundtrip.rs` re-projects planned objects.

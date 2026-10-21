@@ -7,6 +7,8 @@ version = "0.0.1"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
+repository = "https://github.com/zeabur/zeabur"
+# Only the pure crates and their fixture loader are published ([workspace.metadata.pure]).
 publish = false
 
 # Lint policy (see CONTRIBUTING.md).
@@ -16,14 +18,16 @@ publish = false
 # dependencies) only on workspace crates of a lower level. Test crates are dev-dependencies only.
 # (Levels order crates; the product layers L0-L4 in docs/architecture.md are a different thing.)
 [workspace.metadata.levels]
-zeabur-core = 0
+zeabur-kernel = 0
+zeabur-fixtures = 0
+zeabur-core = 1
 zeabur-model = 1
-zeabur-kube = 1
 zeabur-adapters = 1
 zeabur-ui = 1
-zeabur-auth = 1
+zeabur-kube = 2
+zeabur-auth = 2
 zeabur-graph = 2
-zeabur-modules = 2
+zeabur-modules = 3
 zeabur-gaps = 3
 zeabur-plan = 3
 zeabur-catalog = 3
@@ -40,22 +44,37 @@ zeabur-test-support = 6
 crates = ["zeabur-modules"]
 composers = ["zeabur-api", "zeabur-mcp", "zeabur", "zeaburctl"]
 
+# Crates with no I/O and no key, packageable on their own and built for WebAssembly, also checked
+# by scripts/check-levels.sh: a pure crate depends only on pure workspace crates.
+[workspace.metadata.pure]
+crates = [
+  "zeabur-kernel",
+  "zeabur-model",
+  "zeabur-adapters",
+  "zeabur-graph",
+  "zeabur-gaps",
+  "zeabur-plan",
+]
+
 [workspace.dependencies]
-# Workspace crates, levelled from the bottom up.
+# Workspace crates, levelled from the bottom up. A published crate's entry carries the workspace
+# version too, which a package needs; keep it equal to [workspace.package] version.
+zeabur-kernel = { path = "crates/zeabur-kernel", version = "0.0.1" }
 zeabur-core = { path = "crates/zeabur-core" }
-zeabur-model = { path = "crates/zeabur-model" }
+zeabur-model = { path = "crates/zeabur-model", version = "0.0.1" }
 zeabur-kube = { path = "crates/zeabur-kube" }
-zeabur-adapters = { path = "crates/zeabur-adapters" }
-zeabur-graph = { path = "crates/zeabur-graph" }
-zeabur-gaps = { path = "crates/zeabur-gaps" }
+zeabur-adapters = { path = "crates/zeabur-adapters", version = "0.0.1" }
+zeabur-graph = { path = "crates/zeabur-graph", version = "0.0.1" }
+zeabur-gaps = { path = "crates/zeabur-gaps", version = "0.0.1" }
 zeabur-catalog = { path = "crates/zeabur-catalog" }
 zeabur-modules = { path = "crates/zeabur-modules" }
-zeabur-plan = { path = "crates/zeabur-plan" }
+zeabur-plan = { path = "crates/zeabur-plan", version = "0.0.1" }
 zeabur-api = { path = "crates/zeabur-api" }
 zeabur-mcp = { path = "crates/zeabur-mcp" }
 zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
+zeabur-fixtures = { path = "crates/zeabur-fixtures", version = "0.0.1" }
 
 # Third-party crates.
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }
@@ -88,6 +107,8 @@ secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
 serde_json = "1"
+# SHA-256 for derived names in the pure crates (zeabur-kernel), which hold no C library.
+sha2 = { version = "0.10", default-features = false }
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "io-util"] }
 # A WebSocket client for the terminal's tests; the server side comes with axum's `ws` feature.

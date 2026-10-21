@@ -19,7 +19,7 @@ pub struct AppState {
     /// The embedded Zeabur Catalog.
     pub catalogue: Arc<Vec<zeabur_catalog::Component>>,
     /// The key plan tokens are sealed with; `None` when none could be made.
-    pub plan_key: Option<Arc<zeabur_plan::token::PlanKey>>,
+    pub plan_key: Option<Arc<crate::plan_token::PlanKey>>,
     /// The time now: `Timestamp::now`, or a fixed time in tests, so answers that depend on the
     /// date (end of life, plan expiry) can be checked on one day.
     pub clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
