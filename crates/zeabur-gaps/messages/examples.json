@@ -2575,5 +2575,553 @@
   "en": "container1 keeps its software1 data in path1, on a volume that lasts only as long as the replica; it's lost whenever the replica is replaced.",
   "zh-TW": "container1 把 software1 資料存在 path1，但這個磁碟區只跟著副本存在；副本一換掉，資料就不見了。",
   "zh-CN": "container1 把 software1 数据存在 path1，但这个卷只随副本存在；副本一替换，数据就没了。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.waiting",
+  "params": {
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "pod1 isn't running: container1 is waiting (reason1).",
+  "zh-TW": "pod1 沒有在執行：container1 正在等待（reason1）。",
+  "zh-CN": "pod1 没有在运行：container1 正在等待（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.waiting",
+  "params": {
+   "service": "service1",
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "pod1 isn't running: container1 is waiting (reason1).",
+  "zh-TW": "pod1 沒有在執行：container1 正在等待（reason1）。",
+  "zh-CN": "pod1 没有在运行：container1 正在等待（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.waiting",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "pod": "pod1",
+   "reason": "reason1"
+  },
+  "en": "The rollout of service1 is stuck: the new replica pod1 is waiting (reason1).",
+  "zh-TW": "service1 的部署卡住了：新副本 pod1 正在等待（reason1）。",
+  "zh-CN": "service1 的部署卡住了：新副本 pod1 正在等待（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.waiting",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "The rollout of service1 is stuck: the new replica pod1 is waiting (reason1).",
+  "zh-TW": "service1 的部署卡住了：新副本 pod1 正在等待（reason1）。",
+  "zh-CN": "service1 的部署卡住了：新副本 pod1 正在等待（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.waiting",
+  "params": {
+   "stuck": "false",
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "pod1 isn't running: container1 is waiting (reason1).",
+  "zh-TW": "pod1 沒有在執行：container1 正在等待（reason1）。",
+  "zh-CN": "pod1 没有在运行：container1 正在等待（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.waiting",
+  "params": {
+   "stuck": "false",
+   "service": "service1",
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "pod1 isn't running: container1 is waiting (reason1).",
+  "zh-TW": "pod1 沒有在執行：container1 正在等待（reason1）。",
+  "zh-CN": "pod1 没有在运行：container1 正在等待（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.terminated",
+  "params": {
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "pod1 isn't running: container1 stopped (reason1).",
+  "zh-TW": "pod1 沒有在執行：container1 已停止（reason1）。",
+  "zh-CN": "pod1 没有在运行：container1 已停止（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.terminated",
+  "params": {
+   "service": "service1",
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "pod1 isn't running: container1 stopped (reason1).",
+  "zh-TW": "pod1 沒有在執行：container1 已停止（reason1）。",
+  "zh-CN": "pod1 没有在运行：container1 已停止（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.terminated",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "pod": "pod1",
+   "reason": "reason1"
+  },
+  "en": "The rollout of service1 is stuck: the new replica pod1 stopped (reason1).",
+  "zh-TW": "service1 的部署卡住了：新副本 pod1 已停止（reason1）。",
+  "zh-CN": "service1 的部署卡住了：新副本 pod1 已停止（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.terminated",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "The rollout of service1 is stuck: the new replica pod1 stopped (reason1).",
+  "zh-TW": "service1 的部署卡住了：新副本 pod1 已停止（reason1）。",
+  "zh-CN": "service1 的部署卡住了：新副本 pod1 已停止（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.terminated",
+  "params": {
+   "stuck": "false",
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "pod1 isn't running: container1 stopped (reason1).",
+  "zh-TW": "pod1 沒有在執行：container1 已停止（reason1）。",
+  "zh-CN": "pod1 没有在运行：container1 已停止（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.terminated",
+  "params": {
+   "stuck": "false",
+   "service": "service1",
+   "pod": "pod1",
+   "reason": "reason1",
+   "container": "container1"
+  },
+  "en": "pod1 isn't running: container1 stopped (reason1).",
+  "zh-TW": "pod1 沒有在執行：container1 已停止（reason1）。",
+  "zh-CN": "pod1 没有在运行：container1 已停止（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.pending",
+  "params": {
+   "pod": "pod1"
+  },
+  "en": "pod1 hasn't started (Pending).",
+  "zh-TW": "pod1 還沒啟動（Pending）。",
+  "zh-CN": "pod1 还没启动（Pending）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.pending",
+  "params": {
+   "service": "service1",
+   "pod": "pod1"
+  },
+  "en": "pod1 hasn't started (Pending).",
+  "zh-TW": "pod1 還沒啟動（Pending）。",
+  "zh-CN": "pod1 还没启动（Pending）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.pending",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "pod": "pod1"
+  },
+  "en": "The rollout of service1 is stuck: the new replica pod1 hasn't started (Pending).",
+  "zh-TW": "service1 的部署卡住了：新副本 pod1 還沒啟動（Pending）。",
+  "zh-CN": "service1 的部署卡住了：新副本 pod1 还没启动（Pending）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.pending",
+  "params": {
+   "stuck": "false",
+   "pod": "pod1"
+  },
+  "en": "pod1 hasn't started (Pending).",
+  "zh-TW": "pod1 還沒啟動（Pending）。",
+  "zh-CN": "pod1 还没启动（Pending）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.pending",
+  "params": {
+   "stuck": "false",
+   "service": "service1",
+   "pod": "pod1"
+  },
+  "en": "pod1 hasn't started (Pending).",
+  "zh-TW": "pod1 還沒啟動（Pending）。",
+  "zh-CN": "pod1 还没启动（Pending）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.notReady",
+  "params": {
+   "pod": "pod1"
+  },
+  "en": "pod1 runs but isn't ready.",
+  "zh-TW": "pod1 在執行，但還沒就緒。",
+  "zh-CN": "pod1 在运行，但还没就绪。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.notReady",
+  "params": {
+   "pod": "pod1",
+   "check": "check1"
+  },
+  "en": "pod1 runs but doesn't pass its traffic check (check1).",
+  "zh-TW": "pod1 在執行，但沒有通過就緒檢查（check1）。",
+  "zh-CN": "pod1 在运行，但没有通过就绪检查（check1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.notReady",
+  "params": {
+   "service": "service1",
+   "pod": "pod1"
+  },
+  "en": "pod1 runs but isn't ready.",
+  "zh-TW": "pod1 在執行，但還沒就緒。",
+  "zh-CN": "pod1 在运行，但还没就绪。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.notReady",
+  "params": {
+   "service": "service1",
+   "pod": "pod1",
+   "check": "check1"
+  },
+  "en": "pod1 runs but doesn't pass its traffic check (check1).",
+  "zh-TW": "pod1 在執行，但沒有通過就緒檢查（check1）。",
+  "zh-CN": "pod1 在运行，但没有通过就绪检查（check1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.notReady",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "pod": "pod1"
+  },
+  "en": "The rollout of service1 is stuck: the new replica pod1 runs but isn't ready.",
+  "zh-TW": "service1 的部署卡住了：新副本 pod1 在執行，但還沒就緒。",
+  "zh-CN": "service1 的部署卡住了：新副本 pod1 在运行，但还没就绪。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.notReady",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "pod": "pod1",
+   "check": "check1"
+  },
+  "en": "The rollout of service1 is stuck: the new replica pod1 runs but doesn't pass its traffic check (check1).",
+  "zh-TW": "service1 的部署卡住了：新副本 pod1 在執行，但沒有通過就緒檢查（check1）。",
+  "zh-CN": "service1 的部署卡住了：新副本 pod1 在运行，但没有通过就绪检查（check1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.phase",
+  "params": {
+   "pod": "pod1",
+   "phase": "phase1"
+  },
+  "en": "pod1 is phase1.",
+  "zh-TW": "pod1 的狀態是 phase1。",
+  "zh-CN": "pod1 的状态是 phase1。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.phase",
+  "params": {
+   "service": "service1",
+   "pod": "pod1",
+   "phase": "phase1"
+  },
+  "en": "pod1 is phase1.",
+  "zh-TW": "pod1 的狀態是 phase1。",
+  "zh-CN": "pod1 的状态是 phase1。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.phase",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "pod": "pod1",
+   "phase": "phase1"
+  },
+  "en": "The rollout of service1 is stuck: the new replica pod1 is phase1.",
+  "zh-TW": "service1 的部署卡住了：新副本 pod1 的狀態是 phase1。",
+  "zh-CN": "service1 的部署卡住了：新副本 pod1 的状态是 phase1。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.phase",
+  "params": {
+   "stuck": "false",
+   "pod": "pod1",
+   "phase": "phase1"
+  },
+  "en": "pod1 is phase1.",
+  "zh-TW": "pod1 的狀態是 phase1。",
+  "zh-CN": "pod1 的状态是 phase1。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.phase",
+  "params": {
+   "stuck": "false",
+   "service": "service1",
+   "pod": "pod1",
+   "phase": "phase1"
+  },
+  "en": "pod1 is phase1.",
+  "zh-TW": "pod1 的狀態是 phase1。",
+  "zh-CN": "pod1 的状态是 phase1。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.none",
+  "params": {
+   "service": "service1"
+  },
+  "en": "service1 is failing.",
+  "zh-TW": "service1 異常。",
+  "zh-CN": "service1 异常。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.none",
+  "params": {
+   "service": "service1",
+   "reason": "reason1"
+  },
+  "en": "service1 is failing (reason1).",
+  "zh-TW": "service1 異常（reason1）。",
+  "zh-CN": "service1 异常（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.none",
+  "params": {
+   "stuck": "true",
+   "service": "service1"
+  },
+  "en": "The rollout of service1 is stuck.",
+  "zh-TW": "service1 的部署卡住了。",
+  "zh-CN": "service1 的部署卡住了。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.none",
+  "params": {
+   "stuck": "true",
+   "service": "service1",
+   "reason": "reason1"
+  },
+  "en": "The rollout of service1 is stuck.",
+  "zh-TW": "service1 的部署卡住了。",
+  "zh-CN": "service1 的部署卡住了。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.none",
+  "params": {
+   "stuck": "false",
+   "service": "service1"
+  },
+  "en": "service1 is failing.",
+  "zh-TW": "service1 異常。",
+  "zh-CN": "service1 异常。"
+ },
+ {
+  "key": "diagnosis.unexplained.cause.none",
+  "params": {
+   "stuck": "false",
+   "service": "service1",
+   "reason": "reason1"
+  },
+  "en": "service1 is failing (reason1).",
+  "zh-TW": "service1 異常（reason1）。",
+  "zh-CN": "service1 异常（reason1）。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.event",
+  "params": {
+   "event": "event1",
+   "note": "note1"
+  },
+  "en": "The newest event about it: event1, “note1”.",
+  "zh-TW": "關於它的最新事件：event1，「note1」。",
+  "zh-CN": "关于它的最新事件：event1，“note1”。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.event",
+  "params": {
+   "event": "event1",
+   "note": "note1",
+   "serving": "1"
+  },
+  "en": "The newest event about it: event1, “note1”. The replica of the previous release still serves traffic.",
+  "zh-TW": "關於它的最新事件：event1，「note1」。上一個版本的 1 個副本仍在提供服務。",
+  "zh-CN": "关于它的最新事件：event1，“note1”。上一个版本的 1 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.event",
+  "params": {
+   "event": "event1",
+   "note": "note1",
+   "serving": "2"
+  },
+  "en": "The newest event about it: event1, “note1”. 2 replicas of the previous release still serve traffic.",
+  "zh-TW": "關於它的最新事件：event1，「note1」。上一個版本的 2 個副本仍在提供服務。",
+  "zh-CN": "关于它的最新事件：event1，“note1”。上一个版本的 2 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.event",
+  "params": {
+   "event": "event1",
+   "note": "note1",
+   "serving": "60"
+  },
+  "en": "The newest event about it: event1, “note1”. 60 replicas of the previous release still serve traffic.",
+  "zh-TW": "關於它的最新事件：event1，「note1」。上一個版本的 60 個副本仍在提供服務。",
+  "zh-CN": "关于它的最新事件：event1，“note1”。上一个版本的 60 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.event",
+  "params": {
+   "event": "event1",
+   "note": "note1",
+   "serving": "90"
+  },
+  "en": "The newest event about it: event1, “note1”. 90 replicas of the previous release still serve traffic.",
+  "zh-TW": "關於它的最新事件：event1，「note1」。上一個版本的 90 個副本仍在提供服務。",
+  "zh-CN": "关于它的最新事件：event1，“note1”。上一个版本的 90 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.event",
+  "params": {
+   "event": "event1",
+   "note": "note1",
+   "serving": "120"
+  },
+  "en": "The newest event about it: event1, “note1”. 120 replicas of the previous release still serve traffic.",
+  "zh-TW": "關於它的最新事件：event1，「note1」。上一個版本的 120 個副本仍在提供服務。",
+  "zh-CN": "关于它的最新事件：event1，“note1”。上一个版本的 120 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.noEvent",
+  "params": {},
+  "en": "The cluster has recorded no event about it.",
+  "zh-TW": "叢集沒有關於它的事件。",
+  "zh-CN": "集群没有关于它的事件。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.noEvent",
+  "params": {
+   "serving": "1"
+  },
+  "en": "The cluster has recorded no event about it. The replica of the previous release still serves traffic.",
+  "zh-TW": "叢集沒有關於它的事件。上一個版本的 1 個副本仍在提供服務。",
+  "zh-CN": "集群没有关于它的事件。上一个版本的 1 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.noEvent",
+  "params": {
+   "serving": "2"
+  },
+  "en": "The cluster has recorded no event about it. 2 replicas of the previous release still serve traffic.",
+  "zh-TW": "叢集沒有關於它的事件。上一個版本的 2 個副本仍在提供服務。",
+  "zh-CN": "集群没有关于它的事件。上一个版本的 2 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.noEvent",
+  "params": {
+   "serving": "60"
+  },
+  "en": "The cluster has recorded no event about it. 60 replicas of the previous release still serve traffic.",
+  "zh-TW": "叢集沒有關於它的事件。上一個版本的 60 個副本仍在提供服務。",
+  "zh-CN": "集群没有关于它的事件。上一个版本的 60 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.noEvent",
+  "params": {
+   "serving": "90"
+  },
+  "en": "The cluster has recorded no event about it. 90 replicas of the previous release still serve traffic.",
+  "zh-TW": "叢集沒有關於它的事件。上一個版本的 90 個副本仍在提供服務。",
+  "zh-CN": "集群没有关于它的事件。上一个版本的 90 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.why.noEvent",
+  "params": {
+   "serving": "120"
+  },
+  "en": "The cluster has recorded no event about it. 120 replicas of the previous release still serve traffic.",
+  "zh-TW": "叢集沒有關於它的事件。上一個版本的 120 個副本仍在提供服務。",
+  "zh-CN": "集群没有关于它的事件。上一个版本的 120 个副本仍在提供服务。"
+ },
+ {
+  "key": "diagnosis.unexplained.fix.waiting",
+  "params": {
+   "pod": "pod1"
+  },
+  "en": "Open pod1's events: the kubelet says there what it waits for.",
+  "zh-TW": "開啟 pod1 的事件，kubelet 會在那裡說明它在等什麼。",
+  "zh-CN": "打开 pod1 的事件，kubelet 会在那里说明它在等什么。"
+ },
+ {
+  "key": "diagnosis.unexplained.fix.terminated",
+  "params": {
+   "pod": "pod1"
+  },
+  "en": "Read pod1's logs and events for why it stopped.",
+  "zh-TW": "開啟 pod1 的日誌和事件，看它為什麼停止。",
+  "zh-CN": "从 pod1 的日志和事件找出它停止的原因。"
+ },
+ {
+  "key": "diagnosis.unexplained.fix.pending",
+  "params": {
+   "pod": "pod1"
+  },
+  "en": "Open pod1's events: the scheduler and the kubelet say there why it hasn't started.",
+  "zh-TW": "開啟 pod1 的事件，排程器和 kubelet 會在那裡說明它為什麼還沒啟動。",
+  "zh-CN": "打开 pod1 的事件，调度器和 kubelet 会在那里说明它为什么还没启动。"
+ },
+ {
+  "key": "diagnosis.unexplained.fix.notReady",
+  "params": {
+   "pod": "pod1"
+  },
+  "en": "Make sure the app answers where its traffic check looks, and read pod1's logs.",
+  "zh-TW": "確認應用程式回應就緒檢查探測的位置，再看 pod1 的日誌。",
+  "zh-CN": "确认应用在就绪检查查看的位置有响应，再看 pod1 的日志。"
+ },
+ {
+  "key": "diagnosis.unexplained.fix.phase",
+  "params": {
+   "pod": "pod1"
+  },
+  "en": "Open pod1's events and logs.",
+  "zh-TW": "開啟 pod1 的事件和日誌。",
+  "zh-CN": "查看 pod1 的事件和日志。"
+ },
+ {
+  "key": "diagnosis.unexplained.fix.none",
+  "params": {
+   "service": "service1"
+  },
+  "en": "Open service1's events.",
+  "zh-TW": "開啟 service1 的事件。",
+  "zh-CN": "查看 service1 的事件。"
  }
 ]
