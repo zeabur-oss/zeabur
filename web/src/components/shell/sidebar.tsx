@@ -3,6 +3,7 @@ import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GearSixIcon from "~icons/ph/gear-six"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 import HouseIcon from "~icons/ph/house"
+import UsersThreeIcon from "~icons/ph/users-three"
 
 import { SearchRow } from "@/components/shell/search-row"
 import { DockToggle } from "@/components/shell/dock-slot"
@@ -21,7 +22,7 @@ import {
   SidebarSection,
 } from "@zeabur/design-system/components/sidebar"
 
-type Destination = "/" | "/cluster" | "/projects" | "/settings"
+type Destination = "/" | "/cluster" | "/projects" | "/members" | "/settings"
 
 interface Item {
   to: Destination
@@ -49,6 +50,12 @@ export function Sidebar() {
       icon: HardDrivesIcon,
       label: t("shell.cluster"),
       active: route.startsWith("/cluster"),
+    },
+    {
+      to: "/members",
+      icon: UsersThreeIcon,
+      label: t("shell.members"),
+      active: route === "/members",
     },
     {
       to: "/settings",

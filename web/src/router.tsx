@@ -27,6 +27,7 @@ import {
   toolsQuery,
   upgradesQuery,
 } from "@/api/queries"
+import { accountQuery, membersQuery } from "@/api/members"
 import { AppShell } from "@/components/app-shell"
 import { NotFound } from "@/components/not-found"
 import { openKubectl, openShell, showDock } from "@/lib/dock"
@@ -64,6 +65,10 @@ import {
 //                                              Settings' parts as #anchors; a former ?tab=status…
 //                                              redirects to its place
 //   /settings                                  preferences, the signed-in person, About
+//   /account                                   your account: passkeys, linked accounts, a link
+//                                              that adds a passkey
+//   /members                                   everyone Zeabur Identity signs in: invite, setup
+//                                              links, reset, remove
 //   /settings/components                       moved: redirects to /cluster/components
 //   /problems/$kind                            what one kind of problem means, and what to do
 //
@@ -255,6 +260,20 @@ const settingsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/settings"), "SettingsPage"),
 })
 
+const accountRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/account",
+  loader: () => load(ensure(accountQuery)),
+  component: lazyRouteComponent(() => import("@/routes/account"), "AccountPage"),
+})
+
+const membersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/members",
+  loader: () => load(ensure(membersQuery)),
+  component: lazyRouteComponent(() => import("@/routes/members"), "MembersPage"),
+})
+
 const componentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/cluster/components",
@@ -292,6 +311,8 @@ export const router = createRouter({
     toolsTerminalRoute,
     serviceRoute,
     settingsRoute,
+    accountRoute,
+    membersRoute,
     componentsRoute,
     problemRoute,
     movedComponentsRoute,

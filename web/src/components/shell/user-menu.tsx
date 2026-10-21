@@ -10,6 +10,7 @@ import ShieldCheckIcon from "~icons/ph/shield-check"
 import ShieldSlashIcon from "~icons/ph/shield-slash"
 import SignOutIcon from "~icons/ph/sign-out"
 import SunIcon from "~icons/ph/sun"
+import UserCircleIcon from "~icons/ph/user-circle"
 
 import { clusterNameQuery, clusterQuery, sessionQuery, whoamiQuery } from "@/api/queries"
 import { dropElevation, retryAsAdmin } from "@/auth/elevation"
@@ -91,6 +92,10 @@ export function ContextMenu() {
             </span>
           ) : null}
         </div>
+        <MenuItem render={<Link to="/account" />}>
+          <UserCircleIcon aria-hidden="true" />
+          {t("shell.account")}
+        </MenuItem>
         <MenuItem render={<Link to="/cluster" />}>
           <HardDrivesIcon aria-hidden="true" />
           <span className="flex min-w-0 flex-1 flex-col">
