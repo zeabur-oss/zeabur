@@ -1,0 +1,3 @@
+description: "Two new volumes at one path in one plan are refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "uploads", "size": "5Gi", "mountPath": "/srv/uploads"}}, {"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "more", "size": "1Gi", "mountPath": "/srv/uploads"}}]}}

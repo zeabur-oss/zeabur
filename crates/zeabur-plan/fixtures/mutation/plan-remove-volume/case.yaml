@@ -1,0 +1,3 @@
+description: "A volume is unmounted and dropped from the template, behind tests of its path and name; its claim stays."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "removeVolume", "workload": {"kind": "Deployment", "name": "web"}, "mountPath": "/data"}]}}

@@ -1,0 +1,269 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "v1",
+          "path": "apiVersion"
+        },
+        {
+          "after": "PersistentVolumeClaim",
+          "path": "kind"
+        },
+        {
+          "after": "web-logs",
+          "path": "metadata.name"
+        },
+        {
+          "after": "demo",
+          "path": "metadata.namespace"
+        },
+        {
+          "after": "ReadWriteOnce",
+          "path": "spec.accessModes[0]"
+        },
+        {
+          "after": "1Gi",
+          "path": "spec.resources.requests.storage"
+        }
+      ],
+      "owners": [],
+      "target": {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "name": "web-logs",
+        "plural": "persistentvolumeclaims"
+      },
+      "write": {
+        "body": {
+          "apiVersion": "v1",
+          "kind": "PersistentVolumeClaim",
+          "metadata": {
+            "name": "web-logs",
+            "namespace": "demo"
+          },
+          "spec": {
+            "accessModes": [
+              "ReadWriteOnce"
+            ],
+            "resources": {
+              "requests": {
+                "storage": "1Gi"
+              }
+            }
+          }
+        },
+        "type": "create"
+      }
+    },
+    {
+      "changes": [
+        {
+          "after": "v1",
+          "path": "apiVersion"
+        },
+        {
+          "after": "PersistentVolumeClaim",
+          "path": "kind"
+        },
+        {
+          "after": "web-uploads",
+          "path": "metadata.name"
+        },
+        {
+          "after": "demo",
+          "path": "metadata.namespace"
+        },
+        {
+          "after": "ReadWriteOnce",
+          "path": "spec.accessModes[0]"
+        },
+        {
+          "after": "5Gi",
+          "path": "spec.resources.requests.storage"
+        }
+      ],
+      "owners": [],
+      "target": {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "name": "web-uploads",
+        "plural": "persistentvolumeclaims"
+      },
+      "write": {
+        "body": {
+          "apiVersion": "v1",
+          "kind": "PersistentVolumeClaim",
+          "metadata": {
+            "name": "web-uploads",
+            "namespace": "demo"
+          },
+          "spec": {
+            "accessModes": [
+              "ReadWriteOnce"
+            ],
+            "resources": {
+              "requests": {
+                "storage": "5Gi"
+              }
+            }
+          }
+        },
+        "type": "create"
+      }
+    },
+    {
+      "changes": [
+        {
+          "after": "true",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=data].readOnly"
+        },
+        {
+          "after": "/srv/logs",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=logs].mountPath"
+        },
+        {
+          "after": "logs",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=logs].name"
+        },
+        {
+          "after": "/srv/uploads",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=uploads].mountPath"
+        },
+        {
+          "after": "uploads",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=uploads].name"
+        },
+        {
+          "after": "logs",
+          "path": "spec.template.spec.volumes[name=logs].name"
+        },
+        {
+          "after": "web-logs",
+          "path": "spec.template.spec.volumes[name=logs].persistentVolumeClaim.claimName"
+        },
+        {
+          "after": "uploads",
+          "path": "spec.template.spec.volumes[name=uploads].name"
+        },
+        {
+          "after": "web-uploads",
+          "path": "spec.template.spec.volumes[name=uploads].persistentVolumeClaim.claimName"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/volumes/-",
+            "value": {
+              "name": "uploads",
+              "persistentVolumeClaim": {
+                "claimName": "web-uploads"
+              }
+            }
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/volumeMounts/-",
+            "value": {
+              "mountPath": "/srv/uploads",
+              "name": "uploads"
+            }
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/volumes/-",
+            "value": {
+              "name": "logs",
+              "persistentVolumeClaim": {
+                "claimName": "web-logs"
+              }
+            }
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/volumeMounts/-",
+            "value": {
+              "mountPath": "/srv/logs",
+              "name": "logs"
+            }
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/volumeMounts/0/mountPath",
+            "value": "/data"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/volumeMounts/0/readOnly",
+            "value": true
+          }
+        ],
+        "type": "patch"
+      }
+    },
+    {
+      "changes": [
+        {
+          "after": "20Gi",
+          "before": "10Gi",
+          "path": "spec.resources.requests.storage"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "60",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "name": "web-data",
+        "plural": "persistentvolumeclaims"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "60"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/resources/requests/storage",
+            "value": "20Gi"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

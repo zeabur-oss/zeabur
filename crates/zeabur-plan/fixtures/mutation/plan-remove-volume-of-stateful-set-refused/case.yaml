@@ -1,0 +1,3 @@
+description: "A StatefulSet's claim template volume cannot be removed."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "removeVolume", "workload": {"kind": "StatefulSet", "name": "postgresql"}, "mountPath": "/var/lib/postgresql/data"}]}}

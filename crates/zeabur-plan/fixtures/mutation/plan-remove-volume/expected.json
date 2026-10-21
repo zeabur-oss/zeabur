@@ -1,0 +1,67 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "before": "/data",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=data].mountPath"
+        },
+        {
+          "before": "data",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=data].name"
+        },
+        {
+          "before": "data",
+          "path": "spec.template.spec.volumes[name=data].name"
+        },
+        {
+          "before": "web-data",
+          "path": "spec.template.spec.volumes[name=data].persistentVolumeClaim.claimName"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/volumeMounts/0/mountPath",
+            "value": "/data"
+          },
+          {
+            "op": "remove",
+            "path": "/spec/template/spec/containers/0/volumeMounts/0"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/volumes/0/name",
+            "value": "data"
+          },
+          {
+            "op": "remove",
+            "path": "/spec/template/spec/volumes/0"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

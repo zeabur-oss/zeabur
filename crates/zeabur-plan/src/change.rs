@@ -112,6 +112,18 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         read_only: Option<bool>,
     },
+    /// Stop mounting a volume in a container, and drop it from the pod template once nothing
+    /// mounts it. A PersistentVolumeClaim it names stays, with its data.
+    #[serde(rename_all = "camelCase")]
+    RemoveVolume {
+        /// The workload.
+        workload: WorkloadRef,
+        /// The container; may be left out when the workload has only one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        container: Option<String>,
+        /// Where it is mounted.
+        mount_path: String,
+    },
     /// Set or remove a liveness, readiness or startup probe of a container.
     #[serde(rename_all = "camelCase")]
     Probe {

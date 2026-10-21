@@ -1,0 +1,3 @@
+description: "Several volume changes of one service share one plan: two new volumes, a moved mount and a grown claim."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "uploads", "size": "5Gi", "mountPath": "/srv/uploads"}}, {"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "logs", "size": "1Gi", "mountPath": "/srv/logs"}}, {"op": "editMount", "workload": {"kind": "Deployment", "name": "web"}, "mountPath": "/data", "readOnly": true}, {"op": "expandVolume", "claim": "web-data", "size": "20Gi"}]}, "storageClasses": [{"name": "local-path", "allowVolumeExpansion": true, "default": true}]}

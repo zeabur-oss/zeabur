@@ -320,6 +320,11 @@ impl<'a> Planner<'a> {
                 new_mount_path.as_deref(),
                 *read_only,
             ),
+            Change::RemoveVolume {
+                workload,
+                container,
+                mount_path,
+            } => self.remove_volume(workload, container.as_deref(), mount_path),
             Change::Probe {
                 workload,
                 container,

@@ -1158,6 +1158,16 @@ export interface components {
       | {
           /** @description The container; may be left out when the workload has only one. */
           container?: string | null
+          /** @description Where it is mounted. */
+          mountPath: string
+          /** @enum {string} */
+          op: "removeVolume"
+          /** @description The workload. */
+          workload: components["schemas"]["WorkloadRef"]
+        }
+      | {
+          /** @description The container; may be left out when the workload has only one. */
+          container?: string | null
           /** @enum {string} */
           op: "probe"
           /** @description Which probe. */

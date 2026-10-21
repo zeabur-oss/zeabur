@@ -12,6 +12,8 @@
 //!   person chooses otherwise, created before the workload's template mounts it; a claim that
 //!   exists is refused rather than shared. A StatefulSet's `volumeClaimTemplates` cannot change
 //!   after creation [k8s-sts-limitations], so a StatefulSet gets no new volume here.
+//! - **A volume is removed** by unmounting it, and dropping it from the pod template once no
+//!   container mounts it; the claim and its data stay until deleted on their own.
 //! - **Probes** follow the container's declared ports [k8s-probes].
 //! - **Scaling** sets `spec.replicas` of a Deployment or StatefulSet.
 //! - **A YAML edit** becomes the patch between the object as read and as edited ([`crate::edit`]);
@@ -370,18 +372,21 @@ impl<'a> Planner<'a> {
             ));
         }
         let target = Self::container(found, reference, container)?;
-        let paths: Vec<&str> = target
-            .spec
-            .volume_mounts
+        // As this plan has left the template so far, so two new volumes cannot collide.
+        let (index, container_pointer, _) = self.container_slot(found, &target)?;
+        let working = self.current(index);
+        let mounts = array_at(&working, &format!("{container_pointer}/volumeMounts"));
+        let paths: Vec<&str> = mounts
             .iter()
-            .flatten()
-            .map(|m| m.mount_path.as_str())
+            .filter_map(|m| m["mountPath"].as_str())
             .collect();
         validate_storage(volume, &paths).map_err(|r| bad(r, "The volume is not valid."))?;
-        let volume_in_use = found
-            .pod_spec()
-            .and_then(|s| s.volumes.as_ref())
-            .is_some_and(|volumes| volumes.iter().any(|v| v.name == volume.name));
+        let volume_in_use = array_at(
+            &working,
+            &format!("{}/volumes", spec_of(&container_pointer)),
+        )
+        .iter()
+        .any(|v| v["name"].as_str() == Some(volume.name.as_str()));
         if volume_in_use {
             return Err(error(
                 ErrorKind::Conflict,
@@ -396,11 +401,13 @@ impl<'a> Planner<'a> {
             .claim_name
             .clone()
             .unwrap_or_else(|| format!("{}-{}", reference.name, volume.name));
+        let claim_target = Target::of::<PersistentVolumeClaim>(&claim_name);
         if self
             .input
             .snapshot
             .persistent_volume_claim(&claim_name)
             .is_some()
+            || self.objects.iter().any(|w| w.target == claim_target)
         {
             return Err(error(
                 ErrorKind::Conflict,
@@ -435,7 +442,7 @@ impl<'a> Planner<'a> {
         self.objects.insert(
             0,
             Working {
-                target: Target::of::<PersistentVolumeClaim>(&claim_name),
+                target: claim_target,
                 original: None,
                 current: body,
                 operations: Vec::new(),
@@ -444,9 +451,7 @@ impl<'a> Planner<'a> {
             },
         );
         let (index, container_pointer, _) = self.container_slot(found, &target)?;
-        let spec_pointer = container_pointer
-            .rsplit_once("/containers/")
-            .map_or_else(String::new, |(spec, _)| spec.to_owned());
+        let spec_pointer = spec_of(&container_pointer);
         let current = self.current(index);
         let volume_entry =
             json!({"name": volume.name, "persistentVolumeClaim": {"claimName": claim_name}});
@@ -508,16 +513,6 @@ impl<'a> Planner<'a> {
         new_mount_path: Option<&str>,
         read_only: Option<bool>,
     ) -> Result<(), PlanError> {
-        let found = self.editable_workload(reference)?;
-        let target = Self::container(found, reference, container)?;
-        let mounts = target.spec.volume_mounts.clone().unwrap_or_default();
-        let Some(at) = mounts.iter().position(|m| m.mount_path == mount_path) else {
-            return Err(error(
-                ErrorKind::NotFound,
-                "unknown_mount",
-                format!("Container {} mounts nothing at {mount_path}.", target.name),
-            ));
-        };
         if new_mount_path.is_none() && read_only.is_none() {
             return Err(error(
                 ErrorKind::BadRequest,
@@ -525,17 +520,33 @@ impl<'a> Planner<'a> {
                 "Nothing to change on the mount.",
             ));
         }
+        let found = self.editable_workload(reference)?;
+        let target = Self::container(found, reference, container)?;
+        let (index, container_pointer, mut steps) = self.container_slot(found, &target)?;
+        let mounts = array_at(
+            &self.current(index),
+            &format!("{container_pointer}/volumeMounts"),
+        );
+        let Some(at) = mounts
+            .iter()
+            .position(|m| m["mountPath"].as_str() == Some(mount_path))
+        else {
+            return Err(error(
+                ErrorKind::NotFound,
+                "unknown_mount",
+                format!("Container {} mounts nothing at {mount_path}.", target.name),
+            ));
+        };
         if let Some(path) = new_mount_path {
             let others: Vec<&str> = mounts
                 .iter()
                 .enumerate()
                 .filter(|(i, _)| *i != at)
-                .map(|(_, m)| m.mount_path.as_str())
+                .filter_map(|(_, m)| m["mountPath"].as_str())
                 .collect();
             validate_mount_path(path, &others)
                 .map_err(|r| bad(r, "The mount path is not valid."))?;
         }
-        let (index, container_pointer, mut steps) = self.container_slot(found, &target)?;
         steps.extend([
             Step::field("volumeMounts"),
             Step::Key(json!({ "mountPath": mount_path })),
@@ -548,6 +559,78 @@ impl<'a> Planner<'a> {
         }
         if let Some(read_only) = read_only {
             operations.push(add(&format!("{entry}/readOnly"), json!(read_only)));
+        }
+        self.patch(index, operations)
+    }
+
+    /// Unmounts a volume, and drops it from the pod template when no container mounts it any
+    /// more; the claim it names is left alone.
+    pub(crate) fn remove_volume(
+        &mut self,
+        reference: &WorkloadRef,
+        container: Option<&str>,
+        mount_path: &str,
+    ) -> Result<(), PlanError> {
+        let found = self.editable_workload(reference)?;
+        let target = Self::container(found, reference, container)?;
+        let (index, container_pointer, mut steps) = self.container_slot(found, &target)?;
+        let working = self.current(index);
+        let mounts = array_at(&working, &format!("{container_pointer}/volumeMounts"));
+        let Some(at) = mounts
+            .iter()
+            .position(|m| m["mountPath"].as_str() == Some(mount_path))
+        else {
+            return Err(error(
+                ErrorKind::NotFound,
+                "unknown_mount",
+                format!("Container {} mounts nothing at {mount_path}.", target.name),
+            ));
+        };
+        let name = mounts
+            .get(at)
+            .and_then(|m| m["name"].as_str())
+            .unwrap_or_default()
+            .to_owned();
+        let spec_pointer = spec_of(&container_pointer);
+        let volumes = array_at(&working, &format!("{spec_pointer}/volumes"));
+        let Some(volume_at) = volumes
+            .iter()
+            .position(|v| v["name"].as_str() == Some(name.as_str()))
+        else {
+            return Err(error(
+                ErrorKind::Invalid,
+                "stateful_set_volumes_fixed",
+                "A StatefulSet's volumeClaimTemplates cannot change after it is created; remove \
+                 the volume from its manifest and recreate it.",
+            ));
+        };
+        steps.extend([
+            Step::field("volumeMounts"),
+            Step::Key(json!({ "mountPath": mount_path })),
+        ]);
+        self.claim(index, &steps, &format!("the mount at {mount_path}"))?;
+        let entry = format!("{container_pointer}/volumeMounts/{at}");
+        let mut operations = vec![
+            test(&format!("{entry}/mountPath"), json!(mount_path)),
+            remove(&entry),
+        ];
+        let mounted_elsewhere = ["containers", "initContainers"].iter().any(|list| {
+            array_at(&working, &format!("{spec_pointer}/{list}"))
+                .iter()
+                .enumerate()
+                .any(|(position, c)| {
+                    let this = *list == "containers" && position == target.position;
+                    c["volumeMounts"].as_array().is_some_and(|ms| {
+                        ms.iter().enumerate().any(|(i, m)| {
+                            m["name"].as_str() == Some(name.as_str()) && !(this && i == at)
+                        })
+                    })
+                })
+        });
+        if !mounted_elsewhere {
+            let volume = format!("{spec_pointer}/volumes/{volume_at}");
+            operations.push(test(&format!("{volume}/name"), json!(name)));
+            operations.push(remove(&volume));
         }
         self.patch(index, operations)
     }
@@ -946,4 +1029,20 @@ impl<'a> Planner<'a> {
         }
         Ok((!edits.is_empty()).then_some(edits))
     }
+}
+
+/// The array at `pointer`, or none.
+fn array_at(object: &Value, pointer: &str) -> Vec<Value> {
+    object
+        .pointer(pointer)
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+/// The pod spec's pointer, from one of its containers'.
+fn spec_of(container_pointer: &str) -> String {
+    container_pointer
+        .rsplit_once("/containers/")
+        .map_or_else(String::new, |(spec, _)| spec.to_owned())
 }

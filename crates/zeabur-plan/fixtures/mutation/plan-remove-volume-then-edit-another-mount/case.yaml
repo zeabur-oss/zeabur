@@ -1,0 +1,3 @@
+description: "After a mount is removed, another mount's edit in the same plan finds it where it moved."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "removeVolume", "workload": {"kind": "Deployment", "name": "web"}, "mountPath": "/data"}, {"op": "editMount", "workload": {"kind": "Deployment", "name": "web"}, "mountPath": "/cache", "readOnly": true}]}}

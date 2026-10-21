@@ -2076,6 +2076,30 @@ components:
             $ref: "#/components/schemas/WorkloadRef"
             description: The workload.
       - type: object
+        description: |-
+          Stop mounting a volume in a container, and drop it from the pod template once nothing
+          mounts it. A PersistentVolumeClaim it names stays, with its data.
+        required:
+        - workload
+        - mountPath
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          mountPath:
+            type: string
+            description: Where it is mounted.
+          op:
+            type: string
+            enum:
+            - removeVolume
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
         description: Set or remove a liveness, readiness or startup probe of a container.
         required:
         - workload
