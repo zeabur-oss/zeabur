@@ -6,7 +6,8 @@ use crate::provenance::Provenance;
 use crate::source::Origin;
 
 /// The application protocol a Service port speaks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum PortProtocol {
     /// HTTP.
     #[serde(rename = "HTTP")]
@@ -27,7 +28,8 @@ pub enum PortProtocol {
 
 /// Which signal decided a [`PortProtocol`], so a client can tell a declared protocol from a
 /// guessed one.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum InferredFrom {
     /// The port's `appProtocol`.
@@ -39,7 +41,8 @@ pub enum InferredFrom {
 }
 
 /// A port's application protocol and how it was decided.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ProtocolInference {
     /// The protocol.
@@ -53,7 +56,8 @@ pub struct ProtocolInference {
     clippy::struct_field_names,
     reason = "the field names are the Kubernetes ones"
 )]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Port {
     /// The port's name.
@@ -75,7 +79,8 @@ pub struct Port {
 }
 
 /// A Kubernetes Service selecting workloads' pods: how they are reached inside the cluster.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Endpoint {
     /// The Service's name.
@@ -95,7 +100,8 @@ pub struct Endpoint {
 }
 
 /// An Ingress routing to workloads' Services: how they are reached from outside.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Route {
     /// The Ingress's name.
@@ -125,7 +131,8 @@ pub struct Route {
 }
 
 /// One backend of an Ingress: the requests that reach a Service port.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct RouteRule {
     /// The host it matches; absent matches every host.

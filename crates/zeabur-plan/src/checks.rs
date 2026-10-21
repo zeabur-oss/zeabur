@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use zeabur_core::quantity;
+use zeabur_kernel::quantity;
 
 use crate::rules::Refusal;
 
@@ -19,7 +19,8 @@ fn refusal(code: &str) -> Refusal {
 /// dry run and the provisioner decide.
 ///
 /// [k8s-access-modes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[expect(
     clippy::enum_variant_names,
     reason = "the names Kubernetes gives the modes, serialized as they are"
@@ -37,7 +38,8 @@ pub enum AccessMode {
 }
 
 /// A new volume for a workload: a PersistentVolumeClaim and where it is mounted.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct VolumeRequest {
     /// The volume's name in the pod.
@@ -169,7 +171,8 @@ pub fn owned_by_stateful_set(claim: &str, stateful_set: &str) -> bool {
 // ── Probes ───────────────────────────────────────────────────────────────────────────────────
 
 /// How a probe checks the container.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum ProbeHandler {
     /// An HTTP `GET`; healthy on a status from 200 to 399.
     #[serde(rename = "HTTPGet")]
@@ -185,7 +188,8 @@ pub enum ProbeHandler {
 }
 
 /// A probe as a person asks for it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeRequest {
     /// How it checks.
@@ -346,7 +350,8 @@ pub fn validate_resources(resources: &Value) -> Result<(), Refusal> {
 // ── YAML edits ───────────────────────────────────────────────────────────────────────────────
 
 /// A namespaced resource, as a request path names it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ResourceRef {
     /// The API group; empty for the core group.
     #[serde(default)]

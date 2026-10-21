@@ -53,4 +53,4 @@ cases in `fixtures/gaps/` run against both.
 
 ## Place in the workspace
 
-Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-graph`.
+Level 3: may depend on `zeabur-kernel`, `zeabur-model` and `zeabur-graph`.

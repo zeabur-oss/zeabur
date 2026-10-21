@@ -13,12 +13,12 @@
 //! for any field ([`crate::fields::reapplying_tool`]): the tool would restore it.
 //!
 //! The namespaces Kubernetes keeps for itself (`kube-` prefix,
-//! [`zeabur_core::names::is_system_namespace`]) are never adopted.
+//! [`zeabur_kernel::names::is_system_namespace`]) are never adopted.
 //!
 //! [rfc6902-add]: https://www.rfc-editor.org/rfc/rfc6902#section-4.1
 
 use serde_json::{Value, json};
-use zeabur_core::names::{
+use zeabur_kernel::names::{
     ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON, LABEL_PROJECT,
     is_system_namespace,
 };

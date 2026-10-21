@@ -61,11 +61,12 @@ The code is split into small crates in one flat `crates/` directory:
 
 ```mermaid
 flowchart BT
-  core[zeabur-core]
-  model[zeabur-model] --> core
-  kube[zeabur-kube] --> core
-  adapters[zeabur-adapters] --> core
+  kernel[zeabur-kernel]
+  core[zeabur-core] --> kernel
+  model[zeabur-model] --> kernel
+  adapters[zeabur-adapters] --> kernel
   ui[zeabur-ui]
+  kube[zeabur-kube] --> core
   auth[zeabur-auth] --> core
   graph[zeabur-graph] --> model & adapters
   modules[zeabur-modules] --> kube & adapters
@@ -82,14 +83,15 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 
 | Level | Crate | What it hides |
 |---|---|---|
-| 0 | [`zeabur-core`](../crates/zeabur-core) | names shared with Kubernetes: label keys, the field manager, error categories |
+| 0 | [`zeabur-kernel`](../crates/zeabur-kernel) | names shared with Kubernetes (label keys, the field manager), quantities, JSON Patch; no I/O, no cryptography |
+| 1 | [`zeabur-core`](../crates/zeabur-core) | error categories, request guards, cryptography |
 | 1 | [`zeabur-model`](../crates/zeabur-model) | the projected view clients see: projects, services, their endpoints and routes, sources |
-| 1 | [`zeabur-kube`](../crates/zeabur-kube) | how a request reaches kube-apiserver, always as the person |
 | 1 | [`zeabur-adapters`](../crates/zeabur-adapters) | conventions of Helm, Argo CD, Flux, operators, Gateway API; label selectors |
 | 1 | [`zeabur-ui`](../crates/zeabur-ui) | embedding and serving the web interface |
-| 1 | [`zeabur-auth`](../crates/zeabur-auth) | signing in through Zeabur Identity (OAuth client), sessions, cross-site checks |
+| 2 | [`zeabur-kube`](../crates/zeabur-kube) | how a request reaches kube-apiserver, always as the person |
+| 2 | [`zeabur-auth`](../crates/zeabur-auth) | signing in through Zeabur Identity (OAuth client), sessions, cross-site checks |
 | 2 | [`zeabur-graph`](../crates/zeabur-graph) | the projection rules (pure functions, tested with `fixtures/`) |
-| 2 | [`zeabur-modules`](../crates/zeabur-modules) | each installed component's resources and what Zeabur makes of them (one module per provider) |
+| 3 | [`zeabur-modules`](../crates/zeabur-modules) | each installed component's resources and what Zeabur makes of them (one module per provider) |
 | 3 | [`zeabur-gaps`](../crates/zeabur-gaps) | gap rules and plain-language diagnostics |
 | 3 | [`zeabur-plan`](../crates/zeabur-plan) | change plans, minimal apply bodies, impact |
 | 3 | [`zeabur-catalog`](../crates/zeabur-catalog) | the recommendations bundle and install suggestions |

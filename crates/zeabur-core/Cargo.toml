@@ -1,6 +1,6 @@
 [package]
 name = "zeabur-core"
-description = "zeabur: shared primitives (names, label keys, errors as Problem Details); no I/O"
+description = "zeabur: what the servers share (errors as Problem Details, request guards, cryptography); no I/O"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,6 +11,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+zeabur-kernel = { workspace = true, features = ["openapi"] }
 aws-lc-rs.workspace = true
 http.workspace = true
 serde.workspace = true

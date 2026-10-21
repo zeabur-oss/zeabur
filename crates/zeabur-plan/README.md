@@ -17,7 +17,7 @@ Argo CD or Flux owns: an object one of them manages may be restarted but not edi
 
 ## Place in the workspace
 
-Level 3: may depend on `zeabur-core`, `zeabur-model`, `zeabur-adapters` and `zeabur-graph`. It
+Level 3: may depend on `zeabur-kernel`, `zeabur-model`, `zeabur-adapters` and `zeabur-graph`. It
 computes; `zeabur-api` reads the cluster, asks for the plan, signs it and sends the writes
 through `zeabur-kube`.
 

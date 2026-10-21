@@ -25,4 +25,4 @@ pub use plan::{
 };
 pub use releases::{Release, ReleasePods};
 pub use rules::{EnvEdit, EnvValueFrom, FieldChange};
-pub use zeabur_core::names::GatewayRef;
+pub use zeabur_kernel::names::GatewayRef;

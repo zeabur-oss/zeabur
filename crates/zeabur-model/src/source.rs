@@ -1,7 +1,7 @@
 //! Where a projected value comes from.
 
 use serde::{Deserialize, Serialize};
-pub use zeabur_core::origin::Origin;
+pub use zeabur_kernel::origin::Origin;
 
 use crate::is_false;
 
@@ -9,19 +9,8 @@ use crate::is_false;
 ///
 /// This is the *value's* source, which is what a client needs to show or change it: a literal is
 /// edited in place, a Secret or ConfigMap key is edited in that object.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum SourceKind {
     /// `value`, written in the workload itself.
     Literal,
@@ -38,9 +27,10 @@ pub enum SourceKind {
 }
 
 /// The source of a value: its kind and, for references, the object and key it reads.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
-#[schema(as = ValueSource)]
+#[cfg_attr(feature = "openapi", schema(as = ValueSource))]
 pub struct Source {
     /// What the value is read from.
     pub kind: SourceKind,
@@ -74,9 +64,8 @@ impl Source {
 }
 
 /// A Kubernetes object in the projected namespace.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectRef {
     /// The object's kind, such as `ConfigMap`.

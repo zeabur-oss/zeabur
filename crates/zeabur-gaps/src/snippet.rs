@@ -6,7 +6,7 @@
 //! cannot know (how much memory a container needs, which path answers health checks) are
 //! starting points marked as such.
 
-use zeabur_core::names::GatewayRef;
+use zeabur_kernel::names::GatewayRef;
 use zeabur_model::{Gap, PortProtocol, Project, Service};
 
 /// The snippet that fixes `gap` in `project`.

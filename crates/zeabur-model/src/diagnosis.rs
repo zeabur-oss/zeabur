@@ -1,24 +1,13 @@
 //! Why a service is unhealthy, in words a client translates.
 
 use serde::{Deserialize, Serialize};
-pub use zeabur_core::message::Message;
+pub use zeabur_kernel::message::Message;
 
 use crate::source::Origin;
 
 /// What kind of failure a diagnosis explains.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum DiagnosisKind {
     /// A long-running container keeps exiting and being restarted.
@@ -48,7 +37,8 @@ pub enum DiagnosisKind {
 }
 
 /// One explained failure of a service's container.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Diagnosis {
     /// What kind of failure.
@@ -81,19 +71,9 @@ pub struct Diagnosis {
 
 /// Where the cause of a failure lies, so a cluster's fault never reads as the reader's.
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum FaultOrigin {
     /// The program in the image: it exits, crashes or does not answer.
@@ -115,19 +95,9 @@ pub enum FaultOrigin {
 
 /// Who can remove the cause.
 #[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum Fixer {
     /// Whoever may change the service.
@@ -140,7 +110,8 @@ pub enum Fixer {
 }
 
 /// Where a failure's cause lies, and who can fix it.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Fault {
     /// Where the cause lies.
@@ -176,19 +147,8 @@ impl Fault {
 }
 
 /// What kind of cluster-side cause an incident is.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum IncidentKind {
     /// A component with no ready replica: an ingress controller, cert-manager, cluster DNS or
@@ -199,9 +159,8 @@ pub enum IncidentKind {
 }
 
 /// A service an incident reaches.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct AffectedService {
     /// Its id, `projects/<project>/services/<kind>/<name>`.
@@ -219,7 +178,8 @@ pub struct AffectedService {
 
 /// One cause on the cluster's side with everything it reaches, told once instead of as a
 /// separate problem of every service it breaks.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Incident {
     /// `incidents/<kind>/<name>`, stable while the cause lasts, so diagnoses link to it.

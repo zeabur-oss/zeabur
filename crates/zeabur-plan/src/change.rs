@@ -10,7 +10,8 @@ use crate::checks::{ProbeRequest, ResourceRef, VolumeRequest};
 use crate::rules::{EnvEdit, FieldChange};
 
 /// One change a person asks for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "op", rename_all = "camelCase")]
 pub enum Change {
     /// Set or remove environment variables of one container of a workload.
@@ -169,7 +170,7 @@ pub enum Change {
     #[serde(rename_all = "camelCase")]
     Create {
         /// The object: `apiVersion`, `kind`, `metadata.name`, and its fields.
-        #[schema(value_type = Object)]
+        #[cfg_attr(feature = "openapi", schema(value_type = Object))]
         object: Value,
     },
     /// Delete one object of the project, as `kubectl delete` does: what it owns goes after it
@@ -245,7 +246,8 @@ impl Change {
 /// The probes of a container [k8s-probes].
 ///
 /// [k8s-probes]: https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum ProbeKind {
     /// Restarts the container when it fails.
@@ -269,7 +271,8 @@ impl ProbeKind {
 }
 
 /// A ConfigMap or a Secret.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum DataKind {
     /// `v1` `ConfigMap`.
     ConfigMap,
@@ -278,7 +281,8 @@ pub enum DataKind {
 }
 
 /// One requested change to a ConfigMap or Secret key.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct DataEdit {
     /// `set` or `remove`.
@@ -291,7 +295,8 @@ pub struct DataEdit {
 }
 
 /// A route object: an Ingress or a Gateway API `HTTPRoute`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RouteRef {
     /// `Ingress` or `HTTPRoute`.
     pub kind: RouteKind,
@@ -300,7 +305,8 @@ pub struct RouteRef {
 }
 
 /// The kinds of route object.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum RouteKind {
     /// `networking.k8s.io/v1` `Ingress`.
     Ingress,
@@ -310,7 +316,8 @@ pub enum RouteKind {
 }
 
 /// What a person asks to change, as one plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct PlanRequest {
     /// The changes, applied in order.
@@ -322,11 +329,10 @@ pub struct PlanRequest {
 }
 
 /// The object a planned write addresses.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
-#[schema(as = PlanTarget)]
+#[cfg_attr(feature = "openapi", schema(as = PlanTarget))]
 pub struct Target {
     /// `apiVersion`.
     pub api_version: String,
@@ -366,15 +372,16 @@ impl Target {
 
 /// How a planned write changes its object: a new object is created whole, an existing one is
 /// patched or deleted. Creations and patches go as the field manager `zeabur`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "type", rename_all = "camelCase")]
-#[schema(as = PlannedWrite)]
+#[cfg_attr(feature = "openapi", schema(as = PlannedWrite))]
 pub enum Write {
     /// A new object, created with `POST`; it fails if one of that name exists by then.
     #[serde(rename_all = "camelCase")]
     Create {
         /// The object, `apiVersion`, `kind` and `metadata` included.
-        #[schema(value_type = Object)]
+        #[cfg_attr(feature = "openapi", schema(value_type = Object))]
         body: Value,
     },
     /// An RFC 6902 JSON Patch whose first operation tests `metadata.generation` (or, for an
@@ -383,7 +390,7 @@ pub enum Write {
     #[serde(rename_all = "camelCase")]
     Patch {
         /// The operations.
-        #[schema(value_type = Vec<Object>)]
+        #[cfg_attr(feature = "openapi", schema(value_type = Vec<Object>))]
         operations: Vec<Value>,
     },
     /// A `DELETE` with background propagation, refused (`409`) unless the object still has this
@@ -402,14 +409,15 @@ pub enum Write {
     #[serde(rename_all = "camelCase")]
     EphemeralContainers {
         /// The operations.
-        #[schema(value_type = Vec<Object>)]
+        #[cfg_attr(feature = "openapi", schema(value_type = Vec<Object>))]
         operations: Vec<Value>,
     },
 }
 
 /// The managers that own a field a write touches.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = PlanFieldOwners)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(as = PlanFieldOwners))]
 pub struct FieldOwners {
     /// The field.
     pub path: String,
@@ -418,7 +426,8 @@ pub struct FieldOwners {
 }
 
 /// One object a plan writes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct PlannedObject {
     /// The object.
@@ -426,11 +435,11 @@ pub struct PlannedObject {
     /// The object as it is, without `managedFields` and with Secret values redacted; absent
     /// when the write creates it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<Object>)]
+    #[cfg_attr(feature = "openapi", schema(value_type = Option<Object>))]
     pub before: Option<Value>,
     /// The object as it will be, the same way; absent when the write deletes it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<Object>)]
+    #[cfg_attr(feature = "openapi", schema(value_type = Option<Object>))]
     pub after: Option<Value>,
     /// `before` as YAML, written as the object's YAML view writes it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -450,14 +459,15 @@ pub struct PlannedObject {
     /// The object as it will be, unredacted: for re-projection only, never sent; `Null` when the
     /// write deletes it.
     #[serde(skip)]
-    #[schema(ignore)]
+    #[cfg_attr(feature = "openapi", schema(ignore))]
     pub raw_after: Value,
 }
 
 /// Something a person should know before applying.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "code", rename_all = "camelCase")]
-#[schema(as = PlanWarning)]
+#[cfg_attr(feature = "openapi", schema(as = PlanWarning))]
 pub enum Warning {
     /// These workloads read a changed ConfigMap or Secret into environment variables, which a
     /// running container reads only when it starts: restart them for the change to take effect.
@@ -617,7 +627,7 @@ pub enum Warning {
     #[serde(rename_all = "camelCase")]
     RightsMissing {
         /// Each right, as kube-apiserver would name it in a refusal.
-        rights: Vec<zeabur_core::problem::Denied>,
+        rights: Vec<zeabur_kernel::denied::Denied>,
     },
     /// The plan creates a tools pod: what runs where, as whom, until when.
     #[serde(rename_all = "camelCase")]
@@ -659,9 +669,8 @@ pub enum Warning {
 }
 
 /// An object of the project, by kind and name.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ObjectName {
     /// The kind.
     pub kind: String,
@@ -670,7 +679,8 @@ pub struct ObjectName {
 }
 
 /// A connection between two services of the project.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct ConnectionRef {
     /// The caller.
     pub from: WorkloadRef,
@@ -679,7 +689,8 @@ pub struct ConnectionRef {
 }
 
 /// What a plan will do.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Plan {
     /// The objects it writes, in the order it writes them.

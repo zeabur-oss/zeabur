@@ -17,9 +17,8 @@ use serde::{Deserialize, Serialize};
 /// addressed by that key, `containers[name=app]`; an atomic list by index, `envFrom[0]`.
 ///
 /// [k8s-api-conventions]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#object-references
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Origin {
     /// The object's `apiVersion`, when the response stands alone.

@@ -6,8 +6,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
-use zeabur_core::names::{ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON};
+use zeabur_kernel::names::{ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON};
 
 /// The longest display name, in characters: a name, not a sentence.
 pub const DISPLAY_NAME_MAX: usize = 64;
@@ -17,7 +16,8 @@ pub const DESCRIPTION_MAX: usize = 500;
 
 /// The icons a project may have: a built-in set, so nothing is uploaded and the interface draws
 /// each from its own icon font. An annotation naming another value is ignored.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "kebab-case")]
 pub enum ProjectIcon {
     /// A folder (the default look of a project).
@@ -107,7 +107,8 @@ impl ProjectIcon {
 
 /// A project's details, as its namespace's annotations give them. Each is absent when its
 /// annotation is missing or blank (or, for the icon, names no built-in icon).
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDetails {
     /// The name to show instead of the namespace's.

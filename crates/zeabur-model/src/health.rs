@@ -3,19 +3,8 @@
 use serde::{Deserialize, Serialize};
 
 /// A service's health, from worst to best: what a status dot shows.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum Health {
     /// A pod keeps failing, or the workload failed.
@@ -33,7 +22,8 @@ pub enum Health {
 
 /// What a service is doing, in one word for a person. An open set: clients must show an unknown
 /// value by its [`Health`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum StatusWord {
     /// Every wanted replica is ready.
@@ -59,7 +49,8 @@ pub enum StatusWord {
 }
 
 /// A service's health, the word for it, and why when a pod keeps failing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceStatus {
     /// What its status dot shows.
@@ -75,7 +66,8 @@ pub struct ServiceStatus {
 
 /// How many of a project's services are in each state, for lists that show a project's health
 /// without its whole document.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectHealth {
     /// Services (workloads, without the Jobs a CronJob runs).

@@ -16,14 +16,15 @@ publish = false
 # dependencies) only on workspace crates of a lower level. Test crates are dev-dependencies only.
 # (Levels order crates; the product layers L0-L4 in docs/architecture.md are a different thing.)
 [workspace.metadata.levels]
-zeabur-core = 0
+zeabur-kernel = 0
+zeabur-core = 1
 zeabur-model = 1
-zeabur-kube = 1
 zeabur-adapters = 1
 zeabur-ui = 1
-zeabur-auth = 1
+zeabur-kube = 2
+zeabur-auth = 2
 zeabur-graph = 2
-zeabur-modules = 2
+zeabur-modules = 3
 zeabur-gaps = 3
 zeabur-plan = 3
 zeabur-catalog = 3
@@ -42,6 +43,7 @@ composers = ["zeabur-api", "zeabur-mcp", "zeabur", "zeaburctl"]
 
 [workspace.dependencies]
 # Workspace crates, levelled from the bottom up.
+zeabur-kernel = { path = "crates/zeabur-kernel" }
 zeabur-core = { path = "crates/zeabur-core" }
 zeabur-model = { path = "crates/zeabur-model" }
 zeabur-kube = { path = "crates/zeabur-kube" }
@@ -88,6 +90,8 @@ secrecy = "0.10"
 serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
 serde_json = "1"
+# SHA-256 for derived names in the pure crates (zeabur-kernel), which hold no C library.
+sha2 = { version = "0.10", default-features = false }
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "io-util"] }
 # A WebSocket client for the terminal's tests; the server side comes with axum's `ws` feature.

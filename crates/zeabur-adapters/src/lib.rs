@@ -9,7 +9,7 @@ pub mod provenance;
 pub mod selector;
 
 /// The field manager (`fieldManager`) Zeabur's writes are recorded under in `managedFields`.
-pub use zeabur_core::names::FIELD_MANAGER;
+pub use zeabur_kernel::names::FIELD_MANAGER;
 
 /// The object's controller: the owner reference with `controller: true`, of which there is at
 /// most one [k8s-owners]. Other owners only keep the object from garbage collection.

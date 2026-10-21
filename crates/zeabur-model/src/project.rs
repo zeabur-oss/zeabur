@@ -1,7 +1,7 @@
 //! A project: one namespace, seen as services.
 
 use serde::{Deserialize, Serialize};
-pub use zeabur_core::data_store::DataStore;
+pub use zeabur_kernel::data_store::DataStore;
 
 use crate::attribution::{Attribution, WorkloadRef};
 use crate::container::Container;
@@ -11,7 +11,8 @@ use crate::source::{ObjectRef, Origin};
 use crate::workload::WorkloadSummary;
 
 /// One namespace projected into services, the resources around them and how they relate.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     /// The namespace.
@@ -34,7 +35,8 @@ pub struct Project {
 ///
 /// Kubernetes has no field for "this workload talks to that one", so every connection is read
 /// from evidence and says which. It describes configuration, never observed traffic.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Connection {
     /// The caller.
@@ -49,9 +51,8 @@ pub struct Connection {
 }
 
 /// Why a [`Connection`] is drawn.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "basis", rename_all = "camelCase")]
 pub enum ConnectionEvidence {
     /// The caller and a data store read the same Secret or ConfigMap, which usually holds the
@@ -121,7 +122,8 @@ fn by_name<'a, T>(list: &'a [T], name: &str, key: impl Fn(&T) -> &String) -> Opt
 }
 
 /// A workload and what it uses: what people think of as "a service".
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Service {
     /// Its resource name, `projects/<project>/services/<kind>/<name>`; see [`crate::id`].
@@ -154,19 +156,8 @@ pub struct Service {
 }
 
 /// The kinds of resource attributed to workloads.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum ResourceKind {
     /// A ConfigMap.
     ConfigMap,
@@ -181,7 +172,8 @@ pub enum ResourceKind {
 }
 
 /// A resource of the namespace and the workloads it belongs to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Resource {
     /// Its resource name, `projects/<project>/resources/<kind>/<name>`; see [`crate::id`].
@@ -202,19 +194,8 @@ pub struct Resource {
 }
 
 /// How a workload uses a resource.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum RelationKind {
     /// An `env` entry reads one key (`valueFrom`).
@@ -234,9 +215,8 @@ pub enum RelationKind {
 }
 
 /// One reference between a workload and a resource.
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Relation {
     /// The workload.

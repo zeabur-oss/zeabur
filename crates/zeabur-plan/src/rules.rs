@@ -24,7 +24,8 @@ impl Refusal {
 // ── Environment variables ────────────────────────────────────────────────────────────────────
 
 /// One requested change to a container's environment.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct EnvEdit {
     /// `set` or `remove`.
@@ -40,7 +41,8 @@ pub struct EnvEdit {
 }
 
 /// A value read from a Secret or ConfigMap key, or a pod field.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct EnvValueFrom {
     /// The Secret.
@@ -211,7 +213,8 @@ pub const fn managed_code(tool: Tool) -> &'static str {
 pub const REDACTED: &str = zeabur_graph::manifest::HIDDEN;
 
 /// One changed field.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct FieldChange {
     /// The field, dotted; keyed list entries as `[name=app]`, others by position.
     pub path: String,

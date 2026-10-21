@@ -31,8 +31,9 @@ const POD_TEMPLATE_HASH: &str = "pod-template-hash";
 const REVISION_HASH: &str = "controller-revision-hash";
 
 /// How many of a release's pods there are and how many are ready.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = WorkloadReleasePods)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(as = WorkloadReleasePods))]
 pub struct ReleasePods {
     /// Ready.
     pub ready: i32,
@@ -41,9 +42,10 @@ pub struct ReleasePods {
 }
 
 /// One pod template a workload has run.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
-#[schema(as = WorkloadRelease)]
+#[cfg_attr(feature = "openapi", schema(as = WorkloadRelease))]
 pub struct Release {
     /// Its number; higher is newer.
     pub revision: i64,
@@ -62,11 +64,11 @@ pub struct Release {
     /// Its pods.
     pub pods: ReleasePods,
     /// The pod template, as the workload would hold it again after a rollback.
-    #[schema(value_type = Object)]
+    #[cfg_attr(feature = "openapi", schema(value_type = Object))]
     pub template: Value,
     /// `template` as YAML, written as the object's YAML view writes it.
     #[serde(default)]
-    #[schema(required = true)]
+    #[cfg_attr(feature = "openapi", schema(required = true))]
     pub template_yaml: String,
 }
 

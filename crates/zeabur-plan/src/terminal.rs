@@ -58,7 +58,7 @@
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
-use zeabur_core::crypto::{hex, sha256};
+use zeabur_kernel::digest::{hex, sha256};
 
 use crate::change::{Plan, PlannedObject, Target, Warning, Write};
 use crate::plan::{ErrorKind, PlanError, error, shown, yaml};

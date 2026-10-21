@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 /// Zeabur's label naming a workload's group explicitly. It always wins.
-pub use zeabur_core::names::LABEL_GROUP as GROUP_LABEL;
+pub use zeabur_kernel::names::LABEL_GROUP as GROUP_LABEL;
 
 use crate::label;
 

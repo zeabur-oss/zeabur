@@ -7,8 +7,8 @@
 
 use std::collections::BTreeSet;
 
-use zeabur_core::names::GatewayRef;
 use zeabur_graph::{Snapshot, ingress_backends};
+use zeabur_kernel::names::GatewayRef;
 use zeabur_model::{
     Citation, Fix, FixKind, Gap, HttpRoute, Message, Origin, Project, Service, Severity,
     WorkloadKind,

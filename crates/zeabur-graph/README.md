@@ -11,7 +11,7 @@ one service". Pure functions from a snapshot to a projection, tested entirely wi
 
 ## Place in the workspace
 
-Level 2: may depend on `zeabur-core`, `zeabur-model` and `zeabur-adapters`. No I/O.
+Level 2: may depend on `zeabur-kernel`, `zeabur-model` and `zeabur-adapters`. No I/O.
 
 ## Design
 

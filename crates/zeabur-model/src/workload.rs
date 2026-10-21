@@ -6,7 +6,8 @@ use crate::provenance::Provenance;
 use crate::source::Origin;
 
 /// One pod of a workload.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct PodSummary {
     /// Its resource name, `projects/<project>/pods/<name>`; see [`crate::id`].
@@ -45,7 +46,8 @@ pub struct PodSummary {
 /// One container's state in a pod [k8s-container-states].
 ///
 /// [k8s-container-states]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerStatusSummary {
     /// The container's name.
@@ -69,7 +71,8 @@ pub struct ContainerStatusSummary {
 }
 
 /// Why a container is waiting.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerWaiting {
     /// `CrashLoopBackOff`, `ImagePullBackOff`, `ErrImagePull`, `CreateContainerConfigError`, …
@@ -81,7 +84,8 @@ pub struct ContainerWaiting {
 }
 
 /// How a container run ended.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerTermination {
     /// `Error`, `Completed`, `OOMKilled`, `ContainerCannotRun`, …
@@ -103,19 +107,8 @@ pub struct ContainerTermination {
 /// The workload kinds Zeabur projects.
 ///
 /// Declared in alphabetical order, so the derived [`Ord`] sorts as the kind names do.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    utoipa::ToSchema,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum WorkloadKind {
     /// `batch/v1` `CronJob`.
     CronJob,
@@ -188,7 +181,8 @@ impl WorkloadKind {
 
 /// A one-word aggregate of a workload's status for lists. The Kubernetes conditions stay the
 /// authority; this is only the badge.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Phase {
     /// Every desired replica is up to date and ready.
     Running,
@@ -210,7 +204,8 @@ pub enum Phase {
 
 /// The custom resource whose operator controls a workload. Direct edits to the workload are
 /// reverted by that operator; the resource is what to change.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ManagedBy {
     /// The resource's kind as people create it, such as `PerconaPGCluster`.
@@ -223,7 +218,8 @@ pub struct ManagedBy {
 }
 
 /// Where a workload is listed and under which name.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Classification {
     /// The group the workload is listed in.
@@ -238,7 +234,8 @@ pub struct Classification {
 }
 
 /// Ready and desired replicas (per node for a DaemonSet, completions for a Job).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Replicas {
     /// Ready (or, for a Job, succeeded) pods.
@@ -248,7 +245,8 @@ pub struct Replicas {
 }
 
 /// A workload as lists show it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct WorkloadSummary {
     /// The workload's kind.

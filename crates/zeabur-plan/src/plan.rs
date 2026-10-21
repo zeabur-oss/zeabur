@@ -36,8 +36,8 @@ use k8s_openapi::api::apps::v1::ReplicaSet;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use zeabur_adapters::provenance::{Tool, detect_tool};
-use zeabur_core::names::GatewayRef;
 use zeabur_graph::{Snapshot, Workload, workloads};
+use zeabur_kernel::names::GatewayRef;
 use zeabur_model::{HttpRoute, Project, SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{

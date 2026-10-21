@@ -1,7 +1,7 @@
 //! A container's environment and storage.
 
 use serde::{Deserialize, Serialize};
-use zeabur_core::quantity;
+use zeabur_kernel::quantity;
 
 use crate::attribution::Attribution;
 use crate::is_false;
@@ -9,7 +9,8 @@ use crate::provenance::Tool;
 use crate::source::{ObjectRef, Origin, Source};
 
 /// One container of a workload.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Container {
     /// The container's name.
@@ -42,7 +43,8 @@ pub struct Container {
 /// endpoints, and startup holds the other two back until the application has started.
 ///
 /// [k8s-probes]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Probes {
     /// The liveness probe.
@@ -65,7 +67,8 @@ impl Probes {
 }
 
 /// What one probe checks.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeSummary {
     /// How it checks.
@@ -79,8 +82,9 @@ pub struct ProbeSummary {
 }
 
 /// A probe's handler.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
-#[schema(as = ContainerProbeHandler)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[cfg_attr(feature = "openapi", schema(as = ContainerProbeHandler))]
 pub enum ProbeHandler {
     /// `httpGet`.
     #[serde(rename = "HTTP")]
@@ -100,7 +104,8 @@ pub enum ProbeHandler {
 /// the kubelet enforces [k8s-resources].
 ///
 /// [k8s-resources]: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerResources {
     /// What the scheduler reserves.
@@ -112,7 +117,8 @@ pub struct ContainerResources {
 }
 
 /// CPU and memory as Kubernetes quantity strings, such as `250m` and `512Mi`, and as numbers.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Quantities {
     /// CPU.
@@ -149,7 +155,8 @@ impl Quantities {
 }
 
 /// One `env` entry.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct EnvVar {
     /// The variable's name.
@@ -182,7 +189,8 @@ pub struct EnvVar {
 ///
 /// [k8s-configmap-env]: https://kubernetes.io/docs/concepts/configuration/configmap/#configmaps-and-pods
 /// [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct PendingRestart {
     /// When the object was last written by a field manager that owns the key (for an `envFrom`
@@ -198,7 +206,8 @@ pub struct PendingRestart {
 
 /// One `envFrom` entry. Imports are not flattened into variables: a ConfigMap's twelve keys
 /// shown as twelve entries would misrepresent what the workload says.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct ImportedEnv {
     /// The imported ConfigMap or Secret.
@@ -224,7 +233,8 @@ pub struct ImportedEnv {
 
 /// Why an `envFrom` entry is read-only. Either way the way out is the same: override one
 /// variable with a same-named `env` entry, which takes precedence and leaves the import alone.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(tag = "reason", rename_all = "camelCase")]
 pub enum ReadOnlyReason {
     /// Another field manager owns the container's `envFrom`. The list is atomic, so changing one
@@ -243,7 +253,8 @@ pub enum ReadOnlyReason {
 }
 
 /// What kind of storage a mount is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum MountCategory {
     /// Durable storage, paid for, that outlives the pod.
@@ -259,7 +270,8 @@ pub enum MountCategory {
     clippy::struct_field_names,
     reason = "the field names are the Kubernetes ones"
 )]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Mount {
     /// The volume's name in the pod spec.

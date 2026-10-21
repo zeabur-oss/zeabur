@@ -19,5 +19,5 @@ own page's requests from other sites'.
 
 ## Place in the workspace
 
-Level 1: depends on `zeabur-core` only. Only the `zeabur` binary uses it; `zeaburctl ui` signs
+Level 2: depends on `zeabur-core` only. Only the `zeabur` binary uses it; `zeaburctl ui` signs
 nobody in (see `zeabur_api::local`).
