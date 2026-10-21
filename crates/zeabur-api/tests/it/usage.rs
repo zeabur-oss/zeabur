@@ -385,4 +385,68 @@ mod tests {
                    "name": "zeabur-settings", "namespace": "zeabur"})
         );
     }
+
+    #[tokio::test]
+    async fn volumes_and_node_disks_come_from_the_kubelets_or_say_why_not() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.nodes = vec![
+                serde_json::from_value(json!({"metadata": {"name": "vps-1"},
+                    "status": {"conditions": [{"type": "Ready", "status": "True"}]}}))
+                .unwrap(),
+            ];
+            s.objects.insert(
+                "shop".to_owned(),
+                zeabur_kube::NamespaceObjects {
+                    namespace: "shop".to_owned(),
+                    pods: vec![
+                        serde_json::from_value(json!({
+                            "metadata": {"name": "db-0", "namespace": "shop"},
+                            "spec": {"nodeName": "vps-1", "containers": [{"name": "db"}],
+                                "volumes": [{"name": "data",
+                                    "persistentVolumeClaim": {"claimName": "data-db-0"}}]}
+                        }))
+                        .unwrap(),
+                    ],
+                    ..zeabur_kube::NamespaceObjects::default()
+                },
+            );
+        });
+        let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
+        assert_eq!(volumes["state"], "unavailable");
+        assert_eq!(volumes["items"], json!([]));
+
+        cluster.update(|s| {
+            s.kubelet_summaries.insert(
+                "vps-1".to_owned(),
+                json!({
+                    "node": {"fs": {"capacityBytes": 100, "usedBytes": 88, "availableBytes": 12}},
+                    "pods": [{"podRef": {"name": "db-0", "namespace": "shop"}, "volume": [
+                        {"name": "data", "pvcRef": {"name": "data-db-0", "namespace": "shop"},
+                         "capacityBytes": 10, "usedBytes": 9, "availableBytes": 1}]}]
+                }),
+            );
+        });
+        let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
+        assert_eq!(volumes["state"], "available");
+        assert_eq!(
+            volumes["items"],
+            json!([{"claim": "data-db-0", "pod": "db-0", "node": "vps-1",
+                    "capacityBytes": 10, "usedBytes": 9, "availableBytes": 1}])
+        );
+        let nodes = get(&cluster, "/api/v1/cluster/nodes").await;
+        assert_eq!(nodes["disk"], "available");
+        assert_eq!(nodes["items"][0]["disk"]["usedBytes"], 88);
+        assert_eq!(nodes["totals"]["disk"]["capacityBytes"], 100);
+
+        cluster.update(|s| {
+            s.forbidden_resources.insert("nodes/proxy".to_owned());
+        });
+        let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
+        assert_eq!(volumes["state"], "unreadable");
+        assert_eq!(volumes["unreadable"][0]["resource"], "nodes/proxy");
+        let nodes = get(&cluster, "/api/v1/cluster/nodes").await;
+        assert_eq!(nodes["disk"], "unreadable");
+        assert!(nodes["items"][0].get("disk").is_none());
+    }
 }

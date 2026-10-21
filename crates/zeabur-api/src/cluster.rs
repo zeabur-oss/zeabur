@@ -10,7 +10,7 @@
 //! |---|---|---|
 //! | `GET /cluster` | `/version` | nothing: every signed-in person (`system:public-info-viewer`) |
 //! | `GET /cluster/upgrades` | `/version`; nodes and Plans when allowed | nothing; nodes and Plans add skew and progress |
-//! | `GET /cluster/nodes` | nodes; pods and node metrics when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage |
+//! | `GET /cluster/nodes` | nodes; pods, node metrics and kubelet summaries when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get nodes/proxy` for disks |
 //! | `GET /cluster/events` | `events.k8s.io` events, all namespaces (`scope=cluster` keeps those about the cluster) | `list events.events.k8s.io` |
 //! | `GET /cluster/capabilities` | CRDs, APIServices, classes, `HelmChart`s, Helm release Secrets' labels, workloads | all of them: in practice a cluster administrator |
 //!
@@ -45,6 +45,7 @@
 pub(crate) mod capacity;
 pub mod install;
 pub mod modules;
+pub(crate) mod stats;
 
 use std::collections::BTreeMap;
 
@@ -67,8 +68,8 @@ use crate::projects::events::{EventKey, event_key, event_view, last_seen, newest
 use crate::query::{EventQuery, LimitParams};
 use crate::settings::cluster_name;
 use crate::views::{
-    CapabilityList, Cluster, ClusterEventList, MetricsState, NodeCondition, NodeList, NodeTotals,
-    NodeView, PodScan, Resources, Taint, UnreadableView, UpgradeExtensions, Upgrades,
+    CapabilityList, Cluster, ClusterEventList, DiskUsage, MetricsState, NodeCondition, NodeList,
+    NodeTotals, NodeView, PodScan, Resources, Taint, UnreadableView, UpgradeExtensions, Upgrades,
 };
 
 /// The most pods or events a cluster-wide read takes.
@@ -288,6 +289,8 @@ fn node_view(node: &Node) -> NodeView {
         requests: None,
         limits: None,
         usage: None,
+        disk: None,
+        images_bytes: None,
         created: node
             .metadata
             .creation_timestamp
@@ -312,6 +315,35 @@ const fn plus(a: Option<Resources>, b: Option<Resources>) -> Option<Resources> {
     }
 }
 
+const fn disk_plus(a: Option<DiskUsage>, b: Option<DiskUsage>) -> Option<DiskUsage> {
+    match (a, b) {
+        (Some(a), Some(b)) => Some(DiskUsage {
+            capacity_bytes: a.capacity_bytes.saturating_add(b.capacity_bytes),
+            used_bytes: a.used_bytes.saturating_add(b.used_bytes),
+            available_bytes: a.available_bytes.saturating_add(b.available_bytes),
+        }),
+        (x, None) => x,
+        (None, y) => y,
+    }
+}
+
+/// Each node's usage from metrics-server's quantities.
+fn usage_by_node(usage: Vec<(String, String, String)>) -> BTreeMap<String, Resources> {
+    usage
+        .into_iter()
+        .map(|(node, cpu, memory)| {
+            (
+                node,
+                Resources {
+                    cpu_millicores: capacity::millicores(&cpu).unwrap_or(0),
+                    memory_bytes: capacity::bytes(&memory).unwrap_or(0),
+                    pods: None,
+                },
+            )
+        })
+        .collect()
+}
+
 /// metrics-server's node metrics, through its module.
 async fn node_metrics(
     cluster: &dyn zeabur_kube::Cluster,
@@ -332,8 +364,9 @@ fn node_usage(objects: &[DynamicObject]) -> Vec<(String, String, String)> {
 /// Requests and limits are summed per node from every unfinished pod, the way
 /// `kubectl describe node` sums them (see `capacity`); usage is added only when metrics-server
 /// is installed and readable, and is approximate ("meant only for autoscaling purposes"
-/// [metrics-server]). `403` when nodes cannot be listed; a refusal of pods or metrics leaves
-/// those parts out and says so.
+/// [metrics-server]). Each node's disk comes from its kubelet's stats summary (see `stats`).
+/// `403` when nodes cannot be listed; a refusal of pods, metrics or summaries leaves those parts
+/// out and says so.
 ///
 /// [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
 #[utoipa::path(get, path = "/api/v1/cluster/nodes", tag = "cluster", operation_id = "listNodes",
@@ -380,25 +413,22 @@ pub(crate) async fn nodes(Person(cluster): Person) -> Result<Json<NodeList>, Api
             entry.2 += 1;
         }
     }
-    let usage: Option<BTreeMap<String, Resources>> = usage.map(|usage| {
-        usage
-            .into_iter()
-            .map(|(node, cpu, memory)| {
-                (
-                    node,
-                    Resources {
-                        cpu_millicores: capacity::millicores(&cpu).unwrap_or(0),
-                        memory_bytes: capacity::bytes(&memory).unwrap_or(0),
-                        pods: None,
-                    },
-                )
-            })
-            .collect()
-    });
+    let usage = usage.map(usage_by_node);
 
     let mut items: Vec<NodeView> = nodes.iter().map(node_view).collect();
+    let (summaries, disk) = stats::summaries(
+        &cluster,
+        items.iter().map(|n| n.name.clone()).collect(),
+        &mut unreadable,
+    )
+    .await;
     let mut totals = NodeTotals::default();
     for item in &mut items {
+        if let Some(summary) = summaries.get(&item.name) {
+            item.disk = summary.node;
+            item.images_bytes = summary.images_bytes;
+            totals.disk = disk_plus(totals.disk, summary.node);
+        }
         if pods.is_some() {
             let (requests, limits, count) = sums.get(&item.name).copied().unwrap_or_default();
             item.requests = Some(Resources {
@@ -433,6 +463,7 @@ pub(crate) async fn nodes(Person(cluster): Person) -> Result<Json<NodeList>, Api
         pods_scanned,
         unscheduled_pods: unscheduled,
         metrics,
+        disk,
         unreadable,
     }))
 }
