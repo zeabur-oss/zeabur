@@ -5,12 +5,10 @@ import { expect, test } from "./fixtures.ts"
 // The page's frame and edges. Runs where ui.spec.ts runs, with its variables, and:
 //
 //   ZEABUR_E2E_CROWDED  a project with 40 or more services (the demo server: analytics)
-//   ZEABUR_E2E_VOLUME   a service of the project with a volume, as Kind/name (the demo: StatefulSet/db)
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const healthy = env("ZEABUR_E2E_SERVICE", "talker")
 const crowded = env("ZEABUR_E2E_CROWDED")
-const volume = env("ZEABUR_E2E_VOLUME")
 const project = `/projects/${encodeURIComponent(namespace)}`
 
 test.beforeAll(() => {
@@ -160,36 +158,47 @@ test.describe("in a project with many services", () => {
   }
 })
 
-for (const locale of ["en-US", "zh-TW"]) {
-  test.describe(`a volume's card in ${locale}`, () => {
-    test.skip(!volume, "ZEABUR_E2E_VOLUME is not set")
-    test.use({ locale, viewport: { width: 400, height: 900 } })
+/** Enabled or not, every primary button on the page that is disabled. */
+const disabledPrimaries = (page: Page) =>
+  page.locator(
+    "main button.button-primary:disabled, main button.button-primary[aria-disabled=true]",
+  )
 
-    test("lines its fields up and saves them with one button", async ({ page }) => {
-      await page.goto(`${project}/services/${volume}?tab=settings#storage`)
-      const card = page
-        .locator("form")
-        .filter({ has: page.getByRole("switch") })
-        .first()
-      await card.scrollIntoViewIfNeeded()
-      const [size, path] = await card.getByRole("textbox").all()
-      const box = async (locator: typeof card) => {
-        const b = await locator.boundingBox()
-        return b && [Math.round(b.x), Math.round(b.x + b.width)]
-      }
-      const sizeEdges = await box(size!)
-      expect(await box(path!)).toEqual(sizeEdges)
-      const toggle = await card.getByRole("switch").boundingBox()
-      expect(Math.round(toggle!.x + toggle!.width)).toBe(sizeEdges![1])
+for (const width of [1440, 390, 1960]) {
+  test.describe(`Storage at ${width}px`, () => {
+    test.use({ viewport: { width, height: 900 } })
 
-      const save = card.getByRole("button")
-      await expect(save).toHaveCount(1)
-      await expect(save).toBeDisabled()
-      await size!.fill("50Gi")
-      await expect(save).toBeEnabled()
-      await card.getByRole("switch").click()
-      await expect(save).toBeEnabled()
-      await card.screenshot({ path: test.info().outputPath(`storage-card-${locale}.png`) })
+    test("the volume list and its add row span the column, with no disabled primary button", async ({
+      page,
+    }) => {
+      await page.goto(`${project}/services/Deployment/${healthy}?tab=settings#storage`)
+      const part = page.locator("#storage")
+      await expect(part.getByRole("heading", { name: "Volumes" })).toBeVisible()
+      await expect(disabledPrimaries(page)).toHaveCount(0)
+
+      const edit = part.getByRole("button", { name: "Edit", exact: true })
+      if (await edit.isVisible()) await edit.click()
+      else await part.getByRole("button", { name: "Add a volume" }).click()
+      const list = part.getByRole("group", { name: "Volumes" })
+      const add = list.getByRole("button", { name: "Add a volume" })
+      if (!(await list.getByRole("textbox", { name: "Mount path of the new volume" }).count()))
+        await add.click()
+      const row = add.locator("..")
+      const edges = (locator: Locator) =>
+        locator.evaluate((element) => {
+          const rect = element.getBoundingClientRect()
+          return [Math.round(rect.left), Math.round(rect.right)]
+        })
+      const column = await edges(part)
+      expect(await edges(list)).toEqual(column)
+      const [left, right] = column as [number, number]
+      const [rowLeft, rowRight] = (await edges(row)) as [number, number]
+      // The add row sits inside the list's border, one pixel in on each side.
+      expect(rowLeft - left).toBeLessThanOrEqual(1)
+      expect(right - rowRight).toBeLessThanOrEqual(1)
+      expect(await mainOverflows(page)).toBe(false)
+      await expect(disabledPrimaries(page)).toHaveCount(0)
+      await part.screenshot({ path: test.info().outputPath(`storage-${width}.png`) })
     })
   })
 }

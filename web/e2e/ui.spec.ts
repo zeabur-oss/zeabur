@@ -772,7 +772,6 @@ test("scaling goes through a plan from Compute, and is undone from its toast", a
   if (before === undefined) throw new Error(`${editor} reports no replicas`)
   const more = before + 1
   await replicas.fill(String(more))
-  await replicas.press("Enter")
   await review(page)
   const applied = await confirmPlan(
     page,
@@ -788,15 +787,11 @@ test("scaling goes through a plan from Compute, and is undone from its toast", a
 
 test("a readiness probe is set through a plan", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=health-checks`)
-  const form = page
-    .getByRole("region", { name: "Health checks" })
-    .locator("form")
-    .filter({ has: page.getByRole("heading", { name: "Traffic check" }) })
+  const form = page.getByRole("form", { name: "Traffic check" })
   // The Select's list is portalled to the page's root, outside the form.
   await form.getByRole("combobox", { name: "Check" }).click()
   await page.getByRole("option", { name: "Command" }).click()
   await form.getByRole("textbox", { name: "Command" }).fill("true")
-  await form.getByRole("button", { name: "Add to changes" }).click()
   await review(page)
   await confirmPlan(
     page,
@@ -806,27 +801,34 @@ test("a readiness probe is set through a plan", async ({ page }) => {
   )
 })
 
-test("a volume is added and its claim edited under Storage", async ({ page }) => {
+test("volumes are added, changed and removed in one list under Storage", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=storage`)
-  const panel = page.getByRole("region", { name: "Storage" })
-  // With no volume yet, the form to add one is the section's empty state.
-  const add = panel.getByRole("form", { name: "Add a volume" })
-  await expect(add).toContainText(`${editor} has no volume`)
-  await add.getByRole("textbox", { name: /^Name/ }).fill("e2e-data")
-  await add.getByRole("textbox", { name: /^Mount path/ }).fill("/e2e-data")
-  await add.getByRole("button", { name: "Add to changes" }).click()
-  await review(page)
-  await confirmPlan(
-    page,
-    `Change ${editor}`,
-    "Add volume",
-    new RegExp(`${editor} gets a new \\S+ volume\\.`),
+  const part = page.locator("#storage")
+  await expect(part).toContainText(`${editor} has no volume`)
+  await part.getByRole("button", { name: "Add a volume" }).click()
+  const list = part.getByRole("group", { name: "Volumes" })
+  await list.getByRole("textbox", { name: "Mount path of the new volume" }).fill("/e2e-data")
+  await list.getByRole("button", { name: "Add a volume" }).click()
+  await list
+    .getByRole("textbox", { name: "Mount path of the new volume" })
+    .last()
+    .fill("/e2e-cache")
+  await page.getByRole("button", { name: "Save", exact: true }).click()
+  await confirmPlan(page, `Change ${editor}`, "Save volumes", `${editor} gets a new`)
+  await expect(list.getByText("/e2e-cache")).toBeVisible({ timeout: 15_000 })
+
+  await part.getByRole("button", { name: "Edit", exact: true }).click()
+  // k3d's local-path class cannot grow a claim, so the kept volume turns read-only instead.
+  await list.getByRole("switch", { name: "/e2e-data read-only" }).click()
+  await list.getByRole("button", { name: "Remove /e2e-cache" }).click()
+  await expect(list).toContainText("Removed")
+  await page.getByRole("button", { name: "Save", exact: true }).click()
+  await confirmPlan(page, `Change ${editor}`, "Save volumes", "stops mounting /e2e-cache")
+  await expect(list.getByText("/e2e-cache")).toHaveCount(0, { timeout: 15_000 })
+  await expect(list.getByText("/e2e-data")).toBeVisible()
+  await expect(list.getByRole("listitem").filter({ hasText: "/e2e-data" })).toContainText(
+    "Read-only",
   )
-  const card = panel
-    .locator("form")
-    .filter({ has: page.getByRole("switch", { name: "Read-only" }) })
-  await expect(card).toBeVisible({ timeout: 15_000 })
-  await expect(panel.getByRole("textbox", { name: /^Mount path/ }).first()).toHaveValue("/e2e-data")
 })
 
 test("Deployments lists the releases and rolls back to one through a plan", async ({ page }) => {
