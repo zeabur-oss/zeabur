@@ -15,8 +15,8 @@ look-alikes; `src/styles/app.css` imports it and adds only this interface's layo
   `type-body`, `type-meta`, `type-label`, `type-micro`, `type-nano`, `type-figure`); `type-mono`
   for machine values only. Han text falls back to the system's CJK face; `text-autospace` spaces
   it from Latin and digits. Figures are tabular.
-- **Motion**: `slide`, `enter-from-right` and the popups' transitions; `prefers-reduced-motion`
-  turns them off.
+- **Motion**: the design system's motion utilities and components (its README, "Motion");
+  nothing of this interface's own. See "Motion and focus".
 - **Replicas** are said in words first, "2/3" (ready out of desired), then one small square per
   replica in its state, at most 10 and the rest counted; only in tables, where each square opens
   that pod's logs.
@@ -63,6 +63,9 @@ the design system's components by their import (`componentImports` in `.oxlintrc
   properties, read by classes (`left-(--x)`, `translate-y-(--slide-y)`, `h-(--bar)`).
 - **Design system components only** (`no-restricted-imports`): no `@base-ui/react`, Radix,
   Headless UI or Motion imports in app code; a missing component is added to the design system.
+- **Guarded motion** (`zeabur/no-unguarded-motion`, `lint/zeabur.js`, the design system's rule):
+  `transition-transform`, `transition-all`, `animate-spin` and the like are written `motion-safe:`,
+  or the motion is a design-system utility.
 - **Static classes** (`require-static-classes`): a component's `className` is literal strings or
   `cn` of literals; pick a variant rather than indexing a lookup table.
 
@@ -304,14 +307,25 @@ Forward or a link.
 
 ## Motion and focus
 
-Transitions are short and decorative only; `prefers-reduced-motion` turns them off. No focus
-rings (see the design system's tokens above); scrollable regions (the log) still take focus.
+Motion follows the design system's README, "Motion": which pattern moves how, its timings, what
+never animates, and what is left under `prefers-reduced-motion` (opacity and colour only). Use
+its utilities and components, not `transition-*` classes of your own. Here that means:
 
-Movement is written so that it happens only without that preference: the `slide` and
-`enter-from-right` utilities (the design system's) inside `prefers-reduced-motion: no-preference`, and
-`motion-safe:` on the dialogs' slide. A marker that has a place to slide to is one element moved
-by `translate`, never a highlight per item: Base UI's tab indicator (`--active-tab-*`) under Tabs,
-and the thumb of `Segmented` (equal segments, so it moves by whole widths of itself and nothing
-is measured). An entrance uses `@starting-style`, so no script waits for a frame. On top of that,
-`app.css` shortens every transition and animation to nothing under the preference, for the parts
-that come from libraries.
+- Popups, dialogs, sheets, tooltips, toasts and collapsibles move as the design system's
+  components do. A disclosure is `CollapsibleTrigger variant="disclosure"`, not a chevron of its
+  own. Its panel clips (`collapse-motion`), so one that holds a field, a button or a code block
+  takes `-mx-1` and its content `px-1 pb-1`, room for the focus outline.
+- An element Base UI does not mount takes `usePresence`, so its exit plays: the quick look
+  (`sheet-motion-end`) and the draft bar (`overlay-motion`). The palette keeps its body mounted
+  through the close, is anchored to the top so typing never moves it, and its fallback has its
+  height.
+- `SwapText` for one service's own status word and counts (the service header, the quick look,
+  the status card, a rollout's progress); never for rows in a list or table.
+- A row this tab just created (a variable, a domain, a volume) enters once (`lib/created.ts`);
+  rows that load or poll in, logs, charts, the map, tab panels and route changes do not move.
+- Pages do not shift as they load: a route's loader reads what sits at the top of its page, a
+  skeleton has the size of what replaces it, and a part that arrives later goes below the rest or
+  holds its place.
+
+No focus rings (see the design system's tokens above); scrollable regions (the log) still take
+focus.
