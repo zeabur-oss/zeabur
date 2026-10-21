@@ -453,6 +453,7 @@ export const en = {
   "service.tabs": "Service sections",
   "service.copyName": "Copy name for kubectl",
   "service.more": "More",
+  "service.moreTabs": "Show more tabs",
   "service.views": "Views",
   "service.delete": "Delete service",
   "service.notFound": "This service does not exist.",
@@ -588,6 +589,11 @@ export const en = {
   "vars.emptyTitle": "No environment variables yet",
   "vars.emptyBody": "Add one to change a setting without building a new image.",
   "vars.direct": "Set directly",
+  "vars.filter": "Filter variables",
+  "vars.noMatch": "No variable matches.",
+  "vars.also": "Also ",
+  "vars.alsoObjects": (n: number) => `${n} from config files and secrets`,
+  "vars.alsoCluster": (n: number) => `${n} filled in by Kubernetes`,
   "vars.fromObjects": "From config files and secrets",
   "vars.fromCluster": "Filled in by Kubernetes",
   "vars.reveal": (secret: string) => `Show values in ${secret}`,
@@ -606,6 +612,19 @@ export const en = {
   "net.path": "Path",
   "net.publicTitle": "Public domains",
   "net.publicAbout": "Anyone on the internet can open these addresses.",
+  "net.publicLead": (
+    domains: number,
+    service: string,
+    ready: number,
+    total: number,
+    plain: number,
+  ) =>
+    `${domains === 1 ? "1 domain routes" : `${domains} domains all route`} to ${service}${total > 0 ? ` (${ready}/${total} ready)` : ""}${plain > 0 ? `; ${plain} without HTTPS` : ""}.`,
+  "net.filter": "Filter domains",
+  "net.noMatch": "No domain matches.",
+  "net.noHttps": "No HTTPS",
+  "net.https": "HTTPS",
+  "net.routeMore": (host: string) => `Path, port and actions for ${host}`,
   "net.publicEmpty": (name: string) => `${name} has no public domain yet`,
   "net.publicEmptyBody": "Add a domain to open this service from a browser.",
   "net.publicNeedsPrivate":
@@ -628,7 +647,6 @@ export const en = {
   "net.scheduledTitle": (name: string) => `${name} doesn't receive traffic`,
   "net.scheduledBody":
     "A job runs and exits, so nothing connects to it. It can still connect to other services and the internet.",
-  "reach.about": "Which connections to and from this service the cluster allows.",
   "reach.fromDomains": "Public domains",
   "net.anyHost": "Any host",
   "net.defaultBackend": "Default backend",
@@ -1225,6 +1243,7 @@ export const en = {
   "diagnosis.action.reservation": "Change reservation",
   "diagnosis.action.variables": "Variables",
   "diagnosis.action.storage": "Storage",
+  "diagnosis.action.yaml": "Edit YAML",
   "gap.title": "Missing setup",
   "gap.warning": "Warning",
   "gap.advice": "Advice",
@@ -1268,7 +1287,6 @@ export const en = {
   "reach.addPolicy": "Add rule",
   "reach.isolate": "Isolate this service",
   "reach.allowIngress": "Allow traffic from public domains",
-  "reach.allowFrom": (name: string) => `Allow from ${name}`,
   "reach.planIsolate": (name: string) => `Isolate ${name}`,
   "reach.planAllowIngress": (name: string) => `Let public domains reach ${name}`,
   "reach.planAllowFrom": (from: string, to: string) => `Let ${from} reach ${to}`,
@@ -1286,6 +1304,29 @@ export const en = {
   "reach.blocked": "Blocked",
   "reach.edgeBlocked": "Blocked by a connection rule",
   "reach.edgeLimited": "Only partly allowed by connection rules",
+  "reach.allowFromPick": "Allow from a service…",
+  "reach.rulesApply": (n: number) => plural(n, "rule applies", "rules apply"),
+  "reach.rules": (n: number) => plural(n, "rule", "rules"),
+  "reach.lead": (clauses: string[], capital: boolean) => {
+    const text = clauses.join("; ")
+    return `${capital ? text.charAt(0).toUpperCase() + text.slice(1) : text}.`
+  },
+  "reach.lead.none": (name: string) => `${name} accepts no other service`,
+  "reach.lead.all": (name: string) => `${name} accepts every service in the project`,
+  "reach.lead.only": (name: string, n: number) =>
+    `${name} accepts only ${plural(n, "service", "services")}`,
+  "reach.services": (n: number) => plural(n, "service", "services"),
+  "reach.lead.otherProjects": "other projects",
+  "reach.lead.domains": "public domains",
+  "reach.lead.blocked": (list: string, one: boolean) => `${list} ${one ? "is" : "are"} blocked`,
+  "reach.lead.limited": (list: string, one: boolean) =>
+    `${list} ${one ? "is" : "are"} partly allowed`,
+  "reach.lead.allowed": (list: string, one: boolean) => `${list} ${one ? "is" : "are"} allowed`,
+  "reach.more": (n: number) => `+${n} more`,
+  "reach.filter": "Filter services",
+  "reach.service": "Service",
+  "reach.allow": "Allow",
+  "reach.noMatch": "No service matches.",
   "backups.title": "Backups",
   "backups.namespace": "All objects in the namespace",
   "backups.unscheduled": "No schedule",
@@ -1559,10 +1600,18 @@ export const en = {
   "event.word.evicted": "Moved off its machine",
   "event.word.outOfMemory": "Out of memory",
   "changes.title": "Deployment history",
-  "changes.description":
-    "Each release of the service and the warnings around it. Compare a release with the current one, or roll back to it.",
   "changes.none": "No deployments yet",
   "changes.release": (revision: number) => `Release #${revision}`,
+  "changes.lead.current": (revision: number) => `Running #${revision}`,
+  "changes.lead.deployed": "deployed",
+  "changes.lead.stop": ". ",
+  "changes.lead.week": (releases: number, warnings: number) =>
+    `Last 7 days: ${plural(releases, "deployment", "deployments")}, ${warnings === 0 ? "no warnings" : plural(warnings, "warning", "warnings")}.`,
+  "changes.older": "Older",
+  "changes.filter": "Filter older changes",
+  "changes.when": "When",
+  "changes.what": "Change",
+  "changes.noMatch": "No change matches.",
   "settings.sections": "Settings of this service",
   "part.variables": "Variables",
   "part.networking": "Networking",
@@ -1704,6 +1753,16 @@ export const en = {
     `The rollout of ${p.name} is stuck: a new replica reads a secret or config that doesn't exist.`,
   "sentence.rollout.stuck.runFailed": (p: P) =>
     `The rollout of ${p.name} is stuck: a new replica's run failed.`,
+  "sentence.fix.multiAttach": (p: P) =>
+    `The old replica still holds its volume, and a volume attaches to one machine at a time. In YAML, set ${p.service || "the service"}'s strategy.type to Recreate so the old replica stops first; each release then takes it offline for the seconds the new one needs to start.`,
+  "sentence.fix.outOfMemory": (p: P) =>
+    `Raise the memory maximum${p.limit ? ` above ${p.limit}` : ""}; Usage shows how close it runs. The maximum reserves nothing, so the machine needs that memory free when it is used.`,
+  "sentence.fix.evicted.disk":
+    "The machine ran short of disk and stopped this replica; a new one starts on its own, without what the old one wrote to its own disk. Keep data on a volume and logs small, or have whoever runs the cluster free disk on that machine.",
+  "sentence.fix.evicted.memory":
+    "The machine ran short of memory and stopped this replica first. Reserve memory close to what it uses so it goes last; the reservation is held for it even when idle.",
+  "sentence.fix.evicted":
+    "The machine ran short of resources and stopped this replica; a new one starts on its own. Its events say which resource.",
   "sentence.rollout.stuck.deadlineExceeded": (p: P) =>
     `The rollout of ${p.name} is stuck: it made no progress before its deadline (progressDeadlineSeconds).`,
   "sentence.rollout.stuck.replicaFailure": (p: P) =>

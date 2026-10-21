@@ -178,6 +178,10 @@ explanation a first-time user needs goes in a tooltip or an (i). Empty states ar
 A search or filter box has no placeholder: its magnifying glass (or funnel) and its accessible name
 say what it is. A placeholder stays only where it shows the format of a value (`250m`, `/healthz`)
 or names one of two fields side by side (Name, Value).
+A list that can grow long (variables past 15, domains past 10, a group of services, older
+releases) gets a filter (`components/filter-field.tsx`) once it is long, a bounded frame
+(`max-h-90`, scrolling inside, its header sticky) where it would push the rest of the tab far
+down, and a sentence above it that sums it up; a short list stays as it is.
 A write's confirmation is the one place for whole sentences: what will happen, in words a
 first-time user follows (see Operations); its toast is a word or two and the thing it names.
 Kubernetes terms stay as Kubernetes spells them in every language.

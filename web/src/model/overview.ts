@@ -97,12 +97,43 @@ export function overviewOf(
         }
       : undefined
   return {
-    causes,
+    causes: causes.map(concreteFix),
     waiting,
     alsoDown,
     rollout: rolloutShown(rollout, causes),
     warnings: events.filter((e) => isWarning(e) && !explainedBy(e, diagnoses)),
   }
+}
+
+const lowOnDisk = /ephemeral-storage|nodefs|imagefs|disk/i
+
+/**
+ * A step to take, with what it costs, where the API's fix only says where to look: a volume held
+ * by the replica being replaced, a container stopped for memory, a replica evicted by its machine.
+ */
+export function concreteFix(d: Diagnosis): Diagnosis {
+  const why = d.why.params ?? {}
+  const reason = d.cause.params?.reason
+  if (d.kind === "outOfMemory" && d.fix.key.endsWith(".fix.limit"))
+    return { ...d, fix: { key: "fix.outOfMemory", params: { limit: why.limit ?? "" } } }
+  if (d.kind !== "unexplained") return d
+  if (why.event === "FailedAttachVolume" && why.note?.includes("Multi-Attach"))
+    return {
+      ...d,
+      fix: { key: "fix.multiAttach", params: { service: d.cause.params?.service ?? "" } },
+    }
+  if (reason === "OOMKilled")
+    return { ...d, fix: { key: "fix.outOfMemory", params: { limit: "" } } }
+  if (reason === "Evicted" || why.event === "Evicted") {
+    const note = why.note ?? ""
+    const key = lowOnDisk.test(note)
+      ? "fix.evicted.disk"
+      : /memory/i.test(note)
+        ? "fix.evicted.memory"
+        : "fix.evicted"
+    return { ...d, fix: { key, params: {} } }
+  }
+  return d
 }
 
 function rolloutShown(rollout: Rollout | undefined, causes: Diagnosis[]): RolloutShown {

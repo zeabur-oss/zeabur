@@ -15,6 +15,13 @@ const diagnosis = (kind: Diagnosis["kind"], cause: string): Diagnosis => ({
 })
 
 describe("a diagnosis's action", () => {
+  test("follows a concrete fix to where it is done", () => {
+    const held = { ...diagnosis("unexplained", "x"), fix: { key: "fix.multiAttach" } }
+    expect(diagnosisAction(held).tab).toBe("yaml")
+    const oom = { ...diagnosis("unexplained", "x"), fix: { key: "fix.outOfMemory" } }
+    expect(diagnosisAction(oom).label).toBe("diagnosis.action.memory")
+  })
+
   test("opens the tab its fix is done in", () => {
     expect(
       diagnosisAction(diagnosis("crashLoop", "diagnosis.crashLoop.cause.exitCode")),

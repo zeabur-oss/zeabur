@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
+import CaretDownIcon from "~icons/ph/caret-down"
 import ClockIcon from "~icons/ph/clock"
 import GlobeIcon from "~icons/ph/globe"
 import LockSimpleBoldIcon from "~icons/ph/lock-simple-bold"
@@ -16,7 +17,7 @@ import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
 import { usePlanner } from "@/components/plan/planner"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
-import { StatusPill } from "@/components/status"
+import { FilterField } from "@/components/filter-field"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
 import { Button } from "@zeabur/design-system/components/button"
@@ -34,7 +35,9 @@ import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
+import { domainsLead, filterRoutes, plainFirst } from "@/model/domains"
 import { stagedDomains, type DomainEdit } from "@/model/draft"
+import { isLongList } from "@/model/lists"
 import {
   endpointsOf,
   hostUrl,
@@ -82,7 +85,6 @@ export function NetworkingTab({
   const routes = publicRoutesOf(network, service)
   const endpoints = endpointsOf(network, service)
   const ready = service.pods.filter((p) => p.ready).length
-  const podsOk = ready === service.pods.length && ready > 0
   const planner = usePlanner(project)
   const [adding, setAdding] = useState<string>()
   const [renaming, setRenaming] = useState<{ from: string; to: string }>()
@@ -97,6 +99,11 @@ export function NetworkingTab({
   const editOf = (route: PublicRoute) =>
     route.host ? staged.edits.get(`${route.ingress}/${route.host}`) : undefined
   const listed = routes.length + staged.added.length
+  const [query, setQuery] = useState("")
+  const [opened, setOpened] = useState<string>()
+  const long = isLongList(routes.length, 10)
+  const shown = plainFirst(long ? filterRoutes(routes, query) : routes)
+  const lead = domainsLead(routes)
   const undo = (change: DomainEdit) => (
     <Button variant="ghost" size="xs" onClick={() => draft?.unstage([change])}>
       <ArrowCounterClockwiseIcon aria-hidden="true" data-icon="inline-start" />
@@ -148,7 +155,18 @@ export function NetworkingTab({
               id="net-public"
               title={t("net.publicTitle")}
               count={listed > 0 ? listed : undefined}
-              description={t("net.publicAbout")}
+              description={
+                lead.hosts > 0
+                  ? t(
+                      "net.publicLead",
+                      lead.hosts,
+                      service.name,
+                      ready,
+                      service.pods.length,
+                      lead.plain,
+                    )
+                  : t("net.publicAbout")
+              }
               action={
                 listed > 0 ? (
                   <Managed tool={managed}>
@@ -211,144 +229,183 @@ export function NetworkingTab({
                 </Empty>
               ) : null
             ) : (
-              <Table label={t("net.publicTitle")} minWidth="sm:min-w-160">
-                <thead className={thead}>
-                  <tr>
-                    <th className={`${head} pl-4`}>{t("table.domain")}</th>
-                    <th className={head}>{t("net.path")}</th>
-                    <th className={head}>{t("net.sendsTo")}</th>
-                    <th className={head}>{t("pod.pods")}</th>
-                    <th className={`${head} pr-4`}>
-                      <span className="sr-only">{t("table.actions")}</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y max-sm:block">
-                  {routes.map((route, i) => {
-                    const edit = editOf(route)
-                    return (
-                      <tr
-                        className={cn(row, route.host && entrance(createdKey.domain(route.host)))}
-                        key={`${route.ingress}/${route.host ?? ""}/${route.path ?? ""}/${i}`}
-                      >
-                        <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
-                          {renaming && route.host === renaming.from ? (
-                            <HostForm
-                              value={renaming.to}
-                              onCancel={() => setRenaming(undefined)}
-                              onReview={(to) => {
-                                planner.plan({
-                                  title: t("title.renameDomain", renaming.from, to),
-                                  service: workload,
-                                  changes: [
-                                    {
-                                      op: "renameDomain",
-                                      route: routeOf(route),
-                                      from: renaming.from,
-                                      to,
-                                    },
-                                  ],
-                                })
-                                setRenaming(undefined)
-                              }}
-                            />
-                          ) : edit?.op === "renameDomain" ? (
-                            <PendingHost host={edit.to} was={edit.from} state="changed" />
-                          ) : edit ? (
-                            <PendingHost host={edit.hostname} state="removed" />
-                          ) : (
-                            <Host route={route} />
-                          )}
-                        </td>
-                        <td className={cell}>
-                          <Path route={route} />
-                        </td>
-                        <td className={cell}>
-                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                            <ArrowRightIcon
-                              className="size-3 shrink-0 text-muted-foreground"
-                              aria-hidden="true"
-                            />
-                            <span className="whitespace-nowrap">
-                              {route.port
-                                ? t("net.port", portNumber(endpoints, route))
-                                : t("net.anyPort")}
-                            </span>
-                          </span>
-                        </td>
-                        <td className={cell}>
-                          <StatusPill health={podsOk ? "ok" : "fail"} size="sm">
-                            {t("pod.readyCount", ready, service.pods.length)}
-                          </StatusPill>
-                        </td>
-                        <td className={`${cell} pr-4 max-sm:ml-auto`}>
-                          {edit ? (
-                            <span className="flex justify-end">{undo(edit)}</span>
-                          ) : route.host ? (
-                            <span className="flex items-center justify-end gap-0.5">
-                              <Managed tool={managed}>
-                                <Button
-                                  variant="muted"
-                                  size="icon-xs"
-                                  disabled={Boolean(managed) || renaming !== undefined}
-                                  aria-label={t("edit.edit", route.host)}
-                                  title={t("edit.edit", route.host)}
-                                  onClick={() =>
-                                    route.host
-                                      ? setRenaming({ from: route.host, to: route.host })
-                                      : undefined
-                                  }
-                                >
-                                  <PencilSimpleIcon aria-hidden="true" />
-                                </Button>
-                              </Managed>
-                              <Managed tool={managed}>
-                                <Button
-                                  variant="muted"
-                                  size="icon-xs"
-                                  disabled={Boolean(managed)}
-                                  aria-label={t("edit.remove", route.host)}
-                                  title={t("edit.remove", route.host)}
-                                  onClick={() =>
-                                    route.host
-                                      ? planner.plan({
-                                          title: t("title.removeDomain", route.host),
-                                          service: workload,
-                                          changes: [
-                                            {
-                                              op: "removeDomain",
-                                              route: routeOf(route),
-                                              hostname: route.host,
-                                            },
-                                          ],
-                                        })
-                                      : undefined
-                                  }
-                                >
-                                  <TrashIcon aria-hidden="true" />
-                                </Button>
-                              </Managed>
-                            </span>
-                          ) : null}
+              <>
+                {long ? (
+                  <FilterField value={query} onChange={setQuery} label={t("net.filter")} />
+                ) : null}
+                <Table label={t("net.publicTitle")} minWidth="sm:min-w-160">
+                  <thead className={thead}>
+                    <tr>
+                      <th className={`${head} pl-4`}>{t("table.domain")}</th>
+                      <th className={head}>{t("net.path")}</th>
+                      <th className={head}>{t("net.sendsTo")}</th>
+                      <th className={`${head} pr-4`}>
+                        <span className="sr-only">{t("table.actions")}</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y max-sm:block">
+                    {shown.length === 0 ? (
+                      <tr className={row}>
+                        <td
+                          colSpan={4}
+                          className={`${cell} px-4 py-3 text-xs text-muted-foreground`}
+                        >
+                          {t("net.noMatch")}
                         </td>
                       </tr>
-                    )
-                  })}
-                  {staged.added.map((change) => (
-                    <tr className={row} key={`added/${change.hostname}`}>
-                      <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
-                        <PendingHost host={change.hostname} state="added" />
-                      </td>
-                      <td className={cell} />
-                      <td className={cell} />
-                      <td className={cell} />
-                      <td className={`${cell} pr-4 max-sm:ml-auto`}>
-                        <span className="flex justify-end">{undo(change)}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </Table>
+                    ) : null}
+                    {shown.map((route, i) => {
+                      const edit = editOf(route)
+                      const key = `${route.ingress}/${route.host ?? ""}/${route.path ?? ""}/${i}`
+                      const folded = opened !== key && !edit && renaming?.from !== route.host
+                      const more = folded ? "max-sm:hidden" : undefined
+                      return (
+                        <tr
+                          className={cn(row, route.host && entrance(createdKey.domain(route.host)))}
+                          key={key}
+                        >
+                          <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
+                            {renaming && route.host === renaming.from ? (
+                              <HostForm
+                                value={renaming.to}
+                                onCancel={() => setRenaming(undefined)}
+                                onReview={(to) => {
+                                  planner.plan({
+                                    title: t("title.renameDomain", renaming.from, to),
+                                    service: workload,
+                                    changes: [
+                                      {
+                                        op: "renameDomain",
+                                        route: routeOf(route),
+                                        from: renaming.from,
+                                        to,
+                                      },
+                                    ],
+                                  })
+                                  setRenaming(undefined)
+                                }}
+                              />
+                            ) : edit?.op === "renameDomain" ? (
+                              <PendingHost host={edit.to} was={edit.from} state="changed" />
+                            ) : edit ? (
+                              <PendingHost host={edit.hostname} state="removed" />
+                            ) : (
+                              <span className="flex min-w-0 items-center gap-2">
+                                <Host route={route} />
+                                <span className="flex-1 sm:hidden" />
+                                {route.host && !route.https ? (
+                                  <span className="shrink-0 type-meta text-warn-strong">
+                                    {t("net.noHttps")}
+                                  </span>
+                                ) : route.https ? (
+                                  <span className="shrink-0 type-meta text-muted-foreground sm:hidden">
+                                    {t("net.https")}
+                                  </span>
+                                ) : null}
+                                <Button
+                                  variant="muted"
+                                  size="icon-xs"
+                                  className="sm:hidden"
+                                  aria-expanded={!folded}
+                                  aria-label={t("net.routeMore", route.host ?? t("net.anyHost"))}
+                                  onClick={() => setOpened(folded ? key : undefined)}
+                                >
+                                  <CaretDownIcon
+                                    aria-hidden="true"
+                                    className={cn(
+                                      "motion-safe:transition-transform",
+                                      !folded && "rotate-180",
+                                    )}
+                                  />
+                                </Button>
+                              </span>
+                            )}
+                          </td>
+                          <td className={cn(cell, more)}>
+                            <Path route={route} />
+                          </td>
+                          <td className={cn(cell, more)}>
+                            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                              <ArrowRightIcon
+                                className="size-3 shrink-0 text-muted-foreground"
+                                aria-hidden="true"
+                              />
+                              <span className="whitespace-nowrap">
+                                {route.port
+                                  ? t("net.port", portNumber(endpoints, route))
+                                  : t("net.anyPort")}
+                              </span>
+                            </span>
+                          </td>
+                          <td className={cn(cell, "pr-4 max-sm:ml-auto", more)}>
+                            {edit ? (
+                              <span className="flex justify-end">{undo(edit)}</span>
+                            ) : route.host ? (
+                              <span className="flex items-center justify-end gap-0.5">
+                                <Managed tool={managed}>
+                                  <Button
+                                    variant="muted"
+                                    size="icon-xs"
+                                    disabled={Boolean(managed) || renaming !== undefined}
+                                    aria-label={t("edit.edit", route.host)}
+                                    title={t("edit.edit", route.host)}
+                                    onClick={() =>
+                                      route.host
+                                        ? setRenaming({ from: route.host, to: route.host })
+                                        : undefined
+                                    }
+                                  >
+                                    <PencilSimpleIcon aria-hidden="true" />
+                                  </Button>
+                                </Managed>
+                                <Managed tool={managed}>
+                                  <Button
+                                    variant="muted"
+                                    size="icon-xs"
+                                    disabled={Boolean(managed)}
+                                    aria-label={t("edit.remove", route.host)}
+                                    title={t("edit.remove", route.host)}
+                                    onClick={() =>
+                                      route.host
+                                        ? planner.plan({
+                                            title: t("title.removeDomain", route.host),
+                                            service: workload,
+                                            changes: [
+                                              {
+                                                op: "removeDomain",
+                                                route: routeOf(route),
+                                                hostname: route.host,
+                                              },
+                                            ],
+                                          })
+                                        : undefined
+                                    }
+                                  >
+                                    <TrashIcon aria-hidden="true" />
+                                  </Button>
+                                </Managed>
+                              </span>
+                            ) : null}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {staged.added.map((change) => (
+                      <tr className={row} key={`added/${change.hostname}`}>
+                        <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
+                          <PendingHost host={change.hostname} state="added" />
+                        </td>
+                        <td className={cell} />
+                        <td className={cell} />
+                        <td className={`${cell} pr-4 max-sm:ml-auto`}>
+                          <span className="flex justify-end">{undo(change)}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </>
             )}
             <KubeDetails
               facts={routes.map((route) => [
@@ -640,7 +697,9 @@ function Host({ route }: { route: PublicRoute }) {
               aria-hidden="true"
             />
           </a>
-          <CopyButton value={route.host} />
+          <span className="max-sm:hidden">
+            <CopyButton value={route.host} />
+          </span>
         </>
       ) : (
         <span className="text-muted-foreground">{t("net.anyHost")}</span>

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import { en } from "@/i18n/en"
-import { eventWord, explainedBy, overviewOf, suggestionsOf } from "@/model/overview"
+import { concreteFix, eventWord, explainedBy, overviewOf, suggestionsOf } from "@/model/overview"
 import type { Event } from "@/model/service"
 
 type Diagnosis = Schemas["Diagnosis"]
@@ -233,5 +233,61 @@ describe("a project's suggestions", () => {
   test("with every service checked, the gaps stay as they are", () => {
     const limits = gap("gap.resourceLimits.none", "CronJob", "nightly-report")
     expect(suggestionsOf([limits])).toEqual([{ as: "gap", gap: limits }])
+  })
+})
+
+describe("concreteFix", () => {
+  const waiting = (why: Record<string, string>, reason = "ContainerCreating") =>
+    diagnosis("unexplained", "waiting", {
+      cause: {
+        key: "diagnosis.unexplained.cause.waiting",
+        params: { service: "gateway", reason },
+      },
+      why: { key: "diagnosis.unexplained.why.event", params: why },
+      fix: { key: "diagnosis.unexplained.fix.waiting" },
+    })
+
+  test("keeps the API's fix where it has nothing more concrete", () => {
+    expect(concreteFix(imagePull)).toBe(imagePull)
+    const other = waiting({ event: "FailedMount", note: "timed out" })
+    expect(concreteFix(other)).toBe(other)
+  })
+
+  test("a volume still held by the old replica names the strategy to change", () => {
+    const d = waiting({
+      event: "FailedAttachVolume",
+      note: 'Multi-Attach error for volume "pvc-3f1c" Volume is already used by pod(s) gateway-old',
+    })
+    expect(concreteFix(d).fix).toEqual({ key: "fix.multiAttach", params: { service: "gateway" } })
+    expect(en["sentence.fix.multiAttach"]({ service: "gateway" })).toContain("Recreate")
+  })
+
+  test("running out of memory points to the maximum and to Usage", () => {
+    const limited = diagnosis("outOfMemory", "limit", {
+      why: { key: "diagnosis.outOfMemory.why.limit", params: { limit: "512Mi" } },
+      fix: { key: "diagnosis.outOfMemory.fix.limit" },
+    })
+    expect(concreteFix(limited).fix).toEqual({
+      key: "fix.outOfMemory",
+      params: { limit: "512Mi" },
+    })
+    const unlimited = diagnosis("outOfMemory", "noLimit", {
+      fix: { key: "diagnosis.outOfMemory.fix.noLimit" },
+    })
+    expect(concreteFix(unlimited)).toBe(unlimited)
+    expect(concreteFix(waiting({}, "OOMKilled")).fix.key).toBe("fix.outOfMemory")
+  })
+
+  test("an eviction says which resource ran short", () => {
+    const evicted = (note: string) => concreteFix(waiting({ event: "Evicted", note })).fix.key
+    expect(evicted("The node was low on resource: ephemeral-storage.")).toBe("fix.evicted.disk")
+    expect(evicted("The node was low on resource: memory.")).toBe("fix.evicted.memory")
+    expect(evicted("")).toBe("fix.evicted")
+  })
+
+  test("the Overview shows every cause with its concrete fix", () => {
+    const held = waiting({ event: "FailedAttachVolume", note: "Multi-Attach error" })
+    const o = overviewOf({ diagnoses: [held, imagePull], stopped: false }, undefined, [], [])
+    expect(o.causes.map((d) => d.fix.key)).toEqual(["fix.multiAttach", "f"])
   })
 })

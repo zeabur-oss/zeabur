@@ -52,6 +52,7 @@ export interface DiagnosisAction {
     | "diagnosis.action.reservation"
     | "diagnosis.action.variables"
     | "diagnosis.action.storage"
+    | "diagnosis.action.yaml"
   pod?: string
 }
 
@@ -81,6 +82,9 @@ export function diagnosisAction(d: Diagnosis): DiagnosisAction {
         ? { tab: "storage", label: "diagnosis.action.storage" }
         : { tab: "variables", label: "diagnosis.action.variables" }
     case "unexplained":
+      if (d.fix.key === "fix.multiAttach") return { tab: "yaml", label: "diagnosis.action.yaml" }
+      if (d.fix.key === "fix.outOfMemory")
+        return { tab: "compute", label: "diagnosis.action.memory" }
       return cause.endsWith(".notReady")
         ? { tab: "logs", label: "diagnosis.action.logs", pod }
         : { tab: "events", label: "diagnosis.action.events", pod }

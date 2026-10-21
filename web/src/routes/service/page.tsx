@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { getRouteApi, useBlocker } from "@tanstack/react-router"
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
+import CaretRightIcon from "~icons/ph/caret-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
 import ChartBarIcon from "~icons/ph/chart-bar"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
@@ -254,7 +255,9 @@ function ServiceView({
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-secondary">
                   {service.created ? (
-                    <span>{t("service.created", formatDate(service.created, locale))}</span>
+                    <span className="whitespace-nowrap">
+                      {t("service.created", formatDate(service.created, locale))}
+                    </span>
                   ) : null}
                   <Freshness
                     project={project}
@@ -263,22 +266,45 @@ function ServiceView({
                   />
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:pl-13">
                 {restart ? (
-                  <Button variant="outline" size="sm" onClick={restart}>
-                    <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-                    {t("ops.restart")}
-                  </Button>
+                  <>
+                    <Button variant="outline" size="sm" className="max-sm:hidden" onClick={restart}>
+                      <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+                      {t("ops.restart")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="sm:hidden"
+                      aria-label={t("ops.restart")}
+                      onClick={restart}
+                    >
+                      <ArrowClockwiseIcon aria-hidden="true" />
+                    </Button>
+                  </>
                 ) : null}
                 {isTask(service.kind) ? null : (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openShell(project, service, search.pod)}
-                  >
-                    <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
-                    <span className="max-sm:sr-only">{t("tab.terminal")}</span>
-                  </Button>
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="max-sm:hidden"
+                      onClick={() => openShell(project, service, search.pod)}
+                    >
+                      <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+                      {t("tab.terminal")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="sm:hidden"
+                      aria-label={t("tab.terminal")}
+                      onClick={() => openShell(project, service, search.pod)}
+                    >
+                      <TerminalWindowIcon aria-hidden="true" />
+                    </Button>
+                  </>
                 )}
                 <Menu>
                   <MenuTrigger
@@ -316,7 +342,7 @@ function ServiceView({
               </div>
             </div>
             <RefusedSome unreadable={refusedElsewhere(unreadable, inServiceTabs)} />
-            <div className="pt-1 pb-3">
+            <TabRow>
               <TabsList aria-label={t("service.tabs")} className="w-full">
                 {serviceTabs.map((value) => {
                   const TabIcon = tabIcons[value]
@@ -329,7 +355,7 @@ function ServiceView({
                   )
                 })}
               </TabsList>
-            </div>
+            </TabRow>
           </PageColumn>
         </header>
         <PageColumn width="content" className={cn("mt-3", wide ? "mb-4 min-h-0 flex-1" : "mb-16")}>
@@ -515,5 +541,64 @@ function Column({ children }: { children: React.ReactNode }) {
     <PageColumn width="content" className="my-6 md:my-8">
       {children}
     </PageColumn>
+  )
+}
+
+/** The tabs, with a button to scroll on while some of them are out of view. */
+function TabRow({ children }: { children: ReactNode }) {
+  const t = useT()
+  const ref = useRef<HTMLDivElement>(null)
+  const [overflow, setOverflow] = useState<"none" | "more" | "end">("none")
+  const list = () => ref.current?.querySelector<HTMLElement>("[role=tablist]") ?? undefined
+  const showing = overflow !== "none"
+  useLayoutEffect(() => {
+    const row = list()
+    if (!row) return
+    const check = () =>
+      setOverflow(
+        row.scrollWidth <= row.clientWidth + 1
+          ? "none"
+          : row.scrollLeft + row.clientWidth >= row.scrollWidth - 1
+            ? "end"
+            : "more",
+      )
+    check()
+    row.addEventListener("scroll", check, { passive: true })
+    const observer = new ResizeObserver(check)
+    observer.observe(row)
+    return () => {
+      row.removeEventListener("scroll", check)
+      observer.disconnect()
+    }
+  }, [])
+  // The button narrows the row: keep the chosen tab clear of it.
+  useLayoutEffect(() => {
+    const row = list()
+    const active = row?.querySelector<HTMLElement>("[aria-selected=true]")
+    if (!row || !active || !showing) return
+    const end = active.offsetLeft + active.offsetWidth - row.scrollLeft
+    if (end > row.clientWidth) row.scrollLeft += end - row.clientWidth + 24
+  }, [showing])
+  return (
+    <div ref={ref} className="flex items-center gap-1 pt-1 pb-3">
+      <div className="min-w-0 flex-1">{children}</div>
+      {overflow === "none" ? null : (
+        <Button
+          variant="muted"
+          size="icon-sm"
+          aria-label={t("service.moreTabs")}
+          className={cn(overflow === "end" && "invisible")}
+          onClick={() => {
+            const row = list()
+            row?.scrollBy({
+              left: row.clientWidth * 0.6,
+              behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+            })
+          }}
+        >
+          <CaretRightIcon aria-hidden="true" />
+        </Button>
+      )}
+    </div>
   )
 }
