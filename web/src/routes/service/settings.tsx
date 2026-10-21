@@ -1,4 +1,4 @@
-import { useForm } from "@tanstack/react-form"
+import { useForm, useStore } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 
 import type { Schemas } from "@/api/client"
@@ -15,7 +15,7 @@ import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { FormField, quantity } from "@/components/form-field"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { useReviewWord } from "@/components/plan/draft"
+import { useHold } from "@/components/plan/draft"
 
 const probeKinds = ["readiness", "liveness", "startup"] as const
 type ProbeKind = (typeof probeKinds)[number]
@@ -38,7 +38,6 @@ export function ComputeSection({ project, service }: { project: string; service:
         <Compute
           service={service}
           disabled={!!managed}
-          onPlan={(changes) => planner.plan({ title: t("title.compute", service.name), changes })}
           workload={{ kind: service.kind, name: service.name }}
           refused={planner.fields}
         />
@@ -64,7 +63,6 @@ export function HealthChecksSection({
   network: Network
 }) {
   const t = useT()
-  const planner = usePlanner(project)
   if (service.kind === "Job" || service.kind === "CronJob") return null
   return (
     <section aria-labelledby="health-title" className="flex flex-col gap-3">
@@ -78,17 +76,18 @@ export function HealthChecksSection({
         service={service}
         endpoints={endpointsOf(network, service)}
         disabled={!!service.provenance.tool}
-        onPlan={(change) =>
-          planner.plan({ title: t("title.probe", service.name), changes: [change] })
-        }
       />
-      {planner.dialog}
     </section>
   )
 }
 
 type Change = Schemas["Change"]
-type Amounts = { cpuRequest: string; memoryRequest: string; cpuLimit: string; memoryLimit: string }
+type Amounts = {
+  cpuRequest: string
+  memoryRequest: string
+  cpuLimit: string
+  memoryLimit: string
+}
 
 /** As kube-apiserver names a field it refused. */
 const paths: Record<keyof Amounts, string> = {
@@ -102,13 +101,11 @@ function Compute({
   service,
   workload,
   disabled,
-  onPlan,
   refused,
 }: {
   service: Service
   workload: Schemas["WorkloadRef"]
   disabled: boolean
-  onPlan: (changes: Change[]) => void
   refused: Schemas["FieldCause"][]
 }) {
   const t = useT()
@@ -130,42 +127,50 @@ function Compute({
       memoryLimit: c.resources?.limits?.memory ?? "",
     })),
   }
-  const form = useForm({
-    defaultValues: initial,
-    onSubmit: ({ value }) => {
-      const changes: Change[] = []
-      if (scalable && value.replicas !== initial.replicas)
-        changes.push({ op: "scale", workload, replicas: Number(value.replicas) })
-      value.containers.forEach((amounts, index) => {
-        const before = initial.containers[index]
-        const container = containers[index]
-        if (!before || !container || JSON.stringify(amounts) === JSON.stringify(before)) return
-        const pick = (cpu: string, memory: string) =>
-          Object.fromEntries(
-            Object.entries({ cpu: cpu.trim(), memory: memory.trim() }).filter(([, v]) => v),
-          )
-        changes.push({
-          op: "resources",
-          workload,
-          container: container.name,
-          requests: pick(amounts.cpuRequest, amounts.memoryRequest),
-          limits: pick(amounts.cpuLimit, amounts.memoryLimit),
-        })
+  const changesOf = (value: typeof initial) => {
+    const changes: Change[] = []
+    if (scalable && value.replicas !== initial.replicas)
+      changes.push({ op: "scale", workload, replicas: Number(value.replicas) })
+    value.containers.forEach((amounts, index) => {
+      const before = initial.containers[index]
+      const container = containers[index]
+      if (!before || !container || JSON.stringify(amounts) === JSON.stringify(before)) return
+      const pick = (cpu: string, memory: string) =>
+        Object.fromEntries(
+          Object.entries({ cpu: cpu.trim(), memory: memory.trim() }).filter(([, v]) => v),
+        )
+      changes.push({
+        op: "resources",
+        workload,
+        container: container.name,
+        requests: pick(amounts.cpuRequest, amounts.memoryRequest),
+        limits: pick(amounts.cpuLimit, amounts.memoryLimit),
       })
-      if (changes.length > 0) onPlan(changes)
-    },
-  })
-  const review = useReviewWord()
+    })
+    return changes
+  }
+  const form = useForm({ defaultValues: initial })
+  const values = useStore(form.store, (s) => s.values)
+  const valid = useStore(form.store, (s) => s.canSubmit)
+  const changes = disabled ? [] : changesOf(values)
+  useHold(
+    "compute",
+    changes.length > 0
+      ? {
+          changes,
+          blocked: valid ? undefined : t("form.computeBlocked"),
+          scope: { ops: ["scale", "resources"], workload },
+        }
+      : undefined,
+  )
   const amount = ({ value }: { value: string }) =>
     value.trim() === "" || quantity.test(value.trim()) ? undefined : t("form.badQuantity")
 
   return (
     <form
-      className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-4"
-      onSubmit={(event) => {
-        event.preventDefault()
-        void form.handleSubmit()
-      }}
+      aria-label={t("form.compute")}
+      className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-5"
+      onSubmit={(event) => event.preventDefault()}
     >
       {scalable ? (
         <form.Field
@@ -251,25 +256,11 @@ function Compute({
           ))}
         </fieldset>
       ))}
-      <div className="flex flex-wrap items-center gap-3">
-        {largest ? (
-          <span className="type-meta text-muted-foreground">
-            {t("form.largestNode", cores(largest.cpuMillicores), memory(largest.memoryBytes))}
-          </span>
-        ) : null}
-        <form.Subscribe selector={(s) => [s.canSubmit, s.isDirty] as const}>
-          {([canSubmit, dirty]) => (
-            <Button
-              type="submit"
-              size="xs"
-              className="ml-auto"
-              disabled={disabled || !canSubmit || !dirty}
-            >
-              {review}
-            </Button>
-          )}
-        </form.Subscribe>
-      </div>
+      {largest ? (
+        <p className="type-meta text-muted-foreground">
+          {t("form.largestNode", cores(largest.cpuMillicores), memory(largest.memoryBytes))}
+        </p>
+      ) : null}
     </form>
   )
 }
@@ -326,13 +317,11 @@ function Probes({
   service,
   endpoints,
   disabled,
-  onPlan,
 }: {
   project: string
   service: Service
   endpoints: Endpoint[]
   disabled: boolean
-  onPlan: (change: Change) => void
 }) {
   const t = useT()
   const releases = useQuery(releasesQuery(project, service.kind, service.name))
@@ -343,8 +332,9 @@ function Probes({
     return <p className="type-meta text-muted-foreground">{t("common.loading")}</p>
   // The first port the Services reach this workload on, for the HTTP and TCP presets.
   const port = endpoints[0]?.ports[0]?.targetPort ?? endpoints[0]?.ports[0]?.port
+  const workload = { kind: service.kind, name: service.name }
   return (
-    <div className="flex flex-col gap-3">
+    <ul className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
       {probeKinds.map((kind) => (
         <ProbeForm
           key={`${kind}-${releases.dataUpdatedAt}`}
@@ -356,19 +346,25 @@ function Probes({
           }
           preset={port === undefined ? undefined : String(port)}
           disabled={disabled}
-          onPlan={(set) =>
-            onPlan({
-              op: "probe",
-              workload: { kind: service.kind, name: service.name },
-              container: container.name,
-              probe: kind,
-              set,
-            })
-          }
+          workload={workload}
+          container={container.name}
         />
       ))}
-    </div>
+    </ul>
   )
+}
+
+function probeRequest(value: ProbeValues): Schemas["ProbeRequest"] | null {
+  if (value.handler === "none") return null
+  const number = (text: string) => (text.trim() === "" ? undefined : Number(text))
+  return {
+    handler: value.handler,
+    path: value.handler === "HTTPGet" ? value.path || "/" : undefined,
+    port: value.handler === "Exec" ? undefined : number(value.port),
+    command: value.handler === "Exec" ? value.command.trim().split(/\s+/) : undefined,
+    periodSeconds: number(value.periodSeconds),
+    failureThreshold: number(value.failureThreshold),
+  }
 }
 
 function ProbeForm({
@@ -376,170 +372,54 @@ function ProbeForm({
   current,
   preset,
   disabled,
-  onPlan,
+  workload,
+  container,
 }: {
   kind: ProbeKind
   current: ProbeValues
   preset?: string
   disabled: boolean
-  onPlan: (set: Schemas["ProbeRequest"] | null) => void
+  workload: Schemas["WorkloadRef"]
+  container: string
 }) {
   const t = useT()
-  const form = useForm({
-    defaultValues: current,
-    onSubmit: ({ value }) => {
-      if (value.handler === "none") {
-        onPlan(null)
-        return
-      }
-      const number = (text: string) => (text.trim() === "" ? undefined : Number(text))
-      onPlan({
-        handler: value.handler,
-        path: value.handler === "HTTPGet" ? value.path || "/" : undefined,
-        port: value.handler === "Exec" ? undefined : number(value.port),
-        command: value.handler === "Exec" ? value.command.trim().split(/\s+/) : undefined,
-        periodSeconds: number(value.periodSeconds),
-        failureThreshold: number(value.failureThreshold),
-      })
-    },
-  })
-  const review = useReviewWord()
+  const form = useForm({ defaultValues: current })
+  const values = useStore(form.store, (s) => s.values)
+  const canSubmit = useStore(form.store, (s) => s.canSubmit)
+  const valid = canSubmit && (values.handler !== "Exec" || values.command.trim() !== "")
+  const edited = !disabled && JSON.stringify(values) !== JSON.stringify(current)
+  useHold(
+    `probe:${kind}`,
+    edited
+      ? {
+          changes: [
+            {
+              op: "probe",
+              workload,
+              container,
+              probe: kind,
+              set: probeRequest(values),
+            },
+          ],
+          blocked: valid ? undefined : t("form.probeBlocked", t(`form.probe.${kind}`)),
+          scope: { ops: ["probe"], workload, probe: kind },
+        }
+      : undefined,
+  )
   const positive = ({ value }: { value: string }) =>
     value.trim() === "" || /^[1-9]\d*$/.test(value.trim()) ? undefined : t("form.badNumber")
+  const handler = values.handler
   return (
-    <form
-      className="flex flex-col gap-3 rounded-xl border border-v2-border bg-card p-4"
-      onSubmit={(event) => {
-        event.preventDefault()
-        void form.handleSubmit()
-      }}
-    >
-      <div className="flex items-center gap-1.5">
+    <li className="flex flex-col gap-3 px-5 py-4">
+      <div className="flex min-h-6 items-center gap-1.5">
         <h3 className="text-sm font-medium">{t(`form.probe.${kind}`)}</h3>
         <Hint label={t(`form.probe.${kind}`)}>{t(`form.probeEffect.${kind}`)}</Hint>
-      </div>
-      <form.Subscribe selector={(s) => s.values.handler}>
-        {(handler) => (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <form.Field name="handler">
-              {(f) => (
-                <FormField label={t("form.probeCheck")}>
-                  <Select<ProbeValues["handler"]>
-                    size="sm"
-                    value={f.state.value}
-                    disabled={disabled}
-                    onValueChange={(handler) => f.handleChange(handler)}
-                    items={[
-                      { value: "none", label: t("form.probeNone") },
-                      { value: "HTTPGet", label: "HTTP GET" },
-                      { value: "TCPSocket", label: "TCP" },
-                      { value: "Exec", label: t("form.probeExec") },
-                      // gRPC only for a probe that has it already; the form does not offer it.
-                      ...(current.handler === "GRPC"
-                        ? [{ value: "GRPC" as const, label: "gRPC" }]
-                        : []),
-                    ]}
-                  />
-                </FormField>
-              )}
-            </form.Field>
-            {handler === "HTTPGet" ? (
-              <form.Field name="path">
-                {(f) => (
-                  <FormField label={t("form.probePath")}>
-                    <Input
-                      size="sm"
-                      mono
-                      value={f.state.value}
-                      placeholder="/healthz"
-                      disabled={disabled}
-                      onChange={(e) => f.handleChange(e.target.value)}
-                    />
-                  </FormField>
-                )}
-              </form.Field>
-            ) : null}
-            {handler === "HTTPGet" || handler === "TCPSocket" || handler === "GRPC" ? (
-              <form.Field name="port">
-                {(f) => (
-                  <FormField label={t("form.probePort")}>
-                    <Input
-                      size="sm"
-                      mono
-                      value={f.state.value}
-                      placeholder={preset ?? "8080"}
-                      disabled={disabled}
-                      onChange={(e) => f.handleChange(e.target.value)}
-                    />
-                  </FormField>
-                )}
-              </form.Field>
-            ) : null}
-            {handler === "Exec" ? (
-              <form.Field
-                name="command"
-                validators={{
-                  onChange: ({ value }) =>
-                    value.trim() ? undefined : t("form.probeCommandMissing"),
-                }}
-              >
-                {(f) => (
-                  <FormField label={t("form.probeCommand")} errors={f.state.meta.errors}>
-                    <Input
-                      size="sm"
-                      mono
-                      value={f.state.value}
-                      placeholder="cat /tmp/ready"
-                      disabled={disabled}
-                      onChange={(e) => f.handleChange(e.target.value)}
-                    />
-                  </FormField>
-                )}
-              </form.Field>
-            ) : null}
-            {handler === "none" ? null : (
-              <>
-                <form.Field name="periodSeconds" validators={{ onChange: positive }}>
-                  {(f) => (
-                    <FormField label={t("form.probePeriod")} errors={f.state.meta.errors}>
-                      <Input
-                        size="sm"
-                        mono
-                        inputMode="numeric"
-                        value={f.state.value}
-                        placeholder="10"
-                        disabled={disabled}
-                        onChange={(e) => f.handleChange(e.target.value)}
-                      />
-                    </FormField>
-                  )}
-                </form.Field>
-                <form.Field name="failureThreshold" validators={{ onChange: positive }}>
-                  {(f) => (
-                    <FormField label={t("form.probeFailures")} errors={f.state.meta.errors}>
-                      <Input
-                        size="sm"
-                        mono
-                        inputMode="numeric"
-                        value={f.state.value}
-                        placeholder="3"
-                        disabled={disabled}
-                        onChange={(e) => f.handleChange(e.target.value)}
-                      />
-                    </FormField>
-                  )}
-                </form.Field>
-              </>
-            )}
-          </div>
-        )}
-      </form.Subscribe>
-      <div className="flex items-center gap-2">
-        {preset && current.handler === "none" ? (
+        {preset && current.handler === "none" && handler === "none" ? (
           <Button
             type="button"
             variant="ghost"
             size="xs"
+            className="ml-auto"
             disabled={disabled}
             onClick={() => {
               form.setFieldValue("handler", "HTTPGet")
@@ -550,19 +430,130 @@ function ProbeForm({
             {t("form.probePreset", preset)}
           </Button>
         ) : null}
-        <form.Subscribe selector={(s) => [s.canSubmit, s.isDirty] as const}>
-          {([canSubmit, dirty]) => (
-            <Button
-              type="submit"
-              size="xs"
-              className="ml-auto"
-              disabled={disabled || !canSubmit || !dirty}
-            >
-              {review}
-            </Button>
-          )}
-        </form.Subscribe>
       </div>
-    </form>
+      <form
+        aria-label={t(`form.probe.${kind}`)}
+        className="grid grid-cols-2 items-start gap-3 sm:grid-cols-5"
+        onSubmit={(event) => event.preventDefault()}
+      >
+        <form.Field name="handler">
+          {(f) => (
+            <FormField label={t("form.probeCheck")}>
+              <Select<ProbeValues["handler"]>
+                size="sm"
+                value={f.state.value}
+                disabled={disabled}
+                onValueChange={(handler) => f.handleChange(handler)}
+                items={[
+                  { value: "none", label: t("form.probeNone") },
+                  { value: "HTTPGet", label: "HTTP GET" },
+                  { value: "TCPSocket", label: "TCP" },
+                  { value: "Exec", label: t("form.probeExec") },
+                  // gRPC only for a probe that has it already; the form does not offer it.
+                  ...(current.handler === "GRPC"
+                    ? [{ value: "GRPC" as const, label: "gRPC" }]
+                    : []),
+                ]}
+              />
+            </FormField>
+          )}
+        </form.Field>
+        {handler === "HTTPGet" ? (
+          <form.Field name="path">
+            {(f) => (
+              <FormField label={t("form.probePath")}>
+                <Input
+                  size="sm"
+                  mono
+                  value={f.state.value}
+                  placeholder="/healthz"
+                  disabled={disabled}
+                  onChange={(e) => f.handleChange(e.target.value)}
+                />
+              </FormField>
+            )}
+          </form.Field>
+        ) : null}
+        {handler === "HTTPGet" || handler === "TCPSocket" || handler === "GRPC" ? (
+          <form.Field name="port">
+            {(f) => (
+              <FormField label={t("form.probePort")} className="sm:col-start-3">
+                <Input
+                  size="sm"
+                  mono
+                  value={f.state.value}
+                  placeholder={preset ?? "8080"}
+                  disabled={disabled}
+                  onChange={(e) => f.handleChange(e.target.value)}
+                />
+              </FormField>
+            )}
+          </form.Field>
+        ) : null}
+        {handler === "Exec" ? (
+          <form.Field
+            name="command"
+            validators={{
+              onChange: ({ value }) => (value.trim() ? undefined : t("form.probeCommandMissing")),
+            }}
+          >
+            {(f) => (
+              <FormField
+                label={t("form.probeCommand")}
+                errors={f.state.meta.errors}
+                className="sm:col-span-2"
+              >
+                <Input
+                  size="sm"
+                  mono
+                  value={f.state.value}
+                  placeholder="cat /tmp/ready"
+                  disabled={disabled}
+                  onChange={(e) => f.handleChange(e.target.value)}
+                />
+              </FormField>
+            )}
+          </form.Field>
+        ) : null}
+        {handler === "none" ? null : (
+          <>
+            <form.Field name="periodSeconds" validators={{ onChange: positive }}>
+              {(f) => (
+                <FormField
+                  label={t("form.probePeriod")}
+                  errors={f.state.meta.errors}
+                  className="sm:col-start-4"
+                >
+                  <Input
+                    size="sm"
+                    mono
+                    inputMode="numeric"
+                    value={f.state.value}
+                    placeholder="10"
+                    disabled={disabled}
+                    onChange={(e) => f.handleChange(e.target.value)}
+                  />
+                </FormField>
+              )}
+            </form.Field>
+            <form.Field name="failureThreshold" validators={{ onChange: positive }}>
+              {(f) => (
+                <FormField label={t("form.probeFailures")} errors={f.state.meta.errors}>
+                  <Input
+                    size="sm"
+                    mono
+                    inputMode="numeric"
+                    value={f.state.value}
+                    placeholder="3"
+                    disabled={disabled}
+                    onChange={(e) => f.handleChange(e.target.value)}
+                  />
+                </FormField>
+              )}
+            </form.Field>
+          </>
+        )}
+      </form>
+    </li>
   )
 }

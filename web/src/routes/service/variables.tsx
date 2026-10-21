@@ -1,14 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import {
-  lazy,
-  Suspense,
-  useEffect,
-  useRef,
-  useState,
-  type ClipboardEvent,
-  type ReactElement,
-  type ReactNode,
-} from "react"
+import { lazy, Suspense, useRef, useState, type ClipboardEvent, type ReactNode } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
@@ -23,9 +14,9 @@ import TrashIcon from "~icons/ph/trash"
 
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { configMapsQuery } from "@/api/queries"
-import { CopyButton, Hint, Segmented } from "@/components/bits"
+import { CopyButton, Hint, ManagedTip, Segmented } from "@/components/bits"
 import { KubeDetails } from "@/components/kube-details"
-import { useDraft } from "@/components/plan/draft"
+import { useDraft, useHold } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { RefusedKinds } from "@/components/refused"
@@ -266,14 +257,10 @@ export function VariablesTab({
         changes,
       }))
     : undefined
-  const heldKey = JSON.stringify([held, blocked])
-  const hold = draft?.hold
-  useEffect(() => {
-    hold?.(held ? { workload, changes: held, blocked } : undefined)
-    // `heldKey` stands for `held` and `blocked`; the workload is the tab's.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [hold, heldKey])
-  useEffect(() => () => hold?.(undefined), [hold])
+  useHold(
+    "variables",
+    held ? { changes: held, blocked, editing: true, scope: { ops: ["env"], workload } } : undefined,
+  )
 
   const setRows = (change: (rows: EnvRow[]) => EnvRow[]) =>
     setEditing((previous) => (previous ? { ...previous, rows: change(previous.rows) } : previous))
@@ -848,16 +835,6 @@ function VarGroup({
       </div>
       {children}
     </section>
-  )
-}
-
-function ManagedTip({ tool, children }: { tool?: string; children: ReactElement }) {
-  const t = useT()
-  if (!tool) return children
-  return (
-    <Tooltip content={t("ops.managedEdit", tool)}>
-      <span>{children}</span>
-    </Tooltip>
   )
 }
 

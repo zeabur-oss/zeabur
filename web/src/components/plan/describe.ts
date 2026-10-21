@@ -68,6 +68,8 @@ export function sentenceOf(t: Translate, change: Change, podsOf: PodsOf): string
       return t("confirm.noShrink")
     case "addVolume":
       return t("confirm.addVolume", change.volume.size, change.workload.name)
+    case "removeVolume":
+      return t("confirm.removeVolume", change.workload.name, change.mountPath)
     case "editMount": {
       const moved =
         change.newMountPath && change.newMountPath !== change.mountPath
@@ -273,15 +275,16 @@ function hasWarning(plan: Plan, code: Schemas["PlanWarning"]["code"]): boolean {
   return plan.warnings.some((w) => w.code === code)
 }
 
+const storageOps = new Set<Change["op"]>(["addVolume", "expandVolume", "editMount", "removeVolume"])
+
 export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
   const ops = new Set(ask.changes.map((c) => c.op))
   const [change] = ask.changes
   if (!change) return t("plan.apply")
   if (ops.size > 1) {
     // The compute form: replicas and resources together.
-    return [...ops].every((op) => op === "scale" || op === "resources")
-      ? t("action.save")
-      : t("plan.apply")
+    if ([...ops].every((op) => op === "scale" || op === "resources")) return t("action.save")
+    return [...ops].every((op) => storageOps.has(op)) ? t("action.saveVolumes") : t("plan.apply")
   }
   switch (change.op) {
     case "restart":
@@ -306,6 +309,8 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
       return t("action.addVolume")
     case "editMount":
       return t("action.saveMount")
+    case "removeVolume":
+      return t("action.removeVolume")
     case "probe":
       return t("action.saveHealthChecks")
     case "scale":

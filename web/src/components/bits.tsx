@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react"
+import { useState, type ReactElement, type ReactNode } from "react"
 import CheckIcon from "~icons/ph/check"
 import CopyIcon from "~icons/ph/copy"
 import InfoIcon from "~icons/ph/info"
@@ -215,5 +215,16 @@ export function Segmented<T extends string>({
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
+  )
+}
+
+/** A control another tool owns, disabled, with why in a tooltip. */
+export function ManagedTip({ tool, children }: { tool?: string; children: ReactElement }) {
+  const t = useT()
+  if (!tool) return children
+  return (
+    <Tooltip content={t("ops.managedEdit", tool)}>
+      <span>{children}</span>
+    </Tooltip>
   )
 }

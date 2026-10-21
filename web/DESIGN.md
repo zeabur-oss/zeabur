@@ -283,9 +283,13 @@ with Open and Stop, and ended when the credential expires. Running locally, none
 Settings holds the forms (TanStack Form, loaded with the tab): compute (replicas; requests and
 limits per container, with the largest node's allocatable beside them) and health checks (readiness,
 liveness and startup, each with its effect in an (i) and a preset on the Service's port; they stay in
-Settings because they also gate a rollout). Storage is edited where it is shown: each claim's card
-on the Storage tab grows the claim and moves or protects its mount, and Add a volume sits below the
-cards (the forms load after the cards). Modules add their own sections after Settings' forms
+Settings because they also gate a rollout; the three share one card, a row each, with their fields
+in fixed columns). These forms have no buttons of their own: what is typed waits in the page's draft
+and is saved once from its bar. Storage is one list in the column's width (mount path, size, read-only,
+status); Edit turns the rows into fields in place: a size only grows, the mount path moves, read-only
+switches, a volume is removed with Undo (its claim and data stay), and Add a volume adds a row to the
+same list, its name, claim name and access mode behind Advanced. The list's edits go through the
+same draft and plan. Modules add their own sections after Settings' forms
 through `modules/service-settings.ts`, an explicit list; their changes are their provider's change
 types and still go through the confirmation. Releases lists the workload's templates newest first;
 any one compares with the running one as a YAML diff, and Roll back plans a return to it (the

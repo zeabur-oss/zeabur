@@ -17,6 +17,7 @@
   --grid-template-columns-variable: minmax(10rem, 14rem) 1fr;
   --grid-template-columns-variable-actions: minmax(10rem, 14rem) 1fr auto;
   --grid-template-columns-variable-edit: minmax(10rem, 14rem) 1fr 4rem auto;
+  --grid-template-columns-volume: minmax(0, 1fr) 7rem 7rem 7rem 1.75rem;
   --grid-template-columns-attention: minmax(12rem, 1.3fr) minmax(10rem, 1fr) minmax(10rem, 1fr) auto;
   --grid-template-columns-warning: minmax(10rem, 1fr) minmax(0, 2fr) auto;
   --translate-tooltip: calc(100% + 0.5rem);

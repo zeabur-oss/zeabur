@@ -170,7 +170,9 @@ function ServiceView({
   const restartable =
     service.kind === "Deployment" || service.kind === "StatefulSet" || service.kind === "DaemonSet"
   const draft = useDraftState()
-  const pending = usePresence<HTMLDivElement>(draft.count > 0 || draft.held !== undefined)
+  const pending = usePresence<HTMLDivElement>(
+    draft.count > 0 || draft.editing || draft.blocked !== undefined,
+  )
   const reviewer = usePlanner(project, draft.applied, true)
   const unsaved = draft.count > 0
   // Tabs change only the search; leaving the service is what loses the edits.
@@ -446,10 +448,10 @@ function PendingChanges({
   const t = useT()
   const detail = describeDraft(t, draft)
   // While it fades out after Discard or Apply, it keeps saying what it held.
-  const editing = draft.held !== undefined
+  const editing = draft.editing
   const [shown, setShown] = useState({ count: draft.count, detail, editing })
   if (
-    (draft.count > 0 || editing) &&
+    (draft.count > 0 || editing || draft.blocked !== undefined) &&
     (draft.count !== shown.count || detail !== shown.detail || editing !== shown.editing)
   )
     setShown({ count: draft.count, detail, editing })
@@ -459,19 +461,17 @@ function PendingChanges({
       <DraftBar
         label={shown.editing && shown.count === 0 ? t("draft.none") : t("draft.count", shown.count)}
         detail={shown.count > 0 ? shown.detail : undefined}
-        blocked={draft.held?.blocked}
+        blocked={draft.blocked}
         actions={
           <>
             <Button variant="ghost" size="sm" onClick={draft.discard}>
               {shown.editing && shown.count === 0 ? t("edit.cancel") : t("draft.discard")}
             </Button>
-            <Button
-              size="sm"
-              onClick={onReview}
-              disabled={draft.count === 0 || draft.held?.blocked !== undefined}
-            >
-              {shown.editing ? t("draft.save") : t("draft.review")}
-            </Button>
+            {shown.count === 0 ? null : (
+              <Button size="sm" onClick={onReview} disabled={draft.blocked !== undefined}>
+                {shown.editing ? t("draft.save") : t("draft.review")}
+              </Button>
+            )}
           </>
         }
       />

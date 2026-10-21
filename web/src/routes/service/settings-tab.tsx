@@ -14,10 +14,14 @@ import { ModeSwitch } from "@/routes/service/views"
 import { YamlTab } from "@/routes/service/yaml"
 
 const Compute = lazy(() =>
-  import("@/routes/service/settings").then((m) => ({ default: m.ComputeSection })),
+  import("@/routes/service/settings").then((m) => ({
+    default: m.ComputeSection,
+  })),
 )
 const HealthChecks = lazy(() =>
-  import("@/routes/service/settings").then((m) => ({ default: m.HealthChecksSection })),
+  import("@/routes/service/settings").then((m) => ({
+    default: m.HealthChecksSection,
+  })),
 )
 
 /** Compute, health checks and storage, one under the other; edits wait in the draft. */
@@ -76,28 +80,26 @@ export function SettingsTab({
           </nav>
         )}
       </ModeSwitch>
-      {mode === "yaml" ? (
-        <YamlTab project={project} service={service} />
-      ) : (
-        <div key={draft?.generation} className="flex min-w-0 flex-col gap-14">
-          <Suspense fallback={<LoadingRows label={t("common.loading")} rows={4} />}>
-            <Part id="compute">
-              <Compute project={project} service={service} />
+      {mode === "yaml" ? <YamlTab project={project} service={service} /> : null}
+      {/* Kept while the YAML shows, so edits typed here stay in the draft. */}
+      <div key={draft?.generation} hidden={mode === "yaml"} className="flex min-w-0 flex-col gap-8">
+        <Suspense fallback={<LoadingRows label={t("common.loading")} rows={4} />}>
+          <Part id="compute">
+            <Compute project={project} service={service} />
+          </Part>
+          {parts.includes("health-checks") ? (
+            <Part id="health-checks">
+              <HealthChecks project={project} service={service} network={network} />
             </Part>
-            {parts.includes("health-checks") ? (
-              <Part id="health-checks">
-                <HealthChecks project={project} service={service} network={network} />
-              </Part>
-            ) : null}
-            <Part id="storage">
-              <div className="flex flex-col gap-4">
-                <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.claims)} />
-                <StorageTab project={project} service={service} />
-              </div>
-            </Part>
-          </Suspense>
-        </div>
-      )}
+          ) : null}
+          <Part id="storage">
+            <div className="flex flex-col gap-4">
+              <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.claims)} />
+              <StorageTab project={project} service={service} />
+            </div>
+          </Part>
+        </Suspense>
+      </div>
     </div>
   )
 }

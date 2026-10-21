@@ -94,6 +94,7 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "expandVolume":
     case "addVolume":
     case "editMount":
+    case "removeVolume":
       return { risk: "high", reason: "storage" }
     case "edit":
       return { risk: "high", reason: "yamlEdit" }
@@ -237,6 +238,7 @@ export function destinationOf(
       return tab(service, "networking")
     case "addVolume":
     case "editMount":
+    case "removeVolume":
       return tab(change.workload, "settings#storage")
     case "expandVolume":
       return tab(service, "settings#storage") ?? object()

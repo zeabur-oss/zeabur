@@ -17,6 +17,7 @@ export function partOf(change: Change): DraftPart | undefined {
     case "addVolume":
     case "expandVolume":
     case "editMount":
+    case "removeVolume":
       return "storage"
     case "scale":
     case "resources":
@@ -55,6 +56,7 @@ function keyOf(change: Change): string | undefined {
     case "expandVolume":
       return `expand:${change.claim}`
     case "editMount":
+    case "removeVolume":
       return `mount:${workloadKey(change.workload)}:${change.mountPath}`
     default:
       return undefined
