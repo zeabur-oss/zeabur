@@ -9,6 +9,7 @@ import { useT } from "@/i18n"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 const paths = { overview: "/cluster", components: "/cluster/components" } as const
 
@@ -22,16 +23,20 @@ export function ClusterFrame({ tab, children }: { tab: ClusterTab; children: Rea
       value={tab}
       onValueChange={(value) => void navigate({ to: paths[value as ClusterTab] })}
       variant="page"
-      className="flex w-full max-w-7xl flex-col"
+      className="flex flex-col"
     >
-      <header className="flex flex-col gap-4 px-4 pt-6 md:px-8 md:pt-8">
-        <Heading />
-        <TabsList aria-label={t("cluster.tabs")}>
-          <TabsTrigger value="overview">{t("cluster.overview")}</TabsTrigger>
-          <TabsTrigger value="components">{t("settings.components")}</TabsTrigger>
-        </TabsList>
+      <header className="pt-6 md:pt-8">
+        <PageColumn gap="sm">
+          <Heading />
+          <TabsList aria-label={t("cluster.tabs")}>
+            <TabsTrigger value="overview">{t("cluster.overview")}</TabsTrigger>
+            <TabsTrigger value="components">{t("settings.components")}</TabsTrigger>
+          </TabsList>
+        </PageColumn>
       </header>
-      <div className="flex flex-col gap-9 px-4 pt-6 pb-12 type-body md:px-8">{children}</div>
+      <PageColumn gap="lg" className="mt-6 mb-12">
+        {children}
+      </PageColumn>
     </Tabs>
   )
 }

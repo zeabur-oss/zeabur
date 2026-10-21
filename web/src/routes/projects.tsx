@@ -23,6 +23,7 @@ import { Label } from "@zeabur/design-system/components/label"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Switch } from "@zeabur/design-system/components/switch"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 export function ProjectsPage() {
   const t = useT()
@@ -38,7 +39,7 @@ export function ProjectsPage() {
   const other = otherNamespaces(items, showSystem)
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-6 pb-12 md:box-content md:px-8 md:pt-10">
+    <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
       <PageHeader title={t("projects.title")} actions={<ProjectViewSwitch />} />
       {projects.isPending ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -103,6 +104,6 @@ export function ProjectsPage() {
           </section>
         </>
       )}
-    </div>
+    </PageColumn>
   )
 }

@@ -26,6 +26,7 @@ import {
   EmptyTitle,
 } from "@zeabur/design-system/components/empty"
 import { Illustration } from "@zeabur/design-system/components/illustration"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { useT } from "@/i18n"
 import { useHistoryIndex, useLocationText } from "@/lib/history"
@@ -113,58 +114,60 @@ function Header({ project, data, view }: { project: string; data: Project; view?
     })
   }
   return (
-    <header className="shrink-0 px-4 pt-6 pb-4 md:px-8 md:pt-8">
-      <PageHeader
-        title={<span translate="no">{projectTitle(details, project)}</span>}
-        badges={
-          <>
-            {details?.displayName ? (
-              <span className="type-meta text-muted-foreground" translate="no">
-                {project}
-              </span>
-            ) : null}
-            <HealthPill data={data} />
-          </>
-        }
-        description={
-          details?.description ? (
-            <span className="whitespace-pre-line">{details.description}</span>
-          ) : undefined
-        }
-        actions={
-          <span className="flex flex-wrap items-center gap-3">
-            <Freshness updatedAt={document.dataUpdatedAt} failed={document.isRefetchError} />
-            <Suggestions project={project} data={data} />
-            {view ? (
-              <Segmented
-                label={t("project.view")}
-                value={view}
-                onChange={choose}
-                options={[
-                  {
-                    value: "map",
-                    label: (
-                      <>
-                        <TreeStructureIcon aria-hidden="true" />
-                        {t("project.viewMap")}
-                      </>
-                    ),
-                  },
-                  {
-                    value: "list",
-                    label: (
-                      <>
-                        <ListBulletsIcon aria-hidden="true" />
-                        {t("project.viewList")}
-                      </>
-                    ),
-                  },
-                ]}
-              />
-            ) : null}
-          </span>
-        }
-      />
+    <header className="shrink-0 pt-6 pb-4 md:pt-8">
+      <PageColumn>
+        <PageHeader
+          title={<span translate="no">{projectTitle(details, project)}</span>}
+          badges={
+            <>
+              {details?.displayName ? (
+                <span className="type-meta text-muted-foreground" translate="no">
+                  {project}
+                </span>
+              ) : null}
+              <HealthPill data={data} />
+            </>
+          }
+          description={
+            details?.description ? (
+              <span className="whitespace-pre-line">{details.description}</span>
+            ) : undefined
+          }
+          actions={
+            <span className="flex flex-wrap items-center gap-3">
+              <Freshness updatedAt={document.dataUpdatedAt} failed={document.isRefetchError} />
+              <Suggestions project={project} data={data} />
+              {view ? (
+                <Segmented
+                  label={t("project.view")}
+                  value={view}
+                  onChange={choose}
+                  options={[
+                    {
+                      value: "map",
+                      label: (
+                        <>
+                          <TreeStructureIcon aria-hidden="true" />
+                          {t("project.viewMap")}
+                        </>
+                      ),
+                    },
+                    {
+                      value: "list",
+                      label: (
+                        <>
+                          <ListBulletsIcon aria-hidden="true" />
+                          {t("project.viewList")}
+                        </>
+                      ),
+                    },
+                  ]}
+                />
+              ) : null}
+            </span>
+          }
+        />
+      </PageColumn>
     </header>
   )
 }
@@ -288,9 +291,9 @@ function MapView({
   return (
     <>
       {broken ? (
-        <div className="shrink-0 px-4 pb-4 md:px-8">
+        <PageColumn className="mb-4 shrink-0">
           <Problems project={project} services={data.services} />
-        </div>
+        </PageColumn>
       ) : null}
       <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.services)} />
       <div className="flex min-h-140 flex-1 border-t border-main">
@@ -323,7 +326,7 @@ function ListView({
   const events = useProjectEvents(project)
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-7 px-4 pb-12 md:box-content md:px-8">
+    <PageColumn gap="md" className="mb-12">
       <Problems project={project} services={data.services} />
       <div className="flex flex-col gap-3">
         <RefusedKinds unreadable={refused(refusedPlaces.services)} />
@@ -338,13 +341,13 @@ function ListView({
             unreadable={unreadable}
           />
         </div>
-        <div className="flex min-w-0 flex-side flex-col gap-7">
+        <div className="flex min-w-0 flex-side flex-col gap-7 empty:hidden">
           <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} />
           <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} />
           <Backups project={project} />
         </div>
       </div>
-    </div>
+    </PageColumn>
   )
 }
 
@@ -352,7 +355,7 @@ function NextStep({ project }: { project: string }) {
   const t = useT()
   const command = `kubectl create deployment hello --image=nginx --port=80 -n ${project}`
   return (
-    <div className="mx-auto flex w-full max-w-content flex-col gap-6 px-4 pb-12 md:box-content md:px-8">
+    <PageColumn gap="md" className="mb-12">
       <Empty variant="outline">
         <EmptyHeader>
           <EmptyMedia>
@@ -386,6 +389,6 @@ function NextStep({ project }: { project: string }) {
           </Link>
         </EmptyContent>
       </Empty>
-    </div>
+    </PageColumn>
   )
 }

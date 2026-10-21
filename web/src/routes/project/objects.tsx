@@ -34,6 +34,7 @@ import {
   EmptyMedia,
 } from "@zeabur/design-system/components/empty"
 import { Illustration } from "@zeabur/design-system/components/illustration"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 const ObjectSheet = lazy(() =>
   import("@/components/object-sheet").then((m) => ({ default: m.ObjectSheet })),
@@ -116,8 +117,8 @@ export function ObjectsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ProjectHeader entry="objects" column="wide" />
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-3 px-4 pb-8 md:box-content md:px-8">
+      <ProjectHeader entry="objects" />
+      <PageColumn gap="sm" className="mb-8 min-h-0 flex-1">
         {base.isPending ? (
           <LoadingRows label={t("common.loading")} rows={8} />
         ) : base.isError ? (
@@ -149,7 +150,7 @@ export function ObjectsPage() {
             onOpen={(key) => set({ object: key })}
           />
         )}
-      </div>
+      </PageColumn>
       {address ? (
         <Suspense fallback={null}>
           <ObjectSheet

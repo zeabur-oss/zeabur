@@ -180,7 +180,7 @@ export function ServicesTable({
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-v2-border bg-card">
+      <div className="relative overflow-x-auto rounded-xl border border-v2-border bg-card">
         <table className="w-full min-w-205 text-sm" aria-label={t("project.services")}>
           <thead className="border-b bg-muted/30">
             <tr>

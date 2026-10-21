@@ -23,6 +23,7 @@ import { Select } from "@zeabur/design-system/components/select"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 export function SettingsPage() {
   const t = useT()
@@ -38,7 +39,7 @@ export function SettingsPage() {
     ["dark", MoonIcon],
   ]
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
+    <PageColumn width="content" gap="md" className="my-6 md:my-8">
       <PageHeader title={t("settings.title")} />
 
       <Panel title={t("settings.preferences")}>
@@ -108,7 +109,7 @@ export function SettingsPage() {
           ) : null}
         </dl>
       </Panel>
-    </div>
+    </PageColumn>
   )
 }
 

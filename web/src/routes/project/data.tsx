@@ -8,6 +8,7 @@ import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
 import type { Event, Project } from "@/model/service"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 const noEvents: Event[] = []
 
@@ -26,15 +27,15 @@ export function ProjectData({
   const view = useQuery(projectQuery(project))
   if (view.isPending)
     return (
-      <div className="px-4 py-6 md:px-8">
+      <PageColumn className="my-6">
         <LoadingRows label={t("common.loading")} rows={6} />
-      </div>
+      </PageColumn>
     )
   if (view.isError)
     return (
-      <div className="px-4 py-6 md:px-8">
+      <PageColumn className="my-6">
         <Problem error={view.error} />
-      </div>
+      </PageColumn>
     )
   return children(view.data, view.data.unreadable)
 }

@@ -25,6 +25,7 @@ import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
 import { Textarea } from "@zeabur/design-system/components/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@zeabur/design-system/components/toggle-group"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 const route = getRouteApi("/projects/$project/settings")
 
@@ -38,18 +39,16 @@ export function ProjectSettingsPage() {
   const namespace = useQuery(namespaceQuery(project))
   const data = namespace.data
   return (
-    <div className="px-4 pt-6 pb-20 md:px-8 md:pt-8">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-10">
-        <PageHeader title={t("projectSettings.general")} />
-        {namespace.isPending ? (
-          <LoadingRows label={t("common.loading")} rows={4} />
-        ) : namespace.isError ? (
-          <Problem error={namespace.error} />
-        ) : data ? (
-          <ProjectSettings namespace={data} />
-        ) : null}
-      </div>
-    </div>
+    <PageColumn width="content" gap="xl" className="mt-6 mb-20 md:mt-8">
+      <PageHeader title={t("projectSettings.general")} />
+      {namespace.isPending ? (
+        <LoadingRows label={t("common.loading")} rows={4} />
+      ) : namespace.isError ? (
+        <Problem error={namespace.error} />
+      ) : data ? (
+        <ProjectSettings namespace={data} />
+      ) : null}
+    </PageColumn>
   )
 }
 

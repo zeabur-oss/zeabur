@@ -517,7 +517,7 @@ function Table({
   children: ReactNode
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-v2-border bg-card">
+    <div className="relative overflow-x-auto rounded-xl border border-v2-border bg-card">
       <table className={`w-full text-sm max-sm:block ${minWidth}`} aria-label={label}>
         {children}
       </table>

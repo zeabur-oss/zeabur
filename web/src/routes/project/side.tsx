@@ -179,7 +179,7 @@ function TimelineEntries({
             tone={entryTone[entry.kind]}
             time={<Ago iso={entry.at} />}
             title={
-              <span>
+              <span className="wrap-anywhere">
                 {write(entry.message)}
                 {entry.count && entry.count > 1 ? (
                   <span className="text-muted-foreground"> ×{entry.count}</span>

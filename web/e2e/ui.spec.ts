@@ -34,7 +34,7 @@ test.beforeAll(() => {
 const logsPod = (page: Page) =>
   page.getByRole("tabpanel", { name: "Logs" }).getByRole("button", { name: /^Replica / })
 
-/** The URL of a tab or a view from the menu: `?tab=<tab>`. */
+/** The URL of a tab: `?tab=<tab>`. */
 const tabUrl = (tab: string) => new RegExp(`[?&]tab=${tab}(&|#|$)`)
 const modeUrl = (tab: string, mode: string) => (url: URL) =>
   url.searchParams.get("tab") === tab && url.searchParams.get("mode") === mode

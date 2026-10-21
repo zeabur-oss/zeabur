@@ -53,6 +53,7 @@ import {
 } from "@zeabur/design-system/components/empty"
 import { Illustration } from "@zeabur/design-system/components/illustration"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
+import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 type ProjectItem = Schemas["ProjectSummary"]
 
@@ -65,7 +66,7 @@ export function HomePage() {
   const adopted = projects.data?.items.filter((p) => p.adopted) ?? []
   const problems = useProblems(adopted)
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 pt-6 pb-12 type-body md:box-content md:px-8 md:pt-10">
+    <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
       <div className="flex flex-col gap-2">
         <PageHeader title={t("home.title")} />
         <StateLine adopted={adopted} loaded={projects.isSuccess} problems={problems} />
@@ -81,7 +82,7 @@ export function HomePage() {
           <WarningsSection adopted={adopted} />
         </>
       )}
-    </div>
+    </PageColumn>
   )
 }
 
