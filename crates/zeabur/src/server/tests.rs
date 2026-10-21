@@ -310,6 +310,110 @@ async fn without_a_session_the_api_answers_signed_out() {
     }
 }
 
+#[cfg(feature = "ui")]
+const NAVIGATE: [(&str, &str); 2] = [
+    ("sec-fetch-mode", "navigate"),
+    ("sec-fetch-dest", "document"),
+];
+
+/// Where a page opened as `headers` goes, if the server sends it elsewhere.
+#[cfg(feature = "ui")]
+async fn open_page(rig: &Rig, uri: &str, headers: &[(&str, &str)]) -> Option<String> {
+    let response = rig.send(Method::GET, uri, headers).await;
+    match response.status() {
+        StatusCode::SEE_OTHER => {
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+            Some(location(&response).to_owned())
+        }
+        StatusCode::OK => {
+            let kind = response.headers()[header::CONTENT_TYPE].to_str().unwrap();
+            assert!(kind.starts_with("text/html"), "{kind}");
+            None
+        }
+        status => panic!("{uri}: {status}"),
+    }
+}
+
+#[cfg(feature = "ui")]
+#[tokio::test]
+async fn a_page_opened_without_a_session_goes_to_sign_in_first() {
+    let rig = Rig::new(true).await;
+    let page = [HOST, NAVIGATE[0], NAVIGATE[1]];
+    assert_eq!(
+        open_page(&rig, "/projects/shop?tab=logs", &page)
+            .await
+            .as_deref(),
+        Some("/auth/login?return=%2Fprojects%2Fshop%3Ftab%3Dlogs")
+    );
+    assert_eq!(
+        open_page(&rig, "/", &page).await.as_deref(),
+        Some("/auth/login")
+    );
+    // Without Fetch Metadata, `Accept` tells a page load apart.
+    let old_browser = [
+        HOST,
+        ("accept", "text/html,application/xhtml+xml,*/*;q=0.8"),
+    ];
+    assert_eq!(
+        open_page(&rig, "/projects/shop", &old_browser)
+            .await
+            .as_deref(),
+        Some("/auth/login?return=%2Fprojects%2Fshop")
+    );
+    let ended = [HOST, NAVIGATE[0], ("cookie", "__Host-zeabur=guess")];
+    assert_eq!(
+        open_page(&rig, "/projects/shop", &ended).await.as_deref(),
+        Some("/auth/login?return=%2Fprojects%2Fshop")
+    );
+
+    // Not a page load: served as before, and the API still answers `signed-out`.
+    let fetch = [HOST, ("sec-fetch-mode", "cors"), ("accept", "text/html")];
+    assert_eq!(open_page(&rig, "/projects/shop", &fetch).await, None);
+    let api = rig.send(Method::GET, "/api/v1/whoami", &page).await;
+    assert_eq!(api.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(json_of(api).await["type"], "/problems/signed-out");
+    let login = rig.send(Method::GET, "/auth/login", &page).await;
+    assert!(location(&login).starts_with(&rig.issuer.url().to_string()));
+}
+
+#[cfg(feature = "ui")]
+#[tokio::test]
+async fn a_signed_in_page_load_gets_the_interface() {
+    let rig = Rig::new(true).await;
+    let session = rig.sign_in("alice").await;
+    let page = [HOST, NAVIGATE[0], NAVIGATE[1], ("cookie", &session)];
+    assert_eq!(open_page(&rig, "/projects/shop", &page).await, None);
+    assert_eq!(open_page(&rig, "/", &page).await, None);
+}
+
+#[cfg(feature = "ui")]
+#[tokio::test]
+async fn the_return_path_never_leaves_this_server() {
+    let rig = Rig::new(true).await;
+    let page = [HOST, NAVIGATE[0], NAVIGATE[1]];
+    for uri in ["//attacker.example/", "//attacker.example/projects"] {
+        assert_eq!(
+            open_page(&rig, uri, &page).await.as_deref(),
+            Some("/auth/login"),
+            "{uri}"
+        );
+    }
+    // Of an absolute-form target, only the path is kept.
+    assert_eq!(
+        open_page(&rig, "http://attacker.example/projects", &page)
+            .await
+            .as_deref(),
+        Some("/auth/login?return=%2Fprojects")
+    );
+    // Encoded, a backslash stays part of a path on this server.
+    assert_eq!(
+        open_page(&rig, "/%5Cattacker.example", &page)
+            .await
+            .as_deref(),
+        Some("/auth/login?return=%2F%255Cattacker.example")
+    );
+}
+
 #[tokio::test]
 async fn signing_in_sends_the_browser_to_the_issuer_with_a_sealed_flow_cookie() {
     let rig = Rig::new(true).await;

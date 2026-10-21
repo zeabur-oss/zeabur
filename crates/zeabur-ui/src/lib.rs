@@ -89,6 +89,23 @@ pub fn router_for(assets: &'static [Asset]) -> Router {
     })
 }
 
+/// Whether `path` is a page of the interface: a client-side route answered with `index.html`,
+/// not a file, an API path or a missing build output.
+#[must_use]
+pub fn is_page(path: &str) -> bool {
+    is_page_in(assets(), path)
+}
+
+/// [`is_page`] for `assets`.
+#[must_use]
+pub fn is_page_in(assets: &[Asset], path: &str) -> bool {
+    let path = path.trim_start_matches('/');
+    if path == "api" || path.starts_with("api/") || path.starts_with("assets/") {
+        return false;
+    }
+    path.is_empty() || path == "index.html" || !assets.iter().any(|a| a.path == path)
+}
+
 /// Answers one request for a file of the interface.
 ///
 /// - Paths under `/api` are never the interface: an unknown API path is a `404`, not a page.
@@ -371,6 +388,21 @@ mod tests {
                 header(&response, "content-type"),
                 Some("application/problem+json")
             );
+        }
+    }
+
+    #[test]
+    fn pages_are_routes_not_files() {
+        for path in ["/", "/index.html", "/projects/demo", "//elsewhere.example/"] {
+            assert!(is_page_in(TEST_ASSETS, path), "{path}");
+        }
+        for path in [
+            "/assets/index-3f2a.js",
+            "/assets/gone-1234.js",
+            "/api",
+            "/api/v1/x",
+        ] {
+            assert!(!is_page_in(TEST_ASSETS, path), "{path}");
         }
     }
 

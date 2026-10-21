@@ -10,7 +10,7 @@
 //! | `GET /auth/elevate` | in a window of its own: asks Zeabur Identity for administrator rights |
 //! | `DELETE /auth/elevation` | drops administrator rights |
 //! | `/api/…` | the API (`zeabur_api`), as the person the session belongs to |
-//! | anything else | the web interface |
+//! | anything else | the web interface; a page opened without a session goes to `/auth/login` first |
 //!
 //! Every request but the health check passes [`zeabur_core::guard`] first: its `Host` must be
 //! the public URL's, and a request that changes something must come from Zeabur's own page.
@@ -113,7 +113,9 @@ pub(crate) fn app(auth: &Arc<Auth>, plan_key: PlanKey, settings: zeabur_api::Set
         .with_state(Arc::clone(auth));
     let guarded = api.merge(sign_in);
     #[cfg(feature = "ui")]
-    let guarded = guarded.fallback_service(zeabur_ui::router());
+    let guarded = guarded.fallback_service(zeabur_ui::router().layer(
+        axum::middleware::from_fn_with_state(Arc::clone(auth), sign_in_first),
+    ));
     let guarded = guarded.layer(axum::middleware::from_fn_with_state(
         Arc::clone(auth),
         check,
@@ -142,6 +144,53 @@ async fn check(State(auth): State<Arc<Auth>>, request: Request, next: Next) -> R
             Kind::Forbidden,
             "Zeabur accepts changes only from its own page.",
         ),
+    }
+}
+
+/// Sends a browser that opens a page without a session straight to `/auth/login`, so it does
+/// not load the interface only for its script to leave for Zeabur Identity. Anything but a
+/// top-level navigation (scripts, files, the API) is served as before; the interface still sends
+/// the browser to sign in when the API answers `signed-out`.
+#[cfg(feature = "ui")]
+async fn sign_in_first(State(auth): State<Arc<Auth>>, request: Request, next: Next) -> Response {
+    if request.method() != axum::http::Method::GET
+        || !navigation(request.headers())
+        || !zeabur_ui::is_page(request.uri().path())
+    {
+        return next.run(request).await;
+    }
+    let signed_in = match cookie::get(request.headers(), cookie::SESSION) {
+        Some(id) => !matches!(auth.sessions.current(id).await, Lookup::SignedOut),
+        None => false,
+    };
+    if signed_in {
+        return next.run(request).await;
+    }
+    let back = return_path(
+        request
+            .uri()
+            .path_and_query()
+            .map(axum::http::uri::PathAndQuery::as_str),
+    );
+    if back == "/" {
+        redirect("/auth/login", &[])
+    } else {
+        let back: String = form_urlencoded::byte_serialize(back.as_bytes()).collect();
+        redirect(&format!("/auth/login?return={back}"), &[])
+    }
+}
+
+/// Whether the browser is loading a document to show, by Fetch Metadata or, from a browser
+/// without it, by `Accept`.
+#[cfg(feature = "ui")]
+fn navigation(headers: &HeaderMap) -> bool {
+    match (headers.get("sec-fetch-mode"), headers.get("sec-fetch-dest")) {
+        (Some(mode), dest) => mode == "navigate" && dest.is_none_or(|dest| dest == "document"),
+        (None, Some(dest)) => dest == "document",
+        (None, None) => headers
+            .get(header::ACCEPT)
+            .and_then(|v| v.to_str().ok())
+            .is_some_and(|accept| accept.contains("text/html")),
     }
 }
 
