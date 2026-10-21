@@ -103,7 +103,8 @@ pub struct State {
     pub uids: u64,
     /// Pods, as `namespace/pod`, in which running a command is refused with `403 Forbidden`.
     pub exec_refused: BTreeSet<String>,
-    /// Pods, as `namespace/pod`, whose image has no shell, as a distroless image.
+    /// Pods, as `namespace/pod`, whose image has no shell, as a distroless image; their ephemeral
+    /// containers have one.
     pub without_shell: BTreeSet<String>,
     /// Every terminal size a [`Cluster::exec`] session was given, in order.
     pub terminal_sizes: Vec<TerminalSize>,
@@ -651,7 +652,8 @@ impl Cluster for MemoryCluster {
 
     /// An echo shell: it echoes what is typed, as a TTY does, answers each line with the line,
     /// and exits on `exit [code]` or end of input. Any command but `/bin/sh` or `sh`, or any
-    /// command in a pod of [`State::without_shell`], is not found.
+    /// command in a container of a pod of [`State::without_shell`] that is not an ephemeral
+    /// container, is not found.
     fn exec<'a>(
         &'a self,
         namespace: &'a str,
@@ -665,16 +667,21 @@ impl Cluster for MemoryCluster {
                 if state.exec_refused.contains(&key) {
                     return Err(forbidden(&format!("pods/exec {key}")));
                 }
-                let exists = state.objects.get(namespace).is_some_and(|objects| {
+                let found = state.objects.get(namespace).and_then(|objects| {
                     objects
                         .pods
                         .iter()
-                        .any(|p| p.metadata.name.as_deref() == Some(pod))
+                        .find(|p| p.metadata.name.as_deref() == Some(pod))
                 });
-                if !exists {
+                let Some(found) = found else {
                     return Err(not_found(&key));
-                }
-                !state.without_shell.contains(&key)
+                };
+                let ephemeral = found
+                    .spec
+                    .as_ref()
+                    .and_then(|s| s.ephemeral_containers.as_ref())
+                    .is_some_and(|list| list.iter().any(|c| c.name == request.container));
+                (ephemeral || !state.without_shell.contains(&key))
                     && matches!(
                         request.command.first().map(String::as_str),
                         Some("/bin/sh" | "sh")

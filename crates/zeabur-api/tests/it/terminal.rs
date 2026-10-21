@@ -256,6 +256,7 @@ mod tests {
                 "image": "busybox", "imageID": "", "ready": false, "restartCount": 0,
                 "state": {"running": {}}}]);
             *pod = serde_json::from_value(value).unwrap();
+            state.without_shell.insert("shop/api-1".to_owned());
         });
         let app = local(&cluster);
         let (status, planned) = plan(&app, debug()).await;
@@ -273,6 +274,18 @@ mod tests {
         assert_eq!(
             frame(&mut socket).await,
             json!({"type": "ready", "container": "zeabur-debug-abcdef"})
+        );
+        socket
+            .send(Message::binary(b"exit 3\r".to_vec()))
+            .await
+            .unwrap();
+        assert_eq!(frame(&mut socket).await, json!({"type": "exit", "code": 3}));
+
+        let mut socket = connect(address, "/api/v1/projects/shop/pods/api-1/exec").await;
+        assert_eq!(frame(&mut socket).await["type"], "ready");
+        assert_eq!(
+            frame(&mut socket).await,
+            json!({"type": "exit", "reason": "command-not-found"})
         );
     }
 

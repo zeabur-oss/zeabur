@@ -19,6 +19,10 @@
 //! no `/auth/elevate` to grant them). `services/proxy` in `ZEABUR_DEMO_FORBID` refuses the
 //! sample metrics store, whose history is made up like the live usage. A system-upgrade-controller
 //! Plan resolves a newer patch, so the cluster page shows one; the demo makes no outbound request.
+//!
+//! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
+//! after it is added, as do tools pods. `ZEABUR_DEMO_TOOLS=1` hands the session a made-up token,
+//! so the kubectl terminal is offered.
 
 #![expect(
     clippy::expect_used,
@@ -33,8 +37,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use axum::http::request::Parts;
+use secrecy::SecretString;
 use serde_json::{Value, json};
-use zeabur_api::access::{Access, ClusterAccess, Elevation};
+use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
 use zeabur_core::problem::Problem;
 use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use zeabur_kube::k8s_openapi::api::batch::v1::{CronJob, Job};
@@ -1531,6 +1536,7 @@ fn place(pods: &mut [Pod]) {
 struct Demo {
     cluster: Arc<dyn Cluster>,
     offered: bool,
+    tools: bool,
 }
 
 impl ClusterAccess for Demo {
@@ -1543,6 +1549,84 @@ impl ClusterAccess for Demo {
                 Elevation::Unavailable
             },
         })
+    }
+
+    fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
+        self.tools.then(|| Handoff {
+            token: Arc::new(SecretString::from("demo-token")),
+            expires_at: Timestamp::now()
+                .checked_add(SignedDuration::from_mins(30))
+                .expect("in range"),
+            admin: false,
+        })
+    }
+}
+
+/// Starts what the in-memory cluster leaves waiting: added debug containers and tools pods.
+fn kubelet(cluster: MemoryCluster) {
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+            let now = Timestamp::now().to_string();
+            cluster.update(|s| {
+                for objects in s.objects.values_mut() {
+                    for pod in &mut objects.pods {
+                        start(pod, &now);
+                    }
+                }
+            });
+        }
+    });
+}
+
+fn start(pod: &mut Pod, now: &str) {
+    let tools = pod
+        .metadata
+        .labels
+        .as_ref()
+        .is_some_and(|l| l.contains_key("zeabur.com/tools"));
+    let added: Vec<String> = pod
+        .spec
+        .as_ref()
+        .and_then(|s| s.ephemeral_containers.as_ref())
+        .into_iter()
+        .flatten()
+        .map(|c| c.name.clone())
+        .collect();
+    let mut status = serde_json::to_value(pod.status.clone().unwrap_or_default())
+        .expect("a pod status serialises");
+    let status_map = status.as_object_mut().expect("an object");
+    let running = json!({"running": {"startedAt": now}});
+    let mut changed = false;
+    for name in added {
+        let list = status_map
+            .entry("ephemeralContainerStatuses")
+            .or_insert_with(|| json!([]))
+            .as_array_mut()
+            .expect("a list");
+        if !list
+            .iter()
+            .any(|c| c.get("name").and_then(Value::as_str) == Some(name.as_str()))
+        {
+            list.push(
+                json!({"name": name, "image": "busybox", "imageID": "", "ready": false,
+                "restartCount": 0, "state": running}),
+            );
+            changed = true;
+        }
+    }
+    if tools && status_map.get("phase").and_then(Value::as_str) != Some("Running") {
+        status_map.insert("phase".to_owned(), json!("Running"));
+        status_map.insert("startTime".to_owned(), json!(now));
+        status_map.insert(
+            "containerStatuses".to_owned(),
+            json!([{"name": "tools", "image": "tools", "imageID": "", "ready": true,
+                "restartCount": 0, "state": running}]),
+        );
+        changed = true;
+    }
+    if changed {
+        pod.status = Some(from(status));
     }
 }
 
@@ -1565,9 +1649,15 @@ async fn main() -> std::io::Result<()> {
             s.exec_refused.extend(pods);
         });
     }
+    cluster.update(|s| {
+        s.without_shell
+            .extend(["shop/web-7c9d8-abcde", "shop/web-7c9d8-fghij"].map(str::to_owned));
+    });
+    kubelet(cluster.clone());
     let access = Demo {
         cluster: Arc::new(cluster),
         offered: std::env::var_os("ZEABUR_DEMO_ELEVATION").is_some(),
+        tools: std::env::var_os("ZEABUR_DEMO_TOOLS").is_some(),
     };
     // Settings are kept in an `zeabur` namespace, as on the in-cluster server.
     let settings = zeabur_api::Settings {
