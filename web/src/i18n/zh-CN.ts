@@ -383,7 +383,6 @@ export const zhCN: Messages = {
   "quickLook.noDownstream": "这个服务没有连到其他服务。",
 
   "service.tabs": "服务页面",
-  "service.openTerminal": "打开终端",
   "service.copyName": "复制 kubectl 用的名称",
   "service.more": "更多",
   "service.views": "查看方式",

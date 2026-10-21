@@ -67,13 +67,12 @@ test("a service's terminal lives on while the person moves between services", as
   // One connection all along: moving around neither closed nor reopened it.
   expect(sockets).toHaveLength(1)
 
-  // The service's menu opens another tab; asking again shows the one already open.
+  // The header's Terminal opens another tab; asking again shows the one already open.
   await page
     .locator("main header")
     .first()
-    .getByRole("button", { name: "More", exact: true })
+    .getByRole("button", { name: "Terminal", exact: true })
     .click()
-  await page.getByRole("menuitem", { name: "Open terminal" }).click()
   await expect(dock(page).getByRole("tab")).toHaveCount(1)
 })
 

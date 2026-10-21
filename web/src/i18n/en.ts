@@ -424,7 +424,6 @@ export const en = {
 
   // Service page
   "service.tabs": "Service sections",
-  "service.openTerminal": "Open terminal",
   "service.copyName": "Copy name for kubectl",
   "service.more": "More",
   "service.views": "Views",

@@ -298,7 +298,6 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
   await header.getByRole("button", { name: "More", exact: true }).click()
   // The menu holds actions; the views are in their tabs.
   await expect(page.getByRole("menuitem")).toHaveText([
-    "Open terminal",
     "Copy diagnosis",
     "Copy name for kubectl",
     "Delete service",
@@ -313,6 +312,7 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
   // A tab is never a header button too.
   await expect(header.getByRole("link", { name: "Logs", exact: true })).toHaveCount(0)
   await expect(header.getByRole("button", { name: "Restart" })).toBeEnabled()
+  await expect(header.getByRole("button", { name: "Terminal", exact: true })).toBeEnabled()
   const sections = page.getByRole("navigation", { name: "Project sections" })
   await expect(sections.getByRole("link", { name: "Projects" })).toHaveAttribute(
     "href",

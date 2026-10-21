@@ -270,6 +270,16 @@ function ServiceView({
                     {t("ops.restart")}
                   </Button>
                 ) : null}
+                {isTask(service.kind) ? null : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openShell(project, service, search.pod)}
+                  >
+                    <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+                    <span className="max-sm:sr-only">{t("tab.terminal")}</span>
+                  </Button>
+                )}
                 <Menu>
                   <MenuTrigger
                     render={
@@ -279,15 +289,6 @@ function ServiceView({
                     <DotsThreeIcon aria-hidden="true" />
                   </MenuTrigger>
                   <MenuContent>
-                    {isTask(service.kind) ? null : (
-                      <>
-                        <MenuItem onClick={() => openShell(project, service, search.pod)}>
-                          <TerminalWindowIcon aria-hidden="true" />
-                          {t("service.openTerminal")}
-                        </MenuItem>
-                        <MenuSeparator />
-                      </>
-                    )}
                     <MenuItem onClick={() => void copyDiagnosis()}>
                       <CopyIcon aria-hidden="true" />
                       {t("diagnosis.copy")}

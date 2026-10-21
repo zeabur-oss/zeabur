@@ -114,8 +114,11 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     // may or may not close itself.
     await page.goto(servicePage)
     await expect(page.getByRole("heading", { level: 1, name: service })).toBeVisible()
-    await page.getByRole("button", { name: "More", exact: true }).click()
-    await page.getByRole("menuitem", { name: "Open terminal" }).click()
+    await page
+      .locator("main header")
+      .first()
+      .getByRole("button", { name: "Terminal", exact: true })
+      .click()
     const dock = page.getByRole("region", { name: "Terminal" })
     await expect(dock.getByRole("tab", { name: service })).toHaveAttribute("aria-selected", "true")
     // Scoped to the dock: refused Secrets elsewhere on the page also offer admin rights.

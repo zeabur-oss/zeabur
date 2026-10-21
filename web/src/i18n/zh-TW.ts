@@ -383,7 +383,6 @@ export const zhTW: Messages = {
   "quickLook.noDownstream": "這個服務沒有連到其他服務。",
 
   "service.tabs": "服務頁面",
-  "service.openTerminal": "開啟終端機",
   "service.copyName": "複製 kubectl 用的名稱",
   "service.more": "更多",
   "service.views": "檢視方式",
