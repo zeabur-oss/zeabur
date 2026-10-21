@@ -10,6 +10,7 @@ import { api, toProblem, unwrap, type Schemas } from "@/api/client"
 import { queryClient } from "@/api/queries"
 import { retryAsAdmin } from "@/auth/elevation"
 import { failureOf } from "@/components/plan/describe"
+import { markCreated } from "@/lib/created"
 import type { PlanAsk } from "@/components/plan/planner"
 import type { Locale, Translate } from "@/i18n"
 import { namespaceOps } from "@/model/project"
@@ -62,6 +63,7 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
   try {
     const { applied } = await apply(project, token)
     const undo = confirmed.undo?.(applied)
+    markCreated(ask.changes)
     void queryClient.invalidateQueries({ queryKey: ["project", project] })
     // Adopting, letting go and the details change how the project list names it.
     if (ask.changes.some((c) => namespaceOps.has(c.op)))

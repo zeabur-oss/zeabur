@@ -31,6 +31,8 @@ import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Term, TermDetail } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
+import { createdKey, entrance } from "@/lib/created"
+import { cn } from "@/lib/utils"
 import {
   endpointsOf,
   hostUrl,
@@ -215,7 +217,7 @@ export function NetworkingTab({
                 <tbody className="divide-y max-sm:block">
                   {routes.map((route, i) => (
                     <tr
-                      className={row}
+                      className={cn(row, route.host && entrance(createdKey.domain(route.host)))}
                       key={`${route.ingress}/${route.host ?? ""}/${route.path ?? ""}/${i}`}
                     >
                       <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>

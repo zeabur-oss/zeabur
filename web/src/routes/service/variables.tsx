@@ -38,6 +38,8 @@ import { Spinner } from "@zeabur/design-system/components/spinner"
 import { TermDetail } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
+import { createdKey, entrance } from "@/lib/created"
+import { cn } from "@/lib/utils"
 import type { Edge } from "@/model/connections"
 import { configObjectsOf, type Service } from "@/model/service"
 
@@ -418,7 +420,10 @@ export function VariablesTab({
                     return (
                       <li
                         key={`${container}/${env.name}`}
-                        className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
+                        className={cn(
+                          "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions",
+                          entrance(createdKey.env(workload, env.name)),
+                        )}
                       >
                         <span
                           className="flex items-center gap-1.5 font-mono text-xs font-medium"

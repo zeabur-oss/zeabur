@@ -17,6 +17,7 @@ import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Term } from "@zeabur/design-system/components/term"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT, type Translate } from "@/i18n"
+import { createdKey, entrance } from "@/lib/created"
 import { claimOf, volumesOf, type Service } from "@/model/service"
 
 const ClaimForm = lazy(() =>
@@ -75,6 +76,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
             return (
               <Panel
                 key={name}
+                className={entrance(createdKey.volume(workload, m.mountPath))}
                 title={
                   <span className="flex items-center gap-2">
                     <HardDriveIcon className="size-4 text-muted-foreground" aria-hidden="true" />

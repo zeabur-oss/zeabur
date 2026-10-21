@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
+import { useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import CodeIcon from "~icons/ph/code"
@@ -24,6 +25,7 @@ import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus } from "@/components/status"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { DraftBar } from "@zeabur/design-system/components/draft-bar"
+import { usePresence } from "@zeabur/design-system/components/presence"
 import {
   Menu,
   MenuContent,
@@ -138,6 +140,7 @@ function ServiceView({
   const restartable =
     service.kind === "Deployment" || service.kind === "StatefulSet" || service.kind === "DaemonSet"
   const draft = useDraftState()
+  const pending = usePresence<HTMLDivElement>(draft.count > 0)
   const reviewer = usePlanner(project, draft.applied, true)
   const planner = usePlanner(project)
   const deleter = usePlanner(
@@ -180,7 +183,7 @@ function ServiceView({
                   <h1 className="min-w-0 truncate type-name" translate="no">
                     {service.displayName ?? service.name}
                   </h1>
-                  <ServiceStatus status={statusOf(service)} counts />
+                  <ServiceStatus status={statusOf(service)} counts swap />
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-secondary">
                   <span className="flex min-w-0 items-center gap-1">
@@ -329,9 +332,10 @@ function ServiceView({
                 />
               ) : null}
             </TabsContent>
-            {draft.count > 0 ? (
+            {pending.mounted ? (
               <PendingChanges
                 draft={draft}
+                presence={pending.props}
                 onReview={() =>
                   reviewer.plan({
                     title: t("draft.title", service.name),
@@ -352,24 +356,39 @@ function ServiceView({
   )
 }
 
-function PendingChanges({ draft, onReview }: { draft: Draft; onReview: () => void }) {
+function PendingChanges({
+  draft,
+  presence,
+  onReview,
+}: {
+  draft: Draft
+  presence: ReturnType<typeof usePresence<HTMLDivElement>>["props"]
+  onReview: () => void
+}) {
   const t = useT()
+  const detail = describeDraft(t, draft)
+  // While it fades out after Discard or Apply, it keeps saying what it held.
+  const [shown, setShown] = useState({ count: draft.count, detail })
+  if (draft.count > 0 && (draft.count !== shown.count || detail !== shown.detail))
+    setShown({ count: draft.count, detail })
+  // The wrapper sticks in the bar's place, so it can fade the bar in and out.
   return (
-    <DraftBar
-      className="mt-6"
-      label={t("draft.count", draft.count)}
-      detail={describeDraft(t, draft)}
-      actions={
-        <>
-          <Button variant="ghost" size="sm" onClick={draft.discard}>
-            {t("draft.discard")}
-          </Button>
-          <Button size="sm" onClick={onReview}>
-            {t("draft.review")}
-          </Button>
-        </>
-      }
-    />
+    <div {...presence} className="sticky bottom-3 z-10 mt-6 overlay-motion">
+      <DraftBar
+        label={t("draft.count", shown.count)}
+        detail={shown.detail}
+        actions={
+          <>
+            <Button variant="ghost" size="sm" onClick={draft.discard}>
+              {t("draft.discard")}
+            </Button>
+            <Button size="sm" onClick={onReview}>
+              {t("draft.review")}
+            </Button>
+          </>
+        }
+      />
+    </div>
   )
 }
 
