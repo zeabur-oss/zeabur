@@ -359,8 +359,30 @@ export const zhTW: Messages = {
   "services.allKinds": "所有類型",
   "services.count": (shown, total) => (shown === total ? `${total} 個服務` : `${shown} / ${total}`),
   "services.noMatch": "沒有符合的服務。",
+  "services.showAll": (n) => `顯示全部 ${n} 個`,
+  "services.showFewer": "收合",
+  "attention.services": (n) => `${n} 個服務`,
+  "attention.eachOne": "各個服務",
+  "attention.more": (n) => `+${n}`,
+  "attention.moreOf": (n) => `再顯示 ${n} 個服務`,
+  "events.warningsCount": (n) => `${n} 個警告`,
+  "domains.withoutHttps": (n) => `${n} 個沒有 HTTPS`,
+  "domains.filter": "篩選網域",
+  "domains.noMatch": "沒有符合的網域。",
+  "storage.onVolumes": (size, n) => `${n} 個磁碟區共 ${size}`,
+  "storage.other": "其他磁碟區",
+  "storage.filter": "篩選磁碟區",
+  "storage.noMatch": "沒有符合的磁碟區。",
+  "storage.size": "大小",
+  "storage.usedBy": "使用的服務",
+  "backups.unbacked": (missing, total) =>
+    missing === total
+      ? total === 1
+        ? "這個磁碟區沒有備份。"
+        : `${total} 個磁碟區都沒有備份。`
+      : `${total} 個磁碟區中有 ${missing} 個沒有備份。`,
+  "backups.volumes": (n) => `${n} 個磁碟區`,
 
-  "lane.domains": "網域",
   "lane.web": "網站",
   "lane.internal": "私有服務",
   "lane.workers": "背景與批次工作",

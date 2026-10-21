@@ -399,9 +399,31 @@ export const en = {
   "services.count": (shown: number, total: number) =>
     shown === total ? plural(total, "service", "services") : `${shown} of ${total}`,
   "services.noMatch": "No services match.",
+  "services.showAll": (n: number) => `Show all ${n}`,
+  "services.showFewer": "Show fewer",
+  "attention.services": (n: number) => plural(n, "service", "services"),
+  "attention.eachOne": "Each one",
+  "attention.more": (n: number) => `+${n}`,
+  "attention.moreOf": (n: number) => `Show ${plural(n, "more service", "more services")}`,
+  "events.warningsCount": (n: number) => plural(n, "warning", "warnings"),
+  "domains.withoutHttps": (n: number) => `${n} without HTTPS`,
+  "domains.filter": "Filter domains",
+  "domains.noMatch": "No domains match.",
+  "storage.onVolumes": (size: string, n: number) => `${size} on ${plural(n, "volume", "volumes")}`,
+  "storage.other": "Other volumes",
+  "storage.filter": "Filter volumes",
+  "storage.noMatch": "No volumes match.",
+  "storage.size": "Size",
+  "storage.usedBy": "Used by",
+  "backups.unbacked": (missing: number, total: number) =>
+    missing === total
+      ? total === 1
+        ? "The volume isn't backed up."
+        : `None of the ${total} volumes is backed up.`
+      : `${missing} of ${total} volumes aren't backed up.`,
+  "backups.volumes": (n: number) => plural(n, "volume", "volumes"),
 
   // Architecture
-  "lane.domains": "Domains",
   "lane.web": "Web",
   "lane.internal": "Private services",
   "lane.workers": "Workers & jobs",

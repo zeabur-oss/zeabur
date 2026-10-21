@@ -8,9 +8,7 @@ import {
 } from "react"
 import CornersOutIcon from "~icons/ph/corners-out"
 import GitBranchIcon from "~icons/ph/git-branch"
-import GlobeIcon from "~icons/ph/globe"
 import HardDriveIcon from "~icons/ph/hard-drive"
-import LockSimpleBoldIcon from "~icons/ph/lock-simple-bold"
 import MinusIcon from "~icons/ph/minus"
 import PlusIcon from "~icons/ph/plus"
 
@@ -25,7 +23,7 @@ import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { originOf } from "@/model/origin"
-import { bounds, layout, type LaidEdge, type LaidNode, type Lane } from "@/model/layout"
+import { bounds, fittedZoom, layout, type LaidEdge, type LaidNode, type Lane } from "@/model/layout"
 import {
   claimOf,
   domainsOf,
@@ -103,7 +101,6 @@ export function ProjectMap({
 }
 
 const laneTitle: Record<Lane, `lane.${Lane}`> = {
-  domains: "lane.domains",
   web: "lane.web",
   internal: "lane.internal",
   workers: "lane.workers",
@@ -123,7 +120,7 @@ function Graph({
 }) {
   const t = useT()
   const word = useStatusWord()
-  const graph = layout(data, data.services, edgesOf(data))
+  const graph = layout(data.services, edgesOf(data))
   const box = bounds(graph)
   const viewport = useRef<HTMLDivElement>(null)
   const [view, setViewState] = useState<Viewport>(
@@ -154,8 +151,7 @@ function Graph({
     const h = el.clientHeight
     const bw = box.maxX - box.minX
     const bh = box.maxY - box.minY
-    const pad = w < 640 ? 16 : 56
-    const k = Math.min(1.1, (w - pad * 2) / bw, (h - pad * 2 - 40) / bh)
+    const k = fittedZoom(graph, w, h)
     const node = graph.nodes.find((n) => n.id === selected)
     if (node && k < 0.75) {
       const z = 0.75
@@ -260,10 +256,7 @@ function Graph({
         {graph.frames.map((frame) => (
           <div
             key={frame.lane}
-            className={cn(
-              "absolute top-(--y) left-(--x) h-(--h) w-(--w) rounded-2xl border border-dashed border-foreground/12 bg-background/35",
-              frame.lane === "domains" && "border-transparent bg-transparent",
-            )}
+            className="absolute top-(--y) left-(--x) h-(--h) w-(--w) rounded-2xl border border-dashed border-foreground/12 bg-background/35"
             style={{
               "--x": px(frame.x),
               "--y": px(frame.y),
@@ -273,15 +266,13 @@ function Graph({
           >
             <div className="flex h-7.5 items-center gap-2 px-3 type-meta font-medium text-muted-foreground">
               {t(laneTitle[frame.lane])}
-              {frame.lane === "domains" ? null : (
-                <span className="flex items-center gap-1 tracking-normal normal-case">
-                  <StatusDot
-                    health={frame.ready === frame.total ? "ok" : "fail"}
-                    className="size-1.5"
-                  />
-                  {frame.ready}/{frame.total}
-                </span>
-              )}
+              <span className="flex items-center gap-1 tracking-normal normal-case">
+                <StatusDot
+                  health={frame.ready === frame.total ? "ok" : "fail"}
+                  className="size-1.5"
+                />
+                {frame.ready}/{frame.total}
+              </span>
             </div>
           </div>
         ))}
@@ -342,31 +333,27 @@ function Graph({
           ))}
         </svg>
 
-        {graph.nodes.map((node) =>
-          node.service ? (
-            <ServiceCard
-              key={node.id}
-              node={node}
-              service={node.service}
-              host={domainsOf(data, node.service)[0]?.host}
-              selected={selected === node.id}
-              faded={
-                !!active &&
-                active !== node.id &&
-                !graph.edges.some(
-                  (e) =>
-                    (e.from === active && e.to === node.id) ||
-                    (e.to === active && e.from === node.id),
-                )
-              }
-              onOpen={() => onOpen(node.id)}
-              onHover={(on) => setHoverNode(on ? node.id : undefined)}
-              word={word}
-            />
-          ) : (
-            <DomainCard key={node.id} node={node} />
-          ),
-        )}
+        {graph.nodes.map((node) => (
+          <ServiceCard
+            key={node.id}
+            node={node}
+            service={node.service}
+            host={domainsOf(data, node.service)[0]?.host}
+            selected={selected === node.id}
+            faded={
+              !!active &&
+              active !== node.id &&
+              !graph.edges.some(
+                (e) =>
+                  (e.from === active && e.to === node.id) ||
+                  (e.to === active && e.from === node.id),
+              )
+            }
+            onOpen={() => onOpen(node.id)}
+            onHover={(on) => setHoverNode(on ? node.id : undefined)}
+            word={word}
+          />
+        ))}
 
         {hovered ? (
           <div
@@ -519,11 +506,6 @@ function ServiceCard({
               </span>
             ) : null}
           </span>
-          {first ? (
-            <Badge variant="fail" className="shrink-0">
-              {t(`origin.${originOf(first).origin}`)}
-            </Badge>
-          ) : null}
           {service.provenance.tool ? (
             <GitBranchIcon
               className="size-3.5 text-muted-foreground"
@@ -531,6 +513,11 @@ function ServiceCard({
             />
           ) : null}
         </span>
+        {first ? (
+          <span className="flex min-w-0">
+            <Badge variant="fail">{t(`origin.${originOf(first).origin}`)}</Badge>
+          </span>
+        ) : null}
         <span className="mt-auto flex items-center gap-2 text-xs">
           <StatusDot health={status.health} />
           <span className={cn("truncate font-medium", status.health === "fail" && "text-fail")}>
@@ -555,23 +542,6 @@ function ServiceCard({
           <span className="ml-auto font-medium text-foreground/70 tabular-nums">{m.size}</span>
         </div>
       ))}
-    </div>
-  )
-}
-
-function DomainCard({ node }: { node: LaidNode }) {
-  return (
-    <div
-      className="absolute top-(--y) left-(--x) flex h-(--h) w-(--w) items-center gap-2 rounded-md border bg-background px-3 text-xs shadow-xs"
-      style={{ "--x": px(node.x), "--y": px(node.y), "--w": px(node.w), "--h": px(node.h) }}
-    >
-      <GlobeIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <span className="min-w-0 truncate font-mono font-medium" translate="no">
-        {node.host}
-      </span>
-      {node.https ? (
-        <LockSimpleBoldIcon className="ml-auto size-3.5 shrink-0 text-ok" aria-label="HTTPS" />
-      ) : null}
     </div>
   )
 }

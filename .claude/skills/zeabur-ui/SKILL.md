@@ -71,9 +71,10 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   4. *Overview, filter, details* (Shneiderman): a long collection scrolls inside a bounded frame
      with a sticky header instead of pushing the rest of the page away; working sets are not
      paginated. Counts next to section names say what is below the fold.
-  5. *Defaults follow the data*: the view, its density and what is expanded depend on how many
-     items there are (as the project page switches from map to list above 12 services), not on a
-     toggle people must find.
+  5. *Defaults follow the data*: the view, its density and what is expanded depend on the data
+     and the screen, not on a toggle people must find. The project page opens on the map only
+     when the map, fitted to the screen, can be read (zoom 0.75 or more, at most 16 services; on
+     a phone never); else on the list. A remembered choice never overrides that rule.
   6. *Visible entry points* (Norman): a frequent action is a labelled button where people look
      for it, not only inside ⋯ or another tab.
   7. *Accelerators that novices never see* (Nielsen 7): `/` to filter, ⌘K, sortable headers, state

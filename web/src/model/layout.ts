@@ -1,16 +1,15 @@
-// The Architecture tab's automatic layered layout, left to right: Domains → Web (exposed by an
-// Ingress) → Internal (behind a Service) → Workers & jobs → Data. Within a layer, nodes are ordered
-// by the barycentre of their neighbours (a few down and up sweeps; Sugiyama, Tagawa and Toda 1981)
-// to reduce crossings. Deterministic: the same project always gives the same coordinates.
+// The Architecture tab's automatic layered layout, left to right: Web (exposed by an Ingress) →
+// Internal (behind a Service) → Workers & jobs → Data. Within a layer, nodes are ordered by the
+// barycentre of their neighbours (a few down and up sweeps; Sugiyama, Tagawa and Toda 1981) to
+// reduce crossings; a layer with many cards wraps into up to three columns. Deterministic: the
+// same project always gives the same coordinates.
 import type { Edge } from "@/model/connections"
 import {
-  domainsOf,
   isHealthy,
   roleOf,
   serviceId,
   statusOf,
   volumesOf,
-  type Network,
   type Role,
   type Service,
 } from "@/model/service"
@@ -18,14 +17,16 @@ import {
 const CARD_W = 224
 const CARD_H = 112
 const DRAWER_H = 30
-const DOMAIN_W = 220
-const DOMAIN_H = 40
 const GAP_X = 84
 const GAP_Y = 36
+const GAP_COLUMN = 24
+/** Rows a layer holds before it wraps into another column. */
+const ROWS = 4
+const COLUMNS = 3
 const FRAME_PAD = 18
 const FRAME_HEAD = 30
 
-export type Lane = "domains" | "web" | "internal" | "workers" | "data"
+export type Lane = "web" | "internal" | "workers" | "data"
 const laneOf: Record<Role, Lane> = {
   web: "web",
   internal: "internal",
@@ -33,7 +34,7 @@ const laneOf: Record<Role, Lane> = {
   job: "workers",
   data: "data",
 }
-const laneOrder: Lane[] = ["domains", "web", "internal", "workers", "data"]
+const laneOrder: Lane[] = ["web", "internal", "workers", "data"]
 
 export interface LaidNode {
   id: string
@@ -42,10 +43,7 @@ export interface LaidNode {
   y: number
   w: number
   h: number
-  service?: Service
-  host?: string
-  /** A domain whose Ingress lists it under TLS. */
-  https?: boolean
+  service: Service
 }
 
 export interface LaidEdge extends Edge {
@@ -78,7 +76,7 @@ function spread(list: string[], id: string): number {
   return (i - (list.length - 1) / 2) * 12
 }
 
-export function layout(network: Network, services: Service[], allEdges: Edge[]): Layout {
+export function layout(services: Service[], allEdges: Edge[]): Layout {
   const nodes = new Map<string, LaidNode>()
   for (const service of services) {
     const id = serviceId(service)
@@ -91,20 +89,6 @@ export function layout(network: Network, services: Service[], allEdges: Edge[]):
       h: CARD_H + volumesOf(service).length * DRAWER_H,
       service,
     })
-    for (const { host, https } of domainsOf(network, service)) {
-      const domainId = `domain:${host}`
-      if (!nodes.has(domainId))
-        nodes.set(domainId, {
-          id: domainId,
-          lane: "domains",
-          x: 0,
-          y: 0,
-          w: DOMAIN_W,
-          h: DOMAIN_H,
-          host,
-          https,
-        })
-    }
   }
 
   const edges = allEdges.filter((e) => nodes.has(e.from) && nodes.has(e.to))
@@ -178,51 +162,57 @@ export function layout(network: Network, services: Service[], allEdges: Edge[]):
     }
   }
 
-  // Coordinates: lanes left to right, each column centred on the tallest.
-  const columnHeight = (all: string[]) => {
-    const ids = all.filter(real)
-    return ids.reduce((sum, id) => sum + (nodes.get(id)?.h ?? 0), 0) + GAP_Y * (ids.length - 1)
+  // Coordinates: lanes left to right, each centred on the tallest. A lane's cards fill rows of
+  // `columns`; a row is as tall as its tallest card, so the gaps between rows run straight
+  // across the lane and dummies pass through them.
+  const grid = (ids: string[]) => {
+    const cards = ids.filter(real)
+    const columns = Math.min(COLUMNS, Math.max(1, Math.ceil(cards.length / ROWS)))
+    const rows: number[] = []
+    cards.forEach((id, i) => {
+      const r = Math.floor(i / columns)
+      rows[r] = Math.max(rows[r] ?? 0, nodes.get(id)?.h ?? 0)
+    })
+    const height = rows.reduce((sum, h) => sum + h, 0) + GAP_Y * (rows.length - 1)
+    return { columns, rows, height }
   }
-  const tallest = Math.max(...lanes.map((l) => columnHeight(l.ids)))
+  const tallest = Math.max(...lanes.map((l) => grid(l.ids).height))
   let x = 0
   const frames: Frame[] = []
   for (const l of lanes) {
-    const width = Math.max(...l.ids.filter(real).map((id) => nodes.get(id)?.w ?? 0))
-    let y = (tallest - columnHeight(l.ids)) / 2
-    for (const id of l.ids) {
-      const node = nodes.get(id)
-      if (!node) continue
-      node.x = x + (width - node.w) / 2
-      node.y = y
-      y += node.h + GAP_Y
-    }
-    // Dummies: spread evenly over the gap they were ordered into.
-    const groups: { before?: LaidNode; after?: LaidNode; ids: string[] }[] = []
-    let previous: LaidNode | undefined
-    let pending: string[] = []
+    const { columns, rows, height } = grid(l.ids)
+    const width = columns * CARD_W + (columns - 1) * GAP_COLUMN
+    const top0 = (tallest - height) / 2
+    const rowTop = rows.map((_, r) => top0 + rows.slice(0, r).reduce((s, h) => s + h + GAP_Y, 0))
+    // Dummies, by the row they follow (-1: above the first).
+    const after = new Map<number, string[]>()
+    let index = 0
+    let row = -1
     for (const id of l.ids) {
       if (!real(id)) {
-        pending.push(id)
+        after.set(row, [...(after.get(row) ?? []), id])
         continue
       }
       const node = nodes.get(id)
-      if (pending.length) groups.push({ before: previous, after: node, ids: pending })
-      pending = []
-      previous = node
+      row = Math.floor(index / columns)
+      if (node) {
+        node.x = x + (index % columns) * (CARD_W + GAP_COLUMN)
+        node.y = rowTop[row] ?? 0
+      }
+      index++
     }
-    if (pending.length) groups.push({ before: previous, ids: pending })
-    for (const group of groups) {
-      const top = group.before ? group.before.y + group.before.h : (group.after?.y ?? 0) - 56
-      const bottom = group.after ? group.after.y : top + 56
-      group.ids.forEach((id, i) => {
-        const gy = top + ((i + 1) * (bottom - top)) / (group.ids.length + 1)
+    for (const [r, ids] of after) {
+      const top = r < 0 ? (rowTop[0] ?? 0) - 56 : (rowTop[r] ?? 0) + (rows[r] ?? 0)
+      const bottom = r + 1 < rows.length ? (rowTop[r + 1] ?? 0) : top + 56
+      ids.forEach((id, i) => {
+        const gy = top + ((i + 1) * (bottom - top)) / (ids.length + 1)
         passes.set(id, { y: gy, left: x - FRAME_PAD, right: x + width + FRAME_PAD })
       })
     }
     const members = l.ids.map((id) => nodes.get(id)).filter((n): n is LaidNode => !!n)
     const top = Math.min(...members.map((n) => n.y))
     const bottom = Math.max(...members.map((n) => n.y + n.h))
-    const laneServices = members.flatMap((n) => (n.service ? [n.service] : []))
+    const laneServices = members.map((n) => n.service)
     frames.push({
       lane: l.lane,
       x: x - FRAME_PAD,
@@ -230,7 +220,7 @@ export function layout(network: Network, services: Service[], allEdges: Edge[]):
       w: width + FRAME_PAD * 2,
       h: bottom - top + FRAME_PAD * 2 + FRAME_HEAD,
       ready: laneServices.filter((s) => isHealthy(statusOf(s))).length,
-      total: l.lane === "domains" ? members.length : laneServices.length,
+      total: laneServices.length,
     })
     x += width + GAP_X
   }
@@ -313,4 +303,27 @@ export function bounds(l: Layout) {
     maxX: Math.max(...xe),
     maxY: Math.max(...ye),
   }
+}
+
+/** The zoom at which the whole map fits a canvas of `width` × `height`, as the map's Fit does. */
+export function fittedZoom(l: Layout, width: number, height: number): number {
+  const box = bounds(l)
+  const pad = width < 640 ? 16 : 56
+  return Math.min(
+    1.1,
+    (width - pad * 2) / (box.maxX - box.minX),
+    (height - pad * 2 - 40) / (box.maxY - box.minY),
+  )
+}
+
+/** Below this zoom a card's name and status are too small to read. */
+const READABLE_ZOOM = 0.75
+/** Past this many services the map is a picture, not a way to find one. */
+const MAP_SERVICES = 16
+
+/** Whether the map, fitted to a canvas of `width` × `height`, can be read without zooming in. */
+export function mapReadable(l: Layout, width: number, height: number): boolean {
+  const services = l.nodes.length
+  if (services === 0 || services > MAP_SERVICES) return false
+  return fittedZoom(l, width, height) >= READABLE_ZOOM
 }
