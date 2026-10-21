@@ -216,7 +216,9 @@ test("the account card's lines share one left edge, also with admin rights on", 
   )
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto("/")
-  const card = page.getByRole("navigation", { name: "Main" }).locator('[data-slot="context-chip"]')
+  const card = page
+    .getByRole("navigation", { name: "Main" })
+    .locator('button:has([data-slot="avatar"])')
   await expect(card).toContainText("This cluster")
   await expect(card).not.toContainText("10.43.0.1")
   await expect(card).toContainText("ada.lovelace")
