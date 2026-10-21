@@ -47,7 +47,7 @@ export const zhTW: Messages = {
   "elevate.failed": "沒有取得管理員權限。",
   "elevate.signedOut": "工作階段已結束，重新登入後再繼續。",
   "elevate.signIn": "登入",
-  "elevate.until": (time) => `管理員權限，到 ${time}`,
+  "elevate.until": (time) => `管理員權限至 ${time}`,
   "elevate.activeDetail": "在此之前，你的所有操作都會使用管理員權限。",
   "elevate.drop": "放棄管理員權限",
   "elevate.use": "使用管理員權限",

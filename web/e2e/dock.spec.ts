@@ -158,9 +158,11 @@ test("a terminal closed when its credential expires keeps its tab and reopens", 
 
   // Folded, the bar says when the first of the open terminals will close.
   await page.keyboard.press("Control+Backquote")
-  const clock = new Intl.DateTimeFormat("en", { hour: "numeric", minute: "2-digit" }).format(
-    new Date(expiresAt),
-  )
+  const clock = new Intl.DateTimeFormat("en", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(expiresAt))
   await expect(page.getByRole("button", { name: /^1 terminal/ })).toContainText(
     `Credential expires at ${clock}`,
   )

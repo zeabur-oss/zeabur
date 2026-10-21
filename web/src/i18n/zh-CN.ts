@@ -47,7 +47,7 @@ export const zhCN: Messages = {
   "elevate.failed": "没有获得管理员权限。",
   "elevate.signedOut": "会话已结束，重新登录后再继续。",
   "elevate.signIn": "登录",
-  "elevate.until": (time) => `管理员权限，到 ${time}`,
+  "elevate.until": (time) => `管理员权限至 ${time}`,
   "elevate.activeDetail": "在此之前，你的所有操作都会使用管理员权限。",
   "elevate.drop": "放弃管理员权限",
   "elevate.use": "使用管理员权限",

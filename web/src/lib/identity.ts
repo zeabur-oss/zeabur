@@ -18,14 +18,13 @@ export function clusterNameOf(name: string | undefined): string | undefined {
   return name
 }
 
-/** A time of day: 24-hour in Chinese, the locale's own clock otherwise. */
+/** A time of day, 24-hour in every language. */
 export function formatClock(iso: string, locale: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
-  const chinese = locale.startsWith("zh")
   return new Intl.DateTimeFormat(locale, {
-    hour: chinese ? "2-digit" : "numeric",
+    hour: "2-digit",
     minute: "2-digit",
-    hourCycle: chinese ? "h23" : undefined,
+    hourCycle: "h23",
   }).format(date)
 }

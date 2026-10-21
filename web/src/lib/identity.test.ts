@@ -22,11 +22,11 @@ describe("identity", () => {
     expect(clusterNameOf(undefined)).toBe(undefined)
   })
 
-  test("a time of day is 24-hour in Chinese", () => {
+  test("a time of day is 24-hour in every language", () => {
     const iso = "2026-10-21T07:04:00Z"
     const hour = new Date(iso).getHours()
     expect(formatClock(iso, "zh-TW")).toBe(`${String(hour).padStart(2, "0")}:04`)
     expect(formatClock(iso, "zh-CN")).toBe(`${String(hour).padStart(2, "0")}:04`)
-    expect(formatClock(iso, "en")).toMatch(/^\d{1,2}:04\s?(AM|PM)$/)
+    expect(formatClock(iso, "en")).toBe(`${String(hour).padStart(2, "0")}:04`)
   })
 })
