@@ -87,6 +87,7 @@ fn identity_object(
 /// that adds another), Carol (GitHub and a passkey), and Dan, invited and not yet signed in.
 fn people() -> Vec<DynamicObject> {
     let now = Timestamp::now().as_second();
+    let last_used = Timestamp::from_second(now - 600).map_or_default(|t| t.to_string());
     let passkey = |name: &str, user: &str, created: &str, label: &str, extra: &Value| {
         identity_object(
             "Credential",
@@ -140,7 +141,7 @@ fn people() -> Vec<DynamicObject> {
             "alice",
             "2026-03-02T08:01:00Z",
             "MacBook Pro",
-            &json!({"annotations": {"identity.zeabur.com/last-used-at": "2026-10-21T23:40:00Z"}}),
+            &json!({"annotations": {"identity.zeabur.com/last-used-at": last_used}}),
         ),
         passkey(
             "cred-alice-phone",
