@@ -35,10 +35,9 @@ export function CommandPalette() {
     }
   }, [])
 
-  // Anchored to the top, so the input stays put while the results change height.
   return (
     <Dialog open={open} onOpenChange={(next) => palette.set(next)}>
-      <DialogContent aria-describedby={undefined} className="top-24 translate-y-0">
+      <DialogContent aria-describedby={undefined} position="top">
         <DialogTitle className="sr-only">{t("palette.title")}</DialogTitle>
         <Suspense fallback={<PaletteFallback />}>
           <PaletteBody />
