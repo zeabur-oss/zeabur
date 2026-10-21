@@ -1278,7 +1278,7 @@ export const zhCN: Messages = {
   "link.own":
     "设置页面已在新标签页打开，请在那里完成。若要在手机上保留备用密钥，请改在手机上打开这个链接。",
   "link.send": (user) =>
-    `把这个链接发给 ${user}。第一个打开的人会在 ${user} 的账号添加一把通行密钥。`,
+    `把这个链接发给 ${user}。谁先打开，谁就能在 ${user} 的账号添加一把通行密钥。`,
   "members.title": "成员",
   "members.everyone": "成员",
   "members.invite": "邀请",
@@ -1319,7 +1319,7 @@ export const zhCN: Messages = {
     "Zeabur Identity 目前不接受设置链接：要用 --invitations 运行，链接才能使用。",
   "invite.title": "邀请成员",
   "invite.body":
-    "生成一个 7 天内有效、只能使用一次的链接。第一个打开的人会添加通行密钥，并以这位成员登录。",
+    "生成一个 7 天内有效、只能使用一次的链接。谁先打开，谁就能添加通行密钥并以这位成员登录。",
   "invite.username": "用户名",
   "invite.usernameHint": "只能用小写字母、数字、- 和 .。",
   "invite.invalid": "只能用小写字母、数字、- 和 .，最多 63 个字符。",

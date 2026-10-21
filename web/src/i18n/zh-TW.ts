@@ -1279,7 +1279,7 @@ export const zhTW: Messages = {
   "link.own":
     "設定頁面已在新分頁開啟，請在那裡完成。若要在手機上保留備用密鑰，請改在手機上開啟這個連結。",
   "link.send": (user) =>
-    `把這個連結傳給 ${user}。第一個開啟的人會在 ${user} 的帳號新增一把通行密鑰。`,
+    `把這個連結傳給 ${user}。誰先開啟，誰就能在 ${user} 的帳號新增一把通行密鑰。`,
   "members.title": "成員",
   "members.everyone": "成員",
   "members.invite": "邀請",
@@ -1320,7 +1320,7 @@ export const zhTW: Messages = {
     "Zeabur Identity 目前不接受設定連結：要以 --invitations 執行，連結才能使用。",
   "invite.title": "邀請成員",
   "invite.body":
-    "產生一個 7 天內有效、只能使用一次的連結。第一個開啟的人會新增通行密鑰，並以這位成員登入。",
+    "產生一個 7 天內有效、只能使用一次的連結。誰先開啟，誰就能新增通行密鑰並以這位成員登入。",
   "invite.username": "使用者名稱",
   "invite.usernameHint": "只能用小寫字母、數字、- 和 .。",
   "invite.invalid": "只能用小寫字母、數字、- 和 .，最多 63 個字元。",
