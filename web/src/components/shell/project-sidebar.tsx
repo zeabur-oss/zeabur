@@ -23,7 +23,14 @@ import { serviceLink, usePlace, type ProjectEntry } from "@/lib/place"
 import { useProjectSummary } from "@/lib/project-name"
 import { remembered } from "@/lib/stores"
 import { projectTitle } from "@/model/project"
-import { groupServices, serviceId, statusOf, type Project, type Service } from "@/model/service"
+import {
+  groupServices,
+  needsAttention,
+  serviceId,
+  statusOf,
+  type Project,
+  type Service,
+} from "@/model/service"
 import {
   Sidebar,
   SidebarContent,
@@ -52,6 +59,9 @@ const pages: Entry[] = [
 ]
 
 const advancedSection = remembered("zeabur.column.advanced", false)
+
+/** Past this many services only the groups with a problem start open. */
+const OPEN_ALL = 12
 
 export function ProjectSidebar({ project }: { project: string }) {
   const place = usePlace()
@@ -208,9 +218,13 @@ function Services({ project, data }: { project: string; data: Project }) {
     />
   )
   if (groups.length === 1) return <>{groups[0]?.services.map((s) => row(s, false))}</>
+  const many = data.services.length > OPEN_ALL
   return (
     <>
       {groups.map((group) => {
+        const trouble = group.services.filter((s) => needsAttention(statusOf(s)))
+        const failing = trouble.filter((s) => statusOf(s).health === "fail").length
+        const active = group.services.some((s) => !place.entry && place.service === serviceId(s))
         const label = group.role ? (
           <Tooltip content={roleKube[group.role]}>
             <span>{t(`role.${group.role}`)}</span>
@@ -225,9 +239,24 @@ function Services({ project, data }: { project: string; data: Project }) {
               group.role ? <RoleIcon role={group.role} /> : <FolderSimpleIcon aria-hidden="true" />
             }
             label={label}
-            badge={<span className="type-nano text-tertiary">{group.services.length}</span>}
-            active={group.services.some((s) => !place.entry && place.service === serviceId(s))}
-            defaultOpen
+            badge={
+              <span className="flex shrink-0 items-center gap-1.5 type-nano text-tertiary">
+                {group.services.length}
+                {trouble.length > 0 ? (
+                  <span className="flex items-center gap-1">
+                    <StatusDot health={failing > 0 ? "fail" : "warn"} />
+                    {trouble.length}
+                    <span className="sr-only">
+                      {failing > 0
+                        ? t("overview.failingCount", failing)
+                        : t("overview.degradedCount", trouble.length)}
+                    </span>
+                  </span>
+                ) : null}
+              </span>
+            }
+            active={active}
+            defaultOpen={!many || trouble.length > 0 || active}
           >
             {group.services.map((s) => row(s, true))}
           </SidebarMenu>
