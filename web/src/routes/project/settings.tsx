@@ -250,20 +250,24 @@ function DetailsForm({
           <form.Subscribe
             selector={(s) =>
               [
-                s.canSubmit,
                 s.values.displayName.trim() !== initial.displayName ||
                   s.values.description.trim() !== initial.description ||
                   s.values.icon !== initial.icon,
               ] as const
             }
           >
-            {([canSubmit, changed]) => (
-              <CardFooter className="justify-end">
-                <Button type="submit" size="sm" disabled={!changed || !canSubmit}>
-                  {t("action.saveDetails")}
-                </Button>
-              </CardFooter>
-            )}
+            {([changed]) =>
+              changed ? (
+                <CardFooter className="justify-end">
+                  <Button type="button" variant="ghost" size="sm" onClick={() => form.reset()}>
+                    {t("draft.discard")}
+                  </Button>
+                  <Button type="submit" size="sm">
+                    {t("action.saveDetails")}
+                  </Button>
+                </CardFooter>
+              ) : null
+            }
           </form.Subscribe>
         )}
       </Card>
