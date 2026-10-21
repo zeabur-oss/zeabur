@@ -72,7 +72,6 @@ export const zhTW: Messages = {
   "column.label": "服務",
   "column.other": "其他物件",
   "column.advanced": "進階",
-  "column.allServices": "所有服務",
   "column.namespace": "Namespace",
 
   "theme.system": "跟隨系統",

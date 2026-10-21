@@ -5,7 +5,6 @@ import CubeIcon from "~icons/ph/cube"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GearSixIcon from "~icons/ph/gear-six"
 import InfoIcon from "~icons/ph/info"
-import ListBulletsIcon from "~icons/ph/list-bullets"
 import SquaresFourIcon from "~icons/ph/squares-four"
 import StackIcon from "~icons/ph/stack"
 
@@ -156,22 +155,7 @@ function ProjectNav({ project }: { project: string }) {
       <SearchRow />
       <SidebarContent>
         <SidebarGroup>{pages.map(pageRow)}</SidebarGroup>
-        <SidebarSection
-          title={t("column.label")}
-          action={
-            <Tooltip content={t("column.allServices")}>
-              <Link
-                to="/projects/$project"
-                params={{ project }}
-                search={{ view: "list" }}
-                aria-label={t("column.allServices")}
-                className="flex size-6 items-center justify-center rounded-md text-tertiary outline-none hover:text-main aria-[current=page]:text-main"
-              >
-                <ListBulletsIcon aria-hidden="true" className="size-3.5" />
-              </Link>
-            </Tooltip>
-          }
-        >
+        <SidebarSection title={t("column.label")}>
           {data ? (
             <Services project={project} data={data} />
           ) : (
@@ -190,7 +174,11 @@ function ProjectNav({ project }: { project: string }) {
             if (!advancedHolds) advancedSection.set(open)
           }}
         >
-          {pageRow({ entry: "objects", to: "/projects/$project/objects", icon: CubeIcon })}
+          {pageRow({
+            entry: "objects",
+            to: "/projects/$project/objects",
+            icon: CubeIcon,
+          })}
           {data && data.resources.length > 0 ? (
             <OtherObjects project={project} data={data} />
           ) : null}
@@ -268,7 +256,9 @@ function ServiceRow({
       tone={child ? "child" : "default"}
       render={
         <Link
-          {...serviceLink(project, service, { tab: place.entry ? undefined : place.tab })}
+          {...serviceLink(project, service, {
+            tab: place.entry ? undefined : place.tab,
+          })}
           activeOptions={{ exact: true, includeSearch: false }}
         />
       }

@@ -88,7 +88,6 @@ export const en = {
   "column.label": "Services",
   "column.other": "Other objects",
   "column.advanced": "Advanced",
-  "column.allServices": "All services",
   "column.namespace": "Namespace",
 
   "theme.system": "System theme",

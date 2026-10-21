@@ -409,8 +409,7 @@ test("the services search box follows the URL on Back and Forward", async ({ pag
   await expect(page).toHaveURL(new RegExp(`q=${failing}`))
   await expect(healthyRow).toHaveCount(0)
 
-  const sections = page.getByRole("navigation", { name: "Project sections" })
-  await sections.getByRole("link", { name: "All services" }).click()
+  await page.goto(`${project}?view=list`)
   await expect(page).not.toHaveURL(/q=/)
   await expect(box).toHaveValue("")
   await expect(healthyRow).toBeVisible()

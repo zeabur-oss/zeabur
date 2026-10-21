@@ -72,7 +72,6 @@ export const zhCN: Messages = {
   "column.label": "服务",
   "column.other": "其他对象",
   "column.advanced": "高级",
-  "column.allServices": "所有服务",
   "column.namespace": "Namespace",
 
   "theme.system": "跟随系统",
