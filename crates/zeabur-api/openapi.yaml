@@ -18,6 +18,128 @@ info:
     identifier: Apache-2.0
   version: 0.0.1
 paths:
+  /api/v1/account:
+    get:
+      tags:
+      - members
+      summary: |-
+        Your account: who you are, your passkeys and linked accounts. Reading passkeys needs the
+        rights to read Zeabur Identity's credentials, which only admins have by default.
+      operationId: getAccount
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountView"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/account/passkeys/{id}":
+    delete:
+      tags:
+      - members
+      summary: |-
+        Removes one of your passkeys or linked accounts. Your last passkey is refused: admin rights
+        need one, and without it you could not sign in again.
+      operationId: removePasskey
+      parameters:
+      - name: id
+        in: path
+        description: The `Credential` object's name
+        required: true
+        schema:
+          type: string
+      responses:
+        "204": {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    patch:
+      tags:
+      - members
+      summary: >-
+        Renames one of your passkeys; an empty name goes back to the one given when it
+        was added.
+      operationId: renamePasskey
+      parameters:
+      - name: id
+        in: path
+        description: The `Credential` object's name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PasskeyLabel"
+        required: true
+      responses:
+        "204": {}
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/account/setup-links:
+    post:
+      tags:
+      - members
+      summary: |-
+        A one-time link that adds a passkey to your account, valid for an hour. Open it on the device
+        or in the password manager that should hold the passkey.
+      operationId: createOwnSetupLink
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupLinkView"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster:
     get:
       tags:
@@ -247,6 +369,193 @@ paths:
               schema:
                 $ref: "#/components/schemas/Upgrades"
         "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/members:
+    get:
+      tags:
+      - members
+      summary: Everyone who can sign in, and the setup links waiting to be used.
+      operationId: listMembers
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembersView"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/members/invitations:
+    post:
+      tags:
+      - members
+      summary: "Invites someone: a one-time link that adds a passkey to their account, made a member if new."
+      operationId: inviteMember
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupLinkView"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/members/invitations/{name}":
+    delete:
+      tags:
+      - members
+      summary: >-
+        Revokes a setup link that has not been used. One already used or expired is
+        gone already.
+      operationId: revokeInvitation
+      parameters:
+      - name: name
+        in: path
+        description: The `Invitation` object's name
+        required: true
+        schema:
+          type: string
+      responses:
+        "204": {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/members/{username}":
+    delete:
+      tags:
+      - members
+      summary: |-
+        Removes a member: their links, passkeys, linked accounts and sessions, then the member.
+        Projects and everything in the cluster stay; RBAC bindings that name them stay too.
+      operationId: removeMember
+      parameters:
+      - name: username
+        in: path
+        description: The member's user name
+        required: true
+        schema:
+          type: string
+      responses:
+        "204": {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/members/{username}/credentials/{id}":
+    delete:
+      tags:
+      - members
+      summary: |-
+        Removes a member's passkey or linked account. Sessions it started keep renewing until they
+        end or are signed out; your own last passkey is refused.
+      operationId: removeMemberCredential
+      parameters:
+      - name: username
+        in: path
+        description: The member's user name
+        required: true
+        schema:
+          type: string
+      - name: id
+        in: path
+        description: The `Credential` object's name
+        required: true
+        schema:
+          type: string
+      responses:
+        "204": {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/members/{username}/setup-links":
+    post:
+      tags:
+      - members
+      summary: "A new setup link for a member: to add a passkey, or (`reset`) to start over after a lost one."
+      operationId: createSetupLink
+      parameters:
+      - name: username
+        in: path
+        description: The member's user name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetupLinkRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupLinkView"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
           content:
             application/problem+json:
               schema:
@@ -1584,6 +1893,46 @@ components:
       - ReadWriteOncePod
       - ReadWriteMany
       - ReadOnlyMany
+    AccountStatus:
+      type: string
+      description: Whether the person is a Zeabur Identity user Zeabur can show.
+      enum:
+      - identity
+      - missing
+      - kubernetes
+      - not-installed
+    AccountView:
+      type: object
+      description: The person's own account.
+      required:
+      - id
+      - kubernetesUsername
+      - status
+      - setupLinks
+      - canManage
+      properties:
+        canManage:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Whether the person may create invitations (and so add a passkey), as far as their rules
+            tell.
+        id:
+          type: string
+          description: "`account`."
+        kubernetesUsername:
+          type: string
+          description: Who the cluster says the person is.
+        member:
+          oneOf:
+          - $ref: "#/components/schemas/MemberView"
+            description: The account, when it does.
+          - type: "null"
+        setupLinks:
+          $ref: "#/components/schemas/SetupLinks"
+          description: Whether setup links can be made and redeemed.
+        status:
+          $ref: "#/components/schemas/AccountStatus"
+          description: Whether Zeabur Identity holds the account.
     AddressKind:
       type: string
       description: What kind of address a trace follows.
@@ -3933,6 +4282,64 @@ components:
           - string
           - "null"
           description: The installed chart version, when it can be read.
+    InvitationView:
+      type: object
+      description: |-
+        A pending one-time setup link. Its token is not kept anywhere: it can be revoked, not shown
+        again.
+      required:
+      - id
+      - name
+      - username
+      - expiresAt
+      - newMember
+      - origin
+      properties:
+        createdAt:
+          type:
+          - string
+          - "null"
+          description: When it was made.
+        expiresAt:
+          type: string
+          description: When it stops working, RFC 3339.
+        id:
+          type: string
+          description: "`members/invitations/<name>`."
+        name:
+          type: string
+          description: The `Invitation` object's name.
+        newMember:
+          type: boolean
+          description: Whether it is for someone who cannot sign in yet (no credential).
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `Invitation`.
+        username:
+          type: string
+          description: Who it enrols a passkey for.
+    InviteRequest:
+      type: object
+      description: Someone to invite.
+      required:
+      - username
+      properties:
+        admin:
+          type: boolean
+          description: >-
+            Whether a new member may take on admin rights (groups and elevated groups
+            `admins`).
+        displayName:
+          type:
+          - string
+          - "null"
+          description: Name shown in the interface, for a new member.
+        username:
+          type: string
+          description: |-
+            Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. An existing
+            member gets a link that adds a passkey; their name and role stay.
+      additionalProperties: false
     Kind:
       type: string
       description: |-
@@ -3984,6 +4391,33 @@ components:
             How long kube-apiserver asked clients to wait before retrying
             (`details.retryAfterSeconds`).
           minimum: 0
+    LinkedAccountView:
+      type: object
+      description: A GitHub or Google account linked for everyday sign-in.
+      required:
+      - id
+      - provider
+      - origin
+      properties:
+        createdAt:
+          type:
+          - string
+          - "null"
+          description: When it was linked.
+        id:
+          type: string
+          description: The `Credential` object's name.
+        lastUsedAt:
+          type:
+          - string
+          - "null"
+          description: When it last signed in, where recorded.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `Credential`.
+        provider:
+          type: string
+          description: "`GitHub` or `Google`."
     LogSnapshot:
       type: object
       description: A snapshot of a container's log.
@@ -4031,6 +4465,118 @@ components:
       - autoscaler
       - controller
       - other
+    MemberRole:
+      type: string
+      description: What a member may do in the cluster, as far as Zeabur Identity grants it.
+      enum:
+      - admin
+      - member
+    MemberView:
+      type: object
+      description: A person who can sign in.
+      required:
+      - id
+      - username
+      - groups
+      - role
+      - disabled
+      - passkeys
+      - linked
+      - sessions
+      - invitations
+      - you
+      - origin
+      properties:
+        disabled:
+          type: boolean
+          description: A disabled member cannot sign in.
+        displayName:
+          type:
+          - string
+          - "null"
+          description: Name shown in the interface.
+        groups:
+          type: array
+          items:
+            type: string
+          description: Groups; Kubernetes sees each as `zeabur:<group>`.
+        id:
+          type: string
+          description: "`members/<username>`."
+        invitations:
+          type: integer
+          description: Pending setup links.
+          minimum: 0
+        lastSignInAt:
+          type:
+          - string
+          - "null"
+          description: "The latest sign-in Zeabur Identity knows of: from live sessions and recorded last use."
+        linked:
+          type: array
+          items:
+            $ref: "#/components/schemas/LinkedAccountView"
+          description: Linked GitHub or Google accounts.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `User`.
+        passkeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/PasskeyView"
+          description: Passkeys, oldest first.
+        role:
+          $ref: "#/components/schemas/MemberRole"
+          description: Admin or member.
+        sessions:
+          type: integer
+          description: Signed-in sessions (grants) that can still renew.
+          minimum: 0
+        username:
+          type: string
+          description: Login name; Kubernetes sees `zeabur:<username>`.
+        you:
+          type: boolean
+          description: Whether this is the person asking.
+    MembersView:
+      type: object
+      description: Everyone who can sign in, and the links waiting to be used.
+      required:
+      - id
+      - installed
+      - items
+      - invitations
+      - setupLinks
+      - canManage
+      - unreadable
+      properties:
+        canManage:
+          $ref: "#/components/schemas/Permission"
+          description: Whether the person may create invitations, as far as their rules tell.
+        id:
+          type: string
+          description: "`members`."
+        installed:
+          type: boolean
+          description: Whether Zeabur Identity is installed; when not, everything else is empty.
+        invitations:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvitationView"
+          description: Pending invitations, soonest to expire first.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberView"
+          description: Members, by user name.
+        setupLinks:
+          $ref: "#/components/schemas/SetupLinks"
+          description: Whether setup links can be made and redeemed.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: Kinds the person may not read (invitations, grants), whose parts are left out.
     Message:
       type: object
       description: |-
@@ -4805,6 +5351,55 @@ components:
       - owned
       - shared
       - orphan
+    PasskeyLabel:
+      type: object
+      description: A passkey's new name.
+      properties:
+        label:
+          type:
+          - string
+          - "null"
+          description: At most 64 characters; empty or `null` goes back to the name given at enrolment.
+      additionalProperties: false
+    PasskeyView:
+      type: object
+      description: "A passkey: a way to sign in that lives on a device or in a password manager."
+      required:
+      - id
+      - synced
+      - origin
+      properties:
+        authenticator:
+          type:
+          - string
+          - "null"
+          description: The authenticator model (AAGUID), when it reported one.
+        createdAt:
+          type:
+          - string
+          - "null"
+          description: When it was added, RFC 3339.
+        id:
+          type: string
+          description: The `Credential` object's name.
+        label:
+          type:
+          - string
+          - "null"
+          description: The name its owner gave it, at enrolment or since.
+        lastUsedAt:
+          type:
+          - string
+          - "null"
+          description: When it last signed in, where Zeabur Identity records it.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `Credential`.
+        synced:
+          type: boolean
+          description: >-
+            Whether it may be synced to the owner's other devices (the authenticator's BE
+            flag).
     PendingRestart:
       type: object
       description: |-
@@ -7278,6 +7873,63 @@ components:
       enum:
       - default
       - setting
+    SetupLinkRequest:
+      type: object
+      description: A member's setup link.
+      properties:
+        reset:
+          type: boolean
+          description: |-
+            Also remove their passkeys, linked accounts, sessions and other links first, so only
+            whoever opens this link gets in.
+      additionalProperties: false
+    SetupLinkView:
+      type: object
+      description: "A one-time setup link, shown once: only its hash is kept."
+      required:
+      - url
+      - username
+      - expiresAt
+      - name
+      - createdMember
+      - reset
+      properties:
+        createdMember:
+          type: boolean
+          description: Whether the member was created now.
+        expiresAt:
+          type: string
+          description: When it stops working, RFC 3339.
+        name:
+          type: string
+          description: The `Invitation` object's name, to revoke it.
+        reset:
+          type: boolean
+          description: Whether their passkeys, sessions and other links were removed first.
+        url:
+          type: string
+          description: The link; whoever opens it first adds a passkey to the account.
+        username:
+          type: string
+          description: Whose account it adds a passkey to.
+    SetupLinks:
+      type: object
+      description: Whether setup links can be made and redeemed here.
+      properties:
+        accepted:
+          type:
+          - boolean
+          - "null"
+          description: |-
+            Whether Zeabur Identity redeems invitations (`--invitations`), from its Deployment;
+            `None` when it could not be read.
+        issuer:
+          type:
+          - string
+          - "null"
+          description: |-
+            The address links open at; `None` when neither the server's configuration nor the
+            Identity Deployment (where it can be read) names it.
     Severity:
       type: string
       description: How much a state matters, from nothing to act on to act now.
@@ -8017,6 +8669,8 @@ components:
 tags:
 - name: identity
   description: Who you are
+- name: members
+  description: "Your account and everyone Zeabur Identity signs in: passkeys, setup links, removals"
 - name: cluster
   description: The cluster and what it has installed
 - name: projects

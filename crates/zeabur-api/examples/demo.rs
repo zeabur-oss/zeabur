@@ -58,6 +58,127 @@ fn from<T: serde::de::DeserializeOwned>(value: Value) -> T {
     serde_json::from_value(value).expect("valid example object")
 }
 
+/// One of Zeabur Identity's objects in `zeabur-identity`, labelled with its user when it has one.
+fn identity_object(
+    kind: &str,
+    name: &str,
+    created: &str,
+    spec: &Value,
+    extra: &Value,
+) -> DynamicObject {
+    let labels = spec.get("user").and_then(Value::as_str).map_or_else(
+        || json!({}),
+        |user| json!({"identity.zeabur.com/user": user}),
+    );
+    let annotations = extra
+        .get("annotations")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let metadata = json!({"name": name, "namespace": "zeabur-identity",
+        "uid": format!("identity-{name}"), "creationTimestamp": created,
+        "labels": labels, "annotations": annotations});
+    from(
+        json!({"apiVersion": "identity.zeabur.com/v1alpha1", "kind": kind,
+        "metadata": metadata, "spec": spec}),
+    )
+}
+
+/// Zeabur Identity's people: Alice (an admin with two passkeys), Bob (one passkey and a link
+/// that adds another), Carol (GitHub and a passkey), and Dan, invited and not yet signed in.
+fn people() -> Vec<DynamicObject> {
+    let now = Timestamp::now().as_second();
+    let last_used = Timestamp::from_second(now - 600).map_or_default(|t| t.to_string());
+    let passkey = |name: &str, user: &str, created: &str, label: &str, extra: &Value| {
+        identity_object(
+            "Credential",
+            name,
+            created,
+            &json!({"user": user, "type": "Passkey",
+            "passkey": {"credentialId": name, "record": "{}", "backupEligible": false,
+                        "label": label}}),
+            extra,
+        )
+    };
+    let user = |name: &str, display: &str, admin: bool, created: &str| {
+        let groups = if admin { json!(["admins"]) } else { json!([]) };
+        identity_object(
+            "User",
+            name,
+            created,
+            &json!({"username": name, "displayName": display,
+            "groups": groups, "elevatedGroups": groups}),
+            &json!({}),
+        )
+    };
+    let grant = |name: &str, user: &str, ago: i64| {
+        identity_object(
+            "Grant",
+            name,
+            "2026-10-01T00:00:00Z",
+            &json!({"user": user,
+            "client": "zeabur", "audience": "zeabur", "authTime": now - ago,
+            "expiresAt": now + 86_400}),
+            &json!({}),
+        )
+    };
+    let invitation = |name: &str, user: &str, days: i64| {
+        identity_object(
+            "Invitation",
+            name,
+            "2026-10-20T09:00:00Z",
+            &json!({"user": user,
+            "tokenHash": "sha256:0000", "expiresAt": now + days * 86_400}),
+            &json!({}),
+        )
+    };
+    vec![
+        user("alice", "Alice Wang", true, "2026-03-02T08:00:00Z"),
+        user("bob", "Bob Chen", false, "2026-05-11T10:30:00Z"),
+        user("carol", "Carol Lin", false, "2026-07-21T04:12:00Z"),
+        user("dan", "", false, "2026-10-20T09:00:00Z"),
+        passkey(
+            "cred-alice-mac",
+            "alice",
+            "2026-03-02T08:01:00Z",
+            "MacBook Pro",
+            &json!({"annotations": {"identity.zeabur.com/last-used-at": last_used}}),
+        ),
+        passkey(
+            "cred-alice-phone",
+            "alice",
+            "2026-03-02T08:05:00Z",
+            "iPhone",
+            &json!({}),
+        ),
+        passkey(
+            "cred-bob-key",
+            "bob",
+            "2026-05-11T10:31:00Z",
+            "YubiKey 5C",
+            &json!({}),
+        ),
+        passkey(
+            "cred-carol-laptop",
+            "carol",
+            "2026-07-21T04:13:00Z",
+            "",
+            &json!({}),
+        ),
+        identity_object(
+            "Credential",
+            "cred-carol-github",
+            "2026-07-22T02:00:00Z",
+            &json!({"user": "carol", "type": "GitHub",
+                    "external": {"issuer": "https://github.com", "subject": "1048576"}}),
+            &json!({}),
+        ),
+        grant("grant-alice", "alice", 600),
+        grant("grant-bob", "bob", 3 * 86_400),
+        invitation("inv-3f9a1c0d7e2b4a6f", "dan", 6),
+        invitation("inv-8c2e5b1a9d4f7e30", "bob", 1),
+    ]
+}
+
 /// A Deployment in `shop` with one container, its selector `app=<name>`.
 fn deployment(name: &str, image: &str, replicas: i32, ready: i32, env: &Value) -> Deployment {
     deployment_in("shop", name, image, replicas, ready, env)
@@ -959,8 +1080,8 @@ fn state() -> State {
         .join("\n");
     State {
         identity: Identity {
-            username: "alice@example.com".to_owned(),
-            groups: vec!["developers".to_owned()],
+            username: "zeabur:alice".to_owned(),
+            groups: vec!["zeabur:admins".to_owned()],
         },
         namespaces: vec![
             namespace("shop", true),
@@ -1008,6 +1129,22 @@ fn state() -> State {
                 true,
             ),
             ServedResource::readable("upgrade.cattle.io", "v1", "plans", "Plan", true),
+            ServedResource::readable("identity.zeabur.com", "v1alpha1", "users", "User", true),
+            ServedResource::readable(
+                "identity.zeabur.com",
+                "v1alpha1",
+                "credentials",
+                "Credential",
+                true,
+            ),
+            ServedResource::readable(
+                "identity.zeabur.com",
+                "v1alpha1",
+                "invitations",
+                "Invitation",
+                true,
+            ),
+            ServedResource::readable("identity.zeabur.com", "v1alpha1", "grants", "Grant", true),
         ],
         dynamic: [
             usage("vps-1", "1420m", "1730Mi"),
@@ -1022,6 +1159,7 @@ fn state() -> State {
         ]
         .into_iter()
         .chain(live)
+        .chain(people())
         .collect(),
         // The metrics store where Zeabur's recommendation installs it.
         proxied: BTreeMap::from([(
@@ -1300,7 +1438,7 @@ fn store(path: &str) -> Result<Value, zeabur_core::problem::KubernetesStatus> {
             403,
             "Forbidden",
             "services \"vmsingle-vm-victoria-metrics-k8s-stack:8428\" is forbidden: User \
-             \"alice@example.com\" cannot get resource \"services/proxy\" in API group \"\" in \
+             \"zeabur:alice\" cannot get resource \"services/proxy\" in API group \"\" in \
              the namespace \"observability\"",
         ));
     }
@@ -1760,6 +1898,10 @@ async fn main() -> std::io::Result<()> {
     // Settings are kept in an `zeabur` namespace, as on the in-cluster server.
     let settings = zeabur_api::Settings {
         namespace: Some("zeabur".to_owned()),
+        identity: zeabur_api::settings::IdentitySettings {
+            issuer: Some("https://identity.example.com".to_owned()),
+            ..zeabur_api::settings::IdentitySettings::default()
+        },
         ..zeabur_api::Settings::default()
     };
     let app = zeabur_api::router_with_settings(Arc::new(access), settings)

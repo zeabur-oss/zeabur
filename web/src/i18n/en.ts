@@ -1563,6 +1563,149 @@ export const en = {
     "Zeabur runs on this computer and keeps no settings. Start it with --metrics-service namespace/name:port to use another store.",
   "settings.storeTenancy":
     "Anyone who can read the store can read every project's metrics. Grant access only to people who may see the whole cluster.",
+  // Account and members (Zeabur Identity)
+  "shell.account": "Account",
+  "shell.members": "Members",
+  "account.title": "Account",
+  "account.you": "You",
+  "account.name": "Name",
+  "account.username": "User name",
+  "account.role": "Role",
+  "account.kubernetesUser": "Kubernetes user",
+  "account.passkeys": "Passkeys",
+  "account.yourPasskeys": "your passkeys",
+  "account.addPasskey": "Add a passkey",
+  "account.adding": "Adding a passkey",
+  "account.denied":
+    "Adding a passkey needs rights you don't have here. Ask a cluster administrator.",
+  "account.backup": "Add a backup passkey on your phone; one lost device must not lock you out.",
+  "account.noPasskey":
+    "You have no passkey. Add one, or you can't sign in again once this session ends.",
+  "account.linked": "Linked accounts",
+  "account.kubernetes": (user: string) =>
+    `You're signed in as ${user} with a kubeconfig, not with Zeabur Identity, so there are no passkeys to manage here.`,
+  "account.missing": (user: string) => `Zeabur Identity has no account for ${user}.`,
+  "account.notInstalled":
+    "Zeabur Identity isn't installed in this cluster, so there are no passkeys to manage here.",
+  "passkey.unnamed": "Passkey",
+  "passkey.nameLabel": "Passkey name",
+  "passkey.added": (date: string) => `Added ${date}`,
+  "passkey.lastUsed": "Last used",
+  "passkey.none": "No passkeys.",
+  "passkey.rename": "Rename",
+  "passkey.save": "Save",
+  "passkey.remove": "Remove",
+  "passkey.renamed": "Passkey renamed",
+  "passkey.removed": "Passkey removed",
+  "passkey.lastKept": "Your only passkey can't be removed. Add another first.",
+  "passkey.removeTitle": (name: string) => `Remove ${name}?`,
+  "passkey.removeOwn": (name: string) =>
+    `You can no longer sign in with ${name}. Your other passkeys keep working.`,
+  "passkey.removeOther": (name: string, member: string) =>
+    `${member} can no longer sign in with ${name}.`,
+  "passkey.sessionsStay": "Sessions it already started keep working until they end.",
+  "passkey.removeAction": "Remove passkey",
+  "linked.none": "None.",
+  "linked.remove": "Unlink",
+  "linked.removed": "Account unlinked",
+  "linked.removeTitle": (provider: string) => `Unlink ${provider}?`,
+  "linked.removeOwn": (provider: string) =>
+    `You can no longer sign in with this ${provider} account. Your passkeys keep working.`,
+  "linked.removeOther": (member: string, provider: string) =>
+    `${member} can no longer sign in with this ${provider} account.`,
+  "link.copy": "Copy link",
+  "link.open": "Open the setup page",
+  "link.done": "Done",
+  "link.expires": (when: string) => `Works once, until ${when}.`,
+  "link.once": "It isn't shown again.",
+  "link.own":
+    "The setup page opened in a new tab: finish there. To keep a backup on your phone, open this link on the phone instead.",
+  "link.send": (user: string) =>
+    `Send this link to ${user}. Whoever opens it first adds a passkey to ${user}'s account.`,
+  "members.title": "Members",
+  "members.everyone": "the members",
+  "members.invite": "Invite",
+  "members.denied":
+    "Inviting and changing members needs rights you don't have here. Ask a cluster administrator.",
+  "members.inviting": "Inviting members",
+  "members.filter": "Filter members",
+  "members.none": "No one can sign in yet.",
+  "members.noMatch": "No members match.",
+  "members.you": "(you)",
+  "members.role.admin": "Admin",
+  "members.role.member": "Member",
+  "members.adminHint": "Can take on admin rights, which give full control of the cluster.",
+  "members.disabled": "Disabled",
+  "members.column.name": "Name",
+  "members.column.role": "Role",
+  "members.column.passkeys": "Passkeys",
+  "members.column.lastSignIn": "Last sign-in",
+  "members.sessions": "Sessions",
+  "members.passkeys": (n: number) => `${n} ${n === 1 ? "passkey" : "passkeys"}`,
+  "members.noPasskey": "No passkey",
+  "members.noPasskeyHint": "Can't sign in until they open a setup link.",
+  "members.onePasskeyHint": "One lost device locks them out. A second passkey is a backup.",
+  "members.actions": (name: string) => `Actions for ${name}`,
+  "members.newLink": "New setup link",
+  "members.reset": "Reset after a lost device",
+  "members.remove": "Remove member",
+  "members.pending": "Pending setup links",
+  "members.pendingNew": "New member",
+  "members.pendingAdds": "Adds a passkey",
+  "members.expires": (when: string) => `Expires ${when}`,
+  "members.revoke": "Revoke",
+  "members.revoked": "Link revoked",
+  "members.notInstalled": "Zeabur Identity isn't installed",
+  "members.notInstalledBody": "Members are the people Zeabur Identity signs in to this cluster.",
+  "members.noIssuer":
+    "Zeabur doesn't know Zeabur Identity's address, so it can't make setup links. Start Zeabur with --issuer-url.",
+  "members.notRedeemed":
+    "Zeabur Identity doesn't accept setup links yet: they work once it runs with --invitations.",
+  "invite.title": "Invite a member",
+  "invite.body":
+    "Makes a one-time link that works for 7 days. Whoever opens it first adds a passkey and signs in as this member.",
+  "invite.username": "User name",
+  "invite.usernameHint": "Lower-case letters, digits, - and . only.",
+  "invite.invalid": "Use lower-case letters, digits, - and . only, at most 63.",
+  "invite.existing": (user: string) =>
+    `${user} is already a member: the link adds a passkey to their account.`,
+  "invite.displayName": "Display name",
+  "invite.optional": "(optional)",
+  "invite.admin": "Admin",
+  "invite.create": "Create link",
+  "reset.title": (name: string) => `New setup link for ${name}`,
+  "reset.keep": (name: string) =>
+    `Adds a passkey to ${name}'s account; nothing is removed. The link works once, for 24 hours.`,
+  "reset.option":
+    "Also remove their passkeys, linked accounts and sessions, for a lost or stolen device",
+  "reset.consequence": (name: string, parts: string) =>
+    `${name} loses ${parts} now. Until someone opens the new link, nobody can sign in as ${name}.`,
+  "reset.consequenceNone": (name: string) =>
+    `${name}'s other setup links stop working. Until someone opens the new link, nobody can sign in as ${name}.`,
+  "reset.passkeys": (n: number) => `${n} ${n === 1 ? "passkey" : "passkeys"}`,
+  "reset.linked": (n: number) => `${n} linked ${n === 1 ? "account" : "accounts"}`,
+  "reset.sessions": (n: number) => `${n} ${n === 1 ? "session" : "sessions"}`,
+  "reset.resetCreate": "Reset and create link",
+  "remove.title": (name: string) => `Remove ${name}?`,
+  "remove.consequence": (name: string) =>
+    `${name} can no longer sign in: their passkeys, linked accounts, sessions and setup links are removed.`,
+  "remove.stays": (user: string) =>
+    `Projects and everything in the cluster stay. Role bindings that name ${user} stay too.`,
+  "remove.action": (name: string) => `Remove ${name}`,
+  "remove.done": (name: string) => `Removed ${name}`,
+  "sentence.account.lastPasskey": () => "This is your only passkey",
+  "sentence.account.lastPasskey.fix": () => "Add another passkey first, then remove this one.",
+  "sentence.members.resetSelf": () => "You can't reset your own account",
+  "sentence.members.resetSelf.fix": () =>
+    "Add a passkey from your account instead, or ask another admin.",
+  "sentence.members.removeSelf": () => "You can't remove yourself",
+  "sentence.members.removeSelf.fix": () => "Ask another admin to remove you.",
+  "sentence.members.noIssuer": () => "Zeabur doesn't know Zeabur Identity's address",
+  "sentence.members.noIssuer.fix": () => "Start Zeabur with --issuer-url.",
+  "sentence.members.notInstalled": () => "Zeabur Identity isn't installed",
+  "sentence.members.notInstalled.fix": () =>
+    "Install Zeabur Identity, or start Zeabur with the namespace it runs in.",
+  // Account and members end
   // Sentences the server names by key (problems; diagnoses, gaps, traces and incidents are spread in
   // above); `writeSentence` finds them under `sentence.<key>`.
   "sentence.problem.forbidden.fix.askForRule": (p: P) =>

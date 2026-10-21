@@ -4,6 +4,67 @@
  */
 
 export interface paths {
+  "/api/v1/account": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Your account: who you are, your passkeys and linked accounts. Reading passkeys needs the
+     *     rights to read Zeabur Identity's credentials, which only admins have by default.
+     */
+    get: operations["getAccount"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/account/passkeys/{id}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Removes one of your passkeys or linked accounts. Your last passkey is refused: admin rights
+     *     need one, and without it you could not sign in again.
+     */
+    delete: operations["removePasskey"]
+    options?: never
+    head?: never
+    /** Renames one of your passkeys; an empty name goes back to the one given when it was added. */
+    patch: operations["renamePasskey"]
+    trace?: never
+  }
+  "/api/v1/account/setup-links": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * A one-time link that adds a passkey to your account, valid for an hour. Open it on the device
+     *     or in the password manager that should hold the passkey.
+     */
+    post: operations["createOwnSetupLink"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster": {
     parameters: {
       query?: never
@@ -178,6 +239,114 @@ export interface paths {
     get: operations["getUpgrades"]
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/members": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Everyone who can sign in, and the setup links waiting to be used. */
+    get: operations["listMembers"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/members/invitations": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Invites someone: a one-time link that adds a passkey to their account, made a member if new. */
+    post: operations["inviteMember"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/members/invitations/{name}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Revokes a setup link that has not been used. One already used or expired is gone already. */
+    delete: operations["revokeInvitation"]
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/members/{username}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Removes a member: their links, passkeys, linked accounts and sessions, then the member.
+     *     Projects and everything in the cluster stay; RBAC bindings that name them stay too.
+     */
+    delete: operations["removeMember"]
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/members/{username}/credentials/{id}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * Removes a member's passkey or linked account. Sessions it started keep renewing until they
+     *     end or are signed out; your own last passkey is refused.
+     */
+    delete: operations["removeMemberCredential"]
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/members/{username}/setup-links": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** A new setup link for a member: to add a passkey, or (`reset`) to start over after a lost one. */
+    post: operations["createSetupLink"]
     delete?: never
     options?: never
     head?: never
@@ -924,6 +1093,28 @@ export interface components {
      * @enum {string}
      */
     AccessMode: "ReadWriteOnce" | "ReadWriteOncePod" | "ReadWriteMany" | "ReadOnlyMany"
+    /**
+     * @description Whether the person is a Zeabur Identity user Zeabur can show.
+     * @enum {string}
+     */
+    AccountStatus: "identity" | "missing" | "kubernetes" | "not-installed"
+    /** @description The person's own account. */
+    AccountView: {
+      /**
+       * @description Whether the person may create invitations (and so add a passkey), as far as their rules
+       *     tell.
+       */
+      canManage: components["schemas"]["Permission"]
+      /** @description `account`. */
+      id: string
+      /** @description Who the cluster says the person is. */
+      kubernetesUsername: string
+      member?: components["schemas"]["MemberView"] | null
+      /** @description Whether setup links can be made and redeemed. */
+      setupLinks: components["schemas"]["SetupLinks"]
+      /** @description Whether Zeabur Identity holds the account. */
+      status: components["schemas"]["AccountStatus"]
+    }
     /**
      * @description What kind of address a trace follows.
      * @enum {string}
@@ -2138,6 +2329,38 @@ export interface components {
       version?: string | null
     }
     /**
+     * @description A pending one-time setup link. Its token is not kept anywhere: it can be revoked, not shown
+     *     again.
+     */
+    InvitationView: {
+      /** @description When it was made. */
+      createdAt?: string | null
+      /** @description When it stops working, RFC 3339. */
+      expiresAt: string
+      /** @description `members/invitations/<name>`. */
+      id: string
+      /** @description The `Invitation` object's name. */
+      name: string
+      /** @description Whether it is for someone who cannot sign in yet (no credential). */
+      newMember: boolean
+      /** @description The `Invitation`. */
+      origin: components["schemas"]["Origin"]
+      /** @description Who it enrols a passkey for. */
+      username: string
+    }
+    /** @description Someone to invite. */
+    InviteRequest: {
+      /** @description Whether a new member may take on admin rights (groups and elevated groups `admins`). */
+      admin?: boolean
+      /** @description Name shown in the interface, for a new member. */
+      displayName?: string | null
+      /**
+       * @description Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. An existing
+       *     member gets a link that adds a passkey; their name and role stay.
+       */
+      username: string
+    }
+    /**
      * @description What went wrong, in categories a person can act on. An open set: clients must expect new
      *     values and treat an unknown one by its HTTP status.
      * @enum {string}
@@ -2178,6 +2401,19 @@ export interface components {
        */
       retryAfterSeconds?: number | null
     }
+    /** @description A GitHub or Google account linked for everyday sign-in. */
+    LinkedAccountView: {
+      /** @description When it was linked. */
+      createdAt?: string | null
+      /** @description The `Credential` object's name. */
+      id: string
+      /** @description When it last signed in, where recorded. */
+      lastUsedAt?: string | null
+      /** @description The `Credential`. */
+      origin: components["schemas"]["Origin"]
+      /** @description `GitHub` or `Google`. */
+      provider: string
+    }
     /** @description A snapshot of a container's log. */
     LogSnapshot: {
       /** @description The lines, oldest first. */
@@ -2210,6 +2446,57 @@ export interface components {
       | "autoscaler"
       | "controller"
       | "other"
+    /**
+     * @description What a member may do in the cluster, as far as Zeabur Identity grants it.
+     * @enum {string}
+     */
+    MemberRole: "admin" | "member"
+    /** @description A person who can sign in. */
+    MemberView: {
+      /** @description A disabled member cannot sign in. */
+      disabled: boolean
+      /** @description Name shown in the interface. */
+      displayName?: string | null
+      /** @description Groups; Kubernetes sees each as `zeabur:<group>`. */
+      groups: string[]
+      /** @description `members/<username>`. */
+      id: string
+      /** @description Pending setup links. */
+      invitations: number
+      /** @description The latest sign-in Zeabur Identity knows of: from live sessions and recorded last use. */
+      lastSignInAt?: string | null
+      /** @description Linked GitHub or Google accounts. */
+      linked: components["schemas"]["LinkedAccountView"][]
+      /** @description The `User`. */
+      origin: components["schemas"]["Origin"]
+      /** @description Passkeys, oldest first. */
+      passkeys: components["schemas"]["PasskeyView"][]
+      /** @description Admin or member. */
+      role: components["schemas"]["MemberRole"]
+      /** @description Signed-in sessions (grants) that can still renew. */
+      sessions: number
+      /** @description Login name; Kubernetes sees `zeabur:<username>`. */
+      username: string
+      /** @description Whether this is the person asking. */
+      you: boolean
+    }
+    /** @description Everyone who can sign in, and the links waiting to be used. */
+    MembersView: {
+      /** @description Whether the person may create invitations, as far as their rules tell. */
+      canManage: components["schemas"]["Permission"]
+      /** @description `members`. */
+      id: string
+      /** @description Whether Zeabur Identity is installed; when not, everything else is empty. */
+      installed: boolean
+      /** @description Pending invitations, soonest to expire first. */
+      invitations: components["schemas"]["InvitationView"][]
+      /** @description Members, by user name. */
+      items: components["schemas"]["MemberView"][]
+      /** @description Whether setup links can be made and redeemed. */
+      setupLinks: components["schemas"]["SetupLinks"]
+      /** @description Kinds the person may not read (invitations, grants), whose parts are left out. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /**
      * @description A sentence a client words in its own language: a stable key and the values it names.
      *
@@ -2599,6 +2886,28 @@ export interface components {
      * @enum {string}
      */
     Ownership: "owned" | "shared" | "orphan"
+    /** @description A passkey's new name. */
+    PasskeyLabel: {
+      /** @description At most 64 characters; empty or `null` goes back to the name given at enrolment. */
+      label?: string | null
+    }
+    /** @description A passkey: a way to sign in that lives on a device or in a password manager. */
+    PasskeyView: {
+      /** @description The authenticator model (AAGUID), when it reported one. */
+      authenticator?: string | null
+      /** @description When it was added, RFC 3339. */
+      createdAt?: string | null
+      /** @description The `Credential` object's name. */
+      id: string
+      /** @description The name its owner gave it, at enrolment or since. */
+      label?: string | null
+      /** @description When it last signed in, where Zeabur Identity records it. */
+      lastUsedAt?: string | null
+      /** @description The `Credential`. */
+      origin: components["schemas"]["Origin"]
+      /** @description Whether it may be synced to the owner's other devices (the authenticator's BE flag). */
+      synced: boolean
+    }
     /**
      * @description A variable's ConfigMap or Secret was written after the oldest running pod started.
      *
@@ -3867,6 +4176,42 @@ export interface components {
      * @enum {string}
      */
     SettingSource: "default" | "setting"
+    /** @description A member's setup link. */
+    SetupLinkRequest: {
+      /**
+       * @description Also remove their passkeys, linked accounts, sessions and other links first, so only
+       *     whoever opens this link gets in.
+       */
+      reset?: boolean
+    }
+    /** @description A one-time setup link, shown once: only its hash is kept. */
+    SetupLinkView: {
+      /** @description Whether the member was created now. */
+      createdMember: boolean
+      /** @description When it stops working, RFC 3339. */
+      expiresAt: string
+      /** @description The `Invitation` object's name, to revoke it. */
+      name: string
+      /** @description Whether their passkeys, sessions and other links were removed first. */
+      reset: boolean
+      /** @description The link; whoever opens it first adds a passkey to the account. */
+      url: string
+      /** @description Whose account it adds a passkey to. */
+      username: string
+    }
+    /** @description Whether setup links can be made and redeemed here. */
+    SetupLinks: {
+      /**
+       * @description Whether Zeabur Identity redeems invitations (`--invitations`), from its Deployment;
+       *     `None` when it could not be read.
+       */
+      accepted?: boolean | null
+      /**
+       * @description The address links open at; `None` when neither the server's configuration nor the
+       *     Identity Deployment (where it can be read) names it.
+       */
+      issuer?: string | null
+    }
     /**
      * @description How much a state matters, from nothing to act on to act now.
      * @enum {string}
@@ -4276,6 +4621,176 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  getAccount: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["AccountView"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  removePasskey: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The `Credential` object's name */
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  renamePasskey: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The `Credential` object's name */
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PasskeyLabel"]
+      }
+    }
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  createOwnSetupLink: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["SetupLinkView"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
   getCluster: {
     parameters: {
       query?: never
@@ -4520,6 +5035,256 @@ export interface operations {
         }
       }
       401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listMembers: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["MembersView"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  inviteMember: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InviteRequest"]
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["SetupLinkView"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  revokeInvitation: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The `Invitation` object's name */
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  removeMember: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The member's user name */
+        username: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  removeMemberCredential: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The member's user name */
+        username: string
+        /** @description The `Credential` object's name */
+        id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  createSetupLink: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The member's user name */
+        username: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SetupLinkRequest"]
+      }
+    }
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["SetupLinkView"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
         headers: {
           [name: string]: unknown
         }

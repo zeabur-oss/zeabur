@@ -59,6 +59,27 @@ pub struct Settings {
     pub cluster_name: Option<String>,
     /// The host of the URL people open Zeabur at, when the server was started with one.
     pub public_host: Option<String>,
+    /// Where Zeabur Identity keeps its people (see [`crate::members`]).
+    pub identity: IdentitySettings,
+}
+
+/// Where Zeabur Identity keeps its people, and the address its setup links open.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IdentitySettings {
+    /// The namespace of its `User`, `Credential`, `Invitation` and `Grant` objects.
+    pub namespace: String,
+    /// Its issuer URL (`https://identity.example.com`), which setup links start with; `None`
+    /// where the server was not started with one, and the Identity Deployment's is read instead.
+    pub issuer: Option<String>,
+}
+
+impl Default for IdentitySettings {
+    fn default() -> Self {
+        Self {
+            namespace: crate::members::DEFAULT_NAMESPACE.to_owned(),
+            issuer: None,
+        }
+    }
 }
 
 impl Default for Settings {
@@ -69,6 +90,7 @@ impl Default for Settings {
             terminal: TerminalSettings::default(),
             cluster_name: None,
             public_host: None,
+            identity: IdentitySettings::default(),
         }
     }
 }
