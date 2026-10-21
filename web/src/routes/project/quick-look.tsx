@@ -10,6 +10,7 @@ import { EventList } from "@/components/events"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus, StatusDot } from "@/components/status"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
+import type { usePresence } from "@zeabur/design-system/components/presence"
 import { useT } from "@/i18n"
 import { podLogsLink, serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
@@ -26,6 +27,7 @@ import {
 } from "@/model/service"
 
 export function QuickLook({
+  presence,
   project,
   service,
   services,
@@ -34,6 +36,7 @@ export function QuickLook({
   onClose,
   onSelect,
 }: {
+  presence: ReturnType<typeof usePresence>["props"]
   project: string
   service: Service
   services: Service[]
@@ -53,6 +56,8 @@ export function QuickLook({
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [onClose])
+
+  useEffect(() => presence.ref.current?.focus(), [presence.ref])
 
   const row = (edge: Edge, direction: "in" | "out") => {
     const otherId = direction === "out" ? edge.to : edge.from
@@ -92,10 +97,10 @@ export function QuickLook({
 
   return (
     <aside
-      ref={focusOnMount}
+      {...presence}
       tabIndex={-1}
       aria-label={t("quickLook.label", service.name)}
-      className="enter-from-right absolute inset-y-0 right-0 z-30 flex w-full flex-col overflow-y-auto border-l bg-background shadow-2xl outline-none sm:w-100"
+      className="sheet-motion-end absolute inset-y-0 right-0 z-30 flex w-full flex-col overflow-y-auto border-l bg-background shadow-2xl outline-none sm:w-100"
     >
       <header className="flex flex-col gap-3 border-b p-4">
         <div className="flex items-start gap-3">
@@ -105,7 +110,7 @@ export function QuickLook({
               {service.displayName ?? service.name}
             </h2>
             <span className="flex flex-wrap items-center gap-2">
-              <ServiceStatus status={statusOf(service)} size="sm" counts />
+              <ServiceStatus status={statusOf(service)} size="sm" counts swap />
               <span className="type-meta text-muted-foreground" translate="no">
                 {service.kind}
               </span>
@@ -182,9 +187,4 @@ export function QuickLook({
       </section>
     </aside>
   )
-}
-
-/** Outside the component, so React calls it on mount, not on every render. */
-function focusOnMount(element: HTMLElement | null) {
-  element?.focus()
 }

@@ -9,6 +9,7 @@ import PlusIcon from "~icons/ph/plus"
 
 import { Hint } from "@/components/bits"
 import { Badge } from "@zeabur/design-system/components/badge"
+import { usePresence } from "@zeabur/design-system/components/presence"
 import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot, useStatusWord } from "@/components/status"
 import { useT } from "@/i18n"
@@ -47,14 +48,19 @@ export function ProjectMap({
   const t = useT()
   const events = useProjectEvents(project)
   const edges = edgesOf(data)
-  const open = data.services.find((s) => serviceId(s) === selected)
+  // The last service shown stays in the panel while it closes.
+  const [shown, setShown] = useState(selected)
+  if (selected && selected !== shown) setShown(selected)
+  const open = data.services.find((s) => serviceId(s) === shown)
+  const presence = usePresence(Boolean(selected && open))
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
       <Graph project={project} data={data} selected={selected} onOpen={onSelect} />
-      {open ? (
+      {open && presence.mounted ? (
         <QuickLook
           key={serviceId(open)}
+          presence={presence.props}
           project={project}
           service={open}
           services={data.services}
