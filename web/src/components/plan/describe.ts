@@ -281,10 +281,12 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
   const ops = new Set(ask.changes.map((c) => c.op))
   const [change] = ask.changes
   if (!change) return t("plan.apply")
+  if (ask.changes.length > 1 && [...ops].every((op) => storageOps.has(op)))
+    return t("action.saveVolumes")
   if (ops.size > 1) {
     // The compute form: replicas and resources together.
     if ([...ops].every((op) => op === "scale" || op === "resources")) return t("action.save")
-    return [...ops].every((op) => storageOps.has(op)) ? t("action.saveVolumes") : t("plan.apply")
+    return t("plan.apply")
   }
   switch (change.op) {
     case "restart":

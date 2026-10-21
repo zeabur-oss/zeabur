@@ -573,6 +573,7 @@ export const zhTW: Messages = {
   "storage.writable": "可讀寫",
   "storage.status": "狀態",
   "storage.newPath": "新磁碟區的掛載路徑",
+  "storage.newVolume": "新磁碟區",
   "storage.sizeOf": (path) => `${path} 的大小`,
   "storage.pathOf": (path) => `${path} 的掛載路徑`,
   "storage.readOnlyOf": (path) => `${path} 唯讀`,

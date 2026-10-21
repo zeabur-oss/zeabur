@@ -359,7 +359,7 @@ function EditRow({
 }) {
   const t = useT()
   const state = rowState(row)
-  const label = row.was?.mountPath ?? (row.mountPath.trim() || t("storage.newPath"))
+  const label = row.was?.mountPath ?? (row.mountPath.trim() || t("storage.newVolume"))
   const problemId = `${row.id}-problem`
   const invalid = (...kinds: VolumeProblem[]) => problem !== undefined && kinds.includes(problem)
   if (state === "removed")

@@ -571,6 +571,7 @@ export const zhCN: Messages = {
   "storage.writable": "可读写",
   "storage.status": "状态",
   "storage.newPath": "新卷的挂载路径",
+  "storage.newVolume": "新卷",
   "storage.sizeOf": (path) => `${path} 的大小`,
   "storage.pathOf": (path) => `${path} 的挂载路径`,
   "storage.readOnlyOf": (path) => `${path} 只读`,

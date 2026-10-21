@@ -628,6 +628,7 @@ export const en = {
   "storage.writable": "Read and write",
   "storage.status": "Status",
   "storage.newPath": "Mount path of the new volume",
+  "storage.newVolume": "the new volume",
   "storage.sizeOf": (path: string) => `Size of ${path}`,
   "storage.pathOf": (path: string) => `Mount path of ${path}`,
   "storage.readOnlyOf": (path: string) => `${path} read-only`,

@@ -320,6 +320,21 @@ group("actionOf", () => {
       }),
     ).toBe("plan.apply")
   })
+
+  test("several volume changes save the volumes, even of one kind", () => {
+    const add = (mountPath: string): Schemas["Change"] => ({
+      op: "addVolume",
+      workload: api,
+      volume: { mountPath, size: "1Gi" },
+    })
+    expect(actionOf(t, { changes: [add("/a")] })).toBe("action.addVolume")
+    expect(actionOf(t, { changes: [add("/a"), add("/b")] })).toBe("action.saveVolumes")
+    expect(
+      actionOf(t, {
+        changes: [add("/a"), { op: "removeVolume", workload: api, mountPath: "/b" }],
+      }),
+    ).toBe("action.saveVolumes")
+  })
 })
 
 group("replaced", () => {
