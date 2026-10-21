@@ -95,7 +95,7 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     expect(identity.username).toBe("zeabur:admin")
     expect(identity.groups).toContain("zeabur:admins")
     expect(identity.groups).not.toContain("zeabur:elevated:admins")
-    await expect(page.getByRole("button", { name: "Account" })).toContainText(identity.username)
+    await expect(page.getByRole("button", { name: /, signed in as admin$/ })).toContainText("admin")
   })
 
   await test.step("before elevating, the cluster's nodes are refused with View as admin", async () => {
@@ -114,7 +114,7 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     // may or may not close itself.
     await page.goto(servicePage)
     await expect(page.getByRole("heading", { level: 1, name: service })).toBeVisible()
-    await page.getByRole("button", { name: "More actions" }).click()
+    await page.getByRole("button", { name: "More", exact: true }).click()
     await page.getByRole("menuitem", { name: "Open terminal" }).click()
     const dock = page.getByRole("region", { name: "Terminal" })
     await expect(dock.getByRole("tab", { name: service })).toHaveAttribute("aria-selected", "true")
