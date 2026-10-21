@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "jsPlugins": ["@shadcn/lint"],
+  "jsPlugins": ["@shadcn/lint", "./lint/zeabur.js"],
   "settings": {
     "shadcn": {
       "note": "See web/DESIGN.md (Lint): give the component a variant or size in @zeabur/design-system rather than restyling it; use the type-* roles, the spacing scale or a named token (the design system's tokens, or src/styles/app.css); dynamic values are custom properties.",
@@ -19,6 +19,7 @@
     "shadcn/no-inline-styles": "error",
     "shadcn/no-unknown-classes": "error",
     "shadcn/require-static-classes": "error",
+    "zeabur/no-unguarded-motion": "error",
     "no-restricted-imports": [
       "error",
       {

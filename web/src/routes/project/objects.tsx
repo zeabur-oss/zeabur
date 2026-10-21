@@ -289,10 +289,14 @@ function ObjectList({
             size="icon-sm"
             onClick={onRefresh}
             disabled={refreshing}
+            aria-busy={refreshing}
             aria-label={t("objects.refresh")}
             title={t("objects.refresh")}
           >
-            <ArrowClockwiseIcon aria-hidden="true" className={cn(refreshing && "animate-spin")} />
+            <ArrowClockwiseIcon
+              aria-hidden="true"
+              className={cn(refreshing && "motion-safe:animate-spin")}
+            />
           </Button>
         </span>
       </div>
