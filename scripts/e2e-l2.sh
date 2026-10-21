@@ -217,7 +217,7 @@ retry 180 "kube-apiserver to load Zeabur Identity's configuration" reloaded
 
 # Zeabur's client: confidential, may ask for elevation, gets tokens kube-apiserver accepts.
 "$zeabur_identityctl" client create zeabur --type confidential --allow-elevation --audience kubernetes \
-  --redirect-uri "https://$zeabur_host/auth/callback" 2>"$out/client.err" | kubectl apply -f -
+  --redirect-uri "https://$zeabur_host/auth/callback" --home-url "https://$zeabur_host/" 2>"$out/client.err" | kubectl apply -f -
 client_secret=$(tail -n 1 "$out/client.err")
 rm -f "$out/client.err"
 setup_link=$("$zeabur_identityctl" setup-link --username admin)

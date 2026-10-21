@@ -67,7 +67,8 @@ refuses something to the everyday ones (`--allow-elevation`):
 
 ```sh
 zeabur-identityctl client create zeabur --type confidential --allow-elevation --audience kubernetes \
-  --redirect-uri https://zeabur.example.com/auth/callback | kubectl apply -f -
+  --redirect-uri https://zeabur.example.com/auth/callback --home-url https://zeabur.example.com/ \
+  | kubectl apply -f -
 ```
 
 `zeabur-identityctl` prints the client secret once, on stderr. Store it as a Secret in Zeabur's namespace
