@@ -32,7 +32,8 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   unplugin-icons (its JSX compiler, through svgr); decorative ones with `aria-hidden`.
 - **Design.** The frame is the design system's (`AppFrame`, `FrameSidebar`, `Sidebar` with
   `SidebarSearch`, `SidebarMenu`, `SidebarCopyPill`, and `ContextChip` at the foot for the
-  cluster, the person and admin rights), with no top bar; inside a project its own sidebar
+  cluster, the person and admin rights; Home and Projects, then Cluster, Members and Settings
+  under Manage; the chip's menu links Account), with no top bar; inside a project its own sidebar
   (`components/shell/project-sidebar.tsx`) replaces the global one. Home is "What needs you"
   (incidents, then problems by origin, each with cause, fixer and fix). A project is one page:
   Needs attention, then its map or list (`?view`) with Activity, gaps behind "N suggestions". A
