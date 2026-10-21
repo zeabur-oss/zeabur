@@ -216,7 +216,7 @@ reloaded() { (($(reloads) > before)); }
 retry 180 "kube-apiserver to load Zeabur Identity's configuration" reloaded
 
 # Zeabur's client: confidential, may ask for elevation, gets tokens kube-apiserver accepts.
-"$zeabur_identityctl" client create zeabur --type confidential --allow-elevation --audience kubernetes \
+"$zeabur_identityctl" client create zeabur --type confidential --allow-elevation --audience kubernetes --display-name Zeabur \
   --redirect-uri "https://$zeabur_host/auth/callback" --home-url "https://$zeabur_host/" 2>"$out/client.err" | kubectl apply -f -
 client_secret=$(tail -n 1 "$out/client.err")
 rm -f "$out/client.err"

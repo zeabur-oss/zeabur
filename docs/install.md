@@ -66,7 +66,7 @@ kube-apiserver accepts (`--audience kubernetes`), and it asks for admin rights w
 refuses something to the everyday ones (`--allow-elevation`):
 
 ```sh
-zeabur-identityctl client create zeabur --type confidential --allow-elevation --audience kubernetes \
+zeabur-identityctl client create zeabur --type confidential --allow-elevation --audience kubernetes --display-name Zeabur \
   --redirect-uri https://zeabur.example.com/auth/callback --home-url https://zeabur.example.com/ \
   | kubectl apply -f -
 ```
