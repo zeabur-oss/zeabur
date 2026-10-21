@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 
+pub mod cluster_name;
 pub mod group;
 pub mod images;
 pub mod operators;

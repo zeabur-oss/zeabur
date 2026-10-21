@@ -21,6 +21,9 @@ Level 1: may depend on `zeabur-kernel`. Pure functions; no I/O.
   operators and their controllers (`operators`), and the recommended `app.kubernetes.io/*`
   labels (`group`). Zeabur's own label, `zeabur.com/group`, is here too; its field
   manager `zeabur` is re-exported from `zeabur-core`, which holds the names every crate shares.
+- **A cluster's name from its provider** (`cluster_name`). Kubernetes gives a cluster no name;
+  k3d, kind, minikube, Docker Desktop, `OrbStack`, EKS (eksctl), GKE and AKS name or label the
+  nodes after it, and k3d, kind, EKS and GKE wrap it in the kubeconfig's name for it.
 - **One label-selector matcher** (`selector`). Kubernetes' set-based selector semantics, shared
   by the projection (a Deployment's pods) and the modules (NetworkPolicy, K8up) so the two cannot
   drift; each caller decides what an empty selector means.
