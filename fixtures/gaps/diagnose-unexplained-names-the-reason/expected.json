@@ -1,27 +1,31 @@
 [
   {
     "kind": "unexplained",
-    "container": null,
+    "container": "api",
     "pods": [
       "api-1"
     ],
     "cause": {
-      "key": "diagnosis.unexplained.cause",
+      "key": "diagnosis.unexplained.cause.waiting",
       "params": {
         "service": "api",
-        "reason": "RunContainerError"
+        "pod": "api-1",
+        "phase": "Running",
+        "container": "api",
+        "reason": "RunContainerError",
+        "stuck": "false"
       }
     },
     "why": {
-      "key": "diagnosis.unexplained.why",
-      "params": {
-        "reason": "RunContainerError"
-      }
+      "key": "diagnosis.unexplained.why.noEvent",
+      "params": null
     },
     "fix": {
-      "key": "diagnosis.unexplained.fix",
+      "key": "diagnosis.unexplained.fix.waiting",
       "params": {
-        "service": "api"
+        "service": "api",
+        "pod": "api-1",
+        "stuck": "false"
       }
     },
     "evidence": [

@@ -3563,6 +3563,7 @@ export interface components {
       | "scheduled"
       | "paused"
       | "failed"
+      | "rolloutStuck"
       | "scaledToZero"
       | "completed"
       | "unknown"

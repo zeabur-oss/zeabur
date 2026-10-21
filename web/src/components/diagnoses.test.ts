@@ -46,6 +46,10 @@ describe("a diagnosis's action", () => {
       diagnosisAction(diagnosis("configMissing", `diagnosis.configMissing.cause.${cause}`)).tab
     expect(configMissing("object")).toBe("variables")
     expect(configMissing("volume")).toBe("storage")
+    const unexplained = (cause: string) =>
+      diagnosisAction(diagnosis("unexplained", `diagnosis.unexplained.cause.${cause}`)).tab
+    expect(unexplained("notReady")).toBe("logs")
+    expect(unexplained("waiting")).toBe("events")
   })
 
   test("has words in the catalogue for every action", () => {

@@ -2,6 +2,11 @@ import type { Messages } from "@/i18n/en"
 import { cuts, listZh, probeTiming, thingZh, type P, type ProbeTiming } from "@/i18n/sentence-parts"
 
 // A space where Han text meets a Latin word ("查看 Secrets 需要…").
+
+/** How many replicas of the release before still serve, after a stuck rollout's sentence. */
+const servingZhCN = (p: P) =>
+  Number(p.serving ?? 0) > 0 ? `上一个版本的 ${p.serving} 个副本仍在提供服务。` : ""
+
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
 const latinEnd = (text: string) => (/[A-Za-z0-9]$/.test(text) ? " " : "")
 
@@ -191,6 +196,7 @@ export const zhCN: Messages = {
   "status.degraded": "未全部就绪",
   "status.scheduled": "已调度",
   "status.paused": "已暂停",
+  "status.rolloutStuck": "部署卡住",
   "status.failed": "失败",
   "status.scaledToZero": "已缩容到 0",
   "status.completed": "已完成",
@@ -1236,11 +1242,47 @@ export const zhCN: Messages = {
     "找出为什么没有副本就绪：它的其他问题、就绪检查、日志。",
   "sentence.diagnosis.unreachable.fix.routeNotAccepted": () =>
     "检查路由的流量入口和它指向的地址；路由的状态会说是哪一个。",
-  "sentence.diagnosis.unexplained.cause": (p) =>
-    p.reason ? `${p.service} 运行失败（${p.reason}）。` : `${p.service} 运行失败。`,
-  "sentence.diagnosis.unexplained.why": (p) =>
-    p.reason ? `Zeabur 无法解释集群报告的状态 ${p.reason}。` : "Zeabur 无法解释集群报告的状态。",
-  "sentence.diagnosis.unexplained.fix": () => "它的事件和日志可能有更多信息。",
+  "sentence.diagnosis.unexplained.cause.waiting": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} 正在等待（${p.reason}）。`
+      : `${p.pod} 没有在运行：${p.container} 正在等待（${p.reason}）。`,
+  "sentence.diagnosis.unexplained.cause.terminated": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} 已停止（${p.reason}）。`
+      : `${p.pod} 没有在运行：${p.container} 已停止（${p.reason}）。`,
+  "sentence.diagnosis.unexplained.cause.pending": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} 还没启动（Pending）。`
+      : `${p.pod} 还没启动（Pending）。`,
+  "sentence.diagnosis.unexplained.cause.notReady": (p) => {
+    const state = p.check ? `在运行，但没有通过就绪检查（${p.check}）` : "在运行，但还没就绪"
+    return p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} ${state}。`
+      : `${p.pod} ${state}。`
+  },
+  "sentence.diagnosis.unexplained.cause.phase": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} 的状态是 ${p.phase}。`
+      : `${p.pod} 的状态是 ${p.phase}。`,
+  "sentence.diagnosis.unexplained.cause.none": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了。`
+      : p.reason
+        ? `${p.service} 异常（${p.reason}）。`
+        : `${p.service} 异常。`,
+  "sentence.diagnosis.unexplained.why.event": (p) =>
+    `关于它的最新事件：${p.event}，“${p.note}”。${servingZhCN(p)}`,
+  "sentence.diagnosis.unexplained.why.noEvent": (p) => `集群没有关于它的事件。${servingZhCN(p)}`,
+  "sentence.diagnosis.unexplained.fix.waiting": (p) =>
+    `打开 ${p.pod} 的事件，kubelet 会在那里说明它在等什么。`,
+  "sentence.diagnosis.unexplained.fix.terminated": (p) =>
+    `从 ${p.pod} 的日志和事件找出它停止的原因。`,
+  "sentence.diagnosis.unexplained.fix.pending": (p) =>
+    `打开 ${p.pod} 的事件，调度器和 kubelet 会在那里说明它为什么还没启动。`,
+  "sentence.diagnosis.unexplained.fix.notReady": (p) =>
+    `确认应用在就绪检查查看的位置有响应，再看 ${p.pod} 的日志。`,
+  "sentence.diagnosis.unexplained.fix.phase": (p) => `查看 ${p.pod} 的事件和日志。`,
+  "sentence.diagnosis.unexplained.fix.none": (p) => `查看 ${p.service} 的事件。`,
   "sentence.problem.summary.bad-request": () => "这个请求无效。",
   "sentence.problem.summary.unauthenticated": () => "集群不接受你的登录。",
   "sentence.problem.summary.signed-out": () => "你已退出登录。",
@@ -1392,12 +1434,12 @@ export const zhCN: Messages = {
   "origin.configuration": "服务配置",
   "origin.cluster": "集群",
   "origin.upstream": "集群外部",
-  "origin.unknown": "原因不明",
+  "origin.unknown": "其他",
   "origin.code.hint": "应用本身的代码或命令让它停止；日志会说明原因。",
   "origin.configuration.hint": "这个服务的某项配置导致问题：变量、上限、检查或地址。",
   "origin.cluster.hint": "服务底下的集群导致问题：节点、配额或剩余资源。",
   "origin.upstream.hint": "集群外部的东西导致问题，例如镜像仓库。",
-  "origin.unknown.hint": "Zeabur 还无法判断原因；事件和日志有详细信息。",
+  "origin.unknown.hint": "Zeabur 还没把它归到已知的原因；上面的句子写着集群报告的状态。",
   "fixer.you": "你可以修复",
   "fixer.clusterAdmin": "需要集群管理员",
   "fixer.unknown": "不确定由谁修复",

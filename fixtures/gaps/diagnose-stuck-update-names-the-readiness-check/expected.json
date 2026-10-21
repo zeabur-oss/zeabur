@@ -1,0 +1,45 @@
+[
+  {
+    "cause": {
+      "key": "diagnosis.unexplained.cause.notReady",
+      "params": {
+        "check": "HTTP GET :80/",
+        "container": "nginx",
+        "phase": "Running",
+        "pod": "demo-gateway-7d9c8b6f5-new1",
+        "service": "demo-gateway",
+        "stuck": "true"
+      }
+    },
+    "container": "nginx",
+    "evidence": [
+      {
+        "fieldPath": "status",
+        "kind": "Pod",
+        "name": "demo-gateway-7d9c8b6f5-new1"
+      }
+    ],
+    "fault": {
+      "fixer": "you",
+      "origin": "unknown"
+    },
+    "fix": {
+      "key": "diagnosis.unexplained.fix.notReady",
+      "params": {
+        "pod": "demo-gateway-7d9c8b6f5-new1",
+        "service": "demo-gateway",
+        "stuck": "true"
+      }
+    },
+    "kind": "unexplained",
+    "pods": [
+      "demo-gateway-7d9c8b6f5-new1"
+    ],
+    "why": {
+      "key": "diagnosis.unexplained.why.noEvent",
+      "params": {
+        "serving": "1"
+      }
+    }
+  }
+]

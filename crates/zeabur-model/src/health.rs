@@ -50,6 +50,8 @@ pub enum StatusWord {
     Paused,
     /// The workload failed.
     Failed,
+    /// An update does not finish, while replicas of the release before it still serve.
+    RolloutStuck,
     /// Scaled to zero replicas.
     ScaledToZero,
     /// A Job that finished.

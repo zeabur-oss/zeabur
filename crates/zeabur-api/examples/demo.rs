@@ -647,6 +647,79 @@ fn internal_tools() -> NamespaceObjects {
     }
 }
 
+/// A chart's release: two Deployments Helm manages. The gateway's update is stuck past its
+/// deadline while the replica of the release before it still serves; the new one waits for its
+/// volume.
+fn edge() -> NamespaceObjects {
+    let ns = "edge";
+    let helm = |mut deployment: Deployment| {
+        let labels = deployment
+            .metadata
+            .labels
+            .get_or_insert_with(Default::default);
+        labels.insert("app.kubernetes.io/managed-by".to_owned(), "Helm".to_owned());
+        labels.insert("helm.sh/chart".to_owned(), "gateway-1.4.0".to_owned());
+        deployment
+    };
+    let mut gateway = helm(deployment_in(
+        ns,
+        "demo-gateway",
+        "nginx:1.27-alpine",
+        1,
+        1,
+        &json!([]),
+    ));
+    gateway.metadata.generation = Some(2);
+    gateway.status = Some(from(json!({"observedGeneration": 2, "replicas": 2,
+        "readyReplicas": 1, "updatedReplicas": 1, "availableReplicas": 1,
+        "unavailableReplicas": 1,
+        "conditions": [{"type": "Progressing", "status": "False",
+            "reason": "ProgressDeadlineExceeded",
+            "message": "ReplicaSet \"demo-gateway-7c9f8\" has timed out progressing."}]})));
+    let pending = json!({"phase": "Pending", "containerStatuses": [{"name": "demo-gateway",
+        "ready": false, "restartCount": 0, "image": "nginx:1.27-alpine", "imageID": "",
+        "state": {"waiting": {"reason": "ContainerCreating"}}}]});
+    NamespaceObjects {
+        namespace: ns.to_owned(),
+        deployments: vec![
+            gateway,
+            helm(deployment_in(
+                ns,
+                "demo-worker",
+                "ghcr.io/example/gateway-worker:1.4.0",
+                1,
+                1,
+                &json!([]),
+            )),
+        ],
+        pods: vec![
+            pod_in(
+                ns,
+                "demo-gateway-5b6d4-q8w2e",
+                "demo-gateway",
+                None,
+                &running("demo-gateway", 0),
+            ),
+            pod_in(
+                ns,
+                "demo-gateway-7c9f8-z3x5c",
+                "demo-gateway",
+                None,
+                &pending,
+            ),
+            pod_in(
+                ns,
+                "demo-worker-6a1b2-m4n6b",
+                "demo-worker",
+                None,
+                &running("demo-worker", 0),
+            ),
+        ],
+        services: vec![service_in(ns, "demo-gateway", 80, "http")],
+        ..NamespaceObjects::default()
+    }
+}
+
 /// cAdvisor as a DaemonSet with one ready pod, the shape most node agents have.
 fn cadvisor(namespace: &str) -> DaemonSet {
     from(json!({
@@ -839,6 +912,7 @@ fn state() -> State {
         payments(),
         analytics(),
         internal_tools(),
+        edge(),
         kube_system(),
     ] {
         place(&mut project.pods);
@@ -878,6 +952,7 @@ fn state() -> State {
             namespace("payments", true),
             namespace("analytics", true),
             namespace("internal-tools", true),
+            namespace("edge", true),
             namespace("default", false),
             namespace("kube-system", false),
         ],
@@ -887,6 +962,20 @@ fn state() -> State {
             ("blog".to_owned(), blog_events),
             ("billing".to_owned(), billing_events),
             ("kube-system".to_owned(), system_events),
+            (
+                "edge".to_owned(),
+                vec![event_in(
+                    "edge",
+                    "e1",
+                    20,
+                    "Pod",
+                    "demo-gateway-7c9f8-z3x5c",
+                    "Warning",
+                    "FailedAttachVolume",
+                    "Multi-Attach error for volume \"pvc-3f1c\": Volume is already used by pod demo-gateway-5b6d4-q8w2e",
+                    6,
+                )],
+            ),
         ]),
         nodes: nodes(),
         // metrics-server and system-upgrade-controller, read through their modules; and

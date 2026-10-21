@@ -2,6 +2,11 @@ import type { Messages } from "@/i18n/en"
 import { cuts, listZh, probeTiming, thingZh, type P, type ProbeTiming } from "@/i18n/sentence-parts"
 
 // A space where Han text meets a Latin word ("檢視 Secrets 需要…").
+
+/** How many replicas of the release before still serve, after a stuck rollout's sentence. */
+const servingZhTW = (p: P) =>
+  Number(p.serving ?? 0) > 0 ? `上一個版本的 ${p.serving} 個副本仍在提供服務。` : ""
+
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
 const latinEnd = (text: string) => (/[A-Za-z0-9]$/.test(text) ? " " : "")
 
@@ -191,6 +196,7 @@ export const zhTW: Messages = {
   "status.degraded": "未全數就緒",
   "status.scheduled": "已排程",
   "status.paused": "已暫停",
+  "status.rolloutStuck": "部署卡住",
   "status.failed": "失敗",
   "status.scaledToZero": "已縮為 0",
   "status.completed": "已完成",
@@ -1239,11 +1245,47 @@ export const zhTW: Messages = {
     "找出為什麼沒有副本就緒：它的其他問題、就緒檢查、日誌。",
   "sentence.diagnosis.unreachable.fix.routeNotAccepted": () =>
     "檢查路由用的流量入口，以及路由指向的位址；路由的狀態會說是哪一個。",
-  "sentence.diagnosis.unexplained.cause": (p) =>
-    p.reason ? `${p.service} 執行失敗（${p.reason}）。` : `${p.service} 執行失敗。`,
-  "sentence.diagnosis.unexplained.why": (p) =>
-    p.reason ? `Zeabur 無法解釋叢集回報的狀態 ${p.reason}。` : "Zeabur 無法解釋叢集回報的狀態。",
-  "sentence.diagnosis.unexplained.fix": () => "它的事件和日誌可能有更多資訊。",
+  "sentence.diagnosis.unexplained.cause.waiting": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} 正在等待（${p.reason}）。`
+      : `${p.pod} 沒有在執行：${p.container} 正在等待（${p.reason}）。`,
+  "sentence.diagnosis.unexplained.cause.terminated": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} 已停止（${p.reason}）。`
+      : `${p.pod} 沒有在執行：${p.container} 已停止（${p.reason}）。`,
+  "sentence.diagnosis.unexplained.cause.pending": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} 還沒啟動（Pending）。`
+      : `${p.pod} 還沒啟動（Pending）。`,
+  "sentence.diagnosis.unexplained.cause.notReady": (p) => {
+    const state = p.check ? `在執行，但沒有通過就緒檢查（${p.check}）` : "在執行，但還沒就緒"
+    return p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} ${state}。`
+      : `${p.pod} ${state}。`
+  },
+  "sentence.diagnosis.unexplained.cause.phase": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了：新副本 ${p.pod} 的狀態是 ${p.phase}。`
+      : `${p.pod} 的狀態是 ${p.phase}。`,
+  "sentence.diagnosis.unexplained.cause.none": (p) =>
+    p.stuck === "true"
+      ? `${p.service} 的部署卡住了。`
+      : p.reason
+        ? `${p.service} 異常（${p.reason}）。`
+        : `${p.service} 異常。`,
+  "sentence.diagnosis.unexplained.why.event": (p) =>
+    `關於它的最新事件：${p.event}，「${p.note}」。${servingZhTW(p)}`,
+  "sentence.diagnosis.unexplained.why.noEvent": (p) => `叢集沒有關於它的事件。${servingZhTW(p)}`,
+  "sentence.diagnosis.unexplained.fix.waiting": (p) =>
+    `開啟 ${p.pod} 的事件，kubelet 會在那裡說明它在等什麼。`,
+  "sentence.diagnosis.unexplained.fix.terminated": (p) =>
+    `從 ${p.pod} 的日誌和事件找出它停止的原因。`,
+  "sentence.diagnosis.unexplained.fix.pending": (p) =>
+    `開啟 ${p.pod} 的事件，排程器和 kubelet 會在那裡說明它為什麼還沒啟動。`,
+  "sentence.diagnosis.unexplained.fix.notReady": (p) =>
+    `確認應用程式在就緒檢查查看的位置有回應，再看 ${p.pod} 的日誌。`,
+  "sentence.diagnosis.unexplained.fix.phase": (p) => `查看 ${p.pod} 的事件和日誌。`,
+  "sentence.diagnosis.unexplained.fix.none": (p) => `查看 ${p.service} 的事件。`,
   "sentence.problem.summary.bad-request": () => "這個請求無效。",
   "sentence.problem.summary.unauthenticated": () => "叢集不接受你的登入。",
   "sentence.problem.summary.signed-out": () => "你已登出。",
@@ -1399,12 +1441,12 @@ export const zhTW: Messages = {
   "origin.configuration": "服務設定",
   "origin.cluster": "叢集",
   "origin.upstream": "叢集外部",
-  "origin.unknown": "原因不明",
+  "origin.unknown": "其他",
   "origin.code.hint": "應用程式本身的程式碼或指令讓它停止；日誌會說明原因。",
   "origin.configuration.hint": "這個服務的某項設定造成問題：變數、上限、檢查或位址。",
   "origin.cluster.hint": "服務底下的叢集造成問題：節點、配額或剩餘資源。",
   "origin.upstream.hint": "叢集外部的東西造成問題，例如映像檔倉庫。",
-  "origin.unknown.hint": "Zeabur 還無法判斷原因；事件和日誌有詳細資訊。",
+  "origin.unknown.hint": "Zeabur 還沒把它歸到已知的原因；上面的句子寫著叢集回報的狀態。",
   "fixer.you": "你可以修正",
   "fixer.clusterAdmin": "需要叢集管理員",
   "fixer.unknown": "不確定由誰修正",

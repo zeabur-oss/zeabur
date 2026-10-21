@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-gateway
+  namespace: demo
+  generation: 2
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: demo-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo-gateway
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+status:
+  observedGeneration: 2
+  replicas: 2
+  readyReplicas: 1
+  updatedReplicas: 1
+  availableReplicas: 1
+  unavailableReplicas: 1
+  conditions:
+    - type: Available
+      status: "True"
+      reason: MinimumReplicasAvailable
+    - type: Progressing
+      status: "False"
+      reason: ProgressDeadlineExceeded
+      message: ReplicaSet "demo-gateway-7d9c8b6f5" has timed out progressing.
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-gateway-5f7b9c4d8-old1
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-gateway
+spec:
+  containers:
+    - name: nginx
+      image: nginx:1.27-alpine
+status:
+  phase: Running
+  conditions:
+    - type: Ready
+      status: "True"
+  containerStatuses:
+    - name: nginx
+      image: nginx:1.27-alpine
+      imageID: ""
+      ready: true
+      restartCount: 0
+      state:
+        running:
+          startedAt: "2026-10-21T09:00:00Z"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-gateway-7d9c8b6f5-new1
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo-gateway
+spec:
+  nodeName: node-2
+  containers:
+    - name: nginx
+      image: nginx:1.27-alpine
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 80
+status:
+  phase: Pending
+  conditions:
+    - type: PodScheduled
+      status: "True"
+    - type: Ready
+      status: "False"
+  containerStatuses:
+    - name: nginx
+      image: nginx:1.27-alpine
+      imageID: ""
+      ready: false
+      restartCount: 0
+      state:
+        waiting:
+          reason: ContainerCreating
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+metadata:
+  name: demo-gateway-7d9c8b6f5-new1.scheduled
+  namespace: demo
+eventTime: null
+deprecatedLastTimestamp: "2026-10-21T11:40:00Z"
+reportingController: default-scheduler
+reportingInstance: default-scheduler
+action: Binding
+type: Normal
+reason: Scheduled
+note: Successfully assigned demo/demo-gateway-7d9c8b6f5-new1 to node-2
+regarding:
+  kind: Pod
+  name: demo-gateway-7d9c8b6f5-new1
+  namespace: demo
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+metadata:
+  name: demo-gateway-7d9c8b6f5-new1.attach
+  namespace: demo
+eventTime: null
+deprecatedLastTimestamp: "2026-10-21T11:55:00Z"
+reportingController: attachdetach-controller
+reportingInstance: attachdetach-controller
+action: Attaching
+type: Warning
+reason: FailedAttachVolume
+note: Multi-Attach error for volume "pvc-3f1c" Volume is already used by pod(s) demo-gateway-5f7b9c4d8-old1
+regarding:
+  kind: Pod
+  name: demo-gateway-7d9c8b6f5-new1
+  namespace: demo

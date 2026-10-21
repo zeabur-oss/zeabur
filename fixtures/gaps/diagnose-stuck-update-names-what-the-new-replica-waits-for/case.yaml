@@ -1,0 +1,8 @@
+description: >-
+  A Helm-managed Deployment whose update passed its progress deadline while the replica of the
+  release before still serves, as demo-gateway on a k3s cluster: the new replica waits in
+  ContainerCreating. The diagnosis says what was seen (the state, the newest event about the new
+  replica, how many replicas still serve) instead of "unknown".
+operation: gaps.diagnose
+params:
+  now: "2026-10-21T12:00:00Z"

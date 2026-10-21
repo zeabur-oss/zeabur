@@ -4,6 +4,15 @@ import { cuts, probeTiming, type P, type ProbeTiming } from "@/i18n/sentence-par
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
+/** How many replicas of the release before still serve, after a stuck rollout's sentence. */
+const servingEn = (p: P) => {
+  const n = Number(p.serving ?? 0)
+  if (n === 0) return ""
+  return n === 1
+    ? " The replica of the previous release still serves traffic."
+    : ` ${n} replicas of the previous release still serve traffic.`
+}
+
 /** What a refused verb does, in a phrase: `patch` changes, `create` adds. */
 const verbEn: Record<string, string> = {
   get: "read",
@@ -213,6 +222,7 @@ export const en = {
   "status.degraded": "Degraded",
   "status.scheduled": "Scheduled",
   "status.paused": "Paused",
+  "status.rolloutStuck": "Rollout stuck",
   "status.failed": "Failed",
   "status.scaledToZero": "Scaled to 0",
   "status.completed": "Completed",
@@ -1339,13 +1349,50 @@ export const en = {
     "Find out why no replica is ready: its other problems, its traffic check, its logs.",
   "sentence.diagnosis.unreachable.fix.routeNotAccepted": () =>
     "Check the route's entry point and the address it sends to; the route's status says which.",
-  "sentence.diagnosis.unexplained.cause": (p: P) =>
-    p.reason ? `${p.service} is failing (${p.reason}).` : `${p.service} is failing.`,
-  "sentence.diagnosis.unexplained.why": (p: P) =>
-    p.reason
-      ? `Zeabur has no explanation for the state the cluster reports, ${p.reason}.`
-      : "Zeabur has no explanation for the state the cluster reports.",
-  "sentence.diagnosis.unexplained.fix": () => "Its events and logs may say more.",
+  "sentence.diagnosis.unexplained.cause.waiting": (p: P) =>
+    p.stuck === "true"
+      ? `The rollout of ${p.service} is stuck: the new replica ${p.pod} is waiting (${p.reason}).`
+      : `${p.pod} isn't running: ${p.container} is waiting (${p.reason}).`,
+  "sentence.diagnosis.unexplained.cause.terminated": (p: P) =>
+    p.stuck === "true"
+      ? `The rollout of ${p.service} is stuck: the new replica ${p.pod} stopped (${p.reason}).`
+      : `${p.pod} isn't running: ${p.container} stopped (${p.reason}).`,
+  "sentence.diagnosis.unexplained.cause.pending": (p: P) =>
+    p.stuck === "true"
+      ? `The rollout of ${p.service} is stuck: the new replica ${p.pod} hasn't started (Pending).`
+      : `${p.pod} hasn't started (Pending).`,
+  "sentence.diagnosis.unexplained.cause.notReady": (p: P) => {
+    const state = p.check
+      ? `runs but doesn't pass its traffic check (${p.check})`
+      : "runs but isn't ready"
+    return p.stuck === "true"
+      ? `The rollout of ${p.service} is stuck: the new replica ${p.pod} ${state}.`
+      : `${p.pod} ${state}.`
+  },
+  "sentence.diagnosis.unexplained.cause.phase": (p: P) =>
+    p.stuck === "true"
+      ? `The rollout of ${p.service} is stuck: the new replica ${p.pod} is ${p.phase}.`
+      : `${p.pod} is ${p.phase}.`,
+  "sentence.diagnosis.unexplained.cause.none": (p: P) =>
+    p.stuck === "true"
+      ? `The rollout of ${p.service} is stuck.`
+      : p.reason
+        ? `${p.service} is failing (${p.reason}).`
+        : `${p.service} is failing.`,
+  "sentence.diagnosis.unexplained.why.event": (p: P) =>
+    `The newest event about it: ${p.event}, “${p.note}”.${servingEn(p)}`,
+  "sentence.diagnosis.unexplained.why.noEvent": (p: P) =>
+    `The cluster has recorded no event about it.${servingEn(p)}`,
+  "sentence.diagnosis.unexplained.fix.waiting": (p: P) =>
+    `Open ${p.pod}'s events: the kubelet says there what it waits for.`,
+  "sentence.diagnosis.unexplained.fix.terminated": (p: P) =>
+    `Read ${p.pod}'s logs and events for why it stopped.`,
+  "sentence.diagnosis.unexplained.fix.pending": (p: P) =>
+    `Open ${p.pod}'s events: the scheduler and the kubelet say there why it hasn't started.`,
+  "sentence.diagnosis.unexplained.fix.notReady": (p: P) =>
+    `Make sure the app answers where its traffic check looks, and read ${p.pod}'s logs.`,
+  "sentence.diagnosis.unexplained.fix.phase": (p: P) => `Open ${p.pod}'s events and logs.`,
+  "sentence.diagnosis.unexplained.fix.none": (p: P) => `Open ${p.service}'s events.`,
   "sentence.problem.summary.bad-request": () => "The request isn't valid.",
   "sentence.problem.summary.unauthenticated": () => "The cluster didn't accept your sign-in.",
   "sentence.problem.summary.signed-out": () => "You're signed out.",
@@ -1529,14 +1576,14 @@ export const en = {
   "origin.configuration": "In its settings",
   "origin.cluster": "In the cluster",
   "origin.upstream": "Outside the cluster",
-  "origin.unknown": "Cause unknown",
+  "origin.unknown": "Other",
   "origin.code.hint": "The app's own code or command stops it; its logs say why.",
   "origin.configuration.hint":
     "A setting of this service causes it: a variable, a limit, a check or an address.",
   "origin.cluster.hint": "The cluster under the service causes it: its nodes, quotas or room.",
   "origin.upstream.hint": "Something outside the cluster causes it, such as an image registry.",
   "origin.unknown.hint":
-    "Zeabur can't tell yet what causes it; the events and logs have the details.",
+    "Zeabur hasn't matched this to a known cause; the sentence above says what the cluster reports.",
   "fixer.you": "You can fix this",
   "fixer.clusterAdmin": "Needs a cluster admin",
   "fixer.unknown": "Fixer unknown",

@@ -78,8 +78,11 @@ export function diagnosisAction(d: Diagnosis): DiagnosisAction {
       return cause.endsWith(".volume")
         ? { tab: "storage", label: "diagnosis.action.storage" }
         : { tab: "variables", label: "diagnosis.action.variables" }
-    case "imagePull":
     case "unexplained":
+      return cause.endsWith(".notReady")
+        ? { tab: "logs", label: "diagnosis.action.logs", pod }
+        : { tab: "events", label: "diagnosis.action.events", pod }
+    case "imagePull":
       return { tab: "events", label: "diagnosis.action.events", pod }
   }
 }

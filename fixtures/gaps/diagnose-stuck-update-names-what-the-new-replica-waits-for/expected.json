@@ -1,0 +1,52 @@
+[
+  {
+    "cause": {
+      "key": "diagnosis.unexplained.cause.waiting",
+      "params": {
+        "container": "nginx",
+        "phase": "Pending",
+        "pod": "demo-gateway-7d9c8b6f5-new1",
+        "reason": "ContainerCreating",
+        "service": "demo-gateway",
+        "stuck": "true"
+      }
+    },
+    "container": "nginx",
+    "evidence": [
+      {
+        "fieldPath": "status",
+        "kind": "Pod",
+        "name": "demo-gateway-7d9c8b6f5-new1"
+      },
+      {
+        "kind": "Event",
+        "name": "demo-gateway-7d9c8b6f5-new1.attach"
+      }
+    ],
+    "fault": {
+      "fixer": "you",
+      "origin": "unknown"
+    },
+    "fix": {
+      "key": "diagnosis.unexplained.fix.waiting",
+      "params": {
+        "pod": "demo-gateway-7d9c8b6f5-new1",
+        "service": "demo-gateway",
+        "stuck": "true"
+      }
+    },
+    "kind": "unexplained",
+    "lastSeen": "2026-10-21T11:55:00Z",
+    "pods": [
+      "demo-gateway-7d9c8b6f5-new1"
+    ],
+    "why": {
+      "key": "diagnosis.unexplained.why.event",
+      "params": {
+        "event": "FailedAttachVolume",
+        "note": "Multi-Attach error for volume \"pvc-3f1c\" Volume is already used by pod(s) demo-gateway-5f7b9c4d8-old1",
+        "serving": "1"
+      }
+    }
+  }
+]

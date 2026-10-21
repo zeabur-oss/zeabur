@@ -1,0 +1,6 @@
+description: >-
+  The same stuck update with the new replica running but not ready and no event about it: the
+  diagnosis names the readiness check the replica has not passed.
+operation: gaps.diagnose
+params:
+  now: "2026-10-21T12:00:00Z"

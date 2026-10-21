@@ -31,8 +31,11 @@
 //!   `HTTPRoute` to it is not accepted, its Service has no ready pod, or a Service's `targetPort`
 //!   names no port of its containers.
 //!
-//! **Never only a raw reason.** A failing service that none of these explain gets `unexplained`,
-//! naming the reason the cluster gave, so the status pill's word is never the only text.
+//! **Never only a raw reason.** A failing service, or a Deployment whose update stopped while
+//! the release before still serves, that none of these explain gets `unexplained`: what was seen
+//! of its first replica that is not ready (waiting in a reason, pending, running but not ready,
+//! with its readiness check), the newest event about it, and how many replicas still serve. The
+//! status pill's word is never the only text, and "unknown" is never the whole answer.
 //!
 //! Every sentence is a [`Message`] key that clients translate, with a `why`: the rule that
 //! applies, with this occurrence's numbers; this module writes no prose.
@@ -52,7 +55,7 @@ use serde_json::Value;
 use zeabur_graph::{Snapshot, Workload, workloads};
 use zeabur_model::{
     ContainerStatusSummary, ContainerTermination, Diagnosis, DiagnosisKind, Health, Message,
-    Origin, PodSummary, Service, WorkloadKind,
+    Origin, PodSummary, Service, StatusWord, WorkloadKind,
 };
 
 use crate::event::Event;
@@ -213,8 +216,19 @@ impl<'a> Namespace<'a> {
             traffic::unreachable(&mut found, service, &self.traffic, workload);
         }
         let mut diagnoses = found.finish(runs);
-        if diagnoses.is_empty() && service.status.health == Health::Fail {
-            diagnoses.push(unexplained(service));
+        let stuck = service.status.word == StatusWord::RolloutStuck;
+        if diagnoses.is_empty() && (service.status.health == Health::Fail || stuck) {
+            let spec = |pod: &str| {
+                self.pod(pod)
+                    .and_then(|p| p.spec.as_ref())
+                    .or_else(|| workload.and_then(Workload::pod_spec))
+            };
+            diagnoses.push(unexplained(
+                service,
+                stuck,
+                |pod| self.events_about("Pod", pod),
+                spec,
+            ));
         }
         diagnoses
     }
@@ -1081,35 +1095,130 @@ fn quota_blocked(found: &mut Found, workload: Workload<'_>, events: &[&Event]) {
 
 // ── The fallback ────────────────────────────────────────────────────────────────────────────────
 
-/// A failing service nothing else explains, naming the reason the cluster gave.
-fn unexplained(service: &Service) -> Diagnosis {
+/// What was seen of a pod nothing else explains: the first of its containers that waits or
+/// stopped with a reason, else its phase. Returns the variant, the container and the reason.
+fn seen(pod: &PodSummary) -> (&'static str, Option<&str>, Option<&str>) {
+    let main = || pod.container_statuses.iter().filter(|c| !c.ready);
+    if let Some((status, reason)) = main().find_map(|c| {
+        let reason = c.waiting.as_ref()?.reason.as_deref()?;
+        Some((c, reason))
+    }) {
+        return ("waiting", Some(&status.name), Some(reason));
+    }
+    if let Some((status, reason)) = main().find_map(|c| {
+        let reason = c.terminated.as_ref()?.reason.as_deref()?;
+        Some((c, reason))
+    }) {
+        return ("terminated", Some(&status.name), Some(reason));
+    }
+    match pod.phase.as_str() {
+        "Pending" => ("pending", None, None),
+        "Running" if !pod.ready => ("notReady", main().next().map(|c| c.name.as_str()), None),
+        _ => ("phase", None, None),
+    }
+}
+
+/// The readiness check of `container` as one could type it: `HTTP GET :80/healthz`,
+/// `TCP :5432`, `gRPC :9090` or `exec`.
+fn readiness(spec: &PodSpec, container: &str) -> Option<String> {
+    let probe = probe_of(spec, container, "readiness")?;
+    let port = |port: &k8s_openapi::apimachinery::pkg::util::intstr::IntOrString| match port {
+        k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(n) => n.to_string(),
+        k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::String(name) => name.clone(),
+    };
+    if let Some(http) = &probe.http_get {
+        return Some(format!(
+            "HTTP GET :{}{}",
+            port(&http.port),
+            http.path.as_deref().unwrap_or("/")
+        ));
+    }
+    if let Some(tcp) = &probe.tcp_socket {
+        return Some(format!("TCP :{}", port(&tcp.port)));
+    }
+    if let Some(grpc) = &probe.grpc {
+        return Some(format!("gRPC :{}", grpc.port));
+    }
+    probe.exec.as_ref().map(|_| "exec".to_owned())
+}
+
+/// A failing service, or a stuck update, nothing else explains: what was seen of its first
+/// replica that is not ready, and the newest event about that replica. `stuck` says the
+/// release before still serves.
+fn unexplained<'e, 's>(
+    service: &Service,
+    stuck: bool,
+    events: impl Fn(&str) -> &'e [&'e Event],
+    spec: impl Fn(&str) -> Option<&'s PodSpec>,
+) -> Diagnosis {
     let name = &service.workload.name;
     let reason = service.status.reason.as_deref();
-    let with_reason = |message: Message| match reason {
-        Some(reason) => message.with("reason", reason),
-        None => message,
+    let of = |health: Health| -> Vec<&PodSummary> {
+        service
+            .pods
+            .iter()
+            .filter(|pod| pod.health == health)
+            .collect()
     };
-    let failing: Vec<&PodSummary> = service
-        .pods
+    let mut affected = of(Health::Fail);
+    if affected.is_empty() {
+        affected = of(Health::Warn);
+    }
+    let serving = service.pods.iter().filter(|pod| pod.ready).count();
+    let first = affected.first();
+    let (variant, container, state) = first.map_or(("none", None, reason), |pod| seen(pod));
+    let mut cause = Message::new(&format!("diagnosis.unexplained.cause.{variant}"))
+        .with("service", name)
+        .with("stuck", stuck.to_string());
+    let mut fix = Message::new(&format!("diagnosis.unexplained.fix.{variant}"))
+        .with("service", name)
+        .with("stuck", stuck.to_string());
+    let mut evidence: Vec<Origin> = affected
         .iter()
-        .filter(|pod| pod.health == Health::Fail)
+        .map(|pod| Origin::field("Pod", &pod.name, "status".to_owned()))
         .collect();
+    let mut why = Message::new("diagnosis.unexplained.why.noEvent");
+    let mut last_seen = None;
+    if let Some(pod) = first {
+        cause = cause.with("pod", &pod.name).with("phase", &pod.phase);
+        fix = fix.with("pod", &pod.name);
+        if let Some(check) = container
+            .filter(|_| variant == "notReady")
+            .and_then(|c| Some((c, spec(&pod.name)?)))
+            .and_then(|(c, spec)| readiness(spec, c))
+        {
+            cause = cause.with("check", check);
+        }
+        let newest = events(&pod.name)
+            .iter()
+            .max_by_key(|e| (e.kind == "Warning", e.last_seen));
+        if let Some(event) = newest {
+            why = Message::new("diagnosis.unexplained.why.event")
+                .with("event", &event.reason)
+                .with("note", truncate(&event.note));
+            evidence.push(event.origin.clone());
+            last_seen = event.last_seen;
+        }
+    }
+    if let Some(container) = container {
+        cause = cause.with("container", container);
+    }
+    if let Some(state) = state {
+        cause = cause.with("reason", state);
+    }
+    if stuck {
+        why = why.with("serving", serving.to_string());
+    }
     Diagnosis {
         kind: DiagnosisKind::Unexplained,
-        container: String::new(),
-        pods: failing.iter().map(|pod| pod.name.clone()).collect(),
-        cause: with_reason(Message::new("diagnosis.unexplained.cause").with("service", name)),
-        why: with_reason(Message::new("diagnosis.unexplained.why")),
-        fix: Message::new("diagnosis.unexplained.fix").with("service", name),
-        evidence: failing
-            .iter()
-            .map(|pod| Origin::field("Pod", &pod.name, "status".to_owned()))
-            .collect(),
-        last_seen: None,
-        fault: fault::fault(
-            DiagnosisKind::Unexplained,
-            &Message::new("diagnosis.unexplained.cause"),
-        ),
+        container: container.unwrap_or_default().to_owned(),
+        pods: affected.iter().map(|pod| pod.name.clone()).collect(),
+        fault: fault::fault(DiagnosisKind::Unexplained, &cause),
+        cause,
+        why,
+        fix,
+        evidence,
+        last_seen: last_seen.map(|t| t.to_string()),
         incident: None,
     }
 }
