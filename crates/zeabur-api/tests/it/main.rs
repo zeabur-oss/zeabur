@@ -11,6 +11,7 @@ mod durability;
 mod evidence;
 mod exec;
 mod incidents;
+mod members;
 mod namespace;
 mod preview;
 mod releases;

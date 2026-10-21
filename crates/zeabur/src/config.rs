@@ -168,6 +168,7 @@ impl Args {
                 )
                 .to_owned(),
         );
+        settings.identity.issuer = Some(issuer.to_string());
         terminal(self, &mut settings.terminal)?;
         if self.session_idle_minutes == 0 || self.session_max_hours == 0 {
             return Err(
@@ -432,6 +433,10 @@ mod tests {
             config.settings,
             zeabur_api::Settings {
                 public_host: Some("zeabur.example.com".to_owned()),
+                identity: zeabur_api::settings::IdentitySettings {
+                    issuer: Some("https://identity.example.com".to_owned()),
+                    ..zeabur_api::settings::IdentitySettings::default()
+                },
                 ..zeabur_api::Settings::default()
             }
         );

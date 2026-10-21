@@ -44,6 +44,16 @@
 //! | `GET /api/v1/projects/{p}/tools` | your tools pods (the `clusterTools` change starts one); deletes those that have stopped (see the `tools` module) |
 //! | `GET /api/v1/projects/{p}/tools/{name}/terminal` | a terminal with `kubectl` and `helm` acting as you, over a WebSocket |
 //! | `DELETE /api/v1/projects/{p}/tools/{name}` | deletes your tools pod |
+//! | `GET /api/v1/account` | your Zeabur Identity account: passkeys, linked accounts |
+//! | `POST /api/v1/account/setup-links` | a one-time link that adds a passkey to your account |
+//! | `PATCH /api/v1/account/passkeys/{id}` | renames one of your passkeys |
+//! | `DELETE /api/v1/account/passkeys/{id}` | removes one; never your last |
+//! | `GET /api/v1/members` | everyone Zeabur Identity signs in, and pending setup links |
+//! | `POST /api/v1/members/invitations` | invites someone: a one-time setup link, the member made if new |
+//! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
+//! | `POST /api/v1/members/{username}/setup-links` | a new setup link for a member, optionally removing their passkeys first |
+//! | `DELETE /api/v1/members/{username}/credentials/{id}` | removes a member's passkey or linked account |
+//! | `DELETE /api/v1/members/{username}` | removes a member; projects stay |
 //! | `POST /api/v1/projects/{p}/plan` | the writes a change needs, what they do (pods replaced, fit, data and fields removed), and a token; writes nothing |
 //! | `POST /api/v1/projects/{p}/apply` | carries out a plan by its token |
 //!
@@ -83,6 +93,7 @@ mod handlers;
 pub mod identity;
 pub mod incidents;
 pub mod local;
+pub mod members;
 pub mod plan_token;
 pub mod pods;
 pub mod projects;
@@ -143,6 +154,7 @@ promised a stable `/api/v1`.",
     ),
     tags(
         (name = "identity", description = "Who you are"),
+        (name = "members", description = "Your account and everyone Zeabur Identity signs in: passkeys, setup links, removals"),
         (name = "cluster", description = "The cluster and what it has installed"),
         (name = "projects", description = "Projects (namespaces), their events, and changes: plan, then apply"),
         (name = "services", description = "A project's services (workloads): releases and usage history"),
@@ -201,6 +213,18 @@ fn routes() -> OpenApiRouter<AppState> {
             settings::cluster_name::get_setting,
             settings::cluster_name::set
         ))
+        .routes(routes!(members::account::get))
+        .routes(routes!(members::account::setup_link))
+        .routes(routes!(
+            members::account::rename_passkey,
+            members::account::remove_passkey
+        ))
+        .routes(routes!(members::handlers::list))
+        .routes(routes!(members::handlers::invite))
+        .routes(routes!(members::handlers::revoke_invitation))
+        .routes(routes!(members::handlers::setup_link))
+        .routes(routes!(members::handlers::remove_passkey))
+        .routes(routes!(members::handlers::remove))
 }
 
 /// The API, for `access`; mount it next to the web interface.
