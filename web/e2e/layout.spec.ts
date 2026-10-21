@@ -212,15 +212,22 @@ test("the account card's lines share one left edge, also with admin rights on", 
     }),
   )
   await page.route("**/api/v1/cluster", (route) =>
-    route.fulfill({ json: { name: "10.43.0.1", kubernetesVersion: "v1.36.5+k3s1" } }),
+    route.fulfill({
+      json: {
+        name: "zeabur-l2",
+        nameSource: "nodes",
+        nameProvider: "k3d",
+        kubernetesVersion: "v1.36.5+k3s1",
+      },
+    }),
   )
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto("/")
   const card = page
     .getByRole("navigation", { name: "Main" })
     .locator('button:has([data-slot="avatar"])')
-  await expect(card).toContainText("This cluster")
-  await expect(card).not.toContainText("10.43.0.1")
+  await expect(card).toContainText("zeabur-l2")
+  await expect(card.getByTitle(/Name from k3d/)).toContainText("zeabur-l2")
   await expect(card).toContainText("ada.lovelace")
   await expect(card).not.toContainText("zeabur:")
   await expect(card.locator('[data-slot="avatar"]')).toContainText("AD")
