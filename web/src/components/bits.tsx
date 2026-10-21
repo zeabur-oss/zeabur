@@ -44,6 +44,21 @@ export function Panel({
   )
 }
 
+/** Labels and values in two columns from `sm`, every value at one left edge, in each `Row`. */
+export function Rows({ children }: { children: ReactNode }) {
+  return <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-settings">{children}</dl>
+}
+
+/** A label and its value; the label lines up with the value's first line. */
+export function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
+  return (
+    <div className="grid gap-1.5 sm:col-span-2 sm:grid-cols-subgrid sm:items-baseline">
+      <dt className="flex items-center gap-1.5 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
+  )
+}
+
 export function Ago({ iso, className }: { iso?: string | null; className?: string }) {
   const { locale } = useI18n()
   if (!iso) return <span className={className}>—</span>

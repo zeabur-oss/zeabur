@@ -1169,6 +1169,7 @@ export const zhCN: Messages = {
   "settings.storeHint":
     "保存用量历史的 Service，格式为 namespace/name:port。任何提供 Prometheus HTTP API 的存储服务都可以。Zeabur 通过 Kubernetes API，以每个人自己的权限读取。",
   "settings.storeDefault": "默认",
+  "settings.storeIsDefault": "（默认）",
   "settings.storeChosen": "在 Zeabur 中设置",
   "settings.storeState": "状态",
   "settings.storeState.available": "有响应",

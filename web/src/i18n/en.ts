@@ -1268,6 +1268,7 @@ export const en = {
   "settings.storeHint":
     "The Service that holds usage history, as namespace/name:port. Any store with the Prometheus HTTP API works. Zeabur reads it through the Kubernetes API with each person's own rights.",
   "settings.storeDefault": "Default",
+  "settings.storeIsDefault": "(default)",
   "settings.storeChosen": "Set in Zeabur",
   "settings.storeState": "Status",
   "settings.storeState.available": "Responding",

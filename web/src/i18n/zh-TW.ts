@@ -1171,6 +1171,7 @@ export const zhTW: Messages = {
   "settings.storeHint":
     "保存用量歷史的 Service，格式為 namespace/name:port。任何提供 Prometheus HTTP API 的儲存服務都可以。Zeabur 透過 Kubernetes API，以每個人自己的權限讀取。",
   "settings.storeDefault": "預設",
+  "settings.storeIsDefault": "（預設）",
   "settings.storeChosen": "在 Zeabur 中設定",
   "settings.storeState": "狀態",
   "settings.storeState.available": "有回應",

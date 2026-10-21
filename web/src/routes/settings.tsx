@@ -13,7 +13,7 @@ import {
   queryClient,
   whoamiQuery,
 } from "@/api/queries"
-import { Hint, Panel, Segmented } from "@/components/bits"
+import { Hint, Panel, Row, Rows, Segmented } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { StatusPill } from "@/components/status"
@@ -43,11 +43,8 @@ export function SettingsPage() {
       <PageHeader title={t("settings.title")} />
 
       <Panel title={t("settings.preferences")}>
-        <div className="flex flex-col gap-5">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-settings sm:items-center">
-            <label htmlFor={languageId} className="text-sm text-muted-foreground">
-              {t("settings.language")}
-            </label>
+        <Rows>
+          <Row label={<label htmlFor={languageId}>{t("settings.language")}</label>}>
             <div className="flex items-center gap-1.5">
               <Select
                 id={languageId}
@@ -62,9 +59,8 @@ export function SettingsPage() {
               />
               <Hint label={t("settings.language")}>{t("settings.languageHint")}</Hint>
             </div>
-          </div>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-settings sm:items-center">
-            <span className="text-sm text-muted-foreground">{t("settings.theme")}</span>
+          </Row>
+          <Row label={t("settings.theme")}>
             <Segmented
               label={t("settings.theme")}
               value={theme}
@@ -79,35 +75,39 @@ export function SettingsPage() {
                 ),
               }))}
             />
-          </div>
-        </div>
+          </Row>
+        </Rows>
       </Panel>
 
       <MetricsStorePanel />
 
       <Panel title={t("settings.about")}>
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-settings">
-          <dt className="text-muted-foreground">{t("settings.user")}</dt>
-          <dd translate="no">{whoami.data?.username ?? "—"}</dd>
-          <dt className="text-muted-foreground">{t("settings.groups")}</dt>
-          <dd className="flex flex-wrap gap-1.5">
-            {whoami.data?.groups.map((group) => (
-              <span key={group} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">
-                {group}
-              </span>
-            )) ?? "—"}
-          </dd>
+        <Rows>
+          <Row label={t("settings.user")}>
+            <span translate="no">{whoami.data?.username ?? "—"}</span>
+          </Row>
+          <Row label={t("settings.groups")}>
+            <span className="flex flex-wrap gap-1.5">
+              {whoami.data?.groups.map((group) => (
+                <span key={group} className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs">
+                  {group}
+                </span>
+              )) ?? "—"}
+            </span>
+          </Row>
           {capabilities.data ? (
             <>
-              <dt className="text-muted-foreground">{t("settings.kubernetesVersion")}</dt>
-              <dd className="font-mono text-xs">{cluster.data?.kubernetesVersion ?? "—"}</dd>
-              <dt className="text-muted-foreground">{t("settings.catalogueCommit")}</dt>
-              <dd className="font-mono text-xs">
-                {capabilities.data.catalogueCommit.slice(0, 12)}
-              </dd>
+              <Row label={t("settings.kubernetesVersion")}>
+                <span className="font-mono text-xs">{cluster.data?.kubernetesVersion ?? "—"}</span>
+              </Row>
+              <Row label={t("settings.catalogueCommit")}>
+                <span className="font-mono text-xs">
+                  {capabilities.data.catalogueCommit.slice(0, 12)}
+                </span>
+              </Row>
             </>
           ) : null}
-        </dl>
+        </Rows>
       </Panel>
     </PageColumn>
   )
@@ -163,97 +163,118 @@ function StoreForm({ setting }: { setting: StoreSetting }) {
   // The hint is checked with everyday rights; admin rights may allow the change.
   const elevation = useHintOffersElevation(setting.canChange)
   const changed = draft.trim() !== setting.service
+  const isDefault = setting.service === setting.default
+  const defaultMark = isDefault ? (
+    <span className="text-xs text-muted-foreground">{t("settings.storeIsDefault")}</span>
+  ) : null
+  // A refusal that offers admin rights says who may change it; the line below would repeat it.
+  const who =
+    keeps && !editable && elevation ? null : (
+      <p id={`${inputId}-who`} className="text-xs text-muted-foreground">
+        {setting.storedIn ? t("settings.storeWho") : t("settings.storeLocal")}
+        {keeps && !editable ? ` ${t("settings.storeDenied")}` : ""}
+        {setting.storedIn ? (
+          <Hint label={t("settings.storeWhereLabel")}>
+            {t("settings.storeWhere", setting.storedIn.namespace ?? "")}
+          </Hint>
+        ) : null}
+      </p>
+    )
   return (
-    <div className="flex flex-col gap-5">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-settings sm:items-start">
-        <label
-          htmlFor={inputId}
-          className="flex items-center gap-1.5 pt-1.5 text-sm text-muted-foreground"
-        >
-          {t("settings.store")}
-          <Hint label={t("settings.store")}>{t("settings.storeHint")}</Hint>
-        </label>
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(event) => {
-            event.preventDefault()
-            save.mutate(draft.trim())
-          }}
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              id={inputId}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              disabled={!editable || save.isPending}
-              spellCheck={false}
-              autoComplete="off"
-              translate="no"
-              className="min-w-64 flex-1"
-              aria-describedby={`${inputId}-who`}
-            />
+    <Rows>
+      <Row
+        label={
+          <>
             {editable ? (
-              <>
-                <Button type="submit" size="sm" disabled={!changed || save.isPending}>
-                  {t("settings.storeSave")}
+              <label htmlFor={inputId}>{t("settings.store")}</label>
+            ) : (
+              t("settings.store")
+            )}
+            <Hint label={t("settings.store")}>{t("settings.storeHint")}</Hint>
+          </>
+        }
+      >
+        {editable ? (
+          <form
+            className="flex flex-col gap-2"
+            onSubmit={(event) => {
+              event.preventDefault()
+              save.mutate(draft.trim())
+            }}
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Input
+                id={inputId}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                disabled={save.isPending}
+                autoComplete="off"
+                mono
+                className="min-w-64 flex-1"
+                aria-describedby={`${inputId}-who`}
+              />
+              {defaultMark}
+              <Button type="submit" size="sm" disabled={!changed || save.isPending}>
+                {t("settings.storeSave")}
+              </Button>
+              {setting.source === "setting" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={save.isPending}
+                  onClick={() => save.mutate(null)}
+                >
+                  {t("settings.storeReset")}
                 </Button>
-                {setting.source === "setting" ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    disabled={save.isPending}
-                    onClick={() => save.mutate(null)}
-                  >
-                    {t("settings.storeReset")}
-                  </Button>
-                ) : null}
-              </>
+              ) : null}
+            </div>
+            {who}
+            {save.isError ? <Problem error={save.error} what={t("settings.metricsStore")} /> : null}
+          </form>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <span className="flex flex-wrap items-baseline gap-x-2">
+              <span className="type-mono break-all" translate="no">
+                {setting.service}
+              </span>
+              {defaultMark}
+            </span>
+            {keeps ? (
+              <RefusedHint
+                hint={setting.canChange}
+                what={t("settings.storeChange")}
+                missing={[permission("patch", "configmaps")]}
+              />
             ) : null}
+            {who}
           </div>
-          {keeps ? (
-            <RefusedHint
-              hint={setting.canChange}
-              what={t("settings.storeChange")}
-              missing={[permission("patch", "configmaps")]}
-            />
-          ) : null}
-          <p id={`${inputId}-who`} className="text-xs text-muted-foreground">
-            {setting.storedIn ? t("settings.storeWho") : t("settings.storeLocal")}
-            {keeps && setting.canChange === "denied" && !elevation
-              ? ` ${t("settings.storeDenied")}`
-              : ""}
-            {setting.storedIn ? (
-              <Hint label={t("settings.storeWhereLabel")}>
-                {t("settings.storeWhere", setting.storedIn.namespace ?? "")}
-              </Hint>
+        )}
+      </Row>
+      {setting.state === "unreadable" ? null : (
+        <Row label={t("settings.storeState")}>
+          <span className="flex flex-wrap items-center gap-2" data-store-state={setting.state}>
+            <StatusPill health={storeHealth[setting.state]} size="sm">
+              {t(`settings.storeState.${setting.state}`)}
+            </StatusPill>
+            {setting.source === "setting" ? (
+              <span className="text-xs text-muted-foreground">{t("settings.storeChosen")}</span>
             ) : null}
-          </p>
-          {save.isError ? <Problem error={save.error} what={t("settings.metricsStore")} /> : null}
-        </form>
-      </div>
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-settings">
-        <dt className="text-muted-foreground">{t("settings.storeState")}</dt>
-        <dd className="flex flex-wrap items-center gap-2" data-store-state={setting.state}>
-          <StatusPill health={storeHealth[setting.state]} size="sm">
-            {t(`settings.storeState.${setting.state}`)}
-          </StatusPill>
-          {setting.source === "setting" ? (
-            <span className="text-xs text-muted-foreground">{t("settings.storeChosen")}</span>
-          ) : null}
-          {setting.message ? (
-            <Hint label={t("settings.storeState")}>
-              <span className="font-mono" translate="no">
+            {setting.message ? (
+              <span className="font-mono text-xs break-all text-muted-foreground" translate="no">
                 {setting.message}
               </span>
-            </Hint>
-          ) : null}
-        </dd>
-        <dt className="text-muted-foreground">{t("settings.storeDefault")}</dt>
-        <dd className="min-w-0 truncate font-mono text-xs" translate="no" title={setting.default}>
-          {setting.default}
-        </dd>
-      </dl>
-    </div>
+            ) : null}
+          </span>
+        </Row>
+      )}
+      {isDefault ? null : (
+        <Row label={t("settings.storeDefault")}>
+          <span className="type-mono break-all" translate="no">
+            {setting.default}
+          </span>
+        </Row>
+      )}
+    </Rows>
   )
 }

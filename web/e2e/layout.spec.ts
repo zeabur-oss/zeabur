@@ -107,6 +107,23 @@ for (const width of [1440, 1960]) {
   })
 }
 
+test("every settings card starts its values at one left edge", async ({ page }) => {
+  await page.goto("/settings")
+  const cards = page.locator("main section")
+  await expect(
+    page.getByRole("region", { name: "Usage history" }).locator("dd").first(),
+  ).toBeVisible()
+  for (const card of await cards.all()) {
+    const lefts = await card
+      .locator("dd, form")
+      .evaluateAll((values) =>
+        values.map((value) => Math.round(value.getBoundingClientRect().left)),
+      )
+    expect(lefts.length).toBeGreaterThan(0)
+    expect(new Set(lefts).size, `${JSON.stringify(lefts)}`).toBe(1)
+  }
+})
+
 test.describe("in a project with many services", () => {
   test.skip(!crowded, "ZEABUR_E2E_CROWDED is not set")
 
