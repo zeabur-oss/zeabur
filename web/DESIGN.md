@@ -63,7 +63,7 @@ the design system's components by their import (`componentImports` in `.oxlintrc
   properties, read by classes (`left-(--x)`, `translate-y-(--slide-y)`, `h-(--bar)`).
 - **Design system components only** (`no-restricted-imports`): no `@base-ui/react`, Radix,
   Headless UI or Motion imports in app code; a missing component is added to the design system.
-- **Guarded motion** (`zeabur/no-unguarded-motion`, `lint/zeabur.js`, the design system's rule):
+- **Guarded motion** (`zeabur/no-unguarded-motion`, from `@zeabur/design-system/lint`):
   `transition-transform`, `transition-all`, `animate-spin` and the like are written `motion-safe:`,
   or the motion is a design-system utility.
 - **Static classes** (`require-static-classes`): a component's `className` is literal strings or
