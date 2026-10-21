@@ -63,10 +63,14 @@ pub struct WhoAmI {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Cluster {
-    /// What the person calls the cluster: in local mode the kubeconfig's name for the cluster
-    /// of the context in use, otherwise the host of kube-apiserver's address. Kubernetes gives a
-    /// cluster no name of its own.
+    /// What to call the cluster, never kube-apiserver's address (see
+    /// `crate::settings::cluster_name`).
     pub name: String,
+    /// Where `name` comes from.
+    pub name_source: crate::settings::cluster_name::NameSource,
+    /// Whose convention `name` follows, when one does (`nodes`, `kubeconfig`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name_provider: Option<crate::settings::cluster_name::NameProvider>,
     /// kube-apiserver's version (`gitVersion`, such as `v1.36.5+k3s1`).
     pub kubernetes_version: String,
     /// The distribution, when the version names one: `k3s` or `rke2`.

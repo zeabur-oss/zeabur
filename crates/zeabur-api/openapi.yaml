@@ -23,8 +23,8 @@ paths:
       tags:
       - cluster
       summary: |-
-        The cluster: its name, kube-apiserver's version and distribution. Readable by every signed-in
-        person.
+        The cluster: its name and where that comes from, kube-apiserver's version and distribution.
+        Readable by every signed-in person; the name may come from the nodes when they may list them.
       operationId: getCluster
       responses:
         "200":
@@ -1410,6 +1410,61 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/settings/cluster-name:
+    get:
+      tags:
+      - settings
+      summary: |-
+        The cluster's name chosen in the settings, the one Zeabur was installed with, and whether you
+        may change it. Readable by everyone signed in.
+      operationId: getClusterName
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterNameSetting"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    put:
+      tags:
+      - settings
+      summary: |-
+        Renames the cluster in Zeabur, or goes back to the name Zeabur finds with `null`, by writing
+        the settings ConfigMap as you (created the first time). Who may: whoever may update (and
+        create) the ConfigMap `zeabur-settings` in Zeabur's namespace. Changes nothing in the cluster
+        itself.
+      operationId: setClusterName
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClusterNameChange"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterNameSetting"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/settings/metrics-store:
     get:
       tags:
@@ -2316,6 +2371,7 @@ components:
       description: The cluster.
       required:
       - name
+      - nameSource
       - kubernetesVersion
       properties:
         distribution:
@@ -2329,9 +2385,16 @@ components:
         name:
           type: string
           description: |-
-            What the person calls the cluster: in local mode the kubeconfig's name for the cluster
-            of the context in use, otherwise the host of kube-apiserver's address. Kubernetes gives a
-            cluster no name of its own.
+            What to call the cluster, never kube-apiserver's address (see
+            `crate::settings::cluster_name`).
+        nameProvider:
+          oneOf:
+          - $ref: "#/components/schemas/NameProvider"
+            description: Whose convention `name` follows, when one does (`nodes`, `kubeconfig`).
+          - type: "null"
+        nameSource:
+          $ref: "#/components/schemas/NameSource"
+          description: Where `name` comes from.
     ClusterEventList:
       type: object
       description: Events of the whole cluster, the newest `limit` of them.
@@ -2356,6 +2419,58 @@ components:
           type: integer
           description: How many events matched, also those past `limit`.
           minimum: 0
+    ClusterNameChange:
+      type: object
+      description: A change of the cluster's name.
+      properties:
+        name:
+          type:
+          - string
+          - "null"
+          description: >-
+            The name, at most 63 characters; `null` goes back to the name Zeabur finds
+            itself.
+      additionalProperties: false
+    ClusterNameSetting:
+      type: object
+      description: The cluster's name setting.
+      required:
+      - id
+      - canChange
+      - unreadable
+      properties:
+        canChange:
+          $ref: "#/components/schemas/Permission"
+          description: >-
+            Whether the person may change it, as far as their RBAC rules in that namespace
+            tell.
+        default:
+          type:
+          - string
+          - "null"
+          description: |-
+            The name Zeabur was installed with (`ZEABUR_CLUSTER_NAME`); absent when it was not given
+            one.
+        id:
+          type: string
+          description: "`settings/cluster-name`."
+        name:
+          type:
+          - string
+          - "null"
+          description: The name chosen in the settings; absent when none is.
+        storedIn:
+          oneOf:
+          - $ref: "#/components/schemas/Origin"
+            description: |-
+              The ConfigMap a change is kept in; absent where Zeabur keeps no settings (on a person's
+              computer).
+          - type: "null"
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: The settings ConfigMap, when it could not be read.
     Component:
       type: object
       description: "One component of the catalogue: an upstream project that provides a capability."
@@ -4015,6 +4130,31 @@ components:
       - persistent
       - config
       - ephemeral
+    NameProvider:
+      type: string
+      description: Whose convention a name follows. An open set.
+      enum:
+      - eks
+      - gke
+      - aks
+      - k3d
+      - kind
+      - minikube
+      - docker-desktop
+      - orbstack
+      - k3s
+      - k0s
+      - rke2
+      - node
+    NameSource:
+      type: string
+      description: Where the cluster's name comes from.
+      enum:
+      - setting
+      - install
+      - kubeconfig
+      - nodes
+      - address
     NetworkPolicyAccess:
       type: string
       description: How far a peer may reach.

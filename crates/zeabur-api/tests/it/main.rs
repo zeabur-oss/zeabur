@@ -3,6 +3,7 @@
 //! cluster tests on k3s are their own binary, `kubernetes`.
 
 mod api;
+mod cluster_name;
 #[cfg(test)]
 #[path = "../common/mod.rs"]
 mod common;

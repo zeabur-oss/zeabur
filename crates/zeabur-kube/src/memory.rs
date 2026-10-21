@@ -36,7 +36,7 @@ use crate::port::{
 /// What the in-memory cluster holds.
 #[derive(Debug, Default)]
 pub struct State {
-    /// What the person calls the cluster ([`Cluster::name`]).
+    /// The kubeconfig's name for the cluster ([`Cluster::kubeconfig_name`]); empty: none.
     pub name: String,
     /// The person's identity.
     pub identity: Identity,
@@ -598,9 +598,11 @@ impl Cluster for MemoryCluster {
         Box::pin(async move { Ok(self.lock()?.facts.version.clone()) })
     }
 
-    fn name(&self) -> String {
+    fn kubeconfig_name(&self) -> Option<String> {
         self.lock()
-            .map_or_else(|_| String::new(), |s| s.name.clone())
+            .ok()
+            .map(|s| s.name.clone())
+            .filter(|name| !name.is_empty())
     }
 
     fn pod_logs<'a>(

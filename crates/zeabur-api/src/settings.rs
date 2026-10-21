@@ -1,4 +1,4 @@
-//! Zeabur's own settings: the metrics store, the one setting so far.
+//! Zeabur's own settings: the metrics store and the cluster's name.
 //!
 //! # Where a setting is kept
 //!
@@ -25,6 +25,13 @@
 //!
 //! `GET` says which Service is in use, where it came from, whether it answers and whether the
 //! person may change it; `PUT` changes it (`null`: back to the default).
+//!
+//! # The cluster's name
+//!
+//! What the interface calls the cluster (see [`cluster_name`]). The chart's `clusterName`
+//! (`ZEABUR_CLUSTER_NAME`) is the default; a name chosen in the settings replaces it.
+
+pub mod cluster_name;
 
 use zeabur_kube::ServicePort;
 
@@ -33,6 +40,9 @@ pub const CONFIG_MAP: &str = "zeabur-settings";
 
 /// The ConfigMap's key for the metrics store.
 pub const METRICS_STORE_KEY: &str = "metrics-store";
+
+/// The ConfigMap's key for the cluster's name.
+pub const CLUSTER_NAME_KEY: &str = "cluster-name";
 
 /// Zeabur's settings as the server was started: the defaults, and where people's choices are
 /// kept.
@@ -45,6 +55,10 @@ pub struct Settings {
     pub namespace: Option<String>,
     /// The debug container's and the tools pod's images and limits.
     pub terminal: TerminalSettings,
+    /// The cluster's name the server was started with (`ZEABUR_CLUSTER_NAME`).
+    pub cluster_name: Option<String>,
+    /// The host of the URL people open Zeabur at, when the server was started with one.
+    pub public_host: Option<String>,
 }
 
 impl Default for Settings {
@@ -53,6 +67,8 @@ impl Default for Settings {
             metrics_store: default_metrics_store(),
             namespace: None,
             terminal: TerminalSettings::default(),
+            cluster_name: None,
+            public_host: None,
         }
     }
 }
@@ -149,8 +165,35 @@ pub fn parse_service_port(text: &str) -> Result<ServicePort, String> {
     })
 }
 
+/// The most characters a cluster's name may have.
+pub const CLUSTER_NAME_MAX: usize = 63;
+
+/// A cluster's name as a person or an installer wrote it: trimmed, at most
+/// [`CLUSTER_NAME_MAX`] characters, no control characters.
+///
+/// # Errors
+///
+/// What is wrong with `text`, to show the person.
+pub fn parse_cluster_name(text: &str) -> Result<String, String> {
+    let name = text.trim();
+    if name.is_empty() {
+        return Err("A cluster's name must not be empty.".to_owned());
+    }
+    if name.chars().count() > CLUSTER_NAME_MAX {
+        return Err(format!(
+            "Choose a name with at most {CLUSTER_NAME_MAX} characters."
+        ));
+    }
+    if name.chars().any(char::is_control) {
+        return Err("A cluster's name must be on one line, without control characters.".to_owned());
+    }
+    Ok(name.to_owned())
+}
+
 pub use store::{MetricsStoreChange, MetricsStoreSetting, SettingSource, StoreState};
-pub(crate) use store::{Proxied, metrics_store, proxy_get, proxy_refusal};
+pub(crate) use store::{
+    Proxied, can_change, metrics_store, proxy_get, proxy_refusal, read_stored, write_key,
+};
 
 pub(crate) mod store {
     use axum::Json;
@@ -217,18 +260,30 @@ pub(crate) mod store {
         }
     }
 
-    /// The metrics store for this person: the setting when the ConfigMap holds a valid one, else
-    /// the default. A refused or failed read of the ConfigMap falls back to the default too, and
-    /// a refusal is kept to say so.
-    pub(crate) async fn metrics_store(cluster: &dyn Cluster, settings: &Settings) -> Store {
-        let mut store = Store {
-            service: settings.metrics_store.clone(),
-            source: SettingSource::Default,
-            unreadable: None,
-            stored: None,
-        };
+    /// The settings ConfigMap as one person reads it.
+    #[derive(Debug, Clone, Default)]
+    pub(crate) struct Stored {
+        /// The ConfigMap, when it exists and could be read.
+        pub(crate) object: Option<Value>,
+        /// The refusal, when it could not be read.
+        pub(crate) unreadable: Option<UnreadableView>,
+    }
+
+    impl Stored {
+        /// The text kept under `key`.
+        pub(crate) fn get(&self, key: &str) -> Option<&str> {
+            self.object
+                .as_ref()?
+                .pointer(&format!("/data/{key}"))
+                .and_then(Value::as_str)
+        }
+    }
+
+    /// The settings ConfigMap, read as the person; nothing where Zeabur keeps no settings. A
+    /// refusal is kept to say so; another failure reads as no ConfigMap.
+    pub(crate) async fn read_stored(cluster: &dyn Cluster, settings: &Settings) -> Stored {
         let Some(namespace) = &settings.namespace else {
-            return store;
+            return Stored::default();
         };
         let target = config_map(namespace);
         let read = cluster
@@ -241,23 +296,98 @@ pub(crate) mod store {
                     .map_err(|e| ClusterError::Decode(e.to_string()))
             });
         match read {
-            Ok(Some(object)) => {
-                let chosen = object
-                    .pointer(&format!("/data/{METRICS_STORE_KEY}"))
-                    .and_then(Value::as_str)
-                    .and_then(|text| parse_service_port(text).ok());
-                if let Some(service) = chosen {
-                    store.service = service;
-                    store.source = SettingSource::Setting;
-                }
-                store.stored = Some(object);
-            }
-            Err(error) => {
-                store.unreadable = error.into_unreadable("configmaps").ok().map(Into::into);
-            }
-            Ok(None) => {}
+            Ok(object) => Stored {
+                object,
+                unreadable: None,
+            },
+            Err(error) => Stored {
+                object: None,
+                unreadable: error.into_unreadable("configmaps").ok().map(Into::into),
+            },
         }
-        store
+    }
+
+    /// The metrics store for this person: the setting when the ConfigMap holds a valid one, else
+    /// the default. A refused or failed read of the ConfigMap falls back to the default too, and
+    /// a refusal is kept to say so.
+    pub(crate) async fn metrics_store(cluster: &dyn Cluster, settings: &Settings) -> Store {
+        let stored = read_stored(cluster, settings).await;
+        let chosen = stored
+            .get(METRICS_STORE_KEY)
+            .and_then(|text| parse_service_port(text).ok());
+        Store {
+            source: if chosen.is_some() {
+                SettingSource::Setting
+            } else {
+                SettingSource::Default
+            },
+            service: chosen.unwrap_or_else(|| settings.metrics_store.clone()),
+            unreadable: stored.unreadable,
+            stored: stored.object,
+        }
+    }
+
+    /// Whether the person may write the settings ConfigMap (`patch` it, or `create` it when
+    /// `exists` is false), as far as their RBAC rules in Zeabur's namespace tell.
+    pub(crate) async fn can_change(
+        cluster: &dyn Cluster,
+        settings: &Settings,
+        exists: bool,
+    ) -> Permission {
+        let Some(namespace) = &settings.namespace else {
+            return Permission::Denied;
+        };
+        let resource = zeabur_kube::ResourceRef::new("", "v1", "configmaps", "ConfigMap");
+        let verb = if exists { "patch" } else { "create" };
+        cluster
+            .access_rules(namespace)
+            .await
+            .map_or(Permission::Unknown, |rules| {
+                rules.allows(verb, &resource, CONFIG_MAP).into()
+            })
+    }
+
+    /// Keeps `value` under `key` in the settings ConfigMap of `namespace` (removes the key for
+    /// `None`), as the person, from the ConfigMap as `stored` read it.
+    pub(crate) async fn write_key(
+        cluster: &dyn Cluster,
+        namespace: &str,
+        stored: Option<&Value>,
+        key: &str,
+        value: Option<&str>,
+    ) -> Result<(), ApiError> {
+        let Some(body) = write_body(stored, key, value) else {
+            return Ok(());
+        };
+        let verb = match &body {
+            WriteBody::Create(_) => "create",
+            WriteBody::JsonPatch(_) | WriteBody::Delete(_) | WriteBody::EphemeralContainers(_) => {
+                "patch"
+            }
+        };
+        let request = WriteRequest {
+            target: config_map(namespace),
+            body,
+            dry_run: false,
+        };
+        cluster.write(&request).await.map(|_| ()).map_err(|error| {
+            // The `test` of the version read failed: someone changed the settings meanwhile.
+            if matches!(&error, ClusterError::Status(status) if status.code == 422) {
+                return ApiError::from(Problem::new(
+                    Kind::Conflict,
+                    "Someone changed the settings after you loaded them. Load them again, then \
+                     make your change.",
+                ));
+            }
+            let refused = Denied {
+                verb: verb.to_owned(),
+                group: String::new(),
+                resource: "configmaps".to_owned(),
+                name: (verb == "patch").then(|| CONFIG_MAP.to_owned()),
+                namespace: Some(namespace.to_owned()),
+            };
+            read_problem(error, "the settings ConfigMap", refused)
+        })
     }
 
     /// What a `GET` through the proxy gave: the answer, or the state it means and kube-apiserver's
@@ -384,23 +514,7 @@ pub(crate) mod store {
     /// The setting as `cluster` sees it, `store` already read.
     async fn view(cluster: &dyn Cluster, settings: &Settings, store: Store) -> MetricsStoreSetting {
         let (state, refused, message) = probe(cluster, &store.service).await;
-        let can_change = match &settings.namespace {
-            None => Permission::Denied,
-            Some(namespace) => {
-                let resource = zeabur_kube::ResourceRef::new("", "v1", "configmaps", "ConfigMap");
-                let verb = if store.stored.is_some() {
-                    "patch"
-                } else {
-                    "create"
-                };
-                cluster
-                    .access_rules(namespace)
-                    .await
-                    .map_or(Permission::Unknown, |rules| {
-                        rules.allows(verb, &resource, CONFIG_MAP).into()
-                    })
-            }
-        };
+        let can_change = can_change(cluster, settings, store.stored.is_some()).await;
         MetricsStoreSetting {
             id: "settings/metrics-store".to_owned(),
             service: store.service.to_string(),
@@ -462,58 +576,34 @@ pub(crate) mod store {
             .transpose()
             .map_err(|detail| ApiError::from(Problem::new(Kind::BadRequest, detail)))?;
         let store = metrics_store(cluster.as_ref(), &state.settings).await;
-        let target = config_map(&namespace);
-        let body = write_body(store.stored.as_ref(), service.as_ref());
-        if let Some(body) = body {
-            let verb = match &body {
-                WriteBody::Create(_) => "create",
-                WriteBody::JsonPatch(_)
-                | WriteBody::Delete(_)
-                | WriteBody::EphemeralContainers(_) => "patch",
-            };
-            let request = WriteRequest {
-                target,
-                body,
-                dry_run: false,
-            };
-            cluster.write(&request).await.map_err(|error| {
-                // The `test` of the version read failed: someone changed the settings meanwhile.
-                if matches!(&error, ClusterError::Status(status) if status.code == 422) {
-                    return ApiError::from(Problem::new(
-                        Kind::Conflict,
-                        "Someone changed the settings after you loaded them. Load them again, \
-                         then make your change.",
-                    ));
-                }
-                let refused = Denied {
-                    verb: verb.to_owned(),
-                    group: String::new(),
-                    resource: "configmaps".to_owned(),
-                    name: (verb == "patch").then(|| CONFIG_MAP.to_owned()),
-                    namespace: Some(namespace.clone()),
-                };
-                read_problem(error, "the settings ConfigMap", refused)
-            })?;
-        }
+        let wanted = service.as_ref().map(ToString::to_string);
+        write_key(
+            cluster.as_ref(),
+            &namespace,
+            store.stored.as_ref(),
+            METRICS_STORE_KEY,
+            wanted.as_deref(),
+        )
+        .await?;
         let store = metrics_store(cluster.as_ref(), &state.settings).await;
         Ok(Json(view(cluster.as_ref(), &state.settings, store).await))
     }
 
-    /// The write that makes the ConfigMap hold `service` (or nothing, for the default); `None`
-    /// when it already does. A patch tests the `resourceVersion` it was read at, so a change made
-    /// in between is refused (`409`) rather than overwritten.
-    fn write_body(stored: Option<&Value>, service: Option<&ServicePort>) -> Option<WriteBody> {
-        let pointer = format!("/data/{METRICS_STORE_KEY}");
+    /// The write that makes the ConfigMap hold `value` under `key` (or nothing, for the
+    /// default); `None` when it already does. A patch tests the `resourceVersion` it was read at,
+    /// so a change made in between is refused (`409`) rather than overwritten.
+    fn write_body(stored: Option<&Value>, key: &str, value: Option<&str>) -> Option<WriteBody> {
+        let pointer = format!("/data/{key}");
         let Some(stored) = stored else {
-            let service = service?;
+            let value = value?;
             return Some(WriteBody::Create(json!({
                 "apiVersion": "v1", "kind": "ConfigMap",
                 "metadata": {"name": CONFIG_MAP},
-                "data": {METRICS_STORE_KEY: service.to_string()}
+                "data": {key: value}
             })));
         };
         let current = stored.pointer(&pointer).and_then(Value::as_str);
-        let wanted = service.map(ToString::to_string);
+        let wanted = value.map(str::to_owned);
         if current == wanted.as_deref() {
             return None;
         }
@@ -525,7 +615,7 @@ pub(crate) mod store {
         let change = match (wanted, stored.get("data").is_some_and(Value::is_object)) {
             (Some(wanted), true) => json!({"op": "add", "path": pointer, "value": wanted}),
             (Some(wanted), false) => {
-                json!({"op": "add", "path": "/data", "value": {METRICS_STORE_KEY: wanted}})
+                json!({"op": "add", "path": "/data", "value": {key: wanted}})
             }
             (None, _) => json!({"op": "remove", "path": pointer}),
         };
@@ -542,21 +632,26 @@ pub(crate) mod store {
 
         #[test]
         fn the_first_choice_creates_the_config_map() {
-            let Some(WriteBody::Create(body)) = write_body(None, Some(&service())) else {
+            let Some(WriteBody::Create(body)) =
+                write_body(None, METRICS_STORE_KEY, Some(&service().to_string()))
+            else {
                 panic!("not a create");
             };
             assert_eq!(
                 body["data"][METRICS_STORE_KEY],
                 "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428"
             );
-            assert_eq!(write_body(None, None), None);
+            assert_eq!(write_body(None, METRICS_STORE_KEY, None), None);
         }
 
         #[test]
         fn a_change_tests_the_version_it_was_read_at() {
             let stored = json!({"metadata": {"resourceVersion": "7"}, "data": {"other": "x"}});
-            let Some(WriteBody::JsonPatch(patch)) = write_body(Some(&stored), Some(&service()))
-            else {
+            let Some(WriteBody::JsonPatch(patch)) = write_body(
+                Some(&stored),
+                METRICS_STORE_KEY,
+                Some(&service().to_string()),
+            ) else {
                 panic!("not a patch");
             };
             assert_eq!(
@@ -566,8 +661,11 @@ pub(crate) mod store {
             assert_eq!(patch[1]["op"], "add");
             assert_eq!(patch[1]["path"], "/data/metrics-store");
             let empty = json!({"metadata": {"resourceVersion": "7"}});
-            let Some(WriteBody::JsonPatch(patch)) = write_body(Some(&empty), Some(&service()))
-            else {
+            let Some(WriteBody::JsonPatch(patch)) = write_body(
+                Some(&empty),
+                METRICS_STORE_KEY,
+                Some(&service().to_string()),
+            ) else {
                 panic!("not a patch");
             };
             assert_eq!(patch[1]["path"], "/data");
@@ -577,7 +675,9 @@ pub(crate) mod store {
         fn going_back_to_the_default_removes_the_key_once() {
             let stored = json!({"metadata": {"resourceVersion": "7"},
                 "data": {METRICS_STORE_KEY: "a/b:80"}});
-            let Some(WriteBody::JsonPatch(patch)) = write_body(Some(&stored), None) else {
+            let Some(WriteBody::JsonPatch(patch)) =
+                write_body(Some(&stored), METRICS_STORE_KEY, None)
+            else {
                 panic!("not a patch");
             };
             assert_eq!(
@@ -585,7 +685,7 @@ pub(crate) mod store {
                 json!({"op": "remove", "path": "/data/metrics-store"})
             );
             let unchanged = json!({"metadata": {"resourceVersion": "7"}, "data": {}});
-            assert_eq!(write_body(Some(&unchanged), None), None);
+            assert_eq!(write_body(Some(&unchanged), METRICS_STORE_KEY, None), None);
         }
     }
 }

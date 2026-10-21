@@ -58,6 +58,10 @@ pub(crate) struct Args {
     /// Zeabur Catalog installs VictoriaMetrics.
     #[arg(long, env = "ZEABUR_METRICS_SERVICE", default_value = "")]
     pub(crate) metrics_service: String,
+    /// What the interface calls the cluster, until someone renames it in the settings, such as
+    /// `shop-prod`. Empty: a name read from the nodes, else the public URL's host.
+    #[arg(long, env = "ZEABUR_CLUSTER_NAME", default_value = "")]
+    pub(crate) cluster_name: String,
     /// The namespace Zeabur runs in, where the ConfigMap `zeabur-settings` keeps the settings
     /// people choose. Empty: settings cannot be changed.
     #[arg(long, env = "ZEABUR_NAMESPACE", default_value = "")]
@@ -147,6 +151,23 @@ impl Args {
             }
             settings.namespace = Some(self.namespace.clone());
         }
+        if !self.cluster_name.trim().is_empty() {
+            settings.cluster_name = Some(
+                zeabur_api::settings::parse_cluster_name(&self.cluster_name)
+                    .map_err(|e| format!("--cluster-name: {e}"))?,
+            );
+        }
+        let authority = public_url.authority();
+        settings.public_host = Some(
+            authority
+                .strip_prefix('[')
+                .and_then(|rest| rest.split_once(']'))
+                .map_or_else(
+                    || authority.split(':').next().unwrap_or(authority),
+                    |(host, _)| host,
+                )
+                .to_owned(),
+        );
         terminal(self, &mut settings.terminal)?;
         if self.session_idle_minutes == 0 || self.session_max_hours == 0 {
             return Err(
@@ -407,7 +428,22 @@ mod tests {
     fn the_metrics_store_and_the_settings_namespace_are_optional() {
         let files = Files::new("settings");
         let config = args(&files, &[]).unwrap();
-        assert_eq!(config.settings, zeabur_api::Settings::default());
+        assert_eq!(
+            config.settings,
+            zeabur_api::Settings {
+                public_host: Some("zeabur.example.com".to_owned()),
+                ..zeabur_api::Settings::default()
+            }
+        );
+        let config = args(&files, &["--cluster-name", " shop-prod "]).unwrap();
+        assert_eq!(config.settings.cluster_name.as_deref(), Some("shop-prod"));
+        let error = args(&files, &["--cluster-name", &"x".repeat(64)]).unwrap_err();
+        assert!(error.starts_with("--cluster-name:"), "{error}");
+        let config = args(&files, &["--public-url", "https://zeabur.localhost:8443"]).unwrap();
+        assert_eq!(
+            config.settings.public_host.as_deref(),
+            Some("zeabur.localhost")
+        );
         let config = args(
             &files,
             &[

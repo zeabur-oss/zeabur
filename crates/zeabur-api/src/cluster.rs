@@ -50,6 +50,7 @@ use std::collections::BTreeMap;
 
 use axum::Json;
 use axum::extract::{RawQuery, State};
+use axum::http::HeaderMap;
 use capacity::Amount;
 use zeabur_catalog::versions::{self, Inputs, PlanStatus};
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -64,6 +65,7 @@ use crate::error::{ApiError, list_read, list_read_of_key};
 use crate::handlers::{AppState, Person};
 use crate::projects::events::{EventKey, event_key, event_view, last_seen, newest_first};
 use crate::query::{EventQuery, LimitParams};
+use crate::settings::cluster_name;
 use crate::views::{
     CapabilityList, Cluster, ClusterEventList, MetricsState, NodeCondition, NodeList, NodeTotals,
     NodeView, PodScan, Resources, Taint, UnreadableView, UpgradeExtensions, Upgrades,
@@ -117,17 +119,24 @@ fn optional<T>(
     }
 }
 
-/// The cluster: its name, kube-apiserver's version and distribution. Readable by every signed-in
-/// person.
+/// The cluster: its name and where that comes from, kube-apiserver's version and distribution.
+/// Readable by every signed-in person; the name may come from the nodes when they may list them.
 #[utoipa::path(get, path = "/api/v1/cluster", tag = "cluster", operation_id = "getCluster",
     responses((status = 200, body = Cluster), (status = 401, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn get(Person(cluster): Person) -> Result<Json<Cluster>, ApiError> {
+pub(crate) async fn get(
+    State(state): State<AppState>,
+    Person(cluster): Person,
+    headers: HeaderMap,
+) -> Result<Json<Cluster>, ApiError> {
     let version = cluster
         .version()
         .await
         .map_err(|e| ApiError::from(e.into_problem("the cluster's version")))?;
+    let named = cluster_name::resolve(cluster.as_ref(), &state.settings, &headers).await;
     Ok(Json(Cluster {
-        name: cluster.name(),
+        name: named.name,
+        name_source: named.source,
+        name_provider: named.provider,
         distribution: distribution(&version),
         kubernetes_version: version,
     }))

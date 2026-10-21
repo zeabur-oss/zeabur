@@ -138,7 +138,7 @@ impl fmt::Debug for UserToken {
 #[derive(Clone)]
 pub struct UserClient {
     client: kube::Client,
-    name: String,
+    name: Option<String>,
 }
 
 impl fmt::Debug for UserClient {
@@ -176,11 +176,7 @@ impl UserClient {
         Self::from_kube_config(config, kubeconfig_cluster(context))
     }
 
-    /// `name`, or the host of kube-apiserver's address.
     fn from_kube_config(config: kube::Config, name: Option<String>) -> Result<Self, ConnectError> {
-        let name = name
-            .or_else(|| config.cluster_url.host().map(str::to_owned))
-            .unwrap_or_default();
         kube::Client::try_from(config)
             .map(|client| Self { client, name })
             .map_err(|e| ConnectError::Client(e.to_string()))
@@ -273,10 +269,10 @@ contexts:
     }
 
     #[tokio::test]
-    async fn without_a_name_the_cluster_is_the_api_servers_host() {
+    async fn in_the_cluster_the_api_servers_address_names_nothing() {
         let endpoint = ClusterEndpoint::new(http::Uri::from_static("https://10.43.0.1:443"), None);
         let client = UserClient::with_token(&endpoint, &UserToken::new("t")).unwrap();
-        assert_eq!(Cluster::name(&client), "10.43.0.1");
+        assert_eq!(Cluster::kubeconfig_name(&client), None);
     }
 
     #[test]

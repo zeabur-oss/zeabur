@@ -411,7 +411,7 @@ impl Cluster for UserClient {
         Box::pin(async move { Ok(self.kube().apiserver_version().await?.git_version) })
     }
 
-    fn name(&self) -> String {
+    fn kubeconfig_name(&self) -> Option<String> {
         self.name.clone()
     }
 

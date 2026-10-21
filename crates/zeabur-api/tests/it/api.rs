@@ -885,7 +885,8 @@ mod tests {
         let about = get(&cluster, "/api/v1/cluster").await;
         assert_eq!(
             about,
-            json!({"name": "k3d-zeabur", "kubernetesVersion": "v1.36.5+k3s1", "distribution": "k3s"})
+            json!({"name": "zeabur", "nameSource": "kubeconfig", "nameProvider": "k3d",
+                   "kubernetesVersion": "v1.36.5+k3s1", "distribution": "k3s"})
         );
 
         let capabilities = get(&cluster, "/api/v1/cluster/capabilities").await;

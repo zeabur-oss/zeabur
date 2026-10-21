@@ -112,10 +112,10 @@ pub trait Cluster: Send + Sync {
     /// the default `system:public-info-viewer` role).
     fn version(&self) -> Answer<'_, String>;
 
-    /// What the person calls this cluster: in local mode the kubeconfig's name for the cluster
-    /// the context uses, otherwise (and when the kubeconfig cannot be read for it) the host of
-    /// kube-apiserver's address. Kubernetes itself gives a cluster no name.
-    fn name(&self) -> String;
+    /// The kubeconfig's name for the cluster the context uses, in local mode; `None` in the
+    /// cluster and when the kubeconfig cannot be read for it. Kubernetes itself gives a cluster
+    /// no name.
+    fn kubeconfig_name(&self) -> Option<String>;
 
     /// A snapshot of a container's log.
     fn pod_logs<'a>(

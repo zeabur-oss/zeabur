@@ -197,6 +197,10 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::usage::get))
         .routes(routes!(services::history::get))
         .routes(routes!(settings::store::get_setting, settings::store::set))
+        .routes(routes!(
+            settings::cluster_name::get_setting,
+            settings::cluster_name::set
+        ))
 }
 
 /// The API, for `access`; mount it next to the web interface.

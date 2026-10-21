@@ -12,8 +12,8 @@ export interface paths {
       cookie?: never
     }
     /**
-     * The cluster: its name, kube-apiserver's version and distribution. Readable by every signed-in
-     *     person.
+     * The cluster: its name and where that comes from, kube-apiserver's version and distribution.
+     *     Readable by every signed-in person; the name may come from the nodes when they may list them.
      */
     get: operations["getCluster"]
     put?: never
@@ -816,6 +816,32 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/settings/cluster-name": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The cluster's name chosen in the settings, the one Zeabur was installed with, and whether you
+     *     may change it. Readable by everyone signed in.
+     */
+    get: operations["getClusterName"]
+    /**
+     * Renames the cluster in Zeabur, or goes back to the name Zeabur finds with `null`, by writing
+     *     the settings ConfigMap as you (created the first time). Who may: whoever may update (and
+     *     create) the ConfigMap `zeabur-settings` in Zeabur's namespace. Changes nothing in the cluster
+     *     itself.
+     */
+    put: operations["setClusterName"]
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/settings/metrics-store": {
     parameters: {
       query?: never
@@ -1265,11 +1291,13 @@ export interface components {
       /** @description kube-apiserver's version (`gitVersion`, such as `v1.36.5+k3s1`). */
       kubernetesVersion: string
       /**
-       * @description What the person calls the cluster: in local mode the kubeconfig's name for the cluster
-       *     of the context in use, otherwise the host of kube-apiserver's address. Kubernetes gives a
-       *     cluster no name of its own.
+       * @description What to call the cluster, never kube-apiserver's address (see
+       *     `crate::settings::cluster_name`).
        */
       name: string
+      nameProvider?: components["schemas"]["NameProvider"] | null
+      /** @description Where `name` comes from. */
+      nameSource: components["schemas"]["NameSource"]
     }
     /** @description Events of the whole cluster, the newest `limit` of them. */
     ClusterEventList: {
@@ -1282,6 +1310,28 @@ export interface components {
       partial: boolean
       /** @description How many events matched, also those past `limit`. */
       totalSize: number
+    }
+    /** @description A change of the cluster's name. */
+    ClusterNameChange: {
+      /** @description The name, at most 63 characters; `null` goes back to the name Zeabur finds itself. */
+      name?: string | null
+    }
+    /** @description The cluster's name setting. */
+    ClusterNameSetting: {
+      /** @description Whether the person may change it, as far as their RBAC rules in that namespace tell. */
+      canChange: components["schemas"]["Permission"]
+      /**
+       * @description The name Zeabur was installed with (`ZEABUR_CLUSTER_NAME`); absent when it was not given
+       *     one.
+       */
+      default?: string | null
+      /** @description `settings/cluster-name`. */
+      id: string
+      /** @description The name chosen in the settings; absent when none is. */
+      name?: string | null
+      storedIn?: components["schemas"]["Origin"] | null
+      /** @description The settings ConfigMap, when it could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
     }
     /** @description One component of the catalogue: an upstream project that provides a capability. */
     Component: {
@@ -2198,6 +2248,28 @@ export interface components {
      * @enum {string}
      */
     MountCategory: "persistent" | "config" | "ephemeral"
+    /**
+     * @description Whose convention a name follows. An open set.
+     * @enum {string}
+     */
+    NameProvider:
+      | "eks"
+      | "gke"
+      | "aks"
+      | "k3d"
+      | "kind"
+      | "minikube"
+      | "docker-desktop"
+      | "orbstack"
+      | "k3s"
+      | "k0s"
+      | "rke2"
+      | "node"
+    /**
+     * @description Where the cluster's name comes from.
+     * @enum {string}
+     */
+    NameSource: "setting" | "install" | "kubeconfig" | "nodes" | "address"
     /**
      * @description How far a peer may reach.
      * @enum {string}
@@ -5486,6 +5558,80 @@ export interface operations {
         }
       }
       401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getClusterName: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ClusterNameSetting"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  setClusterName: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClusterNameChange"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ClusterNameSetting"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
         headers: {
           [name: string]: unknown
         }
