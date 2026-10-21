@@ -1404,6 +1404,7 @@ export const en = {
     "Check its restart check, and what stops the program.",
   "sentence.diagnosis.crashLoop.fix.logs": () =>
     "The error is in the logs of the run before the restart.",
+  "sentence.diagnosis.runFailed.fix.logs": () => "The error is in the logs of the run that failed.",
   "sentence.diagnosis.runFailed.cause.exitCode": (p: P) => `${p.container}'s last run failed.`,
   "sentence.diagnosis.runFailed.cause.exitsZero": (p: P) =>
     `${p.container}'s last run ended unexpectedly.`,

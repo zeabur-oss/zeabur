@@ -1286,6 +1286,7 @@ export const zhCN: Messages = {
   "sentence.diagnosis.crashLoop.fix.killed": () => "有东西终止了它：检查内存用量与存活检查。",
   "sentence.diagnosis.crashLoop.fix.terminated": () => "检查存活检查，以及是什么让程序停止。",
   "sentence.diagnosis.crashLoop.fix.logs": () => "错误信息在重启前那一次的日志里。",
+  "sentence.diagnosis.runFailed.fix.logs": () => "错误信息在失败那次运行的日志里。",
   "sentence.diagnosis.runFailed.cause.exitCode": (p) => `${p.container} 上一次运行失败。`,
   "sentence.diagnosis.runFailed.cause.exitsZero": (p) => `${p.container} 上一次运行意外结束。`,
   "sentence.diagnosis.runFailed.cause.notExecutable": (p) =>

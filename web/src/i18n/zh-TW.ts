@@ -1291,6 +1291,7 @@ export const zhTW: Messages = {
   "sentence.diagnosis.crashLoop.fix.killed": () => "有東西終止了它：檢查記憶體用量與存活檢查。",
   "sentence.diagnosis.crashLoop.fix.terminated": () => "檢查存活檢查，以及是什麼讓程式停止。",
   "sentence.diagnosis.crashLoop.fix.logs": () => "錯誤訊息在重新啟動前那一次的日誌裡。",
+  "sentence.diagnosis.runFailed.fix.logs": () => "錯誤訊息在失敗那次執行的日誌裡。",
   "sentence.diagnosis.runFailed.cause.exitCode": (p) => `${p.container} 上一次執行失敗。`,
   "sentence.diagnosis.runFailed.cause.exitsZero": (p) => `${p.container} 上一次執行意外結束。`,
   "sentence.diagnosis.runFailed.cause.notExecutable": (p) =>

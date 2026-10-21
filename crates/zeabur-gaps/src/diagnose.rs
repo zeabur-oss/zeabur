@@ -485,13 +485,15 @@ const fn exit_variant(code: i32) -> &'static str {
     }
 }
 
-fn exit_fix(variant: &str) -> &'static str {
+/// What to do about a run that ended as `variant`; `logs` where its own logs hold the error (a
+/// crash loop's are those of the run before the restart, a task's those of the run that failed).
+fn exit_fix(variant: &str, logs: &'static str) -> &'static str {
     match variant {
         "exitsZero" => "diagnosis.crashLoop.fix.exitsZero",
         "notExecutable" | "commandNotFound" => "diagnosis.crashLoop.fix.command",
         "killed" => "diagnosis.crashLoop.fix.killed",
         "terminated" => "diagnosis.crashLoop.fix.terminated",
-        _ => "diagnosis.crashLoop.fix.logs",
+        _ => logs,
     }
 }
 
@@ -596,7 +598,8 @@ fn crash_loop(
     if let Some(reason) = &last.reason {
         cause = cause.with("reason", reason);
     }
-    let fix = Message::new(exit_fix(variant)).with("container", &status.name);
+    let fix = Message::new(exit_fix(variant, "diagnosis.crashLoop.fix.logs"))
+        .with("container", &status.name);
     // A clean exit is restarted too, without the waits growing a reason; every other exit is
     // restarted with the kubelet's back-off [k8s-container-restarts].
     let why = if variant == "exitsZero" {
@@ -666,7 +669,8 @@ fn run_failed(
     if let Some(reason) = &termination.reason {
         cause = cause.with("reason", reason);
     }
-    let fix = Message::new(exit_fix(variant)).with("container", &status.name);
+    let fix = Message::new(exit_fix(variant, "diagnosis.runFailed.fix.logs"))
+        .with("container", &status.name);
     let gave_up = job.is_some_and(gave_up);
     let mut why = Message::new(if gave_up {
         "diagnosis.runFailed.why.gaveUp"
@@ -1154,6 +1158,18 @@ mod tests {
         for (reason, text, class) in cases {
             assert_eq!(pull_class(reason, text), class, "{text}");
         }
+    }
+
+    #[test]
+    fn a_failed_run_points_at_its_own_logs_and_a_crash_loop_at_the_run_before() {
+        let crash = "diagnosis.crashLoop.fix.logs";
+        let task = "diagnosis.runFailed.fix.logs";
+        assert_eq!(exit_fix(exit_variant(2), crash), crash);
+        assert_eq!(exit_fix(exit_variant(1), task), task);
+        assert_eq!(
+            exit_fix(exit_variant(127), task),
+            "diagnosis.crashLoop.fix.command"
+        );
     }
 
     #[test]

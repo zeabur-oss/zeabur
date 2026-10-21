@@ -7,7 +7,7 @@
       "key": "diagnosis.runFailed.cause.exitCode",
       "params": {"container": "run", "exitCode": "1", "reason": "Error"}
     },
-    "fix": {"key": "diagnosis.crashLoop.fix.logs", "params": {"container": "run"}},
+    "fix": {"key": "diagnosis.runFailed.fix.logs", "params": {"container": "run"}},
     "lastSeen": "2026-10-15T11:59:05Z"
   }
 ]
