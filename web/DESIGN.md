@@ -236,7 +236,7 @@ it will write, and a confirmation shows it in three layers
    at a time, so the service stays up.", what a variable or value change needs to take effect,
    and who else it touches ("Also affects web and worker (they read shop-config).").
 2. **A button that names the action** ("Restart", "Save variables", "Roll back to revision 5",
-   "Scale to 4"), never a bare "Apply" unless the changes are mixed. The token's countdown shows
+   "Scale to 4"), never a bare "Apply" unless the changes are mixed beyond one draft ("Save"). The token's countdown shows
    only in its last two minutes; once it runs out, the button reviews the change again.
 3. **Technical details**, folded: the YAML diff, the one place for the fields that change, and
    the fields other tools own. An object is named above its diff only when the plan changes
@@ -248,6 +248,17 @@ change (a restart with at least two ready pods, scaling) gets the smaller dialog
 change, a YAML edit, removing a domain, a policy that isolates) the wide one with the consequence
 first, in a warning callout, and a destructive button. Everything else is the wide dialog without
 the callout.
+
+Sentences hold up to five changes (`components/plan/groups.ts`, `FEW`). Past that the dialog
+leads with a fixed summary, conclusion first: what blocks it (in a failure callout, the button
+disabled with the reason beside it), one aggregated risk callout, one line of counts ("1 removed,
+6 changed, 32 added, stays up, fits") and one line of cost. Below, folding groups with their
+counts: a draft by object, then part, each a Field, Before, After table (removed first, "—" for
+none, a Secret's value hidden); a bulk action by outcome, each a Service, Replicas, Effect table,
+with the exceptions open. A table scrolls inside a bounded height under a sticky header and turns
+two-line on a phone; from twelve rows a filter box sits above. A sentence never lists more than
+three names: the rest are "and N more" with Show all. Undo's toast is titled by its count ("Scale
+45 services back up").
 
 Confirming closes the dialog at once; the outcome is a toast (Sonner, one toaster in the shell,
 loaded after the first page; `components/plan/outcome.ts`). Success says "Applied" with what
