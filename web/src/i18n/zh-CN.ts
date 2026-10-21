@@ -388,6 +388,7 @@ export const zhCN: Messages = {
   "service.tabs": "服务页面",
   "service.copyName": "复制 kubectl 用的名称",
   "service.more": "更多",
+  "service.moreTabs": "显示更多标签页",
   "service.views": "查看方式",
   "service.delete": "删除服务",
   "service.notFound": "找不到这个服务。",

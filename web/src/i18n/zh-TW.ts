@@ -388,6 +388,7 @@ export const zhTW: Messages = {
   "service.tabs": "服務頁面",
   "service.copyName": "複製 kubectl 用的名稱",
   "service.more": "更多",
+  "service.moreTabs": "顯示更多分頁",
   "service.views": "檢視方式",
   "service.delete": "刪除服務",
   "service.notFound": "找不到這個服務。",

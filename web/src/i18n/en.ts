@@ -429,6 +429,7 @@ export const en = {
   "service.tabs": "Service sections",
   "service.copyName": "Copy name for kubectl",
   "service.more": "More",
+  "service.moreTabs": "Show more tabs",
   "service.views": "Views",
   "service.delete": "Delete service",
   "service.notFound": "This service does not exist.",
