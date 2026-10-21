@@ -11,8 +11,9 @@
 //! `elevation-required` problem, so the interface can offer to retry as admin and reconnect.
 //! `command` may repeat, one argument each, as in the Kubernetes API; it
 //! defaults to `/bin/sh`. Images without a shell (distroless images [distroless]) end the session
-//! at once with `command-not-found`, which the interface explains; `kubectl debug` with an
-//! ephemeral container is the way into those.
+//! at once with `command-not-found`, which the interface explains; a `debugContainer` plan adds
+//! an ephemeral container with a shell to the pod, and `container` names it to open a terminal
+//! there ([`super::debug`]).
 //!
 //! # Protocol
 //!
@@ -109,7 +110,7 @@ pub const IDLE: Duration = Duration::from_mins(15);
 const DEFAULT_COMMAND: &str = "/bin/sh";
 
 /// The largest message the browser may send; a paste larger than this arrives in pieces.
-const MAX_MESSAGE: usize = 64 * 1024;
+pub(crate) const MAX_MESSAGE: usize = 64 * 1024;
 
 /// Standard input waiting for the process: once this much is pending, the server stops reading
 /// from the browser until the process takes it.
@@ -246,10 +247,12 @@ fn same_origin(headers: &HeaderMap, public: Option<&str>) -> bool {
 /// The person opening a terminal: their cluster, when their credential expires and how long a
 /// terminal may idle. Refuses a handshake from another origin before anything else.
 pub(crate) struct Terminal {
-    cluster: Arc<dyn Cluster>,
-    elevation: Elevation,
-    expires_in: Option<Duration>,
-    idle: Duration,
+    pub(crate) cluster: Arc<dyn Cluster>,
+    pub(crate) elevation: Elevation,
+    pub(crate) expires_in: Option<Duration>,
+    pub(crate) idle: Duration,
+    /// The person's token, for a tools pod (see the `tools` module).
+    pub(crate) handoff: Option<crate::access::Handoff>,
 }
 
 impl<S> FromRequestParts<S> for Terminal
@@ -281,6 +284,7 @@ where
                         elevation: access.elevation,
                         expires_in,
                         idle: state.terminal_idle,
+                        handoff: state.access.handoff(parts),
                     }
                 })
         } else {
@@ -396,23 +400,36 @@ async fn open(
     Ok((container, session))
 }
 
-/// The container asked for, or the pod's default; refused when the pod has no such container or
-/// it is not running.
-fn pick_container(pod: &Value, name: &str, asked: Option<String>) -> Result<String, ApiError> {
-    let containers: Vec<&str> = pod
-        .pointer("/spec/containers")
+fn names<'a>(pod: &'a Value, path: &str) -> Vec<&'a str> {
+    pod.pointer(path)
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .filter_map(|c| c.get("name")?.as_str())
-        .collect();
+        .collect()
+}
+
+/// The container asked for, or the pod's default; refused when the pod has no such container or
+/// it is not running. An ephemeral container (a debug container) is one only when asked for by
+/// name.
+pub(crate) fn pick_container(
+    pod: &Value,
+    name: &str,
+    asked: Option<String>,
+) -> Result<String, ApiError> {
+    let containers = names(pod, "/spec/containers");
+    let ephemeral = names(pod, "/spec/ephemeralContainers");
     let default = pod
         .pointer("/metadata/annotations/kubectl.kubernetes.io~1default-container")
         .and_then(Value::as_str)
         .filter(|d| containers.contains(d))
         .or_else(|| containers.first().copied());
     let container = match asked {
-        Some(asked) if containers.contains(&asked.as_str()) => asked,
+        Some(asked)
+            if containers.contains(&asked.as_str()) || ephemeral.contains(&asked.as_str()) =>
+        {
+            asked
+        }
         Some(asked) => {
             return Err(Problem::new(
                 Kind::NotFound,
@@ -424,13 +441,15 @@ fn pick_container(pod: &Value, name: &str, asked: Option<String>) -> Result<Stri
             .ok_or_else(|| Problem::new(Kind::NotFound, format!("Pod {name} has no containers.")))?
             .to_owned(),
     };
-    let state = pod
-        .pointer("/status/containerStatuses")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .find(|s| s.get("name").and_then(Value::as_str) == Some(container.as_str()))
-        .and_then(|s| s.get("state"));
+    let state = [
+        "/status/containerStatuses",
+        "/status/ephemeralContainerStatuses",
+    ]
+    .into_iter()
+    .filter_map(|path| pod.pointer(path).and_then(Value::as_array))
+    .flatten()
+    .find(|s| s.get("name").and_then(Value::as_str) == Some(container.as_str()))
+    .and_then(|s| s.get("state"));
     if state.and_then(|s| s.get("running")).is_some() {
         return Ok(container);
     }
@@ -455,7 +474,7 @@ fn pick_container(pod: &Value, name: &str, asked: Option<String>) -> Result<Stri
 /// Copies bytes both ways until the process ends, the browser leaves, the credential expires or
 /// the terminal idles. Standard input is written as the process takes it, so a process that is
 /// busy writing output never blocks the reading of more input, nor the other way round.
-async fn relay(
+pub(crate) async fn relay(
     mut socket: WebSocket,
     session: ExecSession,
     expires_in: Option<Duration>,
@@ -554,14 +573,14 @@ async fn drain(
 }
 
 /// Sends a control frame; `false` when the browser is gone.
-async fn send_frame(socket: &mut WebSocket, frame: &ServerFrame) -> bool {
+pub(crate) async fn send_frame(socket: &mut WebSocket, frame: &ServerFrame) -> bool {
     let Ok(text) = serde_json::to_string(frame) else {
         return false;
     };
     socket.send(Message::Text(text.into())).await.is_ok()
 }
 
-async fn close(socket: &mut WebSocket, code: u16, reason: &'static str) {
+pub(crate) async fn close(socket: &mut WebSocket, code: u16, reason: &'static str) {
     let frame = CloseFrame {
         code,
         reason: reason.into(),

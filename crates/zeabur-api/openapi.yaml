@@ -700,6 +700,51 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/debug":
+    get:
+      tags:
+      - pods
+      summary: >-
+        Whether the pod has a debug container of Zeabur's for a container, and its
+        state.
+      description: |-
+        Poll it after applying a `debugContainer` plan until `container.state` is `running`, then
+        open the terminal with `container` set to its name. `problem` says, in plain words, when its
+        image cannot be pulled or it cannot start.
+      operationId: getDebugContainer
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container it shares processes with; by default the pod's default container.
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DebugStatus"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/pods/{pod}/exec":
     get:
       tags:
@@ -1216,6 +1261,105 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Timeline"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/tools":
+    get:
+      tags:
+      - pods
+      summary: >-
+        The person's tools pods in the project's tools namespace, deleting those that
+        are done with.
+      operationId: listToolsPods
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolsStatus"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/tools/{name}":
+    delete:
+      tags:
+      - pods
+      summary: |-
+        Deletes a tools pod of the person's, as long as it is the one they read (`uid` and
+        `resourceVersion` preconditions); its terminals end with it.
+      operationId: deleteToolsPod
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/tools/{name}/terminal":
+    get:
+      tags:
+      - pods
+      summary: A terminal in a tools pod of the person's, over a WebSocket.
+      description: |-
+        The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
+        and `4001`). Before the shell starts, Zeabur writes the person's current credential into the
+        pod (see the module documentation); `ready` names the container `tools`. Failures arrive as an
+        `error` frame: a pod that is not the person's (`404`), one not running yet (`409`), local mode
+        (`400`), or `pods/exec` refused (`403`). The pod is deleted a minute (by default) after its
+        last terminal closes.
+      operationId: toolsTerminal
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "101":
+          description: Switched to the terminal's WebSocket
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
         "403":
           content:
             application/problem+json:
@@ -2073,6 +2217,41 @@ components:
             type: string
             enum:
             - details
+      - type: object
+        description: |-
+          Add a debug container to a pod, for a terminal in a container whose image has no shell:
+          an ephemeral container with a shell image, sharing the target container's processes
+          (see the `terminal` module). Kubernetes keeps it until the pod is replaced. When one of
+          Zeabur's still runs for that container, the plan writes nothing and says so. Planned on
+          its own.
+        required:
+        - pod
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container whose processes it shares; by default the pod's default container.
+          op:
+            type: string
+            enum:
+            - debugContainer
+          pod:
+            type: string
+            description: The pod.
+      - type: object
+        description: |-
+          Start a pod with `kubectl` and `helm` that act as the person, for a terminal (see the
+          `terminal` module). When the person's tools pod still runs, the plan writes nothing and
+          says so. Planned on its own.
+        required:
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - clusterTools
       description: One change a person asks for.
     Citation:
       type: object
@@ -2599,6 +2778,61 @@ components:
       - queue
       - search
       - other
+    DebugContainerStatus:
+      type: object
+      description: A debug container of Zeabur's.
+      required:
+      - name
+      - image
+      - state
+      properties:
+        image:
+          type: string
+          description: Its image.
+        name:
+          type: string
+          description: "Its name: the terminal's `container`."
+        reason:
+          type:
+          - string
+          - "null"
+          description: The kubelet's reason (`ErrImagePull`, `Completed`, …).
+        state:
+          $ref: "#/components/schemas/DebugState"
+          description: Its state.
+    DebugState:
+      type: string
+      description: The state of a debug container.
+      enum:
+      - running
+      - waiting
+      - terminated
+      - unknown
+    DebugStatus:
+      type: object
+      description: A pod's debug container for one of its containers.
+      required:
+      - pod
+      - target
+      properties:
+        container:
+          oneOf:
+          - $ref: "#/components/schemas/DebugContainerStatus"
+            description: |-
+              Zeabur's debug container for it: the newest that runs or is starting, else the newest;
+              absent when there is none, and a plan adds one.
+          - type: "null"
+        pod:
+          type: string
+          description: The pod.
+        problem:
+          oneOf:
+          - $ref: "#/components/schemas/Problem"
+            description: Why it does not start, when it cannot.
+          - type: "null"
+        target:
+          type: string
+          description: The container it shares processes with.
     Denied:
       type: object
       description: |-
@@ -4764,6 +4998,156 @@ components:
           policy:
             type: string
             description: The policy.
+      - type: object
+        description: |-
+          The plan adds this debug container to the pod. Kubernetes cannot remove an ephemeral
+          container: it stays in the pod's spec, stopped once its shell exits, until the pod is
+          replaced.
+        required:
+        - pod
+        - container
+        - target
+        - image
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - debugContainerStays
+          container:
+            type: string
+            description: The debug container.
+          image:
+            type: string
+            description: Its image.
+          pod:
+            type: string
+            description: The pod.
+          target:
+            type: string
+            description: The container whose processes it shares.
+      - type: object
+        description: |-
+          A debug container of Zeabur's still runs (or is starting) for this container; the
+          terminal uses it, and nothing is written.
+        required:
+        - pod
+        - container
+        - target
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - debugContainerReused
+          container:
+            type: string
+            description: The debug container.
+          pod:
+            type: string
+            description: The pod.
+          target:
+            type: string
+            description: The container whose processes it shares.
+      - type: object
+        description: |-
+          The person's credential lacks rights the plan needs: kube-apiserver will refuse it unless
+          an administrator grants them (or the person acts as one).
+        required:
+        - rights
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - rightsMissing
+          rights:
+            type: array
+            items:
+              $ref: "#/components/schemas/Denied"
+            description: Each right, as kube-apiserver would name it in a refusal.
+      - type: object
+        description: "The plan creates a tools pod: what runs where, as whom, until when."
+        required:
+        - namespace
+        - pod
+        - image
+        - person
+        - admin
+        - deadlineSeconds
+        - graceSeconds
+        - code
+        properties:
+          admin:
+            type: boolean
+            description: >-
+              Whether they act with the administrator's credential, which the person holds
+              now.
+          code:
+            type: string
+            enum:
+            - toolsPod
+          credentialExpiresAt:
+            type:
+            - string
+            - "null"
+            description: |-
+              When the credential written into the pod expires, RFC 3339; `kubectl` is refused
+              from then until a terminal opens again with a fresh one.
+          deadlineSeconds:
+            type: integer
+            format: int64
+            description: >-
+              The pod stops this long after it starts, whatever happens
+              (`activeDeadlineSeconds`).
+          graceSeconds:
+            type: integer
+            format: int64
+            description: It is deleted this long after its last terminal closes.
+          image:
+            type: string
+            description: Its image.
+          namespace:
+            type: string
+            description: Its namespace.
+          person:
+            type: string
+            description: "Who `kubectl` and `helm` act as: the person's user name."
+          pod:
+            type: string
+            description: Its name.
+      - type: object
+        description: |-
+          While the credential is valid, anyone who can run commands in the tools pod, or read its
+          memory, can use it as the person.
+        required:
+        - namespace
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - toolsCredentialExposed
+          namespace:
+            type: string
+            description: The pod's namespace, whose `pods/exec` grants decide who that is.
+      - type: object
+        description: The person's tools pod still runs; the terminal uses it, and nothing is written.
+        required:
+        - namespace
+        - pod
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - toolsPodReused
+          namespace:
+            type: string
+            description: Its namespace.
+          pod:
+            type: string
+            description: Its name.
       description: Something a person should know before applying.
     PlannedObject:
       type: object
@@ -4870,6 +5254,24 @@ components:
             - string
             - "null"
             description: The object's `metadata.uid`.
+      - type: object
+        description: |-
+          An RFC 6902 JSON Patch of a Pod's `ephemeralcontainers` subresource that adds one
+          container. Its first operation tests `metadata.uid`, so a pod replaced since the plan
+          fails it.
+        required:
+        - operations
+        - type
+        properties:
+          operations:
+            type: array
+            items:
+              type: object
+            description: The operations.
+          type:
+            type: string
+            enum:
+            - ephemeralContainers
       description: |-
         How a planned write changes its object: a new object is created whole, an existing one is
         patched or deleted. Creations and patches go as the field manager `zeabur`.
@@ -6851,6 +7253,85 @@ components:
       - Helm
       - Argo CD
       - Flux
+    ToolsPodStatus:
+      type: object
+      description: A tools pod of the person's.
+      required:
+      - name
+      - namespace
+      - image
+      - phase
+      - ready
+      - terminals
+      properties:
+        image:
+          type: string
+          description: Its image.
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type: string
+          description: Its namespace.
+        phase:
+          type: string
+          description: "The pod's phase: `Pending`, `Running`, `Succeeded`, `Failed`."
+        problem:
+          oneOf:
+          - $ref: "#/components/schemas/Problem"
+            description: Why it does not start, when it cannot.
+          - type: "null"
+        project:
+          type:
+          - string
+          - "null"
+          description: The project it was opened from.
+        ready:
+          type: boolean
+          description: Whether a terminal can open in it now.
+        startedAt:
+          type:
+          - string
+          - "null"
+          description: When it started, RFC 3339.
+        stopsAt:
+          type:
+          - string
+          - "null"
+          description: >-
+            When it stops whatever happens (`activeDeadlineSeconds` after it started), RFC
+            3339.
+        terminals:
+          type: integer
+          description: How many terminals are open in it on this server.
+          minimum: 0
+    ToolsStatus:
+      type: object
+      description: The person's tools pods.
+      required:
+      - namespace
+      - available
+      - pods
+      - deleted
+      properties:
+        available:
+          type: boolean
+          description: |-
+            Whether Zeabur can open a tools terminal here; `false` in local mode, which holds no
+            token to hand over.
+        deleted:
+          type: array
+          items:
+            type: string
+          description: The tools pods that had stopped or outlived their deadline and were deleted now.
+        namespace:
+          type: string
+          description: The namespace tools pods of this project go in.
+        pods:
+          type: array
+          items:
+            $ref: "#/components/schemas/ToolsPodStatus"
+          description: The person's tools pods there that have not stopped, oldest first.
     UnavailableLog:
       type: string
       description: Why a container's log cannot be read, from the kubelet's answer.

@@ -13,6 +13,7 @@
 use std::sync::Arc;
 
 use axum::http::request::Parts;
+use secrecy::SecretString;
 use zeabur_core::problem::Problem;
 use zeabur_kube::Cluster;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
@@ -49,6 +50,26 @@ impl std::fmt::Debug for Access {
     }
 }
 
+/// A person's bearer token for kube-apiserver, as the session holds it now.
+#[derive(Clone)]
+pub struct Handoff {
+    /// The token.
+    pub token: Arc<SecretString>,
+    /// When it expires.
+    pub expires_at: Timestamp,
+    /// Whether it is the administrator's.
+    pub admin: bool,
+}
+
+impl std::fmt::Debug for Handoff {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Handoff")
+            .field("expires_at", &self.expires_at)
+            .field("admin", &self.admin)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Gives each request the cluster connection of the person who made it.
 pub trait ClusterAccess: Send + Sync + 'static {
     /// The connection for this request and its elevation state, or the problem that prevents one
@@ -77,6 +98,13 @@ pub trait ClusterAccess: Send + Sync + 'static {
     /// administrator's while the person is elevated. kube-apiserver checks a token when a stream
     /// opens, not while it stays open, so a terminal is closed at this time by Zeabur itself.
     fn credential_expiry(&self, _parts: &Parts) -> Option<Timestamp> {
+        None
+    }
+
+    /// The token of [`ClusterAccess::for_request`], to hand to a tools pod (see the `tools`
+    /// module); `None` where Zeabur holds no token of its own to hand over (local mode, where the
+    /// kubeconfig's credential may be anything, and tests).
+    fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
         None
     }
 

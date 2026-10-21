@@ -11,6 +11,7 @@ mod project;
 pub mod releases;
 pub mod rules;
 mod settings;
+pub mod terminal;
 pub mod token;
 
 pub use change::{

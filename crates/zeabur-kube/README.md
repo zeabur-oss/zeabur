@@ -30,6 +30,10 @@ feature).
   resource generically (`served_resources`, `list_objects`, `list_metadata`, `get_object`), for
   custom resources and integrations. Each asks discovery first, so an API that is not installed is
   reported as not installed, never as a missing permission.
+- **Bytes in, not in the spec.** `run` execs a command with the given standard input and waits
+  for its exit, so a caller can hand a container a file (the tools pod's kubeconfig) without
+  writing it into any object. Ephemeral containers are written through their own subresource
+  (`WriteBody::EphemeralContainers`), with a JSON Patch.
 
 ## Place in the workspace
 

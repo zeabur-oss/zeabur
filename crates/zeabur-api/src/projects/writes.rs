@@ -40,6 +40,7 @@ pub(crate) mod preview;
 mod refusals;
 pub(crate) mod releases;
 mod secrets;
+pub(crate) mod terminal;
 mod volumes;
 
 use std::sync::Arc;
@@ -64,7 +65,7 @@ use zeabur_plan::token::{self, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
 use zeabur_plan::{Change, ErrorKind, GatewayRef, Input, Plan, PlanError, PlanRequest, Write};
 
 use crate::error::{ApiError, project_read, read_problem};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::handlers::{AppState, Credential, Everyday, Person};
 use crate::projects::snapshot;
 
 /// A plan and the token that applies it.
@@ -108,7 +109,7 @@ pub struct ApplyResponse {
     pub applied: Vec<Applied>,
 }
 
-fn plan_problem(error: PlanError) -> ApiError {
+pub(crate) fn plan_problem(error: PlanError) -> ApiError {
     let kind = match error.kind {
         _ if error.managed_by.is_some() => Kind::Managed,
         ErrorKind::BadRequest => Kind::BadRequest,
@@ -207,6 +208,21 @@ async fn compute(
     Ok(plan)
 }
 
+/// [`compute`], or [`terminal::compute`] for a terminal's change.
+async fn compute_any(
+    planner: &terminal::Planner<'_>,
+    cluster: &dyn Cluster,
+    project: &str,
+    request: &PlanRequest,
+    now: &str,
+) -> Result<Plan, ApiError> {
+    if request.changes.iter().any(Change::is_terminal_change) {
+        terminal::compute(planner, cluster, project, request, now).await
+    } else {
+        compute(cluster, project, request, now).await
+    }
+}
+
 /// Computes the writes a change needs and returns them with a token; writes nothing.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/plan", tag = "projects",
     params(("project" = String, Path, description = "The project's namespace")),
@@ -220,6 +236,7 @@ pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
     Everyday(everyday): Everyday,
+    Credential(handoff): Credential,
     Path(project): Path<String>,
     Json(request): Json<PlanRequest>,
 ) -> Result<Json<PlanResponse>, ApiError> {
@@ -230,7 +247,12 @@ pub(crate) async fn plan(
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     let now = Timestamp::from_second((state.clock)().as_second()).unwrap_or(Timestamp::UNIX_EPOCH);
     let made_at = now.to_string();
-    let plan = compute(cluster.as_ref(), &project, &request, &made_at).await?;
+    let planner = terminal::Planner {
+        settings: &state.settings.terminal,
+        person: &identity.username,
+        handoff: handoff.as_ref(),
+    };
+    let plan = compute_any(&planner, cluster.as_ref(), &project, &request, &made_at).await?;
     let preview = preview::read(cluster.as_ref(), &project, &plan, &request).await?;
     let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
     let claims = Claims {
@@ -258,6 +280,34 @@ pub(crate) async fn plan(
     }))
 }
 
+/// The problem for a plan token that does not open.
+fn token_problem(error: TokenError) -> ApiError {
+    let kind = match error {
+        TokenError::Expired => Kind::PlanExpired,
+        TokenError::Altered | TokenError::Malformed => Kind::BadRequest,
+    };
+    let detail = match error {
+        TokenError::Expired => "The plan expired.",
+        TokenError::Altered => "The plan token was altered, or it is not from this server.",
+        TokenError::Malformed => "The plan token is malformed.",
+    };
+    let mut problem = Problem::new(kind, detail);
+    let (fix, key) = match error {
+        TokenError::Expired => (
+            "Plans last ten minutes. Make the plan again.",
+            zeabur_core::message::Message::new("problem.planExpired.fix.again")
+                .with("minutes", (LIFETIME_SECONDS / 60).to_string()),
+        ),
+        TokenError::Altered | TokenError::Malformed => (
+            "Make the plan again; a plan applies only with the token it came with, \
+             unchanged, on the server that made it.",
+            zeabur_core::message::Message::new("problem.badRequest.fix.planToken"),
+        ),
+    };
+    problem.fix_for_occasion(fix, key);
+    ApiError::from(problem)
+}
+
 /// Carries out a plan by its token: checks it, dry-runs every write, then writes.
 ///
 /// Reads and writes use the elevated credential while the person holds one, as every request
@@ -279,37 +329,13 @@ pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
     Everyday(everyday): Everyday,
+    Credential(handoff): Credential,
     Path(project): Path<String>,
     Json(request): Json<ApplyRequest>,
 ) -> Result<Json<ApplyResponse>, ApiError> {
     let key = key(&state)?;
     let claims =
-        token::verify(&key, &request.token, (state.clock)().as_second()).map_err(|error| {
-            let kind = match error {
-                TokenError::Expired => Kind::PlanExpired,
-                TokenError::Altered | TokenError::Malformed => Kind::BadRequest,
-            };
-            let detail = match error {
-                TokenError::Expired => "The plan expired.",
-                TokenError::Altered => "The plan token was altered, or it is not from this server.",
-                TokenError::Malformed => "The plan token is malformed.",
-            };
-            let mut problem = Problem::new(kind, detail);
-            let (fix, key) = match error {
-                TokenError::Expired => (
-                    "Plans last ten minutes. Make the plan again.",
-                    zeabur_core::message::Message::new("problem.planExpired.fix.again")
-                        .with("minutes", (LIFETIME_SECONDS / 60).to_string()),
-                ),
-                TokenError::Altered | TokenError::Malformed => (
-                    "Make the plan again; a plan applies only with the token it came with, \
-                     unchanged, on the server that made it.",
-                    zeabur_core::message::Message::new("problem.badRequest.fix.planToken"),
-                ),
-            };
-            problem.fix_for_occasion(fix, key);
-            ApiError::from(problem)
-        })?;
+        token::verify(&key, &request.token, (state.clock)().as_second()).map_err(token_problem)?;
     if claims.project != project {
         return Err(ApiError::from(Problem::new(
             Kind::BadRequest,
@@ -330,7 +356,20 @@ pub(crate) async fn apply(
             "Someone else made this plan, or you made it with other group memberships.",
         )));
     }
-    let plan = compute(cluster.as_ref(), &project, &claims.request, &claims.made_at).await?;
+    let planner = terminal::Planner {
+        settings: &state.settings.terminal,
+        person: &identity.username,
+        handoff: handoff.as_ref(),
+    };
+    let plan = compute_any(
+        &planner,
+        cluster.as_ref(),
+        &project,
+        &claims.request,
+        &claims.made_at,
+    )
+    .await?;
+    let namespace = terminal::namespace(&state.settings.terminal, &claims.request, &project);
     if zeabur_plan::versions(&plan) != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Conflict,
@@ -343,7 +382,7 @@ pub(crate) async fn apply(
         .map(|object| {
             (
                 object.target.clone(),
-                write_request(&project, &object.target, &object.write),
+                write_request(namespace, &object.target, &object.write),
             )
         })
         .collect();
@@ -354,7 +393,7 @@ pub(crate) async fn apply(
         };
         if let Err(error) = cluster.write(&dry).await {
             return Err(ApiError::from(
-                refused(cluster.as_ref(), &project, target, write, error).await,
+                refused(cluster.as_ref(), namespace, target, write, error).await,
             ));
         }
     }
@@ -366,7 +405,8 @@ pub(crate) async fn apply(
                 resource_version: written.resource_version,
             }),
             Err(error) => {
-                let mut problem = refused(cluster.as_ref(), &project, &target, &write, error).await;
+                let mut problem =
+                    refused(cluster.as_ref(), namespace, &target, &write, error).await;
                 if !applied.is_empty() {
                     let done: Vec<String> = applied
                         .iter()
@@ -382,7 +422,7 @@ pub(crate) async fn apply(
     Ok(Json(ApplyResponse { applied }))
 }
 
-pub(super) fn write_request(
+pub(crate) fn write_request(
     project: &str,
     target: &zeabur_plan::Target,
     write: &Write,
@@ -403,6 +443,9 @@ pub(super) fn write_request(
             Write::Create { body } => WriteBody::Create(body.clone()),
             Write::Patch { operations } => {
                 WriteBody::JsonPatch(serde_json::Value::Array(operations.clone()))
+            }
+            Write::EphemeralContainers { operations } => {
+                WriteBody::EphemeralContainers(serde_json::Value::Array(operations.clone()))
             }
             Write::Delete {
                 uid,

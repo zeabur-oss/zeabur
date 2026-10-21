@@ -37,8 +37,9 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
+use secrecy::SecretString;
 use zeabur_api::ApiError;
-use zeabur_api::access::{Access, ClusterAccess, Elevation};
+use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
 use zeabur_auth::client::{AuthError, OAuthClient};
 use zeabur_auth::cookie;
 use zeabur_auth::flow::{FlowKey, LIFETIME_SECONDS, Pending, Purpose, return_path};
@@ -52,8 +53,19 @@ use zeabur_plan::token::PlanKey;
 
 use crate::pages::{self, Elevated, SignInProblem};
 
-/// A cluster connection bound to one person's token.
-pub(crate) type Connection = Arc<dyn Cluster>;
+/// A cluster connection bound to one person's token, and the token, which only a tools pod is
+/// handed (`zeabur_api::tools`).
+#[derive(Clone)]
+pub(crate) struct Connection {
+    pub(crate) cluster: Arc<dyn Cluster>,
+    pub(crate) token: Arc<SecretString>,
+}
+
+impl std::fmt::Debug for Connection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Connection").finish_non_exhaustive()
+    }
+}
 
 /// What the sign-in routes and the API share.
 pub(crate) struct Auth {
@@ -192,17 +204,17 @@ impl ClusterAccess for SessionAccess {
         let credentials = credentials(parts)?;
         Ok(match (&credentials.elevated, self.elevation) {
             (Some(elevated), _) => Access {
-                cluster: Arc::clone(&elevated.value),
+                cluster: Arc::clone(&elevated.value.cluster),
                 elevation: Elevation::Active {
                     until: timestamp(elevated.expires_at),
                 },
             },
             (None, true) => Access {
-                cluster: Arc::clone(&credentials.base.value),
+                cluster: Arc::clone(&credentials.base.value.cluster),
                 elevation: Elevation::Available,
             },
             (None, false) => Access {
-                cluster: Arc::clone(&credentials.base.value),
+                cluster: Arc::clone(&credentials.base.value.cluster),
                 elevation: Elevation::Unavailable,
             },
         })
@@ -210,8 +222,8 @@ impl ClusterAccess for SessionAccess {
 
     /// The base token, for a plan's binding: elevating adds groups, and a plan made with one set
     /// must still apply with the other.
-    fn everyday(&self, parts: &Parts) -> Result<Connection, Box<Problem>> {
-        Ok(Arc::clone(&credentials(parts)?.base.value))
+    fn everyday(&self, parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+        Ok(Arc::clone(&credentials(parts)?.base.value.cluster))
     }
 
     /// The expiry of the token [`ClusterAccess::for_request`] uses: the elevated one's while it
@@ -223,6 +235,20 @@ impl ClusterAccess for SessionAccess {
             .as_ref()
             .map_or(credentials.base.expires_at, |elevated| elevated.expires_at);
         Some(timestamp(expires_at))
+    }
+
+    /// The token of [`ClusterAccess::for_request`]: the elevated one while it is held.
+    fn handoff(&self, parts: &Parts) -> Option<Handoff> {
+        let credentials = credentials(parts).ok()?;
+        let (bound, admin) = credentials
+            .elevated
+            .as_ref()
+            .map_or((&credentials.base, false), |elevated| (elevated, true));
+        Some(Handoff {
+            token: Arc::clone(&bound.value.token),
+            expires_at: timestamp(bound.expires_at),
+            admin,
+        })
     }
 
     fn signs_in(&self) -> bool {
@@ -414,7 +440,7 @@ async fn sign_in(
     };
     // Who the person is, as kube-apiserver sees the token: it validated the token itself.
     let identity = match (auth.connect)(&tokens.access_token) {
-        Ok(cluster) => cluster.whoami().await.map_err(|e| e.to_string()),
+        Ok(connection) => connection.cluster.whoami().await.map_err(|e| e.to_string()),
         Err(error) => Err(error),
     };
     let identity = match identity {
@@ -478,7 +504,7 @@ async fn elevation(
     // user. A passkey of someone else, used in this window, must not lend its rights to this
     // session; and the plan token's binding (the user name) stays true.
     let identity = match (auth.connect)(&tokens.access_token) {
-        Ok(cluster) => cluster.whoami().await.map_err(|e| e.to_string()),
+        Ok(connection) => connection.cluster.whoami().await.map_err(|e| e.to_string()),
         Err(error) => Err(error),
     };
     match identity {

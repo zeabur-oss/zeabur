@@ -335,6 +335,12 @@ impl<'a> Planner<'a> {
                 description,
                 icon,
             } => self.details(display_name.as_deref(), description.as_deref(), *icon),
+            Change::DebugContainer { .. } | Change::ClusterTools => Err(error(
+                ErrorKind::BadRequest,
+                "terminal_change_alone",
+                "A debug container and a tools pod are planned on their own, from what the \
+                 pod or the person's session says.",
+            )),
         }
     }
 
@@ -1505,6 +1511,11 @@ pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
                     "/metadata/resourceVersion={}",
                     json!(resource_version)
                 )),
+                Write::EphemeralContainers { operations } => operations.first().and_then(|op| {
+                    let value = op.get("value")?;
+                    (op.get("path")?.as_str()? == "/metadata/uid")
+                        .then(|| format!("/metadata/uid={value}"))
+                }),
                 Write::Create { .. } => None,
             };
             pin.map(|pin| (format!("{}/{}", o.target.kind, o.target.name), pin))

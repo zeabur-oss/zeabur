@@ -207,9 +207,33 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         icon: Option<ProjectIcon>,
     },
+    /// Add a debug container to a pod, for a terminal in a container whose image has no shell:
+    /// an ephemeral container with a shell image, sharing the target container's processes
+    /// (see the `terminal` module). Kubernetes keeps it until the pod is replaced. When one of
+    /// Zeabur's still runs for that container, the plan writes nothing and says so. Planned on
+    /// its own.
+    #[serde(rename_all = "camelCase")]
+    DebugContainer {
+        /// The pod.
+        pod: String,
+        /// The container whose processes it shares; by default the pod's default container.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        container: Option<String>,
+    },
+    /// Start a pod with `kubectl` and `helm` that act as the person, for a terminal (see the
+    /// `terminal` module). When the person's tools pod still runs, the plan writes nothing and
+    /// says so. Planned on its own.
+    ClusterTools,
 }
 
 impl Change {
+    /// Whether the change is planned for a terminal, alone ([`Change::DebugContainer`],
+    /// [`Change::ClusterTools`]).
+    #[must_use]
+    pub const fn is_terminal_change(&self) -> bool {
+        matches!(self, Self::DebugContainer { .. } | Self::ClusterTools)
+    }
+
     /// Whether the change writes the project's Namespace (adopting it, letting it go, its
     /// details) rather than objects in it.
     #[must_use]
@@ -371,6 +395,15 @@ pub enum Write {
         uid: Option<String>,
         /// The object's `metadata.resourceVersion`.
         resource_version: String,
+    },
+    /// An RFC 6902 JSON Patch of a Pod's `ephemeralcontainers` subresource that adds one
+    /// container. Its first operation tests `metadata.uid`, so a pod replaced since the plan
+    /// fails it.
+    #[serde(rename_all = "camelCase")]
+    EphemeralContainers {
+        /// The operations.
+        #[schema(value_type = Vec<Object>)]
+        operations: Vec<Value>,
     },
 }
 
@@ -553,6 +586,75 @@ pub enum Warning {
         egress_opened: Vec<WorkloadRef>,
         /// Connections it blocked or limited that become allowed.
         connections_opened: Vec<ConnectionRef>,
+    },
+    /// The plan adds this debug container to the pod. Kubernetes cannot remove an ephemeral
+    /// container: it stays in the pod's spec, stopped once its shell exits, until the pod is
+    /// replaced.
+    #[serde(rename_all = "camelCase")]
+    DebugContainerStays {
+        /// The pod.
+        pod: String,
+        /// The debug container.
+        container: String,
+        /// The container whose processes it shares.
+        target: String,
+        /// Its image.
+        image: String,
+    },
+    /// A debug container of Zeabur's still runs (or is starting) for this container; the
+    /// terminal uses it, and nothing is written.
+    #[serde(rename_all = "camelCase")]
+    DebugContainerReused {
+        /// The pod.
+        pod: String,
+        /// The debug container.
+        container: String,
+        /// The container whose processes it shares.
+        target: String,
+    },
+    /// The person's credential lacks rights the plan needs: kube-apiserver will refuse it unless
+    /// an administrator grants them (or the person acts as one).
+    #[serde(rename_all = "camelCase")]
+    RightsMissing {
+        /// Each right, as kube-apiserver would name it in a refusal.
+        rights: Vec<zeabur_core::problem::Denied>,
+    },
+    /// The plan creates a tools pod: what runs where, as whom, until when.
+    #[serde(rename_all = "camelCase")]
+    ToolsPod {
+        /// Its namespace.
+        namespace: String,
+        /// Its name.
+        pod: String,
+        /// Its image.
+        image: String,
+        /// Who `kubectl` and `helm` act as: the person's user name.
+        person: String,
+        /// Whether they act with the administrator's credential, which the person holds now.
+        admin: bool,
+        /// When the credential written into the pod expires, RFC 3339; `kubectl` is refused
+        /// from then until a terminal opens again with a fresh one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        credential_expires_at: Option<String>,
+        /// The pod stops this long after it starts, whatever happens (`activeDeadlineSeconds`).
+        deadline_seconds: i64,
+        /// It is deleted this long after its last terminal closes.
+        grace_seconds: i64,
+    },
+    /// While the credential is valid, anyone who can run commands in the tools pod, or read its
+    /// memory, can use it as the person.
+    #[serde(rename_all = "camelCase")]
+    ToolsCredentialExposed {
+        /// The pod's namespace, whose `pods/exec` grants decide who that is.
+        namespace: String,
+    },
+    /// The person's tools pod still runs; the terminal uses it, and nothing is written.
+    #[serde(rename_all = "camelCase")]
+    ToolsPodReused {
+        /// Its namespace.
+        namespace: String,
+        /// Its name.
+        pod: String,
     },
 }
 

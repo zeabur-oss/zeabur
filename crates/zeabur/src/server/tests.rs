@@ -104,8 +104,10 @@ impl Rig {
             if user == "mallory" {
                 return Err("Unauthorized".to_owned());
             }
-            let cluster: Connection = Arc::new(cluster(user, token.contains(":elevated:")));
-            Ok(cluster)
+            Ok(Connection {
+                cluster: Arc::new(cluster(user, token.contains(":elevated:"))),
+                token: Arc::new(SecretString::from(token.to_owned())),
+            })
         });
         let sessions = Arc::new(Sessions::new(
             Arc::clone(&oauth),
@@ -659,19 +661,24 @@ fn every_request_goes_with_the_token_in_use_and_ends_with_it() {
 
     use super::{SessionAccess, Signed};
 
-    let base: Connection = Arc::new(cluster("alice", false));
-    let elevated: Connection = Arc::new(cluster("alice", true));
+    let connection = |elevated: bool, token: &str| Connection {
+        cluster: Arc::new(cluster("alice", elevated)),
+        token: Arc::new(SecretString::from(token.to_owned())),
+    };
+    let base = connection(false, "alice:1");
+    let elevated = connection(true, "alice:elevated:1");
     let access = SessionAccess {
         elevation: true,
         origin: PUBLIC.to_owned(),
     };
     let mut parts = Request::builder().body(()).unwrap().into_parts().0;
     assert_eq!(access.credential_expiry(&parts), None);
+    assert!(access.handoff(&parts).is_none());
 
     let mut credentials = Credentials {
         username: "alice".to_owned(),
         base: Bound {
-            value: Arc::clone(&base),
+            value: base.clone(),
             expires_at: NOW + 600,
         },
         elevated: None,
@@ -682,16 +689,22 @@ fn every_request_goes_with_the_token_in_use_and_ends_with_it() {
         Some(NOW + 600)
     );
     let now = access.for_request(&parts).unwrap();
-    assert!(Arc::ptr_eq(&now.cluster, &base));
+    assert!(Arc::ptr_eq(&now.cluster, &base.cluster));
     assert!(matches!(now.elevation, Elevation::Available));
+    let handoff = access.handoff(&parts).unwrap();
+    assert_eq!(handoff.token.expose_secret(), "alice:1");
+    assert_eq!(
+        (handoff.expires_at.as_second(), handoff.admin),
+        (NOW + 600, false)
+    );
 
     credentials.elevated = Some(Bound {
-        value: Arc::clone(&elevated),
+        value: elevated.clone(),
         expires_at: NOW + 300,
     });
     parts.extensions.insert(Signed::In(credentials));
     let now = access.for_request(&parts).unwrap();
-    assert!(Arc::ptr_eq(&now.cluster, &elevated));
+    assert!(Arc::ptr_eq(&now.cluster, &elevated.cluster));
     match now.elevation {
         Elevation::Active { until } => assert_eq!(until.as_second(), NOW + 300),
         Elevation::Available | Elevation::Unavailable => panic!("not elevated"),
@@ -700,5 +713,14 @@ fn every_request_goes_with_the_token_in_use_and_ends_with_it() {
         access.credential_expiry(&parts).map(Timestamp::as_second),
         Some(NOW + 300)
     );
-    assert!(Arc::ptr_eq(&access.everyday(&parts).unwrap(), &base));
+    assert!(Arc::ptr_eq(
+        &access.everyday(&parts).unwrap(),
+        &base.cluster
+    ));
+    let handoff = access.handoff(&parts).unwrap();
+    assert_eq!(handoff.token.expose_secret(), "alice:elevated:1");
+    assert_eq!(
+        (handoff.expires_at.as_second(), handoff.admin),
+        (NOW + 300, true)
+    );
 }
