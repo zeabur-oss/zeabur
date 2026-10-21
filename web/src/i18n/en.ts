@@ -1,6 +1,7 @@
 // English: the source of every message key. The other locales are typed as `Messages`, so a key
 // missing there (or added there only) is a TypeScript error.
 import { cuts, probeTiming, type P, type ProbeTiming } from "@/i18n/sentence-parts"
+import sentences from "@/i18n/generated/en"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
@@ -47,6 +48,8 @@ const timingEn = (t: ProbeTiming, sentence: string) =>
       }`
 
 export const en = {
+  // Diagnoses, gaps, traces and incidents: crates/zeabur-gaps/messages
+  ...sentences,
   // Shell
   "shell.skip": "Skip to content",
   "shell.nav": "Main",

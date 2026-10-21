@@ -1,5 +1,6 @@
 import type { Messages } from "@/i18n/en"
 import { cuts, listZh, probeTiming, thingZh, type P, type ProbeTiming } from "@/i18n/sentence-parts"
+import sentences from "@/i18n/generated/zh-TW"
 
 // A space where Han text meets a Latin word ("檢視 Secrets 需要…").
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
@@ -37,6 +38,7 @@ const timingZhTW = (t: ProbeTiming, sentence: string) =>
       }`
 
 export const zhTW: Messages = {
+  ...sentences,
   "shell.skip": "跳到主要內容",
   "shell.nav": "主選單",
   "shell.home": "首頁",

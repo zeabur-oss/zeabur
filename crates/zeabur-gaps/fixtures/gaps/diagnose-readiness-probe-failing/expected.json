@@ -18,7 +18,8 @@
         "period": "5",
         "periodDefault": "false",
         "threshold": "3",
-        "thresholdDefault": "true"
+        "thresholdDefault": "true",
+        "total": "15"
       }
     },
     "fix": {"key": "diagnosis.probeFailure.fix.readiness", "params": {"container": "api"}},

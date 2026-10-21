@@ -4,6 +4,7 @@ mod diagnose;
 mod durability;
 mod event;
 mod incident;
+pub mod messages;
 mod rules;
 mod snippet;
 mod trace;

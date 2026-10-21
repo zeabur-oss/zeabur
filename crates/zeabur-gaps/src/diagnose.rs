@@ -769,13 +769,15 @@ fn probe_of<'s>(spec: &'s PodSpec, container: &str, probe: &str) -> Option<&'s P
 fn with_timing(why: Message, probe: &Probe) -> Message {
     let period = probe.period_seconds;
     let threshold = probe.failure_threshold;
-    why.with("period", period.unwrap_or(PROBE_PERIOD).to_string())
+    let (every, times) = (
+        period.unwrap_or(PROBE_PERIOD),
+        threshold.unwrap_or(PROBE_THRESHOLD),
+    );
+    why.with("period", every.to_string())
         .with("periodDefault", period.is_none().to_string())
-        .with(
-            "threshold",
-            threshold.unwrap_or(PROBE_THRESHOLD).to_string(),
-        )
+        .with("threshold", times.to_string())
         .with("thresholdDefault", threshold.is_none().to_string())
+        .with("total", (i64::from(every) * i64::from(times)).to_string())
 }
 
 fn probe_failures(
