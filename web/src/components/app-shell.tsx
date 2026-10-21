@@ -93,7 +93,7 @@ export function AppShell() {
           <ElevationDialog state={elevating} />
         </Suspense>
       )}
-      <Suspense fallback={null}>
+      <Suspense fallback={<div aria-live="polite" />}>
         <Toaster theme={theme} position="bottom-right" containerAriaLabel={t("toast.region")} />
       </Suspense>
     </TooltipProvider>
