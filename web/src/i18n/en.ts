@@ -1039,6 +1039,11 @@ export const en = {
   "gap.title": "Missing setup",
   "gap.warning": "Warning",
   "gap.advice": "Advice",
+  "gap.unchecked": (count: number) =>
+    `${count} ${count === 1 ? "service has" : "services have"} no traffic check`,
+  "gap.uncheckedWhy":
+    "Without one, Running only means the container started. Each service sets it under Settings.",
+  "gap.uncheckedNames": "Show services",
   "gap.fix": "Fix",
   "gap.install": "Install",
   "gap.snippet": "YAML to add",
@@ -1584,7 +1589,7 @@ export const en = {
   "sentence.page.reload": () => "Check that Zeabur is still running, then reload the page.",
   "sentence.page.followFailed": () => "Unable to follow the log.",
   "sentence.page.followOff": () => "Turn off Follow; the snapshot shows the cluster's answer.",
-  "status.readyUnchecked": "Running (no traffic check)",
+  "status.readyUnchecked": "Running",
   "origin.code": "In the app",
   "origin.configuration": "In its settings",
   "origin.cluster": "In the cluster",
@@ -1613,6 +1618,8 @@ export const en = {
   "trace.hop.failed": "Failed",
   "trace.hop.unknown": "Not checked",
   "status.uncheckedWhy": "Its containers started, but nothing checks that it answers requests.",
+  "status.uncheckedHint":
+    "No traffic check is set, so Running only means the container started, not that it can serve requests.",
   "status.addTrafficCheck": "Add a traffic check",
   "status.private": "Private",
   "rollout.title": "Rollout",

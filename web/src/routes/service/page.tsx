@@ -223,6 +223,13 @@ function ServiceView({
                     {service.displayName ?? service.name}
                   </h1>
                   <ServiceStatus status={statusOf(service)} counts swap />
+                  {statusOf(service).unchecked ? (
+                    <Tooltip content={t("status.uncheckedHint")}>
+                      <Button variant="muted" size="icon-xs" aria-label={t("status.uncheckedHint")}>
+                        <InfoIcon aria-hidden="true" />
+                      </Button>
+                    </Tooltip>
+                  ) : null}
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-secondary">
                   <span className="flex min-w-0 items-center gap-1">

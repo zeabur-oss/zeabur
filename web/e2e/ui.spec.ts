@@ -12,10 +12,12 @@ import { expect, test } from "./fixtures.ts"
 //   ZEABUR_E2E_FAILING       a crash-looping Deployment            (default crasher)
 //   ZEABUR_E2E_SECRET        a Secret the healthy Deployment reads (default talker-secret)
 //   ZEABUR_E2E_SECRET_VALUE  one of its values                     (default zeabur-e2e-secret)
+//   ZEABUR_E2E_UNCHECKED     a service with no traffic check, as Kind/name (optional)
 //
 // The demo server: ZEABUR_E2E_NAMESPACE=shop ZEABUR_E2E_SERVICE=api
 // ZEABUR_E2E_POD=api-5f6b7-k2m4p ZEABUR_E2E_LOG_LINE="GET /products" ZEABUR_E2E_FAILING=worker
 // ZEABUR_E2E_SECRET=db-credentials ZEABUR_E2E_SECRET_VALUE=correct-horse-battery-staple
+// ZEABUR_E2E_UNCHECKED=StatefulSet/db
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const pod = env("ZEABUR_E2E_POD")
@@ -24,6 +26,7 @@ const logLine = env("ZEABUR_E2E_LOG_LINE", "zeabur-e2e-line")
 const failing = env("ZEABUR_E2E_FAILING", "crasher")
 const secret = env("ZEABUR_E2E_SECRET", "talker-secret")
 const secretValue = env("ZEABUR_E2E_SECRET_VALUE", "zeabur-e2e-secret")
+const unchecked = env("ZEABUR_E2E_UNCHECKED")
 const project = `/projects/${encodeURIComponent(namespace)}`
 
 test.beforeAll(() => {
@@ -474,6 +477,41 @@ test("Refresh next to the update time asks the cluster again, also after a faile
   await expect(status).toContainText("Updated just now")
   await expect(status).not.toContainText("Couldn't refresh")
   await expect(refresh).toBeEnabled()
+})
+
+test("a service with no traffic check reads Running, explained on its page and folded in Suggestions", async ({
+  page,
+}) => {
+  test.skip(!unchecked, "ZEABUR_E2E_UNCHECKED is not set")
+  const [, name] = unchecked.split("/")
+  await page.goto(`${project}?view=list`)
+  const row = page
+    .getByRole("table", { name: "Services" })
+    .getByRole("row")
+    .filter({ hasText: name })
+  await expect(row.first()).toContainText("Running")
+  await expect(row.first()).not.toContainText("traffic check")
+
+  await page.getByRole("button", { name: /^\d+ suggestions?$/ }).click()
+  const drawer = page.getByRole("dialog")
+  const folded = drawer
+    .getByRole("listitem")
+    .filter({ hasText: /services? ha(s|ve) no traffic check/ })
+  await expect(folded).toHaveCount(1)
+  await expect(folded).not.toContainText("Warning")
+  await folded.getByRole("button", { name: "Show services" }).click()
+  await expect(folded.getByRole("link", { name, exact: true })).toBeVisible()
+  await page.keyboard.press("Escape")
+
+  await page.goto(`${project}/services/${unchecked}`)
+  const hint = page.getByRole("button", { name: /^No traffic check is set/ })
+  await hint.focus()
+  await expect(hint).toBeFocused()
+  await hint.hover()
+  // Base UI's tooltip popup carries no tooltip role.
+  await expect(
+    page.getByText("Running only means the container started", { exact: false }).last(),
+  ).toBeVisible()
 })
 
 // The writes touch only `editor` and its ConfigMap, so the tests above see the same project.

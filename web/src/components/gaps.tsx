@@ -15,7 +15,9 @@ import {
 import { YamlBlock } from "@/components/yaml"
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
+import { serviceLink } from "@/lib/place"
 import { fixTemplates } from "@/model/fixes"
+import { suggestionsOf } from "@/model/overview"
 
 type Gap = Schemas["GapView"]
 
@@ -34,7 +36,12 @@ export function GapList({
   return (
     <>
       <ul className="flex flex-col">
-        {gaps.map((gap) => {
+        {suggestionsOf(gaps).map((row) => {
+          if (row.as === "unchecked")
+            return project ? (
+              <UncheckedRow key="unchecked" project={project} services={row.services} />
+            ) : null
+          const gap = row.gap
           // A template can decline a case (no numeric port to check): the snippet stays the fix.
           const ask = project && document ? fixTemplates[gap.fix.id]?.(gap, document, t) : undefined
           return (
@@ -48,6 +55,49 @@ export function GapList({
       </ul>
       {planner.dialog}
     </>
+  )
+}
+
+/** Every service without a traffic check, as one piece of advice; the names open below it. */
+function UncheckedRow({
+  project,
+  services,
+}: {
+  project: string
+  services: { kind: string; name: string }[]
+}) {
+  const t = useT()
+  return (
+    <li className="flex flex-col gap-1.5 border-t border-rule py-3 first:border-t-0">
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <StatusPill health="idle" size="sm">
+          {t("gap.advice")}
+        </StatusPill>
+        <span className="min-w-0 flex-1 text-pretty">{t("gap.unchecked", services.length)}</span>
+      </div>
+      <p className="type-meta text-muted-foreground">{t("gap.uncheckedWhy")}</p>
+      <Collapsible>
+        <CollapsibleTrigger variant="disclosure">
+          <CaretRightIcon aria-hidden="true" />
+          {t("gap.uncheckedNames")}
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ul className="flex flex-wrap gap-x-3 gap-y-1 pt-2 type-meta">
+            {services.map((service) => (
+              <li key={`${service.kind}/${service.name}`}>
+                <Link
+                  {...serviceLink(project, service, { tab: "health-checks" })}
+                  className="type-mono text-foreground hover:underline"
+                  translate="no"
+                >
+                  {service.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </CollapsibleContent>
+      </Collapsible>
+    </li>
   )
 }
 

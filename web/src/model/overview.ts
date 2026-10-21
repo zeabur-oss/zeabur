@@ -138,3 +138,26 @@ export const eventWord = (reason: string | undefined): EventWord | undefined =>
   reason && Object.hasOwn(eventWords, reason)
     ? eventWords[reason as keyof typeof eventWords]
     : undefined
+
+type Gap = Schemas["GapView"]
+
+/** A project's suggestions: each gap on its own, and one row for every service without a traffic check. */
+export type Suggestion =
+  | { as: "gap"; gap: Gap }
+  | { as: "unchecked"; services: { kind: string; name: string }[] }
+
+const uncheckedKeys = new Set(["gap.healthChecks.none", "gap.healthChecks.livenessOnly"])
+
+/** The same advice for many services reads as one low-priority row, after the others. */
+export function suggestionsOf(gaps: Gap[]): Suggestion[] {
+  const rows: Suggestion[] = []
+  const unchecked = new Map<string, { kind: string; name: string }>()
+  for (const gap of gaps) {
+    if (uncheckedKeys.has(gap.message.key)) {
+      const { kind, name } = gap.subject
+      unchecked.set(`${kind}/${name}`, { kind, name })
+    } else rows.push({ as: "gap", gap })
+  }
+  if (unchecked.size > 0) rows.push({ as: "unchecked", services: [...unchecked.values()] })
+  return rows
+}

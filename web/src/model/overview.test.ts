@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import { en } from "@/i18n/en"
-import { eventWord, explainedBy, overviewOf } from "@/model/overview"
+import { eventWord, explainedBy, overviewOf, suggestionsOf } from "@/model/overview"
 import type { Event } from "@/model/service"
 
 type Diagnosis = Schemas["Diagnosis"]
@@ -196,5 +196,42 @@ describe("warnings on the overview", () => {
       expect(word, reason).toBeDefined()
       if (word) expect(en[`event.word.${word}`]).toBeTruthy()
     }
+  })
+})
+
+describe("a project's suggestions", () => {
+  const gap = (key: string, kind: string, name: string, container = name) =>
+    ({
+      rule: key.split(".")[1],
+      severity: "warning",
+      subject: { kind, name },
+      message: { key, params: { container } },
+    }) as unknown as Schemas["GapView"]
+
+  test("services without a traffic check fold into one row after the others", () => {
+    const backups = gap("gap.volumeWithoutBackup", "PersistentVolumeClaim", "data-db-0")
+    const rows = suggestionsOf([
+      gap("gap.healthChecks.none", "StatefulSet", "db"),
+      backups,
+      gap("gap.healthChecks.none", "StatefulSet", "redis"),
+      gap("gap.healthChecks.livenessOnly", "Deployment", "api"),
+      gap("gap.healthChecks.none", "Deployment", "api", "sidecar"),
+    ])
+    expect(rows).toEqual([
+      { as: "gap", gap: backups },
+      {
+        as: "unchecked",
+        services: [
+          { kind: "StatefulSet", name: "db" },
+          { kind: "StatefulSet", name: "redis" },
+          { kind: "Deployment", name: "api" },
+        ],
+      },
+    ])
+  })
+
+  test("with every service checked, the gaps stay as they are", () => {
+    const limits = gap("gap.resourceLimits.none", "CronJob", "nightly-report")
+    expect(suggestionsOf([limits])).toEqual([{ as: "gap", gap: limits }])
   })
 })

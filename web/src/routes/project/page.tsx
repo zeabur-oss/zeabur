@@ -33,6 +33,7 @@ import { useT } from "@/i18n"
 import { useHistoryIndex, useLocationText } from "@/lib/history"
 import { useProjectSummary } from "@/lib/project-name"
 import { projectView } from "@/lib/stores"
+import { suggestionsOf } from "@/model/overview"
 import { projectTitle } from "@/model/project"
 import {
   byHealth,
@@ -202,7 +203,7 @@ function Suggestions({ project, data }: { project: string; data: Project }) {
     <>
       <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
         <LightbulbIcon aria-hidden="true" data-icon="inline-start" />
-        {t("project.suggestions", items.length)}
+        {t("project.suggestions", suggestionsOf(items).length)}
       </Button>
       <Drawer
         open={open}
