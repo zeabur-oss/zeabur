@@ -50,7 +50,7 @@ export function remembered(key: string, initial: boolean) {
   }
 }
 
-export const projectsAsList = remembered("zeabur.projects.list", false)
+export const projectsAsList = remembered("zeabur.projects.list", true)
 
 const viewKey = "zeabur.project.view"
 

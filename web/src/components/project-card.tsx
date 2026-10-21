@@ -1,7 +1,11 @@
 import { useQueries } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import type { ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import CaretDownIcon from "~icons/ph/caret-down"
+import CaretUpDownIcon from "~icons/ph/caret-up-down"
+import CaretUpIcon from "~icons/ph/caret-up"
 import ListBulletsIcon from "~icons/ph/list-bullets"
+import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import SquaresFourIcon from "~icons/ph/squares-four"
 
 import type { Schemas } from "@/api/client"
@@ -10,8 +14,19 @@ import { ProjectGlyph } from "@/components/shell/project-glyph"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
 import { useSeen } from "@/lib/in-view"
+import type { ProjectSortKey, ProjectsSearch } from "@/routes/search"
 import { projectsAsList } from "@/lib/stores"
+import { cn } from "@/lib/utils"
+import { compareProjects, matchesProject, restartsIn } from "@/model/project"
 import { domainsOf, type Domain, type Health, type Project } from "@/model/service"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+} from "@zeabur/design-system/components/empty"
+import { Illustration } from "@zeabur/design-system/components/illustration"
+import { Kbd } from "@zeabur/design-system/components/kbd"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
@@ -37,13 +52,18 @@ interface CardProps {
   documentPending?: boolean
 }
 
-function ProjectTile({ project }: { project: ProjectItem }) {
+function ProjectTile({ project, small }: { project: ProjectItem; small?: boolean }) {
   return (
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-main bg-secondary text-main">
+    <span
+      className={cn(
+        "flex shrink-0 items-center justify-center border border-main bg-secondary text-main",
+        small ? "size-6 rounded-md" : "size-8 rounded-lg",
+      )}
+    >
       {project.icon ? (
-        <ProjectGlyph icon={project.icon} className="size-4" />
+        <ProjectGlyph icon={project.icon} className={small ? "size-3.5" : "size-4"} />
       ) : (
-        <span className="text-xs font-semibold" aria-hidden="true">
+        <span className={cn("font-semibold", small ? "type-micro" : "text-xs")} aria-hidden="true">
           {(project.displayName ?? project.name).charAt(0).toUpperCase()}
         </span>
       )}
@@ -142,36 +162,111 @@ function ProjectCard({ project, document, documentPending }: CardProps) {
   )
 }
 
+const columns = {
+  namespace: "hidden w-40 shrink-0 @3xl:block",
+  services: "w-36 shrink-0",
+  restarts: "hidden w-20 shrink-0 text-right @xl:block",
+  domain: "hidden w-48 shrink-0 pl-3 @4xl:block",
+}
+
 function ProjectListRow({ project, document, documentPending }: CardProps) {
+  const restarts = restartsIn(project)
   return (
     <Link
       to="/projects/$project"
       params={{ project: project.name }}
-      className="flex min-h-16 w-full items-center gap-x-3 px-4 py-2 transition-colors outline-none hover:bg-v2-surface-hover"
+      className="flex h-10 w-full items-center gap-x-3 px-4 transition-colors outline-none hover:bg-v2-surface-hover"
     >
-      <ProjectTile project={project} />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-sm font-semibold text-main" translate="no">
+      <span className="flex min-w-0 flex-1 items-center gap-x-2.5">
+        <ProjectTile project={project} small />
+        <span className="min-w-0 truncate text-sm font-medium text-main" translate="no">
           {project.displayName ?? project.name}
         </span>
         {project.description ? (
-          <span className="truncate text-xs text-tertiary">{project.description}</span>
+          <span className="min-w-0 flex-1 basis-0 truncate text-xs text-tertiary">
+            {project.description}
+          </span>
         ) : null}
       </span>
       <span
-        className="hidden w-40 shrink-0 truncate font-mono text-xs text-main @3xl:block"
+        className={cn(columns.namespace, "truncate font-mono text-xs text-main")}
         translate="no"
       >
         {project.name}
       </span>
-      <span className="hidden w-36 shrink-0 @xl:block">
+      <span className={columns.services}>
         <ServicesHealth project={project} />
       </span>
-      <span className="hidden w-48 shrink-0 @4xl:block">
+      <span
+        className={cn(
+          columns.restarts,
+          "text-xs tabular-nums",
+          restarts ? "text-main" : "text-secondary",
+        )}
+      >
+        {restarts ?? "—"}
+      </span>
+      <span className={columns.domain}>
         <DomainValue document={document} documentPending={documentPending} />
       </span>
     </Link>
   )
+}
+
+function ListHeader({
+  sort,
+  descending,
+  onSort,
+}: {
+  sort: ProjectSortKey
+  descending: boolean
+  onSort: (key: ProjectSortKey) => void
+}) {
+  const t = useT()
+  const sortable = (key: ProjectSortKey, label: string) => {
+    const active = sort === key
+    const SortIcon = active ? (descending ? CaretUpIcon : CaretDownIcon) : CaretUpDownIcon
+    return (
+      <button
+        type="button"
+        onClick={() => onSort(key)}
+        aria-pressed={active}
+        className="inline-flex items-center gap-1 rounded outline-none hover:text-foreground"
+      >
+        {label}
+        <SortIcon className={cn("size-3", !active && "opacity-40")} aria-hidden="true" />
+      </button>
+    )
+  }
+  return (
+    <div className="flex h-8 items-center gap-x-3 border-b border-main bg-muted/30 px-4 type-meta font-medium whitespace-nowrap text-muted-foreground">
+      <span className="min-w-0 flex-1">{sortable("name", t("projects.columnName"))}</span>
+      <span className={columns.namespace}>{t("column.namespace")}</span>
+      <span className={columns.services}>{sortable("health", t("metric.services"))}</span>
+      <span className={columns.restarts}>{t("table.restarts")}</span>
+      <span className={columns.domain}>{t("table.domain")}</span>
+    </div>
+  )
+}
+
+function useSlashFocus() {
+  const ref = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return
+      const target = event.target
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || target.closest("input, textarea, select"))
+      )
+        return
+      event.preventDefault()
+      ref.current?.focus()
+    }
+    document.addEventListener("keydown", onKey)
+    return () => document.removeEventListener("keydown", onKey)
+  }, [])
+  return ref
 }
 
 export function ProjectViewSwitch() {
@@ -191,38 +286,108 @@ export function ProjectViewSwitch() {
   )
 }
 
-export function ProjectCollection({ projects, label }: { projects: ProjectItem[]; label: string }) {
+/** `filter` adds a filter field above the collection; `/` focuses it. The filter and the order
+ * are the page's search (`?q`, `?sort`, `?desc`). */
+export function ProjectCollection({
+  projects,
+  label,
+  filter,
+  search,
+  onSearch,
+}: {
+  projects: ProjectItem[]
+  label: string
+  filter?: boolean
+  search: ProjectsSearch
+  onSearch: (patch: ProjectsSearch) => void
+}) {
+  const t = useT()
   const list = projectsAsList.useValue()
   const [ref, seen] = useSeen<HTMLDivElement>()
+  const [query, setQuery] = useState(filter ? (search.q ?? "") : "")
+  const sort = search.sort ?? "health"
+  const descending = search.desc === true
+  const input = useSlashFocus()
   const documents = useQueries({
     queries: projects.map((p) => ({ ...projectQuery(p.name, { poll: false }), enabled: seen })),
   })
-  const item = (project: ProjectItem, i: number) => ({
+  const items = projects.map((project, i) => ({
     project,
     document: documents[i]?.data,
     documentPending: seen && (documents[i]?.isPending ?? false),
-  })
+  }))
+  const needle = query.trim().toLowerCase()
+  const shown = items
+    .filter(({ project, document }) =>
+      matchesProject(
+        project,
+        document ? document.services.flatMap((s) => domainsOf(document, s).map((d) => d.host)) : [],
+        needle,
+      ),
+    )
+    .toSorted((a, b) => (list ? compareProjects(a.project, b.project, sort, descending) : 0))
+  const onSort = (key: ProjectSortKey) =>
+    onSearch(
+      key === sort
+        ? { desc: descending ? undefined : true }
+        : { sort: key === "health" ? undefined : key, desc: undefined },
+    )
   return (
-    <div ref={ref} className="@container w-full">
-      {list ? (
-        <ul
-          aria-label={label}
-          className="flex w-full flex-col divide-y divide-main overflow-hidden rounded-xl border border-main bg-card"
-        >
-          {projects.map((p, i) => (
-            <li key={p.name}>
-              <ProjectListRow {...item(p, i)} />
-            </li>
-          ))}
-        </ul>
+    <div ref={ref} className="@container flex w-full flex-col gap-3">
+      {filter ? (
+        <label className="flex h-8 w-full items-center gap-2 rounded-lg border bg-background px-2.5 focus-within:border-ring sm:w-64">
+          <MagnifyingGlassIcon className="size-4 text-muted-foreground" aria-hidden="true" />
+          <input
+            ref={input}
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value)
+              onSearch({ q: event.target.value || undefined })
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && query) {
+                event.stopPropagation()
+                setQuery("")
+                onSearch({ q: undefined })
+              }
+            }}
+            aria-label={t("projects.filter")}
+            placeholder={t("projects.filter")}
+            aria-keyshortcuts="/"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+          {query ? null : <Kbd keys="/" aria-hidden="true" className="max-md:hidden" />}
+        </label>
+      ) : null}
+      {shown.length === 0 ? (
+        <Empty size="sm">
+          <EmptyHeader>
+            <EmptyMedia>
+              <Illustration kind="no-results" seed="projects" />
+            </EmptyMedia>
+            <EmptyDescription>{t("projects.noMatch", query.trim())}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : list ? (
+        <div className="w-full overflow-hidden rounded-xl border border-main bg-card">
+          <ListHeader sort={sort} descending={descending} onSort={onSort} />
+          <ul aria-label={label} className="flex w-full flex-col divide-y divide-main">
+            {shown.map((item) => (
+              <li key={item.project.name}>
+                <ProjectListRow {...item} />
+              </li>
+            ))}
+          </ul>
+        </div>
       ) : (
         <ul
           aria-label={label}
           className="grid w-full grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3"
         >
-          {projects.map((p, i) => (
-            <li key={p.name} className="flex">
-              <ProjectCard {...item(p, i)} />
+          {shown.map((item) => (
+            <li key={item.project.name} className="flex">
+              <ProjectCard {...item} />
             </li>
           ))}
         </ul>

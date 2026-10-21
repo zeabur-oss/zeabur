@@ -37,6 +37,7 @@ import {
   validateComponentsSearch,
   validateObjectsSearch,
   validateProjectSearch,
+  validateProjectsSearch,
   validateServiceSearch,
 } from "@/routes/search"
 
@@ -98,6 +99,7 @@ const rootRoute = createRootRoute({
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  validateSearch: validateProjectsSearch,
   loader: () =>
     load(
       ensure(projectsQuery),
@@ -125,6 +127,7 @@ const clusterRoute = createRoute({
 const projectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects",
+  validateSearch: validateProjectsSearch,
   loader: () => load(ensure(projectsQuery)),
   component: lazyRouteComponent(() => import("@/routes/projects"), "ProjectsPage"),
 })

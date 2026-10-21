@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { useId, useState } from "react"
 
 import { isStatus, toProblem } from "@/api/client"
@@ -9,6 +9,7 @@ import { Problem } from "@/components/problem"
 import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { ProjectIcon } from "@/components/project-icon"
 import { useT } from "@/i18n"
+import { projectsAsList } from "@/lib/stores"
 import { otherNamespaces } from "@/model/project"
 import { countsHealth, healthRank } from "@/model/service"
 import {
@@ -25,9 +26,14 @@ import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Switch } from "@zeabur/design-system/components/switch"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 
+const route = getRouteApi("/projects")
+
 export function ProjectsPage() {
   const t = useT()
+  const search = route.useSearch()
+  const navigate = useNavigate({ from: "/projects" })
   const projects = useQuery(projectsQuery)
+  const list = projectsAsList.useValue()
   const [showSystem, setShowSystem] = useState(false)
   const switchId = useId()
   const items = projects.data?.items ?? []
@@ -42,11 +48,15 @@ export function ProjectsPage() {
     <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
       <PageHeader title={t("projects.title")} actions={<ProjectViewSwitch />} />
       {projects.isPending ? (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 3 }, (_, i) => (
-            <Skeleton key={i} variant="card" className="h-42" />
-          ))}
-        </div>
+        list ? (
+          <Skeleton variant="card" className="h-50" />
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }, (_, i) => (
+              <Skeleton key={i} variant="card" className="h-42" />
+            ))}
+          </div>
+        )
       ) : projects.isError ? (
         isStatus(projects.error, 403) ? (
           <Empty variant="outline">
@@ -64,7 +74,15 @@ export function ProjectsPage() {
       ) : (
         <>
           {adopted.length > 0 ? (
-            <ProjectCollection projects={adopted} label={t("projects.title")} />
+            <ProjectCollection
+              projects={adopted}
+              label={t("projects.title")}
+              filter
+              search={search}
+              onSearch={(patch) =>
+                void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
+              }
+            />
           ) : (
             <Empty size="sm">
               <EmptyHeader>

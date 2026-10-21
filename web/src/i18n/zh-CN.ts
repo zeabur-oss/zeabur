@@ -311,6 +311,9 @@ export const zhCN: Messages = {
   "projects.view": "视图",
   "projects.viewGrid": "卡片",
   "projects.viewList": "列表",
+  "projects.columnName": "名称",
+  "projects.filter": "筛选项目",
+  "projects.noMatch": (query) => `没有符合“${query}”的项目。`,
 
   "project.sections": "项目页面",
   "project.entry.overview": "概览",

@@ -311,6 +311,9 @@ export const zhTW: Messages = {
   "projects.view": "檢視方式",
   "projects.viewGrid": "卡片",
   "projects.viewList": "清單",
+  "projects.columnName": "名稱",
+  "projects.filter": "篩選專案",
+  "projects.noMatch": (query) => `沒有符合「${query}」的專案。`,
 
   "project.sections": "專案頁面",
   "project.entry.overview": "概覽",

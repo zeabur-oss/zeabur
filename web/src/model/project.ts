@@ -1,5 +1,6 @@
 import type { Schemas } from "@/api/client"
 import { roleYaml } from "@/model/rbac"
+import { countsHealth, healthRank } from "@/model/service"
 
 export type ProjectIconName = Schemas["ProjectIcon"]
 
@@ -70,4 +71,37 @@ export function patchRole(namespace: string, user: string): string {
     ],
     username: user,
   })
+}
+
+type ProjectSummary = Schemas["ProjectSummary"]
+
+/** Restarts summed over its services; absent when its workloads were not read. */
+export const restartsIn = (project: ProjectSummary) =>
+  project.services?.reduce((sum, service) => sum + service.restarts, 0)
+
+/** Whether its name, display name, namespace or one of `hosts` holds `needle` (lower case). */
+export function matchesProject(project: ProjectSummary, hosts: string[], needle: string): boolean {
+  if (!needle) return true
+  return [project.name, project.displayName ?? "", ...hosts]
+    .join(" ")
+    .toLowerCase()
+    .includes(needle)
+}
+
+const healthOrder = (p: ProjectSummary) =>
+  p.health ? healthRank[countsHealth(p.health)] : healthRank.ok
+const named = (p: ProjectSummary) => p.displayName ?? p.name
+
+/** Failing first, or by name; `descending` turns the order around, ties stay by name. */
+export function compareProjects(
+  a: ProjectSummary,
+  b: ProjectSummary,
+  sort: "health" | "name",
+  descending: boolean,
+): number {
+  const sign = descending ? -1 : 1
+  if (sort === "health") {
+    return sign * (healthOrder(a) - healthOrder(b)) || named(a).localeCompare(named(b))
+  }
+  return sign * named(a).localeCompare(named(b))
 }

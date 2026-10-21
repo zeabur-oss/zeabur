@@ -346,6 +346,9 @@ export const en = {
   "projects.view": "View",
   "projects.viewGrid": "Cards",
   "projects.viewList": "List",
+  "projects.columnName": "Name",
+  "projects.filter": "Filter projects",
+  "projects.noMatch": (query: string) => `No projects match “${query}”.`,
 
   // Project
   "project.sections": "Project sections",

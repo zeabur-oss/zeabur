@@ -1,5 +1,5 @@
 import { useQueries, useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
@@ -56,6 +56,8 @@ import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 type ProjectItem = Schemas["ProjectSummary"]
+
+const homeRoute = getRouteApi("/")
 
 const PROJECTS_SHOWN = 9
 const WARNINGS_SHOWN = 5
@@ -319,6 +321,8 @@ function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
 
 function ProjectsSection({ adopted, error }: { adopted: ProjectItem[]; error: Error | null }) {
   const t = useT()
+  const search = homeRoute.useSearch()
+  const navigate = useNavigate({ from: "/" })
   const shown = adopted.toSorted(byProjectHealth).slice(0, PROJECTS_SHOWN)
   return (
     <section aria-labelledby="home-projects" className="flex flex-col gap-3">
@@ -361,7 +365,14 @@ function ProjectsSection({ adopted, error }: { adopted: ProjectItem[]; error: Er
           </EmptyContent>
         </Empty>
       ) : (
-        <ProjectCollection projects={shown} label={t("shell.projects")} />
+        <ProjectCollection
+          projects={shown}
+          label={t("shell.projects")}
+          search={search}
+          onSearch={(patch) =>
+            void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: true })
+          }
+        />
       )}
     </section>
   )

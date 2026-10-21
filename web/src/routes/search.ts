@@ -176,6 +176,24 @@ export function validateComponentsSearch(search: Record<string, unknown>): Compo
   return { component: str(search.component), profile: oneOf(profiles, search.profile) }
 }
 
+const projectSortKeys = ["health", "name"] as const
+export type ProjectSortKey = (typeof projectSortKeys)[number]
+
+/** The projects list on Home and Projects; only Projects has the filter. */
+export interface ProjectsSearch {
+  q?: string
+  sort?: ProjectSortKey
+  desc?: boolean
+}
+
+export function validateProjectsSearch(search: Record<string, unknown>): ProjectsSearch {
+  return {
+    q: str(search.q),
+    sort: oneOf(projectSortKeys, search.sort),
+    desc: search.desc === true || search.desc === "true" ? true : undefined,
+  }
+}
+
 const statusFilters = ["attention", "healthy"] as const
 const sortKeys = ["name", "status", "ready", "restarts", "kind"] as const
 export type SortKey = (typeof sortKeys)[number]

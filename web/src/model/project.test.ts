@@ -6,12 +6,15 @@ import { projectGlyphs } from "@/components/project-icon"
 import type { Translate } from "@/i18n"
 import { en } from "@/i18n/en"
 import {
+  compareProjects,
   kubectlLabel,
+  matchesProject,
   mayChange,
   otherNamespaces,
   patchRole,
   projectIcons,
   projectTitle,
+  restartsIn,
 } from "@/model/project"
 import { destinationOf, weigh } from "@/model/risk"
 
@@ -125,4 +128,45 @@ describe("without the right to patch the namespace", () => {
 
 test("every built-in icon has a glyph, in the picker's order", () => {
   expect<string[]>([...projectIcons]).toStrictEqual(Object.keys(projectGlyphs))
+})
+
+describe("the projects list", () => {
+  const summary = (
+    name: string,
+    failing: number,
+    extra: Partial<Schemas["ProjectSummary"]> = {},
+  ): Schemas["ProjectSummary"] => ({
+    id: `projects/${name}`,
+    name,
+    adopted: true,
+    system: false,
+    origin: { apiVersion: "v1", kind: "Namespace", name },
+    health: { services: 2, healthy: 2 - failing, failing, warning: 0, progressing: 0 },
+    ...extra,
+  })
+
+  test("the filter reads the name, the display name, the namespace and the domains", () => {
+    const shop = summary("shop", 0, { displayName: "Storefront" })
+    expect(matchesProject(shop, [], "")).toBe(true)
+    expect(matchesProject(shop, [], "sho")).toBe(true)
+    expect(matchesProject(shop, [], "storefront")).toBe(true)
+    expect(matchesProject(shop, ["shop.example.com"], "example")).toBe(true)
+    expect(matchesProject(shop, [], "blog")).toBe(false)
+  })
+
+  test("failing first, or by name either way", () => {
+    const list = [summary("blog", 0), summary("api", 0), summary("shop", 1)]
+    const names = (sort: "health" | "name", desc: boolean) =>
+      list.toSorted((a, b) => compareProjects(a, b, sort, desc)).map((p) => p.name)
+    expect(names("health", false)).toEqual(["shop", "api", "blog"])
+    expect(names("health", true)).toEqual(["api", "blog", "shop"])
+    expect(names("name", false)).toEqual(["api", "blog", "shop"])
+    expect(names("name", true)).toEqual(["shop", "blog", "api"])
+  })
+
+  test("restarts add up over services, and are unknown without them", () => {
+    const service = (restarts: number) => ({ restarts }) as Schemas["ServiceSummary"]
+    expect(restartsIn(summary("shop", 0, { services: [service(2), service(3)] }))).toBe(5)
+    expect(restartsIn(summary("shop", 0))).toBeUndefined()
+  })
 })
