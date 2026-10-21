@@ -145,8 +145,9 @@ export interface paths {
      * @description Requests and limits are summed per node from every unfinished pod, the way
      *     `kubectl describe node` sums them (see `capacity`); usage is added only when metrics-server
      *     is installed and readable, and is approximate ("meant only for autoscaling purposes"
-     *     [metrics-server]). `403` when nodes cannot be listed; a refusal of pods or metrics leaves
-     *     those parts out and says so.
+     *     [metrics-server]). Each node's disk comes from its kubelet's stats summary (see `stats`).
+     *     `403` when nodes cannot be listed; a refusal of pods, metrics or summaries leaves those parts
+     *     out and says so.
      *
      *     [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
      */
@@ -791,6 +792,28 @@ export interface paths {
      *     not read it (`unreadable` names the refusal), or it did not answer.
      */
     get: operations["getProjectUsage"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/volumes": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * How full each volume a running pod of the project mounts from a claim is, from the stats
+     *     summary of the kubelet on the pod's node (`get` on `nodes/proxy`). A claim no running pod
+     *     mounts has no measure. Always `200` once the pods can be listed: `state` says when the
+     *     kubelets may not be read (`unreadable` names the refusal) or did not answer.
+     */
+    get: operations["getVolumeUsage"]
     put?: never
     post?: never
     delete?: never
@@ -1662,6 +1685,24 @@ export interface components {
       | "unschedulable"
       | "configMissing"
       | "unexplained"
+    /** @description A filesystem's size and use, as the kubelet measures it. */
+    DiskUsage: {
+      /**
+       * Format: int64
+       * @description Free to use; can be less than size less use where the filesystem keeps some back.
+       */
+      availableBytes: number
+      /**
+       * Format: int64
+       * @description Its size.
+       */
+      capacityBytes: number
+      /**
+       * Format: int64
+       * @description In use.
+       */
+      usedBytes: number
+    }
     /**
      * @description Whether administrator rights are offered and in use.
      * @enum {string}
@@ -2361,6 +2402,8 @@ export interface components {
     }
     /** @description The nodes, with the cluster's totals. */
     NodeList: {
+      /** @description Whether the nodes' disks could be read. */
+      disk: components["schemas"]["StatsState"]
       /** @description Sorted by name. */
       items: components["schemas"]["NodeView"][]
       /** @description Whether usage could be read. */
@@ -2389,6 +2432,7 @@ export interface components {
     NodeTotals: {
       /** @description Allocatable. */
       allocatable: components["schemas"]["Resources"]
+      disk?: components["schemas"]["DiskUsage"] | null
       limits?: components["schemas"]["Resources"] | null
       requests?: components["schemas"]["Resources"] | null
       usage?: components["schemas"]["Resources"] | null
@@ -2407,8 +2451,14 @@ export interface components {
       cordoned: boolean
       /** @description When it joined the cluster (RFC 3339). */
       created?: string | null
+      disk?: components["schemas"]["DiskUsage"] | null
       /** @description `cluster/nodes/<name>`. */
       id: string
+      /**
+       * Format: int64
+       * @description What the container runtime's images take on disk, from the same summary.
+       */
+      imagesBytes?: number | null
       /** @description The kernel version. */
       kernelVersion: string
       /** @description The kubelet's version. */
@@ -3831,6 +3881,11 @@ export interface components {
      */
     SourceKind: "Literal" | "Secret" | "ConfigMap" | "PodField" | "ResourceField" | "File"
     /**
+     * @description Whether the kubelet's stats summaries could be read. An open set.
+     * @enum {string}
+     */
+    StatsState: "available" | "unreadable" | "unavailable"
+    /**
      * @description What a service is doing, in one word for a person. An open set: clients must show an unknown
      *     value by its [`Health`].
      * @enum {string}
@@ -4077,6 +4132,41 @@ export interface components {
       size: string
       /** @description The `StorageClass`; absent for the cluster's default. */
       storageClass?: string | null
+    }
+    /** @description How full one claim's volume is. */
+    VolumeUsage: {
+      /**
+       * Format: int64
+       * @description Free to use.
+       */
+      availableBytes: number
+      /**
+       * Format: int64
+       * @description Its filesystem's size. It can differ a little from the claim's.
+       */
+      capacityBytes: number
+      /** @description The PersistentVolumeClaim. */
+      claim: string
+      /** @description The node that pod runs on. */
+      node: string
+      /** @description The pod it was measured in. */
+      pod: string
+      /**
+       * Format: int64
+       * @description In use.
+       */
+      usedBytes: number
+    }
+    /** @description How full a project's volumes are. */
+    VolumeUsageList: {
+      /** @description `projects/{project}/volumes`. */
+      id: string
+      /** @description Every claim a running pod mounts, measured, by claim. */
+      items: components["schemas"]["VolumeUsage"][]
+      /** @description Whether the kubelets could be read. */
+      state: components["schemas"]["StatsState"]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
     }
     /** @description Who the cluster says the person is. */
     WhoAmI: {
@@ -5544,6 +5634,36 @@ export interface operations {
         }
       }
       401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getVolumeUsage: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["VolumeUsageList"]
+        }
+      }
+      403: {
         headers: {
           [name: string]: unknown
         }

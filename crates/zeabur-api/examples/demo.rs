@@ -1010,7 +1010,7 @@ fn state() -> State {
             ServedResource::readable("upgrade.cattle.io", "v1", "plans", "Plan", true),
         ],
         dynamic: [
-            usage("vps-1", "1420m", "1530Mi"),
+            usage("vps-1", "1420m", "1730Mi"),
             usage("vps-2", "310m", "2210Mi"),
             usage("vps-3", "180m", "940Mi"),
             from(json!({
@@ -1407,6 +1407,94 @@ fn store(path: &str) -> Result<Value, zeabur_core::problem::KubernetesStatus> {
     Ok(json!({"status": "success", "data": {"resultType": "matrix", "result": result}}))
 }
 
+const GIB: u64 = 1 << 30;
+
+/// Each node's kubelet summary: its disk, its images, and the volume of each StatefulSet pod on it
+/// (which this also mounts in the pod, from its claim `data-<pod>`). The small control plane's
+/// disk and shop's database volume are nearly full.
+fn kubelet_summaries(objects: &mut BTreeMap<String, NamespaceObjects>) -> BTreeMap<String, Value> {
+    let mut volumes: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+    for (namespace, objects) in objects.iter_mut() {
+        let sizes: BTreeMap<String, u64> = objects
+            .stateful_sets
+            .iter()
+            .filter_map(|set| {
+                let size = set
+                    .spec
+                    .as_ref()?
+                    .volume_claim_templates
+                    .as_ref()?
+                    .first()?
+                    .spec
+                    .as_ref()?
+                    .resources
+                    .as_ref()?
+                    .requests
+                    .as_ref()?
+                    .get("storage")?;
+                Some((
+                    set.metadata.name.clone()?,
+                    zeabur_core::quantity::bytes(&size.0)?,
+                ))
+            })
+            .collect();
+        for pod in &mut objects.pods {
+            let owner = pod
+                .metadata
+                .owner_references
+                .iter()
+                .flatten()
+                .find(|o| o.kind == "StatefulSet")
+                .map(|o| o.name.clone());
+            let (Some(owner), Some(name), Some(spec)) =
+                (owner, pod.metadata.name.clone(), pod.spec.as_mut())
+            else {
+                continue;
+            };
+            let Some(capacity) = sizes.get(&owner).copied() else {
+                continue;
+            };
+            let claim = format!("data-{name}");
+            spec.volumes = Some(vec![from(
+                json!({"name": "data", "persistentVolumeClaim": {"claimName": claim}}),
+            )]);
+            let percent: u64 = if namespace == "shop" && owner == "db" {
+                93
+            } else {
+                12 + claim.bytes().map(u64::from).sum::<u64>() % 40
+            };
+            let used = capacity / 100 * percent;
+            volumes
+                .entry(spec.node_name.clone().unwrap_or_default())
+                .or_default()
+                .push(
+                    json!({"podRef": {"name": name, "namespace": namespace}, "volume": [{
+                        "name": "data", "pvcRef": {"name": claim, "namespace": namespace},
+                        "capacityBytes": capacity, "usedBytes": used,
+                        "availableBytes": capacity - used
+                    }]}),
+                );
+        }
+    }
+    [
+        ("vps-1", 40, 35, 9),
+        ("vps-2", 160, 61, 14),
+        ("vps-3", 160, 72, 18),
+    ]
+    .into_iter()
+    .map(|(node, size, used, images)| {
+        let (size, used) = (size * GIB, used * GIB);
+        let summary = json!({
+            "node": {"nodeName": node,
+                "fs": {"capacityBytes": size, "usedBytes": used, "availableBytes": size - used},
+                "runtime": {"imageFs": {"capacityBytes": size, "usedBytes": images * GIB}}},
+            "pods": volumes.remove(node).unwrap_or_default()
+        });
+        (node.to_owned(), summary)
+    })
+    .collect()
+}
+
 /// Three nodes: a small control plane, a cordoned worker and a worker one minor behind.
 fn nodes() -> Vec<Node> {
     let node = |name: &str,
@@ -1661,6 +1749,7 @@ async fn main() -> std::io::Result<()> {
         }
         s.without_shell
             .extend(["shop/web-7c9d8-abcde", "shop/web-7c9d8-fghij"].map(str::to_owned));
+        s.kubelet_summaries = kubelet_summaries(&mut s.objects);
     });
     kubelet(cluster.clone());
     let access = Demo {

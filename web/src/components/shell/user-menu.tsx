@@ -15,6 +15,7 @@ import { clusterNameQuery, clusterQuery, sessionQuery, whoamiQuery } from "@/api
 import { dropElevation, retryAsAdmin } from "@/auth/elevation"
 import { signOut } from "@/auth/session"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
+import { lastKnown } from "@/lib/last-known"
 import { nameSourceOf } from "@/lib/cluster-name"
 import { formatClock, personOf } from "@/lib/identity"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
@@ -48,7 +49,8 @@ export function ContextMenu() {
   const groups = whoami.data?.groups.join(", ")
   const until = session?.elevation === "active" ? session.elevatedUntil : undefined
   const time = until ? formatClock(until, locale) : undefined
-  const place = cluster?.name ?? ""
+  // While the cluster does not answer, its name as this browser last saw it.
+  const place = cluster?.name ?? lastKnown().cluster ?? ""
   const source = cluster ? nameSourceOf(cluster, t) : undefined
   const who = name || t("shell.whoamiUnknown")
   useEffect(() => {

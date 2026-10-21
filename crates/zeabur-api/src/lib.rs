@@ -29,6 +29,7 @@
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/timeline` | what changed in it and what went wrong, newest first, with the plan that reverts its running release |
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/history` | its pods' CPU, memory and restarts over a range, from the metrics store |
 //! | `GET /api/v1/projects/{p}/usage` | what each pod uses now, from metrics-server |
+//! | `GET /api/v1/projects/{p}/volumes` | how full each claim's volume is, from the kubelets |
 //! | `GET /api/v1/projects/{p}/gaps` | what the project is missing, with citations and fixes |
 //! | `GET /api/v1/projects/{p}/timeline` | the same for every service of the project |
 //! | `GET /api/v1/projects/{p}/incidents` | the cluster incidents that reach the project, with the services they break |
@@ -195,6 +196,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::backups::get))
         .routes(routes!(projects::network_policy::presets))
         .routes(routes!(projects::usage::get))
+        .routes(routes!(projects::usage::volumes))
         .routes(routes!(services::history::get))
         .routes(routes!(settings::store::get_setting, settings::store::set))
         .routes(routes!(

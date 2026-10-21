@@ -1,4 +1,4 @@
-import { useQueries } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
@@ -286,46 +286,74 @@ export function ProjectViewSwitch() {
   )
 }
 
+/** A project's document, read once its row comes near the viewport: a page of many projects
+ * reads only the ones a person can see. */
+function SeenProject({
+  project,
+  list,
+  offline,
+}: {
+  project: ProjectItem
+  list: boolean
+  offline?: boolean
+}) {
+  const [ref, seen] = useSeen<HTMLLIElement>()
+  const document = useQuery({
+    ...projectQuery(project.name, { poll: false }),
+    enabled: seen && !offline,
+  })
+  const props = {
+    project,
+    document: document.data,
+    documentPending: seen && !offline && document.isPending,
+  }
+  return list ? (
+    <li ref={ref}>
+      <ProjectListRow {...props} />
+    </li>
+  ) : (
+    <li ref={ref} className="flex">
+      <ProjectCard {...props} />
+    </li>
+  )
+}
+
 /** `filter` adds a filter field above the collection; `/` focuses it. The filter and the order
  * are the page's search (`?q`, `?sort`, `?desc`). */
 export function ProjectCollection({
   projects,
   label,
   filter,
+  offline,
   search,
   onSearch,
 }: {
   projects: ProjectItem[]
   label: string
   filter?: boolean
+  /** Shown from what this browser last saw: nothing more is read. */
+  offline?: boolean
   search: ProjectsSearch
   onSearch: (patch: ProjectsSearch) => void
 }) {
   const t = useT()
   const list = projectsAsList.useValue()
-  const [ref, seen] = useSeen<HTMLDivElement>()
+  const queryClient = useQueryClient()
   const [query, setQuery] = useState(filter ? (search.q ?? "") : "")
   const sort = search.sort ?? "health"
   const descending = search.desc === true
   const input = useSlashFocus()
-  const documents = useQueries({
-    queries: projects.map((p) => ({ ...projectQuery(p.name, { poll: false }), enabled: seen })),
-  })
-  const items = projects.map((project, i) => ({
-    project,
-    document: documents[i]?.data,
-    documentPending: seen && (documents[i]?.isPending ?? false),
-  }))
   const needle = query.trim().toLowerCase()
-  const shown = items
-    .filter(({ project, document }) =>
-      matchesProject(
-        project,
-        document ? document.services.flatMap((s) => domainsOf(document, s).map((d) => d.host)) : [],
-        needle,
-      ),
-    )
-    .toSorted((a, b) => (list ? compareProjects(a.project, b.project, sort, descending) : 0))
+  // Domains match once a row's document has been read; names and descriptions always do.
+  const hosts = (name: string) => {
+    const document = queryClient.getQueryData(projectQuery(name).queryKey)
+    return document
+      ? document.services.flatMap((s) => domainsOf(document, s).map((d) => d.host))
+      : []
+  }
+  const shown = projects
+    .filter((project) => matchesProject(project, needle ? hosts(project.name) : [], needle))
+    .toSorted((a, b) => (list ? compareProjects(a, b, sort, descending) : 0))
   const onSort = (key: ProjectSortKey) =>
     onSearch(
       key === sort
@@ -333,7 +361,7 @@ export function ProjectCollection({
         : { sort: key === "health" ? undefined : key, desc: undefined },
     )
   return (
-    <div ref={ref} className="@container flex w-full flex-col gap-3">
+    <div className="@container flex w-full flex-col gap-3">
       {filter ? (
         <label className="flex h-8 w-full items-center gap-2 rounded-lg border bg-background px-2.5 focus-within:border-ring sm:w-64">
           <MagnifyingGlassIcon className="size-4 text-muted-foreground" aria-hidden="true" />
@@ -373,10 +401,8 @@ export function ProjectCollection({
         <div className="w-full overflow-hidden rounded-xl border border-main bg-card">
           <ListHeader sort={sort} descending={descending} onSort={onSort} />
           <ul aria-label={label} className="flex w-full flex-col divide-y divide-main">
-            {shown.map((item) => (
-              <li key={item.project.name}>
-                <ProjectListRow {...item} />
-              </li>
+            {shown.map((project) => (
+              <SeenProject key={project.name} project={project} list offline={offline} />
             ))}
           </ul>
         </div>
@@ -385,10 +411,8 @@ export function ProjectCollection({
           aria-label={label}
           className="grid w-full grid-cols-1 gap-4 @2xl:grid-cols-2 @5xl:grid-cols-3"
         >
-          {shown.map((item) => (
-            <li key={item.project.name} className="flex">
-              <ProjectCard {...item} />
-            </li>
+          {shown.map((project) => (
+            <SeenProject key={project.name} project={project} list={false} offline={offline} />
           ))}
         </ul>
       )}

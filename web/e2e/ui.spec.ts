@@ -176,7 +176,7 @@ test("the cluster page shows the cluster itself, and its components on their own
   const nodes = page.getByRole("region", { name: "Nodes" })
   await expect(
     nodes.getByRole("list", { name: "Nodes" }).getByRole("listitem").first(),
-  ).toContainText(/Ready|Not ready|Cordoned|Pressure|Unknown/)
+  ).toContainText(/Ready|Not ready|Cordoned|Out of|nearly full|over-reserved|No network|Unknown/)
   await expect(nodes.getByRole("img", { name: /^CPU/ }).first()).toBeVisible()
   await expect(page.getByRole("region", { name: "Warnings in the last hour" })).toBeVisible()
 

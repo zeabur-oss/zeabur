@@ -279,11 +279,83 @@ export const en = {
   "cluster.attEolOld": (minor: string) => `Kubernetes ${minor} is past end of life`,
   "cluster.attSkew": (node: string, version: string) =>
     `${node} runs kubelet ${version}, outside the supported version skew`,
-  "cluster.attTight": (node: string, what: string, percent: string) =>
-    `${node}: ${what} reserved at ${percent}`,
-  "cluster.attNode": (node: string, state: string) => `${node}: ${state}`,
   "cluster.attComponent": (name: string, version: string, tested: string) =>
     `${name} ${version} is older than the tested ${tested}`,
+  "cluster.attEol.why": "It no longer gets security fixes.",
+  "cluster.attEolSoon.why": "After that it gets no security fixes.",
+  "cluster.attEol.fix": "Upgrade to a supported minor version.",
+  "cluster.attSkewMany": (n: number) =>
+    `${n} nodes run a kubelet outside the supported version skew`,
+  "cluster.attSkew.why": "Kubernetes does not support it, so pods there may misbehave.",
+  "cluster.attSkew.fix": "Upgrade the kubelet to the control plane's minor version.",
+  "cluster.attComponents": (n: number) => `${n} components are older than the tested versions`,
+  "cluster.attComponent.why": "It still runs; Zeabur was tested with a newer version.",
+  "cluster.attComponent.fix": "Upgrade it under Components.",
+  "cluster.versionOf": (version: string, tested: string) => `${version}, tested ${tested}`,
+  "cluster.showMembers": (n: number) => `Show all ${n}`,
+  "cluster.notChecked":
+    "Nothing found in what could be read, but part of the cluster could not be checked.",
+  "cluster.cannotCheck": "Cannot check: the cluster cannot be reached.",
+  "cluster.notRead": "Not read: the cluster cannot be reached.",
+  "node.notReady": (n: number, node: string) =>
+    n === 1 ? `${node} is not ready` : `${n} nodes are not ready`,
+  "node.notReady.why": "Services with pods there are down until it is back or the pods move.",
+  "node.notReady.fix":
+    "Check that the machine is running and its kubelet can reach the control plane.",
+  "node.memoryPressure": (n: number, node: string) =>
+    n === 1 ? `${node} is out of memory` : `${n} nodes are out of memory`,
+  "node.memoryPressure.why": "The kubelet is stopping pods to free memory.",
+  "node.memoryPressure.fix":
+    "Stop or limit the services that use the most memory, or add memory to the server.",
+  "node.diskPressure": (n: number, node: string) =>
+    n === 1 ? `${node} is almost out of disk space` : `${n} nodes are almost out of disk space`,
+  "node.diskPressure.why":
+    "The kubelet is removing unused images and stopping pods to free space; new pods cannot start.",
+  "node.diskPressure.fix":
+    "Free space: remove unused images (crictl rmi --prune), old logs or volumes, or grow the disk.",
+  "node.pidPressure": (n: number, node: string) =>
+    n === 1 ? `${node} is running out of processes` : `${n} nodes are running out of processes`,
+  "node.pidPressure.why": "New processes and pods may fail to start.",
+  "node.pidPressure.fix":
+    "Find the service that starts too many processes, and restart or limit it.",
+  "node.networkUnavailable": (n: number, node: string) =>
+    n === 1 ? `${node} has no pod network` : `${n} nodes have no pod network`,
+  "node.networkUnavailable.why": "Pods there cannot reach other pods or services.",
+  "node.networkUnavailable.fix": "Check the network plugin on the node (flannel on k3s).",
+  "node.memoryFull": (n: number, node: string, share: string) =>
+    n === 1
+      ? `${node}: memory ${share} used`
+      : `${n} nodes have memory nearly full (up to ${share})`,
+  "node.memoryFull.warn": "When it fills up, services are stopped to free memory.",
+  "node.memoryFull.fail": "Services may be stopped for lack of memory at any moment.",
+  "node.memoryFull.fix":
+    "Set memory limits on the services that use the most, stop one you do not need, or add memory.",
+  "node.diskFull": (n: number, node: string, share: string) =>
+    n === 1 ? `${node}: disk ${share} full` : `${n} nodes have disks nearly full (up to ${share})`,
+  "node.diskFull.warn": "From 90% the kubelet stops pods to free space.",
+  "node.diskFull.fail": "The kubelet is about to stop pods to free space.",
+  "node.diskFull.fix":
+    "Remove unused images (crictl rmi --prune), old logs or volumes, or grow the disk.",
+  "node.cordoned": (n: number, node: string) =>
+    n === 1 ? `${node} is cordoned` : `${n} nodes are cordoned`,
+  "node.cordoned.why": "New pods are not placed there; the running ones stay.",
+  "node.cordoned.fix": (n: number, node: string) =>
+    n === 1
+      ? `When its maintenance is done, uncordon it (kubectl uncordon ${node}).`
+      : "When their maintenance is done, uncordon them.",
+  "node.reservedMemory": (n: number, node: string, share: string) =>
+    n === 1 ? `${node}: memory ${share} reserved` : `${n} nodes over-reserved on memory`,
+  "node.reservedMemory.why": "New pods that ask for memory may wait for room.",
+  "node.reservedMemory.fix": "Lower the memory requests of the services there, or add a node.",
+  "node.reservedCpu": (n: number, node: string, share: string) =>
+    n === 1 ? `${node}: CPU ${share} reserved` : `${n} nodes over-reserved on CPU`,
+  "node.reservedCpu.why": "New pods that ask for CPU may wait for room.",
+  "node.reservedCpu.fix": "Lower the CPU requests of the services there, or add a node.",
+  "unreachable.title": (name: string) => `Cannot reach ${name}`,
+  "unreachable.zeabur": "Zeabur does not respond",
+  "unreachable.lastHeard": "Last answered",
+  "unreachable.retrying": "Trying again…",
+  "unreachable.every": "Zeabur tries again every 15 seconds.",
   "cluster.noProjects": "No projects yet",
   "cluster.noProjectsBody":
     "A project is a Kubernetes namespace shown in Zeabur. Adopt one on the Projects page.",
@@ -291,6 +363,27 @@ export const en = {
   "cluster.nodes": "Nodes",
   "cluster.cpu": "CPU",
   "cluster.memory": "Memory",
+  "cluster.disk": "Disk",
+  "cluster.usedOf": (used: string, whole: string) => `${used} of ${whole} used`,
+  "cluster.reservedShare": (share: string) => `${share} reserved`,
+  "cluster.diskUnreadable":
+    "Disk use is not shown: reading the kubelets' stats (nodes/proxy) was refused.",
+  "cluster.diskUnavailable": "The kubelets did not report disk use.",
+  "cluster.sortNodes": "Sort nodes",
+  "cluster.sortWorst": "Worst first",
+  "cluster.sortName": "Name",
+  "cluster.filterNodes": "Filter nodes",
+  "cluster.noNodeMatch": (query: string) => `No nodes match “${query}”.`,
+  "node.word.notReady": "Not ready",
+  "node.word.memoryPressure": "Out of memory",
+  "node.word.diskPressure": "Out of disk",
+  "node.word.pidPressure": "Out of processes",
+  "node.word.networkUnavailable": "No network",
+  "node.word.memoryFull": "Memory nearly full",
+  "node.word.diskFull": "Disk nearly full",
+  "node.word.cordoned": "Cordoned",
+  "node.word.reservedMemory": "Memory over-reserved",
+  "node.word.reservedCpu": "CPU over-reserved",
   "cluster.cores": (n: string) => `${n} cores`,
   "cluster.requestedOf": (requested: string, allocatable: string) =>
     `${requested} of ${allocatable} reserved`,
@@ -299,8 +392,6 @@ export const en = {
   "cluster.limits": (limits: string) => `${limits} maximum`,
   "cluster.podsOf": (placed: string, room: string) => `${placed} of ${room} pods`,
   "cluster.pods": "Pods",
-  "cluster.notReady": "Not ready",
-  "cluster.cordoned": "Cordoned",
   "cluster.worker": "worker",
   "cluster.kubelet": "kubelet",
   "cluster.skewMixed": "Supported, though its minor version differs from the control plane's.",
@@ -341,6 +432,9 @@ export const en = {
   "projects.adopted": "Project",
   "projects.namespaceOnly": "Namespace",
   "projects.other": "Other namespaces",
+  "projects.noOther": "Every namespace is a project.",
+  "projects.filterOther": "Filter namespaces",
+  "projects.noOtherMatch": (query: string) => `No namespaces match “${query}”.`,
   "projects.noneBody":
     "A project is a Kubernetes namespace shown in Zeabur. Adopt one from the namespaces below.",
   "projects.showSystem": "Show system namespaces",
@@ -653,6 +747,9 @@ export const en = {
 
   // Storage
   "storage.title": "Volumes",
+  "volume.fullestOf": (used: string, n: number) => `${used}, fullest of ${n} replicas`,
+  "volume.full":
+    "When it is full, the app's writes fail. Free space in it, or set a larger size and apply.",
   "storage.about":
     "Files written to a volume stay when a replica restarts or moves to another node. Files anywhere else in the container are lost on restart.",
   "storage.emptyTitle": (name: string) => `${name} has no volume`,
@@ -1656,6 +1753,20 @@ export const en = {
     n === 1 ? "1 problem needs attention." : `${n} problems need attention.`,
   "home.state.rolling": (n: number) =>
     n === 1 ? "1 service is rolling out." : `${n} services are rolling out.`,
+  "home.state.node": (text: string) => `${text}.`,
+  "home.state.unchecked": (n: number) =>
+    n === 1 ? "1 project could not be checked." : `${n} projects could not be checked.`,
+  "home.state.empty": "No projects yet.",
+  "home.unchecked": (n: number) =>
+    n === 1
+      ? "1 project could not be checked; its problems are not listed here."
+      : `${n} projects could not be checked; their problems are not listed here.`,
+  "home.incidentsUnchecked":
+    "Causes in the cluster could not all be read; a problem there may be missing.",
+  "home.lastKnown": "Last known",
+  "home.adoptTitle": "Namespaces to adopt",
+  "home.showWarningsOf": (shown: number, total: number) => `Show ${shown} of ${total} warnings`,
+  "home.allWarnings": (n: number) => `All ${n} on the cluster page`,
   "home.affects": "Affects",
   "home.inProgress": "In progress",
   "home.problems": "What needs you",
@@ -1674,6 +1785,13 @@ export const en = {
   "incident.title": "In the cluster",
   "incident.hint": "One cause takes down several services; fixing it fixes them all.",
   "incident.domains": (n: number) => plural(n, "domain", "domains"),
+  "incident.nodesNotReady": (n: number) => `${n} nodes are not ready`,
+  "incident.nodesNotReporting": (n: number) => `${n} nodes stopped reporting to the cluster`,
+  "incident.nodesNotReady.fix":
+    "Check the machines behind them: whether they are on, their network, and their node agent (kubelet). Drain and replace one that won't come back.",
+  "incident.services": (n: number) => plural(n, "service", "services"),
+  "incident.servicesIn": (n: number, projects: number) =>
+    `${plural(n, "service", "services")} in ${plural(projects, "project", "projects")}`,
   "incident.causedBy": "Caused by",
   "timeline.truncated": "Showing the newest 200 changes; older ones are left out.",
   "timeline.empty":

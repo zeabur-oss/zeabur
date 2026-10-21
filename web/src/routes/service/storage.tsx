@@ -9,6 +9,7 @@ import TrashIcon from "~icons/ph/trash"
 
 import type { Schemas } from "@/api/client"
 import { VolumeBackups } from "@/components/backups"
+import { useVolumeFills, VolumeFullNote, VolumeUse } from "@/components/volume-use"
 import { ManagedTip, Panel } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
@@ -36,6 +37,7 @@ import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
 import { claimOf, type Service } from "@/model/service"
+import { claimMounts } from "@/model/volume-use"
 import {
   changesOf,
   claimNameOf,
@@ -50,23 +52,15 @@ import { accessModes } from "@/routes/service/volume"
 
 type Mount = Schemas["Mount"]
 
-/** Each claim the service mounts once, with the container that mounts it. */
-function claimMounts(service: Service): { container: string; mount: Mount }[] {
-  const seen = new Set<string>()
-  return service.containers
-    .filter((c) => !c.init)
-    .flatMap((c) => c.mounts.map((mount) => ({ container: c.name, mount })))
-    .filter(({ mount }) => {
-      if (mount.kind !== "PersistentVolumeClaim" || seen.has(claimOf(mount))) return false
-      seen.add(claimOf(mount))
-      return true
-    })
-}
-
 export function StorageTab({ project, service }: { project: string; service: Service }) {
   const t = useT()
   const draft = useDraft()
   const mounts = claimMounts(service)
+  const volumes = useVolumeFills(
+    project,
+    service,
+    mounts.map(({ mount }) => claimOf(mount)),
+  )
   const workload = { kind: service.kind, name: service.name }
   const containers = service.containers.filter((c) => !c.init)
   const multi = containers.length > 1
@@ -231,39 +225,46 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                       onChange={(change) => update(row.id, change)}
                     />
                   ))
-                : mounts.map(({ container, mount }) => (
-                    <li
-                      key={`${container}/${mount.mountPath}`}
-                      className={cn(
-                        "grid grid-cols-2 items-center gap-x-3 gap-y-1 px-5 py-3 sm:grid-cols-volume",
-                        entrance(createdKey.volume(workload, mount.mountPath)),
-                      )}
-                    >
-                      <span className="col-span-2 flex min-w-0 items-baseline gap-2 sm:col-span-1">
-                        <span
-                          className="truncate font-mono type-body"
-                          translate="no"
-                          title={mount.mountPath}
-                        >
-                          {mount.mountPath}
-                        </span>
-                        {multi ? (
-                          <span className="shrink-0 type-meta text-tertiary" translate="no">
-                            {container}
+                : mounts.map(({ container, mount }) => {
+                    const fill = volumes.fill(claimOf(mount))
+                    return (
+                      <li
+                        key={`${container}/${mount.mountPath}`}
+                        className={cn(
+                          "grid grid-cols-2 items-center gap-x-3 gap-y-1 px-5 py-3 sm:grid-cols-volume",
+                          entrance(createdKey.volume(workload, mount.mountPath)),
+                        )}
+                      >
+                        <span className="col-span-2 flex min-w-0 flex-col gap-1.5 sm:col-span-1">
+                          <span className="flex min-w-0 items-baseline gap-2">
+                            <span
+                              className="truncate font-mono type-body"
+                              translate="no"
+                              title={mount.mountPath}
+                            >
+                              {mount.mountPath}
+                            </span>
+                            {multi ? (
+                              <span className="shrink-0 type-meta text-tertiary" translate="no">
+                                {container}
+                              </span>
+                            ) : null}
                           </span>
-                        ) : null}
-                      </span>
-                      <span className="font-mono type-body tabular-nums" translate="no">
-                        {mount.size ?? "—"}
-                      </span>
-                      <span className="type-body text-secondary max-sm:justify-self-end">
-                        {mount.readOnly ? t("storage.readOnly") : t("storage.writable")}
-                      </span>
-                      <span className="max-sm:col-span-2">
-                        <Phase mount={mount} />
-                      </span>
-                    </li>
-                  ))}
+                          {fill ? <VolumeUse fill={fill} className="max-w-64" /> : null}
+                          {fill ? <VolumeFullNote fill={fill} /> : null}
+                        </span>
+                        <span className="font-mono type-body tabular-nums" translate="no">
+                          {mount.size ?? "—"}
+                        </span>
+                        <span className="type-body text-secondary max-sm:justify-self-end">
+                          {mount.readOnly ? t("storage.readOnly") : t("storage.writable")}
+                        </span>
+                        <span className="max-sm:col-span-2">
+                          <Phase mount={mount} />
+                        </span>
+                      </li>
+                    )
+                  })}
             </ul>
             {rows ? (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-v2-border py-2 pr-5 pl-3">

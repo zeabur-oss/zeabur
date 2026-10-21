@@ -27,6 +27,7 @@ import {
   toolsQuery,
   upgradesQuery,
 } from "@/api/queries"
+import { isUnreachable } from "@/api/client"
 import { AppShell } from "@/components/app-shell"
 import { NotFound } from "@/components/not-found"
 import { openKubectl, openShell, showDock } from "@/lib/dock"
@@ -80,10 +81,18 @@ import {
 /** A query's data, from the cache when it is there. */
 const ensure: typeof queryClient.ensureQueryData = (options) => queryClient.ensureQueryData(options)
 
-/** Waits for every read; a failure is left for the page to show. */
-const load = async (...reads: Promise<unknown>[]) => {
-  await Promise.all(reads.map((read) => read.catch(() => null)))
-}
+/** Waits for every read, or for the first that finds the cluster away; a failure is left for the
+ * page to show. */
+const load = (...reads: Promise<unknown>[]) =>
+  new Promise<void>((resolve) => {
+    let left = reads.length
+    if (left === 0) resolve()
+    for (const read of reads)
+      read.then(
+        () => --left === 0 && resolve(),
+        (error: unknown) => (isUnreachable(error) || --left === 0) && resolve(),
+      )
+  })
 
 /** The project document and its newest events, which every project page reads. */
 const loadProject = (project: string) =>

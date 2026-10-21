@@ -9,18 +9,22 @@
 //!
 //! [ms-rbac]: https://github.com/kubernetes-sigs/metrics-server/blob/master/manifests/base/rbac.yaml
 
+use std::collections::BTreeSet;
+
 use axum::Json;
 use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::ClusterExt as _;
+use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_model::Origin;
 use zeabur_modules::Reading;
 
-use crate::cluster::modules;
+use crate::cluster::{modules, stats};
 use crate::error::ApiError;
 use crate::handlers::Person;
-use crate::views::{MetricsState, UnreadableView};
+use crate::views::{DiskUsage, MetricsState, StatsState, UnreadableView};
 
 /// What one container uses.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -142,4 +146,98 @@ fn view(project: &str, pod: zeabur_modules::metrics_server::PodUsage) -> PodUsag
         pod: pod.pod,
         containers,
     }
+}
+
+/// How full one claim's volume is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeUsage {
+    /// The PersistentVolumeClaim.
+    pub claim: String,
+    /// The pod it was measured in.
+    pub pod: String,
+    /// The node that pod runs on.
+    pub node: String,
+    /// Its filesystem's size. It can differ a little from the claim's.
+    pub capacity_bytes: u64,
+    /// In use.
+    pub used_bytes: u64,
+    /// Free to use.
+    pub available_bytes: u64,
+}
+
+/// How full a project's volumes are.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumeUsageList {
+    /// `projects/{project}/volumes`.
+    pub id: String,
+    /// Whether the kubelets could be read.
+    pub state: StatsState,
+    /// Every claim a running pod mounts, measured, by claim.
+    pub items: Vec<VolumeUsage>,
+    /// What could not be read.
+    pub unreadable: Vec<UnreadableView>,
+}
+
+/// How full each volume a running pod of the project mounts from a claim is, from the stats
+/// summary of the kubelet on the pod's node (`get` on `nodes/proxy`). A claim no running pod
+/// mounts has no measure. Always `200` once the pods can be listed: `state` says when the
+/// kubelets may not be read (`unreadable` names the refusal) or did not answer.
+#[utoipa::path(get, path = "/api/v1/projects/{project}/volumes", tag = "projects",
+    operation_id = "getVolumeUsage",
+    params(("project" = String, Path, description = "The project's namespace")),
+    responses((status = 200, body = VolumeUsageList),
+              (status = 403, body = Problem, content_type = PROBLEM)))]
+pub(crate) async fn volumes(
+    Person(cluster): Person,
+    Path(project): Path<String>,
+) -> Result<Json<VolumeUsageList>, ApiError> {
+    let pods = cluster
+        .list::<Pod>(Some(&project))
+        .await
+        .map_err(|e| ApiError::from(e.into_problem("the project's pods")))?;
+    let nodes: BTreeSet<String> = pods
+        .iter()
+        .filter(|pod| {
+            pod.spec.as_ref().is_some_and(|spec| {
+                spec.volumes
+                    .iter()
+                    .flatten()
+                    .any(|v| v.persistent_volume_claim.is_some())
+            })
+        })
+        .filter_map(|pod| pod.spec.as_ref()?.node_name.clone())
+        .collect();
+    let mut unreadable = Vec::new();
+    let (summaries, state) =
+        stats::summaries(&cluster, nodes.into_iter().collect(), &mut unreadable).await;
+    let mut items: Vec<VolumeUsage> = Vec::new();
+    for (node, summary) in summaries {
+        for claim in summary.claims {
+            if claim.namespace != project || items.iter().any(|i| i.claim == claim.claim) {
+                continue;
+            }
+            let DiskUsage {
+                capacity_bytes,
+                used_bytes,
+                available_bytes,
+            } = claim.disk;
+            items.push(VolumeUsage {
+                claim: claim.claim,
+                pod: claim.pod,
+                node: node.clone(),
+                capacity_bytes,
+                used_bytes,
+                available_bytes,
+            });
+        }
+    }
+    items.sort_by(|a, b| a.claim.cmp(&b.claim));
+    Ok(Json(VolumeUsageList {
+        id: format!("projects/{project}/volumes"),
+        state,
+        items,
+        unreadable,
+    }))
 }

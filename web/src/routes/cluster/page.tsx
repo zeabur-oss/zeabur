@@ -3,19 +3,20 @@ import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 
-import { isStatus, type Schemas } from "@/api/client"
+import { isStatus, isUnreachable, type Schemas } from "@/api/client"
 import { clusterGapsQuery, clusterWarningsQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { GapList } from "@/components/gaps"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
+import { NotRead } from "@/components/unreachable"
 import { Button } from "@zeabur/design-system/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
 import { useT } from "@/i18n"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
-import { useAttention } from "@/routes/cluster/attention"
+import { AttentionRow, useAttention } from "@/routes/cluster/attention"
 import { NodesSection } from "@/routes/cluster/nodes"
 import { Section } from "@/routes/cluster/section"
 
@@ -42,18 +43,25 @@ function ClusterGaps() {
   )
 }
 
+const ATTENTION_SHOWN = 5
+
 function Attention() {
   const t = useT()
-  const items = useAttention()
+  const { items, pending, checked, unreachable } = useAttention()
   const [all, setAll] = useState(false)
+  if (pending) return null
   if (items.length === 0)
     return (
       <p className="flex items-center gap-2 text-muted-foreground">
-        <StatusDot health="ok" />
-        {t("cluster.allClear")}
+        <StatusDot health={checked ? "ok" : "idle"} />
+        {checked
+          ? t("cluster.allClear")
+          : unreachable
+            ? t("cluster.cannotCheck")
+            : t("cluster.notChecked")}
       </p>
     )
-  const shown = all ? items : items.slice(0, 5)
+  const shown = all ? items : items.slice(0, ATTENTION_SHOWN)
   return (
     <section aria-labelledby="cluster-attention-title">
       <Card size="sm">
@@ -70,24 +78,18 @@ function Attention() {
         <CardContent>
           <ul className="flex flex-col">
             {shown.map((item) => (
-              <li
-                key={item.key}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-rule py-2 first:border-t-0"
-              >
-                <StatusDot health={item.health} />
-                <span className="min-w-0 flex-1">{item.text}</span>
-                {item.link ? (
-                  <span className="type-meta text-muted-foreground">{item.link}</span>
-                ) : null}
-              </li>
+              <AttentionRow key={item.key} item={item} />
             ))}
           </ul>
-          {items.length > 5 ? (
+          {items.length > ATTENTION_SHOWN ? (
             <Button variant="ghost" size="sm" onClick={() => setAll(!all)} aria-expanded={all}>
               <CaretDownIcon aria-hidden="true" data-icon="inline-start" />
-              {all ? t("cluster.fewer") : t("cluster.more", items.length - 5)}
+              {all ? t("cluster.fewer") : t("cluster.more", items.length - ATTENTION_SHOWN)}
             </Button>
           ) : null}
+          {checked ? null : (
+            <p className="type-meta text-muted-foreground">{t("cluster.notChecked")}</p>
+          )}
         </CardContent>
       </Card>
     </section>
@@ -106,7 +108,9 @@ function WarningsSection() {
       {warnings.isPending ? (
         <LoadingRows label={t("common.loading")} rows={2} />
       ) : warnings.isError ? (
-        isStatus(warnings.error, 403) ? (
+        isUnreachable(warnings.error) ? (
+          <NotRead />
+        ) : isStatus(warnings.error, 403) ? (
           <Forbidden
             error={warnings.error}
             what={t("cluster.whatWarnings")}
@@ -157,7 +161,10 @@ function WarningRow({ event }: { event: Schemas["EventView"] }) {
       {event.count > 1 ? (
         <span className="type-meta text-muted-foreground">×{event.count}</span>
       ) : null}
-      <span className="min-w-0 flex-1 truncate type-meta text-muted-foreground" title={event.note}>
+      <span
+        className="w-full min-w-0 type-meta break-words text-muted-foreground sm:w-auto sm:flex-1 sm:truncate"
+        title={event.note}
+      >
         {namespace ? (
           <Link
             to="/projects/$project"

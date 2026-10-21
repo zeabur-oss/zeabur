@@ -7,10 +7,12 @@ import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 
 import { projectsQuery } from "@/api/queries"
 import { ProjectGlyph } from "@/components/shell/project-glyph"
+import { StatusDot } from "@/components/status"
 import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { projectTitle } from "@/model/project"
+import { countsHealth } from "@/model/service"
 
 const triggerClass = "inline-flex shrink-0 items-center justify-center"
 
@@ -23,9 +25,17 @@ export function ProjectSwitcher({ current }: { current: string }) {
   const projects = useQuery(projectsQuery)
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState("")
-  const items = (projects.data?.items ?? []).filter((p) =>
-    [p.name, p.displayName ?? ""].some((n) => n.toLowerCase().includes(filter.toLowerCase())),
-  )
+  // Projects first, then namespaces, by name; system namespaces only when one is open.
+  const items = (projects.data?.items ?? [])
+    .filter((p) => !p.system || p.name === current)
+    .filter((p) =>
+      [p.name, p.displayName ?? ""].some((n) => n.toLowerCase().includes(filter.toLowerCase())),
+    )
+    .toSorted(
+      (a, b) =>
+        Number(b.adopted) - Number(a.adopted) ||
+        projectTitle(a, a.name).localeCompare(projectTitle(b, b.name)),
+    )
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
@@ -53,7 +63,11 @@ export function ProjectSwitcher({ current }: { current: string }) {
                 <span className="truncate" translate="no">
                   {projectTitle(p, p.name)}
                 </span>
-                {p.adopted ? null : (
+                {p.adopted ? (
+                  p.health && p.health.services > 0 ? (
+                    <StatusDot health={countsHealth(p.health)} className="shrink-0" />
+                  ) : null
+                ) : (
                   <span className="type-meta text-muted-foreground">
                     {t("projects.namespaceOnly")}
                   </span>
