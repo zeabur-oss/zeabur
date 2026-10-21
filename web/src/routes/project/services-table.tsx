@@ -196,19 +196,18 @@ export function ServicesTable({
                 {sortable("restarts", t("table.restarts"), "text-right")}
                 {live ? (
                   <>
-                    <th className={cn(head, "w-24 text-right")}>{t("resources.cpu")}</th>
-                    <th className={cn(head, "w-24 text-right")}>{t("resources.memory")}</th>
+                    <th className={cn(head, "w-20 text-right")}>{t("resources.cpu")}</th>
+                    <th className={cn(head, "w-20 text-right")}>{t("resources.memory")}</th>
                   </>
                 ) : null}
-                <th className={head}>{t("table.domain")}</th>
-                {sortable("kind", t("table.kind"), "hidden pr-4 2xl:table-cell")}
+                <th className={cn(head, "pr-4")}>{t("table.domain")}</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {rows.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={live ? 8 : 6}
+                    colSpan={live ? 7 : 5}
                     className="px-4 py-6 text-center text-sm text-muted-foreground"
                   >
                     {t("services.noMatch")}
@@ -222,7 +221,7 @@ export function ServicesTable({
                 const used = live ? serviceUsage(service, usage) : undefined
                 return (
                   <tr key={serviceId(service)} className="hover:bg-hover">
-                    <td className="max-w-64 py-2 pr-3 pl-4">
+                    <td className="max-w-56 py-2 pr-3 pl-4">
                       <Link
                         {...serviceLink(project, service)}
                         className="flex items-center gap-2.5 rounded-md outline-none"
@@ -289,7 +288,7 @@ export function ServicesTable({
                         </td>
                       </>
                     ) : null}
-                    <td className="max-w-52 px-3 py-2">
+                    <td className="max-w-40 py-2 pr-4 pl-3">
                       {domain ? (
                         <span className="flex items-center gap-1.5 text-xs">
                           <GlobeIcon
@@ -303,12 +302,6 @@ export function ServicesTable({
                       ) : (
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
-                    </td>
-                    <td
-                      className="hidden py-2 pr-4 pl-3 text-xs text-muted-foreground 2xl:table-cell"
-                      translate="no"
-                    >
-                      {service.kind}
                     </td>
                   </tr>
                 )
