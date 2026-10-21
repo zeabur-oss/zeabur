@@ -124,7 +124,7 @@ export function Reachability({
             <AccessPill access={reach.fromIngressController} />
           </span>
           <span className="flex items-center gap-1.5">
-            {t("reach.otherNamespaces")}
+            {t("reach.otherProjects")}
             <AccessPill access={reach.fromOtherNamespaces} />
           </span>
           {reach.fromServices.map((peer) => (

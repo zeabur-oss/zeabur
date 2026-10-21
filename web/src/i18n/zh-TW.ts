@@ -1056,7 +1056,7 @@ export const zhTW: Messages = {
   "reach.noneSelect": "沒有規則套用到這個服務，所以允許所有連線。",
   "reach.in": "連入",
   "reach.out": "連出",
-  "reach.otherNamespaces": "其他 Namespace",
+  "reach.otherProjects": "其他專案",
   "reach.dns": "DNS 查詢",
   "reach.outside": "叢集外",
   "reach.cni": "規則是否真的生效，取決於叢集的網路外掛（CNI）。",

@@ -1146,7 +1146,7 @@ export const en = {
   "reach.noneSelect": "No rule applies to this service, so every connection is allowed.",
   "reach.in": "Incoming",
   "reach.out": "Outgoing",
-  "reach.otherNamespaces": "Other namespaces",
+  "reach.otherProjects": "Other projects",
   "reach.dns": "DNS lookups",
   "reach.outside": "Outside the cluster",
   "reach.cni": "Whether these rules are enforced depends on the cluster's network plugin (CNI).",

@@ -1054,7 +1054,7 @@ export const zhCN: Messages = {
   "reach.noneSelect": "没有规则应用到这个服务，所以允许所有连接。",
   "reach.in": "入站",
   "reach.out": "出站",
-  "reach.otherNamespaces": "其他 Namespace",
+  "reach.otherProjects": "其他项目",
   "reach.dns": "域名解析",
   "reach.outside": "集群外",
   "reach.cni": "规则是否真正生效，取决于集群的网络插件（CNI）。",
