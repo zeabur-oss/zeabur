@@ -23,7 +23,7 @@ export function EventList({
   limit?: number
   /** Reason and object only, without the note. */
   compact?: boolean
-  /** Plain words first for the reasons that have them, the reason beside them. */
+  /** Plain words first for the reasons that have them, the reason beside them, and objects by name. */
   plain?: boolean
   empty?: string
   /** A link for the object an event is about (`pod/worker-…`), when the page knows where to go. */
@@ -37,9 +37,14 @@ export function EventList({
   const row = (event: Event, place?: Place) => {
     const warning = isWarning(event)
     const word = plain ? eventWord(event.reason) : undefined
-    const object = event.regarding
-      ? `${event.regarding.kind.toLowerCase()}/${event.regarding.name}`
-      : undefined
+    const regarding = event.regarding
+    const object = !regarding
+      ? undefined
+      : !plain
+        ? `${regarding.kind.toLowerCase()}/${regarding.name}`
+        : regarding.kind === "Pod"
+          ? t("pod.named", regarding.name)
+          : regarding.name
     return (
       <li
         key={event.id}

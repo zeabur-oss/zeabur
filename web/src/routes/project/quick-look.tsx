@@ -111,9 +111,6 @@ export function QuickLook({
             </h2>
             <span className="flex flex-wrap items-center gap-2">
               <ServiceStatus status={statusOf(service)} size="sm" counts swap />
-              <span className="type-meta text-muted-foreground" translate="no">
-                {service.kind}
-              </span>
             </span>
           </div>
           <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label={t("common.close")}>
@@ -163,7 +160,7 @@ export function QuickLook({
           {t("quickLook.upstream")}
         </h3>
         {upstream.length === 0 ? (
-          <p className="text-sm text-muted-foreground">—</p>
+          <p className="text-sm text-muted-foreground">{t("quickLook.noUpstream")}</p>
         ) : (
           <ul className="flex flex-col">{upstream.map((e) => row(e, "in"))}</ul>
         )}
@@ -173,7 +170,7 @@ export function QuickLook({
           {t("quickLook.downstream")}
         </h3>
         {downstream.length === 0 ? (
-          <p className="text-sm text-muted-foreground">—</p>
+          <p className="text-sm text-muted-foreground">{t("quickLook.noDownstream")}</p>
         ) : (
           <ul className="flex flex-col">{downstream.map((e) => row(e, "out"))}</ul>
         )}

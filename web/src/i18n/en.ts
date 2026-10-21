@@ -411,6 +411,8 @@ export const en = {
   "quickLook.open": "Open service page",
   "quickLook.upstream": "Upstream",
   "quickLook.downstream": "Downstream",
+  "quickLook.noUpstream": "Nothing connects to this service.",
+  "quickLook.noDownstream": "This service connects to no other service.",
 
   // Service page
   "service.tabs": "Service sections",
@@ -444,6 +446,7 @@ export const en = {
   "overview.manage": "Manage",
   "overview.warnings": "Warnings",
   "pod.pods": "Replicas",
+  "pod.named": (pod: string) => `Replica ${pod}`,
   "pod.none": "No replicas are running.",
   "pod.ready": "Ready",
   "pod.notReady": "Not ready",

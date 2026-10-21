@@ -372,6 +372,8 @@ export const zhCN: Messages = {
   "quickLook.open": "打开服务页面",
   "quickLook.upstream": "上游",
   "quickLook.downstream": "下游",
+  "quickLook.noUpstream": "没有服务或域名连到这个服务。",
+  "quickLook.noDownstream": "这个服务没有连到其他服务。",
 
   "service.tabs": "服务页面",
   "service.copyName": "复制 kubectl 用的名称",
@@ -404,6 +406,7 @@ export const zhCN: Messages = {
   "overview.manage": "管理",
   "overview.warnings": "警告",
   "pod.pods": "副本",
+  "pod.named": (pod) => `副本 ${pod}`,
   "pod.none": "目前没有运行中的副本。",
   "pod.ready": "就绪",
   "pod.notReady": "未就绪",

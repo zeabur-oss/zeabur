@@ -372,6 +372,8 @@ export const zhTW: Messages = {
   "quickLook.open": "開啟服務頁面",
   "quickLook.upstream": "上游",
   "quickLook.downstream": "下游",
+  "quickLook.noUpstream": "沒有服務或網域連到這個服務。",
+  "quickLook.noDownstream": "這個服務沒有連到其他服務。",
 
   "service.tabs": "服務頁面",
   "service.copyName": "複製 kubectl 用的名稱",
@@ -404,6 +406,7 @@ export const zhTW: Messages = {
   "overview.manage": "管理",
   "overview.warnings": "警告",
   "pod.pods": "副本",
+  "pod.named": (pod) => `副本 ${pod}`,
   "pod.none": "目前沒有執行中的副本。",
   "pod.ready": "就緒",
   "pod.notReady": "未就緒",

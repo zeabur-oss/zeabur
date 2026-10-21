@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from "react"
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+} from "react"
 import CornersOutIcon from "~icons/ph/corners-out"
 import GitBranchIcon from "~icons/ph/git-branch"
 import GlobeIcon from "~icons/ph/globe"
@@ -33,17 +40,33 @@ import { QuickLook } from "@/routes/project/quick-look"
 
 const px = (n: number) => `${n}px`
 
-/** The services drawn by role, with what connects them; a click opens the quick look. */
+/** The quick look's width from `sm` (`sm:w-100`); below it, it covers the whole row. */
+const quickLookWidth = 400
+
+/** Where the quick look starts, in client pixels, from `sm`. */
+function quickLookLeft(canvas: HTMLElement) {
+  const row = canvas.closest("[data-map-row]")
+  return row && window.innerWidth >= 640
+    ? row.getBoundingClientRect().right - quickLookWidth
+    : undefined
+}
+
+/**
+ * The services drawn by role, with what connects them, and `children` (a side column) beside them;
+ * a click opens the quick look at the row's right edge, over the side column.
+ */
 export function ProjectMap({
   project,
   data,
   selected,
   onSelect,
+  children,
 }: {
   project: string
   data: Project
   selected?: string
   onSelect: (id?: string) => void
+  children?: ReactNode
 }) {
   const t = useT()
   const events = useProjectEvents(project)
@@ -55,8 +78,11 @@ export function ProjectMap({
   const presence = usePresence(Boolean(selected && open))
 
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden">
-      <Graph project={project} data={data} selected={selected} onOpen={onSelect} />
+    <div data-map-row className="relative flex min-h-140 flex-1 border-t border-main">
+      <div className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+        <Graph project={project} data={data} selected={selected} onOpen={onSelect} />
+      </div>
+      {children}
       {open && presence.mounted ? (
         <QuickLook
           key={serviceId(open)}
@@ -114,11 +140,16 @@ function Graph({
       return value
     })
 
+  /** How much of the canvas's right side the open quick look hides. */
+  const covered = (el: HTMLElement) => {
+    const left = selected ? quickLookLeft(el) : undefined
+    return left === undefined ? 0 : Math.max(0, el.getBoundingClientRect().right - left)
+  }
+
   const fit = () => {
     const el = viewport.current
     if (!el) return
-    // Leave room for the quick look, which sits over the canvas from `sm`.
-    const w = el.clientWidth - (selected && el.clientWidth >= 640 ? 400 : 0)
+    const w = el.clientWidth - covered(el)
     const h = el.clientHeight
     const bw = box.maxX - box.minX
     const bh = box.maxY - box.minY
@@ -139,6 +170,24 @@ function Graph({
     if (!canvasViewport.get(project)) fit()
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- once per mount, which is per project
   }, [project])
+
+  // The selected service stays in view beside the quick look.
+  useLayoutEffect(() => {
+    const el = viewport.current
+    const node = graph.nodes.find((n) => n.id === selected)
+    if (!el || !node || quickLookLeft(el) === undefined) return
+    const margin = 24
+    const right = el.clientWidth - covered(el) - margin
+    const bottom = el.clientHeight - margin
+    setView((v) => {
+      const x = v.x + node.x * v.k
+      const y = v.y + node.y * v.k
+      const dx = Math.max(margin - x, Math.min(0, right - (x + node.w * v.k)))
+      const dy = Math.max(margin - y, Math.min(0, bottom - (y + node.h * v.k)))
+      return dx || dy ? { ...v, x: v.x + dx, y: v.y + dy } : v
+    })
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- when another service is selected
+  }, [selected])
 
   useEffect(() => {
     const el = viewport.current

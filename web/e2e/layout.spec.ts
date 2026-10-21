@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test"
+import type { Locator, Page } from "@playwright/test"
 
 import { expect, test } from "./fixtures.ts"
 
@@ -79,6 +79,32 @@ for (const width of widths) {
       expect(await mainOverflows(page)).toBe(false)
     })
   }
+}
+
+for (const width of [1440, 1960]) {
+  test(`the quick look sits at the map's right edge, beside its service, at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(`${project}?view=map`)
+    const card = page.getByRole("button", { name: new RegExp(`^${healthy}\\b`) })
+    await card.click()
+    const panel = page.getByRole("complementary", { name: `Quick look: ${healthy}` })
+    await expect(panel).toBeVisible()
+    await expect(panel).not.toHaveCSS("translate", /%/)
+    const box = async (locator: Locator) => {
+      const rect = (await locator.boundingBox())!
+      return { left: Math.round(rect.x), right: Math.round(rect.x + rect.width) }
+    }
+    const sheet = await box(panel)
+    const map = await box(page.locator("[data-map-row]"))
+    const node = await box(card)
+    expect(sheet.right).toBe(map.right)
+    expect(map.right).toBe(width)
+    expect(sheet.right - sheet.left).toBe(400)
+    expect(node.right).toBeLessThanOrEqual(sheet.left)
+    expect(node.left).toBeGreaterThanOrEqual(map.left)
+  })
 }
 
 test.describe("in a project with many services", () => {

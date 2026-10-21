@@ -280,8 +280,7 @@ function MapView({
         </PageColumn>
       ) : null}
       <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.services)} />
-      <div className="flex min-h-140 flex-1 border-t border-main">
-        <ProjectMap project={project} data={data} selected={search.service} onSelect={select} />
+      <ProjectMap project={project} data={data} selected={search.service} onSelect={select}>
         <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-main px-5 py-5 xl:block">
           <Activity
             project={project}
@@ -290,7 +289,7 @@ function MapView({
             unreadable={unreadable}
           />
         </aside>
-      </div>
+      </ProjectMap>
     </>
   )
 }
