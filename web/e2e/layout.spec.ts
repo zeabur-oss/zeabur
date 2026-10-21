@@ -17,6 +17,10 @@ test.beforeAll(() => {
 
 const widths = [1440, 390]
 
+/** The services: a table, or on a phone one line each. */
+const services = (page: Page) =>
+  page.getByRole("table", { name: "Services" }).or(page.getByRole("list", { name: "Services" }))
+
 /** The left and right edges of every page column in <main>, rounded to the pixel. */
 const columnEdges = (page: Page) =>
   page.locator('main [data-slot="page-column"]').evaluateAll((columns) =>
@@ -40,7 +44,7 @@ const pages = [
   {
     name: "the project list",
     path: `${project}?view=list`,
-    ready: (page: Page) => page.getByRole("table", { name: "Services" }),
+    ready: services,
   },
   {
     name: "a service",
@@ -131,7 +135,7 @@ test.describe("in a project with many services", () => {
     }) => {
       await page.setViewportSize({ width, height: 800 })
       await page.goto(`/projects/${encodeURIComponent(crowded)}?view=list`)
-      await expect(page.getByRole("table", { name: "Services" })).toBeVisible()
+      await expect(services(page)).toBeVisible()
       const documentHeight = () =>
         page.evaluate(() => [document.scrollingElement!.scrollHeight, window.innerHeight])
       const [height, inner] = await documentHeight()
