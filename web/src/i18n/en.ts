@@ -1232,8 +1232,10 @@ export const en = {
     `A run counts as failed when its program ends with an exit code other than 0; this one ended with ${p.exitCode}.`,
   "sentence.diagnosis.runFailed.why.gaveUp": (p: P) =>
     p.backoffLimit
-      ? `The task gave up: it retries a failed run ${p.backoffLimit} times, and the last one ended with ${p.exitCode} too.`
-      : `The task gave up after its retries; the last run ended with ${p.exitCode}.`,
+      ? p.backoffLimit === "0"
+        ? `The task doesn't retry a failed run; this one ended with exit code ${p.exitCode}.`
+        : `The task gave up: it retries a failed run ${p.backoffLimit} times, and the last one ended with exit code ${p.exitCode} too.`
+      : `The task gave up after its retries; the last run ended with exit code ${p.exitCode}.`,
   "sentence.diagnosis.outOfMemory.why.limit": (p: P) =>
     `Each replica may use at most ${p.limit} of memory; at that point the system stops it at once, and the program can't catch it.`,
   "sentence.diagnosis.outOfMemory.why.noLimit": () =>
@@ -1556,6 +1558,25 @@ export const en = {
   "rollout.ready": (ready: number, desired: number) => `${ready} of ${desired} new replicas ready`,
   "rollout.older": (n: number) =>
     plural(n, "old replica still running", "old replicas still running"),
+  "rollout.stuckLine": "Deployment stuck",
+  "rollout.waitsLine": "The new release waits on this",
+  "rollout.rollingOut": (name: string) => `${name} is rolling out`,
+  "overview.alsoMeans": "This also means",
+  "overview.alsoDown": (list: string, name: string) =>
+    `${list} can't be reached until ${name} has a ready replica.`,
+  "overview.privateAddress": "the private address",
+  "trace.waiting": (name: string) => `Waiting for ${name} to be ready`,
+  "trace.stopped": (name: string) => `${name} is scaled to 0`,
+  "event.word.retrying": "Retrying",
+  "event.word.checkFailed": "Check failed",
+  "event.word.stopping": "Stopping",
+  "event.word.failed": "Failed",
+  "event.word.noRoom": "Waiting for room",
+  "event.word.mountFailed": "Can't mount volume",
+  "event.word.createFailed": "Can't create replica",
+  "event.word.gaveUp": "Gave up",
+  "event.word.evicted": "Moved off its machine",
+  "event.word.outOfMemory": "Out of memory",
   "changes.title": "Deployment history",
   "changes.description":
     "Each release of the service and the warnings around it. Compare a release with the current one, or roll back to it.",

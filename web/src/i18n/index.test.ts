@@ -2,6 +2,7 @@ import { describe, test, expect } from "bun:test"
 
 import { catalogueLoader, translator, writeSentence } from "@/i18n"
 import { en, type Messages } from "@/i18n/en"
+import { listZh } from "@/i18n/sentence-parts"
 
 const taiwanese = { ...en, "shell.home": "首頁" } as Messages
 const mainland = { ...en, "shell.home": "首页" } as Messages
@@ -86,5 +87,13 @@ describe("server sentences", () => {
     expect(why("readiness", { container: "api" })).toBe(
       "While the traffic check fails, the container gets no traffic from its private addresses.",
     )
+  })
+})
+
+describe("lists in Chinese", () => {
+  test("space a Latin word from the 和 beside it, never from 、 or a Han word", () => {
+    expect(listZh("zh-TW", ["blog.example.com", "私有位址"])).toBe("blog.example.com 和私有位址")
+    expect(listZh("zh-CN", ["api", "web", "worker"])).toBe("api、web 和 worker")
+    expect(listZh("zh-TW", ["網域", "位址"])).toBe("網域和位址")
   })
 })

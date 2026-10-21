@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
 import ArrowRightIcon from "~icons/ph/arrow-right"
@@ -41,13 +41,14 @@ import { usePlanner } from "@/components/plan/planner"
 import { formatAgo, formatTime } from "@/lib/format"
 import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
+import type { Schemas } from "@/api/client"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
+import { overviewOf, type Overview } from "@/model/overview"
 import {
   imageTag,
   isHealthy,
   isTask,
-  isWarning,
   podHealth,
   podReason,
   serviceId,
@@ -59,8 +60,10 @@ import type { ServicePlace } from "@/routes/search"
 import { UsageGlance } from "@/routes/service/usage"
 
 type OnTab = (place: ServicePlace, pod?: string) => void
+type RolloutProgress = Schemas["RolloutProgress"]
+type ServiceTrace = Schemas["ServiceTrace"]
 
-/** Health first, then what needs doing, then how the service is reached and what it talks to. */
+/** Health first, then each cause once with what it takes down, then how the service is reached. */
 export function OverviewTab({
   project,
   service,
@@ -77,26 +80,57 @@ export function OverviewTab({
   onTab: OnTab
 }) {
   const t = useT()
-  const diagnosed = (service.diagnoses?.length ?? 0) > 0
-  const warnings = events.filter(isWarning)
+  const task = isTask(service.kind)
+  const rollout = useQuery({
+    ...rolloutQuery(project, service.kind, service.name),
+    enabled: !task,
+  })
+  const trace = useQuery(traceQuery(project, service.kind, service.name))
+  const said = overviewOf(
+    { diagnoses: service.diagnoses, stopped: service.replicas?.desired === 0 },
+    task ? undefined : rollout.data,
+    trace.data?.routes ?? [],
+    events,
+  )
+  const diagnosed = said.causes.length > 0
   return (
     <div className="flex flex-col gap-5">
-      <Summary project={project} service={service} diagnosed={diagnosed} onTab={onTab} />
+      <Summary
+        project={project}
+        service={service}
+        explained={diagnosed || said.rollout.as === "card"}
+        onTab={onTab}
+      />
       {diagnosed ? (
-        <Diagnoses diagnoses={service.diagnoses} service={service} project={project} />
+        <Diagnoses
+          diagnoses={said.causes}
+          service={service}
+          project={project}
+          also={
+            <AlsoMeans project={project} service={service} said={said} rollout={rollout.data} />
+          }
+        />
       ) : null}
-      {isTask(service.kind) ? null : <Rollout project={project} service={service} />}
+      {said.rollout.as === "card" && rollout.data ? (
+        <Rollout project={project} service={service} data={rollout.data} />
+      ) : null}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
-        <Reachability project={project} service={service} diagnosed={diagnosed} onTab={onTab} />
+        <Reachability
+          project={project}
+          service={service}
+          trace={trace}
+          waiting={said.waiting}
+          onTab={onTab}
+        />
         <div className="flex min-w-0 flex-col gap-4 lg:gap-5">
-          {warnings.length > 0 ? (
+          {said.warnings.length > 0 ? (
             <Container
               title={t("overview.warnings")}
               titleAction={<More onClick={() => onTab("events")}>{t("common.all")}</More>}
               variant="list"
             >
               <div className="px-4">
-                <EventList events={warnings} limit={3} compact />
+                <EventList events={said.warnings} limit={3} compact plain />
               </div>
             </Container>
           ) : null}
@@ -104,6 +138,76 @@ export function OverviewTab({
         </div>
       </div>
     </div>
+  )
+}
+
+/** What the first cause also takes down: the addresses waiting on it, and a release stuck on it. */
+function AlsoMeans({
+  project,
+  service,
+  said,
+  rollout,
+}: {
+  project: string
+  service: Service
+  said: Overview
+  rollout?: RolloutProgress
+}) {
+  const t = useT()
+  const planner = usePlanner(project)
+  const down = said.alsoDown
+  const line = said.rollout.as === "line" && rollout ? said.rollout : undefined
+  if (!down && !line) return null
+  const rollback = rollout?.rollback
+  return (
+    <>
+      {down ? (
+        <p>
+          <span className="font-medium">
+            {t("overview.alsoMeans")}
+            {t("common.colon")}
+          </span>
+          {t(
+            "overview.alsoDown",
+            t("common.list", [
+              ...down.domains,
+              ...(down.private ? [t("overview.privateAddress")] : []),
+            ]),
+            service.name,
+          )}
+        </p>
+      ) : null}
+      {line && rollout ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <p className="min-w-0 flex-1 basis-60">
+            <span className="font-medium">
+              {t(line.stuck ? "rollout.stuckLine" : "rollout.waitsLine")}
+              {t("common.colon")}
+            </span>
+            <span className="tabular-nums">
+              {t("rollout.ready", rollout.updatedReady, rollout.desired)}
+            </span>
+          </p>
+          {rollback ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                void planner.plan({
+                  title: t("rollout.rollBack", service.name),
+                  changes: rollback.changes,
+                  restartAfter: rollback.restartAfter,
+                  service: { kind: service.kind, name: service.name },
+                })
+              }
+            >
+              {t("rollout.rollBackButton")}
+            </Button>
+          ) : null}
+          {planner.dialog}
+        </div>
+      ) : null}
+    </>
   )
 }
 
@@ -115,15 +219,29 @@ const rolloutTone = {
   done: "",
 } as const
 
-/** How far the newest release has come, from its own replicas; done only when all are ready. */
-function Rollout({ project, service }: { project: string; service: Service }) {
+/**
+ * How far the newest release has come, from its own replicas. Without the releases (ReplicaSets
+ * the person may not read) its replicas can't be told from older ones, so the service's are said.
+ */
+function Rollout({
+  project,
+  service,
+  data,
+}: {
+  project: string
+  service: Service
+  data: RolloutProgress
+}) {
   const t = useT()
   const write = useSentence()
-  const rollout = useQuery(rolloutQuery(project, service.kind, service.name))
   const planner = usePlanner(project)
-  const data = rollout.data
-  if (!data || data.status === "done" || data.desired === 0) return null
   const rollback = data.rollback
+  const known = data.revision != null
+  const counts = replicaCounts(service)
+  const ready = known ? data.updatedReady : counts.ready
+  const progress = known
+    ? t("rollout.ready", data.updatedReady, data.desired)
+    : t("overview.someReady", counts.ready, data.desired)
   return (
     <section
       aria-label={t("rollout.title")}
@@ -132,15 +250,17 @@ function Rollout({ project, service }: { project: string; service: Service }) {
     >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
         <span className="font-medium">
-          <SwapText>{write(data.message)}</SwapText>
+          <SwapText>
+            {known || data.status === "stuck"
+              ? write(data.message)
+              : t("rollout.rollingOut", service.name)}
+          </SwapText>
         </span>
         {data.revision ? (
           <span className="text-secondary">{t("changes.release", data.revision)}</span>
         ) : null}
         <span className="text-secondary tabular-nums">
-          <SwapText variant="number">
-            {t("rollout.ready", data.updatedReady, data.desired)}
-          </SwapText>
+          <SwapText variant="number">{progress}</SwapText>
         </span>
         {data.old > 0 ? (
           <span className="text-secondary">{t("rollout.older", data.old)}</span>
@@ -163,10 +283,7 @@ function Rollout({ project, service }: { project: string; service: Service }) {
           </Button>
         ) : null}
       </div>
-      <Meter
-        value={Math.min(data.updatedReady, data.desired) / data.desired}
-        label={t("rollout.ready", data.updatedReady, data.desired)}
-      />
+      <Meter value={Math.min(ready, data.desired) / data.desired} label={progress} />
       {planner.dialog}
     </section>
   )
@@ -188,12 +305,13 @@ function More({ onClick, children }: { onClick: () => void; children: string }) 
 function Summary({
   project,
   service,
-  diagnosed,
+  explained,
   onTab,
 }: {
   project: string
   service: Service
-  diagnosed: boolean
+  /** A diagnosis or a rollout below already says what is missing. */
+  explained: boolean
   onTab: OnTab
 }) {
   const t = useT()
@@ -231,7 +349,7 @@ function Summary({
             {term ? <TermDetail translate="no">{term}</TermDetail> : null}
           </p>
         ) : null}
-        {!isHealthy(status) && !diagnosed ? <Exceptions service={service} /> : null}
+        {!isHealthy(status) && !explained ? <Exceptions service={service} /> : null}
         {status.unchecked ? (
           <p className="mt-2 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
             {t("status.uncheckedWhy")}
@@ -379,16 +497,17 @@ function Replicas({ service, onTab }: { service: Service; onTab: OnTab }) {
 function Reachability({
   project,
   service,
-  diagnosed,
+  trace,
+  waiting,
   onTab,
 }: {
   project: string
   service: Service
-  diagnosed: boolean
+  trace: UseQueryResult<ServiceTrace>
+  waiting: Overview["waiting"]
   onTab: OnTab
 }) {
   const t = useT()
-  const trace = useQuery(traceQuery(project, service.kind, service.name))
   const planner = usePlanner(project)
   const routes = trace.data?.routes ?? []
   if (trace.isSuccess && routes.length === 0) return null
@@ -409,18 +528,25 @@ function Reachability({
       ) : null}
       {routes.map((route) => {
         const fix = route.fix
+        const waits = waiting.get(route.address)
         return (
           <RouteLine
             key={`${route.kind}/${route.address}`}
             route={route}
+            waiting={
+              waits === "cause"
+                ? t("trace.waiting", service.name)
+                : waits === "stopped"
+                  ? t("trace.stopped", service.name)
+                  : undefined
+            }
             fix={
-              // A replica that isn't ready is the service's own diagnosis, already above.
-              diagnosed && route.hops.some((h) => h.step === "ready" && h.status === "failed")
+              waits
                 ? undefined
                 : trace.data?.diagnoses.find((d) => d.cause.params?.address === route.address)?.fix
             }
             onFix={
-              fix
+              fix && !waits
                 ? () =>
                     void planner.plan({
                       title: t("trace.fixTitle", route.address),

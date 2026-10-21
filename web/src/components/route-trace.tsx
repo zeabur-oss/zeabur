@@ -44,10 +44,13 @@ const verdict = {
  */
 export function RouteLine({
   route,
+  waiting,
   fix,
   onFix,
 }: {
   route: Route
+  /** Said in place of the verdict when the address only waits on a cause shown elsewhere. */
+  waiting?: string
   /** The diagnosis's fix for the hop that fails. */
   fix?: Schemas["Message"]
   /** Plans the change the API proposes for the hop that fails. */
@@ -55,9 +58,11 @@ export function RouteLine({
 }) {
   const t = useT()
   const write = useSentence()
-  const stop = route.hops.find((h) => h.status === "failed")
+  const stop = waiting ? undefined : route.hops.find((h) => h.status === "failed")
   const secure = route.hops.some((h) => h.step === "certificate" && h.status === "ok")
-  const said = verdict[route.status]
+  const said = waiting
+    ? { health: "idle" as const, text: waiting, tone: "text-secondary" }
+    : { ...verdict[route.status], text: t(verdict[route.status].key) }
   return (
     <div className="flex flex-col gap-2 px-4 py-3">
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
@@ -89,7 +94,7 @@ export function RouteLine({
         )}
         <span className={cn("ml-auto flex shrink-0 items-center gap-1.5 text-sm", said.tone)}>
           <StatusDot health={said.health} />
-          {t(said.key)}
+          {said.text}
         </span>
       </div>
       {stop ? (

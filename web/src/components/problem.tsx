@@ -109,6 +109,7 @@ export function Layers({
   why,
   whyLang,
   quote,
+  also,
   fix,
   action,
   evidence,
@@ -119,6 +120,8 @@ export function Layers({
   why?: string
   whyLang?: string
   quote?: string
+  /** What else the problem takes down, said where its cause is. */
+  also?: ReactNode
   fix: string
   action?: ReactNode
   evidence?: Schemas["Origin"][]
@@ -140,6 +143,7 @@ export function Layers({
           {quote}
         </blockquote>
       ) : null}
+      {also}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <div className="min-w-0 flex-1 basis-60 text-foreground">
           <span className="font-medium">

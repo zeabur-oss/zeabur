@@ -47,3 +47,16 @@ export const probeTiming = (p: P): ProbeTiming | undefined => {
     thresholdOnly: thresholdDefault && !periodDefault,
   }
 }
+
+/** A list in Chinese, with a space where its 和 meets a Latin word (「api、web 和 worker」). */
+export function listZh(locale: "zh-TW" | "zh-CN", items: string[]): string {
+  const parts = new Intl.ListFormat(locale).formatToParts(items)
+  return parts
+    .map((part, i) => {
+      if (part.type !== "literal" || !/\p{Script=Han}/u.test(part.value)) return part.value
+      const before = /[A-Za-z0-9]$/.test(parts[i - 1]?.value ?? "") ? " " : ""
+      const after = /^[A-Za-z0-9]/.test(parts[i + 1]?.value ?? "") ? " " : ""
+      return `${before}${part.value}${after}`
+    })
+    .join("")
+}

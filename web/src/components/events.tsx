@@ -5,14 +5,17 @@ import { useRef, type ReactNode } from "react"
 
 import { Ago } from "@/components/bits"
 import { StatusDot } from "@/components/status"
+import { Term } from "@zeabur/design-system/components/term"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
+import { eventWord } from "@/model/overview"
 import { isWarning, newestFirst, type Event } from "@/model/service"
 
 export function EventList({
   events,
   limit,
   compact,
+  plain,
   empty,
   objectLink,
 }: {
@@ -20,6 +23,8 @@ export function EventList({
   limit?: number
   /** Reason and object only, without the note. */
   compact?: boolean
+  /** Plain words first for the reasons that have them, the reason beside them. */
+  plain?: boolean
   empty?: string
   /** A link for the object an event is about (`pod/worker-…`), when the page knows where to go. */
   objectLink?: (event: Event, label: string) => ReactNode
@@ -31,6 +36,7 @@ export function EventList({
     return <p className="py-3 text-sm text-muted-foreground">{empty ?? t("events.empty")}</p>
   const row = (event: Event, place?: Place) => {
     const warning = isWarning(event)
+    const word = plain ? eventWord(event.reason) : undefined
     const object = event.regarding
       ? `${event.regarding.kind.toLowerCase()}/${event.regarding.name}`
       : undefined
@@ -53,7 +59,7 @@ export function EventList({
               <span className="sr-only">
                 {warning ? t("events.warning") : t("events.normal")}:{" "}
               </span>
-              {event.reason}
+              {word ? <Term detail={event.reason}>{t(`event.word.${word}`)}</Term> : event.reason}
             </span>
             {event.count > 1 ? (
               <span className="type-meta text-muted-foreground">×{event.count}</span>

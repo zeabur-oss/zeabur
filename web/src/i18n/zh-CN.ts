@@ -1,5 +1,5 @@
 import type { Messages } from "@/i18n/en"
-import { cuts, probeTiming, thingZh, type P, type ProbeTiming } from "@/i18n/sentence-parts"
+import { cuts, listZh, probeTiming, thingZh, type P, type ProbeTiming } from "@/i18n/sentence-parts"
 
 // A space where Han text meets a Latin word ("查看 Secrets 需要…").
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
@@ -83,7 +83,7 @@ export const zhCN: Messages = {
   "common.copied": "已复制",
   "common.status": "状态",
   "common.sep": "，",
-  "common.list": (items) => new Intl.ListFormat("zh-CN").format(items),
+  "common.list": (items) => listZh("zh-CN", items),
   "common.domains": "域名",
   "common.newTab": "（在新标签页打开）",
   "common.notFound": "页面不存在",
@@ -1134,8 +1134,10 @@ export const zhCN: Messages = {
     `程序结束时的退出码不是 0 就算运行失败；这次是 ${p.exitCode}。`,
   "sentence.diagnosis.runFailed.why.gaveUp": (p) =>
     p.backoffLimit
-      ? `这项任务已放弃：运行失败时会重试 ${p.backoffLimit} 次，最后一次也以 ${p.exitCode} 结束。`
-      : `这项任务重试后已放弃；最后一次以 ${p.exitCode} 结束。`,
+      ? p.backoffLimit === "0"
+        ? `这项任务失败后不会重试；这次的退出码是 ${p.exitCode}。`
+        : `这项任务已放弃：运行失败时会重试 ${p.backoffLimit} 次，最后一次的退出码也是 ${p.exitCode}。`
+      : `这项任务重试后已放弃；最后一次的退出码是 ${p.exitCode}。`,
   "sentence.diagnosis.outOfMemory.why.limit": (p) =>
     `每个副本最多只能用 ${p.limit} 内存，用到上限时系统会直接终止它，程序来不及处理。`,
   "sentence.diagnosis.outOfMemory.why.noLimit": () =>
@@ -1416,6 +1418,24 @@ export const zhCN: Messages = {
   "rollout.title": "部署进度",
   "rollout.ready": (ready, desired) => `${desired} 个新副本中 ${ready} 个就绪`,
   "rollout.older": (n) => `${n} 个旧副本仍在运行`,
+  "rollout.stuckLine": "部署卡住",
+  "rollout.waitsLine": "新版本要等这个问题解决",
+  "rollout.rollingOut": (name) => `${name} 正在部署`,
+  "overview.alsoMeans": "连带影响",
+  "overview.alsoDown": (list, name) => `${name} 有就绪的副本之前，无法访问 ${list}。`,
+  "overview.privateAddress": "私有地址",
+  "trace.waiting": (name) => `等待 ${name} 就绪`,
+  "trace.stopped": (name) => `${name} 目前是 0 个副本`,
+  "event.word.retrying": "重试等待中",
+  "event.word.checkFailed": "检查未通过",
+  "event.word.stopping": "正在停止",
+  "event.word.failed": "失败",
+  "event.word.noRoom": "等待可用资源",
+  "event.word.mountFailed": "无法挂载卷",
+  "event.word.createFailed": "无法创建副本",
+  "event.word.gaveUp": "已放弃重试",
+  "event.word.evicted": "已移出节点",
+  "event.word.outOfMemory": "内存不足",
   "changes.title": "历次部署",
   "changes.description":
     "服务的每个发布版本，以及前后发生的警告。可以把某个版本和当前版本比较，或回滚到该版本。",

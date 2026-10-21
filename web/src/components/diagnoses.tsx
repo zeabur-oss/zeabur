@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
+import type { ReactNode } from "react"
 import FileTextIcon from "~icons/ph/file-text"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
@@ -136,10 +137,13 @@ export function Diagnoses({
   diagnoses,
   service,
   project,
+  also,
 }: {
   diagnoses?: Diagnosis[]
   service: Service
   project: string
+  /** What the first cause also takes down, inside its own entry. */
+  also?: ReactNode
 }) {
   const t = useT()
   const write = useSentence()
@@ -155,7 +159,7 @@ export function Diagnoses({
         {t("diagnosis.title")}
       </h2>
       <ul className="flex flex-col">
-        {diagnoses.map((d) => {
+        {diagnoses.map((d, i) => {
           const action = diagnosisAction(d)
           const raw = rawRows(t, d, service)
           const pod = action.pod ?? d.pods[0]
@@ -176,6 +180,7 @@ export function Diagnoses({
                 {d.incident ? <IncidentCause project={project} id={d.incident} /> : null}
                 <Layers
                   why={write(d.why)}
+                  also={i === 0 ? also : undefined}
                   fix={write(d.fix)}
                   action={
                     <span className="flex flex-wrap items-center gap-1.5">

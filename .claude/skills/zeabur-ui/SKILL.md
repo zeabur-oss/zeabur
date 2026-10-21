@@ -42,8 +42,9 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   header's ⋯ menu holds the expert views (Usage, Events, Terminal, YAML) and Delete, nothing
   else; a tab is never also a header button. An old `?tab=` must keep redirecting
   (`routes/search.ts`). Overview leads with one sentence each: health, then each domain
-  reachable, not reachable with its fix, or not verified (never red for a hop Zeabur could not
-  check). Projects are cards (`components/project-card.tsx`); settings are `SectionLabel` over
+  reachable, not reachable with its fix, waiting on the cause above, or not verified (never red
+  for a hop Zeabur could not check); each cause is said once, with what it also takes down inside
+  it (`model/overview.ts`). Projects are cards (`components/project-card.tsx`); settings are `SectionLabel` over
   `Card variant="list"` of `CardRow`s. No underline tabs. Tokens, layout, shell and banned styles are in
   `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including focus rings).
 - **Lint.** `bun run lint` includes [shadcn/lint](https://github.com/shadcn-ui/lint) (rules in

@@ -208,6 +208,11 @@ why. Add a row before introducing a new concept.
 | Overview / Logs / Deployments / Networking / Variables / Settings (a service's tabs) | 概覽／日誌／部署紀錄／網路／環境變數／設定 | 概览／日志／部署记录／网络／变量／设置 | The dashboard's tab names; Deployments holds the releases and what changed |
 | reachable / not reachable / not verified (a domain or address) | 可連線／無法連線／無法確認 | 可访问／无法访问／无法确认 | "Not verified" is never a failure: Zeabur could not check it from where it runs |
 | connection check (one hop of the way to an address) | 連線檢查 | 连接检查 | |
+| waiting for web to be ready (an address whose only failing hop is a cause said above) | 等待 web 就緒 | 等待 web 就绪 | Neutral, never red; the cause is said once |
+| this also means (what one cause also takes down) | 連帶影響 | 连带影响 | Inside the cause, never a card of its own |
+| deployment stuck | 部署卡住 | 部署卡住 | A rollout that never finishes by itself |
+| retrying (an event's `BackOff`) | 重試等待中 | 重试等待中 | An event's reason follows its plain word in a `Term` |
+| check failed (an event's `Unhealthy`) | 檢查未通過 | 检查未通过 | |
 | suggestion (a gap to close) | 建議 | 建议 | |
 | in the app / in its settings / in the cluster (where a problem comes from) | 應用程式本身／服務設定／叢集 | 应用本身／服务配置／集群 | A label beside the problem, never a verdict on its own |
 | you can fix this / needs a cluster admin (who can fix it) | 你可以修正／需要叢集管理員 | 你可以修复／需要集群管理员 | |

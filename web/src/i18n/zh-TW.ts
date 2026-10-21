@@ -1,5 +1,5 @@
 import type { Messages } from "@/i18n/en"
-import { cuts, probeTiming, thingZh, type P, type ProbeTiming } from "@/i18n/sentence-parts"
+import { cuts, listZh, probeTiming, thingZh, type P, type ProbeTiming } from "@/i18n/sentence-parts"
 
 // A space where Han text meets a Latin word ("檢視 Secrets 需要…").
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
@@ -83,7 +83,7 @@ export const zhTW: Messages = {
   "common.copied": "已複製",
   "common.status": "狀態",
   "common.sep": "，",
-  "common.list": (items) => new Intl.ListFormat("zh-TW").format(items),
+  "common.list": (items) => listZh("zh-TW", items),
   "common.domains": "網域",
   "common.newTab": "（在新分頁開啟）",
   "common.notFound": "找不到這個頁面",
@@ -1136,8 +1136,10 @@ export const zhTW: Messages = {
     `程式結束時的結束碼不是 0 就算執行失敗；這次是 ${p.exitCode}。`,
   "sentence.diagnosis.runFailed.why.gaveUp": (p) =>
     p.backoffLimit
-      ? `這項工作已放棄：執行失敗時會重試 ${p.backoffLimit} 次，最後一次也以 ${p.exitCode} 結束。`
-      : `這項工作重試後已放棄；最後一次以 ${p.exitCode} 結束。`,
+      ? p.backoffLimit === "0"
+        ? `這項工作失敗後不會重試；這次的結束碼是 ${p.exitCode}。`
+        : `這項工作已放棄：執行失敗時會重試 ${p.backoffLimit} 次，最後一次的結束碼也是 ${p.exitCode}。`
+      : `這項工作重試後已放棄；最後一次的結束碼是 ${p.exitCode}。`,
   "sentence.diagnosis.outOfMemory.why.limit": (p) =>
     `每個副本最多只能用 ${p.limit} 記憶體，用到上限時系統會直接終止它，程式來不及處理。`,
   "sentence.diagnosis.outOfMemory.why.noLimit": () =>
@@ -1423,6 +1425,24 @@ export const zhTW: Messages = {
   "rollout.title": "部署進度",
   "rollout.ready": (ready, desired) => `${desired} 個新副本中 ${ready} 個就緒`,
   "rollout.older": (n) => `${n} 個舊副本仍在執行`,
+  "rollout.stuckLine": "部署卡住",
+  "rollout.waitsLine": "新版本要等這個問題解決",
+  "rollout.rollingOut": (name) => `${name} 正在部署`,
+  "overview.alsoMeans": "連帶影響",
+  "overview.alsoDown": (list, name) => `${name} 有就緒的副本之前，無法連線到 ${list}。`,
+  "overview.privateAddress": "私有位址",
+  "trace.waiting": (name) => `等待 ${name} 就緒`,
+  "trace.stopped": (name) => `${name} 目前是 0 個副本`,
+  "event.word.retrying": "重試等待中",
+  "event.word.checkFailed": "檢查未通過",
+  "event.word.stopping": "正在停止",
+  "event.word.failed": "失敗",
+  "event.word.noRoom": "等待可用資源",
+  "event.word.mountFailed": "無法掛載磁碟區",
+  "event.word.createFailed": "無法建立副本",
+  "event.word.gaveUp": "已放棄重試",
+  "event.word.evicted": "已移出節點",
+  "event.word.outOfMemory": "記憶體不足",
   "changes.title": "歷次部署",
   "changes.description":
     "服務的每個發布版本，以及前後發生的警告。可以把某個版本和目前的版本比較，或回滾到該版本。",

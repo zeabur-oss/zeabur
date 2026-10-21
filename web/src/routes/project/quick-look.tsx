@@ -183,7 +183,7 @@ export function QuickLook({
         <h3 id="ql-events" className="type-meta font-medium text-muted-foreground">
           {t("project.events")}
         </h3>
-        <EventList events={mine} limit={4} compact />
+        <EventList events={mine} limit={4} compact plain />
       </section>
     </aside>
   )
