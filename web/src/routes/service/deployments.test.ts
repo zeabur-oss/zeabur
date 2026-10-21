@@ -5,7 +5,7 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 
 import { releasesQuery, serviceTimelineQuery } from "@/api/queries"
-import { changesOf } from "@/model/changes"
+import { changesOf, foldChanges, RECENT, weekOf } from "@/model/changes"
 import type { Event, Service } from "@/model/service"
 import { DeploymentsTab } from "@/routes/service/deployments"
 
@@ -83,5 +83,37 @@ describe("A service's changes from the timeline", () => {
     )
     expect(entries.map((e) => e.kind)).toStrictEqual(["timeline", "release", "release"])
     expect(entries[1]?.kind === "release" && entries[1].entry).toBeTruthy()
+  })
+})
+
+describe("Folding a long history", () => {
+  const now = Date.parse("2026-10-22T00:00:00Z")
+  const hoursAgo = (h: number) => new Date(now - h * 3600e3).toISOString()
+  const releases = (n: number) =>
+    Array.from({ length: n }, (_, i) => release(n - i, hoursAgo(i * 7)))
+
+  test("none, one and a few stay whole", () => {
+    for (const n of [0, 1, RECENT, RECENT + 3]) {
+      const { recent, older } = foldChanges(changesOf(releases(n), []), now)
+      expect([recent.length, older.length]).toStrictEqual([n, 0])
+    }
+  })
+
+  test("many keep the newest and this week's warnings, the rest under Older", () => {
+    const entries = changesOf(releases(200), [event("Warning", hoursAgo(100), "w")])
+    const { recent, older } = foldChanges(entries, now)
+    expect(recent.length).toBe(RECENT + 1)
+    expect(recent.at(-1)?.kind).toBe("warning")
+    expect(older.length).toBe(200 - RECENT)
+  })
+
+  test("a warning older than a week stays under Older", () => {
+    const entries = changesOf(releases(200), [event("Warning", hoursAgo(24 * 30), "w")])
+    expect(foldChanges(entries, now).recent.length).toBe(RECENT)
+  })
+
+  test("the week counts releases and warnings in the last seven days", () => {
+    const entries = changesOf(releases(200), [event("Warning", hoursAgo(1), "w")])
+    expect(weekOf(entries, now)).toStrictEqual({ releases: 25, warnings: 1 })
   })
 })
