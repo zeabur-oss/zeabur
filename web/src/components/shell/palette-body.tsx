@@ -59,10 +59,15 @@ export function PaletteBody() {
   const [query, setQuery] = useState("")
   const projects = useQuery(projectsQuery)
   const adopted = (projects.data?.items ?? []).filter((p) => p.adopted)
-  // Not polled: polling every project would multiply the cluster reads.
-  // TODO: use the list's health counts instead.
+  // Services come from the list. A project's pods, domains and objects need its document: the
+  // one on screen always, the others once a query of two letters or more could name them. Not
+  // polled: polling every project would multiply the cluster reads.
+  const deep = query.trim().length >= 2
   const views = useQueries({
-    queries: adopted.map((p) => projectQuery(p.name, { poll: false })),
+    queries: adopted.map((p) => ({
+      ...projectQuery(p.name, { poll: false }),
+      enabled: deep || p.name === place.project,
+    })),
   })
   const recents = recent.useValue()
   const tools = useQuery({ ...toolsQuery(place.project ?? ""), enabled: !!place.project })
@@ -152,9 +157,25 @@ export function PaletteBody() {
       href: router.buildLocation({ to: "/projects/$project", params: { project: p.name } }).href,
     })
 
-  for (const view of views) {
-    const data = view.data
-    if (!data) continue
+  for (const [i, summary] of adopted.entries()) {
+    const data = views[i]?.data
+    if (!data) {
+      for (const s of summary.services ?? [])
+        items.push({
+          id: `service:${summary.name}/${serviceId(s)}`,
+          group: g.services,
+          label: s.name,
+          hint: t("palette.in", s.kind, summary.name),
+          node: (
+            <span className="flex items-center gap-2">
+              <span translate="no">{s.name}</span>
+              <StatusDot health={s.health} />
+            </span>
+          ),
+          href: href(summary.name, s),
+        })
+      continue
+    }
     for (const s of data.services) {
       const serviceHref = href(data.namespace, s)
       items.push({
