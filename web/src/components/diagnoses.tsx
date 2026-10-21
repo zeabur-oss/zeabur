@@ -15,7 +15,8 @@ import { useSentence, useT, writeSentence, type Sentence, type Translate } from 
 import { serviceLink } from "@/lib/place"
 import { writeBundle } from "@/model/bundle"
 import { originOf } from "@/model/origin"
-import { isTask, type Service } from "@/model/service"
+import { isTask, statusOf, type Service } from "@/model/service"
+import { cn } from "@/lib/utils"
 import type { ServicePlace } from "@/routes/search"
 
 export type Diagnosis = Schemas["Diagnosis"]
@@ -153,10 +154,15 @@ export function Diagnoses({
   if (!diagnoses || diagnoses.length === 0) return null
   const button = buttonVariants({ variant: "outline", size: "sm" })
   const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
+  // A stuck rollout while the release before serves is a warning, not a failure.
+  const warn = statusOf(service).health === "warn"
   return (
     <section
       aria-labelledby="diagnoses-title"
-      className="rounded-lg border border-fail/30 bg-fail-soft/40"
+      className={cn(
+        "rounded-lg border",
+        warn ? "border-warn/30 bg-warn-soft/40" : "border-fail/30 bg-fail-soft/40",
+      )}
     >
       <h2 id="diagnoses-title" className="sr-only">
         {t("diagnosis.title")}
@@ -169,10 +175,13 @@ export function Diagnoses({
           return (
             <li
               key={`${d.kind}/${d.container ?? ""}/${d.cause.key}`}
-              className="flex gap-3 border-t border-fail/20 px-4 py-3 text-sm first:border-t-0"
+              className={cn(
+                "flex gap-3 border-t px-4 py-3 text-sm first:border-t-0",
+                warn ? "border-warn/20" : "border-fail/20",
+              )}
             >
               <WarningCircleFillIcon
-                className="mt-0.5 size-4 shrink-0 text-fail"
+                className={cn("mt-0.5 size-4 shrink-0", warn ? "text-warn" : "text-fail")}
                 aria-hidden="true"
               />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
