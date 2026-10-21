@@ -46,7 +46,7 @@ pub struct State {
     pub objects: BTreeMap<String, NamespaceObjects>,
     /// Events per namespace.
     pub events: BTreeMap<String, Vec<Event>>,
-    /// Logs per `namespace/pod`.
+    /// Logs per `namespace/pod`; a pod among `objects` without one has written nothing yet.
     pub logs: BTreeMap<String, String>,
     /// Logs of the run before the last restart, per `namespace/pod`; a pod with a log but none
     /// here has not restarted, and asking for its previous run is refused as the kubelet does.
@@ -593,15 +593,18 @@ impl Cluster for MemoryCluster {
         Box::pin(async move {
             let key = format!("{namespace}/{pod}");
             let state = self.allowed(Some(namespace))?;
-            if !state.logs.contains_key(&key) {
+            let exists = state.objects.get(namespace).is_some_and(|o| {
+                o.pods
+                    .iter()
+                    .any(|p| p.metadata.name.as_deref() == Some(pod))
+            });
+            if !state.logs.contains_key(&key) && !exists {
                 return Err(not_found(&key));
             }
-            let logs = if options.previous {
-                &state.previous_logs
-            } else {
-                &state.logs
-            };
-            logs.get(&key).cloned().ok_or_else(|| {
+            if !options.previous {
+                return Ok(state.logs.get(&key).cloned().unwrap_or_default());
+            }
+            state.previous_logs.get(&key).cloned().ok_or_else(|| {
                 // The kubelet's refusal, as kube-apiserver passes it on.
                 let container = options.container.as_deref().unwrap_or(pod);
                 ClusterError::Status(KubernetesStatus::new(

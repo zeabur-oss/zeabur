@@ -4,16 +4,17 @@
 //! A domain's hops, in the order a request takes them:
 //!
 //! 1. **DNS.** The domain resolves, looked up from where Zeabur runs. A name that does not resolve
-//!    there fails; split-horizon DNS can answer differently elsewhere, which the sentence says.
+//!    there is unknown, not failed: split-horizon DNS and resolvers that cannot reach the public
+//!    internet answer differently from the browsers that use the domain.
 //! 2. **Address.** One of those addresses is the route's: an Ingress's `status.loadBalancer`, where
 //!    its controller writes the address it serves on [k8s-ingress]. Other addresses are not a
 //!    failure: a CDN or proxy in front of the cluster answers with its own, so that is unknown.
 //! 3. **Controller.** The controller of the Ingress's class has a ready replica (see
 //!    [`crate::incidents`]); an `ingressClassName` no IngressClass has fails.
 //! 4. **Certificate.** For a host listed under `spec.tls`: cert-manager's `Certificate` for its
-//!    `secretName` is `Ready` [cert-manager-certificate]. Without cert-manager, a present Secret is
-//!    not checked further (unknown) and a missing one fails: the controller then serves its default
-//!    certificate, which browsers refuse.
+//!    `secretName` is `Ready` [cert-manager-certificate]. Without such a `Certificate`, the Secret
+//!    is not checked further, and a missing one is unknown too: the controller then serves its
+//!    default certificate, which may be a valid wildcard Zeabur cannot read.
 //! 5. **Route.** An Ingress is taken up once its controller writes an address into its status; an
 //!    `HTTPRoute` once a Gateway sets `Accepted` (and `ResolvedRefs` is not `False`)
 //!    [gateway-route-status]. Ingress controllers that never write status leave this unknown.
@@ -374,7 +375,7 @@ fn dns(input: &TraceInput<'_>, host: &str, hops: &mut Vec<Hop>) -> Option<Vec<St
             Some(addresses.clone()),
         ),
         Some(Resolved::NotFound(error)) => (
-            hop(HopStep::Dns, HopStatus::Failed, "notFound")
+            hop(HopStep::Dns, HopStatus::Unknown, "notFound")
                 .with("host", host)
                 .saw(error.clone()),
             None,
@@ -595,7 +596,7 @@ fn certificate(input: &TraceInput<'_>, ingress: &Ingress, host: &str) -> Option<
     Some(if present {
         base(HopStatus::Unknown, "notChecked").evidence(Origin::object("Secret", secret))
     } else {
-        base(HopStatus::Failed, "secretMissing")
+        base(HopStatus::Unknown, "secretMissing")
             .expected(secret)
             .evidence(Origin::field("Ingress", name, field))
     })
@@ -781,7 +782,8 @@ fn ready(service: &Service) -> Hop {
     base(HopStatus::Failed, "noneReady").expected("1")
 }
 
-/// The diagnoses the traces make: the first failed hop of each, once per cause.
+/// The diagnoses the traces make: the first failed hop of each, once per cause. A hop that could
+/// not be checked is never one.
 #[must_use]
 pub fn diagnoses(traces: &[RouteTrace], service: &Service) -> Vec<Diagnosis> {
     let mut out: Vec<Diagnosis> = Vec::new();
@@ -826,10 +828,8 @@ pub fn diagnoses(traces: &[RouteTrace], service: &Service) -> Vec<Diagnosis> {
 fn cause_of(hop: &Hop) -> Option<&'static str> {
     let variant = hop.message.key.rsplit('.').next().unwrap_or_default();
     Some(match (hop.step, variant) {
-        (HopStep::Dns, _) => "dnsNotFound",
         (HopStep::Controller, "classMissing") => "ingressClassMissing",
         (HopStep::Controller, _) => "controllerDown",
-        (HopStep::Certificate, "secretMissing") => "certificateMissing",
         (HopStep::Certificate, _) => "certificateNotReady",
         (HopStep::Route, _) => "routeNotAccepted",
         (HopStep::Service, "missing") => "noService",
@@ -838,7 +838,7 @@ fn cause_of(hop: &Hop) -> Option<&'static str> {
         (HopStep::TargetPort, _) => "targetPort",
         (HopStep::Ready, "scaledToZero") => "scaledToZero",
         (HopStep::Ready, _) => "noReadyEndpoints",
-        (HopStep::Address, _) => return None,
+        (HopStep::Dns | HopStep::Address, _) => return None,
     })
 }
 

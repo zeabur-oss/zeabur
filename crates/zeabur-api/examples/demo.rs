@@ -941,6 +941,15 @@ fn state() -> State {
             ("shop/worker-84c2d-h7j6k".to_owned(), "\u{1b}[32mINFO\u{1b}[0m consumed 42 jobs".to_owned()),
             ("shop/worker-84c2d-w2e5r".to_owned(), "\u{1b}[31mERROR\u{1b}[0m connect redis:6379: connection refused\npanic: queue unavailable".to_owned()),
             ("shop/redis-0".to_owned(), "Ready to accept connections tcp".to_owned()),
+            ("billing/api-5b7d9-c3v8n".to_owned(), billing_log(0)),
+            ("billing/api-5b7d9-m1x4q".to_owned(), billing_log(1)),
+            (
+                "billing/invoice-run-29342880-7xk2p".to_owned(),
+                "2026-10-14T02:00:01Z \u{1b}[32mINFO\u{1b}[0m invoice run started for 2026-10-13\n\
+                 2026-10-14T02:00:04Z \u{1b}[31mERROR\u{1b}[0m connect db:5432: password authentication failed for user \"billing\"\n\
+                 2026-10-14T02:00:04Z exit status 1"
+                    .to_owned(),
+            ),
             (
                 "shop/db-0".to_owned(),
                 "database system is ready to accept connections".to_owned(),
@@ -965,6 +974,21 @@ fn state() -> State {
         facts,
         ..State::default()
     }
+}
+
+/// What one of billing's API replicas wrote: requests, and a slow one now and then.
+fn billing_log(replica: u32) -> String {
+    (1..=30)
+        .map(|i| {
+            let ms = (i * 7 + replica * 3) % 40 + 6;
+            if i % 11 == 0 {
+                format!("2026-10-14T09:{i:02}:12Z \u{1b}[33mWARN\u{1b}[0m POST /invoices 200 {}ms slow query", ms * 30)
+            } else {
+                format!("2026-10-14T09:{i:02}:12Z \u{1b}[32mINFO\u{1b}[0m GET /invoices/{} 200 {ms}ms", 4100 + i)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// The cluster's version: a k3s whose minor is in maintenance and has a newer patch.

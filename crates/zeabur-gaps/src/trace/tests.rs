@@ -148,3 +148,62 @@ fn an_http_route_a_gateway_refused_fails_its_route_hop() {
         Some(&"NotAllowedByListeners".to_owned())
     );
 }
+
+#[test]
+fn a_domain_that_does_not_resolve_here_and_a_missing_certificate_secret_are_unknown_not_failed() {
+    let mut snapshot = snapshot();
+    snapshot.ingresses[0] = serde_json::from_value(json!({
+        "metadata": {"name": "web", "namespace": "shop"},
+        "spec": {"tls": [{"hosts": ["shop.example.test"], "secretName": "web-tls"}],
+            "rules": [{"host": "shop.example.test", "http": {"paths": [{"path": "/",
+                "pathType": "Prefix",
+                "backend": {"service": {"name": "web", "port": {"number": 80}}}}]}}]}
+    }))
+    .unwrap();
+    let project = zeabur_graph::project(&snapshot);
+    let resolved = BTreeMap::from([(
+        "shop.example.test".to_owned(),
+        Resolved::NotFound("no such host".to_owned()),
+    )]);
+    let input = input(&snapshot, &[], Certificates::Listed(&[]), &resolved);
+    let traces = trace(&input, &project.services[0]);
+    let domain = &traces[0];
+    assert_eq!(domain.hops[0].step, HopStep::Dns);
+    assert_eq!(domain.hops[0].status, HopStatus::Unknown);
+    assert_eq!(domain.hops[0].saw.as_deref(), Some("no such host"));
+    let certificate = domain
+        .hops
+        .iter()
+        .find(|h| h.step == HopStep::Certificate)
+        .unwrap();
+    assert_eq!(certificate.status, HopStatus::Unknown);
+    assert_eq!(certificate.message.key, "trace.certificate.secretMissing");
+    assert_eq!(domain.first_failure().map(|h| h.step), Some(HopStep::Ready));
+    let causes: Vec<String> = diagnoses(&traces, &project.services[0])
+        .into_iter()
+        .map(|d| d.cause.key)
+        .collect();
+    assert!(
+        causes
+            .iter()
+            .all(|c| c == "diagnosis.unreachable.cause.noReadyEndpoints")
+    );
+}
+
+#[test]
+fn hops_that_could_not_be_checked_make_no_diagnosis() {
+    let snapshot = snapshot();
+    let project = zeabur_graph::project(&snapshot);
+    let unknown = RouteTrace {
+        kind: AddressKind::Domain,
+        address: "shop.example.test".to_owned(),
+        via: Origin::object("Ingress", "web"),
+        hops: vec![
+            hop(HopStep::Dns, HopStatus::Unknown, "notFound").with("host", "shop.example.test"),
+            hop(HopStep::Certificate, HopStatus::Unknown, "secretMissing"),
+            hop(HopStep::Ready, HopStatus::Ok, "ok"),
+        ],
+        status: HopStatus::Unknown,
+    };
+    assert_eq!(diagnoses(&[unknown], &project.services[0]), []);
+}

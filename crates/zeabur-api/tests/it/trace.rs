@@ -192,13 +192,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_domain_that_does_not_resolve_and_a_controller_that_is_down_fail_their_hops() {
+    async fn a_domain_that_does_not_resolve_here_is_unknown_and_a_controller_that_is_down_fails() {
         let cluster = cluster(0);
         let app = app(&cluster, &[]);
         let (status, trace) = send(&app, "GET", TRACE, None).await;
         assert_eq!(status, StatusCode::OK, "{trace}");
         let domain = &trace["routes"][0];
-        assert_eq!(domain["hops"][0]["status"], "failed");
+        assert_eq!(domain["hops"][0]["status"], "unknown");
         assert_eq!(domain["hops"][2]["status"], "failed");
         assert_eq!(domain["hops"][2]["saw"], "0/1");
         let causes: Vec<&str> = trace["diagnoses"]
@@ -210,11 +210,11 @@ mod tests {
         assert_eq!(
             causes,
             [
-                "diagnosis.unreachable.cause.dnsNotFound",
+                "diagnosis.unreachable.cause.controllerDown",
                 "diagnosis.unreachable.cause.targetPort"
             ]
         );
-        assert_eq!(trace["diagnoses"][0]["fault"]["origin"], "configuration");
+        assert_eq!(trace["diagnoses"][0]["fault"]["origin"], "component");
     }
 
     #[tokio::test]
