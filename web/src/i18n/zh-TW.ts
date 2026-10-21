@@ -4,10 +4,6 @@ import sentences from "@/i18n/generated/zh-TW"
 
 // A space where Han text meets a Latin word ("檢視 Secrets 需要…").
 
-/** How many replicas of the release before still serve, after a stuck rollout's sentence. */
-const servingZhTW = (p: P) =>
-  Number(p.serving ?? 0) > 0 ? `上一個版本的 ${p.serving} 個副本仍在提供服務。` : ""
-
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
 const latinEnd = (text: string) => (/[A-Za-z0-9]$/.test(text) ? " " : "")
 

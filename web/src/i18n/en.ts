@@ -5,15 +5,6 @@ import sentences from "@/i18n/generated/en"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
-/** How many replicas of the release before still serve, after a stuck rollout's sentence. */
-const servingEn = (p: P) => {
-  const n = Number(p.serving ?? 0)
-  if (n === 0) return ""
-  return n === 1
-    ? " The replica of the previous release still serves traffic."
-    : ` ${n} replicas of the previous release still serve traffic.`
-}
-
 /** What a refused verb does, in a phrase: `patch` changes, `create` adds. */
 const verbEn: Record<string, string> = {
   get: "read",
