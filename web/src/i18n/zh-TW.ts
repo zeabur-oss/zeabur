@@ -476,7 +476,11 @@ export const zhTW: Messages = {
   "terminal.reconnect": "重新連線",
   "terminal.exited": (code) => `已結束，結束碼 ${code}`,
   "terminal.ended": "已結束",
-  "terminal.noShell": "這個容器沒有 shell（Distroless 映像檔不含 shell）。改開一個臨時的除錯容器：",
+  "terminal.noShell":
+    "這個容器沒有 shell，精簡的映像檔常是如此。除錯容器會在這個副本裡加上一個 shell，和應用程式並排執行。",
+  "terminal.debugStarting": "正在啟動除錯容器…",
+  "terminal.debugEnded": "除錯容器已結束。再開一個即可繼續。",
+  "terminal.debugOpen": "已連線到除錯容器",
   "terminal.failed": "容器執行環境結束了這個工作階段。",
   "terminal.expired": "工作階段已過期。重新連線即可繼續。",
   "terminal.adminEnded": "管理員權限已結束。重新連線後會改用你自己的權限。",
@@ -485,7 +489,18 @@ export const zhTW: Messages = {
   "terminal.rbac":
     "要開啟終端機，必須有權限在這個專案的容器裡執行指令。把下面的設定交給管理員；這份設定只授予這項權限，也只限這個專案：",
   "terminal.roleLabel": "Role 與 RoleBinding",
-  "terminal.debugLabel": "kubectl debug",
+  "tools.about":
+    "附有 kubectl 與 helm 的終端機，在這個專案裡以你的身分執行。它在一個暫時的容器裡執行，用完後 Zeabur 會刪除它。",
+  "tools.localTitle": "Zeabur 在你的電腦上執行時無法使用",
+  "tools.yours": "你的 kubectl 終端機",
+  "tools.starting": "正在啟動…",
+  "tools.ready": "可以使用",
+  "tools.stopping": "正在停止",
+  "tools.stopsAt": (when: string) => `${when}停止`,
+  "tools.open": "開啟",
+  "tools.stop": "停止",
+  "tools.expired": "這個終端機裡的認證資訊已過期。重新開啟即可換上新的繼續使用。",
+  "tools.reopen": "重新開啟",
 
   "vars.title": "環境變數",
   "vars.about": "應用程式啟動時讀取的設定，例如資料庫位址或 API 金鑰。",
@@ -607,9 +622,12 @@ export const zhTW: Messages = {
   // 物件與 YAML
   "project.entry.objects": "物件",
   // 專案的 Namespace
+  "project.entry.terminal": "kubectl 終端機",
   "project.entry.settings": "設定",
   "action.adopt": "納入",
   "action.unadopt": "不再顯示為專案",
+  "action.openDebugTerminal": "開啟除錯終端機",
+  "action.openToolsTerminal": "開啟 kubectl 終端機",
   "action.saveDetails": "儲存詳細資料",
   "title.adopt": (ns) => `納入 ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再顯示為專案`,
@@ -618,6 +636,21 @@ export const zhTW: Messages = {
   "title.restartAll": (ns) => `重新啟動 ${ns} 的所有服務`,
   "confirm.adopt": "為這個 Namespace 加上專案標籤，裡面的物件都不會變。",
   "confirm.unadopt": "這個 Namespace 不再顯示為專案，裡面的物件都不會刪除。",
+  "confirm.debugContainer": (pod: string) =>
+    `在副本 ${pod} 加上一個附 shell 的除錯容器，它看得到應用程式的處理程序。`,
+  "confirm.debugStays":
+    "它會留在這個副本裡，直到副本被替換為止，例如重新啟動時。Kubernetes 無法提早移除它。",
+  "confirm.debugReused": "這個副本裡已經有除錯容器在執行，終端機會在其中開啟。",
+  "confirm.clusterTools": "為你在這個專案裡啟動一個暫時的容器，內含 kubectl 與 helm。",
+  "confirm.toolsActsAs": (person: string, admin: boolean) =>
+    admin
+      ? `kubectl 與 helm 會以 ${person} 的身分執行，使用你目前持有的管理員權限。`
+      : `kubectl 與 helm 會以 ${person} 的身分執行，使用你自己的權限。`,
+  "confirm.toolsCredential": (minutes: number) =>
+    `其中的認證資訊會在 ${minutes} 分鐘後失效，重新開啟終端機即可換上新的。`,
+  "confirm.toolsStops": (most: number, after: number) =>
+    `它最多執行 ${most} 分鐘，最後一個終端機關閉 ${after} 分鐘後就會刪除。`,
+  "confirm.toolsReused": "你的 kubectl 終端機已在執行，會直接再次開啟。",
   "confirm.details": "把名稱、描述和圖示存到 Namespace 上。",
   "access.title": (ns) => `無法變更 ${ns}`,
   "access.you": "<你的使用者名稱>",
@@ -722,6 +755,9 @@ export const zhTW: Messages = {
   "plan.typeName": (name: string) => `輸入 ${name} 以確認`,
   "plan.added": "新增",
   "plan.removed": "移除",
+  "warn.rightsMissing": (rights: string) => `叢集可能會拒絕：你缺少 ${rights} 的權限。`,
+  "warn.toolsCredentialExposed": (namespace: string) =>
+    `在這個終端機的容器執行期間，能在 ${namespace} 的容器裡執行指令的人，都能使用你的認證資訊。`,
   "warn.restartNeeded": (names: string) => `重新啟動後才會生效：${names}`,
   "warn.restartAdded": (names: string) => `也會重新啟動 ${names}`,
   "warn.tlsHostChanged": (host: string, route: string) =>
@@ -1149,6 +1185,14 @@ export const zhTW: Messages = {
       ? `減少 ${p.object} 的副本數、調低每個副本的保留量，或請管理員調高上限 ${p.quota}。`
       : `減少要求的量、釋出專案已用的資源，或請管理員調高上限 ${p.quota}。`,
   "sentence.problem.policyDenied.fix.change": () => "修改它指出的地方，或洽詢負責這項政策的人。",
+  "sentence.problem.invalid.fix.ephemeralContainers": () =>
+    "請叢集管理員開啟臨時容器（Kubernetes 1.23 起預設開啟），或改用附 shell 的映像檔。",
+  "sentence.problem.conflict.fix.terminalImage": (p) =>
+    `請叢集管理員讓節點能拉取 ${p.image}，或在 Zeabur 的 chart 裡把 ${p.setting} 設成節點拉得到的映像檔。`,
+  "sentence.problem.conflict.fix.terminalContainerStart": () =>
+    "從副本的事件找出原因；可能是某項政策不允許它所用的使用者身分。",
+  "sentence.problem.badRequest.fix.toolsLocally": () =>
+    "在你自己的終端機執行 kubectl 與 helm；它們和 Zeabur 用的是同一份 kubeconfig。",
   "sentence.diagnosis.crashLoop.why.backOff": (p) =>
     `它已重新啟動 ${p.restarts} 次；叢集每次都會再啟動它，兩次之間等得越來越久，預設最多等 5 分鐘。`,
   "sentence.diagnosis.crashLoop.why.exitsZero": (p) =>

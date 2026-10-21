@@ -69,6 +69,10 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
     if (ask.changes.some((c) => namespaceOps.has(c.op)))
       void queryClient.invalidateQueries({ queryKey: ["projects"] })
     confirmed.onApplied?.()
+    if (ask.quiet) {
+      toast.dismiss(id)
+      return
+    }
     toast.success(t("toast.applied"), {
       id,
       description: ask.title,

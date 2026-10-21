@@ -103,6 +103,31 @@ export const configMapsQuery = (project: string) =>
       ),
   })
 
+export const debugQuery = (project: string, pod: string, container: string | undefined) =>
+  queryOptions({
+    queryKey: ["project", project, "debug", pod, container],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/pods/{pod}/debug", {
+          params: { path: { project, pod }, query: { container } },
+          signal,
+        }),
+      ),
+    staleTime: 0,
+  })
+
+export const toolsQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "tools"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/tools", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+  })
+
 export interface LogOptions {
   container?: string
   tailLines: number

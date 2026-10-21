@@ -3,10 +3,11 @@ import { useQuery } from "@tanstack/react-query"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal, type ITheme } from "@xterm/xterm"
 import "@xterm/xterm/css/xterm.css"
-import { useEffect, useReducer, useRef, useState } from "react"
+import { useEffect, useReducer, useRef, useState, type ReactNode } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 
-import { sessionQuery, whoamiQuery } from "@/api/queries"
+import { debugQuery, sessionQuery, whoamiQuery } from "@/api/queries"
+import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Refused } from "@/components/refused"
 import { Button } from "@zeabur/design-system/components/button"
@@ -51,6 +52,7 @@ export function TerminalTab({
   const [container, setContainer] = useState<string>()
   const chosen = container && containerNames.includes(container) ? container : containerNames[0]
   const [attempt, setAttempt] = useState(0)
+  const [debug, setDebug] = useState<{ pod: string; target?: string; name: string }>()
 
   if (!pod) {
     return (
@@ -62,7 +64,8 @@ export function TerminalTab({
       </Empty>
     )
   }
-  const url = terminalUrl(window.location, project, pod.name, chosen)
+  const debugName = debug?.pod === pod.name && debug.target === chosen ? debug.name : undefined
+  const url = terminalUrl(window.location, project, pod.name, debugName ?? chosen)
   return (
     <div className="flex min-h-105 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -88,8 +91,15 @@ export function TerminalTab({
         key={`${url}#${attempt}`}
         url={url}
         project={project}
-        pod={pod.name}
-        container={chosen}
+        debug={debugName !== undefined}
+        noShell={
+          <DebugOffer
+            project={project}
+            pod={pod.name}
+            container={chosen}
+            onAttach={(name) => setDebug({ pod: pod.name, target: chosen, name })}
+          />
+        }
         // Not `a => a + 1`: the refusal's button and the rights it granted both call this, and
         // must start one connection, not two.
         onReconnect={() => setAttempt(attempt + 1)}
@@ -98,17 +108,20 @@ export function TerminalTab({
   )
 }
 
-function Session({
+export function Session({
   url,
   project,
-  pod,
-  container,
+  debug = false,
+  noShell,
+  closed,
   onReconnect,
 }: {
   url: string
   project: string
-  pod: string
-  container?: string
+  debug?: boolean
+  noShell?: ReactNode
+  /** Replaces the status line's words for a closed session. */
+  closed?: (why: "expired" | "idle" | "lost") => ReactNode
   onReconnect: () => void
 }) {
   const t = useT()
@@ -148,16 +161,13 @@ function Session({
 
   const live = state.phase === "connecting" || state.phase === "open"
   // Hidden, not unmounted: the screen lives in this element until the session ends.
-  const screen = state.phase === "error" ? "hidden" : "flex"
+  const noShellShown =
+    noShell !== undefined && state.phase === "exited" && state.reason === "command-not-found"
+  const screen = state.phase === "error" || noShellShown ? "hidden" : "flex"
   return (
     <>
-      <Notice
-        state={state}
-        project={project}
-        pod={pod}
-        container={container}
-        onReconnect={onReconnect}
-      />
+      <Notice state={state} project={project} noShell={noShell} onReconnect={onReconnect} />
+      {state.phase === "closed" ? closed?.(state.why) : null}
       <div
         className={cn(
           "min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-v2-border bg-card",
@@ -169,7 +179,9 @@ function Session({
             {state.phase === "open" ? (
               <span className="size-2 rounded-full bg-ok" aria-hidden="true" />
             ) : null}
-            {statusText(state, asAdmin, t)}
+            {state.phase === "open" && debug
+              ? t("terminal.debugOpen")
+              : statusText(state, asAdmin, t)}
           </output>
           <Button
             variant="ghost"
@@ -214,14 +226,12 @@ function statusText(state: TerminalState, asAdmin: boolean, t: ReturnType<typeof
 function Notice({
   state,
   project,
-  pod,
-  container,
+  noShell,
   onReconnect,
 }: {
   state: TerminalState
   project: string
-  pod: string
-  container?: string
+  noShell?: ReactNode
   onReconnect: () => void
 }) {
   const t = useT()
@@ -243,18 +253,7 @@ function Notice({
       </Refused>
     )
   if (problem) return <Problem problem={problem} retry={onReconnect} />
-  if (state.phase === "exited" && state.reason === "command-not-found") {
-    const target = container ? ` --target=${container}` : ""
-    return (
-      <div className="flex flex-col gap-3">
-        <p className="text-sm">{t("terminal.noShell")}</p>
-        <YamlBlock
-          yaml={`kubectl debug -it -n ${project} ${pod} --image=busybox:1.37${target}\n`}
-          label={t("terminal.debugLabel")}
-        />
-      </div>
-    )
-  }
+  if (state.phase === "exited" && state.reason === "command-not-found") return noShell
   if (state.phase === "exited" && state.reason === "failed") {
     return (
       <p className="text-sm text-muted-foreground">
@@ -263,6 +262,64 @@ function Notice({
     )
   }
   return null
+}
+
+/** No shell in the image: a debug container brings one. Planned and reviewed as any change; a
+ * running one is used again without asking. */
+function DebugOffer({
+  project,
+  pod,
+  container,
+  onAttach,
+}: {
+  project: string
+  pod: string
+  container?: string
+  onAttach: (name: string) => void
+}) {
+  const t = useT()
+  const [waiting, setWaiting] = useState(false)
+  const status = useQuery({
+    ...debugQuery(project, pod, container),
+    refetchInterval: (query) => {
+      const data = query.state.data
+      return waiting && !data?.problem && data?.container?.state !== "running" ? 1500 : false
+    },
+  })
+  const { plan, dialog } = usePlanner(project, () => setWaiting(true), true)
+  const current = status.data?.container ?? undefined
+  const problem = waiting ? (status.data?.problem ?? undefined) : undefined
+  const running = current?.state === "running" ? current.name : undefined
+  useEffect(() => {
+    if (waiting && running) onAttach(running)
+  }, [waiting, running, onAttach])
+  const ended = waiting && current?.state === "terminated"
+  const start = () => {
+    if (running) {
+      onAttach(running)
+      return
+    }
+    setWaiting(false)
+    plan({
+      title: t("action.openDebugTerminal"),
+      changes: [{ op: "debugContainer", pod, container }],
+      quiet: true,
+    })
+  }
+  return (
+    <div className="flex flex-col items-start gap-3">
+      <p className="text-sm">{ended ? t("terminal.debugEnded") : t("terminal.noShell")}</p>
+      {problem ? <Problem problem={problem} retry={start} /> : null}
+      {waiting && !problem && !ended ? (
+        <output className="text-sm text-muted-foreground">{t("terminal.debugStarting")}</output>
+      ) : (
+        <Button size="sm" onClick={start}>
+          {t("action.openDebugTerminal")}
+        </Button>
+      )}
+      {dialog}
+    </div>
+  )
 }
 
 function connect(

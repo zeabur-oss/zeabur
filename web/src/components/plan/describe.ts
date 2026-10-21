@@ -108,6 +108,10 @@ export function sentenceOf(t: Translate, change: Change, podsOf: PodsOf): string
       return t("confirm.unadopt")
     case "details":
       return t("confirm.details")
+    case "debugContainer":
+      return t("confirm.debugContainer", change.pod)
+    case "clusterTools":
+      return t("confirm.clusterTools")
   }
 }
 
@@ -198,6 +202,7 @@ export function describe(
     lines.push(sentenceOf(t, change, podsOf))
     if (change.op === "restart") said.push(change.workload)
   }
+  lines.push(...terminalLines(t, plan))
   if (ask.changes.some((c) => c.op === "rollback") && hasWarning(plan, "configNotRolledBack"))
     lines.push(t("confirm.notRolledBack"))
   for (const workload of replaced(plan))
@@ -235,6 +240,33 @@ export function describe(
     lines,
     action: actionOf(t, ask, plan),
   }
+}
+
+const minutes = (seconds: number) => Math.max(1, Math.ceil(seconds / 60))
+
+function terminalLines(t: Translate, plan: Plan): string[] {
+  return plan.warnings.flatMap((w) => {
+    switch (w.code) {
+      case "debugContainerStays":
+        return [t("confirm.debugStays")]
+      case "debugContainerReused":
+        return [t("confirm.debugReused")]
+      case "toolsPodReused":
+        return [t("confirm.toolsReused")]
+      case "toolsPod": {
+        const expires = w.credentialExpiresAt ? Date.parse(w.credentialExpiresAt) : NaN
+        return [
+          t("confirm.toolsActsAs", w.person, w.admin),
+          Number.isNaN(expires)
+            ? undefined
+            : t("confirm.toolsCredential", minutes((expires - Date.now()) / 1000)),
+          t("confirm.toolsStops", minutes(w.deadlineSeconds), minutes(w.graceSeconds)),
+        ].filter((line): line is string => !!line)
+      }
+      default:
+        return []
+    }
+  })
 }
 
 function hasWarning(plan: Plan, code: Schemas["PlanWarning"]["code"]): boolean {
@@ -295,6 +327,10 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
       return t("action.unadopt")
     case "details":
       return t("action.saveDetails")
+    case "debugContainer":
+      return t("action.openDebugTerminal")
+    case "clusterTools":
+      return t("action.openToolsTerminal")
   }
 }
 

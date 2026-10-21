@@ -52,6 +52,8 @@ import {
 //   /projects/$project/settings                Settings: the project's details, adopted or not
 //   /projects/$project/objects                 Objects: every object by kind, ?object=… opens
 //                                              its YAML
+//   /projects/$project/terminal                a kubectl terminal acting as the person, and
+//                                              their running ones
 //   /projects/$project/services/$kind/$name    one service: ?tab=logs|deployments|networking|
 //                                              variables|settings (Overview when absent), or a
 //                                              view from its menu (usage, events, terminal, yaml);
@@ -186,6 +188,13 @@ const projectSettingsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/project/settings"), "ProjectSettingsPage"),
 })
 
+const toolsTerminalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project/terminal",
+  remountDeps: ({ params }) => params.project,
+  component: lazyRouteComponent(() => import("@/routes/project/terminal"), "ToolsTerminalPage"),
+})
+
 const serviceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/services/$kind/$name",
@@ -264,6 +273,7 @@ export const router = createRouter({
     servicesRoute,
     objectsRoute,
     projectSettingsRoute,
+    toolsTerminalRoute,
     serviceRoute,
     settingsRoute,
     componentsRoute,

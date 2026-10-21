@@ -7,8 +7,9 @@ import GearSixIcon from "~icons/ph/gear-six"
 import InfoIcon from "~icons/ph/info"
 import SquaresFourIcon from "~icons/ph/squares-four"
 import StackIcon from "~icons/ph/stack"
+import TerminalWindowIcon from "~icons/ph/terminal-window"
 
-import { projectQuery } from "@/api/queries"
+import { projectQuery, toolsQuery } from "@/api/queries"
 import { RoleIcon, ServiceIcon } from "@/components/service-icon"
 import { ContextMenu } from "@/components/shell/user-menu"
 import { ProjectGlyph } from "@/components/shell/project-glyph"
@@ -108,7 +109,8 @@ function ProjectNav({ project }: { project: string }) {
   const data = view.data
   const summary = useProjectSummary(project)
   const advancedOpen = advancedSection.useValue()
-  const advancedHolds = place.entry === "objects"
+  const advancedHolds = place.entry === "objects" || place.entry === "terminal"
+  const tools = useQuery(toolsQuery(project))
 
   const pageRow = ({ entry, to, icon: EntryIcon }: Entry) => (
     <SidebarItem
@@ -179,6 +181,13 @@ function ProjectNav({ project }: { project: string }) {
             to: "/projects/$project/objects",
             icon: CubeIcon,
           })}
+          {tools.data?.available
+            ? pageRow({
+                entry: "terminal",
+                to: "/projects/$project/terminal",
+                icon: TerminalWindowIcon,
+              })
+            : null}
           {data && data.resources.length > 0 ? (
             <OtherObjects project={project} data={data} />
           ) : null}

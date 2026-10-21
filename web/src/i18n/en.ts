@@ -529,7 +529,10 @@ export const en = {
   "terminal.exited": (code: number) => `Exited with code ${code}`,
   "terminal.ended": "Ended",
   "terminal.noShell":
-    "This container has no shell (distroless images include none). Open an ephemeral debug container instead:",
+    "This container has no shell, as is common for slim images. A debug container adds one to this replica, beside the app.",
+  "terminal.debugStarting": "Starting the debug container…",
+  "terminal.debugEnded": "The debug container has ended. Open another to continue.",
+  "terminal.debugOpen": "Connected to the debug container",
   "terminal.failed": "The container runtime ended the session.",
   "terminal.expired": "The session expired. Reconnect to continue.",
   "terminal.adminEnded": "Admin rights ended. Reconnect to continue with your own rights.",
@@ -538,7 +541,19 @@ export const en = {
   "terminal.rbac":
     "Opening a terminal needs permission to run commands in this project's containers. Send this to an admin. It grants only that permission, and only in this project:",
   "terminal.roleLabel": "Role and RoleBinding",
-  "terminal.debugLabel": "kubectl debug",
+  "tools.about":
+    "A terminal with kubectl and helm, acting as you in this project. It runs in a temporary container that Zeabur deletes once you're done.",
+  "tools.localTitle": "Not available while Zeabur runs on your computer",
+  "tools.yours": "Your kubectl terminals",
+  "tools.starting": "Starting…",
+  "tools.ready": "Ready",
+  "tools.stopping": "Stopping",
+  "tools.stopsAt": (when: string) => `Stops ${when}`,
+  "tools.open": "Open",
+  "tools.stop": "Stop",
+  "tools.expired":
+    "The credential in this terminal has expired. Reopen it to continue with a fresh one.",
+  "tools.reopen": "Reopen",
 
   // Variables
   "vars.title": "Environment variables",
@@ -669,9 +684,12 @@ export const en = {
   // Objects and YAML
   "project.entry.objects": "Objects",
   // A project's namespace
+  "project.entry.terminal": "kubectl terminal",
   "project.entry.settings": "Settings",
   "action.adopt": "Adopt",
   "action.unadopt": "Stop showing as a project",
+  "action.openDebugTerminal": "Open debug terminal",
+  "action.openToolsTerminal": "Open kubectl terminal",
   "action.saveDetails": "Save details",
   "title.adopt": (ns: string) => `Adopt ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
@@ -680,6 +698,23 @@ export const en = {
   "title.restartAll": (ns: string) => `Restart every service in ${ns}`,
   "confirm.adopt": "Adds the project label to the namespace. Nothing in it changes.",
   "confirm.unadopt": "The namespace stops showing as a project. Nothing in it is deleted.",
+  "confirm.debugContainer": (pod: string) =>
+    `Adds a debug container with a shell to replica ${pod}. It can see the app's processes.`,
+  "confirm.debugStays":
+    "It stays in the replica until the replica is replaced, for example by a restart. Kubernetes cannot remove it sooner.",
+  "confirm.debugReused":
+    "A debug container already runs in this replica; the terminal opens in it.",
+  "confirm.clusterTools":
+    "Starts a temporary container with kubectl and helm for you, in this project.",
+  "confirm.toolsActsAs": (person: string, admin: boolean) =>
+    admin
+      ? `kubectl and helm act as ${person}, with the admin rights you hold now.`
+      : `kubectl and helm act as ${person}, with your own permissions.`,
+  "confirm.toolsCredential": (minutes: number) =>
+    `Your credential in it runs out in ${plural(minutes, "minute", "minutes")}; reopen the terminal for a fresh one.`,
+  "confirm.toolsStops": (most: number, after: number) =>
+    `It stops after ${plural(most, "minute", "minutes")} at most, and is deleted ${plural(after, "minute", "minutes")} after its last terminal closes.`,
+  "confirm.toolsReused": "Your kubectl terminal is already running; it opens again.",
   "confirm.details": "Saves the name, description, and icon on the namespace.",
   "access.title": (ns: string) => `You can't change ${ns}`,
   "access.you": "<your user name>",
@@ -791,6 +826,9 @@ export const en = {
   "plan.typeName": (name: string) => `Type ${name} to confirm`,
   "plan.added": "added",
   "plan.removed": "removed",
+  "warn.rightsMissing": (rights: string) => `The cluster may refuse this: you lack ${rights}.`,
+  "warn.toolsCredentialExposed": (namespace: string) =>
+    `Anyone who can run commands in the containers of ${namespace} can use your credential while this terminal's container runs.`,
   "warn.restartNeeded": (names: string) => `Takes effect after a restart: ${names}`,
   "warn.restartAdded": (names: string) => `Also restarts ${names}`,
   "warn.tlsHostChanged": (host: string, route: string) =>
@@ -1252,6 +1290,14 @@ export const en = {
       : `Ask for less, free some of what the project uses, or ask an admin to raise the limit ${p.quota}.`,
   "sentence.problem.policyDenied.fix.change": () =>
     "Change what it names, or ask whoever runs the policy.",
+  "sentence.problem.invalid.fix.ephemeralContainers": () =>
+    "Ask a cluster administrator to turn on ephemeral containers (on by default since Kubernetes 1.23), or use an image with a shell.",
+  "sentence.problem.conflict.fix.terminalImage": (p: P) =>
+    `Ask a cluster administrator to let the nodes pull ${p.image}, or to set ${p.setting} in Zeabur's chart to an image they can pull.`,
+  "sentence.problem.conflict.fix.terminalContainerStart": () =>
+    "Read the replica's events for the reason; a policy may forbid the user it runs as.",
+  "sentence.problem.badRequest.fix.toolsLocally": () =>
+    "Run kubectl and helm in your own terminal; they use the same kubeconfig as Zeabur.",
   "sentence.diagnosis.crashLoop.why.backOff": (p: P) =>
     `It has restarted ${p.restarts} times; the cluster starts it again each time, waiting longer between tries, up to 5 minutes by default.`,
   "sentence.diagnosis.crashLoop.why.exitsZero": (p: P) =>

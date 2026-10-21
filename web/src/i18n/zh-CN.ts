@@ -475,7 +475,11 @@ export const zhCN: Messages = {
   "terminal.reconnect": "重新连接",
   "terminal.exited": (code) => `已退出，退出码 ${code}`,
   "terminal.ended": "已结束",
-  "terminal.noShell": "这个容器没有 shell（Distroless 镜像不含 shell）。改为打开一个临时调试容器：",
+  "terminal.noShell":
+    "这个容器没有 shell，精简的镜像常常如此。调试容器会在这个副本里加上一个 shell，与应用程序并排运行。",
+  "terminal.debugStarting": "正在启动调试容器…",
+  "terminal.debugEnded": "调试容器已结束。再打开一个即可继续。",
+  "terminal.debugOpen": "已连接到调试容器",
   "terminal.failed": "容器运行时结束了这个会话。",
   "terminal.expired": "会话已过期。重新连接即可继续。",
   "terminal.adminEnded": "管理员权限已结束。重新连接后将改用你自己的权限。",
@@ -484,7 +488,18 @@ export const zhCN: Messages = {
   "terminal.rbac":
     "要打开终端，需要有权限在这个项目的容器里运行命令。把下面的配置交给管理员；这份配置只授予这项权限，也只限这个项目：",
   "terminal.roleLabel": "Role 和 RoleBinding",
-  "terminal.debugLabel": "kubectl debug",
+  "tools.about":
+    "带 kubectl 和 helm 的终端，在这个项目里以你的身份运行。它运行在一个临时容器里，用完后 Zeabur 会删除它。",
+  "tools.localTitle": "Zeabur 在你的电脑上运行时无法使用",
+  "tools.yours": "你的 kubectl 终端",
+  "tools.starting": "正在启动…",
+  "tools.ready": "可以使用",
+  "tools.stopping": "正在停止",
+  "tools.stopsAt": (when: string) => `${when}停止`,
+  "tools.open": "打开",
+  "tools.stop": "停止",
+  "tools.expired": "这个终端里的凭证已过期。重新打开即可换上新的继续使用。",
+  "tools.reopen": "重新打开",
 
   "vars.title": "环境变量",
   "vars.about": "应用启动时读取的设置，例如数据库地址或 API 密钥。",
@@ -605,9 +620,12 @@ export const zhCN: Messages = {
   // 对象与 YAML
   "project.entry.objects": "对象",
   // 项目的 Namespace
+  "project.entry.terminal": "kubectl 终端",
   "project.entry.settings": "设置",
   "action.adopt": "纳入",
   "action.unadopt": "不再显示为项目",
+  "action.openDebugTerminal": "打开调试终端",
+  "action.openToolsTerminal": "打开 kubectl 终端",
   "action.saveDetails": "保存详细信息",
   "title.adopt": (ns) => `纳入 ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再显示为项目`,
@@ -616,6 +634,21 @@ export const zhCN: Messages = {
   "title.restartAll": (ns) => `重启 ${ns} 的所有服务`,
   "confirm.adopt": "为这个 Namespace 加上项目标签，其中的对象都不会改变。",
   "confirm.unadopt": "这个 Namespace 不再显示为项目，其中的对象都不会删除。",
+  "confirm.debugContainer": (pod: string) =>
+    `在副本 ${pod} 中加上一个带 shell 的调试容器，它能看到应用程序的进程。`,
+  "confirm.debugStays":
+    "它会留在这个副本里，直到副本被替换为止，例如重启时。Kubernetes 无法提前移除它。",
+  "confirm.debugReused": "这个副本里已有调试容器在运行，终端会在其中打开。",
+  "confirm.clusterTools": "为你在这个项目里启动一个临时容器，内含 kubectl 和 helm。",
+  "confirm.toolsActsAs": (person: string, admin: boolean) =>
+    admin
+      ? `kubectl 和 helm 会以 ${person} 的身份运行，使用你当前持有的管理员权限。`
+      : `kubectl 和 helm 会以 ${person} 的身份运行，使用你自己的权限。`,
+  "confirm.toolsCredential": (minutes: number) =>
+    `其中的凭证会在 ${minutes} 分钟后失效，重新打开终端即可换上新的。`,
+  "confirm.toolsStops": (most: number, after: number) =>
+    `它最多运行 ${most} 分钟，最后一个终端关闭 ${after} 分钟后就会删除。`,
+  "confirm.toolsReused": "你的 kubectl 终端已在运行，会直接再次打开。",
   "confirm.details": "把名称、描述和图标保存到 Namespace 上。",
   "access.title": (ns) => `无法更改 ${ns}`,
   "access.you": "<你的用户名>",
@@ -720,6 +753,9 @@ export const zhCN: Messages = {
   "plan.typeName": (name: string) => `输入 ${name} 以确认`,
   "plan.added": "新增",
   "plan.removed": "移除",
+  "warn.rightsMissing": (rights: string) => `集群可能会拒绝：你缺少 ${rights} 的权限。`,
+  "warn.toolsCredentialExposed": (namespace: string) =>
+    `在这个终端的容器运行期间，能在 ${namespace} 的容器里执行命令的人，都能使用你的凭证。`,
   "warn.restartNeeded": (names: string) => `重启后才会生效：${names}`,
   "warn.restartAdded": (names: string) => `也会重启 ${names}`,
   "warn.tlsHostChanged": (host: string, route: string) =>
@@ -1147,6 +1183,14 @@ export const zhCN: Messages = {
       ? `减少 ${p.object} 的副本数、调低每个副本的预留量，或请管理员调高上限 ${p.quota}。`
       : `减少请求的量、释放项目已占用的资源，或请管理员调高上限 ${p.quota}。`,
   "sentence.problem.policyDenied.fix.change": () => "修改它指出的地方，或咨询负责这项策略的人。",
+  "sentence.problem.invalid.fix.ephemeralContainers": () =>
+    "请集群管理员开启临时容器（Kubernetes 1.23 起默认开启），或改用带 shell 的镜像。",
+  "sentence.problem.conflict.fix.terminalImage": (p) =>
+    `请集群管理员让节点能拉取 ${p.image}，或在 Zeabur 的 chart 里把 ${p.setting} 设为节点能拉取的镜像。`,
+  "sentence.problem.conflict.fix.terminalContainerStart": () =>
+    "从副本的事件中找出原因；可能是某项策略不允许它使用的用户身份。",
+  "sentence.problem.badRequest.fix.toolsLocally": () =>
+    "在你自己的终端里运行 kubectl 和 helm；它们与 Zeabur 使用同一份 kubeconfig。",
   "sentence.diagnosis.crashLoop.why.backOff": (p) =>
     `它已重启 ${p.restarts} 次；集群每次都会再启动它，两次之间等得越来越久，默认最多等 5 分钟。`,
   "sentence.diagnosis.crashLoop.why.exitsZero": (p) =>

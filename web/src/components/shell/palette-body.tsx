@@ -18,7 +18,7 @@ import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import TranslateIcon from "~icons/ph/translate"
 
-import { projectQuery, projectsQuery } from "@/api/queries"
+import { projectQuery, projectsQuery, toolsQuery } from "@/api/queries"
 import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot } from "@/components/status"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
@@ -64,6 +64,7 @@ export function PaletteBody() {
     queries: adopted.map((p) => projectQuery(p.name, { poll: false })),
   })
   const recents = recent.useValue()
+  const tools = useQuery({ ...toolsQuery(place.project ?? ""), enabled: !!place.project })
 
   const items: Item[] = []
   const g = {
@@ -129,6 +130,18 @@ export function PaletteBody() {
     },
   ]
   if (current && place.project) items.push(...verbs(place.project, current, "action"))
+  if (place.project && tools.data?.available)
+    items.push({
+      id: "action:tools",
+      keywords: "kubectl helm terminal shell",
+      group: g.actions,
+      label: t("action.openToolsTerminal"),
+      icon: TerminalWindowIcon,
+      href: router.buildLocation({
+        to: "/projects/$project/terminal",
+        params: { project: place.project },
+      }).href,
+    })
 
   for (const p of projects.data?.items ?? [])
     items.push({

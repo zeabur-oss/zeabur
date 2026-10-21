@@ -4,7 +4,7 @@ import { useMatches, type RegisteredRouter, type RouteIds } from "@tanstack/reac
 
 import { servicePlace, type ServicePlace } from "@/routes/search"
 
-export type ProjectEntry = "overview" | "objects" | "settings"
+export type ProjectEntry = "overview" | "objects" | "terminal" | "settings"
 
 type RouteId = RouteIds<RegisteredRouter["routeTree"]>
 
@@ -23,6 +23,7 @@ const entries: Partial<Record<RouteId, ProjectEntry>> = {
   "/projects/$project": "overview",
   "/projects/$project/objects": "objects",
   "/projects/$project/settings": "settings",
+  "/projects/$project/terminal": "terminal",
 }
 
 /** The place, from the route the router matched (the deepest match). */

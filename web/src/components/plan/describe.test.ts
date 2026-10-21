@@ -450,3 +450,56 @@ group("failureOf", () => {
     ).toBe("It changed after you reviewed it.")
   })
 })
+
+group("terminals", () => {
+  test("a debug container says it stays, in plain sentences rather than warnings", () => {
+    const said = describe(
+      t,
+      { changes: [{ op: "debugContainer", pod: "api-1" }] },
+      plan({
+        warnings: [
+          {
+            code: "debugContainerStays",
+            container: "zeabur-debug-1",
+            image: "busybox",
+            pod: "api-1",
+            target: "api",
+          },
+        ],
+      }),
+      pods({}),
+    )
+    expect(said.lines).toEqual(["confirm.debugContainer(api-1)", "confirm.debugStays"])
+    expect(said.action).toBe("action.openDebugTerminal")
+  })
+
+  test("a tools pod says as whom it acts, when its credential runs out, and when it goes", () => {
+    const expires = new Date(Date.now() + 29.5 * 60_000).toISOString()
+    const said = describe(
+      t,
+      { changes: [{ op: "clusterTools" }] },
+      plan({
+        warnings: [
+          {
+            code: "toolsPod",
+            admin: false,
+            credentialExpiresAt: expires,
+            deadlineSeconds: 1800,
+            graceSeconds: 60,
+            image: "alpine/k8s",
+            namespace: "shop",
+            person: "alice",
+            pod: "zeabur-tools-1",
+          },
+        ],
+      }),
+      pods({}),
+    )
+    expect(said.lines).toEqual([
+      "confirm.clusterTools",
+      "confirm.toolsActsAs(alice, false)",
+      "confirm.toolsCredential(30)",
+      "confirm.toolsStops(30, 1)",
+    ])
+  })
+})

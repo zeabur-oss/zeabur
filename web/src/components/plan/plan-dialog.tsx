@@ -200,6 +200,10 @@ const said = new Set<Schemas["PlanWarning"]["code"]>([
   "restartNeeded",
   "restartAdded",
   "configNotRolledBack",
+  "debugContainerStays",
+  "debugContainerReused",
+  "toolsPod",
+  "toolsPodReused",
 ])
 
 function PlanBody({
@@ -378,5 +382,22 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): string {
       ]
         .filter(Boolean)
         .join(" ")
+    case "rightsMissing":
+      return t(
+        "warn.rightsMissing",
+        t(
+          "common.list",
+          warning.rights.map(
+            (r) => `${r.verb} ${r.group ? `${r.resource}.${r.group}` : r.resource}`,
+          ),
+        ),
+      )
+    case "toolsCredentialExposed":
+      return t("warn.toolsCredentialExposed", warning.namespace)
+    case "debugContainerStays":
+    case "debugContainerReused":
+    case "toolsPod":
+    case "toolsPodReused":
+      return ""
   }
 }

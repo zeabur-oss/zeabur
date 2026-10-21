@@ -20,6 +20,8 @@ export interface PlanAsk {
   service?: Schemas["WorkloadRef"]
   /** Services the changes leave out because another tool manages them. */
   skipped?: Skipped[]
+  /** No toast once applied: what follows (a terminal opening) shows it. */
+  quiet?: boolean
 }
 
 /** Inside a service's Configure page, an edit waits in its draft instead; `direct` plans at once. */
