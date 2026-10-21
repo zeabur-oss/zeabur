@@ -45,9 +45,45 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   redirecting (`routes/search.ts`). Overview leads with one sentence each: health, then each domain
   reachable, not reachable with its fix, waiting on the cause above, or not verified (never red
   for a hop Zeabur could not check); each cause is said once, with what it also takes down inside
-  it (`model/overview.ts`). Projects are cards (`components/project-card.tsx`); settings are `SectionLabel` over
+  it (`model/overview.ts`). Projects are a compact table by default, cards on request
+  (`components/project-card.tsx`); settings are `SectionLabel` over
   `Card variant="list"` of `CardRow`s. No underline tabs. Tokens, layout, shell and banned styles are in
   `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including focus rings).
+- **Who it is for.** Most people self-hosting run one small server with a few services and do not
+  know Kubernetes: they need to know whether things are fine, why not, and what to do. A minority
+  runs dozens of services and wants raw detail. Serve both with one screen: conclusions by default,
+  density and Kubernetes detail one step behind. Keep hosted Zeabur's nouns, tabs and places
+  (familiarity lives there); change how much is shown and how it is grouped.
+- **Principles.** Check every screen against these before calling it done.
+  1. *Conclusion first* (Nielsen 1, 9): every page and every collection says whether it is fine,
+     the cause when not, the next step, and what that step costs. A red dot without a cause is
+     unfinished.
+  2. *True status* (Norman's gulf of evaluation): show only what Zeabur observed. Unknown or
+     unreachable is not failing. When the cluster cannot be read, show what is still known (the
+     host, the last events) rather than a page of dashes. An operation's result comes from the
+     cluster, not from the request that started it.
+  3. *Design for 0, 1, few and many*: define each collection at 0, 1, up to about 7, and 50+.
+     Sentences and chips are for few. Many becomes a summary grouped by outcome (exceptions first,
+     with counts) that expands into a sortable, filterable table. Never print the same verdict
+     once per item (Tufte: no redundant ink). This includes Plan and Apply: a handful of changes
+     may read as sentences; more are grouped by object and kind (added, changed, removed, with
+     counts) and listed as field, before, after.
+  4. *Overview, filter, details* (Shneiderman): a long collection scrolls inside a bounded frame
+     with a sticky header instead of pushing the rest of the page away; working sets are not
+     paginated. Counts next to section names say what is below the fold.
+  5. *Defaults follow the data*: the view, its density and what is expanded depend on how many
+     items there are (as the project page switches from map to list above 12 services), not on a
+     toggle people must find.
+  6. *Visible entry points* (Norman): a frequent action is a labelled button where people look
+     for it, not only inside ⋯ or another tab.
+  7. *Accelerators that novices never see* (Nielsen 7): `/` to filter, ⌘K, sortable headers, state
+     in the URL. They never change the default screen.
+  8. *Say the cost first* (Nielsen 5): before restart, upgrade, delete or reinstall, say whether it
+     stops traffic, whether data stays and whether it can be undone.
+  9. *Phones triage*: status and problems first, one key fact per row; dense tables and matrices
+     become a summary and a search box, not a squeezed desktop.
+  10. *Check at scale*: screenshot every changed collection at 390, 1440 and 1960 with the demo's
+      small data and with many items (dozens of services, rules, domains, changes, long names).
 - **Lint.** `bun run lint` includes [shadcn/lint](https://github.com/shadcn-ui/lint) (rules in
   `web/.oxlintrc.json`, which recognises the design system's components by `componentImports`;
   conventions in `web/DESIGN.md`, "Lint"). Pages pass only layout classes to a component: a
