@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { Schemas } from "@/api/client"
 import type { PlanAsk } from "@/components/plan/planner"
 import { useT, type Translate } from "@/i18n"
-import { draftable, editCount, mergeChanges, partOf } from "@/model/draft"
+import { draftable, dropChanges, editCount, mergeChanges, partOf } from "@/model/draft"
 import type { DraftPart } from "@/routes/search"
 
 /** Which staged changes a form's edits stand in for: these ops, of this workload (and probe). */
@@ -40,6 +40,8 @@ export interface Draft {
   generation: number
   /** Whether the ask waited in the draft; otherwise the caller plans it at once. */
   stage: (ask: PlanAsk) => boolean
+  /** Takes staged changes back out. */
+  unstage: (changes: Schemas["Change"][]) => void
   discard: () => void
   applied: () => void
   /** Whether an editor is open. */
@@ -97,6 +99,7 @@ export function useDraftState(): Draft {
       if (ask.restartAfter) setRestartAfter(true)
       return true
     },
+    unstage: (dropped) => setChanges((staged) => dropChanges(staged, dropped)),
     discard: reset,
     applied: reset,
     editing: held.some((h) => h.editing),

@@ -970,6 +970,32 @@ test("Networking leads with the short address; the Service sits behind one discl
   await expect(service).toBeVisible()
 })
 
+test("a domain waiting in the draft shows in the list, in the review, and goes with Undo", async ({
+  page,
+}) => {
+  const host = "e2e-pending.example.test"
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
+  const domains = page
+    .getByRole("tabpanel", { name: "Networking" })
+    .getByRole("region", { name: "Public domains" })
+  await expect(domains).toContainText(`${healthy} has no public domain yet`)
+  await domains.getByRole("button", { name: "Add domain" }).click()
+  await domains.getByRole("textbox", { name: "Domain" }).fill(host)
+  await domains.getByRole("button", { name: "Add to changes" }).click()
+  await expect(page.getByText("1 change pending")).toBeVisible()
+  const added = domains.getByRole("row").filter({ hasText: host })
+  await expect(added).toContainText("New")
+  await expect(domains).not.toContainText("has no public domain yet")
+  await review(page)
+  const dialog = page.getByRole("dialog", { name: `Change ${healthy}` })
+  await expect(dialog).toContainText(host, { timeout: 15_000 })
+  await dialog.getByRole("button", { name: "Cancel" }).click()
+  await expect(dialog).toHaveCount(0)
+  await added.getByRole("button", { name: "Undo" }).click()
+  await expect(domains).toContainText(`${healthy} has no public domain yet`)
+  await expect(page.getByText("1 change pending")).toHaveCount(0)
+})
+
 test("Networking shows who may reach a service, and a ready-made policy isolates it", async ({
   page,
 }) => {

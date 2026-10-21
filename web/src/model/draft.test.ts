@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { draftable, editCount, mergeChanges, partOf } from "@/model/draft"
+import {
+  draftable,
+  dropChanges,
+  editCount,
+  mergeChanges,
+  partOf,
+  stagedDomains,
+} from "@/model/draft"
 
 type Change = Schemas["Change"]
 
@@ -43,5 +50,28 @@ describe("draft", () => {
     )
     expect(merged).toHaveLength(2)
     expect(editCount(merged)).toBe(2)
+  })
+
+  test("an edit taken back out leaves the rest staged", () => {
+    const add: Change = { op: "addDomain", workload, hostname: "a.example.com" }
+    const staged = mergeChanges([env(["A", "1"])], [add])
+    expect(dropChanges(staged, [add])).toEqual([env(["A", "1"])])
+  })
+
+  test("a workload's staged domains: those added, and edits of its routes' hosts", () => {
+    const other = { kind: "Deployment", name: "web" } as Schemas["WorkloadRef"]
+    const route = { kind: "Ingress", name: "api" } as Schemas["RouteRef"]
+    const { added, edits } = stagedDomains(
+      [
+        { op: "addDomain", workload, hostname: "a.example.com" },
+        { op: "addDomain", workload: other, hostname: "b.example.com" },
+        { op: "removeDomain", route, hostname: "old.example.com" },
+        { op: "renameDomain", route: { ...route, name: "web" }, from: "c.example.com", to: "d" },
+      ],
+      workload,
+      ["api"],
+    )
+    expect(added.map((c) => c.hostname)).toEqual(["a.example.com"])
+    expect([...edits.keys()]).toEqual(["api/old.example.com"])
   })
 })

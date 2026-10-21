@@ -95,3 +95,37 @@ export function mergeChanges(staged: readonly Change[], added: readonly Change[]
 /** Edits, as a person counts them: each variable or key is one. */
 export const editCount = (changes: readonly Change[]) =>
   changes.reduce((n, c) => n + (c.op === "env" || c.op === "data" ? c.changes.length : 1), 0)
+
+/** The staged changes less those `dropped` stands for. */
+export function dropChanges(staged: readonly Change[], dropped: readonly Change[]): Change[] {
+  const keys = new Set(dropped.map(keyOf).filter((k) => k !== undefined))
+  return staged.filter((c) => {
+    const key = keyOf(c)
+    return key === undefined ? !dropped.includes(c) : !keys.has(key)
+  })
+}
+
+export type DomainEdit =
+  | Extract<Change, { op: "addDomain" }>
+  | Extract<Change, { op: "renameDomain" }>
+  | Extract<Change, { op: "removeDomain" }>
+
+/** The staged domain edits of a workload: domains to add, and edits of its routes' hosts by
+ * `route/host`. */
+export function stagedDomains(
+  changes: readonly Change[],
+  workload: Schemas["WorkloadRef"],
+  routes: readonly string[],
+): { added: Extract<Change, { op: "addDomain" }>[]; edits: Map<string, DomainEdit> } {
+  const added: Extract<Change, { op: "addDomain" }>[] = []
+  const edits = new Map<string, DomainEdit>()
+  for (const change of changes)
+    if (change.op === "addDomain") {
+      if (workloadKey(change.workload) === workloadKey(workload)) added.push(change)
+    } else if (change.op === "removeDomain" || change.op === "renameDomain") {
+      if (!routes.includes(change.route.name)) continue
+      const host = change.op === "removeDomain" ? change.hostname : change.from
+      edits.set(`${change.route.name}/${host}`, change)
+    }
+  return { added, edits }
+}

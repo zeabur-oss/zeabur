@@ -1,5 +1,6 @@
 import { useForm } from "@tanstack/react-form"
 import { useState, type ReactNode } from "react"
+import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import ClockIcon from "~icons/ph/clock"
@@ -10,7 +11,7 @@ import PlugsIcon from "~icons/ph/plugs"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 
-import { ReviewWord } from "@/components/plan/draft"
+import { ReviewWord, useDraft } from "@/components/plan/draft"
 import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
 import { usePlanner } from "@/components/plan/planner"
@@ -33,6 +34,7 @@ import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
+import { stagedDomains, type DomainEdit } from "@/model/draft"
 import {
   endpointsOf,
   hostUrl,
@@ -86,6 +88,21 @@ export function NetworkingTab({
   const [renaming, setRenaming] = useState<{ from: string; to: string }>()
   const managed = service.provenance.tool ?? undefined
   const workload = { kind: service.kind, name: service.name }
+  const draft = useDraft()
+  const staged = stagedDomains(
+    draft?.changes ?? [],
+    workload,
+    routes.map((r) => r.ingress),
+  )
+  const editOf = (route: PublicRoute) =>
+    route.host ? staged.edits.get(`${route.ingress}/${route.host}`) : undefined
+  const listed = routes.length + staged.added.length
+  const undo = (change: DomainEdit) => (
+    <Button variant="ghost" size="xs" onClick={() => draft?.unstage([change])}>
+      <ArrowCounterClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+      {t("vars.undo")}
+    </Button>
+  )
   const routeOf = (route: PublicRoute): Schemas["RouteRef"] => ({
     kind: (routesOf(network, service).find((r) => r.name === route.ingress)?.origin.kind ??
       "Ingress") as Schemas["RouteKind"],
@@ -97,7 +114,7 @@ export function NetworkingTab({
 
   const scheduled = service.kind === "CronJob" || service.kind === "Job"
   const noAddress =
-    routes.length === 0 &&
+    listed === 0 &&
     endpoints.length === 0 &&
     adding === undefined &&
     refusedRoutes.length === 0 &&
@@ -130,10 +147,10 @@ export function NetworkingTab({
             <SectionHeader
               id="net-public"
               title={t("net.publicTitle")}
-              count={routes.length > 0 ? routes.length : undefined}
+              count={listed > 0 ? listed : undefined}
               description={t("net.publicAbout")}
               action={
-                routes.length > 0 ? (
+                listed > 0 ? (
                   <Managed tool={managed}>
                     <Button
                       variant="outline"
@@ -162,7 +179,7 @@ export function NetworkingTab({
               />
             ) : null}
             <RefusedKinds unreadable={refusedRoutes} />
-            {routes.length === 0 ? (
+            {listed === 0 ? (
               adding === undefined && refusedRoutes.length === 0 ? (
                 <Empty variant="outline" size="inline">
                   <EmptyMedia variant="glyph">
@@ -207,104 +224,126 @@ export function NetworkingTab({
                   </tr>
                 </thead>
                 <tbody className="divide-y max-sm:block">
-                  {routes.map((route, i) => (
-                    <tr
-                      className={cn(row, route.host && entrance(createdKey.domain(route.host)))}
-                      key={`${route.ingress}/${route.host ?? ""}/${route.path ?? ""}/${i}`}
-                    >
+                  {routes.map((route, i) => {
+                    const edit = editOf(route)
+                    return (
+                      <tr
+                        className={cn(row, route.host && entrance(createdKey.domain(route.host)))}
+                        key={`${route.ingress}/${route.host ?? ""}/${route.path ?? ""}/${i}`}
+                      >
+                        <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
+                          {renaming && route.host === renaming.from ? (
+                            <HostForm
+                              value={renaming.to}
+                              onCancel={() => setRenaming(undefined)}
+                              onReview={(to) => {
+                                planner.plan({
+                                  title: t("title.renameDomain", renaming.from, to),
+                                  service: workload,
+                                  changes: [
+                                    {
+                                      op: "renameDomain",
+                                      route: routeOf(route),
+                                      from: renaming.from,
+                                      to,
+                                    },
+                                  ],
+                                })
+                                setRenaming(undefined)
+                              }}
+                            />
+                          ) : edit?.op === "renameDomain" ? (
+                            <PendingHost host={edit.to} was={edit.from} state="changed" />
+                          ) : edit ? (
+                            <PendingHost host={edit.hostname} state="removed" />
+                          ) : (
+                            <Host route={route} />
+                          )}
+                        </td>
+                        <td className={cell}>
+                          <Path route={route} />
+                        </td>
+                        <td className={cell}>
+                          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+                            <ArrowRightIcon
+                              className="size-3 shrink-0 text-muted-foreground"
+                              aria-hidden="true"
+                            />
+                            <span className="whitespace-nowrap">
+                              {route.port
+                                ? t("net.port", portNumber(endpoints, route))
+                                : t("net.anyPort")}
+                            </span>
+                          </span>
+                        </td>
+                        <td className={cell}>
+                          <StatusPill health={podsOk ? "ok" : "fail"} size="sm">
+                            {t("pod.readyCount", ready, service.pods.length)}
+                          </StatusPill>
+                        </td>
+                        <td className={`${cell} pr-4 max-sm:ml-auto`}>
+                          {edit ? (
+                            <span className="flex justify-end">{undo(edit)}</span>
+                          ) : route.host ? (
+                            <span className="flex items-center justify-end gap-0.5">
+                              <Managed tool={managed}>
+                                <Button
+                                  variant="muted"
+                                  size="icon-xs"
+                                  disabled={Boolean(managed) || renaming !== undefined}
+                                  aria-label={t("edit.edit", route.host)}
+                                  title={t("edit.edit", route.host)}
+                                  onClick={() =>
+                                    route.host
+                                      ? setRenaming({ from: route.host, to: route.host })
+                                      : undefined
+                                  }
+                                >
+                                  <PencilSimpleIcon aria-hidden="true" />
+                                </Button>
+                              </Managed>
+                              <Managed tool={managed}>
+                                <Button
+                                  variant="muted"
+                                  size="icon-xs"
+                                  disabled={Boolean(managed)}
+                                  aria-label={t("edit.remove", route.host)}
+                                  title={t("edit.remove", route.host)}
+                                  onClick={() =>
+                                    route.host
+                                      ? planner.plan({
+                                          title: t("title.removeDomain", route.host),
+                                          service: workload,
+                                          changes: [
+                                            {
+                                              op: "removeDomain",
+                                              route: routeOf(route),
+                                              hostname: route.host,
+                                            },
+                                          ],
+                                        })
+                                      : undefined
+                                  }
+                                >
+                                  <TrashIcon aria-hidden="true" />
+                                </Button>
+                              </Managed>
+                            </span>
+                          ) : null}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {staged.added.map((change) => (
+                    <tr className={row} key={`added/${change.hostname}`}>
                       <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
-                        {renaming && route.host === renaming.from ? (
-                          <HostForm
-                            value={renaming.to}
-                            onCancel={() => setRenaming(undefined)}
-                            onReview={(to) => {
-                              planner.plan({
-                                title: t("title.renameDomain", renaming.from, to),
-                                service: workload,
-                                changes: [
-                                  {
-                                    op: "renameDomain",
-                                    route: routeOf(route),
-                                    from: renaming.from,
-                                    to,
-                                  },
-                                ],
-                              })
-                              setRenaming(undefined)
-                            }}
-                          />
-                        ) : (
-                          <Host route={route} />
-                        )}
+                        <PendingHost host={change.hostname} state="added" />
                       </td>
-                      <td className={cell}>
-                        <Path route={route} />
-                      </td>
-                      <td className={cell}>
-                        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                          <ArrowRightIcon
-                            className="size-3 shrink-0 text-muted-foreground"
-                            aria-hidden="true"
-                          />
-                          <span className="whitespace-nowrap">
-                            {route.port
-                              ? t("net.port", portNumber(endpoints, route))
-                              : t("net.anyPort")}
-                          </span>
-                        </span>
-                      </td>
-                      <td className={cell}>
-                        <StatusPill health={podsOk ? "ok" : "fail"} size="sm">
-                          {t("pod.readyCount", ready, service.pods.length)}
-                        </StatusPill>
-                      </td>
+                      <td className={cell} />
+                      <td className={cell} />
+                      <td className={cell} />
                       <td className={`${cell} pr-4 max-sm:ml-auto`}>
-                        {route.host ? (
-                          <span className="flex items-center justify-end gap-0.5">
-                            <Managed tool={managed}>
-                              <Button
-                                variant="muted"
-                                size="icon-xs"
-                                disabled={Boolean(managed) || renaming !== undefined}
-                                aria-label={t("edit.edit", route.host)}
-                                title={t("edit.edit", route.host)}
-                                onClick={() =>
-                                  route.host
-                                    ? setRenaming({ from: route.host, to: route.host })
-                                    : undefined
-                                }
-                              >
-                                <PencilSimpleIcon aria-hidden="true" />
-                              </Button>
-                            </Managed>
-                            <Managed tool={managed}>
-                              <Button
-                                variant="muted"
-                                size="icon-xs"
-                                disabled={Boolean(managed)}
-                                aria-label={t("edit.remove", route.host)}
-                                title={t("edit.remove", route.host)}
-                                onClick={() =>
-                                  route.host
-                                    ? planner.plan({
-                                        title: t("title.removeDomain", route.host),
-                                        service: workload,
-                                        changes: [
-                                          {
-                                            op: "removeDomain",
-                                            route: routeOf(route),
-                                            hostname: route.host,
-                                          },
-                                        ],
-                                      })
-                                    : undefined
-                                }
-                              >
-                                <TrashIcon aria-hidden="true" />
-                              </Button>
-                            </Managed>
-                          </span>
-                        ) : null}
+                        <span className="flex justify-end">{undo(change)}</span>
                       </td>
                     </tr>
                   ))}
@@ -528,6 +567,50 @@ function Table({
         {children}
       </table>
     </div>
+  )
+}
+
+/** A domain the draft adds, renames or removes, before it is applied. */
+function PendingHost({
+  host,
+  was,
+  state,
+}: {
+  host: string
+  was?: string
+  state: "added" | "changed" | "removed"
+}) {
+  const t = useT()
+  return (
+    <span className="flex min-w-0 items-center gap-1.5 text-xs">
+      <GlobeIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span
+        className={cn(
+          "truncate font-mono font-medium",
+          state === "removed" && "text-tertiary line-through",
+        )}
+        title={was ? `${was} → ${host}` : host}
+        translate="no"
+      >
+        {host}
+      </span>
+      <span
+        className={cn(
+          "shrink-0 type-meta",
+          state === "added"
+            ? "text-ok-strong"
+            : state === "changed"
+              ? "text-warn-strong"
+              : "text-fail-strong",
+        )}
+      >
+        {state === "added"
+          ? t("vars.state.added")
+          : state === "changed"
+            ? t("vars.state.changed")
+            : t("vars.state.removed")}
+      </span>
+    </span>
   )
 }
 
