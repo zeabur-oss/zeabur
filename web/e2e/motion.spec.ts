@@ -219,7 +219,7 @@ test("moving to another service fades the main panel only, on the page timings",
   expect(seen.filter((a) => a.includes("(root)"))).toEqual([])
 })
 
-test("a tab swaps its panel with a quick fade and no page transition", async ({ page }) => {
+test("a tab swaps its panel with a quick fade, not a page move", async ({ page }) => {
   await openService(page)
   const panel = '[role="tabpanel"]:not([hidden])'
   const tab = page.getByRole("tab", { name: "Deployments" })

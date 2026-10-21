@@ -76,11 +76,11 @@ Zeabur has depth. A person new to it does most of what they came for (is it runn
 logs, change a variable, scale it, give it a domain) on a few plain pages; what takes knowing
 Kubernetes is one deliberate step further. Decide a feature's layer before its place:
 
-| Layer         | For                        | Global         | Project                         | Service                                                                                  |
-| ------------- | -------------------------- | -------------- | ------------------------------- | ---------------------------------------------------------------------------------------- |
-| **Everyday**  | everyone                   | Home, Projects | Overview (map or list)          | Overview, Logs, Deployments, Usage, Networking, Variables, Settings (Compute, Storage)   |
-| **Adjusting** | digging in, tuning         |                | Suggestions, Activity, Settings | Settings' Health checks, Deployments' compare and roll back and its Events               |
-| **Expert**    | people who know Kubernetes | Cluster        | Objects                         | Logs' Terminal and Settings' YAML                                                        |
+| Layer         | For                        | Global         | Project                         | Service                                                                                |
+| ------------- | -------------------------- | -------------- | ------------------------------- | -------------------------------------------------------------------------------------- |
+| **Everyday**  | everyone                   | Home, Projects | Overview (map or list)          | Overview, Logs, Deployments, Usage, Networking, Variables, Settings (Compute, Storage) |
+| **Adjusting** | digging in, tuning         |                | Suggestions, Activity, Settings | Settings' Health checks, Deployments' compare and roll back and its Events             |
+| **Expert**    | people who know Kubernetes | Cluster        | Objects                         | Logs' Terminal and Settings' YAML                                                      |
 
 - **Everyday comes first and alone.** The sidebar leads with Home and Projects; Cluster and
   Settings are in a Manage group after them. A project's sidebar lists Overview and Settings,
