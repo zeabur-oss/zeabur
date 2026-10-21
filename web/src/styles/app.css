@@ -12,9 +12,8 @@
   --grid-template-columns-variable-actions: minmax(10rem, 14rem) 1fr auto;
   --grid-template-columns-attention: minmax(12rem, 1.3fr) minmax(10rem, 1fr) minmax(10rem, 1fr) auto;
   --grid-template-columns-warning: minmax(10rem, 1fr) minmax(0, 2fr) auto;
-  --transition-property-width: width;
   --translate-tooltip: calc(100% + 0.5rem);
-  --max-height-palette: min(60vh, 420px);
+  --height-palette: min(60vh, 420px);
 }
 
 @utility flex-main {

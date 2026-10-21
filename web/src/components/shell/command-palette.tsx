@@ -1,13 +1,17 @@
-// The contents load when the palette first opens, keeping them off the first page load.
+// The contents load when the browser is idle or the search row is pointed at, keeping them off the
+// first page load.
 import { lazy, Suspense, useEffect } from "react"
 
 import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
 import { useT } from "@/i18n"
 import { palette } from "@/lib/stores"
 
-const PaletteBody = lazy(() =>
-  import("@/components/shell/palette-body").then((m) => ({ default: m.PaletteBody })),
-)
+const loadBody = () => import("@/components/shell/palette-body")
+const PaletteBody = lazy(() => loadBody().then((m) => ({ default: m.PaletteBody })))
+
+export function preloadPalette() {
+  void loadBody()
+}
 
 export function CommandPalette() {
   const open = palette.useValue()
@@ -21,19 +25,35 @@ export function CommandPalette() {
       }
     }
     window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
+    if (!("requestIdleCallback" in window)) {
+      return () => window.removeEventListener("keydown", onKey)
+    }
+    const idle = requestIdleCallback(preloadPalette, { timeout: 4000 })
+    return () => {
+      window.removeEventListener("keydown", onKey)
+      cancelIdleCallback(idle)
+    }
   }, [])
 
+  // Anchored to the top, so the input stays put while the results change height.
   return (
     <Dialog open={open} onOpenChange={(next) => palette.set(next)}>
-      <DialogContent aria-describedby={undefined}>
+      <DialogContent aria-describedby={undefined} className="top-24 translate-y-0">
         <DialogTitle className="sr-only">{t("palette.title")}</DialogTitle>
-        {open ? (
-          <Suspense fallback={<div className="h-13" />}>
-            <PaletteBody />
-          </Suspense>
-        ) : null}
+        <Suspense fallback={<PaletteFallback />}>
+          <PaletteBody />
+        </Suspense>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function PaletteFallback() {
+  return (
+    <div aria-hidden="true">
+      <div className="box-content h-13 border-b" />
+      <div className="h-palette" />
+      <div className="border-t bg-muted/40 py-2 type-micro leading-normal">&nbsp;</div>
+    </div>
   )
 }
