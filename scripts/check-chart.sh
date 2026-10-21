@@ -103,6 +103,11 @@ expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "[$terminal_env] |
 expect full "$(render -f "$chart/ci/full-values.yaml")" "[$terminal_env] | join(\" \")" \
   "ZEABUR_DEBUG_IMAGE=registry.example.test/busybox:1.37.0 ZEABUR_TOOLS_IMAGE=registry.example.test/k8s:1.36.5 ZEABUR_TOOLS_NAMESPACE=zeabur-tools ZEABUR_TOOLS_DEADLINE_MINUTES=15 ZEABUR_TOOLS_GRACE_SECONDS=30 ZEABUR_TOOLS_REQUESTS=cpu=20m,memory=96Mi ZEABUR_TOOLS_LIMITS=cpu=500m,memory=256Mi"
 
+# The cluster's name reaches Zeabur only when one is given.
+cluster_env='[select(.kind == "Deployment") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_CLUSTER_NAME") | .value] | join(",")'
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$cluster_env" ""
+expect full "$(render -f "$chart/ci/full-values.yaml")" "$cluster_env" shop-prod
+
 # Values that must be refused before anything is installed.
 refuse() { # $1 = why, $@ = helm arguments
   local why="$1"
@@ -118,6 +123,8 @@ refuse "no client secret" --set issuer.clientSecret.existingSecret=
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm
 refuse "an unknown value" --set replicas=2
+refuse "a cluster name longer than 63 characters" --set clusterName="$(printf 'x%.0s' {1..64})"
+refuse "a cluster name on two lines" --set-json 'clusterName="a\nb"'
 refuse "a tools pod without a deadline" --set terminal.toolsDeadlineMinutes=0
 refuse "a tools namespace that is not a name" --set terminal.toolsNamespace=Tools
 refuse "a tools resource Zeabur does not set" --set terminal.toolsResources.limits.gpu=1

@@ -3,6 +3,7 @@ image:
   repository: registry.example.test/zeabur
   tag: v0.0.0-test
 publicUrl: https://zeabur.example.test
+clusterName: shop-prod
 issuer:
   url: https://identity.example.test:8443
   clientId: zeabur-test

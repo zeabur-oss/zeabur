@@ -18,6 +18,11 @@ imagePullSecrets: []
 # take their host name from it.
 publicUrl: ""
 
+# What the interface calls this cluster, so people with several can tell them apart, such as
+# shop-prod. An administrator can rename it in Settings. Empty: a name read from the nodes (k3d,
+# kind, EKS, GKE, AKS and others, or the first control plane node), else publicUrl's host.
+clusterName: ""
+
 issuer:
   # Zeabur Identity's public URL (its issuer), exactly as Zeabur Identity's discovery document states it.
   # Required.

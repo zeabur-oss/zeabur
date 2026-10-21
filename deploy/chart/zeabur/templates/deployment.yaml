@@ -58,6 +58,10 @@ spec:
               value: "[::]:8080"
             - name: ZEABUR_PUBLIC_URL
               value: {{ required "publicUrl is required" .Values.publicUrl | quote }}
+            {{- with .Values.clusterName }}
+            - name: ZEABUR_CLUSTER_NAME
+              value: {{ . | quote }}
+            {{- end }}
             - name: ZEABUR_ISSUER_URL
               value: {{ required "issuer.url is required" $issuer.url | quote }}
             - name: ZEABUR_CLIENT_ID

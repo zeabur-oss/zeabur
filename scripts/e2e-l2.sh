@@ -249,7 +249,7 @@ kubectl -n "$namespace" create secret tls zeabur-tls --cert="$tls/tls.crt" --key
 kubectl -n "$namespace" create configmap zeabur-identity-ca --from-file=ca.crt="$tls/ca.crt"
 helm install zeabur "$root/deploy/chart/zeabur" --namespace "$namespace" --wait --timeout 3m \
   --set image.repository="${zeabur_image%:*}" --set image.tag="${zeabur_image##*:}" \
-  --set publicUrl="https://$zeabur_host" \
+  --set publicUrl="https://$zeabur_host" --set clusterName="$cluster" \
   --set issuer.url="$ZEABUR_IDENTITY_ISSUER" \
   --set issuer.clientSecret.existingSecret=zeabur-oidc \
   --set issuer.caBundle.configMap=zeabur-identity-ca \
