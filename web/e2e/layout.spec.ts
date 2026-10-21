@@ -150,3 +150,49 @@ for (const locale of ["en-US", "zh-TW"]) {
     })
   })
 }
+
+test("the account card's lines share one left edge, also with admin rights on", async ({
+  page,
+}) => {
+  const until = new Date(Date.now() + 30 * 60_000).toISOString()
+  await page.route("**/api/v1/session", (route) =>
+    route.fulfill({
+      json: { signsIn: true, elevation: "active", elevatedUntil: until, expiresAt: until },
+    }),
+  )
+  await page.route("**/api/v1/whoami", (route) =>
+    route.fulfill({
+      json: {
+        username: "zeabur:ada.lovelace.with.a.rather.long.address@example.com",
+        groups: ["system:authenticated"],
+      },
+    }),
+  )
+  await page.route("**/api/v1/cluster", (route) =>
+    route.fulfill({ json: { name: "10.43.0.1", kubernetesVersion: "v1.36.5+k3s1" } }),
+  )
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto("/")
+  const card = page.getByRole("navigation", { name: "Main" }).locator('[data-slot="context-chip"]')
+  await expect(card).toContainText("This cluster")
+  await expect(card).not.toContainText("10.43.0.1")
+  await expect(card).toContainText("ada.lovelace")
+  await expect(card).not.toContainText("zeabur:")
+  await expect(card.locator('[data-slot="avatar"]')).toContainText("AD")
+  const elevated = card.locator('[data-slot="context-chip-elevated"]')
+  await expect(elevated).toContainText(/Admin until \d{1,2}:\d{2}/)
+  const lefts = await card.evaluate((chip) => {
+    const column = chip.querySelector(":scope > span.flex-col")
+    return [...(column?.children ?? [])].map((line) =>
+      Math.round(line.getBoundingClientRect().left),
+    )
+  })
+  expect(lefts).toHaveLength(3)
+  expect(new Set(lefts).size, JSON.stringify(lefts)).toBe(1)
+  const widths = await card.evaluate((chip) =>
+    [...(chip.querySelector(":scope > span.flex-col")?.children ?? [])].map(
+      (line) => line.getBoundingClientRect().width,
+    ),
+  )
+  for (const width of widths) expect(width).toBeGreaterThan(40)
+})

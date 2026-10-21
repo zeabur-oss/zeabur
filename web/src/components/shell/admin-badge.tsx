@@ -7,6 +7,7 @@ import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
 import { useI18n, useT } from "@/i18n"
+import { formatClock } from "@/lib/identity"
 
 export function AdminBadge() {
   const t = useT()
@@ -14,9 +15,7 @@ export function AdminBadge() {
   const session = useQuery(sessionQuery).data
   const until = session?.elevation === "active" ? session.elevatedUntil : undefined
   if (!until) return null
-  const time = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(
-    new Date(until),
-  )
+  const time = formatClock(until, locale)
   return (
     <Popover>
       <PopoverTrigger variant="plain">

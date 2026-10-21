@@ -37,6 +37,7 @@ export const en = {
   "shell.home": "Home",
   "shell.projects": "Projects",
   "shell.settings": "Settings",
+  "shell.thisCluster": "This cluster",
   "shell.cluster": "Cluster",
   "shell.search": "Search",
   "shell.jumpTo": "Jump to…",

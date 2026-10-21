@@ -13,6 +13,7 @@ import { clusterQuery, sessionQuery, whoamiQuery } from "@/api/queries"
 import { dropElevation, retryAsAdmin } from "@/auth/elevation"
 import { signOut } from "@/auth/session"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
+import { clusterNameOf, formatClock, personOf } from "@/lib/identity"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
 import { Avatar } from "@zeabur/design-system/components/avatar"
 import {
@@ -39,15 +40,14 @@ export function ContextMenu() {
   const session = useQuery(sessionQuery).data
   const cluster = useQuery(clusterQuery).data
   const theme = useTheme()
-  const name = whoami.data?.username ?? ""
+  const username = whoami.data?.username ?? ""
+  const name = personOf(username)
   const groups = whoami.data?.groups.join(", ")
   const until = session?.elevation === "active" ? session.elevatedUntil : undefined
-  const time = until
-    ? new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit" }).format(
-        new Date(until),
-      )
-    : undefined
-  const place = cluster?.name ?? t("shell.cluster")
+  const time = until ? formatClock(until, locale) : undefined
+  const named = clusterNameOf(cluster?.name)
+  const place = named ?? t("shell.thisCluster")
+  const address = cluster?.name && cluster.name !== named ? cluster.name : undefined
   const who = name || t("shell.whoamiUnknown")
 
   return (
@@ -55,8 +55,16 @@ export function ContextMenu() {
       <MenuTrigger
         render={
           <ContextChip
-            place={<span translate="no">{place}</span>}
-            identity={<span translate="no">{who}</span>}
+            place={
+              <span translate={named ? "no" : undefined} title={address ?? place}>
+                {place}
+              </span>
+            }
+            identity={
+              <span translate="no" title={username || undefined}>
+                {who}
+              </span>
+            }
             avatar={<Avatar size="xs" shape="circle" className="size-6" name={name || undefined} />}
             elevated={time ? t("elevate.until", time) : undefined}
           />
@@ -65,8 +73,12 @@ export function ContextMenu() {
       />
       <MenuContent align="start" className="w-60">
         <div className="flex flex-col px-2.5 py-2">
-          <span className="truncate text-sm font-semibold text-main" translate="no">
-            {name || t("shell.whoamiUnknown")}
+          <span
+            className="truncate text-sm font-semibold text-main"
+            translate="no"
+            title={username || undefined}
+          >
+            {who}
           </span>
           {groups ? (
             <span className="truncate text-xs text-secondary" translate="no" title={groups}>
@@ -76,9 +88,14 @@ export function ContextMenu() {
         </div>
         <MenuItem render={<Link to="/cluster" />}>
           <HardDrivesIcon aria-hidden="true" />
-          <span className="flex-1 truncate" translate="no">
+          <span className="flex-1 truncate" translate={named ? "no" : undefined}>
             {place}
           </span>
+          {address ? (
+            <span className="truncate font-mono text-xs text-tertiary" translate="no">
+              {address}
+            </span>
+          ) : null}
         </MenuItem>
         {session?.elevation === "active" || session?.elevation === "available" ? (
           <>
