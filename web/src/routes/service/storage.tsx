@@ -36,6 +36,9 @@ export function StorageTab({ project, service }: { project: string; service: Ser
   const managed = service.provenance.tool
   // A Job runs once; its template is changed as YAML.
   const editable = service.kind !== "Job"
+  // A StatefulSet's volumes come from its claim templates, which cannot change.
+  const addable = editable && service.kind !== "StatefulSet"
+  const disabledReason = managed ? t("ops.managedEdit", managed) : undefined
   const other = service.containers.flatMap((c) =>
     c.mounts
       .filter((m) => m.kind !== "PersistentVolumeClaim")
@@ -43,17 +46,12 @@ export function StorageTab({ project, service }: { project: string; service: Ser
   )
   return (
     <div className="flex flex-col gap-4">
-      {managed && editable ? (
-        <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
-          {t("common.managedByDetail", managed)}
-        </p>
-      ) : null}
       <SectionHeader
         title={<Term detail="PersistentVolumeClaim">{t("storage.title")}</Term>}
         count={volumes.length > 0 ? volumes.length : undefined}
         description={t("storage.about")}
       />
-      {volumes.length === 0 ? (
+      {volumes.length === 0 && addable ? null : volumes.length === 0 ? (
         <Empty variant="outline" size="inline">
           <EmptyMedia variant="glyph">
             <HardDriveIcon aria-hidden="true" />
@@ -61,11 +59,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
           <EmptyHeader>
             <EmptyTitle>{t("storage.emptyTitle", service.name)}</EmptyTitle>
             <EmptyDescription>
-              {service.kind === "StatefulSet"
-                ? t("form.statefulVolumes")
-                : editable
-                  ? t("storage.emptyBody")
-                  : t("storage.emptyJob")}
+              {service.kind === "StatefulSet" ? t("form.statefulVolumes") : t("storage.emptyJob")}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
@@ -118,28 +112,37 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                     <Suspense fallback={null}>
                       <ClaimForm
                         mount={m}
-                        disabled={!!managed}
-                        onExpand={(size) =>
+                        disabledReason={disabledReason}
+                        onSave={({ size, mount }) =>
                           planner.plan({
-                            title: t("title.expand", name, size),
-                            changes: [{ op: "expandVolume", claim: name, size }],
-                            service: workload,
-                          })
-                        }
-                        onMount={(newMountPath, readOnly) =>
-                          planner.plan({
-                            title: t("title.mount", m.mountPath),
+                            title:
+                              size && mount
+                                ? t("title.editVolume", name)
+                                : size
+                                  ? t("title.expand", name, size)
+                                  : t("title.mount", m.mountPath),
                             changes: [
-                              {
-                                op: "editMount",
-                                workload,
-                                container: container?.name,
-                                mountPath: m.mountPath,
-                                newMountPath:
-                                  newMountPath === m.mountPath ? undefined : newMountPath,
-                                readOnly: readOnly === (m.readOnly ?? false) ? undefined : readOnly,
-                              },
+                              ...(size ? [{ op: "expandVolume" as const, claim: name, size }] : []),
+                              ...(mount
+                                ? [
+                                    {
+                                      op: "editMount" as const,
+                                      workload,
+                                      container: container?.name,
+                                      mountPath: m.mountPath,
+                                      newMountPath:
+                                        mount.mountPath === m.mountPath
+                                          ? undefined
+                                          : mount.mountPath,
+                                      readOnly:
+                                        mount.readOnly === (m.readOnly ?? false)
+                                          ? undefined
+                                          : mount.readOnly,
+                                    },
+                                  ]
+                                : []),
                             ],
+                            service: workload,
                           })
                         }
                       />
@@ -151,7 +154,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
           })}
         </div>
       )}
-      {!editable ? null : service.kind === "StatefulSet" ? (
+      {!editable ? null : !addable ? (
         volumes.length === 0 ? null : (
           <p className="type-meta text-muted-foreground">{t("form.statefulVolumes")}</p>
         )
@@ -159,7 +162,11 @@ export function StorageTab({ project, service }: { project: string; service: Ser
         <Suspense fallback={null}>
           <AddVolume
             workload={service.name}
-            disabled={!!managed}
+            title={
+              volumes.length === 0 ? t("storage.emptyTitle", service.name) : t("form.addVolume")
+            }
+            description={volumes.length === 0 ? t("storage.emptyBody") : undefined}
+            disabledReason={disabledReason}
             onPlan={(volume) =>
               planner.plan({
                 title: t("title.addVolume", volume.mountPath),

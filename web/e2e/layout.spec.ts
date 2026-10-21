@@ -5,10 +5,12 @@ import { expect, test } from "./fixtures.ts"
 // The page's frame and edges. Runs where ui.spec.ts runs, with its variables, and:
 //
 //   ZEABUR_E2E_CROWDED  a project with 40 or more services (the demo server: analytics)
+//   ZEABUR_E2E_VOLUME   a service of the project with a volume, as Kind/name (the demo: StatefulSet/db)
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const healthy = env("ZEABUR_E2E_SERVICE", "talker")
 const crowded = env("ZEABUR_E2E_CROWDED")
+const volume = env("ZEABUR_E2E_VOLUME")
 const project = `/projects/${encodeURIComponent(namespace)}`
 
 test.beforeAll(() => {
@@ -114,3 +116,37 @@ test.describe("in a project with many services", () => {
     })
   }
 })
+
+for (const locale of ["en-US", "zh-TW"]) {
+  test.describe(`a volume's card in ${locale}`, () => {
+    test.skip(!volume, "ZEABUR_E2E_VOLUME is not set")
+    test.use({ locale, viewport: { width: 400, height: 900 } })
+
+    test("lines its fields up and saves them with one button", async ({ page }) => {
+      await page.goto(`${project}/services/${volume}?tab=settings#storage`)
+      const card = page
+        .locator("form")
+        .filter({ has: page.getByRole("switch") })
+        .first()
+      await card.scrollIntoViewIfNeeded()
+      const [size, path] = await card.getByRole("textbox").all()
+      const box = async (locator: typeof card) => {
+        const b = await locator.boundingBox()
+        return b && [Math.round(b.x), Math.round(b.x + b.width)]
+      }
+      const sizeEdges = await box(size!)
+      expect(await box(path!)).toEqual(sizeEdges)
+      const toggle = await card.getByRole("switch").boundingBox()
+      expect(Math.round(toggle!.x + toggle!.width)).toBe(sizeEdges![1])
+
+      const save = card.getByRole("button")
+      await expect(save).toHaveCount(1)
+      await expect(save).toBeDisabled()
+      await size!.fill("50Gi")
+      await expect(save).toBeEnabled()
+      await card.getByRole("switch").click()
+      await expect(save).toBeEnabled()
+      await card.screenshot({ path: test.info().outputPath(`storage-card-${locale}.png`) })
+    })
+  })
+}

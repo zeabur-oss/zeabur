@@ -668,7 +668,9 @@ test("a readiness probe is set through a plan", async ({ page }) => {
 test("a volume is added and its claim edited under Storage", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=storage`)
   const panel = page.getByRole("region", { name: "Storage" })
-  const add = panel.locator("form").filter({ hasText: "Add a volume" })
+  // With no volume yet, the form to add one is the section's empty state.
+  const add = panel.getByRole("form", { name: "Add a volume" })
+  await expect(add).toContainText(`${editor} has no volume`)
   await add.getByRole("textbox", { name: /^Name/ }).fill("e2e-data")
   await add.getByRole("textbox", { name: /^Mount path/ }).fill("/e2e-data")
   await add.getByRole("button", { name: "Add to changes" }).click()
@@ -679,7 +681,9 @@ test("a volume is added and its claim edited under Storage", async ({ page }) =>
     "Add volume",
     new RegExp(`${editor} gets a new \\S+ volume\\.`),
   )
-  const card = panel.locator("form").filter({ has: page.getByRole("button", { name: "Grow" }) })
+  const card = panel
+    .locator("form")
+    .filter({ has: page.getByRole("switch", { name: "Read-only" }) })
   await expect(card).toBeVisible({ timeout: 15_000 })
   await expect(panel.getByRole("textbox", { name: /^Mount path/ }).first()).toHaveValue("/e2e-data")
 })
