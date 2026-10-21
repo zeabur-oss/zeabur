@@ -536,6 +536,13 @@ export const zhTW: Messages = {
   "net.path": "路徑",
   "net.publicTitle": "公開網域",
   "net.publicAbout": "網際網路上的任何人都能開啟這些位址。",
+  "net.publicLead": (domains, service, ready, total, plain) =>
+    `${domains === 1 ? "1 個網域轉送到" : `${domains} 個網域都轉送到`} ${service}${total > 0 ? `（${ready}/${total} 就緒）` : ""}${plain > 0 ? `；${plain} 個沒有 HTTPS` : ""}。`,
+  "net.filter": "篩選網域",
+  "net.noMatch": "沒有符合的網域。",
+  "net.noHttps": "沒有 HTTPS",
+  "net.https": "HTTPS",
+  "net.routeMore": (host) => `${host} 的路徑、連接埠與操作`,
   "net.publicEmpty": (name) => `${name} 還沒有公開網域`,
   "net.publicEmptyBody": "新增網域後，就能用瀏覽器開啟這個服務。",
   "net.publicNeedsPrivate": "網域會把請求轉送到服務的私有位址，所以要先有私有位址。",

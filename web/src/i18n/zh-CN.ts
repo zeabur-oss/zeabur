@@ -535,6 +535,13 @@ export const zhCN: Messages = {
   "net.path": "路径",
   "net.publicTitle": "公开域名",
   "net.publicAbout": "互联网上的任何人都能打开这些地址。",
+  "net.publicLead": (domains, service, ready, total, plain) =>
+    `${domains === 1 ? "1 个域名转发到" : `${domains} 个域名都转发到`} ${service}${total > 0 ? `（${ready}/${total} 就绪）` : ""}${plain > 0 ? `；${plain} 个没有 HTTPS` : ""}。`,
+  "net.filter": "筛选域名",
+  "net.noMatch": "没有匹配的域名。",
+  "net.noHttps": "没有 HTTPS",
+  "net.https": "HTTPS",
+  "net.routeMore": (host) => `${host} 的路径、端口和操作`,
   "net.publicEmpty": (name) => `${name} 还没有公开域名`,
   "net.publicEmptyBody": "添加域名后，就能用浏览器打开这个服务。",
   "net.publicNeedsPrivate": "域名会把请求转发到服务的私有地址，所以要先有私有地址。",

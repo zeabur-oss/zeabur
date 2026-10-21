@@ -587,6 +587,19 @@ export const en = {
   "net.path": "Path",
   "net.publicTitle": "Public domains",
   "net.publicAbout": "Anyone on the internet can open these addresses.",
+  "net.publicLead": (
+    domains: number,
+    service: string,
+    ready: number,
+    total: number,
+    plain: number,
+  ) =>
+    `${domains === 1 ? "1 domain routes" : `${domains} domains all route`} to ${service}${total > 0 ? ` (${ready}/${total} ready)` : ""}${plain > 0 ? `; ${plain} without HTTPS` : ""}.`,
+  "net.filter": "Filter domains",
+  "net.noMatch": "No domain matches.",
+  "net.noHttps": "No HTTPS",
+  "net.https": "HTTPS",
+  "net.routeMore": (host: string) => `Path, port and actions for ${host}`,
   "net.publicEmpty": (name: string) => `${name} has no public domain yet`,
   "net.publicEmptyBody": "Add a domain to open this service from a browser.",
   "net.publicNeedsPrivate":
