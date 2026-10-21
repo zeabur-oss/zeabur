@@ -22,7 +22,7 @@ than you have, and keeps no state of its own: no database, no custom resources.
 
 | | |
 | --- | --- |
-| ![A project on one page: what needs attention, the map of its domains, services and data, and its recent activity](docs/images/architecture.png) | ![A service that keeps crashing: its Status says why in plain words, where the problem comes from and what to do](docs/images/crash-loop.png) |
+| ![A project on one page: what needs attention, the map of its domains, services and data, and its recent activity](docs/images/architecture.png) | ![A service that keeps crashing: its Overview says why in plain words, where the problem comes from and what to do](docs/images/crash-loop.png) |
 | **One page per project**: a map or a list, with what needs attention and what happened. | **Diagnoses** in plain words, with the fix and the evidence. |
 | ![The confirmation before a restart: what restarts, whether it fits the cluster, in plain sentences](docs/images/plan.png) | |
 | **Every change is a plan** you confirm: what restarts, whether it fits, what data it removes. | |

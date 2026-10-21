@@ -36,11 +36,15 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   (`components/shell/project-sidebar.tsx`) replaces the global one. Home is "What needs you"
   (incidents, then problems by origin, each with cause, fixer and fix). A project is one page:
   Needs attention, then its map or list (`?view`) with Activity, gaps behind "N suggestions". A
-  service page is a header and four segmented `Tabs` (Status, Changes, Configure, Inspect) in
-  `max-w-content`; Configure is one page with a `SectionNav` whose edits collect in a `DraftBar`;
-  an old `?tab=` must keep redirecting (`routes/search.ts`). Projects are cards
-  (`components/project-card.tsx`); settings are `SectionLabel` over `Card variant="list"` of
-  `CardRow`s. No underline tabs, no "More" menu. Tokens, layout, shell and banned styles are in
+  service page is a header and six segmented `Tabs` named as hosted Zeabur names them (Overview,
+  Logs, Deployments, Networking, Variables, Settings) in `max-w-content`; Settings is one page with
+  a `SectionNav`, and edits in Networking, Variables and Settings collect in one `DraftBar`. The
+  header's ⋯ menu holds the expert views (Usage, Events, Terminal, YAML) and Delete, nothing
+  else; a tab is never also a header button. An old `?tab=` must keep redirecting
+  (`routes/search.ts`). Overview leads with one sentence each: health, then each domain
+  reachable, not reachable with its fix, or not verified (never red for a hop Zeabur could not
+  check). Projects are cards (`components/project-card.tsx`); settings are `SectionLabel` over
+  `Card variant="list"` of `CardRow`s. No underline tabs. Tokens, layout, shell and banned styles are in
   `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including focus rings).
 - **Lint.** `bun run lint` includes [shadcn/lint](https://github.com/shadcn-ui/lint) (rules in
   `web/.oxlintrc.json`, which recognises the design system's components by `componentImports`;
