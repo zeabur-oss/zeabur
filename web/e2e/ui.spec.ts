@@ -621,31 +621,95 @@ async function applyNow(page: Page, change: Record<string, unknown>) {
   expect(applied.status()).toBe(200)
 }
 
-test("a variable is added through a plan", async ({ page }) => {
+/** Pastes text into the focused field, as a clipboard paste does. */
+const paste = (page: Page, text: string) =>
+  page.evaluate((data) => {
+    const transfer = new DataTransfer()
+    transfer.setData("text/plain", data)
+    document.activeElement?.dispatchEvent(
+      new ClipboardEvent("paste", { clipboardData: transfer, bubbles: true, cancelable: true }),
+    )
+  }, text)
+
+test("variables are edited, added by pasting lines, and saved as one plan", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
   const panel = page.getByRole("tabpanel", { name: "Variables" })
-  await panel.getByRole("button", { name: "Add variable" }).click()
-  await panel.getByRole("textbox", { name: "Name" }).fill("E2E_ADDED")
-  await panel.getByRole("textbox", { name: "Value" }).fill("added-1")
-  await panel.getByRole("button", { name: "Add to changes" }).click()
+  await panel.getByRole("button", { name: "Edit", exact: true }).click()
+  await panel.getByRole("textbox", { name: "Value of NOTE" }).fill("second")
+  await panel.getByRole("button", { name: "Add a variable" }).click()
+  const names = panel.getByRole("textbox", { name: "Name", exact: true })
+  await names.last().focus()
+  await paste(page, 'E2E_ADDED=added-1\nexport E2E_QUOTED="two words"\n# a comment\n\nbad name=1')
+  await expect(names).toHaveCount(4)
+  await expect(panel).toContainText("Use letters, digits")
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled()
+  await names.last().fill("E2E_FIXED")
+  await expect(page.getByText("4 changes pending")).toBeVisible()
+  await page.getByRole("button", { name: "Save", exact: true }).click()
+  await confirmPlan(
+    page,
+    `Change ${editor}`,
+    "Save variables",
+    `Set NOTE, E2E_ADDED, E2E_QUOTED, and E2E_FIXED on ${editor}.`,
+  )
+  await expect(panel).toContainText("E2E_QUOTED", { timeout: 15_000 })
+  await expect(panel).toContainText("two words")
+})
+
+test("variables are removed with an undo and rewritten as .env, in one plan", async ({ page }) => {
+  await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
+  const panel = page.getByRole("tabpanel", { name: "Variables" })
+  await expect(panel).toContainText("E2E_FIXED", { timeout: 15_000 })
+  await panel.getByRole("button", { name: "Edit", exact: true }).click()
+  await panel.getByRole("button", { name: "Remove E2E_ADDED" }).click()
+  await panel.getByRole("button", { name: "Remove E2E_FIXED" }).click()
+  await panel.getByRole("button", { name: "Undo" }).last().click()
   await expect(page.getByText("1 change pending")).toBeVisible()
-  await review(page)
-  await confirmPlan(page, `Change ${editor}`, "Save variables", `Set E2E_ADDED on ${editor}.`)
-  await expect(panel).toContainText("E2E_ADDED", { timeout: 15_000 })
-  await expect(panel).toContainText("added-1")
+  await panel.getByText(".env", { exact: true }).click()
+  const text = panel.getByRole("textbox", { name: "Variables as .env" })
+  await expect(text).not.toHaveValue(/E2E_ADDED/)
+  await text.fill(
+    `${await text.inputValue()}\n# from a file\nexport E2E_DOTENV='a # b'\nE2E_MULTI="one\\ntwo"\n`,
+  )
+  await expect(page.getByText("3 changes pending")).toBeVisible()
+  await page.getByRole("button", { name: "Save", exact: true }).click()
+  await confirmPlan(
+    page,
+    `Change ${editor}`,
+    "Save variables",
+    `Set E2E_DOTENV and E2E_MULTI and remove E2E_ADDED on ${editor}.`,
+  )
+  await expect(panel).toContainText("E2E_DOTENV", { timeout: 15_000 })
+  await expect(panel).not.toContainText("E2E_ADDED")
+})
+
+test("leaving with unsaved variables asks first", async ({ page }) => {
+  await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
+  const panel = page.getByRole("tabpanel", { name: "Variables" })
+  await panel.getByRole("button", { name: "Edit", exact: true }).click()
+  await panel.getByRole("textbox", { name: "Value of NOTE" }).fill("unsaved")
+  await page
+    .getByRole("navigation", { name: "Project sections" })
+    .getByRole("link", { name: "Projects" })
+    .click()
+  const ask = page.getByRole("dialog", { name: "Leave without saving?" })
+  await expect(ask).toBeVisible()
+  await ask.getByRole("button", { name: "Stay" }).click()
+  await expect(panel.getByRole("textbox", { name: "Value of NOTE" })).toHaveValue("unsaved")
 })
 
 test("a ConfigMap value is edited where it lives, its key highlighted", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
   const panel = page.getByRole("tabpanel", { name: "Variables" })
-  await panel.getByRole("button", { name: "Edit in ConfigMap editor-config" }).click()
+  await panel.getByRole("button", { name: "mode in config file editor-config" }).click()
   const sheet = page.getByRole("dialog").filter({ hasText: "editor-config" })
   await expect(sheet.locator("li[data-highlight]")).toContainText("mode")
   await sheet.getByRole("textbox", { name: "mode", exact: true }).fill("green")
-  await sheet.getByRole("button", { name: "Review" }).click()
+  await sheet.getByRole("button", { name: "Add to changes" }).click()
+  await review(page)
   await confirmPlan(
     page,
-    "ConfigMap editor-config",
+    `Change ${editor}`,
     "Save values",
     `${editor} reads editor-config and keeps the old value until restarted.`,
   )
@@ -673,11 +737,11 @@ test("a change made meanwhile is refused in a toast, and Review again plans it a
 }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
   const panel = page.getByRole("tabpanel", { name: "Variables" })
-  await panel.getByRole("button", { name: "Add variable" }).click()
-  await panel.getByRole("textbox", { name: "Name" }).fill("E2E_REVIEWED")
-  await panel.getByRole("textbox", { name: "Value" }).fill("reviewed-1")
-  await panel.getByRole("button", { name: "Add to changes" }).click()
-  await review(page)
+  await panel.getByRole("button", { name: "Edit", exact: true }).click()
+  await panel.getByRole("button", { name: "Add a variable" }).click()
+  await panel.getByRole("textbox", { name: "Name", exact: true }).last().fill("E2E_REVIEWED")
+  await panel.getByRole("textbox", { name: "Value of E2E_REVIEWED" }).fill("reviewed-1")
+  await page.getByRole("button", { name: "Save", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: `Change ${editor}` })
   await expect(dialog).toContainText("Set E2E_REVIEWED")
   await applyNow(page, {
@@ -866,13 +930,40 @@ test("install texts come in four forms for a catalogue component", async ({ page
   await expect(text("Argo CD")).toContainText("cert-manager")
 })
 
+const noShell = env("ZEABUR_E2E_NO_SHELL")
+
+test("a service without a shell opens a debug terminal through a plan", async ({ page }) => {
+  test.skip(!noShell, "ZEABUR_E2E_NO_SHELL is not set")
+  await page.goto(`${project}/services/Deployment/${noShell}?tab=terminal`)
+  await expect(page.getByText("This container has no shell")).toBeVisible({ timeout: 20_000 })
+  await page.getByRole("button", { name: "Open debug terminal" }).click()
+  const dialog = page.getByRole("dialog", { name: "Open debug terminal" })
+  await expect(dialog).toContainText("Adds a debug container with a shell")
+  await dialog.getByRole("button", { name: "Open debug terminal" }).click()
+  await expect(page.getByText("Connected to the debug container")).toBeVisible({ timeout: 30_000 })
+})
+
+test("Networking leads with the short address; the Service sits behind one disclosure", async ({
+  page,
+}) => {
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
+  const panel = page.getByRole("tabpanel", { name: "Networking" })
+  const network = panel.getByRole("region", { name: "Private network" })
+  await expect(network.getByText(`${healthy}:80`, { exact: true })).toBeVisible()
+  await expect(network).toContainText(`${healthy}.${namespace}.svc.cluster.local:80`)
+  const service = network.getByText(`Service/${healthy} ClusterIP`)
+  await expect(service).toBeHidden()
+  await expect(network.getByRole("button", { name: "Details for Kubernetes users" })).toHaveCount(1)
+  await network.getByRole("button", { name: "Details for Kubernetes users" }).click()
+  await expect(service).toBeVisible()
+})
+
 test("Networking shows who may reach a service, and a ready-made policy isolates it", async ({
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=networking`)
   const panel = page.getByRole("tabpanel", { name: "Networking" })
   await expect(panel.getByRole("heading", { name: /^Connection rules/ })).toBeVisible()
-  await expect(panel).toContainText("NetworkPolicy")
   await expect(panel).toContainText("network plugin (CNI)")
   await panel.getByRole("button", { name: "Add rule" }).click()
   await page.getByRole("menuitem", { name: "Isolate this service" }).click()
