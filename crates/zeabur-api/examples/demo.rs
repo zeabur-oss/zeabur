@@ -517,7 +517,7 @@ fn payments() -> NamespaceObjects {
     }
 }
 
-/// A large, healthy project: 30 small services, two stores and a dashboard behind a domain.
+/// A large, healthy project: 42 small services, two stores and a dashboard behind a domain.
 fn analytics() -> NamespaceObjects {
     let ns = "analytics";
     let names = [
@@ -551,6 +551,18 @@ fn analytics() -> NamespaceObjects {
         "janitor",
         "metrics",
         "tracer",
+        "profiler",
+        "segmenter",
+        "attribution",
+        "experiments",
+        "flags",
+        "billing-sync",
+        "warehouse-sync",
+        "backfill",
+        "reindexer",
+        "snapshotter",
+        "audit",
+        "webhooks",
     ];
     let mut deployments = Vec::new();
     let mut pods = Vec::new();
