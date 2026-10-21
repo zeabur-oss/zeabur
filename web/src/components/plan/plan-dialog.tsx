@@ -247,15 +247,12 @@ function PlanBody({
         </ul>
       ) : null}
       <Collapsible>
-        <CollapsibleTrigger variant="plain" className="group/trigger mt-1 flex items-center">
-          <CaretRightIcon
-            aria-hidden="true"
-            className="size-3.5 transition-transform group-data-[panel-open]/trigger:rotate-90 motion-reduce:transition-none"
-          />
+        <CollapsibleTrigger variant="disclosure" className="mt-1">
+          <CaretRightIcon aria-hidden="true" />
           {t("plan.details")}
         </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="mt-3 flex flex-col gap-4">
+        <CollapsibleContent className="-mx-1">
+          <div className="flex flex-col gap-4 px-1 pt-3 pb-1">
             {plan.objects.map((object) => (
               <PlannedObject
                 key={`${object.target.kind}/${object.target.name}`}

@@ -102,11 +102,8 @@ export function BackupDetails({ data }: { data: Schemas["ProjectBackups"] }) {
   if (data.schedules.length === 0 && data.runs.length === 0) return null
   return (
     <Collapsible className="mt-1">
-      <CollapsibleTrigger variant="plain" className="group/trigger flex items-center">
-        <CaretRightIcon
-          aria-hidden="true"
-          className="size-3.5 transition-transform group-data-[panel-open]/trigger:rotate-90 motion-reduce:transition-none"
-        />
+      <CollapsibleTrigger variant="disclosure">
+        <CaretRightIcon aria-hidden="true" />
         {t("backups.details")}
       </CollapsibleTrigger>
       <CollapsibleContent>

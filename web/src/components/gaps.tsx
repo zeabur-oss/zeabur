@@ -102,15 +102,14 @@ function GapRow({ gap, onPlan }: { gap: Gap; onPlan?: () => void }) {
       </div>
       {gap.snippet && !onPlan ? (
         <Collapsible>
-          <CollapsibleTrigger variant="plain" className="group/trigger flex items-center">
-            <CaretRightIcon
-              className="size-3 transition-transform group-data-[panel-open]/trigger:rotate-90 motion-reduce:transition-none"
-              aria-hidden="true"
-            />
+          <CollapsibleTrigger variant="disclosure">
+            <CaretRightIcon aria-hidden="true" />
             {t("gap.snippet")}
           </CollapsibleTrigger>
-          <CollapsibleContent>
-            <YamlBlock yaml={gap.snippet} label={t("gap.snippet")} className="mt-2" />
+          <CollapsibleContent className="-mx-1">
+            <div className="px-1 pt-2 pb-1">
+              <YamlBlock yaml={gap.snippet} label={t("gap.snippet")} />
+            </div>
           </CollapsibleContent>
         </Collapsible>
       ) : null}

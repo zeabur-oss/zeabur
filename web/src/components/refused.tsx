@@ -144,11 +144,8 @@ export function Refused({
             </span>
           </p>
           {details ? (
-            <CollapsibleTrigger variant="plain" className="group/trigger flex items-center">
-              <CaretRightIcon
-                aria-hidden="true"
-                className="size-3 transition-transform group-data-[panel-open]/trigger:rotate-90 motion-reduce:transition-none"
-              />
+            <CollapsibleTrigger variant="disclosure">
+              <CaretRightIcon aria-hidden="true" />
               {t("refused.details")}
             </CollapsibleTrigger>
           ) : null}
@@ -168,8 +165,8 @@ export function Refused({
           ) : null}
         </div>
         {details ? (
-          <CollapsibleContent>
-            <div className="flex flex-col gap-3 pt-3">
+          <CollapsibleContent className="-mx-1">
+            <div className="flex flex-col gap-3 px-1 pt-3 pb-1">
               <dl className="grid grid-cols-pairs gap-x-4 gap-y-1 font-mono text-xs">
                 {rules.length > 0 ? (
                   <>

@@ -242,15 +242,12 @@ export function AddVolume({
         )}
       </form.Subscribe>
       <Collapsible className="w-full">
-        <CollapsibleTrigger variant="plain" className="group/trigger flex items-center">
-          <CaretRightIcon
-            aria-hidden="true"
-            className="size-3.5 transition-transform group-data-[panel-open]/trigger:rotate-90 motion-reduce:transition-none"
-          />
+        <CollapsibleTrigger variant="disclosure">
+          <CaretRightIcon aria-hidden="true" />
           {t("form.advanced")}
         </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="flex flex-wrap items-start gap-3 pt-3">
+        <CollapsibleContent className="-mx-1">
+          <div className="flex flex-wrap items-start gap-3 px-1 pt-3 pb-1">
             <form.Subscribe selector={(s) => s.values.name}>
               {(name) => (
                 <form.Field

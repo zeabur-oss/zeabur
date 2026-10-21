@@ -178,11 +178,8 @@ function Fold({
 }) {
   return (
     <Collapsible>
-      <CollapsibleTrigger variant="plain" className="group/trigger flex items-center">
-        <CaretRightIcon
-          aria-hidden="true"
-          className="size-3 transition-transform group-data-[panel-open]/trigger:rotate-90 motion-reduce:transition-none"
-        />
+      <CollapsibleTrigger variant="disclosure">
+        <CaretRightIcon aria-hidden="true" />
         {label}
         {extra}
       </CollapsibleTrigger>
