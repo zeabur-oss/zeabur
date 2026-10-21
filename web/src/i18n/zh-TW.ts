@@ -1294,13 +1294,13 @@ export const zhTW: Messages = {
   "sentence.diagnosis.unexplained.fix.waiting": (p) =>
     `開啟 ${p.pod} 的事件，kubelet 會在那裡說明它在等什麼。`,
   "sentence.diagnosis.unexplained.fix.terminated": (p) =>
-    `從 ${p.pod} 的日誌和事件找出它停止的原因。`,
+    `開啟 ${p.pod} 的日誌和事件，看它為什麼停止。`,
   "sentence.diagnosis.unexplained.fix.pending": (p) =>
     `開啟 ${p.pod} 的事件，排程器和 kubelet 會在那裡說明它為什麼還沒啟動。`,
   "sentence.diagnosis.unexplained.fix.notReady": (p) =>
-    `確認應用程式在就緒檢查查看的位置有回應，再看 ${p.pod} 的日誌。`,
-  "sentence.diagnosis.unexplained.fix.phase": (p) => `查看 ${p.pod} 的事件和日誌。`,
-  "sentence.diagnosis.unexplained.fix.none": (p) => `查看 ${p.service} 的事件。`,
+    `確認應用程式回應就緒檢查探測的位置，再看 ${p.pod} 的日誌。`,
+  "sentence.diagnosis.unexplained.fix.phase": (p) => `開啟 ${p.pod} 的事件和日誌。`,
+  "sentence.diagnosis.unexplained.fix.none": (p) => `開啟 ${p.service} 的事件。`,
   "sentence.problem.summary.bad-request": () => "這個請求無效。",
   "sentence.problem.summary.unauthenticated": () => "叢集不接受你的登入。",
   "sentence.problem.summary.signed-out": () => "你已登出。",
