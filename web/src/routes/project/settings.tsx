@@ -336,11 +336,12 @@ function BatchActions({ project }: { project: string }) {
   const view = useQuery(projectQuery(project))
   const planner = usePlanner(project)
   const services = view.data?.services ?? []
-  const pausable = services.filter(
-    (s) =>
-      (s.kind === "Deployment" || s.kind === "StatefulSet") &&
-      (s.replicas?.desired ?? 0) > 0 &&
-      !s.provenance.tool,
+  const running = services.filter(
+    (s) => (s.kind === "Deployment" || s.kind === "StatefulSet") && (s.replicas?.desired ?? 0) > 0,
+  )
+  const pausable = running.filter((s) => !s.provenance.tool)
+  const skipped = running.flatMap((s) =>
+    s.provenance.tool ? [{ name: s.name, tool: s.provenance.tool }] : [],
   )
   const restarting = services.filter(restartable)
   if (services.length === 0) return null
@@ -358,6 +359,7 @@ function BatchActions({ project }: { project: string }) {
             onClick={() =>
               planner.plan({
                 title: t("title.pauseAll", project),
+                skipped,
                 changes: pausable.map((s) => ({
                   op: "scale" as const,
                   workload: { kind: s.kind, name: s.name },

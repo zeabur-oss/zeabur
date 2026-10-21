@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import type { Schemas } from "@/api/client"
 import { useDraft } from "@/components/plan/draft"
 import { fallback, next, type Open } from "@/components/plan/fallback"
+import type { Skipped } from "@/model/managed"
 
 const PlanDialog = lazy(() =>
   import("@/components/plan/plan-dialog").then((m) => ({ default: m.PlanDialog })),
@@ -17,6 +18,8 @@ export interface PlanAsk {
   restartAfter?: boolean
   /** When the changes do not name it (a ConfigMap, a route, a policy). */
   service?: Schemas["WorkloadRef"]
+  /** Services the changes leave out because another tool manages them. */
+  skipped?: Skipped[]
 }
 
 /** Inside a service's Configure page, an edit waits in its draft instead; `direct` plans at once. */

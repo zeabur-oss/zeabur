@@ -31,6 +31,7 @@ import { Input } from "@zeabur/design-system/components/input"
 import { Label } from "@zeabur/design-system/components/label"
 import { YamlDiff } from "@/components/yaml"
 import { useI18n, useT, type Translate } from "@/i18n"
+import { toolNotes, type Skipped, type ToolNote } from "@/model/managed"
 import { awaitsName, destinationOf, typedName, undoOf, weigh, type PodsOf } from "@/model/risk"
 
 const COUNTDOWN_FROM_SECONDS = 120
@@ -131,6 +132,7 @@ export function PlanDialog({
           ) : description ? (
             <PlanBody
               plan={plan.data}
+              skipped={ask.skipped}
               lines={description.lines}
               consequence={weight.risk === "high" ? (description.consequence ?? "") : undefined}
             />
@@ -202,16 +204,21 @@ const said = new Set<Schemas["PlanWarning"]["code"]>([
 
 function PlanBody({
   plan,
+  skipped,
   lines,
   consequence,
 }: {
   plan: Schemas["PlanResponse"]
+  skipped?: Skipped[]
   lines: string[]
   consequence?: string
 }) {
   const t = useT()
   const [first, ...rest] = lines
-  const warnings = plan.warnings.filter((w) => !said.has(w.code))
+  const warnings = [
+    ...plan.warnings.filter((w) => !said.has(w.code)).map((w) => warningText(t, w)),
+    ...toolNotes(plan, skipped).map((note) => noteText(t, note)),
+  ]
   return (
     <div className="flex flex-col gap-3">
       {consequence !== undefined && first ? (
@@ -239,9 +246,9 @@ function PlanBody({
       {warnings.length > 0 ? (
         <ul className="flex flex-col gap-1.5" aria-label={t("plan.warnings")}>
           {warnings.map((warning) => (
-            <li key={JSON.stringify(warning)} className="flex items-start gap-2 text-sm">
+            <li key={warning} className="flex items-start gap-2 text-sm">
               <StatusDot health="warn" className="mt-1.5" />
-              <span>{warningText(t, warning)}</span>
+              <span>{warning}</span>
             </li>
           ))}
         </ul>
@@ -301,6 +308,13 @@ function PlannedObject({ object, named }: { object: Schemas["PlannedObject"]; na
       <YamlDiff before={before} after={after} />
     </section>
   )
+}
+
+function noteText(t: Translate, note: ToolNote): string {
+  const when = t("plan.when", note.tool)
+  return note.kind === "skipped"
+    ? t("plan.toolSkipped", note.names.join(", "), note.names.length, note.tool, when)
+    : t("plan.toolPutBack", when, note.paths.join(", "), note.object)
 }
 
 function names(workloads: Schemas["WorkloadRef"][]): string {

@@ -651,7 +651,7 @@ export const zhCN: Messages = {
   "projectSettings.shownNo": "否。纳入只会加上 Zeabur 的项目标签，其他都不变。",
   "projectSettings.batch": "批量操作",
   "projectSettings.pauseAll": "暂停所有服务",
-  "projectSettings.pauseAllHint": "把每个运行中的服务缩放到 0 个副本。其他工具管理的服务不会变动。",
+  "projectSettings.pauseAllHint": "停止这个项目的所有服务；之后可以恢复。",
   "projectSettings.pause": "暂停",
   "projectSettings.restartAll": "重启所有服务",
   "projectSettings.restartAllHint": "分批替换副本，涵盖所有能重启的服务。",
@@ -707,6 +707,15 @@ export const zhCN: Messages = {
   "plan.expired": "已失效",
   "plan.warnings": "应用前须知",
   "plan.owners": "字段所有者",
+  "plan.when": (tool) =>
+    tool === "Helm"
+      ? "下次 Helm 升级时"
+      : tool === "kubectl"
+        ? "下次运行 kubectl apply 时"
+        : `下次 ${tool} 同步时`,
+  "plan.toolSkipped": (names, _count, tool, when) =>
+    `略过 ${names}：由 ${tool} 管理，${when}会改回这个变更。`,
+  "plan.toolPutBack": (when, paths, object) => `${when}会改回 ${object} 的 ${paths}。`,
   "plan.diff": "YAML 差异",
   "plan.create": "新建",
   "plan.delete": "删除",

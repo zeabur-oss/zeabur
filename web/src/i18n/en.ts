@@ -719,7 +719,7 @@ export const en = {
   "projectSettings.batch": "Batch actions",
   "projectSettings.pauseAll": "Pause all services",
   "projectSettings.pauseAllHint":
-    "Scales every running service to zero replicas. Services another tool manages are left out.",
+    "Stops every service in this project; you can bring them back later.",
   "projectSettings.pause": "Pause",
   "projectSettings.restartAll": "Restart all services",
   "projectSettings.restartAllHint":
@@ -777,6 +777,16 @@ export const en = {
   "plan.expired": "Expired",
   "plan.warnings": "Before you apply",
   "plan.owners": "Fields owned by",
+  "plan.when": (tool: string) =>
+    tool === "Helm"
+      ? "the next Helm upgrade"
+      : tool === "kubectl"
+        ? "the next kubectl apply"
+        : `the next ${tool} sync`,
+  "plan.toolSkipped": (names: string, count: number, tool: string, when: string) =>
+    `Leaves out ${names}: ${tool} manages ${count === 1 ? "it" : "them"}, and ${when} would undo the change.`,
+  "plan.toolPutBack": (when: string, paths: string, object: string) =>
+    `${when.charAt(0).toUpperCase()}${when.slice(1)} puts back ${paths} on ${object}.`,
   "plan.diff": "YAML diff",
   "plan.create": "New",
   "plan.delete": "Deleted",
