@@ -175,9 +175,14 @@ export function NewDatabaseDrawer({
   const [entered, setForm] = useState<NewDatabase>(() =>
     newDatabase(first, nodes, blockedVersions(first, kernels)),
   )
+  const [membersPicked, setMembersPicked] = useState(false)
   // The nodes can load after the form opened, with a kernel that refuses its version.
   const blocked = blockedVersions(entered.engine, kernels)
-  const form = { ...entered, version: allowedVersion(entered.engine, entered.version, blocked) }
+  const form = {
+    ...entered,
+    version: allowedVersion(entered.engine, entered.version, blocked),
+    members: membersPicked ? entered.members : newDatabase(entered.engine, nodes).members,
+  }
   const [tried, setTried] = useState(false)
   const step = usePlanStep(project, onClose)
   const targets = useTargets(project)
@@ -242,6 +247,7 @@ export function NewDatabaseDrawer({
                   ),
                   name: form.name,
                 })
+                setMembersPicked(false)
                 setChoice((c) => newChoice({ engine: engine as Engine }, c.picked))
               }}
               items={available.map((e) => ({ value: e, label: t(`db.engine.${e}`) }))}
@@ -296,7 +302,10 @@ export function NewDatabaseDrawer({
             <Select
               size="sm"
               value={String(form.members)}
-              onValueChange={(members) => set({ members: Number(members) })}
+              onValueChange={(members) => {
+                setMembersPicked(true)
+                set({ members: Number(members) })
+              }}
               items={memberChoices[form.engine].map((n) => ({
                 value: String(n),
                 label: String(n),
