@@ -83,6 +83,23 @@ for (const width of widths) {
   }
 }
 
+for (const width of [390, 1440]) {
+  test(`a service's Settings keeps space below its last block at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto(`${project}/services/Deployment/${healthy}?tab=settings`)
+    const panel = page.getByRole("tabpanel", { name: "Settings" })
+    await expect(panel).toBeVisible()
+    const space = await page.locator("main").evaluate(
+      (main, panel) => {
+        main.scrollTop = main.scrollHeight
+        return main.getBoundingClientRect().bottom - panel!.getBoundingClientRect().bottom
+      },
+      await panel.elementHandle(),
+    )
+    expect(space).toBeGreaterThanOrEqual(48)
+  })
+}
+
 for (const width of [1440, 1960]) {
   test(`the quick look sits at the map's right edge, beside its service, at ${width}px`, async ({
     page,
