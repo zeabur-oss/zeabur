@@ -209,6 +209,19 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
       timeout: 30_000,
     })
     await expect(dock.getByRole("status").filter({ hasText: "Connected" })).toBeHidden()
+
+    // Zeabur Proxy reads log history as the person: past its review in their project (without
+    // a log store, nothing answers it there), refused in the other.
+    const logHistory = async (project: string) =>
+      (
+        (await (
+          await viewer.request.get(
+            `/api/v1/projects/${encodeURIComponent(project)}/services/deployment/${service}/logs/history`,
+          )
+        ).json()) as { state: string }
+      ).state
+    expect(["available", "unavailable"]).toContain(await logHistory(second))
+    expect(await logHistory(first)).toBe("unreadable")
     await viewer.context().close()
   })
 })
