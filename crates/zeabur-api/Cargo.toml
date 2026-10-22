@@ -44,3 +44,5 @@ zeabur-core.workspace = true
 kube.workspace = true
 serde.workspace = true
 tower.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

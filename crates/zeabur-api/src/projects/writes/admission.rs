@@ -15,7 +15,8 @@
 //!   webhook "{name}" denied the request: …" [k8s-webhook-errors]; that is a policy's refusal too,
 //!   not a malformed request. A `ValidatingAdmissionPolicy` says "`ValidatingAdmissionPolicy`
 //!   '{name}' with binding '{binding}' denied request: …" [k8s-vap-errors], with the status its
-//!   validation's `reason` gives (the chart's own gives `Forbidden`).
+//!   validation's `reason` gives (the chart's own gives `Forbidden`; without one it is `422
+//!   Invalid`, which is no malformed object either).
 //!
 //! Neither kind is a refusal for missing rights, so neither is offered as `elevation-required`
 //! ([`crate::error`]).
@@ -56,6 +57,7 @@ pub(crate) async fn refine(
         Kind::BadRequest if message.starts_with(WEBHOOK_DENIED) => {
             policy_denied(problem, what, &message)
         }
+        Kind::Invalid if message.contains(POLICY_DENIED) => policy_denied(problem, what, &message),
         Kind::Forbidden => {
             let Some(denied) = &problem.denied else {
                 return problem;
