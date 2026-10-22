@@ -7,6 +7,7 @@ import type { Schemas } from "@/api/client"
 import { Ago } from "@/components/bits"
 import { FilterField } from "@/components/filter-field"
 import { LoadingRows } from "@/components/page"
+import { GateTip, useHereGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
@@ -480,6 +481,7 @@ function OlderRow({
 
 function RollbackButton({ managed, onClick }: { managed?: string | null; onClick: () => void }) {
   const t = useT()
+  const gate = useHereGate("changeServices")
   const button = (
     <Button variant="outline" size="xs" disabled={!!managed} onClick={onClick}>
       <ArrowCounterClockwiseIcon aria-hidden="true" data-icon="inline-start" />
@@ -491,7 +493,7 @@ function RollbackButton({ managed, onClick }: { managed?: string | null; onClick
       <span>{button}</span>
     </Tooltip>
   ) : (
-    button
+    <GateTip gate={gate}>{button}</GateTip>
   )
 }
 

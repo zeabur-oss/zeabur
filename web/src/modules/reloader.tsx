@@ -11,6 +11,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 
 import { configReloadQuery } from "@/api/queries"
 import { ManagedTip } from "@/components/bits"
+import { useHereGate } from "@/components/gate"
 import { useT } from "@/i18n"
 import type { Service } from "@/model/service"
 import type { ServiceSettingsProps, ServiceSettingsSection } from "@/modules/service-settings"
@@ -24,6 +25,7 @@ function ConfigReloadSetting({ service, plan }: ServiceSettingsProps) {
   const reload = service.configReload
   const on = reload?.auto ?? false
   const managed = service.provenance.tool ?? undefined
+  const gate = useHereGate("changeServices")
   const workload = { kind: service.kind, name: service.name }
   const named = [...(reload?.configMaps ?? []), ...(reload?.secrets ?? [])]
   const state = cluster.data?.reloader
@@ -40,7 +42,7 @@ function ConfigReloadSetting({ service, plan }: ServiceSettingsProps) {
             </p>
           ) : null}
         </div>
-        <ManagedTip tool={managed}>
+        <ManagedTip tool={managed} gate={gate}>
           <Switch
             id={id}
             checked={on}

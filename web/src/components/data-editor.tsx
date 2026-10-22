@@ -13,6 +13,7 @@ import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } fro
 import { configMapsQuery, objectQuery, projectQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
+import { GateNote, GateTip, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Badge } from "@zeabur/design-system/components/badge"
@@ -121,6 +122,9 @@ export function DataEditor({
   const pending = kind === "ConfigMap" ? configMaps.isPending : secretYaml.isPending
   const error = kind === "ConfigMap" ? configMaps.error : secretYaml.error
   const managed = resource?.provenance.tool ?? undefined
+  const gates = useGates(project)
+  const gate = gates(kind === "Secret" ? "changeSecrets" : "changeConfig")
+  const locked = Boolean(managed) || !gate.open
   const readers = resource?.attribution.owners ?? []
 
   const reveal = async () => {
@@ -178,22 +182,26 @@ export function DataEditor({
             <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
               {t("ops.managedEdit", managed)}
             </p>
-          ) : null}
+          ) : (
+            <GateNote gate={gate} />
+          )}
           {kind === "Secret" && !revealed ? (
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => void reveal()}
-                disabled={revealing.pending}
-              >
-                {revealing.pending ? (
-                  <Spinner data-icon="inline-start" />
-                ) : (
-                  <EyeIcon aria-hidden="true" data-icon="inline-start" />
-                )}
-                {t("data.reveal")}
-              </Button>
+              <GateTip gate={gates("readSecrets")}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void reveal()}
+                  disabled={revealing.pending}
+                >
+                  {revealing.pending ? (
+                    <Spinner data-icon="inline-start" />
+                  ) : (
+                    <EyeIcon aria-hidden="true" data-icon="inline-start" />
+                  )}
+                  {t("data.reveal")}
+                </Button>
+              </GateTip>
               <span className="type-meta text-muted-foreground">{t("yaml.hidden")}</span>
             </div>
           ) : null}
@@ -239,7 +247,7 @@ export function DataEditor({
                           <Button
                             variant="muted"
                             size="icon-xs"
-                            disabled={Boolean(managed)}
+                            disabled={locked}
                             aria-label={removed ? t("edit.undo", key) : t("edit.remove", key)}
                             title={removed ? t("edit.undo", key) : t("edit.remove", key)}
                             onClick={() =>
@@ -264,7 +272,7 @@ export function DataEditor({
                                 ? "••••••••"
                                 : undefined
                             }
-                            disabled={Boolean(managed) || removed}
+                            disabled={locked || removed}
                             onChange={(event) => {
                               const value = event.target.value
                               f.handleChange(
@@ -338,7 +346,7 @@ export function DataEditor({
             <Button
               variant="outline"
               size="sm"
-              disabled={Boolean(managed)}
+              disabled={locked}
               onClick={() => form.pushFieldValue("added", { key: "", value: "" })}
             >
               <PlusIcon aria-hidden="true" data-icon="inline-start" />
@@ -355,7 +363,7 @@ export function DataEditor({
                 ) : null}
                 <Button
                   size="sm"
-                  disabled={count === 0 || Boolean(managed)}
+                  disabled={count === 0 || locked}
                   onClick={() => void form.handleSubmit()}
                 >
                   <ReviewWord />

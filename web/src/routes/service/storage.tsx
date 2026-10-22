@@ -18,6 +18,7 @@ import {
 import { ManagedTip, Panel } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
+import { useGate } from "@/components/gate"
 import { useDraft, useHold } from "@/components/plan/draft"
 import { StatusPill } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
@@ -71,6 +72,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
   const multi = containers.length > 1
   const managed = service.provenance.tool ?? undefined
   // A Job's template cannot change; a StatefulSet's volumes come from its claim templates.
+  const gate = useGate(project, "changeStorage")
   const editable = service.kind !== "Job" && draft !== null
   const addable = editable && service.kind !== "StatefulSet"
   const other = service.containers.flatMap((c) =>
@@ -148,7 +150,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
 
   const editButton =
     rows || !editable || mounts.length === 0 ? undefined : (
-      <ManagedTip tool={managed}>
+      <ManagedTip tool={managed} gate={gate}>
         <Button
           variant="outline"
           size="sm"
@@ -187,7 +189,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
             </EmptyHeader>
             {addable ? (
               <EmptyContent>
-                <ManagedTip tool={managed}>
+                <ManagedTip tool={managed} gate={gate}>
                   <Button
                     variant="outline"
                     size="sm"

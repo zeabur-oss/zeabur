@@ -5,6 +5,7 @@ import XIcon from "~icons/ph/x"
 
 import { installQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
+import { GateTip, useClusterGate } from "@/components/gate"
 import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
@@ -55,6 +56,7 @@ export function InstallSheet({
   const [format, setFormat] = useState<string>("helm")
   const [who, setWho] = useState<"zeabur" | "you">("zeabur")
   const planner = usePlanner("kube-system", onClose, true)
+  const gate = useClusterGate("installComponents")
   const data = guide.data
   const objects = data && !data.here.blocked ? data.here.objects : []
   const mine = objects.length === 0 || who === "you"
@@ -243,9 +245,11 @@ export function InstallSheet({
                   <>
                     <p className="text-pretty">{t("install.here.what", objects.length)}</p>
                     <div>
-                      <Button size="sm" onClick={install}>
-                        {t("install.here.action")}
-                      </Button>
+                      <GateTip gate={gate}>
+                        <Button size="sm" onClick={install}>
+                          {t("install.here.action")}
+                        </Button>
+                      </GateTip>
                     </div>
                   </>
                 )}

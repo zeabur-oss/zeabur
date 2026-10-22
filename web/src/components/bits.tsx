@@ -3,6 +3,8 @@ import CheckIcon from "~icons/ph/check"
 import CopyIcon from "~icons/ph/copy"
 import InfoIcon from "~icons/ph/info"
 
+import { GateTip } from "@/components/gate"
+import type { Gate } from "@/model/rights"
 import { Button } from "@zeabur/design-system/components/button"
 import { ToggleGroup, ToggleGroupItem } from "@zeabur/design-system/components/toggle-group"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
@@ -201,10 +203,19 @@ export function Segmented<T extends string>({
   )
 }
 
-/** A control another tool owns, disabled, with why in a tooltip. */
-export function ManagedTip({ tool, children }: { tool?: string; children: ReactElement }) {
+/** A control another tool owns, or the person's role cannot use, disabled, with why in a
+ * tooltip. */
+export function ManagedTip({
+  tool,
+  gate,
+  children,
+}: {
+  tool?: string
+  gate?: Gate
+  children: ReactElement
+}) {
   const t = useT()
-  if (!tool) return children
+  if (!tool) return gate ? <GateTip gate={gate}>{children}</GateTip> : children
   return (
     <Tooltip content={t("ops.managedEdit", tool)}>
       <span>{children}</span>

@@ -39,6 +39,7 @@ import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useSentence, useT } from "@/i18n"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
+import { GateTip, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { formatAgo, formatTime } from "@/lib/format"
 import { serviceLink } from "@/lib/place"
@@ -192,6 +193,7 @@ function AlsoMeans({
 }) {
   const t = useT()
   const planner = usePlanner(project)
+  const gate = useGate(project, "changeServices")
   const down = said.alsoDown
   const line = said.rollout.as === "line" && rollout ? said.rollout : undefined
   if (!down && !line) return null
@@ -226,19 +228,21 @@ function AlsoMeans({
             </span>
           </p>
           {rollback ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() =>
-                void planner.plan({
-                  title: t("rollout.rollBack", service.name),
-                  changes: rollback.changes,
-                  service: { kind: service.kind, name: service.name },
-                })
-              }
-            >
-              {t("rollout.rollBackButton")}
-            </Button>
+            <GateTip gate={gate}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void planner.plan({
+                    title: t("rollout.rollBack", service.name),
+                    changes: rollback.changes,
+                    service: { kind: service.kind, name: service.name },
+                  })
+                }
+              >
+                {t("rollout.rollBackButton")}
+              </Button>
+            </GateTip>
           ) : null}
           {planner.dialog}
         </div>
@@ -271,6 +275,7 @@ function Rollout({
   const t = useT()
   const write = useSentence()
   const planner = usePlanner(project)
+  const gate = useGate(project, "changeServices")
   const rollback = data.rollback
   const known = data.revision != null
   const counts = replicaCounts(service)
@@ -302,20 +307,23 @@ function Rollout({
           <span className="text-secondary">{t("rollout.older", data.old)}</span>
         ) : null}
         {rollback ? (
-          <Button
-            variant="outline"
-            size="sm"
-            className="ml-auto"
-            onClick={() =>
-              void planner.plan({
-                title: t("rollout.rollBack", service.name),
-                changes: rollback.changes,
-                service: { kind: service.kind, name: service.name },
-              })
-            }
-          >
-            {t("rollout.rollBackButton")}
-          </Button>
+          <span className="ml-auto">
+            <GateTip gate={gate}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  void planner.plan({
+                    title: t("rollout.rollBack", service.name),
+                    changes: rollback.changes,
+                    service: { kind: service.kind, name: service.name },
+                  })
+                }
+              >
+                {t("rollout.rollBackButton")}
+              </Button>
+            </GateTip>
+          </span>
         ) : null}
       </div>
       <Meter value={Math.min(ready, data.desired) / data.desired} label={progress} />

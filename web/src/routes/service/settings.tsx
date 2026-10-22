@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import type { Schemas } from "@/api/client"
 import { nodesQuery, releasesQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
+import { GateNote, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
@@ -25,6 +26,7 @@ export function ComputeSection({ project, service }: { project: string; service:
   const t = useT()
   const planner = usePlanner(project)
   const managed = service.provenance.tool
+  const gate = useGate(project, "changeServices")
   return (
     <section aria-labelledby="compute-title" className="flex flex-col gap-3">
       <SectionHeader
@@ -32,12 +34,13 @@ export function ComputeSection({ project, service }: { project: string; service:
         title={t("form.compute")}
         description={t("form.computeHint")}
       />
+      {managed ? null : <GateNote gate={gate} />}
       {service.kind === "Job" ? (
         <p className="text-sm text-muted-foreground">{t("form.jobs")}</p>
       ) : (
         <Compute
           service={service}
-          disabled={!!managed}
+          disabled={!!managed || !gate.open}
           workload={{ kind: service.kind, name: service.name }}
           refused={planner.fields}
         />
@@ -63,6 +66,7 @@ export function HealthChecksSection({
   network: Network
 }) {
   const t = useT()
+  const gate = useGate(project, "changeServices")
   if (service.kind === "Job" || service.kind === "CronJob") return null
   return (
     <section aria-labelledby="health-title" className="flex flex-col gap-3">
@@ -71,11 +75,12 @@ export function HealthChecksSection({
         title={t("form.health")}
         description={t("form.healthHint")}
       />
+      {service.provenance.tool ? null : <GateNote gate={gate} />}
       <Probes
         project={project}
         service={service}
         endpoints={endpointsOf(network, service)}
-        disabled={!!service.provenance.tool}
+        disabled={!!service.provenance.tool || !gate.open}
       />
     </section>
   )

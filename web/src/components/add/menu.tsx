@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
+import { cloneElement } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 import PlusIcon from "~icons/ph/plus"
 
 import { creatableQuery, databasesQuery } from "@/api/queries"
+import { GatedMenuItem, GateTip, useGates } from "@/components/gate"
 import { useT } from "@/i18n"
 import { openAdd } from "@/lib/adding"
 import { engineName, engines, type Engine } from "@/model/databases"
-import { rightsOf } from "@/model/image-service"
+import type { Gate } from "@/model/rights"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Menu,
@@ -18,11 +20,6 @@ import {
   MenuTrigger,
 } from "@zeabur/design-system/components/menu"
 
-const engineKinds: Record<Engine, [string, string]> = {
-  postgresql: ["postgresql.cnpg.io", "clusters"],
-  mongodb: ["psmdb.percona.com", "perconaservermongodbs"],
-}
-
 export interface AddChoices {
   image: boolean
   /** Offered engines; `installed` false points at Components instead. */
@@ -30,62 +27,79 @@ export interface AddChoices {
   yaml: boolean
   /** Nothing to offer: the person may only look. */
   none: boolean
+  /** Why a service, or a database, cannot be added. */
+  gates: { image: Gate; database: Gate }
 }
 
-/** What "New" offers in the project: a kind denied is left out, one unknown is offered and the
- * plan's dry run decides. */
+/** What "New" offers in the project: a kind the person's role cannot add is closed, one unknown
+ * is offered and the plan's dry run decides. */
 export function useAddChoices(project: string | undefined): AddChoices | undefined {
   const creatable = useQuery({ ...creatableQuery(project ?? ""), enabled: !!project })
   const databases = useQuery({ ...databasesQuery(project ?? ""), enabled: !!project })
+  const gates = useGates(project)
   if (!project || creatable.isPending) return undefined
-  const rights = rightsOf(creatable.data)
   const operators = databases.data?.operators ?? []
-  const image = rights("apps", "deployments") !== "denied"
+  const imageGate = gates("deploy")
+  const databaseGate = gates("changeDatabases")
   // An operator whose databases can't be read is left out: whether it is installed is unknown.
-  const offered = engines
-    .filter((engine) => rights(...engineKinds[engine]) !== "denied")
-    .flatMap((engine) => {
-      const state = operators.find((o) => o.engine === engine)?.state
-      return state === "installed" || state === "not-installed"
-        ? [{ engine, installed: state === "installed" }]
-        : []
-    })
+  const known = engines.flatMap((engine) => {
+    const state = operators.find((o) => o.engine === engine)?.state
+    return state === "installed" || state === "not-installed"
+      ? [{ engine, installed: state === "installed" }]
+      : []
+  })
+  const offered = databaseGate.open ? known : []
   const yaml = (creatable.data?.items ?? []).some((k) => k.access !== "denied")
-  return { image, databases: offered, yaml, none: !image && offered.length === 0 && !yaml }
+  return {
+    image: imageGate.open,
+    databases: offered,
+    yaml,
+    none: !imageGate.open && offered.length === 0 && !yaml,
+    gates: { image: imageGate, database: databaseGate },
+  }
 }
 
 /** "New": the one entry to add a service, a database or YAML to the project. */
 export function AddMenu({ project, compact = false }: { project: string; compact?: boolean }) {
   const t = useT()
   const choices = useAddChoices(project)
-  if (!choices || choices.none) return null
+  if (!choices) return null
+  const trigger = compact ? (
+    <Button variant="ghost" size="icon-xs" aria-label={t("add.inProject", project)} />
+  ) : (
+    <Button size="sm" />
+  )
+  const face = (
+    <>
+      <PlusIcon aria-hidden="true" data-icon={compact ? undefined : "inline-start"} />
+      {compact ? null : (
+        <>
+          {t("add.button")}
+          <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
+        </>
+      )}
+    </>
+  )
+  // A Viewer sees what Developers use to add things, closed, with the role that opens it.
+  if (choices.none)
+    return <GateTip gate={choices.gates.image}>{cloneElement(trigger, {}, face)}</GateTip>
   const databases = choices.databases
   return (
     <Menu>
-      <MenuTrigger
-        render={
-          compact ? (
-            <Button variant="ghost" size="icon-xs" aria-label={t("add.inProject", project)} />
-          ) : (
-            <Button size="sm" />
-          )
-        }
-      >
-        <PlusIcon aria-hidden="true" data-icon={compact ? undefined : "inline-start"} />
-        {compact ? null : (
-          <>
-            {t("add.button")}
-            <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
-          </>
-        )}
-      </MenuTrigger>
+      <MenuTrigger render={trigger}>{face}</MenuTrigger>
       <MenuContent align={compact ? "start" : "end"} className="w-60">
-        {choices.image ? (
-          <MenuItem onClick={() => openAdd(project, "image")}>{t("add.image")}</MenuItem>
+        <GatedMenuItem gate={choices.gates.image} onClick={() => openAdd(project, "image")}>
+          {t("add.image")}
+        </GatedMenuItem>
+        {!choices.gates.database.open ? (
+          <>
+            <MenuSeparator />
+            <GatedMenuItem gate={choices.gates.database}>{t("add.database")}</GatedMenuItem>
+          </>
         ) : null}
         {databases.length > 0 ? (
           <>
-            {choices.image ? <MenuSeparator /> : null}
+            <MenuSeparator />
             {databases.map(({ engine, installed }) =>
               installed ? (
                 <MenuItem key={engine} onClick={() => openAdd(project, engine)}>

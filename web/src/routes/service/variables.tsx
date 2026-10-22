@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   type ClipboardEvent,
+  type ReactElement,
   type ReactNode,
 } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
@@ -30,6 +31,7 @@ import { CopyButton, Hint, ManagedTip, Segmented } from "@/components/bits"
 import { ConnectDrawer, useTargets } from "@/components/connect"
 import { FilterField } from "@/components/filter-field"
 import { KubeDetails } from "@/components/kube-details"
+import { GateTip, useGates } from "@/components/gate"
 import { useDraft, useHold } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
@@ -111,6 +113,13 @@ export function VariablesTab({
   const draft = useDraft()
   const planner = usePlanner(project)
   const managed = service.provenance.tool ?? undefined
+  const gates = useGates(project)
+  const editTip = (button: ReactElement) =>
+    managed ? (
+      <ManagedTip tool={managed}>{button}</ManagedTip>
+    ) : (
+      <GateTip gate={gates("changeServices")}>{button}</GateTip>
+    )
   const workload = { kind: service.kind, name: service.name }
   const configMapList = useQuery(configMapsQuery(project))
   const configMaps = new Map((configMapList.data?.items ?? []).map((c) => [c.origin.name, c.data]))
@@ -369,16 +378,18 @@ export function VariablesTab({
         </span>
       )
     return (
-      <Button
-        variant="muted"
-        size="icon-xs"
-        aria-label={t("vars.reveal", name)}
-        title={t("vars.reveal", name)}
-        disabled={state?.pending}
-        onClick={() => void reveal(name)}
-      >
-        {state?.pending ? <Spinner /> : <EyeIcon aria-hidden="true" />}
-      </Button>
+      <GateTip gate={gates("readSecrets")}>
+        <Button
+          variant="muted"
+          size="icon-xs"
+          aria-label={t("vars.reveal", name)}
+          title={t("vars.reveal", name)}
+          disabled={state?.pending}
+          onClick={() => void reveal(name)}
+        >
+          {state?.pending ? <Spinner /> : <EyeIcon aria-hidden="true" />}
+        </Button>
+      </GateTip>
     )
   }
 
@@ -588,24 +599,26 @@ export function VariablesTab({
               />
             ) : null}
             {editing || !mayConnect || managed ? null : (
-              <Button variant="outline" size="sm" onClick={() => setConnecting(true)}>
-                <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
-                {t("connect.addToService")}
-              </Button>
-            )}
-            {editing || !draft ? null : (
-              <ManagedTip tool={managed}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={Boolean(managed)}
-                  onClick={() => startEditing(literal.length === 0)}
-                >
-                  <PencilSimpleIcon aria-hidden="true" data-icon="inline-start" />
-                  {t("vars.edit")}
+              <GateTip gate={gates("changeServices")}>
+                <Button variant="outline" size="sm" onClick={() => setConnecting(true)}>
+                  <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("connect.addToService")}
                 </Button>
-              </ManagedTip>
+              </GateTip>
             )}
+            {editing || !draft
+              ? null
+              : editTip(
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={Boolean(managed)}
+                    onClick={() => startEditing(literal.length === 0)}
+                  >
+                    <PencilSimpleIcon aria-hidden="true" data-icon="inline-start" />
+                    {t("vars.edit")}
+                  </Button>,
+                )}
             {connecting ? (
               <ConnectDrawer
                 project={project}
@@ -627,11 +640,11 @@ export function VariablesTab({
                 {t("common.colon")}
                 {t("env.pendingRestartDetail", pending[0].pod)}
               </span>
-              <ManagedTip tool={managed}>
+              {editTip(
                 <Button variant="outline" size="sm" disabled={Boolean(managed)} onClick={restart}>
                   {t("title.restart", service.name)}
-                </Button>
-              </ManagedTip>
+                </Button>,
+              )}
               {reloads ? (
                 <Button
                   variant="ghost"
@@ -704,7 +717,7 @@ export function VariablesTab({
           </EmptyHeader>
           {draft ? (
             <EmptyContent>
-              <ManagedTip tool={managed}>
+              {editTip(
                 <Button
                   variant="outline"
                   size="sm"
@@ -713,8 +726,8 @@ export function VariablesTab({
                 >
                   <PlusIcon aria-hidden="true" data-icon="inline-start" />
                   {t("vars.add")}
-                </Button>
-              </ManagedTip>
+                </Button>,
+              )}
             </EmptyContent>
           ) : null}
         </Empty>
@@ -733,16 +746,18 @@ export function VariablesTab({
                   <EyeSlashIcon aria-hidden="true" />
                 </Button>
               ) : locked ? null : (
-                <Button
-                  variant="muted"
-                  size="icon-xs"
-                  aria-label={t("vars.revealAll")}
-                  title={t("vars.revealAll")}
-                  disabled={envSecrets.some((name) => secrets[name]?.pending)}
-                  onClick={revealAll}
-                >
-                  <EyeIcon aria-hidden="true" />
-                </Button>
+                <GateTip gate={gates("readSecrets")}>
+                  <Button
+                    variant="muted"
+                    size="icon-xs"
+                    aria-label={t("vars.revealAll")}
+                    title={t("vars.revealAll")}
+                    disabled={envSecrets.some((name) => secrets[name]?.pending)}
+                    onClick={revealAll}
+                  >
+                    <EyeIcon aria-hidden="true" />
+                  </Button>
+                </GateTip>
               )}
               <CopyButton value={dotenv} />
             </span>

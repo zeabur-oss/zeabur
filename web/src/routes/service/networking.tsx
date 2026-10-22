@@ -1,5 +1,5 @@
 import { useForm } from "@tanstack/react-form"
-import { useState, type ReactNode } from "react"
+import { useState, type ReactElement, type ReactNode } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
@@ -12,6 +12,7 @@ import PlugsIcon from "~icons/ph/plugs"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 
+import { GateTip, useGate } from "@/components/gate"
 import { ReviewWord, useDraft } from "@/components/plan/draft"
 import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
@@ -38,6 +39,7 @@ import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
 import { domainsLead, filterRoutes, plainFirst } from "@/model/domains"
 import { stagedDomains, type DomainEdit } from "@/model/draft"
+import type { Gate } from "@/model/rights"
 import { isLongList } from "@/model/lists"
 import {
   endpointsOf,
@@ -117,6 +119,7 @@ export function NetworkingTab({
     name: route.ingress,
   })
   const canWrite = endpoints.length > 0 && !managed
+  const domainGate = useGate(project, "changeDomains")
   const refusedRoutes = refusedAmong(unreadable, refusedPlaces.routes)
   const refusedEndpoints = refusedAmong(unreadable, refusedPlaces.endpoints)
 
@@ -170,7 +173,7 @@ export function NetworkingTab({
               }
               action={
                 listed > 0 ? (
-                  <Managed tool={managed}>
+                  <Managed tool={managed} gate={domainGate}>
                     <Button
                       variant="outline"
                       size="sm"
@@ -214,7 +217,7 @@ export function NetworkingTab({
                   </EmptyHeader>
                   {endpoints.length > 0 ? (
                     <EmptyContent>
-                      <Managed tool={managed}>
+                      <Managed tool={managed} gate={domainGate}>
                         <Button
                           variant="outline"
                           size="sm"
@@ -344,7 +347,7 @@ export function NetworkingTab({
                               <span className="flex justify-end">{undo(edit)}</span>
                             ) : route.host ? (
                               <span className="flex items-center justify-end gap-0.5">
-                                <Managed tool={managed}>
+                                <Managed tool={managed} gate={domainGate}>
                                   <Button
                                     variant="muted"
                                     size="icon-xs"
@@ -360,7 +363,7 @@ export function NetworkingTab({
                                     <PencilSimpleIcon aria-hidden="true" />
                                   </Button>
                                 </Managed>
-                                <Managed tool={managed}>
+                                <Managed tool={managed} gate={domainGate}>
                                   <Button
                                     variant="muted"
                                     size="icon-xs"
@@ -549,9 +552,11 @@ function ExposeHint({ project, command }: { project: string; command?: string })
   )
 }
 
-function Managed({ tool, children }: { tool?: string; children: ReactNode }) {
+/** A domain control, closed when another tool owns the routes or the person's role cannot change
+ * domains. */
+function Managed({ tool, gate, children }: { tool?: string; gate: Gate; children: ReactElement }) {
   const t = useT()
-  if (!tool) return children
+  if (!tool) return <GateTip gate={gate}>{children}</GateTip>
   return (
     <Tooltip content={t("ops.managedEdit", tool)}>
       <span>{children}</span>

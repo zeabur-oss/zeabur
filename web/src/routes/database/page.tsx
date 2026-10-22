@@ -19,6 +19,7 @@ import { DatabaseState } from "@/components/databases"
 import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { FormField } from "@/components/form-field"
 import { Freshness } from "@/components/freshness"
+import { GateTip, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
@@ -189,6 +190,7 @@ function Body({
 function BackUpNow({ project, database }: { project: string; database: Database }) {
   const t = useT()
   const planner = usePlanner(project)
+  const gate = useGate(project, "backUpDatabases")
   const starting = !database.backups.ready
   return (
     <>
@@ -197,21 +199,23 @@ function BackUpNow({ project, database }: { project: string; database: Database 
           {t("db.backup.starting")}
         </span>
       ) : null}
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={starting}
-        aria-describedby={starting ? "db-backups-starting" : undefined}
-        onClick={() =>
-          planner.plan({
-            title: t("db.backup.planNow", database.name),
-            changes: backUpNow(database, new Date()),
-          })
-        }
-      >
-        <ArchiveIcon aria-hidden="true" data-icon="inline-start" />
-        {t("db.backup.now")}
-      </Button>
+      <GateTip gate={gate}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={starting}
+          aria-describedby={starting ? "db-backups-starting" : undefined}
+          onClick={() =>
+            planner.plan({
+              title: t("db.backup.planNow", database.name),
+              changes: backUpNow(database, new Date()),
+            })
+          }
+        >
+          <ArchiveIcon aria-hidden="true" data-icon="inline-start" />
+          {t("db.backup.now")}
+        </Button>
+      </GateTip>
       {planner.dialog}
     </>
   )
@@ -316,6 +320,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 function Connection({ project, database }: { project: string; database: Database }) {
   const t = useT()
   const c = database.connection
+  const revealGate = useGate(project, "readSecrets")
   const [secret, setSecret] = useState<{
     pending?: boolean
     values?: Schemas["RevealedSecret"]["values"]
@@ -374,15 +379,17 @@ function Connection({ project, database }: { project: string; database: Database
               </Button>
             </>
           ) : (
-            <Button
-              variant="ghost"
-              size="xs"
-              loading={secret?.pending}
-              onClick={() => void reveal()}
-            >
-              <EyeIcon aria-hidden="true" data-icon="inline-start" />
-              {t("db.reveal")}
-            </Button>
+            <GateTip gate={revealGate}>
+              <Button
+                variant="ghost"
+                size="xs"
+                loading={secret?.pending}
+                onClick={() => void reveal()}
+              >
+                <EyeIcon aria-hidden="true" data-icon="inline-start" />
+                {t("db.reveal")}
+              </Button>
+            </GateTip>
           )}
         </Row>
         <Row label={t("db.uri")}>
@@ -401,6 +408,7 @@ function ConnectServices({ project, database }: { project: string; database: Dat
   const [open, setOpen] = useState(false)
   const services = useQuery(projectQuery(project)).data?.services ?? []
   const targets = useTargets(project)
+  const connectGate = useGate(project, "changeServices")
   const readers = services.filter((s) => connected(s, database)).map((s) => s.name)
   if (!database.app)
     return <p className="type-meta text-muted-foreground">{t("connect.noApp", database.name)}</p>
@@ -410,10 +418,12 @@ function ConnectServices({ project, database }: { project: string; database: Dat
         {readers.length > 0 ? t("connect.readBy", t("common.list", readers)) : t("connect.none")}
       </p>
       {targets.some((s) => !connected(s, database)) ? (
-        <Button variant="outline" size="xs" onClick={() => setOpen(true)}>
-          <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
-          {t("connect.action")}
-        </Button>
+        <GateTip gate={connectGate}>
+          <Button variant="outline" size="xs" onClick={() => setOpen(true)}>
+            <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
+            {t("connect.action")}
+          </Button>
+        </GateTip>
       ) : null}
       {open ? (
         <ConnectDrawer project={project} database={database} onClose={() => setOpen(false)} />
@@ -590,6 +600,7 @@ function SetUp({ project, database }: { project: string; database: Database }) {
   const [target, setTarget] = useState<BackupTarget>(newBackupTarget)
   const [tried, setTried] = useState(false)
   const planner = usePlanner(project)
+  const setUpGate = useGate(project, "changeDatabases")
   const problems = targetProblems(target)
   const set = (patch: Partial<BackupTarget>) => setTarget((v) => ({ ...v, ...patch }))
   const error = (problem: (typeof problems)[number]) =>
@@ -698,9 +709,11 @@ function SetUp({ project, database }: { project: string; database: Database }) {
           </FormField>
         </div>
         <div className="flex justify-end">
-          <Button size="sm" type="submit">
-            {t("edit.review")}
-          </Button>
+          <GateTip gate={setUpGate}>
+            <Button size="sm" type="submit">
+              {t("edit.review")}
+            </Button>
+          </GateTip>
         </div>
       </form>
       {planner.dialog}

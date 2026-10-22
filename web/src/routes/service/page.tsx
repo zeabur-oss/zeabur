@@ -24,6 +24,7 @@ import { evidenceQuery, projectQuery, queryClient } from "@/api/queries"
 import { Freshness } from "@/components/freshness"
 import { LoadingRows } from "@/components/page"
 import { describeDraft, DraftProvider, useDraftState, type Draft } from "@/components/plan/draft"
+import { GatedMenuItem, GateTip, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { refusedAmong, refusedElsewhere, RefusedSome } from "@/components/refused"
@@ -180,6 +181,7 @@ function ServiceView({
   const restartable =
     service.kind === "Deployment" || service.kind === "StatefulSet" || service.kind === "DaemonSet"
   const draft = useDraftState()
+  const gates = useGates(project)
   const pending = usePresence<HTMLDivElement>(
     draft.count > 0 || draft.editing || draft.blocked !== undefined,
   )
@@ -283,41 +285,54 @@ function ServiceView({
               <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:pl-13">
                 {restart ? (
                   <>
-                    <Button variant="outline" size="sm" className="max-sm:hidden" onClick={restart}>
-                      <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-                      {t("ops.restart")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      className="sm:hidden"
-                      aria-label={t("ops.restart")}
-                      onClick={restart}
-                    >
-                      <ArrowClockwiseIcon aria-hidden="true" />
-                    </Button>
+                    <GateTip gate={gates("changeServices")}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="max-sm:hidden"
+                        onClick={restart}
+                      >
+                        <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+                        {t("ops.restart")}
+                      </Button>
+                    </GateTip>
+                    <GateTip gate={gates("changeServices")}>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        className="sm:hidden"
+                        aria-label={t("ops.restart")}
+                        onClick={restart}
+                      >
+                        <ArrowClockwiseIcon aria-hidden="true" />
+                      </Button>
+                    </GateTip>
                   </>
                 ) : null}
                 {isTask(service.kind) ? null : (
                   <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="max-sm:hidden"
-                      onClick={() => openShell(project, service, search.pod)}
-                    >
-                      <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
-                      {t("tab.terminal")}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      className="sm:hidden"
-                      aria-label={t("tab.terminal")}
-                      onClick={() => openShell(project, service, search.pod)}
-                    >
-                      <TerminalWindowIcon aria-hidden="true" />
-                    </Button>
+                    <GateTip gate={gates("openTerminal")}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="max-sm:hidden"
+                        onClick={() => openShell(project, service, search.pod)}
+                      >
+                        <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+                        {t("tab.terminal")}
+                      </Button>
+                    </GateTip>
+                    <GateTip gate={gates("openTerminal")}>
+                      <Button
+                        variant="outline"
+                        size="icon-sm"
+                        className="sm:hidden"
+                        aria-label={t("tab.terminal")}
+                        onClick={() => openShell(project, service, search.pod)}
+                      >
+                        <TerminalWindowIcon aria-hidden="true" />
+                      </Button>
+                    </GateTip>
                   </>
                 )}
                 <Menu>
@@ -346,10 +361,10 @@ function ServiceView({
                         </MenuItem>
                       </Tooltip>
                     ) : (
-                      <MenuItem onClick={planDeletion}>
+                      <GatedMenuItem gate={gates("deleteServices")} onClick={planDeletion}>
                         <TrashIcon aria-hidden="true" />
                         {t("service.delete")}
-                      </MenuItem>
+                      </GatedMenuItem>
                     )}
                   </MenuContent>
                 </Menu>

@@ -3,18 +3,21 @@ import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import TrashIcon from "~icons/ph/trash"
 
 import type { ObjectAddress } from "@/api/queries"
+import { GateTip, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Button } from "@zeabur/design-system/components/button"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
+import { rightOfResource, type Gate } from "@/model/rights"
 
 const YamlEditor = lazy(() =>
   import("@/components/yaml-editor").then((m) => ({ default: m.YamlEditor })),
 )
 
 /** Kinds Kubernetes makes on its own or that a plan cannot edit as a whole. */
+const open: Gate = { open: true }
 const readOnlyResources = new Set(["pods", "events", "replicasets", "controllerrevisions"])
 
 /** Recreated when deleted; the server refuses one a tool or a controller would make again. */
@@ -47,6 +50,13 @@ export function YamlView({
   const planner = usePlanner(project, () => setDraft(null))
   const deleter = usePlanner(project, onDeleted)
   const label = t("yaml.label", address.name)
+  const gates = useGates(project)
+  const gateOf = (change: "edit" | "delete") => {
+    const right = rightOfResource(address.resource, change)
+    return right ? gates(right) : open
+  }
+  const editGate = gateOf("edit")
+  const deleteGate = gateOf("delete")
   const blocked = managedBy
     ? t("common.managedByDetail", managedBy)
     : readOnlyResources.has(address.resource)
@@ -88,10 +98,12 @@ export function YamlView({
                   </span>
                 </Tooltip>
               ) : (
-                <Button variant="outline" size="xs" onClick={planDeletion}>
-                  <TrashIcon aria-hidden="true" data-icon="inline-start" />
-                  {t("yaml.delete")}
-                </Button>
+                <GateTip gate={deleteGate}>
+                  <Button variant="outline" size="xs" onClick={planDeletion}>
+                    <TrashIcon aria-hidden="true" data-icon="inline-start" />
+                    {t("yaml.delete")}
+                  </Button>
+                </GateTip>
               )
             ) : null}
             {blocked ? (
@@ -104,10 +116,12 @@ export function YamlView({
                 </span>
               </Tooltip>
             ) : (
-              <Button variant="outline" size="xs" onClick={() => setDraft(yaml)}>
-                <PencilSimpleIcon aria-hidden="true" data-icon="inline-start" />
-                {t("yaml.edit")}
-              </Button>
+              <GateTip gate={editGate}>
+                <Button variant="outline" size="xs" onClick={() => setDraft(yaml)}>
+                  <PencilSimpleIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("yaml.edit")}
+                </Button>
+              </GateTip>
             )}
           </span>
         </div>

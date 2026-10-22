@@ -9,6 +9,7 @@ import { toProblem } from "@/api/client"
 import { buildsQuery, capabilitiesQuery, logsQuery } from "@/api/queries"
 import { Ago, CopyButton, Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
+import { GateTip, useHereGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Alert, AlertAction, AlertDescription } from "@zeabur/design-system/components/alert"
@@ -185,6 +186,8 @@ function Summary({
   const { build, image } = built
   const current = runsLatest(image, build)
   const since = latest?.started ?? latest?.created
+  const deployGate = useHereGate("changeServices")
+  const rebuildGate = useHereGate("build")
   const deployButton = (
     <Button
       variant={current === false ? "default" : "outline"}
@@ -270,12 +273,14 @@ function Summary({
               <span>{deployButton}</span>
             </Tooltip>
           ) : (
-            deployButton
+            <GateTip gate={deployGate}>{deployButton}</GateTip>
           )}
-          <Button variant="outline" size="sm" onClick={onRebuild}>
-            <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-            {t("builds.rebuild")}
-          </Button>
+          <GateTip gate={rebuildGate}>
+            <Button variant="outline" size="sm" onClick={onRebuild}>
+              <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+              {t("builds.rebuild")}
+            </Button>
+          </GateTip>
         </SummaryCardActions>
       </SummaryCardMain>
     </SummaryCard>
@@ -297,6 +302,7 @@ function AutoUpdate({
 }) {
   const t = useT()
   const [installing, setInstalling] = useState(false)
+  const toggleGate = useHereGate("changeServices")
   const capabilities = useQuery({ ...capabilitiesQuery, retry: false })
   const keel = capabilities.data?.items.find((c) => c.name === "image-updates")
   const missing = keel !== undefined && !keel.existing
@@ -341,7 +347,7 @@ function AutoUpdate({
             <span>{control}</span>
           </Tooltip>
         ) : (
-          control
+          <GateTip gate={toggleGate}>{control}</GateTip>
         )}
       </div>
       {missing ? (

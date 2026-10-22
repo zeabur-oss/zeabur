@@ -35,6 +35,7 @@ import { Ago, Hint } from "@/components/bits"
 import { FilterField } from "@/components/filter-field"
 import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
+import { useGateReason, useHereGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { isRefusal, permission, Refused } from "@/components/refused"
@@ -633,7 +634,8 @@ function Folder({
   const mount = mountOf(files.mounts, path)
   const picker = useRef<HTMLInputElement>(null)
   const writable = mount !== undefined && !mount.readOnly
-  const why = writable ? undefined : t("files.readOnly")
+  const role = useGateReason()(useHereGate("openTerminal"))
+  const why = writable ? role : t("files.readOnly")
   const items = (list.data?.items ?? []).filter(
     (e) => !(path === "/" && kernel.includes(`/${e.name}`)),
   )

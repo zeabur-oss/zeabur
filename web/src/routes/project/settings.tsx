@@ -11,6 +11,7 @@ import { AccessDialog, AdoptButton } from "@/components/adopt"
 import { CopyButton } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
+import { GateTip, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { projectGlyphs } from "@/components/project-icon"
@@ -342,6 +343,7 @@ function BatchActions({ project }: { project: string }) {
   const t = useT()
   const view = useQuery(projectQuery(project))
   const planner = usePlanner(project)
+  const gates = useGates(project)
   const services = view.data?.services ?? []
   const running = services.filter(
     (s) => (s.kind === "Deployment" || s.kind === "StatefulSet") && (s.replicas?.desired ?? 0) > 0,
@@ -359,45 +361,49 @@ function BatchActions({ project }: { project: string }) {
           label={t("projectSettings.pauseAll")}
           description={t("projectSettings.pauseAllHint")}
         >
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={pausable.length === 0}
-            onClick={() =>
-              planner.plan({
-                title: t("title.pauseAll", project),
-                skipped,
-                changes: pausable.map((s) => ({
-                  op: "scale" as const,
-                  workload: { kind: s.kind, name: s.name },
-                  replicas: 0,
-                })),
-              })
-            }
-          >
-            {t("projectSettings.pause")}
-          </Button>
+          <GateTip gate={gates("scale")}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pausable.length === 0}
+              onClick={() =>
+                planner.plan({
+                  title: t("title.pauseAll", project),
+                  skipped,
+                  changes: pausable.map((s) => ({
+                    op: "scale" as const,
+                    workload: { kind: s.kind, name: s.name },
+                    replicas: 0,
+                  })),
+                })
+              }
+            >
+              {t("projectSettings.pause")}
+            </Button>
+          </GateTip>
         </CardRow>
         <CardRow
           label={t("projectSettings.restartAll")}
           description={t("projectSettings.restartAllHint")}
         >
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={restarting.length === 0}
-            onClick={() =>
-              planner.plan({
-                title: t("title.restartAll", project),
-                changes: restarting.map((s) => ({
-                  op: "restart" as const,
-                  workload: { kind: s.kind, name: s.name },
-                })),
-              })
-            }
-          >
-            {t("ops.restart")}
-          </Button>
+          <GateTip gate={gates("changeServices")}>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={restarting.length === 0}
+              onClick={() =>
+                planner.plan({
+                  title: t("title.restartAll", project),
+                  changes: restarting.map((s) => ({
+                    op: "restart" as const,
+                    workload: { kind: s.kind, name: s.name },
+                  })),
+                })
+              }
+            >
+              {t("ops.restart")}
+            </Button>
+          </GateTip>
         </CardRow>
       </Card>
       {planner.dialog}

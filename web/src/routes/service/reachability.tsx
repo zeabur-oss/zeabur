@@ -13,6 +13,7 @@ import { Button } from "@zeabur/design-system/components/button"
 import { Drawer } from "@zeabur/design-system/components/drawer"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { GateTip, useGate, useHereGate } from "@/components/gate"
 import { useT, type Translate } from "@/i18n"
 import { objectKey } from "@/lib/objects"
 import { cn } from "@/lib/utils"
@@ -110,6 +111,7 @@ export function Reachability({
   plan: (ask: PlanAsk) => void
 }) {
   const t = useT()
+  const gate = useGate(project, "changeNetworkPolicies")
   const [problem, setProblem] = useState<string>()
   const [open, setOpen] = useState<Access>()
   const [drawer, setDrawer] = useState<"rules" | "pick" | Access>()
@@ -165,22 +167,32 @@ export function Reachability({
             : leadSentence(t, service.name, leadOf(reach))
         }
         action={
-          <Menu>
-            <MenuTrigger render={<Button variant="outline" size="xs" />}>
-              <ShieldPlusIcon aria-hidden="true" data-icon="inline-start" />
-              {t("reach.addPolicy")}
-              <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
-            </MenuTrigger>
-            <MenuContent className="w-72">
-              <MenuItem onClick={() => void choose("isolate")}>{t("reach.isolate")}</MenuItem>
-              <MenuItem onClick={() => void choose("allow-from-ingress-controller")}>
-                {t("reach.allowIngress")}
-              </MenuItem>
-              {closed.length > 0 ? (
-                <MenuItem onClick={() => setDrawer("pick")}>{t("reach.allowFromPick")}</MenuItem>
-              ) : null}
-            </MenuContent>
-          </Menu>
+          !gate.open ? (
+            <GateTip gate={gate}>
+              <Button variant="outline" size="xs">
+                <ShieldPlusIcon aria-hidden="true" data-icon="inline-start" />
+                {t("reach.addPolicy")}
+                <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
+              </Button>
+            </GateTip>
+          ) : (
+            <Menu>
+              <MenuTrigger render={<Button variant="outline" size="xs" />}>
+                <ShieldPlusIcon aria-hidden="true" data-icon="inline-start" />
+                {t("reach.addPolicy")}
+                <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
+              </MenuTrigger>
+              <MenuContent className="w-72">
+                <MenuItem onClick={() => void choose("isolate")}>{t("reach.isolate")}</MenuItem>
+                <MenuItem onClick={() => void choose("allow-from-ingress-controller")}>
+                  {t("reach.allowIngress")}
+                </MenuItem>
+                {closed.length > 0 ? (
+                  <MenuItem onClick={() => setDrawer("pick")}>{t("reach.allowFromPick")}</MenuItem>
+                ) : null}
+              </MenuContent>
+            </Menu>
+          )
         }
       />
       {summary.open ? null : (
@@ -402,6 +414,7 @@ function GroupTable({
   onAllow?: (peer: Peer) => void
 }) {
   const t = useT()
+  const gate = useHereGate("changeNetworkPolicies")
   const [query, setQuery] = useState("")
   const [descending, setDescending] = useState(false)
   const peers = filterPeers(group.peers, query)
@@ -452,9 +465,11 @@ function GroupTable({
                 ) : null}
                 {onAllow ? (
                   <td className="w-px px-3 py-1 text-right">
-                    <Button variant="ghost" size="xs" onClick={() => onAllow(peer)}>
-                      {t("reach.allow")}
-                    </Button>
+                    <GateTip gate={gate}>
+                      <Button variant="ghost" size="xs" onClick={() => onAllow(peer)}>
+                        {t("reach.allow")}
+                      </Button>
+                    </GateTip>
                   </td>
                 ) : null}
               </tr>
@@ -483,6 +498,7 @@ function PeerList({
   onAllow?: (peer: Peer) => void
 }) {
   const t = useT()
+  const gate = useHereGate("changeNetworkPolicies")
   const [query, setQuery] = useState("")
   const shown = filterPeers(peers, query)
   const shared = project ? sharedRules(peers) : undefined
@@ -507,9 +523,11 @@ function PeerList({
               ) : null}
             </span>
             {onAllow ? (
-              <Button variant="outline" size="xs" onClick={() => onAllow(peer)}>
-                {t("reach.allow")}
-              </Button>
+              <GateTip gate={gate}>
+                <Button variant="outline" size="xs" onClick={() => onAllow(peer)}>
+                  {t("reach.allow")}
+                </Button>
+              </GateTip>
             ) : null}
           </li>
         ))}

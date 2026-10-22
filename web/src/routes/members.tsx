@@ -28,6 +28,7 @@ import {
   SetupLinkDialog,
 } from "@/components/members/dialogs"
 import { Problem } from "@/components/problem"
+import { GatedMenuItem, GateTip, useHintGate } from "@/components/gate"
 import { RefusedSome } from "@/components/refused"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo, formatTime } from "@/lib/format"
@@ -60,11 +61,18 @@ import {
   EmptyTitle,
 } from "@zeabur/design-system/components/empty"
 import { Illustration } from "@zeabur/design-system/components/illustration"
-import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
+import { Menu, MenuContent, MenuTrigger } from "@zeabur/design-system/components/menu"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
+import type { Gate } from "@/model/rights"
+
+const open: Gate = { open: true }
+
+function useManageGate(): Gate {
+  return useHintGate("changeMembers", useQuery(membersQuery).data?.canManage)
+}
 
 type Open =
   | { kind: "invite" }
@@ -81,6 +89,7 @@ export function MembersPage() {
   const data = members.data
   const ready = data ? linkState(data.setupLinks) === "ready" : false
   const projectRoles = data?.projectRoles ?? false
+  const manage = useHintGate("changeMembers", data?.canManage)
   const invite = (
     <Button size="sm" disabled={!ready} onClick={() => setOpen({ kind: "invite" })}>
       <UserPlusIcon aria-hidden="true" data-icon="inline-start" />
@@ -95,7 +104,7 @@ export function MembersPage() {
     <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
       <PageHeader
         title={t("members.title")}
-        actions={data?.installed && data.canManage !== "denied" ? invite : undefined}
+        actions={data?.installed ? <GateTip gate={manage}>{invite}</GateTip> : undefined}
       />
       {members.isPending ? (
         <Skeleton variant="card" className="h-50" />
@@ -289,6 +298,7 @@ function MemberMenu({
 }) {
   const t = useT()
   const name = memberName(member)
+  const manage = useManageGate()
   return (
     <Menu>
       <MenuTrigger
@@ -298,26 +308,32 @@ function MemberMenu({
       </MenuTrigger>
       <MenuContent align="end">
         {canChangeAccess(member, projectRoles) ? (
-          <MenuItem onClick={() => onOpen({ kind: "access", member })}>
+          <GatedMenuItem gate={manage} onClick={() => onOpen({ kind: "access", member })}>
             <UserGearIcon aria-hidden="true" />
             {t("roles.change")}
-          </MenuItem>
+          </GatedMenuItem>
         ) : null}
-        <MenuItem onClick={() => onOpen({ kind: "link", member, reset: false })}>
+        <GatedMenuItem
+          gate={member.you ? open : manage}
+          onClick={() => onOpen({ kind: "link", member, reset: false })}
+        >
           <LinkSimpleIcon aria-hidden="true" />
           {t("members.newLink")}
-        </MenuItem>
+        </GatedMenuItem>
         {member.you ? null : (
-          <MenuItem onClick={() => onOpen({ kind: "link", member, reset: true })}>
+          <GatedMenuItem
+            gate={manage}
+            onClick={() => onOpen({ kind: "link", member, reset: true })}
+          >
             <ArrowCounterClockwiseIcon aria-hidden="true" />
             {t("members.reset")}
-          </MenuItem>
+          </GatedMenuItem>
         )}
         {canRemoveMember(member) ? (
-          <MenuItem onClick={() => onOpen({ kind: "remove", member })}>
+          <GatedMenuItem gate={manage} onClick={() => onOpen({ kind: "remove", member })}>
             <TrashIcon aria-hidden="true" />
             {t("members.remove")}
-          </MenuItem>
+          </GatedMenuItem>
         ) : null}
       </MenuContent>
     </Menu>
@@ -337,6 +353,7 @@ function MemberPanel({
   onClose: () => void
 }) {
   const t = useT()
+  const manage = useManageGate()
   const accessLines = useAccessLines()
   const title = useProjectTitle()
   const name = memberName(member)
@@ -405,37 +422,50 @@ function MemberPanel({
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t px-5 py-3">
           {canChangeAccess(member, projectRoles) ? (
-            <Button size="sm" variant="outline" onClick={() => onOpen({ kind: "access", member })}>
-              <UserGearIcon aria-hidden="true" data-icon="inline-start" />
-              {t("roles.change")}
-            </Button>
+            <GateTip gate={manage}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onOpen({ kind: "access", member })}
+              >
+                <UserGearIcon aria-hidden="true" data-icon="inline-start" />
+                {t("roles.change")}
+              </Button>
+            </GateTip>
           ) : null}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => onOpen({ kind: "link", member, reset: false })}
-          >
-            <LinkSimpleIcon aria-hidden="true" data-icon="inline-start" />
-            {t("members.newLink")}
-          </Button>
-          {member.you ? null : (
+          <GateTip gate={member.you ? open : manage}>
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onOpen({ kind: "link", member, reset: true })}
+              onClick={() => onOpen({ kind: "link", member, reset: false })}
             >
-              {t("members.reset")}
+              <LinkSimpleIcon aria-hidden="true" data-icon="inline-start" />
+              {t("members.newLink")}
             </Button>
+          </GateTip>
+          {member.you ? null : (
+            <GateTip gate={manage}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onOpen({ kind: "link", member, reset: true })}
+              >
+                {t("members.reset")}
+              </Button>
+            </GateTip>
           )}
           {canRemoveMember(member) ? (
-            <Button
-              size="sm"
-              variant="secondary-destructive"
-              className="ml-auto"
-              onClick={() => onOpen({ kind: "remove", member })}
-            >
-              {t("members.remove")}
-            </Button>
+            <span className="ml-auto">
+              <GateTip gate={manage}>
+                <Button
+                  size="sm"
+                  variant="secondary-destructive"
+                  onClick={() => onOpen({ kind: "remove", member })}
+                >
+                  {t("members.remove")}
+                </Button>
+              </GateTip>
+            </span>
           ) : null}
         </div>
       </DialogContent>

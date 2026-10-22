@@ -12,6 +12,7 @@ import { ConnectFields, newChoice, pickedOf, useTargets, type Choice } from "@/c
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
+import { GateTip, useGate } from "@/components/gate"
 import { useT } from "@/i18n"
 import { databaseLink } from "@/lib/place"
 import { connectChanges, pendingDatabase, variableProblem } from "@/model/connect"
@@ -130,14 +131,17 @@ export function NewDatabaseButton({
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
+  const gate = useGate(project, "changeDatabases")
   const available = installedEngines(data)
   if (available.length === 0) return null
   return (
     <>
-      <Button variant="outline" size={size} onClick={() => setOpen(true)}>
-        <PlusIcon aria-hidden="true" data-icon="inline-start" />
-        {t("db.new")}
-      </Button>
+      <GateTip gate={gate}>
+        <Button variant="outline" size={size} onClick={() => setOpen(true)}>
+          <PlusIcon aria-hidden="true" data-icon="inline-start" />
+          {t("db.new")}
+        </Button>
+      </GateTip>
       {open ? (
         <NewDatabaseDrawer
           project={project}
