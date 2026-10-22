@@ -1287,9 +1287,8 @@ export const en = {
   "title.restart": (service: string) => `Restart ${service}`,
   "title.deployBuild": (service: string) => `Deploy the newest build to ${service}`,
   "title.rebuild": (build: string) => `Build ${build} again`,
-  "title.autoUpdateOn": (service: string) => `Deploy new images of ${service} automatically`,
-  "title.autoUpdateOff": (service: string) =>
-    `Stop deploying new images of ${service} automatically`,
+  "title.autoUpdateOn": (service: string) => `Auto-deploy ${service}`,
+  "title.autoUpdateOff": (service: string) => `Stop auto-deploying ${service}`,
   "title.addDomain": (host: string) => `Add ${host}`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `Remove ${host}`,

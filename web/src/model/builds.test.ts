@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  building,
   builtContainers,
   durationOf,
   repositoryOf,
   runsLatest,
   type Build,
   type BuildRun,
+  type Builds,
 } from "@/model/builds"
 import type { Service } from "@/model/service"
 
@@ -80,4 +82,19 @@ test("a run's duration runs to now until it finishes", () => {
   expect(durationOf(run, Date.parse("2026-10-23T08:01:30Z"))).toBe(90_000)
   expect(durationOf({ ...run, finished: "2026-10-23T08:00:20Z" }, 0)).toBe(20_000)
   expect(durationOf({ ...run, started: null }, 0)).toBeUndefined()
+})
+
+test("a request to build again counts as building until a run answers it", () => {
+  const now = Date.parse("2026-10-23T08:01:00Z")
+  const run = (over: Partial<BuildRun>) =>
+    ({ build: "web", phase: "Succeeded", created: "2026-10-23T07:00:00Z", ...over }) as BuildRun
+  const data = (runs: BuildRun[], asked?: string) =>
+    ({ builds: [build({ rebuildRequested: asked })], runs, keel: [] }) as unknown as Builds
+  expect(building(data([run({})]), now)).toBe(false)
+  expect(building(data([run({ phase: null })]), now)).toBe(true)
+  expect(building(data([run({ phase: "Building" })]), now)).toBe(true)
+  expect(building(data([run({})], "2026-10-23T08:00:30Z"), now)).toBe(true)
+  const answered = run({ created: "2026-10-23T08:00:40Z" })
+  expect(building(data([answered], "2026-10-23T08:00:30Z"), now)).toBe(false)
+  expect(building(data([run({})], "2026-10-23T07:30:00Z"), now)).toBe(false)
 })

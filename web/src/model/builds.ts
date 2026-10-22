@@ -84,6 +84,22 @@ export function runTone(run: BuildRun): RunTone {
   }
 }
 
+const FINISHED = new Set(["Succeeded", "Failed", "Cancelled"])
+
+/**
+ * Whether a build is under way or about to be: a run not finished yet, or a request to build
+ * again, at most two minutes old, that no run has answered yet.
+ */
+export function building(data: Builds, now: number): boolean {
+  if (data.runs.some((run) => !run.phase || !FINISHED.has(run.phase))) return true
+  return data.builds.some((build) => {
+    const asked = build.rebuildRequested ? Date.parse(build.rebuildRequested) : Number.NaN
+    if (!Number.isFinite(asked) || now - asked > 120_000) return false
+    const newest = data.runs.find((run) => run.build === build.name)
+    return !newest?.created || Date.parse(newest.created) < asked
+  })
+}
+
 /** Milliseconds from start to finish, or to `now` while it runs. */
 export function durationOf(run: BuildRun, now: number): number | undefined {
   if (!run.started) return undefined

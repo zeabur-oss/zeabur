@@ -436,12 +436,7 @@ export const buildsQuery = (project: string) =>
           signal,
         }),
       ),
-    refetchInterval: (query) =>
-      query.state.data?.runs.some(
-        (r) => r.phase && !["Succeeded", "Failed", "Cancelled"].includes(r.phase),
-      )
-        ? 5_000
-        : 30_000,
+    refetchInterval: 30_000,
     refetchIntervalInBackground: false,
   })
 

@@ -36,6 +36,7 @@ import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import {
+  building,
   builtContainers,
   durationOf,
   KEEL_WEBHOOK,
@@ -57,7 +58,11 @@ const InstallSheet = lazy(() =>
 
 /** The service's builds, when a Zeabur Builder `Build` makes one of its images. */
 export function useServiceBuilds(project: string, service: Service) {
-  const builds = useQuery(buildsQuery(project))
+  const builds = useQuery({
+    ...buildsQuery(project),
+    refetchInterval: (query) =>
+      query.state.data && building(query.state.data, Date.now()) ? 5_000 : 30_000,
+  })
   const built = builds.data ? builtContainers(service, builds.data.builds) : []
   return { builds, built }
 }
