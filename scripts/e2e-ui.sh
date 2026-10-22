@@ -25,7 +25,8 @@ wait_for() {
 # The write tests start from the manifest as applied: what an earlier run added (a variable, a
 # volume, a policy) goes with the namespace.
 wait_for kubectl delete namespace "$namespace" "$namespace-adopt" --ignore-not-found --wait --timeout=180s
-kubectl apply -f "$root/web/e2e/manifests/talker.yaml" >/dev/null
+kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \
+  -f "$root/web/e2e/manifests/second-project.yaml" >/dev/null
 wait_for kubectl -n "$namespace" rollout status deployment/talker --timeout=180s
 wait_for kubectl -n "$namespace" rollout status deployment/editor --timeout=180s
 pod=$(kubectl -n "$namespace" get pods -l app=talker -o jsonpath='{.items[0].metadata.name}')
