@@ -621,6 +621,32 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/builds":
+    get:
+      tags:
+      - projects
+      summary: |-
+        The project's Zeabur Builder `Build`s and their runs, with the pod of each run, read as the
+        person. `state` is `not-installed` when the cluster does not serve `builder.zeabur.com`.
+      operationId: getProjectBuilds
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectBuilds"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/configmaps":
     get:
       tags:
@@ -2467,6 +2493,70 @@ components:
           workload:
             $ref: "#/components/schemas/WorkloadRef"
             description: The workload.
+      - type: object
+        description: Run another image in one container of a workload.
+        required:
+        - workload
+        - image
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          image:
+            type: string
+            description: The image reference, such as a Zeabur Builder `Build`'s `status.latestImage`.
+          op:
+            type: string
+            enum:
+            - image
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: Build a Zeabur Builder `Build`'s current commit again (see the `builds` module).
+        required:
+        - build
+        - op
+        properties:
+          build:
+            type: string
+            description: The `Build`.
+          op:
+            type: string
+            enum:
+            - rebuild
+      - type: object
+        description: >-
+          Have Keel move a workload to each new image, or stop it (see the `builds`
+          module).
+        required:
+        - workload
+        - enabled
+        - op
+        properties:
+          build:
+            type:
+            - string
+            - "null"
+            description: The `Build` whose new images Keel is told of, when turning it on.
+          enabled:
+            type: boolean
+            description: On or off.
+          op:
+            type: string
+            enum:
+            - autoUpdate
+          webhook:
+            type:
+            - string
+            - "null"
+            description: Keel's native webhook, `…/v1/webhooks/native`.
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: "The workload: a Deployment, StatefulSet or DaemonSet."
       - type: object
         description: Run this many pods of a Deployment or StatefulSet.
         required:
@@ -6601,6 +6691,52 @@ components:
           items:
             $ref: "#/components/schemas/BackupTarget"
           description: Claims and databases no active schedule covers.
+    ProjectBuildRun:
+      allOf:
+      - $ref: "#/components/schemas/ZeaburBuilderRun"
+        description: The run.
+      - type: object
+        required:
+        - containers
+        properties:
+          containers:
+            type: array
+            items:
+              type: string
+            description: The pod's containers, in the order they run (`fetch`, `plan`, `build`).
+          pod:
+            type:
+            - string
+            - "null"
+            description: Its pod, while it is there.
+      description: A run and the pod that ran it.
+    ProjectBuilds:
+      type: object
+      description: A project's builds.
+      required:
+      - state
+      - builds
+      - runs
+      - unreadable
+      properties:
+        builds:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZeaburBuilderBuild"
+          description: The `Build`s, by name.
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectBuildRun"
+          description: Their runs, newest first.
+        state:
+          $ref: "#/components/schemas/ProviderState"
+          description: Whether Zeabur Builder could be read.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
     ProjectDetails:
       type: object
       description: |-
@@ -8688,6 +8824,146 @@ components:
         tool:
           $ref: "#/components/schemas/ManagerTool"
           description: The tool it is.
+    ZeaburBuilderBuild:
+      type: object
+      description: A `Build`.
+      required:
+      - name
+      - suspended
+      - keelWebhooks
+      properties:
+        builder:
+          type:
+          - string
+          - "null"
+          description: The `ClusterBuilder`.
+        gitRef:
+          type:
+          - string
+          - "null"
+          description: The branch or tag it follows.
+        gitUrl:
+          type:
+          - string
+          - "null"
+          description: The Git repository.
+        keelWebhooks:
+          type: array
+          items:
+            type: string
+          description: The Keel webhooks it tells of new images.
+        latestImage:
+          type:
+          - string
+          - "null"
+          description: The newest successful image, `repository:tag@sha256:…`.
+        latestRevision:
+          type:
+          - string
+          - "null"
+          description: The commit it was built from.
+        message:
+          type:
+          - string
+          - "null"
+          description: The message.
+        name:
+          type: string
+          description: Its name.
+        ready:
+          type:
+          - string
+          - "null"
+          description: "The `Ready` condition: `True`, `False` or `Unknown`."
+        reason:
+          type:
+          - string
+          - "null"
+          description: Its reason and message, as the controller wrote them.
+        rebuildRequested:
+          type:
+          - string
+          - "null"
+          description: The value of the rebuild annotation, when set.
+        remoteRevision:
+          type:
+          - string
+          - "null"
+          description: The commit the ref points at.
+        repository:
+          type:
+          - string
+          - "null"
+          description: |-
+            The repository it pushes to, without tag or digest; unknown until the first image when
+            the controller's default registry is used.
+        suspended:
+          type: boolean
+          description: Whether builds are paused.
+    ZeaburBuilderRun:
+      type: object
+      description: A `BuildRun`.
+      required:
+      - name
+      - build
+      - tags
+      properties:
+        build:
+          type: string
+          description: The `Build`.
+        created:
+          type:
+          - string
+          - "null"
+          description: When it was created.
+        digest:
+          type:
+          - string
+          - "null"
+          description: The pushed manifest's digest.
+        finished:
+          type:
+          - string
+          - "null"
+          description: When it finished.
+        message:
+          type:
+          - string
+          - "null"
+          description: Details, at most 1 KiB of the Job's output.
+        name:
+          type: string
+          description: Its name, also its Job's and its pod's label.
+        phase:
+          type:
+          - string
+          - "null"
+          description: "`Pending`, `Planning`, `Building`, `Succeeded`, `Failed` or `Cancelled`."
+        reason:
+          type:
+          - string
+          - "null"
+          description: Why it waits or failed.
+        revision:
+          type:
+          - string
+          - "null"
+          description: The commit.
+        started:
+          type:
+          - string
+          - "null"
+          description: When it started.
+        tags:
+          type: array
+          items:
+            type: string
+          description: The tags pushed.
+        trigger:
+          type:
+          - string
+          - "null"
+          description: "`webhook`, `poll`, `manual`, `baseImage` or `replan`."
 tags:
 - name: identity
   description: Who you are and what you may do

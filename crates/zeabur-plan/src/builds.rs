@@ -8,8 +8,8 @@
 //! - **Updating automatically** adds `keel.sh/policy: force` to the workload's own metadata, so
 //!   Keel moves it to whatever tag it is told of, and adds a `keel` target to the `Build`'s
 //!   `spec.notify`, so the controller tells Keel of each image it pushes. Turning it off removes
-//!   the annotation and leaves the target: Keel ignores images no workload opts in for, and
-//!   another service may still use it.
+//!   the annotation and leaves the target: Keel ignores images no workload opts in for, and another
+//!   service may still use it.
 //!
 //! [builder]: https://github.com/zeabur/builder
 //! [keel]: https://keel.sh/docs/#policies
@@ -78,7 +78,11 @@ impl Planner<'_> {
             ));
         }
         steps.push(Step::field("image"));
-        self.claim(index, &steps, &format!("image of container {}", target.name))?;
+        self.claim(
+            index,
+            &steps,
+            &format!("image of container {}", target.name),
+        )?;
         let operations = before.map_or_else(
             || vec![add(&path, json!(image))],
             |before| vec![test(&path, before), replace(&path, json!(image))],

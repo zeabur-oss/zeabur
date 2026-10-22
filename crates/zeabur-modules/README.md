@@ -50,6 +50,7 @@ reads) and `zeabur-adapters` (for label selectors). Only the crates that compose
 | `k8up` | volume-backup | `k8up.io/v1` schedules, backups |
 | `velero` | volume-backup | `velero.io/v1` schedules, backups |
 | `cloudnative-pg` | postgres | `postgresql.cnpg.io/v1` clusters, scheduledbackups, backups |
+| `zeabur-builder` | builds | `builder.zeabur.com/v1alpha1` builds, buildruns |
 
 [inventory]: https://github.com/dtolnay/inventory
 [bevy-plugins]: https://docs.rs/bevy/latest/bevy/app/trait.Plugin.html

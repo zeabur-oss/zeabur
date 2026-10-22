@@ -30,6 +30,7 @@
 //! | `GET /api/v1/projects/{p}/services/{kind}/{name}/history` | its pods' CPU, memory and restarts over a range, from the metrics store |
 //! | `GET /api/v1/projects/{p}/usage` | what each pod uses now, from metrics-server |
 //! | `GET /api/v1/projects/{p}/volumes` | how full each claim's volume is, from the kubelets |
+//! | `GET /api/v1/projects/{p}/builds` | its Zeabur Builder builds and their runs, with each run's pod |
 //! | `GET /api/v1/projects/{p}/gaps` | what the project is missing, with citations and fixes |
 //! | `GET /api/v1/projects/{p}/timeline` | the same for every service of the project |
 //! | `GET /api/v1/projects/{p}/incidents` | the cluster incidents that reach the project, with the services they break |
@@ -205,6 +206,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::writes::plan))
         .routes(routes!(projects::writes::apply))
         .routes(routes!(projects::backups::get))
+        .routes(routes!(projects::builds::get))
         .routes(routes!(projects::network_policy::presets))
         .routes(routes!(projects::usage::get))
         .routes(routes!(projects::usage::volumes))

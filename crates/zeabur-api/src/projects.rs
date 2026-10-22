@@ -37,6 +37,7 @@
 //! [k8s-concepts]: https://kubernetes.io/docs/reference/using-api/api-concepts/
 
 pub mod backups;
+pub mod builds;
 pub(crate) mod events;
 pub mod namespace;
 pub mod network_policy;

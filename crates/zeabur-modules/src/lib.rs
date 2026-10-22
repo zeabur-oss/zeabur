@@ -11,6 +11,7 @@ pub mod network_policy;
 pub mod prometheus_api;
 pub mod system_upgrade_controller;
 pub mod velero;
+pub mod zeabur_builder;
 
 /// One gap a module finds, with the object that closes it when Zeabur cannot write the fix
 /// itself.
@@ -112,6 +113,7 @@ pub fn modules() -> Vec<&'static Module> {
         &k8up::MODULE,
         &velero::MODULE,
         &cloudnative_pg::MODULE,
+        &zeabur_builder::MODULE,
     ]
 }
 

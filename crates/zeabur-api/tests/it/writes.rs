@@ -123,6 +123,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_rebuild_reads_the_build_and_plans_its_annotation() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let (status, problem) = post(
+            app.clone(),
+            "/api/v1/projects/shop/plan",
+            &json!({"changes": [{"op": "rebuild", "build": "web"}]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
+        cluster.update(|s| {
+            s.served.push(zeabur_kube::ServedResource::readable(
+                "builder.zeabur.com",
+                "v1alpha1",
+                "builds",
+                "Build",
+                true,
+            ));
+            s.dynamic.push(
+                serde_json::from_value(json!({
+                    "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+                    "metadata": {"name": "web", "namespace": "shop", "resourceVersion": "7"},
+                    "spec": {"builderRef": "dockerfile",
+                        "source": {"git": {"url": "https://example.com/acme/web", "ref": "main"}}}
+                }))
+                .unwrap(),
+            );
+        });
+        let planned = plan(
+            &app,
+            &json!({"changes": [{"op": "rebuild", "build": "web"}]}),
+        )
+        .await;
+        let object = &planned["objects"][0];
+        assert_eq!(object["target"]["kind"], "Build");
+        assert_eq!(
+            object["changes"][0]["path"],
+            "metadata.annotations.builder.zeabur.com/rebuild"
+        );
+    }
+
+    #[tokio::test]
     async fn a_ready_made_network_policy_is_created_once() {
         let cluster = cluster();
         let app = app(&cluster);

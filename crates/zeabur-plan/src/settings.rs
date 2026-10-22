@@ -83,7 +83,10 @@ impl<'a> Planner<'a> {
     // ── Shared lookups ───────────────────────────────────────────────────────────────────────
 
     /// The workload, refused when its template cannot change or a tool manages it.
-    pub(crate) fn editable_workload(&self, reference: &WorkloadRef) -> Result<Workload<'a>, PlanError> {
+    pub(crate) fn editable_workload(
+        &self,
+        reference: &WorkloadRef,
+    ) -> Result<Workload<'a>, PlanError> {
         let found = self.workload(reference)?;
         if found.kind() == WorkloadKind::Job {
             return Err(error(
