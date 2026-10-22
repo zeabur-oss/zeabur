@@ -78,6 +78,55 @@ pub struct Cluster {
     pub distribution: Option<String>,
 }
 
+/// The API server's readiness, from the replica that answered (see `crate::cluster::health`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterHealth {
+    /// `cluster/health`.
+    pub id: String,
+    /// Every check passed.
+    pub ready: bool,
+    /// How many checks ran.
+    pub checks: usize,
+    /// The checks that failed, in the API server's order.
+    pub failing: Vec<FailingCheck>,
+    /// The leader leases of kube-scheduler and kube-controller-manager that exist and may be
+    /// read, in that order.
+    pub leaders: Vec<LeaderLease>,
+}
+
+/// A readiness check that failed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FailingCheck {
+    /// The check's name (`etcd`, `poststarthook/crd-informer-synced`).
+    pub name: String,
+    /// What the API server gave as the reason; it withholds most (`reason withheld`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+/// A component's leader lease in `kube-system`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LeaderLease {
+    /// The Lease.
+    pub origin: Origin,
+    /// `kube-scheduler` or `kube-controller-manager`.
+    pub component: String,
+    /// The leading replica, as it names itself.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub holder: Option<String>,
+    /// When the leader last renewed the lease.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub renewed: Option<String>,
+    /// How long the lease holds without a renewal.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_seconds: Option<i32>,
+    /// Renewed within its duration: a replica is leading.
+    pub current: bool,
+}
+
 /// A project in the list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

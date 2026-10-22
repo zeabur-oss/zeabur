@@ -47,8 +47,8 @@ than you have, and keeps no state of its own: no database, no custom resources.
 
 - **Projects and services.** Namespaces shown as projects, and their workloads, Services,
   routes, ConfigMaps, Secrets and volumes grouped into services, with what Helm, Argo CD or Flux
-  manages marked as such. The cluster page shows the nodes, how long the Kubernetes version is
-  supported, upgrades, and which recommended components are installed.
+  manages marked as such. The cluster page shows the API server's readiness, the nodes, how long
+  the Kubernetes version is supported, upgrades, and which recommended components are installed.
 - **Diagnoses in plain words.** Why a service is unhealthy (a crash loop, out of memory, an image
   that cannot be pulled, a failing probe, traffic that cannot reach it, a quota, no node with
   room, missing configuration), with the fix and the status fields and events it rests on; and

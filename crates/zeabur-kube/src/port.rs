@@ -112,6 +112,14 @@ pub trait Cluster: Send + Sync {
     /// the default `system:public-info-viewer` role).
     fn version(&self) -> Answer<'_, String>;
 
+    /// The body of kube-apiserver's `/readyz?verbose`, one `[+]name ok` or `[-]name failed: …`
+    /// line per check [k8s-health], whether the server is ready (`200`) or not (`500`). Every
+    /// authenticated person may read it through the default `system:public-info-viewer` role;
+    /// a cluster that removed that binding refuses it with `403`.
+    ///
+    /// [k8s-health]: https://kubernetes.io/docs/reference/using-api/health-checks/
+    fn readyz(&self) -> Answer<'_, String>;
+
     /// The kubeconfig's name for the cluster the context uses, in local mode; `None` in the
     /// cluster and when the kubeconfig cannot be read for it. Kubernetes itself gives a cluster
     /// no name.

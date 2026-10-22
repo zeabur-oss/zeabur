@@ -411,6 +411,25 @@ impl Cluster for UserClient {
         Box::pin(async move { Ok(self.kube().apiserver_version().await?.git_version) })
     }
 
+    fn readyz(&self) -> Answer<'_, String> {
+        Box::pin(async move {
+            let request = http::Request::get("/readyz?verbose")
+                .body(Vec::new())
+                .map_err(|e| ClusterError::Transport(e.to_string()))?;
+            match self.kube().request_text(request).await {
+                Ok(body) => Ok(body),
+                // A server that is not ready answers `500` with the same plain-text list, which
+                // kube reports as a status it could not parse, carrying the body as its message.
+                Err(kube::Error::Api(status))
+                    if status.code == 500 && status.message.contains("[-]") =>
+                {
+                    Ok(status.message.clone())
+                }
+                Err(error) => Err(error.into()),
+            }
+        })
+    }
+
     fn kubeconfig_name(&self) -> Option<String> {
         self.name.clone()
     }

@@ -1,11 +1,11 @@
 //! The API against a real kube-apiserver, as a person with a namespace-scoped role: projects,
 //! ConfigMaps and Secrets read as them, Secrets listed without their values, the cluster's
-//! version readable by anyone signed in, backup providers not installed, the first request after
-//! their RoleBinding is deleted answered with `403`, and writes through plan and apply (Helm's
-//! fields kept, one winner of 64 concurrent applies, a write outside the role refused before
-//! anything is written, the other keys of a Secret the person cannot read kept, and the object
-//! stored being the one the plan showed), and usage and history read as a person with `view`
-//! (and, for history, `services/proxy`).
+//! version and the API server's readiness readable by anyone signed in, backup providers not
+//! installed, the first request after their RoleBinding is deleted answered with `403`, and
+//! writes through plan and apply (Helm's fields kept, one winner of 64 concurrent applies, a write
+//! outside the role refused before anything is written, the other keys of a Secret the person
+//! cannot read kept, and the object stored being the one the plan showed), and usage and history
+//! read as a person with `view` (and, for history, `services/proxy`).
 //!
 //! Needs a disposable cluster where the current kubeconfig context is cluster admin
 //! (CONTRIBUTING.md, "Tests"); the admin connection only prepares the namespace and the person.
@@ -134,6 +134,15 @@ mod tests {
             StatusCode::OK,
             "the version is public information: {body}"
         );
+        // So is `/readyz`, through the default `system:public-info-viewer`: the chart grants
+        // nothing for it. The leader leases in kube-system are not this person's to read.
+        let (status, body) = call(&app, "GET", "/api/v1/cluster/health").await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let health: Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(health["ready"], true, "{body}");
+        assert_eq!(health["failing"], json!([]), "{body}");
+        assert!(health["checks"].as_u64().unwrap() > 5, "{body}");
+        assert_eq!(health["leaders"], json!([]), "{body}");
 
         // Backups: discovery says no provider is installed on a plain k3s, before any of the
         // person's rights matter (Velero's objects would be read cluster-wide).

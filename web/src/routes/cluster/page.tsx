@@ -17,6 +17,7 @@ import { useT } from "@/i18n"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { AttentionRow, useAttention } from "@/routes/cluster/attention"
+import { HealthSection } from "@/routes/cluster/health"
 import { NodesSection } from "@/routes/cluster/nodes"
 import { Section } from "@/routes/cluster/section"
 
@@ -25,6 +26,7 @@ export function ClusterPage() {
     <ClusterFrame tab="overview">
       <Attention />
       <ClusterGaps />
+      <HealthSection />
       <NodesSection />
       <WarningsSection />
     </ClusterFrame>
