@@ -1,7 +1,14 @@
 import { describe as group, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { actionOf, describe, failureOf, replaced, shortfall } from "@/components/plan/describe"
+import {
+  actionOf,
+  describe,
+  failureOf,
+  replaced,
+  restartRuleApplies,
+  shortfall,
+} from "@/components/plan/describe"
 import { translator, type Translate } from "@/i18n"
 import { en } from "@/i18n/en"
 import { zhTW } from "@/i18n/zh-TW"
@@ -620,5 +627,22 @@ group("pods that do not fit", () => {
     const said = shortfall(english, preview([nodes], [roll("api")]))
     expect(said?.cost).toContain("The old ones keep running")
     expect(said?.fix).toBe("To finish it, free up room on a node or reserve less per replica.")
+  })
+})
+
+group("restartRuleApplies", () => {
+  test("an env change and a ConfigMap its readers wait on say the rule; a plain restart does not", () => {
+    const env = {
+      ...templated("api"),
+      changes: [
+        { path: "spec.template.spec.containers[name=app].env[name=MODE].value", after: "b" },
+      ],
+    }
+    expect(restartRuleApplies(plan({ objects: [env] }))).toBe(true)
+    expect(
+      restartRuleApplies(plan({ warnings: [{ code: "restartNeeded", workloads: [api] }] })),
+    ).toBe(true)
+    expect(restartRuleApplies(plan({ objects: [templated("api")] }))).toBe(false)
+    expect(restartRuleApplies(plan())).toBe(false)
   })
 })

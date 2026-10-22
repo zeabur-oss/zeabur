@@ -1247,7 +1247,7 @@ export const zhTW: Messages = {
   "title.env": (service: string) => `${service} 的環境變數`,
   "title.data": (kind: string, name: string) => `${kind} ${name}`,
   "title.restart": (service: string) => `重新啟動 ${service}`,
-  "title.configReload": (service: string) => `設定變更時重新啟動 ${service}`,
+  "title.configReload": (service: string) => `ConfigMap 或 Secret 變更時重新啟動 ${service}`,
   "title.deployBuild": (service) => `把最新的建置部署到 ${service}`,
   "title.rebuild": (build) => `重新建置 ${build}`,
   "title.autoUpdateOn": (service) => `自動部署 ${service}`,
@@ -1370,9 +1370,10 @@ export const zhTW: Messages = {
   "data.addKey": "新增鍵",
   "data.key": "鍵",
   "data.readers": "讀取者",
-  "reload.switch": "設定變更時自動重新啟動",
+  "reload.switch": "它讀取的 ConfigMap 或 Secret 變更時自動重新啟動",
   "reload.on": "它讀取的 ConfigMap 或 Secret 一有變更就會重新啟動，不論是誰改的。",
-  "reload.off": "重新啟動前會繼續使用舊的值。",
+  "restart.rule":
+    "儲存服務自己的變數、映像檔、CPU 或記憶體，會立刻替換它的副本；它讀取的 ConfigMap 或 Secret 變更後，要等重新啟動才生效，除非服務設定了變更時自動重新啟動。",
   "reload.notInstalled":
     "這個叢集沒有安裝 Reloader，所以還不會重新啟動。請叢集管理員安裝 Stakater Reloader。",
   "reload.stopped": "Reloader 已安裝但沒有在執行，恢復執行前不會重新啟動。",

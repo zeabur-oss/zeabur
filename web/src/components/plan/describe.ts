@@ -34,6 +34,19 @@ export function replaced(plan: Plan): WorkloadRef[] {
     .map((o) => ({ kind: o.target.kind as WorkloadRef["kind"], name: o.target.name }))
 }
 
+/** Whether the plan restarts a service by changing its own settings or a ConfigMap or Secret it
+ * reads, so the restart rule applies. A plain restart is left out. */
+export function restartRuleApplies(plan: Plan): boolean {
+  const own = plan.objects.some(
+    (o) =>
+      workloadKinds.has(o.target.kind) &&
+      o.changes.some((c) => c.path.startsWith("spec.template.") && !c.path.endsWith("restartedAt")),
+  )
+  return (
+    own || plan.warnings.some((w) => w.code === "restartNeeded" || w.code === "reloaderRestarts")
+  )
+}
+
 const same = (a: WorkloadRef, b: WorkloadRef) => a.kind === b.kind && a.name === b.name
 
 function rolling(t: Translate, workload: WorkloadRef, podsOf: PodsOf, restart: boolean): string {

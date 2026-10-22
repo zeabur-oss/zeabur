@@ -8,7 +8,13 @@ import XIcon from "~icons/ph/x"
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { projectQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
-import { actionOf, describe, undoTitle, type Description } from "@/components/plan/describe"
+import {
+  actionOf,
+  describe,
+  restartRuleApplies,
+  undoTitle,
+  type Description,
+} from "@/components/plan/describe"
 import { bounded, type MountsOf } from "@/components/plan/groups"
 import { PlanGroups } from "@/components/plan/groups-view"
 import { carryOut } from "@/components/plan/outcome"
@@ -430,6 +436,9 @@ function PlanBody({
       ))}
       {!grouped && description.cost ? (
         <p className="text-sm text-muted-foreground">{description.cost}</p>
+      ) : null}
+      {restartRuleApplies(plan) ? (
+        <p className="type-meta text-muted-foreground">{t("restart.rule")}</p>
       ) : null}
       <PlanPreview
         preview={plan.preview}
