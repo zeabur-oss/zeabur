@@ -819,8 +819,14 @@ mod tests {
         );
         assert_eq!(object["origin"]["namespace"], "shop");
         assert_eq!(object["provenance"]["tool"], "Helm");
+        assert_eq!(
+            object["status"],
+            json!({"conditions": [{"type": "Ready", "status": "True"}]}),
+            "the status comes beside the YAML"
+        );
 
         let secret = get(&cluster, "/api/v1/projects/shop/objects/core/v1/secrets/db").await;
+        assert!(secret.get("status").is_none(), "{secret}");
         assert!(
             secret["yaml"]
                 .as_str()

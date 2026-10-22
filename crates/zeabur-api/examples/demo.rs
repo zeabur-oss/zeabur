@@ -401,6 +401,17 @@ fn shop() -> NamespaceObjects {
             {"name": "DATABASE_PASSWORD", "valueFrom": secret("db-credentials", "password")}
         ]),
     );
+    let mut api = api;
+    if let Some(status) = api.status.as_mut() {
+        status.conditions = Some(from(json!([
+            {"type": "Available", "status": "True", "reason": "MinimumReplicasAvailable",
+                "message": "Deployment has minimum availability.",
+                "lastTransitionTime": minutes_ago(50)},
+            {"type": "Progressing", "status": "True", "reason": "NewReplicaSetAvailable",
+                "message": "ReplicaSet \"api-5f6b7\" has successfully progressed.",
+                "lastTransitionTime": minutes_ago(52)}
+        ])));
+    }
     let mut web = web;
     if let Some(container) = web
         .spec

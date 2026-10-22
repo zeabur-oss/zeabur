@@ -30,7 +30,8 @@
 //!
 //! `GET /projects/{p}/objects/{group}/{version}/{resource}/{name}` (`core` for the empty group)
 //! returns the object as YAML without the server's bookkeeping, a Secret's values hidden (see
-//! `zeabur_graph::manifest`), with the object's origin and the tool that manages it.
+//! `zeabur_graph::manifest`), with the object's origin and the tool that manages it. The YAML
+//! leaves out `status`, which is not something a person writes; it comes beside it as JSON.
 
 use std::collections::BTreeSet;
 
@@ -185,6 +186,11 @@ pub struct ObjectDocument {
     pub resource: String,
     /// The object as YAML, without the server's bookkeeping; a Secret's values hidden.
     pub yaml: String,
+    /// The object's `status` as the cluster reports it; absent when it has none, and never for a
+    /// Secret.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub status: Option<serde_json::Value>,
     /// The object.
     pub origin: Origin,
     /// The tool that manages it, if any.
@@ -425,10 +431,19 @@ pub(crate) async fn get(
     }
     let yaml = zeabur_graph::manifest::to_yaml(&value)
         .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e)))?;
+    let status = if reference.group.is_empty() && reference.resource == "secrets" {
+        None
+    } else {
+        value
+            .get("status")
+            .filter(|s| s.as_object().is_some_and(|m| !m.is_empty()))
+            .cloned()
+    };
     Ok(Json(ObjectDocument {
         id: object_id(&project, &reference, &name),
         resource: reference.resource.clone(),
         yaml,
+        status,
         origin: Origin::complete(
             &reference.api_version(),
             &reference.kind,

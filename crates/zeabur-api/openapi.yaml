@@ -6872,6 +6872,13 @@ components:
         resource:
           type: string
           description: The plural resource name.
+        status:
+          type:
+          - object
+          - "null"
+          description: |-
+            The object's `status` as the cluster reports it; absent when it has none, and never for a
+            Secret.
         yaml:
           type: string
           description: The object as YAML, without the server's bookkeeping; a Secret's values hidden.
