@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+  labels: {}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+  labels:
+    zeabur.com/project: "true"

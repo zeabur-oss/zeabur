@@ -1,0 +1,6 @@
+[
+  {"path": "metadata.annotations.team", "after": "shop"},
+  {"path": "spec.template.spec.containers[name=app].env[name=MODE].name", "after": "MODE"},
+  {"path": "spec.template.spec.containers[name=app].env[name=MODE].value", "after": "production"},
+  {"path": "spec.template.spec.volumes[name=cache].emptyDir.sizeLimit", "after": "1Gi"}
+]

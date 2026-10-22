@@ -1,0 +1,2 @@
+description: Filling an empty list or a null field adds its entries; nothing is removed.
+operation: mutation.diff

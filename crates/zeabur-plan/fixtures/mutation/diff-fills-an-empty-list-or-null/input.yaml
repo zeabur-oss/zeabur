@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  annotations: null
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          env: []
+      volumes:
+        - name: cache
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  annotations:
+    team: shop
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          env:
+            - name: MODE
+              value: production
+      volumes:
+        - name: cache
+          emptyDir:
+            sizeLimit: 1Gi

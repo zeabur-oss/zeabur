@@ -69,10 +69,6 @@
       "beforeYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\n  annotations:\n    keel.sh/policy: force\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: example/web:1.0\n        name: app\n",
       "changes": [
         {
-          "after": "{}",
-          "path": "metadata.annotations"
-        },
-        {
           "before": "force",
           "path": "metadata.annotations.keel.sh/policy"
         }

@@ -239,6 +239,7 @@ pub fn diff(before: Option<&Value>, after: &Value) -> Vec<FieldChange> {
     }
     let mut new = Vec::new();
     flatten("", after, &mut new);
+    let (old, new) = (without_filled(&old, &new), without_filled(&new, &old));
     let paths: BTreeSet<&String> = old.iter().chain(&new).map(|(path, _)| path).collect();
     let find = |list: &[(String, String)], path: &str| {
         list.iter().find(|(p, _)| p == path).map(|(_, v)| v.clone())
@@ -260,6 +261,24 @@ pub fn diff(before: Option<&Value>, after: &Value) -> Vec<FieldChange> {
                 after: shown(path, after),
             })
         })
+        .collect()
+}
+
+/// `list` without its empty maps, empty lists and nulls that `other` has fields under: filling
+/// `labels: {}` adds the labels, it does not remove `labels`.
+fn without_filled(list: &[(String, String)], other: &[(String, String)]) -> Vec<(String, String)> {
+    let filled = |path: &str| {
+        other.iter().any(|(child, _)| {
+            child.strip_prefix(path).is_some_and(|rest| {
+                rest.starts_with('[')
+                    || rest.starts_with('.')
+                    || (path.is_empty() && !rest.is_empty())
+            })
+        })
+    };
+    list.iter()
+        .filter(|(path, value)| !(matches!(value.as_str(), "{}" | "[]" | "null") && filled(path)))
+        .cloned()
         .collect()
 }
 

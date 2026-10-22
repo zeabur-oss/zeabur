@@ -1,0 +1,2 @@
+description: Filling an empty map adds its keys; the map itself is not removed.
+operation: mutation.diff

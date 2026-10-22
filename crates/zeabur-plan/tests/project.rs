@@ -124,6 +124,21 @@ mod tests {
     }
 
     #[test]
+    fn adopting_a_namespace_with_empty_labels_only_adds_the_label() {
+        let stored = namespace("shop", &json!({}), None);
+        let plan = planned(Some(&stored), vec![Change::Adopt]).unwrap();
+        let (after, _) = applied(&plan, &stored);
+        only(&stored, &after, "labels", LABEL, Some("true"));
+        let changes = &plan.objects[0].changes;
+        assert_eq!(changes.len(), 1, "{changes:?}");
+        assert_eq!(changes[0].path, "metadata.labels.zeabur.com/project");
+        assert_eq!(
+            (changes[0].before.as_deref(), changes[0].after.as_deref()),
+            (None, Some("true"))
+        );
+    }
+
+    #[test]
     fn letting_go_removes_the_project_label_and_nothing_else() {
         let stored = shop(true);
         let plan = planned(Some(&stored), vec![Change::Unadopt]).unwrap();

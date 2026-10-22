@@ -49,6 +49,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn adopting_a_namespace_with_empty_labels_previews_no_removal() {
+        let cluster = MemoryCluster::new(State {
+            namespaces: vec![namespace("shop", &json!({}))],
+            ..State::default()
+        });
+        let app = app(&cluster);
+        let (status, plan) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({"changes": [{"op": "adopt"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(plan["preview"]["removals"], json!([]), "{plan}");
+        assert_eq!(
+            plan["objects"][0]["changes"],
+            json!([{"path": "metadata.labels.zeabur.com/project", "after": "true"}])
+        );
+    }
+
+    #[tokio::test]
     async fn adopting_then_letting_go_patches_only_the_label_of_the_namespace() {
         let cluster = cluster();
         let app = app(&cluster);
