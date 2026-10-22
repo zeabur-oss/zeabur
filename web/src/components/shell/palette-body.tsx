@@ -12,6 +12,7 @@ import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GlobeIcon from "~icons/ph/globe"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import MoonIcon from "~icons/ph/moon"
+import PlusIcon from "~icons/ph/plus"
 import PuzzlePieceIcon from "~icons/ph/puzzle-piece"
 import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
@@ -145,6 +146,15 @@ export function PaletteBody() {
       label: t("action.openToolsTerminal"),
       icon: TerminalWindowIcon,
       run: () => openKubectl(project),
+    })
+  if (project)
+    items.push({
+      id: "action:create",
+      keywords: "yaml new object manifest",
+      group: g.actions,
+      label: t("create.palette", project),
+      icon: PlusIcon,
+      href: router.buildLocation({ to: "/projects/$project/create", params: { project } }).href,
     })
 
   for (const p of projects.data?.items ?? [])

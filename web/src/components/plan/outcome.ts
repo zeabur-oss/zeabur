@@ -56,6 +56,8 @@ export interface Confirmed {
   /** Opens the plan dialog for the same change again. */
   reopen: (ask: PlanAsk) => void
   onApplied?: () => void
+  /** The apply was refused after it created some of the objects. */
+  onPartial?: (problem: Schemas["Problem"]) => void
 }
 
 /** Applies a confirmed plan and reports the outcome in a toast. */
@@ -89,6 +91,13 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
           : undefined,
     })
   } catch (error) {
+    const problem = toProblem(error)
+    if (problem.applied?.length && confirmed.onPartial) {
+      toast.dismiss(id)
+      void queryClient.invalidateQueries({ queryKey: ["project", project] })
+      confirmed.onPartial(problem)
+      return
+    }
     void fail(
       project,
       id,

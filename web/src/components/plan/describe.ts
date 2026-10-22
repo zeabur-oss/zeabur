@@ -147,7 +147,7 @@ function sentenceOf(
     case "edit":
       return t("confirm.yamlAsIs")
     case "create": {
-      const object = change.object as { kind?: unknown; metadata?: { name?: unknown } }
+      const object = (change.object ?? {}) as { kind?: unknown; metadata?: { name?: unknown } }
       const kind = typeof object.kind === "string" ? object.kind : ""
       const name = typeof object.metadata?.name === "string" ? object.metadata.name : ""
       return t("confirm.create", kind, name)
@@ -281,6 +281,7 @@ export function describe(
   reasons: readonly Reason[] = [],
   mountsOf: MountsOf = () => [],
 ): Description {
+  if (writtenCreates(ask.changes)) return describeWritten(t, plan)
   const more: Record<string, string[]> = {}
   const named = (names: string[], sentence: (list: string) => string) => {
     const { text, rest } = bounded(t, names)
@@ -364,6 +365,29 @@ export function describe(
         : undefined,
     edits,
     outcomes,
+  }
+}
+
+/** Whether the changes create objects a person wrote as YAML. */
+function writtenCreates(changes: readonly Change[]): boolean {
+  return changes.length > 0 && changes.every((c) => c.op === "create" && !!c.yaml)
+}
+
+/** Objects written as YAML, in the order the plan creates them. */
+function describeWritten(t: Translate, plan: Plan): Description {
+  const objects = plan.objects.map((o) => `${o.target.kind} ${o.target.name}`)
+  const [one] = plan.objects
+  const lines =
+    one && plan.objects.length === 1
+      ? [t("confirm.create", one.target.kind, one.target.name)]
+      : [t("create.createsMany", objects.length, objects.join(t("common.sep")))]
+  return {
+    lines,
+    more: {},
+    action:
+      plan.objects.length > 1 ? t("create.buttonMany", plan.objects.length) : t("action.create"),
+    said: [],
+    cost: plan.objects.length > 1 ? t("create.noTransaction") : undefined,
   }
 }
 
@@ -556,6 +580,8 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
   const ops = new Set(ask.changes.map((c) => c.op))
   const [change] = ask.changes
   if (!change) return t("plan.apply")
+  if (writtenCreates(ask.changes))
+    return ask.changes.length > 1 ? t("create.buttonMany", ask.changes.length) : t("action.create")
   if (ask.changes.length > 1 && [...ops].every((op) => storageOps.has(op)))
     return t("action.saveVolumes")
   if (ops.size > 1)
@@ -598,7 +624,7 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
     case "edit":
       return t("action.saveYaml")
     case "create": {
-      const object = change.object as { kind?: unknown }
+      const object = (change.object ?? {}) as { kind?: unknown }
       if (object.kind !== "NetworkPolicy") return t("action.create")
       return isolates(change.object) ? t("action.isolate") : t("action.allow")
     }

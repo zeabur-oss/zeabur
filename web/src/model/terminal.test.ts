@@ -3,6 +3,7 @@ import { describe, test, expect } from "bun:test"
 import type { Problem } from "@/api/client"
 import {
   applyCommand,
+  createCommand,
   execRole,
   isManifest,
   nearestExpiry,
@@ -170,6 +171,12 @@ describe("a command typed into the kubectl terminal", () => {
     const command = applyCommand("apiVersion: v1\nkind: ConfigMap\ndata:\n  a: |\nEOF\nEOF2\n")
     expect(command.startsWith("kubectl apply -f - <<'EOF3'\n")).toBe(true)
     expect(command.endsWith("\nEOF2\nEOF3")).toBe(true)
+  })
+
+  test("creates in the project's namespace", () => {
+    expect(createCommand("shop", "apiVersion: v1\nkind: ConfigMap\n")).toBe(
+      "kubectl create --namespace shop -f - <<'EOF'\napiVersion: v1\nkind: ConfigMap\nEOF",
+    )
   })
 
   test("is offered for a whole object, not for a fragment to merge into one", () => {

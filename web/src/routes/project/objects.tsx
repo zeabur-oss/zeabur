@@ -1,11 +1,12 @@
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { getRouteApi } from "@tanstack/react-router"
+import { getRouteApi, Link } from "@tanstack/react-router"
 import { lazy, Suspense, useRef, useState, type ReactNode } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import CaretDownIcon from "~icons/ph/caret-down"
 import CaretRightIcon from "~icons/ph/caret-right"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
+import PlusIcon from "~icons/ph/plus"
 import PushPinIcon from "~icons/ph/push-pin"
 import PushPinFillIcon from "~icons/ph/push-pin-fill"
 
@@ -22,7 +23,7 @@ import {
   RefusedSome,
   useHintOffersElevation,
 } from "@/components/refused"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { useT } from "@/i18n"
 import { parseObjectKey } from "@/lib/objects"
 import { pinnedKinds, togglePinnedKind } from "@/lib/stores"
@@ -118,7 +119,19 @@ export function ObjectsPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ProjectHeader entry="objects" />
+      <ProjectHeader
+        entry="objects"
+        actions={
+          <Link
+            to="/projects/$project/create"
+            params={{ project }}
+            className={buttonVariants({ size: "sm" })}
+          >
+            <PlusIcon aria-hidden="true" data-icon="inline-start" />
+            {t("create.button")}
+          </Link>
+        }
+      />
       <PageColumn gap="sm" className="mb-8 min-h-0 flex-1">
         {base.isPending ? (
           <LoadingRows label={t("common.loading")} rows={8} />

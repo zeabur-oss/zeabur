@@ -2,7 +2,7 @@
 // (`PlanFallback` in fallback.tsx).
 import { lazy, Suspense, useEffect, useRef, useState } from "react"
 
-import type { Schemas } from "@/api/client"
+import type { Problem, Schemas } from "@/api/client"
 import { useDraft } from "@/components/plan/draft"
 import { fallback, next, type Open } from "@/components/plan/fallback"
 import type { Skipped } from "@/model/managed"
@@ -24,11 +24,24 @@ export interface PlanAsk {
   quiet?: boolean
 }
 
+/** For a plan of objects written as YAML. */
+export interface PlanHooks {
+  /** Where in the YAML a refusal points, in words. */
+  where?: (at: Schemas["ProblemAt"]) => string
+  /** An apply refused after it created some of the objects. */
+  onPartial?: (problem: Problem) => void
+}
+
 /** Inside a service's Configure page, an edit waits in its draft instead; `direct` plans at once. */
-export function usePlanner(project: string, onApplied?: () => void, direct = false) {
+export function usePlanner(
+  project: string,
+  onApplied?: () => void,
+  direct = false,
+  hooks: PlanHooks = {},
+) {
   const draft = useDraft()
   const [open, setOpen] = useState<Open | null>(null)
-  const [fields, setFields] = useState<Schemas["FieldCause"][]>([])
+  const [refusal, setRefusal] = useState<Problem | undefined>(undefined)
   const mounted = useRef(false)
   useEffect(() => {
     mounted.current = true
@@ -37,7 +50,7 @@ export function usePlanner(project: string, onApplied?: () => void, direct = fal
     }
   }, [])
   const show = (ask: PlanAsk) => {
-    setFields([])
+    setRefusal(undefined)
     setOpen(next(project, ask))
   }
   /** True when the ask waits in the draft instead of opening the dialog. */
@@ -56,9 +69,10 @@ export function usePlanner(project: string, onApplied?: () => void, direct = fal
         onClose={() => setOpen(null)}
         onApplied={onApplied}
         reopen={reopen}
-        onRefused={setFields}
+        onRefused={setRefusal}
+        hooks={hooks}
       />
     </Suspense>
   ) : null
-  return { plan, dialog, fields }
+  return { plan, dialog, fields: refusal?.fields ?? [], refusal }
 }
