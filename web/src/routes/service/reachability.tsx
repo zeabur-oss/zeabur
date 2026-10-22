@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 import CaretRightIcon from "~icons/ph/caret-right"
@@ -13,13 +14,17 @@ import { Drawer } from "@zeabur/design-system/components/drawer"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { useT, type Translate } from "@/i18n"
+import { objectKey } from "@/lib/objects"
 import { cn } from "@/lib/utils"
 import type { PlanAsk } from "@/components/plan/planner"
 import {
+  byRules,
   filterPeers,
   leadOf,
   namesShown,
   reachSummary,
+  sharedRules,
+  showsRules,
   type Lead,
   type Peer,
   type PeerGroup,
@@ -37,6 +42,52 @@ function AccessPill({ access, children }: { access: Access; children?: ReactNode
       {t(`reach.${access}`)}
       {children}
     </StatusPill>
+  )
+}
+
+/** A rule's name, opening it on the Objects page. */
+function RuleLink({ project, name }: { project: string; name: string }) {
+  return (
+    <Link
+      to="/projects/$project/objects"
+      params={{ project }}
+      search={{
+        object: objectKey({
+          group: "networking.k8s.io",
+          version: "v1",
+          resource: "networkpolicies",
+          name,
+        }),
+      }}
+      className="font-mono text-xs hover:underline"
+      translate="no"
+    >
+      {name}
+    </Link>
+  )
+}
+
+/** The rules that decide a peer, each a link. */
+function RuleLinks({ project, via }: { project: string; via: string[] }) {
+  const t = useT()
+  return via.map((name, i) => (
+    <span key={name}>
+      {i > 0 ? t("common.sep") : null}
+      <RuleLink project={project} name={name} />
+    </span>
+  ))
+}
+
+/** The rules that decide every peer of a list, said once above it. */
+function SharedRules({ project, via }: { project: string; via: string[] }) {
+  const t = useT()
+  if (via.length === 0) return null
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t("reach.via")}
+      {t("common.colon")}
+      <RuleLinks project={project} via={via} />
+    </p>
   )
 }
 
@@ -90,6 +141,7 @@ export function Reachability({
   const allow = (peer: Peer) => void choose("allow-from-service", peer.id)
   const closed = summary.groups.filter((g) => g.access !== "allowed").flatMap((g) => g.peers)
   const rules = reach.selectedBy
+  const via = showsRules(policies)
   const row =
     "flex flex-wrap items-start gap-x-3 gap-y-1.5 border-t border-rule py-2.5 first:border-t-0"
   const label = "w-28 shrink-0 pt-0.5 text-muted-foreground max-sm:w-full"
@@ -137,12 +189,8 @@ export function Reachability({
             <span className={cn(label, "max-sm:hidden")}>{t("reach.policies")}</span>
             <span className="flex min-w-0 flex-1 flex-wrap gap-1.5 max-sm:hidden">
               {rules.map((policy) => (
-                <code
-                  key={policy}
-                  className="rounded bg-muted px-1 font-mono text-xs"
-                  translate="no"
-                >
-                  {policy}
+                <code key={policy} className="rounded bg-muted px-1">
+                  <RuleLink project={project} name={policy} />
                 </code>
               ))}
             </span>
@@ -160,7 +208,7 @@ export function Reachability({
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               {summary.groups.map((group) =>
                 summary.few ? (
-                  <FewGroup key={group.access} group={group} />
+                  <FewGroup key={group.access} group={group} project={via ? project : undefined} />
                 ) : (
                   <div key={group.access} className="flex flex-col gap-2">
                     <GroupButton
@@ -171,6 +219,7 @@ export function Reachability({
                     {open === group.access ? (
                       <GroupTable
                         group={group}
+                        project={via ? project : undefined}
                         onAllow={group.access === "allowed" ? undefined : allow}
                       />
                     ) : null}
@@ -224,16 +273,17 @@ export function Reachability({
         {drawer === "rules" ? (
           <ul className="flex flex-col divide-y divide-v2-border">
             {rules.map((policy) => (
-              <li key={policy} className="truncate py-2.5 font-mono text-sm" translate="no">
-                {policy}
+              <li key={policy} className="truncate py-2.5">
+                <RuleLink project={project} name={policy} />
               </li>
             ))}
           </ul>
         ) : drawer === "pick" ? (
-          <PeerList peers={closed} onAllow={allow} />
+          <PeerList peers={closed} project={via ? project : undefined} onAllow={allow} />
         ) : shown ? (
           <PeerList
             peers={summary.groups.find((g) => g.access === shown)?.peers ?? []}
+            project={via ? project : undefined}
             onAllow={shown === "allowed" ? undefined : allow}
           />
         ) : null}
@@ -272,13 +322,28 @@ function leadSentence(t: Translate, name: string, lead: Lead): string {
   return t("reach.lead", clauses, peers === 0)
 }
 
-/** Few peers: the verdict once, then every name. */
-function FewGroup({ group }: { group: PeerGroup }) {
+/** Few peers: the verdict once, then every name; with `project`, each set of names with the
+ * rules that decide it. */
+function FewGroup({ group, project }: { group: PeerGroup; project?: string }) {
+  const t = useT()
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1">
+    <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1 py-1">
       <AccessPill access={group.access} />
-      <span className="min-w-0 font-mono text-xs" translate="no">
-        {group.peers.map((p) => p.name).join(", ")}
+      <span className="flex min-w-0 flex-col gap-1">
+        {(project ? byRules(group.peers) : [{ via: [], peers: group.peers }]).map((part) => (
+          <span key={part.via.join(",")} className="flex flex-wrap items-baseline gap-x-2">
+            <span className="min-w-0 font-mono text-xs" translate="no">
+              {part.peers.map((p) => p.name).join(", ")}
+            </span>
+            {project && part.via.length > 0 ? (
+              <span className="type-meta text-muted-foreground">
+                {t("reach.via")}
+                {t("common.colon")}
+                <RuleLinks project={project} via={part.via} />
+              </span>
+            ) : null}
+          </span>
+        ))}
       </span>
     </span>
   )
@@ -325,15 +390,27 @@ function GroupButton({
   )
 }
 
-/** A group opened in place: its peers in a bounded, filterable, sortable table. */
-function GroupTable({ group, onAllow }: { group: PeerGroup; onAllow?: (peer: Peer) => void }) {
+/** A group opened in place: its peers in a bounded, filterable, sortable table; with `project`,
+ * the rules that decide them, once when they share them, else in a column. */
+function GroupTable({
+  group,
+  project,
+  onAllow,
+}: {
+  group: PeerGroup
+  project?: string
+  onAllow?: (peer: Peer) => void
+}) {
   const t = useT()
   const [query, setQuery] = useState("")
   const [descending, setDescending] = useState(false)
   const peers = filterPeers(group.peers, query)
   const sorted = descending ? peers.toReversed() : peers
+  const shared = project ? sharedRules(group.peers) : undefined
+  const column = project && !shared ? project : undefined
   return (
     <div className="mb-2 flex flex-col gap-2">
+      {project && shared ? <SharedRules project={project} via={shared} /> : null}
       <FilterField value={query} onChange={setQuery} label={t("reach.filter")} />
       <div className="max-h-90 overflow-y-auto rounded-lg border border-v2-border">
         <table className="w-full text-sm" aria-label={t(`reach.${group.access}`)}>
@@ -350,6 +427,11 @@ function GroupTable({ group, onAllow }: { group: PeerGroup; onAllow?: (peer: Pee
                   <CaretUpDownIcon className="size-3" aria-hidden="true" />
                 </button>
               </th>
+              {column ? (
+                <th className="px-3 py-1.5 text-left type-meta font-medium text-muted-foreground">
+                  {t("reach.via")}
+                </th>
+              ) : null}
               {onAllow ? (
                 <th className="px-3 py-1.5">
                   <span className="sr-only">{t("table.actions")}</span>
@@ -363,6 +445,11 @@ function GroupTable({ group, onAllow }: { group: PeerGroup; onAllow?: (peer: Pee
                 <td className="max-w-0 truncate px-3 py-1.5 font-mono text-xs" translate="no">
                   {peer.name}
                 </td>
+                {column ? (
+                  <td className="px-3 py-1.5 text-muted-foreground">
+                    <RuleLinks project={column} via={peer.via} />
+                  </td>
+                ) : null}
                 {onAllow ? (
                   <td className="w-px px-3 py-1 text-right">
                     <Button variant="ghost" size="xs" onClick={() => onAllow(peer)}>
@@ -384,19 +471,40 @@ function GroupTable({ group, onAllow }: { group: PeerGroup; onAllow?: (peer: Pee
   )
 }
 
-/** A drawer's list: a filter, then names, each with Allow when it is not allowed yet. */
-function PeerList({ peers, onAllow }: { peers: Peer[]; onAllow?: (peer: Peer) => void }) {
+/** A drawer's list: a filter, then names, each with Allow when it is not allowed yet; with
+ * `project`, the rules that decide them, once when they share them. */
+function PeerList({
+  peers,
+  project,
+  onAllow,
+}: {
+  peers: Peer[]
+  project?: string
+  onAllow?: (peer: Peer) => void
+}) {
   const t = useT()
   const [query, setQuery] = useState("")
   const shown = filterPeers(peers, query)
+  const shared = project ? sharedRules(peers) : undefined
+  const each = project && !shared ? project : undefined
   return (
     <div className="flex flex-col gap-3">
+      {project && shared ? <SharedRules project={project} via={shared} /> : null}
       <FilterField value={query} onChange={setQuery} label={t("reach.filter")} wide />
       <ul className="flex flex-col divide-y divide-v2-border">
         {shown.map((peer) => (
           <li key={peer.id} className="flex min-h-10 items-center gap-2 py-1">
-            <span className="min-w-0 flex-1 truncate font-mono text-sm" translate="no">
-              {peer.name}
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="truncate font-mono text-sm" translate="no">
+                {peer.name}
+              </span>
+              {each && peer.via.length > 0 ? (
+                <span className="type-meta text-muted-foreground">
+                  {t("reach.via")}
+                  {t("common.colon")}
+                  <RuleLinks project={each} via={peer.via} />
+                </span>
+              ) : null}
             </span>
             {onAllow ? (
               <Button variant="outline" size="xs" onClick={() => onAllow(peer)}>

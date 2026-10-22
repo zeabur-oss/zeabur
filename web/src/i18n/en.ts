@@ -1436,6 +1436,7 @@ export const en = {
   "reach.more": (n: number) => `+${n} more`,
   "reach.filter": "Filter services",
   "reach.service": "Service",
+  "reach.via": "Rule",
   "reach.allow": "Allow",
   "reach.noMatch": "No service matches.",
   "backups.title": "Backups",

@@ -7,6 +7,8 @@ type Reach = Schemas["NetworkPolicyService"]
 export interface Peer {
   id: string
   name: string
+  /** The rules that decide its access, by name. */
+  via: string[]
 }
 
 export interface PeerGroup {
@@ -37,11 +39,32 @@ export function reachSummary(reach: Reach, nameOf: (id: string) => string): Reac
       access,
       peers: peers
         .filter((p) => p.access === access)
-        .map((p) => ({ id: p.service, name: p.name }))
+        .map((p) => ({ id: p.service, name: p.name, via: p.via }))
         .toSorted((a, b) => a.name.localeCompare(b.name)),
     }))
     .filter((g) => g.peers.length > 0)
   return { open: reach.selectedBy.length === 0, groups, few: peers.length <= FEW_PEERS }
+}
+
+/** Which rule decides each peer is worth saying only when the project has more than one. */
+export const showsRules = (policies: readonly string[]) => policies.length > 1
+
+/** A few peers split by the rules that decide them, so each set of rules is said once. */
+export function byRules(peers: readonly Peer[]): { via: string[]; peers: Peer[] }[] {
+  const out = new Map<string, { via: string[]; peers: Peer[] }>()
+  for (const peer of peers) {
+    const key = peer.via.join("\n")
+    const entry = out.get(key) ?? { via: peer.via, peers: [] }
+    entry.peers.push(peer)
+    out.set(key, entry)
+  }
+  return [...out.values()]
+}
+
+/** The rules, when the same ones decide every peer: said once rather than on each row. */
+export function sharedRules(peers: readonly Peer[]): string[] | undefined {
+  const parts = byRules(peers)
+  return parts.length === 1 ? parts[0]?.via : undefined
 }
 
 /** What a group says before it is opened: its first names and how many more. */

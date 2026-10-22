@@ -4817,6 +4817,7 @@ components:
       required:
       - service
       - access
+      - via
       properties:
         access:
           $ref: "#/components/schemas/NetworkPolicyAccess"
@@ -4824,6 +4825,14 @@ components:
         service:
           type: string
           description: The service's id.
+        via:
+          type: array
+          items:
+            type: string
+          description: |-
+            The policies, by name, that decide it: those whose rules admit it, on its way out or on the
+            service's way in; when it is blocked, those that isolate the blocking side and admit
+            nothing from it. Empty when no policy isolates either side.
     NetworkPolicyPreset:
       type: object
       description: A ready-made policy for a service, to plan as a new object.

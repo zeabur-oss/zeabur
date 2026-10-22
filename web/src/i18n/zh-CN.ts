@@ -1305,6 +1305,7 @@ export const zhCN: Messages = {
   "reach.more": (n) => `还有 ${n} 个`,
   "reach.filter": "筛选服务",
   "reach.service": "服务",
+  "reach.via": "依据",
   "reach.allow": "允许",
   "reach.noMatch": "没有匹配的服务。",
   "backups.title": "备份",

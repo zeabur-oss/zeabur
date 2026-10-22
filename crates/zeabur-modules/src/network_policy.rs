@@ -146,6 +146,10 @@ pub struct Peer {
     pub service: String,
     /// How far.
     pub access: Access,
+    /// The policies, by name, that decide it: those whose rules admit it, on its way out or on the
+    /// service's way in; when it is blocked, those that isolate the blocking side and admit
+    /// nothing from it. Empty when no policy isolates either side.
+    pub via: Vec<String>,
 }
 
 /// A connection the project shows (inferred from configuration), and whether the policies let it
@@ -324,31 +328,106 @@ fn port_access(ports: Option<&Vec<NetworkPolicyPort>>, dns: bool) -> Access {
     }
 }
 
-/// Ingress to `labels` (pods of `namespace`) from `pod`; `None` when no policy isolates it.
+/// One side of a connection: how far the policies that isolate it admit the peer, and which.
+struct Side<'p> {
+    access: Access,
+    /// The isolating policies, each with how far its own rules admit the peer.
+    by: Vec<(&'p NetworkPolicy, Access)>,
+}
+
+impl<'p> Side<'p> {
+    fn new(by: Vec<(&'p NetworkPolicy, Access)>) -> Self {
+        let access = if by.is_empty() {
+            Access::Allowed
+        } else {
+            by.iter()
+                .fold(Access::Blocked, |best, (_, access)| best.or(*access))
+        };
+        Self { access, by }
+    }
+
+    /// The policies that decide it: those that admit the peer, or, when none does, every one that
+    /// isolates it.
+    fn deciding(&self) -> impl Iterator<Item = &'p NetworkPolicy> + '_ {
+        let blocked = self.access == Access::Blocked;
+        self.by
+            .iter()
+            .filter(move |(_, access)| blocked || *access != Access::Blocked)
+            .map(|(policy, _)| *policy)
+    }
+}
+
+/// Ingress to `labels` (pods of `namespace`) from `pod`.
+fn ingress_side<'p>(
+    policies: &'p [NetworkPolicy],
+    namespace: &str,
+    labels: &BTreeMap<String, String>,
+    pod: &Pod<'_>,
+) -> Side<'p> {
+    Side::new(
+        policies
+            .iter()
+            .filter(|p| types(p).0 && selects(p, labels))
+            .map(|policy| {
+                let access = policy
+                    .spec
+                    .iter()
+                    .flat_map(|s| s.ingress.iter().flatten())
+                    .fold(Access::Blocked, |best, rule| {
+                        let peers = peer_access(rule.from.as_ref(), namespace, pod);
+                        best.or(peers.and(port_access(rule.ports.as_ref(), false)))
+                    });
+                (policy, access)
+            })
+            .collect(),
+    )
+}
+
 fn ingress(
     policies: &[NetworkPolicy],
     namespace: &str,
     labels: &BTreeMap<String, String>,
     pod: &Pod<'_>,
 ) -> Access {
-    let isolating: Vec<&NetworkPolicy> = policies
-        .iter()
-        .filter(|p| types(p).0 && selects(p, labels))
-        .collect();
-    if isolating.is_empty() {
-        return Access::Allowed;
-    }
-    let mut best = Access::Blocked;
-    for policy in isolating {
-        for rule in policy.spec.iter().flat_map(|s| s.ingress.iter().flatten()) {
-            let peers = peer_access(rule.from.as_ref(), namespace, pod);
-            best = best.or(peers.and(port_access(rule.ports.as_ref(), false)));
-        }
-    }
-    best
+    ingress_side(policies, namespace, labels, pod).access
 }
 
-/// Where egress from `labels` may go: to `pod`, or with `pod` `None` to the outside.
+/// Egress from `labels`: to `pod`, or with `pod` `None` to the outside.
+fn egress_side<'p>(
+    policies: &'p [NetworkPolicy],
+    namespace: &str,
+    labels: &BTreeMap<String, String>,
+    pod: Option<&Pod<'_>>,
+    dns: bool,
+) -> Side<'p> {
+    Side::new(
+        policies
+            .iter()
+            .filter(|p| types(p).1 && selects(p, labels))
+            .map(|policy| {
+                let access = policy
+                    .spec
+                    .iter()
+                    .flat_map(|s| s.egress.iter().flatten())
+                    .fold(Access::Blocked, |best, rule| {
+                        let peers = pod.map_or_else(
+                            || match rule.to.as_ref().filter(|t| !t.is_empty()) {
+                                None => Access::Allowed,
+                                Some(to) if to.iter().any(|p| p.ip_block.is_some()) => {
+                                    Access::Allowed
+                                }
+                                Some(_) => Access::Blocked,
+                            },
+                            |pod| peer_access(rule.to.as_ref(), namespace, pod),
+                        );
+                        best.or(peers.and(port_access(rule.ports.as_ref(), dns)))
+                    });
+                (policy, access)
+            })
+            .collect(),
+    )
+}
+
 fn egress(
     policies: &[NetworkPolicy],
     namespace: &str,
@@ -356,38 +435,17 @@ fn egress(
     pod: Option<&Pod<'_>>,
     dns: bool,
 ) -> Access {
-    let isolating: Vec<&NetworkPolicy> = policies
-        .iter()
-        .filter(|p| types(p).1 && selects(p, labels))
-        .collect();
-    if isolating.is_empty() {
-        return Access::Allowed;
-    }
-    let mut best = Access::Blocked;
-    for policy in isolating {
-        for rule in policy.spec.iter().flat_map(|s| s.egress.iter().flatten()) {
-            let peers = pod.map_or_else(
-                || match rule.to.as_ref().filter(|t| !t.is_empty()) {
-                    None => Access::Allowed,
-                    Some(to) if to.iter().any(|p| p.ip_block.is_some()) => Access::Allowed,
-                    Some(_) => Access::Blocked,
-                },
-                |pod| peer_access(rule.to.as_ref(), namespace, pod),
-            );
-            best = best.or(peers.and(port_access(rule.ports.as_ref(), dns)));
-        }
-    }
-    best
+    egress_side(policies, namespace, labels, pod, dns).access
 }
 
 /// Egress of `from` and ingress of `to`, both pods of `namespace`.
-fn between(
-    policies: &[NetworkPolicy],
+fn between<'p>(
+    policies: &'p [NetworkPolicy],
     namespace: &str,
     from: &Workload,
     to: &Workload,
-) -> (Access, Access) {
-    let out = egress(
+) -> (Side<'p>, Side<'p>) {
+    let out = egress_side(
         policies,
         namespace,
         &from.labels,
@@ -397,7 +455,7 @@ fn between(
         }),
         false,
     );
-    let into = ingress(
+    let into = ingress_side(
         policies,
         namespace,
         &to.labels,
@@ -407,6 +465,21 @@ fn between(
         },
     );
     (out, into)
+}
+
+/// The policies, by name, that decide a connection: when it is blocked, those of each side that
+/// blocks it; otherwise those that admit it on either side.
+fn via(out: &Side<'_>, into: &Side<'_>) -> Vec<String> {
+    let blocked = out.access.and(into.access) == Access::Blocked;
+    let mut names: Vec<String> = [out, into]
+        .into_iter()
+        .filter(|side| !blocked || side.access == Access::Blocked)
+        .flat_map(Side::deciding)
+        .filter_map(|p| p.metadata.name.clone())
+        .collect();
+    names.sort();
+    names.dedup();
+    names
 }
 
 /// One service's reachability among `workloads`.
@@ -437,7 +510,8 @@ fn service(policies: &[NetworkPolicy], input: Input<'_>, w: &Workload) -> Servic
                 let (out, into) = between(policies, namespace, other, w);
                 Peer {
                     service: other.id.clone(),
-                    access: out.and(into),
+                    access: out.access.and(into.access),
+                    via: via(&out, &into),
                 }
             })
             .collect(),
@@ -492,6 +566,7 @@ pub fn reachability(input: Input<'_>) -> Reachability {
                 return None;
             };
             let (out, into) = between(&policies, input.namespace, a, b);
+            let (out, into) = (out.access, into.access);
             let mut blocked_at = Vec::new();
             if out == Access::Blocked {
                 blocked_at.push("egress".to_owned());
@@ -1316,5 +1391,88 @@ mod tests {
             connections: &[],
         });
         assert_eq!(r.services[0].from_other_namespaces, Access::Limited);
+    }
+
+    fn allow(name: &str, to: &str, from: &str, ports: Option<Value>) -> DynamicObject {
+        let mut rule = json!({"from": [{"podSelector": {"matchLabels": {"app": from}}}]});
+        if let Some(ports) = ports {
+            rule["ports"] = ports;
+        }
+        object(json!({
+            "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+            "metadata": {"name": name, "namespace": "shop"},
+            "spec": {"podSelector": {"matchLabels": {"app": to}}, "ingress": [rule]}
+        }))
+    }
+
+    /// `via` of each peer of the service `of`, by the peer's name.
+    fn via_of(r: &Reachability, of: usize) -> Vec<(&str, Access, Vec<&str>)> {
+        r.services[of]
+            .from_services
+            .iter()
+            .map(|p| {
+                (
+                    p.service.rsplit('/').next().unwrap(),
+                    p.access,
+                    p.via.iter().map(String::as_str).collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn without_policies_no_peer_names_one() {
+        let workloads = [workload("web", "web"), workload("api", "api")];
+        let r = reachability(input(&workloads, &[], &[]));
+        assert_eq!(via_of(&r, 1), [("web", Access::Allowed, vec![])]);
+    }
+
+    #[test]
+    fn a_peer_names_the_policies_that_admit_it_or_all_that_block_it() {
+        let workloads = [
+            workload("web", "web"),
+            workload("worker", "worker"),
+            workload("cron", "cron"),
+            workload("api", "api"),
+        ];
+        let policies = [
+            deny("deny-api", &json!({"matchLabels": {"app": "api"}})),
+            allow("allow-web", "api", "web", None),
+            allow(
+                "allow-worker",
+                "api",
+                "worker",
+                Some(json!([{"port": 8080}])),
+            ),
+        ];
+        let r = reachability(input(&workloads, &policies, &[]));
+        assert_eq!(
+            via_of(&r, 3),
+            [
+                ("web", Access::Allowed, vec!["allow-web"]),
+                ("worker", Access::Limited, vec!["allow-worker"]),
+                (
+                    "cron",
+                    Access::Blocked,
+                    vec!["allow-web", "allow-worker", "deny-api"]
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_peer_blocked_on_its_way_out_names_only_its_own_egress_policy() {
+        let workloads = [workload("web", "web"), workload("api", "api")];
+        let egress = object(json!({
+            "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+            "metadata": {"name": "web-out", "namespace": "shop"},
+            "spec": {"podSelector": {"matchLabels": {"app": "web"}}, "policyTypes": ["Egress"],
+                "egress": [{"to": [{"podSelector": {"matchLabels": {"app": "db"}}}]}]}
+        }));
+        let policies = [egress, allow("allow-web", "api", "web", None)];
+        let r = reachability(input(&workloads, &policies, &[]));
+        assert_eq!(via_of(&r, 1), [("web", Access::Blocked, vec!["web-out"])]);
+        // Nothing isolates api's way out or web's way in.
+        assert_eq!(via_of(&r, 0), [("api", Access::Allowed, vec![])]);
     }
 }

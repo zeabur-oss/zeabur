@@ -16,7 +16,8 @@
       "fromServices": [
         {
           "service": "projects/shop/services/deployment/web",
-          "access": "allowed"
+          "access": "allowed",
+          "via": []
         }
       ]
     }
