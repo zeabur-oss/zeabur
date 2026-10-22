@@ -272,13 +272,9 @@ export const zhTW: Messages = {
   "cluster.apiCheckFailed": "未通過",
   "cluster.apiUnknown": "不明：讀不到 API 伺服器的就緒狀態。",
   "cluster.apiCovers": (n: number) =>
-    `回應這次請求的 API 伺服器的 ${n} 項就緒檢查（/readyz）。每次請求只會連到其中一台 API 伺服器，其他副本不在這裡檢查。`,
-  "cluster.apiEmbedded": (distribution: string) =>
-    `在 ${distribution} 上，排程器和控制器管理員跟 API 伺服器在同一個行程裡執行，API 伺服器有回應就表示它們也在執行。`,
-  "cluster.apiLeases":
-    "這些檢查不包含排程器和控制器管理員；從它們的領導者租約可以看出各自是否有正在執行的領導者。",
-  "cluster.apiNotCovered":
-    "這些檢查不包含排程器和控制器管理員。在代管叢集上，它們由供應商負責執行。",
+    `就緒狀態來自回應這次請求的那台 API 伺服器，共 ${n} 項檢查。叢集有多台 API 伺服器時，其他幾台不會顯示在這裡。`,
+  "cluster.apiLeases": "排程器和控制器管理員另外檢查：租約最近有續約，就表示它正在運作。",
+  "cluster.apiNotCovered": "這裡沒有檢查排程器和控制器管理員。",
   "cluster.leaseRenewed": "領導者最後續約",
   "cluster.leaseStale": "沒有領導者：最後續約",
   "node.notReady": (n, node) => (n === 1 ? `${node} 未就緒` : `${n} 個節點未就緒`),
@@ -300,7 +296,7 @@ export const zhTW: Messages = {
   "node.networkUnavailable": (n, node) =>
     n === 1 ? `${node} 沒有 Pod 網路` : `${n} 個節點沒有 Pod 網路`,
   "node.networkUnavailable.why": "上面的 Pod 連不到其他 Pod 或服務。",
-  "node.networkUnavailable.fix": "檢查節點上的網路外掛（k3s 是 flannel）。",
+  "node.networkUnavailable.fix": "檢查節點上的網路外掛。",
   "node.memoryFull": (n, node, share) =>
     n === 1 ? `${node}：記憶體已用 ${share}` : `${n} 個節點記憶體快滿了（最高 ${share}）`,
   "node.memoryFull.warn": "一旦用滿，服務會被停掉來釋放記憶體。",

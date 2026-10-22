@@ -272,13 +272,9 @@ export const zhCN: Messages = {
   "cluster.apiCheckFailed": "未通过",
   "cluster.apiUnknown": "未知：读不到 API 服务器的就绪状态。",
   "cluster.apiCovers": (n: number) =>
-    `响应这次请求的 API 服务器的 ${n} 项就绪检查（/readyz）。每次请求只会连到其中一台 API 服务器，其他副本不在这里检查。`,
-  "cluster.apiEmbedded": (distribution: string) =>
-    `在 ${distribution} 上，调度器和控制器管理器与 API 服务器在同一个进程里运行，API 服务器有响应就表示它们也在运行。`,
-  "cluster.apiLeases":
-    "这些检查不包含调度器和控制器管理器；从它们的领导者租约可以看出各自是否有正在运行的领导者。",
-  "cluster.apiNotCovered":
-    "这些检查不包含调度器和控制器管理器。在托管集群上，它们由提供商负责运行。",
+    `就绪状态来自响应这次请求的那台 API 服务器，共 ${n} 项检查。集群有多台 API 服务器时，其他几台不会显示在这里。`,
+  "cluster.apiLeases": "调度器和控制器管理器另外检查：租约最近有续约，就表示它正在运行。",
+  "cluster.apiNotCovered": "这里没有检查调度器和控制器管理器。",
   "cluster.leaseRenewed": "领导者最后续约",
   "cluster.leaseStale": "没有领导者：最后续约",
   "node.notReady": (n, node) => (n === 1 ? `${node} 未就绪` : `${n} 个节点未就绪`),
@@ -299,7 +295,7 @@ export const zhCN: Messages = {
   "node.networkUnavailable": (n, node) =>
     n === 1 ? `${node} 没有 Pod 网络` : `${n} 个节点没有 Pod 网络`,
   "node.networkUnavailable.why": "上面的 Pod 连不上其他 Pod 或服务。",
-  "node.networkUnavailable.fix": "检查节点上的网络插件（k3s 是 flannel）。",
+  "node.networkUnavailable.fix": "检查节点上的网络插件。",
   "node.memoryFull": (n, node, share) =>
     n === 1 ? `${node}：内存已用 ${share}` : `${n} 个节点内存快满了（最高 ${share}）`,
   "node.memoryFull.warn": "一旦用满，服务会被停掉来释放内存。",
