@@ -1,0 +1,93 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "plural": "secrets",
+        "name": "api-env"
+      },
+      "change": 2,
+      "after": {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {
+          "name": "api-env",
+          "namespace": "demo"
+        },
+        "stringData": {
+          "TOKEN": "(hidden)"
+        }
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "Secret",
+          "metadata": {
+            "name": "api-env",
+            "namespace": "demo"
+          },
+          "stringData": {
+            "TOKEN": "s3cr3t"
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "plural": "services",
+        "name": "api"
+      },
+      "change": 1,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "Service",
+          "metadata": {
+            "name": "api",
+            "namespace": "demo"
+          },
+          "spec": {
+            "selector": {
+              "app": "api"
+            },
+            "ports": [
+              {
+                "port": 80,
+                "targetPort": 8080
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "plural": "deployments",
+        "name": "api"
+      },
+      "change": 0,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "apps/v1",
+          "kind": "Deployment",
+          "metadata": {
+            "name": "api",
+            "namespace": "demo"
+          },
+          "spec": {
+            "replicas": 2
+          }
+        }
+      }
+    }
+  ],
+  "warnings": []
+}

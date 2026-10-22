@@ -196,6 +196,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(incidents::project))
         .routes(routes!(resources::objects::list))
         .routes(routes!(resources::objects::get))
+        .routes(routes!(resources::creatable::list))
         .routes(routes!(resources::config::config_maps))
         .routes(routes!(resources::config::reveal_secret))
         .routes(routes!(projects::events::events))

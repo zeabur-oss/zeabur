@@ -452,6 +452,7 @@ pub fn debug_container_with(
                 .and_then(Value::as_str)
                 .map(str::to_owned),
             write: Write::EphemeralContainers { operations },
+            change: None,
             raw_after: after,
         }],
         impact: Vec::new(),
@@ -650,6 +651,7 @@ pub fn tools_pod_with(request: &ToolsPod<'_>, conventions: &Conventions) -> Plan
             owners: Vec::new(),
             resource_version: None,
             write: Write::Create { body: body.clone() },
+            change: None,
             raw_after: body,
         }],
         impact: Vec::new(),

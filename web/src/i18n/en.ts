@@ -997,6 +997,54 @@ export const en = {
   "objects.denied": "No access",
   "objects.pin": (kind: string) => `Pin ${kind}`,
   "objects.unpin": (kind: string) => `Unpin ${kind}`,
+  "create.button": "Create",
+  "create.title": (project: string) => `Create in ${project}`,
+  "create.palette": (project: string) => `Create in ${project}…`,
+  "create.templateAdd": "Add a template",
+  "create.common": "Common kinds",
+  "create.custom": "Custom resources",
+  "create.more": "Other kinds you may create",
+  "create.documents": (n: number) => plural(n, "document", "documents"),
+  "create.editor": "YAML to create",
+  "create.review": "Review",
+  "create.empty": "Write the objects as YAML, or add a template.",
+  "create.inOrder": "Created in this order",
+  "create.inOrderHint":
+    "ConfigMaps, Secrets, claims and service accounts first, then Services, then workloads, then the rest, so what a workload reads exists when it starts.",
+  "create.docLine": (document: number, line: number) => `Document ${document}, line ${line}`,
+  "create.docLineField": (document: number, line: number, field: string) =>
+    `Document ${document}, line ${line}, ${field}`,
+  "create.showInYaml": "Show in YAML",
+  "create.problems": (n: number) => plural(n, "problem", "problems"),
+  "create.notes": (n: number) => plural(n, "note", "notes"),
+  "create.fixFirst": "Fix the problems above to review.",
+  "create.found.invalidYaml": "This line doesn't read as YAML: check its indentation and quotes.",
+  "create.found.missingField": (field: string) => `Every object needs ${field}.`,
+  "create.found.clusterScoped": (kind: string) =>
+    `${kind} belongs to the whole cluster. Zeabur creates objects only inside a project.`,
+  "create.found.notServed": (kind: string, apiVersion: string) =>
+    `This cluster doesn't serve ${kind} (${apiVersion}).`,
+  "create.found.rights": (kind: string, project: string) =>
+    `Your rights don't seem to allow creating ${kind} in ${project}. The review asks the cluster.`,
+  "create.found.otherNamespace": (namespace: string, project: string) =>
+    `Namespace ${namespace} isn't this project. Remove the line, or write ${project}.`,
+  "create.found.duplicate": (kind: string, name: string) => `${kind} ${name} is written twice.`,
+  "create.found.exists": (kind: string, name: string) =>
+    `A ${kind} named ${name} already exists. Create never changes it.`,
+  "create.edit": (name: string) => `Edit ${name}`,
+  "create.planOne": (kind: string, name: string) => `Create ${kind} ${name}`,
+  "create.planMany": (n: number, project: string) => `Create ${n} objects in ${project}`,
+  "create.createsMany": (n: number, list: string) =>
+    `Creates ${n} objects, one after another: ${list}.`,
+  "create.noTransaction":
+    "Kubernetes has no undo across objects: if one is refused, the ones before it stay, and you can delete exactly those.",
+  "create.buttonMany": (n: number) => `Create ${n} objects`,
+  "create.partialTitle": (done: number, n: number) => `${done} of ${n} created`,
+  "create.notAttempted": "not attempted",
+  "create.deleteCreated": (n: number) => `Delete the ${n} just created`,
+  "create.keep": "Keep them",
+  "create.cleanupTitle": (n: number) =>
+    n === 1 ? "Delete the object just created" : `Delete the ${n} objects just created`,
   "tab.yaml": "YAML",
   "yaml.hidden": "Secret values are hidden.",
   "yaml.label": (name: string) => `YAML of ${name}`,

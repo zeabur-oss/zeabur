@@ -14,7 +14,9 @@ mod tests {
         reconcile_identity, resource_allowed, validate_storage,
     };
     use zeabur_plan::rules::{EnvEdit, diff, route_name, validate_env, validate_hostname};
-    use zeabur_plan::{Fetched, GatewayRef, Input, PlanRequest, Release, StorageClassInfo, plan};
+    use zeabur_plan::{
+        Fetched, GatewayRef, Input, PlanRequest, Release, ServedKind, StorageClassInfo, plan,
+    };
 
     /// The resource (plural) of a kind, for the fixtures' objects.
     fn plural(kind: &str) -> String {
@@ -69,6 +71,23 @@ mod tests {
             Ok(()) => json!({"ok": true}),
             Err(error) => json!({"error": error.to_string()}),
         }
+    }
+
+    /// `params.kinds`: the kinds discovery names.
+    fn served_kinds(params: &Value) -> Vec<ServedKind> {
+        params
+            .get("kinds")
+            .and_then(Value::as_array)
+            .map_or_else(Vec::new, |list| {
+                list.iter()
+                    .map(|k| ServedKind {
+                        group: k["group"].as_str().unwrap().to_owned(),
+                        kind: k["kind"].as_str().unwrap().to_owned(),
+                        plural: k["plural"].as_str().unwrap().to_owned(),
+                        namespaced: k["namespaced"].as_bool().unwrap(),
+                    })
+                    .collect()
+            })
     }
 
     /// `mutation.plan`: the request planned against the fixture's objects.
@@ -151,6 +170,7 @@ mod tests {
         let reclaim_policies: BTreeMap<String, String> = params
             .get("reclaimPolicies")
             .map_or_else(BTreeMap::new, |p| from_value(p.clone()).unwrap());
+        let kinds = served_kinds(params);
         let input = Input {
             snapshot: &snapshot,
             http_routes: &routes,
@@ -164,6 +184,7 @@ mod tests {
             reclaim_policies: &reclaim_policies,
             namespace: None,
             reloader: params.get("reloader").and_then(Value::as_bool),
+            kinds: &kinds,
         };
         match plan(input, &request) {
             Ok(plan) => to_value(plan).unwrap(),

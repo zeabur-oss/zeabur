@@ -47,7 +47,7 @@ use std::sync::Arc;
 
 use axum::Json;
 use axum::extract::{Path, State};
-use creations::refuse_existing;
+use creations::{refuse_existing, served_kinds};
 use deletions::{deleted, network_policies_opened, reclaim_policies, replica_sets_of_deleted};
 use edits::edited_objects;
 use namespace::compute_namespace;
@@ -57,7 +57,7 @@ use secrets::secret_values;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use volumes::storage_class;
-use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_core::problem::{AppliedObject, Kind, MEDIA_TYPE as PROBLEM, Problem, ProblemAt};
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, Preconditions, WriteBody, WriteRequest};
@@ -82,6 +82,9 @@ pub struct PlanResponse {
     /// What the plan does once applied: the pods it replaces, whether new ones fit, the data
     /// and fields it removes.
     pub preview: preview::Preview,
+    /// What the workloads it creates miss: resource requests and limits, health checks.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gaps: Vec<zeabur_model::Gap>,
 }
 
 /// The token of a plan to apply.
@@ -118,8 +121,14 @@ pub(crate) fn plan_problem(error: PlanError) -> ApiError {
         ErrorKind::Invalid => Kind::Invalid,
         ErrorKind::SystemNamespace => Kind::SystemNamespace,
     };
+    let at = error.change.map(|change| ProblemAt {
+        change,
+        line: error.line,
+        field: error.field,
+    });
     ApiError::from(Problem {
         managed_by: error.managed_by,
+        at,
         ..Problem::new(kind, error.detail)
     })
 }
@@ -161,7 +170,8 @@ async fn compute(
     } else {
         Some(Vec::new())
     };
-    refuse_existing(cluster, project, request).await?;
+    let kinds = served_kinds(cluster, request).await?;
+    refuse_existing(cluster, project, request, &kinds).await?;
     let secret_values = secret_values(cluster, project, request).await?;
     let releases = releases_to_roll_back(cluster, project, request, &snapshot).await?;
     let storage_classes = if request
@@ -204,6 +214,7 @@ async fn compute(
             reclaim_policies: &reclaim_policies,
             namespace: None,
             reloader,
+            kinds: &kinds,
         },
         request,
     )
@@ -264,7 +275,16 @@ pub(crate) async fn plan(
         handoff: handoff.as_ref(),
     };
     let plan = compute_any(&planner, cluster.as_ref(), &project, &request, &made_at).await?;
+    let from_yaml = creations::from_yaml(&request);
+    if from_yaml {
+        creations::dry_run(cluster.as_ref(), &project, &plan).await?;
+    }
     let preview = preview::read(cluster.as_ref(), &project, &plan, &request).await?;
+    let gaps = if from_yaml {
+        creations::gaps(&project, &plan)
+    } else {
+        Vec::new()
+    };
     let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
     let claims = Claims {
         person: identity.username,
@@ -286,8 +306,9 @@ pub(crate) async fn plan(
         expires_at: Timestamp::from_second(expires_at)
             .unwrap_or(Timestamp::UNIX_EPOCH)
             .to_string(),
-        plan,
+        plan: plan.without_secret_values(),
         preview,
+        gaps,
     }))
 }
 
@@ -403,9 +424,8 @@ pub(crate) async fn apply(
             ..write.clone()
         };
         if let Err(error) = cluster.write(&dry).await {
-            return Err(ApiError::from(
-                refused(cluster.as_ref(), namespace, target, write, error).await,
-            ));
+            let problem = refused(cluster.as_ref(), namespace, target, write, error).await;
+            return Err(ApiError::from(refusal(problem, &plan, target, &[])));
         }
     }
     let mut applied = Vec::new();
@@ -416,21 +436,54 @@ pub(crate) async fn apply(
                 resource_version: written.resource_version,
             }),
             Err(error) => {
-                let mut problem =
-                    refused(cluster.as_ref(), namespace, &target, &write, error).await;
-                if !applied.is_empty() {
-                    let done: Vec<String> = applied
-                        .iter()
-                        .map(|a| format!("{} {}", a.target.kind, a.target.name))
-                        .collect();
-                    problem.detail =
-                        format!("{} Already written: {}.", problem.detail, done.join(", "));
-                }
-                return Err(ApiError::from(problem));
+                let problem = refused(cluster.as_ref(), namespace, &target, &write, error).await;
+                return Err(ApiError::from(refusal(problem, &plan, &target, &applied)));
             }
         }
     }
     Ok(Json(ApplyResponse { applied }))
+}
+
+/// The problem for a refused write of `target`: the document it came from, when a create made
+/// it; what the apply wrote before it; no Secret's value.
+fn refusal(
+    mut problem: Problem,
+    plan: &Plan,
+    target: &zeabur_plan::Target,
+    applied: &[Applied],
+) -> Problem {
+    problem.at = change_of(plan, target).map(|change| ProblemAt {
+        change,
+        line: None,
+        field: problem.fields.first().map(|f| f.field.clone()),
+    });
+    problem.applied = applied
+        .iter()
+        .map(|a| AppliedObject {
+            api_version: a.target.api_version.clone(),
+            kind: a.target.kind.clone(),
+            plural: a.target.plural.clone(),
+            name: a.target.name.clone(),
+            resource_version: a.resource_version.clone(),
+        })
+        .collect();
+    let mut problem = creations::without_secret_values(problem, plan);
+    if !applied.is_empty() {
+        let done: Vec<String> = applied
+            .iter()
+            .map(|a| format!("{} {}", a.target.kind, a.target.name))
+            .collect();
+        problem.detail = format!("{} Already written: {}.", problem.detail, done.join(", "));
+    }
+    problem
+}
+
+/// The index of the `create` that makes `target`, if one does.
+fn change_of(plan: &Plan, target: &zeabur_plan::Target) -> Option<usize> {
+    plan.objects
+        .iter()
+        .find(|o| &o.target == target)
+        .and_then(|o| o.change)
 }
 
 pub(crate) fn write_request(

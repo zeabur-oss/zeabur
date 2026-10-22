@@ -5,14 +5,14 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import WarningFillIcon from "~icons/ph/warning-fill"
 import XIcon from "~icons/ph/x"
 
-import { api, toProblem, unwrap, type Schemas } from "@/api/client"
+import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { projectQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { actionOf, describe, undoTitle, type Description } from "@/components/plan/describe"
 import { bounded, type MountsOf } from "@/components/plan/groups"
 import { PlanGroups } from "@/components/plan/groups-view"
 import { carryOut } from "@/components/plan/outcome"
-import type { PlanAsk } from "@/components/plan/planner"
+import type { PlanAsk, PlanHooks } from "@/components/plan/planner"
 import { PlanPreview, useShortfall } from "@/components/plan/preview"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
@@ -32,7 +32,7 @@ import {
 import { Input } from "@zeabur/design-system/components/input"
 import { Label } from "@zeabur/design-system/components/label"
 import { YamlDiff } from "@/components/yaml"
-import { useI18n, useT, type Translate } from "@/i18n"
+import { useI18n, useT, writeSentence, type Translate } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { toolNotes, type Skipped, type ToolNote } from "@/model/managed"
 import { awaitsName, destinationOf, typedName, undoOf, weigh, type PodsOf } from "@/model/risk"
@@ -52,13 +52,15 @@ export function PlanDialog({
   onApplied,
   reopen,
   onRefused,
+  hooks,
 }: {
   project: string
   ask: PlanAsk
   onClose: () => void
   onApplied?: () => void
   reopen: (ask: PlanAsk) => void
-  onRefused?: (fields: Schemas["FieldCause"][]) => void
+  onRefused?: (problem: ProblemBody) => void
+  hooks?: PlanHooks
 }) {
   const t = useT()
   const { locale } = useI18n()
@@ -115,13 +117,16 @@ export function PlanDialog({
       navigate: (href) => void navigate({ href }),
       reopen,
       onApplied,
+      onPartial: hooks?.onPartial,
     })
     onClose()
   }
   const cancel = () => {
-    if (plan.isError) onRefused?.(toProblem(plan.error).fields ?? [])
+    if (plan.isError) onRefused?.(toProblem(plan.error))
     onClose()
   }
+  const refusedAt = plan.isError ? toProblem(plan.error).at : undefined
+  const where = refusedAt && hooks?.where ? hooks.where(refusedAt) : undefined
   const ready = !plan.isPending && !plan.isFetching && plan.data && description
 
   return (
@@ -149,7 +154,17 @@ export function PlanDialog({
           {plan.isPending || plan.isFetching ? (
             <LoadingRows label={t("plan.planning")} rows={light ? 1 : 3} />
           ) : plan.isError ? (
-            <Problem error={plan.error} />
+            <div className="flex flex-col gap-3">
+              {where ? <p className="type-meta text-muted-foreground">{where}</p> : null}
+              <Problem error={plan.error} />
+              {where ? (
+                <div>
+                  <Button variant="outline" size="xs" onClick={cancel}>
+                    {t("create.showInYaml")}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
           ) : description ? (
             <PlanBody
               plan={plan.data}
@@ -386,6 +401,10 @@ function PlanBody({
   const [first, ...rest] = lines
   const warnings = [
     ...plan.warnings.filter((w) => !sentenced.has(w.code)).map((w) => warningText(t, w)),
+    ...(plan.gaps ?? []).flatMap((gap) => {
+      const text = writeSentence(t, gap.message)
+      return text ? [{ text }] : []
+    }),
     ...toolNotes(plan, skipped).map((note) => noteText(t, note)),
   ]
   const grouped = !!description.facts

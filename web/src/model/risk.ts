@@ -148,22 +148,26 @@ export function undoOf(
   applied: readonly Applied[] = [],
 ): Change[] | undefined {
   if (changes.length === 0) return undefined
+  // Objects written as YAML: every object the apply wrote, the last created deleted first.
+  if (changes.every((c) => c.op === "create" && c.yaml)) {
+    const deletes = applied.map((a) =>
+      deletionOf({ ...a.target, resourceVersion: a.resourceVersion }),
+    )
+    return deletes.length > 0 && deletes.every((d): d is Change => d !== undefined)
+      ? deletes.toReversed()
+      : undefined
+  }
   const undo: Change[] = []
   for (const change of changes) {
     if (change.op === "create") {
       const object: Record<string, unknown> = isRecord(change.object) ? change.object : {}
       const name = isRecord(object.metadata) ? object.metadata.name : undefined
       const created = applied.find((a) => a.target.kind === object.kind && a.target.name === name)
-      if (!created?.resourceVersion) return undefined
-      const [group, version] = created.target.apiVersion.includes("/")
-        ? created.target.apiVersion.split("/")
-        : ["", created.target.apiVersion]
-      undo.push({
-        op: "delete",
-        resource: { group, version, resource: created.target.plural },
-        name: created.target.name,
-        resourceVersion: created.resourceVersion,
-      })
+      const deletion = created
+        ? deletionOf({ ...created.target, resourceVersion: created.resourceVersion })
+        : undefined
+      if (!deletion) return undefined
+      undo.push(deletion)
       continue
     }
     if (change.op !== "scale") return undefined
@@ -172,6 +176,26 @@ export function undoOf(
     undo.push({ op: "scale", workload: change.workload, replicas: before })
   }
   return undo
+}
+
+/** The deletion of an object just created, at the version it was created at; `undefined` when
+ * that version is not known. */
+export function deletionOf(created: {
+  apiVersion: string
+  plural: string
+  name: string
+  resourceVersion?: string | null
+}): Change | undefined {
+  if (!created.resourceVersion) return undefined
+  const [group = "", version = created.apiVersion] = created.apiVersion.includes("/")
+    ? created.apiVersion.split("/")
+    : ["", created.apiVersion]
+  return {
+    op: "delete",
+    resource: { group, version, resource: created.plural },
+    name: created.name,
+    resourceVersion: created.resourceVersion,
+  }
 }
 
 /** The name a person types to confirm a plan that deletes something: the first object it

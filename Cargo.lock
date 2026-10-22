@@ -2385,6 +2385,8 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tower",
+ "tracing",
+ "tracing-subscriber",
  "utoipa",
  "utoipa-axum",
  "zeabur-adapters",

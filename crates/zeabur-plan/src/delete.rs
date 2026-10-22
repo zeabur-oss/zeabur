@@ -448,6 +448,7 @@ pub(crate) fn deletion(working: Working) -> Result<PlannedObject, PlanError> {
             uid,
             resource_version,
         },
+        change: None,
         raw_after: Value::Null,
         target: working.target,
     })

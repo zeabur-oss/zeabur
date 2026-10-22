@@ -98,6 +98,9 @@ pub struct State {
     /// allowed them, as `kind/name`, with kube-apiserver's answer: a quota's `403` or a
     /// webhook's `400` or `403`.
     pub admission_refusals: BTreeMap<String, KubernetesStatus>,
+    /// Objects whose dry run passes but whose write is refused, as `kind/name`, with
+    /// kube-apiserver's answer: what changed in the cluster between the two.
+    pub write_refusals: BTreeMap<String, KubernetesStatus>,
     /// `ResourceQuotas` per namespace.
     pub resource_quotas: BTreeMap<String, Vec<ResourceQuota>>,
     /// ReplicaSets per namespace.
@@ -181,8 +184,13 @@ fn not_found(what: &str) -> ClusterError {
 /// The built-in kinds the in-memory cluster serves from [`State`]'s typed fields.
 #[must_use]
 pub fn builtin_resources() -> Vec<ServedResource> {
-    let r = |group: &str, resource: &str, kind: &str, namespaced: bool| {
-        ServedResource::readable(group, "v1", resource, kind, namespaced)
+    let r = |group: &str, resource: &str, kind: &str, namespaced: bool| ServedResource {
+        verbs: [
+            "create", "delete", "get", "list", "patch", "update", "watch",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        ..ServedResource::readable(group, "v1", resource, kind, namespaced)
     };
     vec![
         r("", "configmaps", "ConfigMap", true),
@@ -226,6 +234,14 @@ fn in_namespace<T: Serialize>(
 }
 
 impl State {
+    /// What admission answers a write of `what` (`kind/name`), dry run or not.
+    fn refusal(&self, what: &str, dry_run: bool) -> Option<KubernetesStatus> {
+        self.admission_refusals
+            .get(what)
+            .or_else(|| (!dry_run).then(|| self.write_refusals.get(what)).flatten())
+            .cloned()
+    }
+
     /// The typed objects of `resource` in one namespace's objects.
     fn builtin_in(
         &self,
@@ -1118,8 +1134,8 @@ impl Cluster for MemoryCluster {
             if state.forbidden_writes.contains(&what) {
                 return Err(forbidden(&what));
             }
-            if let Some(refusal) = state.admission_refusals.get(&what) {
-                return Err(ClusterError::Status(refusal.clone()));
+            if let Some(refusal) = state.refusal(&what, request.dry_run) {
+                return Err(ClusterError::Status(refusal));
             }
             let current = state.stored(target)?;
             let version = current

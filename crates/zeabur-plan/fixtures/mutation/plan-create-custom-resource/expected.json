@@ -1,0 +1,27 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "cert-manager.io/v1",
+        "kind": "Certificate",
+        "plural": "certificates",
+        "name": "shop"
+      },
+      "change": 0,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "cert-manager.io/v1",
+          "kind": "Certificate",
+          "metadata": {
+            "name": "shop",
+            "namespace": "demo"
+          },
+          "spec": {
+            "secretName": "shop-tls"
+          }
+        }
+      }
+    }
+  ]
+}

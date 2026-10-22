@@ -16,6 +16,8 @@ mod common;
 #[cfg(test)]
 #[path = "kubernetes/files.rs"]
 mod files;
+#[path = "kubernetes/creations.rs"]
+mod creations;
 #[cfg(test)]
 #[path = "kubernetes/terminal.rs"]
 mod terminal;

@@ -1,4 +1,4 @@
-description: "Only kinds zeabur's forms create may be created; a Deployment is refused."
+description: "Without discovery only the kinds Zeabur's own forms create are known; a Deployment is refused."
 operation: mutation.plan
 params:
   request:

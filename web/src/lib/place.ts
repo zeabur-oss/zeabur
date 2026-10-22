@@ -22,6 +22,7 @@ export interface Place {
 const entries: Partial<Record<RouteId, ProjectEntry>> = {
   "/projects/$project": "overview",
   "/projects/$project/objects": "objects",
+  "/projects/$project/create": "objects",
   "/projects/$project/settings": "settings",
 }
 

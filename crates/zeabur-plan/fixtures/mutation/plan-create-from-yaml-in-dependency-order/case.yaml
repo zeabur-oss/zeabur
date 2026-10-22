@@ -1,0 +1,15 @@
+description: "Objects written as YAML are created in dependency order (the Secret, then the Service, then the Deployment), each naming the change that made it; the server's metadata is dropped."
+operation: mutation.plan
+params:
+  kinds:
+    - {group: "", kind: ConfigMap, plural: configmaps, namespaced: true}
+    - {group: "", kind: Secret, plural: secrets, namespaced: true}
+    - {group: "", kind: Service, plural: services, namespaced: true}
+    - {group: apps, kind: Deployment, plural: deployments, namespaced: true}
+    - {group: cert-manager.io, kind: Certificate, plural: certificates, namespaced: true}
+    - {group: rbac.authorization.k8s.io, kind: ClusterRole, plural: clusterroles, namespaced: false}
+  request:
+    changes:
+      - {"op": "create", "yaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: api\n  uid: dropped\n  resourceVersion: \"9\"\nspec:\n  replicas: 2\n  selector:\n    matchLabels: {app: api}\n  template:\n    metadata:\n      labels: {app: api}\n    spec:\n      containers:\n        - name: api\n          image: example/api:1.0\n          ports:\n            - containerPort: 8080\n"}
+      - {"op": "create", "yaml": "apiVersion: v1\nkind: Service\nmetadata:\n  name: api\n  namespace: demo\nspec:\n  selector: {app: api}\n  ports:\n    - port: 80\n      targetPort: 8080\n"}
+      - {"op": "create", "yaml": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: api-env\nstringData:\n  TOKEN: s3cr3t\n"}

@@ -1,0 +1,13 @@
+description: "A cluster-scoped kind is refused: a project holds only what is in its namespace."
+operation: mutation.plan
+params:
+  kinds:
+    - {group: "", kind: ConfigMap, plural: configmaps, namespaced: true}
+    - {group: "", kind: Secret, plural: secrets, namespaced: true}
+    - {group: "", kind: Service, plural: services, namespaced: true}
+    - {group: apps, kind: Deployment, plural: deployments, namespaced: true}
+    - {group: cert-manager.io, kind: Certificate, plural: certificates, namespaced: true}
+    - {group: rbac.authorization.k8s.io, kind: ClusterRole, plural: clusterroles, namespaced: false}
+  request:
+    changes:
+      - {"op": "create", "yaml": "apiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: reader\nrules: []\n"}

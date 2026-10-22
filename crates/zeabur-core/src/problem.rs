@@ -398,7 +398,7 @@ impl KubernetesStatus {
 }
 
 /// An RFC 9457 problem, with Zeabur's extension members `kind`, `summary`, `why`, `fix`,
-/// `evidence`, `fields`, `kubernetes`, `managedBy` and `denied`.
+/// `evidence`, `fields`, `kubernetes`, `managedBy`, `denied`, `at` and `applied`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Problem {
@@ -450,6 +450,45 @@ pub struct Problem {
     /// tells the reason by this member, not by the wording of `detail`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unavailable_log: Option<UnavailableLog>,
+    /// Where in the request it lies, for a request of several changes or one written as YAML:
+    /// the change, and the line of its YAML or the field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at: Option<ProblemAt>,
+    /// The objects an apply wrote before this refusal, in order. A plan of several writes is
+    /// not one transaction, so these stay; a client can offer to delete exactly these.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub applied: Vec<AppliedObject>,
+}
+
+/// Where in a request a problem lies.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProblemAt {
+    /// The index of the change in the request.
+    pub change: usize,
+    /// The line of the change's YAML, from 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<u64>,
+    /// The field, as kube-apiserver writes it (`metadata.namespace`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+}
+
+/// An object an apply wrote.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AppliedObject {
+    /// Its `apiVersion`.
+    pub api_version: String,
+    /// Its kind.
+    pub kind: String,
+    /// The plural resource name in its path.
+    pub plural: String,
+    /// Its name.
+    pub name: String,
+    /// Its `resourceVersion` after the write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_version: Option<String>,
 }
 
 /// Why a container's log cannot be read, from the kubelet's answer.
@@ -525,6 +564,8 @@ impl Problem {
             managed_by: None,
             denied: None,
             unavailable_log: None,
+            at: None,
+            applied: Vec::new(),
         }
     }
 
@@ -632,6 +673,8 @@ impl Problem {
             denied: self.denied,
             managed_by: self.managed_by,
             unavailable_log: self.unavailable_log,
+            at: self.at,
+            applied: self.applied,
             ..Self::new(kind, self.detail)
         }
     }

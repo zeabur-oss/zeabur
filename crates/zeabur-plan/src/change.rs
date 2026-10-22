@@ -186,14 +186,20 @@ pub enum Change {
         /// The edited object, YAML (JSON is YAML too).
         yaml: String,
     },
-    /// Create one object in the project, of a kind [`crate::plan::CREATABLE`] lists (such as a
-    /// ready-made NetworkPolicy). Its namespace is the project's; an object of that name must not
-    /// exist yet.
+    /// Create one object in the project, of any namespaced kind the cluster serves (see the
+    /// `create` module). Its namespace is the project's; an object of that name must not exist
+    /// yet. Several are created in dependency order, without a transaction.
     #[serde(rename_all = "camelCase")]
     Create {
-        /// The object: `apiVersion`, `kind`, `metadata.name`, and its fields.
-        #[cfg_attr(feature = "openapi", schema(value_type = Object))]
+        /// The object: `apiVersion`, `kind`, `metadata.name`, and its fields. Left out when
+        /// `yaml` gives it.
+        #[serde(default, skip_serializing_if = "Value::is_null")]
+        #[cfg_attr(feature = "openapi", schema(value_type = Option<Object>))]
         object: Value,
+        /// The object as one YAML document, as a person wrote it; a problem with it names the
+        /// line.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        yaml: Option<String>,
     },
     /// Delete one object of the project, as `kubectl delete` does: what it owns goes after it
     /// (background propagation). Refused for an object Helm, Argo CD or Flux manages, and for one
@@ -474,6 +480,9 @@ pub struct PlannedObject {
     pub resource_version: Option<String>,
     /// The write.
     pub write: Write,
+    /// For an object a `create` makes, the index of that change in the request.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub change: Option<usize>,
     /// The object as it will be, unredacted: for re-projection only, never sent; `Null` when the
     /// write deletes it.
     #[serde(skip)]

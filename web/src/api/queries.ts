@@ -290,6 +290,20 @@ export const objectsQuery = (project: string, read: ObjectsRead = {}) =>
     staleTime: 45_000,
   })
 
+/** The kinds the person may create in the project, and the cluster-scoped ones Create refuses. */
+export const creatableQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "creatable"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/creatable", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    staleTime: 5 * 60_000,
+  })
+
 /** An empty group is the core group. */
 export interface ObjectAddress {
   group: string

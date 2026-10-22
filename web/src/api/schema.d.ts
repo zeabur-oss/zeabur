@@ -487,6 +487,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/creatable": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The kinds the person may create in a project, each with an access hint, and the kinds that
+     *     belong to the whole cluster.
+     */
+    get: operations["listCreatable"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/events": {
     parameters: {
       query?: never
@@ -1326,6 +1346,19 @@ export interface components {
       /** @description The object. */
       target: components["schemas"]["PlanTarget"]
     }
+    /** @description An object an apply wrote. */
+    AppliedObject: {
+      /** @description Its `apiVersion`. */
+      apiVersion: string
+      /** @description Its kind. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description The plural resource name in its path. */
+      plural: string
+      /** @description Its `resourceVersion` after the write. */
+      resourceVersion?: string | null
+    }
     /** @description The token of a plan to apply. */
     ApplyRequest: {
       /** @description The token `plan` returned. */
@@ -1622,10 +1655,18 @@ export interface components {
           yaml: string
         }
       | {
-          /** @description The object: `apiVersion`, `kind`, `metadata.name`, and its fields. */
-          object: Record<string, never>
+          /**
+           * @description The object: `apiVersion`, `kind`, `metadata.name`, and its fields. Left out when
+           *     `yaml` gives it.
+           */
+          object?: Record<string, never> | null
           /** @enum {string} */
           op: "create"
+          /**
+           * @description The object as one YAML document, as a person wrote it; a problem with it names the
+           *     line.
+           */
+          yaml?: string | null
         }
       | {
           /** @description Its name. */
@@ -1728,6 +1769,13 @@ export interface components {
       partial: boolean
       /** @description How many events matched, also those past `limit`. */
       totalSize: number
+    }
+    /** @description A kind that belongs to the whole cluster. */
+    ClusterKind: {
+      /** @description The API group; empty for the core group. */
+      group: string
+      /** @description The kind. */
+      kind: string
     }
     /** @description A change of the cluster's name. */
     ClusterNameChange: {
@@ -1976,6 +2024,28 @@ export interface components {
       message?: string | null
       /** @description `CrashLoopBackOff`, `ImagePullBackOff`, `ErrImagePull`, `CreateContainerConfigError`, … */
       reason?: string | null
+    }
+    /** @description A kind that can be created in a project. */
+    CreatableKind: {
+      /** @description Whether the person may create it, as the review hints. */
+      access: components["schemas"]["ObjectAccess"]
+      /** @description Not one of Kubernetes' own groups: a custom resource, or an extension API. */
+      custom: boolean
+      /** @description The API group; empty for the core group. */
+      group: string
+      /** @description The kind. */
+      kind: string
+      /** @description The plural resource name. */
+      resource: string
+      /** @description The preferred version. */
+      version: string
+    }
+    /** @description What can be created in a project. */
+    CreatableList: {
+      /** @description The cluster-scoped kinds, which a project cannot hold. */
+      clusterScoped: components["schemas"]["ClusterKind"][]
+      /** @description The namespaced kinds, by group then kind. */
+      items: components["schemas"]["CreatableKind"][]
     }
     /** @description One requested change to a ConfigMap or Secret key. */
     DataEdit: {
@@ -3426,6 +3496,8 @@ export interface components {
     PlanResponse: components["schemas"]["Plan"] & {
       /** @description When the token stops working, RFC 3339. */
       expiresAt: string
+      /** @description What the workloads it creates miss: resource requests and limits, health checks. */
+      gaps?: components["schemas"]["Gap"][]
       /**
        * @description What the plan does once applied: the pods it replaces, whether new ones fit, the data
        *     and fields it removes.
@@ -3646,6 +3718,8 @@ export interface components {
       before?: Record<string, never> | null
       /** @description `before` as YAML, written as the object's YAML view writes it. */
       beforeYaml?: string | null
+      /** @description For an object a `create` makes, the index of that change in the request. */
+      change?: number | null
       /** @description The fields that change. */
       changes: components["schemas"]["FieldChange"][]
       /** @description Who owns the fields the write touches now. */
@@ -3863,9 +3937,15 @@ export interface components {
     }
     /**
      * @description An RFC 9457 problem, with Zeabur's extension members `kind`, `summary`, `why`, `fix`,
-     *     `evidence`, `fields`, `kubernetes`, `managedBy` and `denied`.
+     *     `evidence`, `fields`, `kubernetes`, `managedBy`, `denied`, `at` and `applied`.
      */
     Problem: {
+      /**
+       * @description The objects an apply wrote before this refusal, in order. A plan of several writes is
+       *     not one transaction, so these stay; a client can offer to delete exactly these.
+       */
+      applied?: components["schemas"]["AppliedObject"][]
+      at?: components["schemas"]["ProblemAt"] | null
       denied?: components["schemas"]["Denied"] | null
       /** @description What happened, in plain language, for this occurrence. */
       detail: string
@@ -3896,6 +3976,18 @@ export interface components {
       type: string
       unavailableLog?: components["schemas"]["UnavailableLog"] | null
       why?: components["schemas"]["Message"] | null
+    }
+    /** @description Where in a request a problem lies. */
+    ProblemAt: {
+      /** @description The index of the change in the request. */
+      change: number
+      /** @description The field, as kube-apiserver writes it (`metadata.namespace`). */
+      field?: string | null
+      /**
+       * Format: int64
+       * @description The line of the change's YAML, from 1.
+       */
+      line?: number | null
     }
     /** @description One namespace projected into services, the resources around them and how they relate. */
     Project: {
@@ -5940,6 +6032,35 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["ConfigMapList"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listCreatable: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["CreatableList"]
         }
       }
       403: {

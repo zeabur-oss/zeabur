@@ -2,6 +2,7 @@
 
 mod change;
 pub mod checks;
+mod create;
 mod delete;
 pub mod edit;
 pub mod fields;
@@ -20,6 +21,7 @@ pub use change::{
     PlannedObject, ProbeKind, RouteKind, RouteRef, Target, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
+pub use create::{ServedKind, created_object, resolve};
 pub use plan::{
     CREATABLE, ErrorKind, Fetched, Input, PlanError, RESTARTED_AT, StorageClassInfo, creatable,
     plan, plan_with, versions,
