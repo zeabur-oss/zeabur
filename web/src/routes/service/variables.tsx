@@ -1,6 +1,14 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { lazy, Suspense, useRef, useState, type ClipboardEvent, type ReactNode } from "react"
+import {
+  Fragment,
+  lazy,
+  Suspense,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type ReactNode,
+} from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
@@ -660,44 +668,48 @@ export function VariablesTab({
                     <p className="py-2 text-xs text-muted-foreground">{t("vars.noMatch")}</p>
                   ) : null}
                   <ul className="flex flex-col divide-y">
-                    {shownLiteral.map(({ container, env }) => {
+                    {shownLiteral.map(({ container, env }, at) => {
                       const targets = named.get(`${container}/${env.name}`) ?? []
+                      const first = multi && shownLiteral[at - 1]?.container !== container
                       return (
-                        <li
-                          key={`${container}/${env.name}`}
-                          className={cn(
-                            "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable",
-                            entrance(createdKey.env(workload, env.name)),
-                          )}
-                        >
-                          <span
-                            className="flex items-center gap-1.5 font-mono text-xs font-medium"
-                            translate="no"
-                          >
-                            {env.name}
-                            {multi ? (
-                              <span className="font-normal text-muted-foreground">{container}</span>
-                            ) : null}
-                          </span>
-                          <span className="flex min-w-0 items-center gap-2">
-                            <span
-                              className="truncate font-mono text-xs"
+                        <Fragment key={`${container}/${env.name}`}>
+                          {first ? (
+                            <li
+                              className="pt-3 pb-1.5 font-mono type-meta text-muted-foreground"
                               translate="no"
-                              title={env.value ?? ""}
                             >
-                              {env.value}
+                              {container}
+                            </li>
+                          ) : null}
+                          <li
+                            className={cn(
+                              "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable",
+                              entrance(createdKey.env(workload, env.name)),
+                            )}
+                          >
+                            <span className="font-mono text-xs font-medium" translate="no">
+                              {env.name}
                             </span>
-                            <CopyButton value={env.value ?? ""} />
-                            {targets.map((target) => (
-                              <Tooltip key={target} content={t("vars.names", target)}>
-                                <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
-                                  <ArrowRightIcon className="size-3" aria-hidden="true" />
-                                  {target}
-                                </span>
-                              </Tooltip>
-                            ))}
-                          </span>
-                        </li>
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span
+                                className="truncate font-mono text-xs"
+                                translate="no"
+                                title={env.value ?? ""}
+                              >
+                                {env.value}
+                              </span>
+                              <CopyButton value={env.value ?? ""} />
+                              {targets.map((target) => (
+                                <Tooltip key={target} content={t("vars.names", target)}>
+                                  <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
+                                    <ArrowRightIcon className="size-3" aria-hidden="true" />
+                                    {target}
+                                  </span>
+                                </Tooltip>
+                              ))}
+                            </span>
+                          </li>
+                        </Fragment>
                       )
                     })}
                   </ul>
