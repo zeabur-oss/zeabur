@@ -780,6 +780,7 @@ export const zhTW: Messages = {
   "action.unadopt": "不再顯示為專案",
   "action.openDebugTerminal": "開啟除錯終端機",
   "action.openToolsTerminal": "開啟 kubectl 終端機",
+  "action.openInToolsTerminal": "在 kubectl 終端機開啟",
   "action.saveDetails": "儲存詳細資料",
   "title.adopt": (ns) => `納入 ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再顯示為專案`,

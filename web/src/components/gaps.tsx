@@ -4,6 +4,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import WrenchIcon from "~icons/ph/wrench"
 
 import type { Schemas } from "@/api/client"
+import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils"
 import { serviceLink } from "@/lib/place"
 import { fixTemplates } from "@/model/fixes"
 import { suggestionsOf } from "@/model/overview"
+import { applyCommand, isManifest } from "@/model/terminal"
 
 type Gap = Schemas["GapView"]
 
@@ -25,11 +27,14 @@ export function GapList({
   gaps,
   project,
   document,
+  onTerminal,
 }: {
   gaps: Gap[]
   /** Absent for cluster gaps. */
   project?: string
   document?: Schemas["Project"]
+  /** A snippet opened in the kubectl terminal. */
+  onTerminal?: () => void
 }) {
   const t = useT()
   const planner = usePlanner(project ?? "")
@@ -48,7 +53,9 @@ export function GapList({
             <GapRow
               key={`${gap.rule}/${gap.subject.kind}/${gap.subject.name}/${gap.message.key}/${gap.message.params?.container ?? ""}`}
               gap={gap}
+              project={project}
               onPlan={ask ? () => planner.plan(ask) : undefined}
+              onTerminal={onTerminal}
             />
           )
         })}
@@ -101,7 +108,17 @@ function UncheckedRow({
   )
 }
 
-function GapRow({ gap, onPlan }: { gap: Gap; onPlan?: () => void }) {
+function GapRow({
+  gap,
+  project,
+  onPlan,
+  onTerminal,
+}: {
+  gap: Gap
+  project?: string
+  onPlan?: () => void
+  onTerminal?: () => void
+}) {
   const t = useT()
   const write = useSentence()
   const install = gap.fix.kind === "install" ? gap.fix.id.split("/") : undefined
@@ -157,8 +174,16 @@ function GapRow({ gap, onPlan }: { gap: Gap; onPlan?: () => void }) {
             {t("gap.snippet")}
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="pt-2">
-              <YamlBlock yaml={gap.snippet} label={t("gap.snippet")} />
+            <div className="flex flex-col items-start gap-1.5 pt-2">
+              <YamlBlock yaml={gap.snippet} label={t("gap.snippet")} className="self-stretch" />
+              {project && isManifest(gap.snippet) ? (
+                <OpenInTerminal
+                  project={project}
+                  command={applyCommand(gap.snippet)}
+                  variant="outline"
+                  onOpen={onTerminal}
+                />
+              ) : null}
             </div>
           </CollapsibleContent>
         </Collapsible>

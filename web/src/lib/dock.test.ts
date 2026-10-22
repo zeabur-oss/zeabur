@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 
-import { closeTab, dock, isDockShortcut, openKubectl, openShell } from "@/lib/dock"
+import { closeTab, commandTyped, dock, isDockShortcut, openKubectl, openShell } from "@/lib/dock"
 
 describe("the dock", () => {
   beforeEach(() => dock.set({ open: false, tabs: [], focus: 0 }))
@@ -43,6 +43,18 @@ describe("the dock", () => {
     expect(dock.get().tabs[0]).toMatchObject({ asked: 0 })
     openKubectl("shop")
     expect(dock.get().tabs[0]).toMatchObject({ asked: 1 })
+  })
+
+  test("a command waits on the kubectl tab until its shell has it; a plain ask keeps it", () => {
+    openKubectl("shop", { command: "kubectl get pods" })
+    expect(dock.get().tabs[0]).toMatchObject({ asked: 1, command: "kubectl get pods" })
+    openKubectl("shop")
+    expect(dock.get().tabs[0]).toMatchObject({ asked: 2, command: "kubectl get pods" })
+    openKubectl("shop", { command: "helm list" })
+    expect(dock.get().tabs[0]).toMatchObject({ asked: 3, command: "helm list" })
+    commandTyped("kubectl:shop")
+    expect(dock.get().tabs[0]).toMatchObject({ asked: 3, command: undefined })
+    expect(dock.get()).toMatchObject({ open: true, active: "kubectl:shop" })
   })
 
   test("closing shows the tab beside it and leaves the dock open after the last", () => {

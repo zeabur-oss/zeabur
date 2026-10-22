@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { FitAddon } from "@xterm/addon-fit"
 import { Terminal, type ITheme } from "@xterm/xterm"
 import "@xterm/xterm/css/xterm.css"
-import { useEffect, useReducer, useRef, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 
 import { sessionQuery, whoamiQuery } from "@/api/queries"
@@ -22,6 +22,7 @@ import {
   type ClientFrame,
   type TerminalEvent,
   type TerminalState,
+  typedCommand,
 } from "@/model/terminal"
 import { Button } from "@zeabur/design-system/components/button"
 
@@ -39,6 +40,8 @@ export function Session({
   debug = false,
   toolbar,
   noShell,
+  command,
+  onTyped,
   onReconnect,
 }: {
   /** The tab's, for the expiry it records. */
@@ -54,6 +57,9 @@ export function Session({
   debug?: boolean
   toolbar?: ReactNode
   noShell?: ReactNode
+  /** Typed at the shell's prompt, not run. */
+  command?: string
+  onTyped?: () => void
   onReconnect: () => void
 }) {
   const t = useT()
@@ -99,19 +105,45 @@ export function Session({
     }
   }, [])
 
+  const pending = useRef(command)
+  pending.current = command
+  const typed = useRef(onTyped)
+  typed.current = onTyped
+  const atPrompt = useRef(false)
+  const typeIn = useCallback(() => {
+    if (!terminal || !atPrompt.current || !pending.current) return
+    terminal.paste(typedCommand(pending.current))
+    pending.current = undefined
+    typed.current?.()
+  }, [terminal])
+
   useEffect(() => {
     if (!terminal) return
     dispatch({ type: "connect" })
     setAsAdmin(seen.current === "active")
-    return relay(terminal, url, (event) => {
-      dispatch(event)
-      if (event.type === "frame" && event.frame.type === "ready") {
-        setExpiry(id, expiresAt.current)
-        if (visible.current) terminal.focus()
-      }
-      if (event.type === "close") setExpiry(id, undefined)
-    })
-  }, [terminal, url, attempt, id])
+    atPrompt.current = false
+    return relay(
+      terminal,
+      url,
+      (event) => {
+        dispatch(event)
+        if (event.type === "frame" && event.frame.type === "ready") {
+          setExpiry(id, expiresAt.current)
+          if (visible.current) terminal.focus()
+        }
+        if (event.type === "close") {
+          atPrompt.current = false
+          setExpiry(id, undefined)
+        }
+      },
+      () => {
+        atPrompt.current = true
+        typeIn()
+      },
+    )
+  }, [terminal, url, attempt, id, typeIn])
+
+  useEffect(() => typeIn(), [command, typeIn])
 
   useEffect(() => {
     if (!shown) return
@@ -273,13 +305,33 @@ function screen(
   ]
 }
 
-/** One connection between the screen and the server, until it closes or is replaced. */
-function relay(terminal: Terminal, url: string, dispatch: (event: TerminalEvent) => void) {
+/** The shell's greeting and prompt have arrived once it has been quiet this long after printing,
+ * or this long after opening when it prints nothing. */
+const promptQuiet = 250
+const promptLatest = 3000
+
+/** One connection between the screen and the server, until it closes or is replaced. `onPrompt`
+ * runs once the shell waits for input. */
+function relay(
+  terminal: Terminal,
+  url: string,
+  dispatch: (event: TerminalEvent) => void,
+  onPrompt: () => void,
+) {
   const socket = new WebSocket(url)
   socket.binaryType = "arraybuffer"
   const encoder = new TextEncoder()
   let live = false
   let replaced = false
+  let quiet: number | undefined
+  let latest: number | undefined
+  const prompted = () => {
+    window.clearTimeout(quiet)
+    window.clearTimeout(latest)
+    quiet = undefined
+    latest = undefined
+    if (live) onPrompt()
+  }
   const send = (frame: ClientFrame) => {
     if (live) socket.send(JSON.stringify(frame))
   }
@@ -288,16 +340,25 @@ function relay(terminal: Terminal, url: string, dispatch: (event: TerminalEvent)
   socket.addEventListener("message", (event: MessageEvent<string | ArrayBuffer>) => {
     if (typeof event.data !== "string") {
       terminal.write(new Uint8Array(event.data))
+      if (latest !== undefined) {
+        window.clearTimeout(quiet)
+        quiet = window.setTimeout(prompted, promptQuiet)
+      }
       return
     }
     const frame = parseFrame(event.data)
     if (!frame) return
     live = frame.type === "ready"
-    if (live) sendSize()
+    if (live) {
+      sendSize()
+      latest = window.setTimeout(prompted, promptLatest)
+    }
     dispatch({ type: "frame", frame })
   })
   socket.addEventListener("close", (event) => {
     live = false
+    window.clearTimeout(quiet)
+    window.clearTimeout(latest)
     if (!replaced) dispatch({ type: "close", code: event.code })
   })
   const typed = terminal.onData((data) => {
@@ -308,6 +369,8 @@ function relay(terminal: Terminal, url: string, dispatch: (event: TerminalEvent)
   if (terminal.buffer.active.cursorX > 0) terminal.write("\r\n")
   return () => {
     replaced = true
+    window.clearTimeout(quiet)
+    window.clearTimeout(latest)
     typed.dispose()
     resized.dispose()
     socket.close()

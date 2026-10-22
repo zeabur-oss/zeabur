@@ -107,6 +107,25 @@ export function nearestExpiry(expiries: Iterable<string | null | undefined>): st
   return nearest?.iso
 }
 
+/** Typed into a shell, a command waits for Enter: no line break after it. */
+export function typedCommand(command: string): string {
+  return command.replace(/\r\n?/g, "\n").trimEnd()
+}
+
+/** A whole object, with its own `apiVersion` and `kind`, not a fragment to merge into one. */
+export function isManifest(yaml: string): boolean {
+  return /^apiVersion:/m.test(yaml) && /^kind:/m.test(yaml)
+}
+
+/** `kubectl apply` with the YAML in a quoted here-document, so nothing in it expands; its end
+ * marker is one no line of the YAML equals. */
+export function applyCommand(yaml: string): string {
+  const lines = typedCommand(yaml).split("\n")
+  let end = "EOF"
+  for (let n = 2; lines.includes(end); n += 1) end = `EOF${n}`
+  return [`kubectl apply -f - <<'${end}'`, ...lines, end].join("\n")
+}
+
 /** Both verbs on `pods/exec`: a WebSocket handshake is a GET (RFC 6455 §4.1), so RBAC checks `get`
  * where `kubectl exec` over SPDY needs `create`
  * (https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb). */

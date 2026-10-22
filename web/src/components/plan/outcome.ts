@@ -3,14 +3,16 @@
 // change can be taken back, model/risk.ts); failure gives the reason in plain words and, when the
 // object moved on or the plan ran out, "Review again", which plans the same change afresh; when the
 // cluster refused it and the server offers admin rights, "Retry as admin", which applies the same
-// plan again after the passkey confirmation (auth/elevation.ts).
+// plan again after the passkey confirmation (auth/elevation.ts); when Helm would undo it, the
+// kubectl terminal with `helm list` typed in.
 import { toast } from "sonner"
 
 import { api, toProblem, unwrap, type Schemas } from "@/api/client"
-import { queryClient } from "@/api/queries"
+import { queryClient, toolsQuery } from "@/api/queries"
 import { retryAsAdmin } from "@/auth/elevation"
 import { failureOf } from "@/components/plan/describe"
 import { markCreated } from "@/lib/created"
+import { openKubectl } from "@/lib/dock"
 import type { PlanAsk } from "@/components/plan/planner"
 import type { Locale, Translate } from "@/i18n"
 import { namespaceOps } from "@/model/project"
@@ -87,7 +89,8 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
           : undefined,
     })
   } catch (error) {
-    fail(
+    void fail(
+      project,
       id,
       t,
       locale,
@@ -111,13 +114,15 @@ async function takeBack(
     void queryClient.invalidateQueries({ queryKey: ["project", project] })
     toast.success(t("toast.undone"), { id, description: title })
   } catch (error) {
-    fail(id, t, locale, error)
+    void fail(project, id, t, locale, error)
   }
 }
 
 /** Reports a failed apply. `review` plans the change afresh; `again` applies the same plan once
- * more, which is what "Retry as admin" does after the passkey confirmation. */
-function fail(
+ * more, which is what "Retry as admin" does after the passkey confirmation. A change Helm would
+ * undo offers the kubectl terminal with `helm list` typed in, to find the release to upgrade. */
+async function fail(
+  project: string,
   id: string | number,
   t: Translate,
   locale: Locale,
@@ -132,7 +137,12 @@ function fail(
       ? { label: t("elevate.retry"), onClick: () => void retryAsAdmin(again) }
       : failure.review && review
         ? { label: t("plan.replan"), onClick: () => review() }
-        : undefined
+        : problem.managedBy === "Helm" && (await toolsAvailable(project))
+          ? {
+              label: t("action.openInToolsTerminal"),
+              onClick: () => openKubectl(project, { command: "helm list" }),
+            }
+          : undefined
   toast.error(failure.title, {
     id,
     description: failure.description,
@@ -140,3 +150,9 @@ function fail(
     action,
   })
 }
+
+const toolsAvailable = (project: string) =>
+  queryClient.fetchQuery(toolsQuery(project)).then(
+    (tools) => tools.available,
+    () => false,
+  )

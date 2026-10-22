@@ -8,7 +8,7 @@ import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { useI18n, useT } from "@/i18n"
-import { openKubectl, updateShell, type DockTab } from "@/lib/dock"
+import { commandTyped, openKubectl, updateShell, type DockTab } from "@/lib/dock"
 import { formatAgo } from "@/lib/format"
 import { terminalUrl, toolsTerminalUrl } from "@/model/terminal"
 import { Button } from "@zeabur/design-system/components/button"
@@ -244,6 +244,8 @@ export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
         project={project}
         shown={shown}
         focus={focus}
+        command={tab.command}
+        onTyped={() => commandTyped(tab.id)}
         onReconnect={() => setAttempt(attempt + 1)}
       />
     )
