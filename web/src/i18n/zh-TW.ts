@@ -321,8 +321,11 @@ export const zhTW: Messages = {
   "cluster.disk": "磁碟",
   "cluster.usedOf": (used, whole) => `已使用 ${used}/${whole}`,
   "cluster.reservedShare": (share) => `已保留 ${share}`,
-  "cluster.diskUnreadable": "未顯示磁碟用量：讀取 kubelet 統計資料（nodes/proxy）的權限被拒絕。",
-  "cluster.diskUnavailable": "kubelet 沒有回報磁碟用量。",
+  "cluster.diskState.not-configured": "未顯示磁碟用量：沒有 metrics 儲存服務。",
+  "cluster.diskState.unreadable": "未顯示磁碟用量：讀取 metrics 儲存服務的權限被拒絕。",
+  "cluster.diskState.unavailable": "未顯示磁碟用量：metrics 儲存服務沒有回應。",
+  "cluster.diskState.not-collected":
+    "未顯示磁碟用量：metrics 儲存服務沒有這些節點的 node-exporter 檔案系統指標。",
   "cluster.sortNodes": "節點排序",
   "cluster.sortWorst": "最差的在前",
   "cluster.sortName": "名稱",
@@ -671,6 +674,11 @@ export const zhTW: Messages = {
   "storage.title": "磁碟區",
   "volume.fullestOf": (used, n) => `${used}，${n} 個副本中最滿的`,
   "volume.full": "用滿後應用程式會寫入失敗。請清出空間，或設定更大的容量後套用。",
+  "volume.state.not-configured": "未顯示磁碟區用量：沒有 metrics 儲存服務。",
+  "volume.state.unreadable": "未顯示磁碟區用量：讀取 metrics 儲存服務的權限被拒絕。",
+  "volume.state.unavailable": "未顯示磁碟區用量：metrics 儲存服務沒有回應。",
+  "volume.state.not-collected":
+    "未顯示磁碟區用量：metrics 儲存服務裡沒有這個服務所用磁碟區的 kubelet 指標。",
   "storage.about":
     "寫進磁碟區的檔案，在副本重新啟動或移到其他節點後仍會保留；容器裡其他地方的檔案，重新啟動後就會消失。",
   "storage.emptyTitle": (name) => `${name} 沒有磁碟區`,

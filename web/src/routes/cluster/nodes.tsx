@@ -323,8 +323,7 @@ function Notes({ data }: { data: Schemas["NodeList"] }) {
   const lines: string[] = []
   if (data.metrics === "not-installed") lines.push(t("cluster.noMetrics"))
   if (data.metrics === "unavailable") lines.push(t("cluster.metricsUnavailable"))
-  if (data.disk === "unreadable") lines.push(t("cluster.diskUnreadable"))
-  if (data.disk === "unavailable") lines.push(t("cluster.diskUnavailable"))
+  if (data.disk !== "available") lines.push(t(`cluster.diskState.${data.disk}`))
   if (data.podScan === "partial") lines.push(t("cluster.partialPods", data.podsScanned))
   if (data.unscheduledPods > 0) lines.push(t("cluster.unscheduled", data.unscheduledPods))
   const podsRefused = data.podScan === "unreadable"

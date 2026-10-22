@@ -757,22 +757,6 @@ impl Cluster for UserClient {
             Ok(self.kube().request::<serde_json::Value>(request).await?)
         })
     }
-
-    fn node_proxy_get<'a>(&'a self, node: &'a str, path: &'a str) -> Answer<'a, serde_json::Value> {
-        Box::pin(async move {
-            names::name(node)?;
-            if !path.starts_with('/') || path.split('/').any(|segment| segment == "..") {
-                return Err(ClusterError::Transport(format!(
-                    "{path:?} is not a path for the node proxy"
-                )));
-            }
-            let request = http::Request::get(format!("/api/v1/nodes/{node}/proxy{path}"))
-                .header(http::header::ACCEPT, "application/json")
-                .body(Vec::new())
-                .map_err(|e| ClusterError::Transport(e.to_string()))?;
-            Ok(self.kube().request::<serde_json::Value>(request).await?)
-        })
-    }
 }
 
 /// The service proxy's path for `path_and_query` of `service`. Refuses a path that does not

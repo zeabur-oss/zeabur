@@ -206,9 +206,9 @@ export interface paths {
      * @description Requests and limits are summed per node from every unfinished pod, the way
      *     `kubectl describe node` sums them (see `capacity`); usage is added only when metrics-server
      *     is installed and readable, and is approximate ("meant only for autoscaling purposes"
-     *     [metrics-server]). Each node's disk comes from its kubelet's stats summary (see `stats`).
-     *     `403` when nodes cannot be listed; a refusal of pods, metrics or summaries leaves those parts
-     *     out and says so.
+     *     [metrics-server]). Each node's disk comes from the metrics store (see `disks`), and `disk`
+     *     says when it could not. `403` when nodes cannot be listed; a refusal of pods, metrics or the
+     *     store leaves those parts out and says so.
      *
      *     [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
      */
@@ -977,10 +977,12 @@ export interface paths {
       cookie?: never
     }
     /**
-     * How full each volume a running pod of the project mounts from a claim is, from the stats
-     *     summary of the kubelet on the pod's node (`get` on `nodes/proxy`). A claim no running pod
-     *     mounts has no measure. Always `200` once the pods can be listed: `state` says when the
-     *     kubelets may not be read (`unreadable` names the refusal) or did not answer.
+     * How full each volume of the project is, by claim, from the kubelets' volume metrics in the
+     *     metrics store, as you. A kubelet measures a volume only while a pod on its node mounts it.
+     *     Always `200` for a project's name: `state` says when there is no store, you may not read it
+     *     (`get` on its `services/proxy`; `unreadable` names it), it did not answer, or it holds no
+     *     values for the project. Reading the store is reading every project's metrics: see the
+     *     description of `GET /api/v1/settings/metrics-store`.
      */
     get: operations["getVolumeUsage"]
     put?: never
@@ -1876,7 +1878,12 @@ export interface components {
       | "unschedulable"
       | "configMissing"
       | "unexplained"
-    /** @description A filesystem's size and use, as the kubelet measures it. */
+    /**
+     * @description Whether disk use could be read from the metrics store. An open set.
+     * @enum {string}
+     */
+    DiskState: "available" | "not-configured" | "unreadable" | "unavailable" | "not-collected"
+    /** @description A filesystem's size and use. */
     DiskUsage: {
       /**
        * Format: int64
@@ -2690,7 +2697,7 @@ export interface components {
     /** @description The nodes, with the cluster's totals. */
     NodeList: {
       /** @description Whether the nodes' disks could be read. */
-      disk: components["schemas"]["StatsState"]
+      disk: components["schemas"]["DiskState"]
       /** @description Sorted by name. */
       items: components["schemas"]["NodeView"][]
       /** @description Whether usage could be read. */
@@ -2741,11 +2748,6 @@ export interface components {
       disk?: components["schemas"]["DiskUsage"] | null
       /** @description `cluster/nodes/<name>`. */
       id: string
-      /**
-       * Format: int64
-       * @description What the container runtime's images take on disk, from the same summary.
-       */
-      imagesBytes?: number | null
       /** @description The kernel version. */
       kernelVersion: string
       /** @description The kubelet's version. */
@@ -4226,11 +4228,6 @@ export interface components {
      */
     SourceKind: "Literal" | "Secret" | "ConfigMap" | "PodField" | "ResourceField" | "File"
     /**
-     * @description Whether the kubelet's stats summaries could be read. An open set.
-     * @enum {string}
-     */
-    StatsState: "available" | "unreadable" | "unavailable"
-    /**
      * @description What a service is doing, in one word for a person. An open set: clients must show an unknown
      *     value by its [`Health`].
      * @enum {string}
@@ -4492,10 +4489,6 @@ export interface components {
       capacityBytes: number
       /** @description The PersistentVolumeClaim. */
       claim: string
-      /** @description The node that pod runs on. */
-      node: string
-      /** @description The pod it was measured in. */
-      pod: string
       /**
        * Format: int64
        * @description In use.
@@ -4506,11 +4499,11 @@ export interface components {
     VolumeUsageList: {
       /** @description `projects/{project}/volumes`. */
       id: string
-      /** @description Every claim a running pod mounts, measured, by claim. */
+      /** @description Every claim the store has values for, by claim. */
       items: components["schemas"]["VolumeUsage"][]
-      /** @description Whether the kubelets could be read. */
-      state: components["schemas"]["StatsState"]
-      /** @description What could not be read. */
+      /** @description Whether the metrics store could be read. */
+      state: components["schemas"]["DiskState"]
+      /** @description The settings ConfigMap or the store, when the person may not read it. */
       unreadable: components["schemas"]["UnreadableView"][]
     }
     /** @description Who the cluster says the person is. */
@@ -6428,7 +6421,7 @@ export interface operations {
           "application/json": components["schemas"]["VolumeUsageList"]
         }
       }
-      403: {
+      400: {
         headers: {
           [name: string]: unknown
         }

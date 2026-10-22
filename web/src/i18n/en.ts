@@ -366,9 +366,11 @@ export const en = {
   "cluster.disk": "Disk",
   "cluster.usedOf": (used: string, whole: string) => `${used} of ${whole} used`,
   "cluster.reservedShare": (share: string) => `${share} reserved`,
-  "cluster.diskUnreadable":
-    "Disk use is not shown: reading the kubelets' stats (nodes/proxy) was refused.",
-  "cluster.diskUnavailable": "The kubelets did not report disk use.",
+  "cluster.diskState.not-configured": "Disk use is not shown: there is no metrics store.",
+  "cluster.diskState.unreadable": "Disk use is not shown: reading the metrics store was refused.",
+  "cluster.diskState.unavailable": "Disk use is not shown: the metrics store did not respond.",
+  "cluster.diskState.not-collected":
+    "Disk use is not shown: the metrics store has no node-exporter filesystem metrics for these nodes.",
   "cluster.sortNodes": "Sort nodes",
   "cluster.sortWorst": "Worst first",
   "cluster.sortName": "Name",
@@ -750,6 +752,11 @@ export const en = {
   "volume.fullestOf": (used: string, n: number) => `${used}, fullest of ${n} replicas`,
   "volume.full":
     "When it is full, the app's writes fail. Free space in it, or set a larger size and apply.",
+  "volume.state.not-configured": "Volume use is not shown: there is no metrics store.",
+  "volume.state.unreadable": "Volume use is not shown: reading the metrics store was refused.",
+  "volume.state.unavailable": "Volume use is not shown: the metrics store did not respond.",
+  "volume.state.not-collected":
+    "Volume use is not shown: the metrics store has no kubelet volume metrics for this service.",
   "storage.about":
     "Files written to a volume stay when a replica restarts or moves to another node. Files anywhere else in the container are lost on restart.",
   "storage.emptyTitle": (name: string) => `${name} has no volume`,

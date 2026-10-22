@@ -52,10 +52,11 @@ planKey:
   existingSecret: ""
   key: plan-key
 
-# The metrics store usage history is read from, until someone chooses another in Settings (kept
-# in the ConfigMap zeabur-settings of this namespace, by whoever may change it): a Service port
-# serving the Prometheus HTTP API, namespace/name:port. Empty: where Zeabur Catalog
-# installs VictoriaMetrics (observability/vmsingle-vm-victoria-metrics-k8s-stack:8428).
+# The metrics store usage history, node disk and volume use are read from, until someone
+# chooses another in Settings (kept in the ConfigMap zeabur-settings of this namespace, by
+# whoever may change it): a Service port serving the Prometheus HTTP API, namespace/name:port.
+# Empty: where Zeabur Catalog installs VictoriaMetrics
+# (observability/vmsingle-vm-victoria-metrics-k8s-stack:8428).
 metricsStore:
   service: ""
   # Let everyone signed in read the setting (a Role with `get` on that one ConfigMap, bound to

@@ -169,6 +169,25 @@ What remains: until the token expires, anyone who may exec into pods in that nam
 administers its node, can use it. The plan says this in one sentence; a namespace of its own for
 tools pods narrows who that is.
 
+## Use and disk
+
+CPU and memory use come from metrics-server (`metrics.k8s.io`). Everything else measured
+comes from the metrics store, a Service serving the Prometheus HTTP API, read through
+kube-apiserver's service proxy as the person (`get` on its `services/proxy`):
+
+- **History**: range queries over the series the store keeps.
+- **Node disk**: node-exporter's `node_filesystem_size_bytes`, `node_filesystem_avail_bytes`
+  and `node_filesystem_free_bytes` for the filesystem holding `/var/lib/kubelet` (the kubelet's
+  `nodefs`, which disk-pressure eviction watches), else `/`. A series counts for a node by its
+  `node` label, else by its `instance` host matching the node's name or one of its addresses.
+- **Volume use**: the kubelets' `kubelet_volume_stats_*` by `namespace` and
+  `persistentvolumeclaim`.
+
+Zeabur never reads the kubelets' own API (`nodes/proxy`): that right also lets someone run
+commands in any pod on the node. Where the store is not set up, refuses, does not answer, or
+holds no series for a node or claim, the answer says which, and the interface says it in one
+line instead of a number; requests and requested sizes are still shown.
+
 ## Web interface
 
 The interface's sources live in [`web/`](../web) (React, TanStack Router and Query, shadcn/ui on

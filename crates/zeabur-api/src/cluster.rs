@@ -10,7 +10,7 @@
 //! |---|---|---|
 //! | `GET /cluster` | `/version` | nothing: every signed-in person (`system:public-info-viewer`) |
 //! | `GET /cluster/upgrades` | `/version`; nodes and Plans when allowed | nothing; nodes and Plans add skew and progress |
-//! | `GET /cluster/nodes` | nodes; pods, node metrics and kubelet summaries when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get nodes/proxy` for disks |
+//! | `GET /cluster/nodes` | nodes; pods, node metrics and the metrics store when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get` on the metrics store's `services/proxy` for disks |
 //! | `GET /cluster/events` | `events.k8s.io` events, all namespaces (`scope=cluster` keeps those about the cluster) | `list events.events.k8s.io` |
 //! | `GET /cluster/capabilities` | CRDs, APIServices, classes, `HelmChart`s, Helm release Secrets' labels, workloads | all of them: in practice a cluster administrator |
 //!
@@ -36,6 +36,9 @@
 //!     verbs: [list]
 //! ```
 //!
+//! Disk use also needs the metrics store, which a Role in its own namespace grants (`get` on
+//! `services/proxy`, see `crate::services::history` for who should have it).
+//!
 //! # Bounded reads
 //!
 //! The cluster-wide pod and event lists stop at 5,000 items and say so (`podScan: partial`,
@@ -43,9 +46,9 @@
 //! one (see `zeabur_kube`'s cluster-wide reads).
 
 pub(crate) mod capacity;
+pub(crate) mod disks;
 pub mod install;
 pub mod modules;
-pub(crate) mod stats;
 
 use std::collections::BTreeMap;
 
@@ -290,7 +293,6 @@ fn node_view(node: &Node) -> NodeView {
         limits: None,
         usage: None,
         disk: None,
-        images_bytes: None,
         created: node
             .metadata
             .creation_timestamp
@@ -364,18 +366,22 @@ fn node_usage(objects: &[DynamicObject]) -> Vec<(String, String, String)> {
 /// Requests and limits are summed per node from every unfinished pod, the way
 /// `kubectl describe node` sums them (see `capacity`); usage is added only when metrics-server
 /// is installed and readable, and is approximate ("meant only for autoscaling purposes"
-/// [metrics-server]). Each node's disk comes from its kubelet's stats summary (see `stats`).
-/// `403` when nodes cannot be listed; a refusal of pods, metrics or summaries leaves those parts
-/// out and says so.
+/// [metrics-server]). Each node's disk comes from the metrics store (see `disks`), and `disk`
+/// says when it could not. `403` when nodes cannot be listed; a refusal of pods, metrics or the
+/// store leaves those parts out and says so.
 ///
 /// [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
 #[utoipa::path(get, path = "/api/v1/cluster/nodes", tag = "cluster", operation_id = "listNodes",
     responses((status = 200, body = NodeList), (status = 403, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn nodes(Person(cluster): Person) -> Result<Json<NodeList>, ApiError> {
-    let (nodes, pods, usage) = futures_util::join!(
+pub(crate) async fn nodes(
+    State(state): State<AppState>,
+    Person(cluster): Person,
+) -> Result<Json<NodeList>, ApiError> {
+    let (nodes, pods, usage, asked) = futures_util::join!(
         cluster.list::<Node>(None),
         cluster.cluster_pods(WIDE_LIMIT),
-        node_metrics(cluster.as_ref())
+        node_metrics(cluster.as_ref()),
+        disks::ask(cluster.as_ref(), &state.settings, disks::NODE_FILESYSTEMS)
     );
     let nodes = nodes.map_err(|e| {
         refused(
@@ -416,19 +422,12 @@ pub(crate) async fn nodes(Person(cluster): Person) -> Result<Json<NodeList>, Api
     let usage = usage.map(usage_by_node);
 
     let mut items: Vec<NodeView> = nodes.iter().map(node_view).collect();
-    let (summaries, disk) = stats::summaries(
-        &cluster,
-        items.iter().map(|n| n.name.clone()).collect(),
-        &mut unreadable,
-    )
-    .await;
+    let disk = asked.disks(|samples| disks::node_disks(samples, &nodes));
+    unreadable.extend(asked.unreadable);
     let mut totals = NodeTotals::default();
     for item in &mut items {
-        if let Some(summary) = summaries.get(&item.name) {
-            item.disk = summary.node;
-            item.images_bytes = summary.images_bytes;
-            totals.disk = disk_plus(totals.disk, summary.node);
-        }
+        item.disk = disk.disks.get(&item.name).copied();
+        totals.disk = disk_plus(totals.disk, item.disk);
         if pods.is_some() {
             let (requests, limits, count) = sums.get(&item.name).copied().unwrap_or_default();
             item.requests = Some(Resources {
@@ -463,7 +462,7 @@ pub(crate) async fn nodes(Person(cluster): Person) -> Result<Json<NodeList>, Api
         pods_scanned,
         unscheduled_pods: unscheduled,
         metrics,
-        disk,
+        disk: disk.state,
         unreadable,
     }))
 }

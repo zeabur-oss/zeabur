@@ -119,10 +119,6 @@ pub struct State {
     /// Every path and query asked of a Service through the proxy, as
     /// `namespace/name:port/path?query`, in order.
     pub proxy_requests: Vec<String>,
-    /// What each node's kubelet answers at `/stats/summary` through the node proxy; a node not
-    /// here answers `503`, as kube-apiserver does when it cannot reach the kubelet. Refused with
-    /// `403` when `forbidden_resources` holds `nodes/proxy`.
-    pub kubelet_summaries: BTreeMap<String, Value>,
 }
 
 /// A command [`Cluster::run`] ran.
@@ -1132,25 +1128,6 @@ impl Cluster for MemoryCluster {
                 .ok_or_else(|| not_found(&format!("services \"{}\"", service.name)));
             drop(state);
             answer?(path_and_query).map_err(ClusterError::Status)
-        })
-    }
-
-    fn node_proxy_get<'a>(&'a self, node: &'a str, path: &'a str) -> Answer<'a, Value> {
-        Box::pin(async move {
-            let state = self.allowed(None)?;
-            if state.forbidden_resources.contains("nodes/proxy") {
-                return Err(forbidden(&format!("nodes \"{node}\" proxy")));
-            }
-            if path != "/stats/summary" {
-                return Err(not_found(path));
-            }
-            state.kubelet_summaries.get(node).cloned().ok_or_else(|| {
-                ClusterError::Status(KubernetesStatus::new(
-                    503,
-                    "ServiceUnavailable",
-                    format!("the kubelet on {node} did not answer"),
-                ))
-            })
         })
     }
 }

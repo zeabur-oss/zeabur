@@ -378,19 +378,16 @@ pub struct NodeView {
     /// What it uses now, from metrics-server (approximate, for autoscaling); absent without it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<Resources>,
-    /// Its root filesystem (`nodefs`), where pods' logs, writable layers and `emptyDir` volumes
-    /// live, from the kubelet's stats summary; absent when that could not be read.
+    /// The kubelet's filesystem (`nodefs`), where pods' logs, writable layers and `emptyDir`
+    /// volumes live, from the metrics store; absent when the store has no value for this node.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disk: Option<DiskUsage>,
-    /// What the container runtime's images take on disk, from the same summary.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub images_bytes: Option<u64>,
     /// When it joined the cluster (RFC 3339).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<String>,
 }
 
-/// A filesystem's size and use, as the kubelet measures it.
+/// A filesystem's size and use.
 #[expect(
     clippy::struct_field_names,
     reason = "the API names every byte count with its unit"
@@ -406,16 +403,21 @@ pub struct DiskUsage {
     pub available_bytes: u64,
 }
 
-/// Whether the kubelet's stats summaries could be read. An open set.
+/// Whether disk use could be read from the metrics store. An open set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
-pub enum StatsState {
-    /// Every kubelet asked answered, or nothing needed asking.
+pub enum DiskState {
+    /// The store answered with values.
     Available,
-    /// The person may not read them (`get` on `nodes/proxy`).
+    /// There is no store at the configured Service (`404`).
+    NotConfigured,
+    /// The person may not reach the store (`get` on its `services/proxy`).
     Unreadable,
-    /// No kubelet answered.
+    /// The store did not answer, or not as the Prometheus HTTP API.
     Unavailable,
+    /// The store answered but holds none of the series asked for: it does not scrape them, or
+    /// not yet.
+    NotCollected,
 }
 
 /// The cluster's totals over every node.
@@ -481,7 +483,7 @@ pub struct NodeList {
     /// Whether usage could be read.
     pub metrics: MetricsState,
     /// Whether the nodes' disks could be read.
-    pub disk: StatsState,
+    pub disk: DiskState,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
 }

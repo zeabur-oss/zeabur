@@ -320,8 +320,11 @@ export const zhCN: Messages = {
   "cluster.disk": "磁盘",
   "cluster.usedOf": (used, whole) => `已使用 ${used}/${whole}`,
   "cluster.reservedShare": (share) => `已预留 ${share}`,
-  "cluster.diskUnreadable": "未显示磁盘用量：读取 kubelet 统计数据（nodes/proxy）的权限被拒绝。",
-  "cluster.diskUnavailable": "kubelet 没有报告磁盘用量。",
+  "cluster.diskState.not-configured": "未显示磁盘用量：没有 metrics 存储服务。",
+  "cluster.diskState.unreadable": "未显示磁盘用量：读取 metrics 存储服务的权限被拒绝。",
+  "cluster.diskState.unavailable": "未显示磁盘用量：metrics 存储服务没有响应。",
+  "cluster.diskState.not-collected":
+    "未显示磁盘用量：metrics 存储服务没有这些节点的 node-exporter 文件系统指标。",
   "cluster.sortNodes": "节点排序",
   "cluster.sortWorst": "最差的在前",
   "cluster.sortName": "名称",
@@ -669,6 +672,11 @@ export const zhCN: Messages = {
   "storage.title": "卷",
   "volume.fullestOf": (used, n) => `${used}，${n} 个副本中最满的`,
   "volume.full": "用满后应用写入会失败。请腾出空间，或设置更大的容量后应用。",
+  "volume.state.not-configured": "未显示卷用量：没有 metrics 存储服务。",
+  "volume.state.unreadable": "未显示卷用量：读取 metrics 存储服务的权限被拒绝。",
+  "volume.state.unavailable": "未显示卷用量：metrics 存储服务没有响应。",
+  "volume.state.not-collected":
+    "未显示卷用量：metrics 存储服务里没有这个服务所用卷的 kubelet 指标。",
   "storage.about":
     "写入卷的文件，在副本重启或迁移到其他节点后仍会保留；容器里其他位置的文件，重启后就会丢失。",
   "storage.emptyTitle": (name) => `${name} 没有卷`,

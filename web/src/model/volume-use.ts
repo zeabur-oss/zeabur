@@ -1,5 +1,6 @@
-// How full a service's volumes are, from the kubelets' stats. A StatefulSet's mount names a claim
-// template (`data`); each replica has its own claim (`data-db-0`), and the fullest one counts.
+// How full a service's volumes are, from the kubelets' volume metrics in the metrics store. A
+// StatefulSet's mount names a claim template (`data`); each replica has its own claim
+// (`data-db-0`), and the fullest one counts.
 import type { Schemas } from "@/api/client"
 import { diskShare, fillHealth, VOLUME } from "@/model/node-health"
 import { claimOf, type Health, type Service } from "@/model/service"
@@ -29,6 +30,17 @@ export interface VolumeFill {
   health: Health
   /** Replicas whose claims were measured. */
   replicas: number
+}
+
+export type MissingReason = Exclude<Schemas["DiskState"], "available">
+
+/** Why some of `fills` are missing: the store's state, or that it holds nothing for them. */
+export function missingReason(
+  state: Schemas["DiskState"],
+  fills: readonly (VolumeFill | undefined)[],
+): MissingReason | undefined {
+  if (fills.every(Boolean)) return undefined
+  return state === "available" ? "not-collected" : state
 }
 
 const belongs = (claim: string, template: string, workload: string) =>
