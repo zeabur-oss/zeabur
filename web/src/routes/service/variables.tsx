@@ -395,7 +395,7 @@ export function VariablesTab({
           )}
           {secret ? secretToggle(secret) : null}
         </span>
-        <span className="flex min-w-0 items-center gap-1 sm:justify-end">
+        <span className="flex min-w-0 items-center gap-1 sm:max-w-72 sm:justify-end">
           {env.pendingRestart ? <PendingMark pending={env.pendingRestart} /> : null}
           <SourceLink
             source={env.source}
@@ -438,7 +438,7 @@ export function VariablesTab({
             ) : null}
             {secret ? secretToggle(secret) : null}
           </span>
-          <span className="flex min-w-0 items-center gap-1 sm:justify-end">
+          <span className="flex min-w-0 items-center gap-1 sm:max-w-72 sm:justify-end">
             {i.pendingRestart ? <PendingMark pending={i.pendingRestart} /> : null}
             <SourceLink
               source={i.source}
