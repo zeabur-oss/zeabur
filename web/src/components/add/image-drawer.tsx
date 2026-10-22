@@ -247,10 +247,12 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                 hideLabel
                 hint={
                   <>
-                    {domains.suffix ? null : `${t("add.hostHint")} `}
-                    {domains.clusterIssuer
-                      ? t("add.https", domains.clusterIssuer)
-                      : t("add.httpOnly")}
+                    {domains.suffix ? null : <span className="block">{t("add.hostHint")}</span>}
+                    <span className="block">
+                      {domains.clusterIssuer
+                        ? t("add.https", domains.clusterIssuer)
+                        : t("add.httpOnly")}
+                    </span>
                   </>
                 }
                 errors={shown(problems.host, () =>

@@ -96,7 +96,7 @@ function NewProjectDialog({
             <p className="type-meta text-muted-foreground">{t("projects.newBody")}</p>
             <RefusedHint
               hint={canCreate}
-              what={t("refused.createProject", name || "…")}
+              what={name ? t("refused.createProject", name) : t("projects.new")}
               missing={[permission("create", "namespaces")]}
             />
             <FormField
