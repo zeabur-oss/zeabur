@@ -13,11 +13,12 @@ import { expect, test } from "./fixtures.ts"
 //   ZEABUR_E2E_SECRET        a Secret the healthy Deployment reads (default talker-secret)
 //   ZEABUR_E2E_SECRET_VALUE  one of its values                     (default zeabur-e2e-secret)
 //   ZEABUR_E2E_UNCHECKED     a service with no traffic check, as Kind/name (optional)
+//   ZEABUR_E2E_OTHER         another project with a service        (default zeabur-e2e-second)
 //
 // The demo server: ZEABUR_E2E_NAMESPACE=shop ZEABUR_E2E_SERVICE=api
 // ZEABUR_E2E_POD=api-5f6b7-k2m4p ZEABUR_E2E_LOG_LINE="GET /products" ZEABUR_E2E_FAILING=worker
 // ZEABUR_E2E_SECRET=db-credentials ZEABUR_E2E_SECRET_VALUE=correct-horse-battery-staple
-// ZEABUR_E2E_UNCHECKED=StatefulSet/db
+// ZEABUR_E2E_UNCHECKED=StatefulSet/db ZEABUR_E2E_OTHER=analytics
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const namespace = env("ZEABUR_E2E_NAMESPACE")
 const pod = env("ZEABUR_E2E_POD")
@@ -27,6 +28,7 @@ const failing = env("ZEABUR_E2E_FAILING", "crasher")
 const secret = env("ZEABUR_E2E_SECRET", "talker-secret")
 const secretValue = env("ZEABUR_E2E_SECRET_VALUE", "zeabur-e2e-secret")
 const unchecked = env("ZEABUR_E2E_UNCHECKED")
+const otherProject = env("ZEABUR_E2E_OTHER", "zeabur-e2e-second")
 const project = `/projects/${encodeURIComponent(namespace)}`
 
 test.beforeAll(() => {
@@ -379,8 +381,6 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
 const canvasZoom = (page: Page) => page.getByText(/^\d+%$/)
 
 test("each project keeps its own map zoom", async ({ page }) => {
-  // kube-system is in every cluster.
-  const other = namespace === "kube-system" ? "default" : "kube-system"
   await page.goto(`${project}?view=map`)
   await expect(page.getByRole("button", { name: new RegExp(`^${healthy}\\b`) })).toBeVisible()
   const before = await canvasZoom(page).textContent()
@@ -389,8 +389,8 @@ test("each project keeps its own map zoom", async ({ page }) => {
   const mine = (await canvasZoom(page).textContent()) ?? ""
 
   await page.getByRole("button", { name: "Switch project" }).first().click()
-  await page.getByRole("button", { name: new RegExp(`^${other}\\b`) }).click()
-  await expect(page).toHaveURL(new RegExp(`/projects/${other}`))
+  await page.getByRole("button", { name: new RegExp(`^${otherProject}\\b`) }).click()
+  await expect(page).toHaveURL(new RegExp(`/projects/${otherProject}`))
   // A project with many services opens as a list.
   if (!(await canvasZoom(page).isVisible()))
     await page.getByRole("button", { name: "Map", exact: true }).click()
@@ -847,7 +847,8 @@ test("Deployments lists the releases and rolls back to one through a plan", asyn
     expect(await list.getByRole("listitem").count()).toBeGreaterThan(1)
   }).toPass({ timeout: 15_000 })
   await expect(list).toContainText("Running")
-  await expect(panel.getByRole("heading", { name: /^#\d+ → #\d+$/ })).toBeVisible()
+  await list.getByRole("button", { name: "Compare" }).first().click()
+  await expect(list.getByText(/^#\d+ → #\d+$/)).toBeVisible()
   await list.getByRole("button", { name: "Roll back" }).first().click()
   await confirmPlan(
     page,
@@ -987,7 +988,7 @@ test("a domain waiting in the draft shows in the list, in the review, and goes w
   await expect(added).toContainText("New")
   await expect(domains).not.toContainText("has no public domain yet")
   await review(page)
-  const dialog = page.getByRole("dialog", { name: `Change ${healthy}` })
+  const dialog = page.getByRole("dialog", { name: `Save changes to ${healthy}` })
   await expect(dialog).toContainText(host, { timeout: 15_000 })
   await dialog.getByRole("button", { name: "Cancel" }).click()
   await expect(dialog).toHaveCount(0)
