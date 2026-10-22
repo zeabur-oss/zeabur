@@ -59,6 +59,9 @@ pub struct State {
     pub secret_values: BTreeMap<String, BTreeMap<String, Vec<u8>>>,
     /// Cluster-wide facts.
     pub facts: ClusterFacts,
+    /// The body of `/readyz?verbose`; empty answers three passing checks. Refused with `403`
+    /// when `forbidden_resources` holds `/readyz`.
+    pub readyz: String,
     /// When set, every call is refused with `403 Forbidden`.
     pub forbid_everything: bool,
     /// When set, every call is refused with `429 Too Many Requests` and a `Retry-After` of this
@@ -610,6 +613,17 @@ impl Cluster for MemoryCluster {
 
     fn version(&self) -> Answer<'_, String> {
         Box::pin(async move { Ok(self.lock()?.facts.version.clone()) })
+    }
+
+    fn readyz(&self) -> Answer<'_, String> {
+        Box::pin(async move {
+            let state = self.wide("/readyz")?;
+            Ok(if state.readyz.is_empty() {
+                "[+]ping ok\n[+]log ok\n[+]etcd ok\nreadyz check passed\n".to_owned()
+            } else {
+                state.readyz.clone()
+            })
+        })
     }
 
     fn kubeconfig_name(&self) -> Option<String> {

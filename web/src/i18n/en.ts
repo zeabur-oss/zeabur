@@ -297,6 +297,22 @@ export const en = {
     "Nothing found in what could be read, but part of the cluster could not be checked.",
   "cluster.cannotCheck": "Cannot check: the cluster cannot be reached.",
   "cluster.notRead": "Not read: the cluster cannot be reached.",
+  "cluster.apiServer": "API server",
+  "cluster.whatApiServer": "the API server's readiness",
+  "cluster.apiReady": "Ready",
+  "cluster.apiFailing": (n: number) => plural(n, "check failing", "checks failing"),
+  "cluster.apiCheckFailed": "failed",
+  "cluster.apiUnknown": "Unknown: the API server's readiness could not be read.",
+  "cluster.apiCovers": (n: number) =>
+    `${plural(n, "readiness check", "readiness checks")} (/readyz) of the API server that answered. Each request reaches one API server, so other replicas are not checked here.`,
+  "cluster.apiEmbedded": (distribution: string) =>
+    `On ${distribution} the scheduler and controller manager run in the same process as the API server, so they are running when it answers.`,
+  "cluster.apiLeases":
+    "The scheduler and controller manager are not part of these checks; their leader leases show whether each has a running leader.",
+  "cluster.apiNotCovered":
+    "The scheduler and controller manager are not part of these checks. On a managed cluster the provider runs them.",
+  "cluster.leaseRenewed": "Leader renewed",
+  "cluster.leaseStale": "No leader: last renewed",
   "node.notReady": (n: number, node: string) =>
     n === 1 ? `${node} is not ready` : `${n} nodes are not ready`,
   "node.notReady.why": "Services with pods there are down until it is back or the pods move.",

@@ -11,6 +11,7 @@
 //! | `GET /cluster` | `/version` | nothing: every signed-in person (`system:public-info-viewer`) |
 //! | `GET /cluster/upgrades` | `/version`; nodes and Plans when allowed | nothing; nodes and Plans add skew and progress |
 //! | `GET /cluster/nodes` | nodes; pods, node metrics and the metrics store when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get` on the metrics store's `services/proxy` for disks |
+//! | `GET /cluster/health` | `/readyz?verbose`; the scheduler's and controller manager's leases when allowed | nothing: every signed-in person (`system:public-info-viewer`); `get leases.coordination.k8s.io` in `kube-system` adds the leases |
 //! | `GET /cluster/events` | `events.k8s.io` events, all namespaces (`scope=cluster` keeps those about the cluster) | `list events.events.k8s.io` |
 //! | `GET /cluster/alerts` | Falco's `ClusterPolicyReport`s (`zeabur_modules::falco`) | `list clusterpolicyreports.wgpolicyk8s.io`; refused or not installed is a state, not an error |
 //! | `GET /cluster/capabilities` | CRDs, APIServices, classes, `HelmChart`s, Helm release Secrets' labels, workloads | all of them: in practice a cluster administrator |
@@ -48,6 +49,7 @@
 
 pub(crate) mod capacity;
 pub(crate) mod disks;
+pub(crate) mod health;
 pub mod install;
 pub mod modules;
 
@@ -72,8 +74,9 @@ use crate::projects::events::{EventKey, event_key, event_view, last_seen, newest
 use crate::query::{EventQuery, LimitParams};
 use crate::settings::cluster_name;
 use crate::views::{
-    CapabilityList, Cluster, ClusterEventList, DiskUsage, MetricsState, NodeCondition, NodeList,
-    NodeTotals, NodeView, PodScan, Resources, Taint, UnreadableView, UpgradeExtensions, Upgrades,
+    CapabilityList, Cluster, ClusterEventList, ClusterHealth, DiskUsage, MetricsState,
+    NodeCondition, NodeList, NodeTotals, NodeView, PodScan, Resources, Taint, UnreadableView,
+    UpgradeExtensions, Upgrades,
 };
 
 /// The most pods or events a cluster-wide read takes.
@@ -145,6 +148,18 @@ pub(crate) async fn get(
         distribution: distribution(&version),
         kubernetes_version: version,
     }))
+}
+
+/// The API server's readiness checks, of the replica that answered, with only the failing ones
+/// named, and the scheduler's and controller manager's leader leases when the person may read
+/// them (see [`mod@health`]). `403` when `/readyz` is refused.
+#[utoipa::path(get, path = "/api/v1/cluster/health", tag = "cluster", operation_id = "getClusterHealth",
+    responses((status = 200, body = ClusterHealth), (status = 403, body = Problem, content_type = PROBLEM)))]
+pub(crate) async fn health(
+    State(state): State<AppState>,
+    Person(cluster): Person,
+) -> Result<Json<ClusterHealth>, ApiError> {
+    Ok(Json(health::read(cluster.as_ref(), (state.clock)()).await?))
 }
 
 /// Which capabilities the cluster has, by Zeabur Catalog, with the version of

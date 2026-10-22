@@ -1067,6 +1067,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn health_names_only_the_failing_checks_and_a_refusal_is_its_own_403() {
+        let cluster = with_nodes();
+        let health = get(&cluster, "/api/v1/cluster/health").await;
+        assert_eq!(health["ready"], true);
+        assert_eq!(health["failing"], json!([]));
+        assert_eq!(health["leaders"], json!([]));
+
+        cluster.update(|s| {
+            s.readyz = "[+]ping ok\n[-]etcd failed: reason withheld\n[+]log ok\n\
+                        readyz check failed\n"
+                .to_owned();
+        });
+        let health = get(&cluster, "/api/v1/cluster/health").await;
+        assert_eq!(health["ready"], false);
+        assert_eq!(health["checks"], 3);
+        assert_eq!(
+            health["failing"],
+            json!([{"name": "etcd", "reason": "reason withheld"}])
+        );
+
+        cluster.update(|s| {
+            s.forbidden_resources.insert("/readyz".to_owned());
+        });
+        let (status, _, body) = call(app(&cluster), "GET", "/api/v1/cluster/health").await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert!(body.contains("`/readyz`"), "{body}");
+    }
+
+    #[tokio::test]
     async fn upgrades_warn_of_end_of_life_from_the_bundled_table() {
         let cluster = with_nodes();
         let on = |clock: fn() -> Timestamp| {

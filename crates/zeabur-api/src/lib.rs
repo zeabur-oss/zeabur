@@ -181,6 +181,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::capabilities))
         .routes(routes!(cluster::install::guide_for))
         .routes(routes!(cluster::nodes))
+        .routes(routes!(cluster::health))
         .routes(routes!(cluster::upgrades))
         .routes(routes!(cluster::events))
         .routes(routes!(alerts::cluster))

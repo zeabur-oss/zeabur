@@ -265,6 +265,22 @@ export const zhTW: Messages = {
   "cluster.notChecked": "讀得到的部分沒有問題，但叢集有些部分無法檢查。",
   "cluster.cannotCheck": "無法檢查：連不到叢集。",
   "cluster.notRead": "沒有讀取：連不到叢集。",
+  "cluster.apiServer": "API 伺服器",
+  "cluster.whatApiServer": "API 伺服器的就緒狀態",
+  "cluster.apiReady": "就緒",
+  "cluster.apiFailing": (n: number) => `${n} 項檢查未通過`,
+  "cluster.apiCheckFailed": "未通過",
+  "cluster.apiUnknown": "不明：讀不到 API 伺服器的就緒狀態。",
+  "cluster.apiCovers": (n: number) =>
+    `回應這次請求的 API 伺服器的 ${n} 項就緒檢查（/readyz）。每次請求只會連到其中一台 API 伺服器，其他副本不在這裡檢查。`,
+  "cluster.apiEmbedded": (distribution: string) =>
+    `在 ${distribution} 上，排程器和控制器管理員跟 API 伺服器在同一個行程裡執行，API 伺服器有回應就表示它們也在執行。`,
+  "cluster.apiLeases":
+    "這些檢查不包含排程器和控制器管理員；從它們的領導者租約可以看出各自是否有正在執行的領導者。",
+  "cluster.apiNotCovered":
+    "這些檢查不包含排程器和控制器管理員。在代管叢集上，它們由供應商負責執行。",
+  "cluster.leaseRenewed": "領導者最後續約",
+  "cluster.leaseStale": "沒有領導者：最後續約",
   "node.notReady": (n, node) => (n === 1 ? `${node} 未就緒` : `${n} 個節點未就緒`),
   "node.notReady.why": "在上面有 Pod 的服務會停擺，直到節點恢復或 Pod 移走。",
   "node.notReady.fix": "確認機器有在運作，且 kubelet 連得到控制平面。",
