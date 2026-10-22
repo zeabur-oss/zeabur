@@ -14,7 +14,7 @@ pub use embedded::KIND;
 
 /// Content Security Policy for the interface's HTML.
 ///
-/// Scripts, fonts and API calls come from this origin only, nothing may frame the page, and
+/// Scripts and fonts come from this origin only, nothing may frame the page, and
 /// scripts may not write HTML strings into the DOM (Trusted Types with no policy). The build emits
 /// no inline script, so `script-src 'self'` needs neither a hash nor `'unsafe-inline'`;
 /// `scripts/build-ui.sh` fails if `index.html` gains an inline script or style.
@@ -25,10 +25,14 @@ pub use embedded::KIND;
 /// both are refused (`style-src` governs `<style>` elements, [mdn-style-src]). Inline styles can
 /// restyle the page but not run code; script execution stays restricted to this origin.
 ///
+/// API calls go to this origin. `connect-src` also allows any `https:` origin for one request: a
+/// service's page checks from the person's browser whether its public domain answers
+/// (`fetch` with `no-cors`, so the response stays unreadable). Plain `http:` stays refused.
+///
 /// [sonner#449]: https://github.com/emilkowalski/sonner/issues/449
 /// [mdn-style-src]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/style-src
 pub const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
-img-src 'self' data:; font-src 'self'; connect-src 'self'; manifest-src 'self'; base-uri 'none'; \
+img-src 'self' data:; font-src 'self'; connect-src 'self' https:; manifest-src 'self'; base-uri 'none'; \
 form-action 'self'; frame-ancestors 'none'; require-trusted-types-for 'script'; \
 trusted-types 'none'";
 
@@ -347,6 +351,7 @@ mod tests {
         let csp = header(&response, "content-security-policy").unwrap_or_default();
         assert!(csp.contains("; script-src 'self';"), "{csp}");
         assert!(csp.contains("; style-src 'self' 'unsafe-inline';"), "{csp}");
+        assert!(csp.contains("; connect-src 'self' https:;"), "{csp}");
         assert_eq!(header(&response, "vary"), Some("accept-encoding"));
         assert_eq!(body(response).await, b"<html>index</html>");
     }

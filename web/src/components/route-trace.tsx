@@ -6,6 +6,7 @@ import XCircleFillIcon from "~icons/ph/x-circle-fill"
 
 import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
+import { BrowserCheckLine } from "@/components/browser-check"
 import { StatusDot } from "@/components/status"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
@@ -97,6 +98,12 @@ export function RouteLine({
           {said.text}
         </span>
       </div>
+      {route.kind === "domain" && route.status === "unknown" && !waiting ? (
+        <BrowserCheckLine
+          address={route.address}
+          tls={route.hops.some((h) => h.step === "certificate")}
+        />
+      ) : null}
       {stop ? (
         <div className="flex flex-col gap-1 text-sm">
           <p>{write(stop.message)}</p>
