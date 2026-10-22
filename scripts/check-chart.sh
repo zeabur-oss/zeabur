@@ -38,11 +38,14 @@ for values in "$chart"/ci/*-values.yaml; do
   # Zeabur has no rights of its own: no binding to a ServiceAccount, no ClusterRoleBinding, and no
   # token in the pod. The one Role the chart may render lets people read Zeabur's settings: `get`
   # on the ConfigMap zeabur-settings, nothing else. The ClusterRoles are the member roles, which
-  # Zeabur binds per member.
+  # Zeabur binds per member, and the rule sets the project roles aggregate.
   expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "ClusterRole") | .metadata.name] | sort | join(",")' \
-    zeabur-member,zeabur-project-developer,zeabur-project-viewer
-  roles='select(.kind == "ClusterRole") | .rules[]'
+    zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules
+  expect "$name" "$out" \
+    '[select(.kind == "ClusterRole") | .metadata as $m | ($m.labels // {}) | to_entries[] | select(.key | test("^zeabur.com/aggregate-to-")) | (.key | sub("^zeabur.com/aggregate-to-", "")) + "<" + $m.name] | sort | join(",")' \
+    "zeabur-project-developer<zeabur-project-builds-read,zeabur-project-developer<zeabur-project-builds-write,zeabur-project-developer<zeabur-project-developer-rules,zeabur-project-viewer<zeabur-project-builds-read,zeabur-project-viewer<zeabur-project-viewer-rules"
+  roles='select(.kind == "ClusterRole") | .rules[]?'
   # Every rule names its groups, resources and verbs.
   expect "$name" "$out" "[$roles | (.apiGroups + .resources + .verbs)[] | select(test(\"^[*]$\"))] | length" 0
   # No RBAC objects, no kubelet, no widening of one's own rights, no namespace made or deleted.
@@ -52,8 +55,8 @@ for values in "$chart"/ci/*-values.yaml; do
   # The one namespace write is the Developer's patch of their project's Namespace, which the
   # admission policy keeps to its details.
   expect "$name" "$out" \
-    "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .rules[] | select(.resources[] == \"namespaces\") | .verbs[] | select(. != \"get\" and . != \"list\") | \$n + \" \" + .] | join(\",\")" \
-    "zeabur-project-developer patch"
+    "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .rules[]? | select(.resources[] == \"namespaces\") | .verbs[] | select(. != \"get\" and . != \"list\") | \$n + \" \" + .] | join(\",\")" \
+    "zeabur-project-developer-rules patch"
   vap='select(.kind == "ValidatingAdmissionPolicy")'
   expect "$name" "$out" "$vap | [.metadata.name, .spec.failurePolicy, (.spec.matchConstraints.resourceRules[] | .resources + .operations | join(\"/\"))] | join(\",\")" \
     "zeabur-project-namespace,Fail,namespaces/UPDATE"
@@ -61,8 +64,8 @@ for values in "$chart"/ci/*-values.yaml; do
     "zeabur-project-namespace,Deny"
   # Secret values and shells in containers belong to developers only.
   expect "$name" "$out" \
-    '[select(.kind == "ClusterRole") | select(.rules | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \
-    zeabur-project-developer
+    '[select(.kind == "ClusterRole") | select(.rules // [] | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \
+    zeabur-project-developer-rules
   expect "$name" "$out" '[select(.kind == "RoleBinding") | .subjects[] | select(.kind == "ServiceAccount")] | length' 0
   expect "$name" "$out" \
     'select(.kind == "Role") | .rules[] | [.apiGroups, .resources, .resourceNames, .verbs] | map(join(",")) | join("|")' \
