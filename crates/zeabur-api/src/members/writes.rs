@@ -1,4 +1,4 @@
-//! Changing Zeabur Identity's people: setup links, passkey names, removals.
+//! Changing Zeabur Identity's people: setup links and removals.
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -13,10 +13,7 @@ use zeabur_kube::{Cluster, ObjectTarget, Preconditions, WriteBody, WriteRequest}
 
 use super::access::ProjectGrant;
 use super::directory::{Directory, IdentityKind, Object, UserSpec, request};
-use super::{
-    ADMIN_GROUP, API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, LABEL_ANNOTATION,
-    MAX_LABEL, USER_LABEL,
-};
+use super::{ADMIN_GROUP, API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, USER_LABEL};
 use crate::error::{ApiError, read_problem};
 
 /// How long a link made for a new member lasts, as `zeabur-identityctl invite`'s default.
@@ -24,8 +21,6 @@ pub(crate) const INVITE_SECONDS: i64 = 7 * 24 * 3600;
 /// How long a reset link lasts: long enough to reach someone, short enough to matter little if
 /// it leaks.
 pub(crate) const RESET_SECONDS: i64 = 24 * 3600;
-/// How long a link for one's own new passkey lasts: it opens at once, in the next tab.
-pub(crate) const OWN_SECONDS: i64 = 3600;
 
 /// Someone to invite.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
@@ -64,15 +59,6 @@ pub struct SetupLinkRequest {
     /// whoever opens this link gets in.
     #[serde(default)]
     pub reset: bool,
-}
-
-/// A passkey's new name.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PasskeyLabel {
-    /// At most 64 characters; empty or `null` goes back to the name given at enrolment.
-    #[serde(default)]
-    pub label: Option<String>,
 }
 
 /// A one-time setup link, shown once: only its hash is kept.
@@ -423,60 +409,6 @@ pub(crate) async fn create_user(
         .ok_or_else(|| bad("The new member could not be read back."))
 }
 
-/// The JSON Patch that names a passkey `label`, or takes its name back to the enrolment's.
-pub(crate) fn label_patch<S>(credential: &Object<S>, label: Option<&str>) -> Value {
-    let key = LABEL_ANNOTATION.replace('~', "~0").replace('/', "~1");
-    let has_annotations = credential.metadata.annotations.is_some();
-    let has_label = credential.annotation(LABEL_ANNOTATION).is_some();
-    let mut operations = vec![json!({"op": "test", "path": "/metadata/uid",
-        "value": credential.metadata.uid})];
-    match label {
-        Some(label) if !has_annotations => operations.push(
-            json!({"op": "add", "path": "/metadata/annotations", "value": {LABEL_ANNOTATION: label}}),
-        ),
-        Some(label) => operations.push(
-            json!({"op": "add", "path": format!("/metadata/annotations/{key}"), "value": label}),
-        ),
-        None if has_label => operations
-            .push(json!({"op": "remove", "path": format!("/metadata/annotations/{key}")})),
-        None => {}
-    }
-    Value::Array(operations)
-}
-
-/// A passkey's new name, checked.
-pub(crate) fn clean_label(label: Option<&str>) -> Result<Option<String>, ApiError> {
-    let Some(label) = label.map(str::trim).filter(|l| !l.is_empty()) else {
-        return Ok(None);
-    };
-    if label.chars().count() > MAX_LABEL {
-        return Err(bad(format!(
-            "Choose a name with at most {MAX_LABEL} characters."
-        )));
-    }
-    if label.chars().any(char::is_control) {
-        return Err(bad("A passkey's name must be on one line."));
-    }
-    Ok(Some(label.to_owned()))
-}
-
-pub(crate) async fn rename(
-    cluster: &dyn Cluster,
-    namespace: &str,
-    credential: &Object<super::directory::CredentialSpec>,
-    label: Option<&str>,
-) -> Result<(), ApiError> {
-    let patch = label_patch(credential, label);
-    send(
-        cluster,
-        IdentityKind::Credential,
-        namespace,
-        credential.name(),
-        WriteBody::JsonPatch(patch),
-    )
-    .await
-}
-
 /// Deletes the member `user`: their invitations, credentials and grants, then the `User`.
 pub(crate) async fn remove_member(
     cluster: &dyn Cluster,
@@ -580,34 +512,5 @@ mod tests {
         let patch = admin_patch(&admin, false).unwrap();
         assert_eq!(patch[2]["value"], json!(["dev"]));
         assert_eq!(patch[3]["value"], json!([]));
-    }
-
-    #[test]
-    fn a_name_is_an_annotation_and_clearing_it_removes_only_that() {
-        let bare: Object<UserSpec> = serde_json::from_value(
-            json!({"metadata": {"name": "c", "uid": "u"}, "spec": {"username": "c"}}),
-        )
-        .unwrap();
-        assert_eq!(
-            label_patch(&bare, Some("Phone"))[1],
-            json!({"op": "add", "path": "/metadata/annotations", "value": {LABEL_ANNOTATION: "Phone"}})
-        );
-        assert_eq!(label_patch(&bare, None).as_array().unwrap().len(), 1);
-        let named: Object<UserSpec> = serde_json::from_value(json!({
-            "metadata": {"name": "c", "uid": "u", "annotations": {LABEL_ANNOTATION: "Phone"}},
-            "spec": {"username": "c"}
-        }))
-        .unwrap();
-        assert_eq!(
-            label_patch(&named, None)[1],
-            json!({"op": "remove", "path": "/metadata/annotations/identity.zeabur.com~1label"})
-        );
-        assert_eq!(clean_label(Some("  ")).unwrap(), None);
-        assert_eq!(
-            clean_label(Some(" Work laptop ")).unwrap().as_deref(),
-            Some("Work laptop")
-        );
-        assert!(clean_label(Some(&"x".repeat(65))).is_err());
-        assert!(clean_label(Some("a\nb")).is_err());
     }
 }

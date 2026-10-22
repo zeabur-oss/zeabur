@@ -2,6 +2,7 @@
 //! (<https://doc.rust-lang.org/cargo/reference/cargo-targets.html#integration-tests>); the
 //! cluster tests on k3s are their own binary, `kubernetes`.
 
+mod account;
 mod api;
 mod cluster_name;
 #[cfg(test)]

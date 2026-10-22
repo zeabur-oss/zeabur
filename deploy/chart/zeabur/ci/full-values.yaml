@@ -12,6 +12,7 @@ issuer:
     key: secret
   caBundle:
     configMap: zeabur-identity-ca
+  accountUrl: https://identity.example.test:8443/account
 elevation:
   enabled: false
 terminal:

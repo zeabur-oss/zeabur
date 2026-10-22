@@ -193,6 +193,26 @@ commands in any pod on the node. Where the store is not set up, refuses, does no
 holds no series for a node or claim, the answer says which, and the interface says it in one
 line instead of a number; requests and requested sizes are still shown.
 
+## Accounts
+
+Zeabur holds no credentials and reads none of the issuer's objects. The Account page shows what
+kube-apiserver says:
+
+- **Who you are**: the user name and groups of a `SelfSubjectReview`.
+- **Your role in each project**: one `SelfSubjectRulesReview` per adopted project, summarised as
+  Admin, Developer or Viewer by a few key rights (`crates/zeabur-api/src/account.rs` lists
+  them). A cluster administrator, found with one `SelfSubjectAccessReview` for every verb on
+  every resource, is Admin everywhere and no project is reviewed. A project whose review fails
+  says its access could not be read.
+- **Sign-in methods**: a link to the issuer's own page, from `issuer.accountUrl`, else the
+  `manage` URL of the issuer's `/.well-known/passkey-endpoints` ([W3C Passkey Endpoints]),
+  read with a 3-second deadline and kept for 10 minutes, else no link.
+
+Members (`/members`) is Zeabur Identity's admin view and still reads and changes its objects as
+the signed-in person.
+
+[W3C Passkey Endpoints]: https://www.w3.org/TR/passkey-endpoints-1/
+
 ## Web interface
 
 The interface's sources live in [`web/`](../web) (React, TanStack Router and Query, shadcn/ui on

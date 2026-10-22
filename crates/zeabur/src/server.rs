@@ -27,6 +27,8 @@
 //! `BroadcastChannel`, which fetches again what was refused.
 
 use std::collections::HashMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::Router;
@@ -40,10 +42,12 @@ use axum::routing::{delete, get, post};
 use secrecy::SecretString;
 use zeabur_api::ApiError;
 use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
+use zeabur_api::account::SignInPage;
 use zeabur_api::plan_token::PlanKey;
 use zeabur_auth::client::{AuthError, OAuthClient};
 use zeabur_auth::cookie;
 use zeabur_auth::flow::{FlowKey, LIFETIME_SECONDS, Pending, Purpose, return_path};
+use zeabur_auth::passkey::PasskeyEndpoints;
 use zeabur_auth::session::{Bind, Clock, Credentials, Lookup, Sessions};
 use zeabur_auth::url::BaseUrl;
 use zeabur_core::guard::{self, Origins, Refusal};
@@ -94,13 +98,27 @@ enum Signed {
     IssuerDown,
 }
 
+/// The issuer's page for managing how people sign in, from its passkey endpoints.
+pub(crate) struct IssuerPage(pub(crate) PasskeyEndpoints);
+
+impl SignInPage for IssuerPage {
+    fn find(&self) -> Pin<Box<dyn Future<Output = Option<String>> + Send + '_>> {
+        Box::pin(self.0.manage())
+    }
+}
+
 /// The whole server.
-pub(crate) fn app(auth: &Arc<Auth>, plan_key: PlanKey, settings: zeabur_api::Settings) -> Router {
+pub(crate) fn app(
+    auth: &Arc<Auth>,
+    plan_key: PlanKey,
+    settings: zeabur_api::Settings,
+    sign_in: Arc<dyn SignInPage>,
+) -> Router {
     let access = Arc::new(SessionAccess {
         elevation: auth.elevation,
         origin: auth.public.origin(),
     });
-    let api = zeabur_api::router_with_key(access, plan_key, settings).layer(
+    let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in).layer(
         axum::middleware::from_fn_with_state(Arc::clone(auth), session),
     );
     let sign_in = Router::new()

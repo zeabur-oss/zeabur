@@ -113,6 +113,10 @@ spec:
             - name: ZEABUR_ISSUER_CA_FILE
               value: /etc/zeabur/issuer-ca/{{ $issuer.caBundle.key }}
             {{- end }}
+            {{- with $issuer.accountUrl }}
+            - name: ZEABUR_ACCOUNT_URL
+              value: {{ . | quote }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080

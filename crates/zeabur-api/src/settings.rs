@@ -62,6 +62,9 @@ pub struct Settings {
     pub public_host: Option<String>,
     /// Where Zeabur Identity keeps its people (see [`crate::members`]).
     pub identity: IdentitySettings,
+    /// The issuer's page where people manage how they sign in, as the server was started with it
+    /// (`--account-url`); `None`: the issuer's passkey endpoints say (see [`crate::account`]).
+    pub account_url: Option<String>,
 }
 
 /// Where Zeabur Identity keeps its people, and the address its setup links open.
@@ -96,6 +99,7 @@ impl Default for Settings {
             cluster_name: None,
             public_host: None,
             identity: IdentitySettings::default(),
+            account_url: None,
         }
     }
 }

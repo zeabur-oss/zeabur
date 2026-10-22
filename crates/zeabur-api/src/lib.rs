@@ -45,10 +45,7 @@
 //! | `GET /api/v1/projects/{p}/tools` | your tools pods (the `clusterTools` change starts one); deletes those that have stopped (see the `tools` module) |
 //! | `GET /api/v1/projects/{p}/tools/{name}/terminal` | a terminal with `kubectl` and `helm` acting as you, over a WebSocket |
 //! | `DELETE /api/v1/projects/{p}/tools/{name}` | deletes your tools pod |
-//! | `GET /api/v1/account` | your Zeabur Identity account: passkeys, linked accounts |
-//! | `POST /api/v1/account/setup-links` | a one-time link that adds a passkey to your account |
-//! | `PATCH /api/v1/account/passkeys/{id}` | renames one of your passkeys |
-//! | `DELETE /api/v1/account/passkeys/{id}` | removes one; never your last |
+//! | `GET /api/v1/account` | who you are, your role in each project, and where to manage how you sign in |
 //! | `GET /api/v1/members` | everyone Zeabur Identity signs in, and pending setup links |
 //! | `POST /api/v1/members/invitations` | invites someone: a one-time setup link, the member made if new |
 //! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
@@ -87,6 +84,7 @@
 //! [k8s-api-changes]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api_changes.md
 
 pub mod access;
+pub mod account;
 mod cache;
 pub mod cluster;
 mod error;
@@ -155,8 +153,8 @@ promised a stable `/api/v1`.",
         license(name = "Apache-2.0", identifier = "Apache-2.0")
     ),
     tags(
-        (name = "identity", description = "Who you are"),
-        (name = "members", description = "Your account and everyone Zeabur Identity signs in: passkeys, setup links, removals"),
+        (name = "identity", description = "Who you are and what you may do"),
+        (name = "members", description = "Everyone Zeabur Identity signs in: passkeys, setup links, removals"),
         (name = "cluster", description = "The cluster and what it has installed"),
         (name = "projects", description = "Projects (namespaces), their events, and changes: plan, then apply"),
         (name = "services", description = "A project's services (workloads): releases and usage history"),
@@ -216,12 +214,7 @@ fn routes() -> OpenApiRouter<AppState> {
             settings::cluster_name::get_setting,
             settings::cluster_name::set
         ))
-        .routes(routes!(members::account::get))
-        .routes(routes!(members::account::setup_link))
-        .routes(routes!(
-            members::account::rename_passkey,
-            members::account::remove_passkey
-        ))
+        .routes(routes!(account::get))
         .routes(routes!(members::handlers::list))
         .routes(routes!(members::handlers::invite))
         .routes(routes!(members::handlers::revoke_invitation))
@@ -238,19 +231,24 @@ pub fn router(access: Arc<dyn ClusterAccess>) -> Router {
     router_at(access, zeabur_kube::k8s_openapi::jiff::Timestamp::now)
 }
 
-/// [`router`], sealing plan tokens with `plan_key` instead of a key made at start, so that
-/// tokens outlive a restart of the in-cluster server, and with the server's `settings`.
+/// [`router`] for the in-cluster server, with its `settings`.
+///
+/// Plan tokens are sealed with `plan_key` instead of a key made at start, so that they outlive a
+/// restart, and `sign_in` finds the issuer's page where people manage how they sign in.
 pub fn router_with_key(
     access: Arc<dyn ClusterAccess>,
     plan_key: PlanKey,
     settings: Settings,
+    sign_in: Arc<dyn account::SignInPage>,
 ) -> Router {
-    build(
+    build_with(
         access,
         zeabur_kube::k8s_openapi::jiff::Timestamp::now,
         Some(Arc::new(plan_key)),
         pods::exec::IDLE,
         settings,
+        Arc::new(resolve::System),
+        sign_in,
     )
 }
 
@@ -307,6 +305,7 @@ pub fn router_with_resolver(
         pods::exec::IDLE,
         Settings::default(),
         resolver,
+        Arc::new(account::Fixed(None)),
     )
 }
 
@@ -324,6 +323,7 @@ fn build(
         terminal_idle,
         settings,
         Arc::new(resolve::System),
+        Arc::new(account::Fixed(None)),
     )
 }
 
@@ -334,6 +334,7 @@ fn build_with(
     terminal_idle: std::time::Duration,
     settings: Settings,
     resolver: Arc<dyn resolve::Resolve>,
+    sign_in: Arc<dyn account::SignInPage>,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let state = AppState {
@@ -345,6 +346,7 @@ fn build_with(
         settings: Arc::new(settings),
         resolver,
         tools: Arc::new(tools::Sessions::default()),
+        sign_in,
     };
     let (router, api) = routes().split_for_parts();
     let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());

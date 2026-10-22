@@ -1,4 +1,4 @@
-//! Members and your account, kept in Zeabur Identity's custom resources.
+//! Members, kept in Zeabur Identity's custom resources.
 
 #[cfg(test)]
 mod tests {
@@ -310,7 +310,13 @@ mod tests {
     #[tokio::test]
     async fn your_last_passkey_is_refused_and_another_is_removed() {
         let cluster = signed_in("zeabur:ada");
-        let (status, body) = call(&cluster, "DELETE", "/api/v1/account/passkeys/ada-1", None).await;
+        let (status, body) = call(
+            &cluster,
+            "DELETE",
+            "/api/v1/members/ada/credentials/ada-1",
+            None,
+        )
+        .await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
         assert_eq!(body["summary"]["key"], "account.lastPasskey");
         assert_eq!(body["fixKey"]["key"], "account.lastPasskey.fix");
@@ -324,68 +330,14 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
         assert_eq!(writes(&cluster), ["delete Credential/bob-1"]);
-        let bob = signed_in("zeabur:bob");
-        let (status, body) = call(&bob, "DELETE", "/api/v1/account/passkeys/bob-2", None).await;
-        assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
-        let (status, _) = call(&bob, "DELETE", "/api/v1/account/passkeys/ada-1", None).await;
-        assert_eq!(status, StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
-    async fn your_account_has_your_passkeys_and_renaming_one_keeps_its_name_in_an_annotation() {
-        let cluster = signed_in("zeabur:bob");
-        let (status, body) = call(&cluster, "GET", "/api/v1/account", None).await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        assert_eq!(body["status"], "identity");
-        assert_eq!(body["member"]["username"], "bob");
-        let (status, body) = call(
-            &cluster,
-            "PATCH",
-            "/api/v1/account/passkeys/bob-1",
-            Some(&json!({"label": " Phone "})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
-        let (_, body) = call(&cluster, "GET", "/api/v1/account", None).await;
-        assert_eq!(body["member"]["passkeys"][0]["label"], "Phone");
         let (status, _) = call(
             &cluster,
-            "PATCH",
-            "/api/v1/account/passkeys/bob-1",
-            Some(&json!({"label": "x".repeat(65)})),
+            "DELETE",
+            "/api/v1/members/bob/credentials/ada-1",
+            None,
         )
         .await;
-        assert_eq!(status, StatusCode::BAD_REQUEST);
-    }
-
-    #[tokio::test]
-    async fn an_account_outside_zeabur_identity_says_so() {
-        let cluster = signed_in("kubernetes-admin");
-        let (status, body) = call(&cluster, "GET", "/api/v1/account", None).await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        assert_eq!(body["status"], "kubernetes");
-        assert_eq!(body["kubernetesUsername"], "kubernetes-admin");
-        let cluster = cluster_missing();
-        let (_, body) = call(&cluster, "GET", "/api/v1/account", None).await;
-        assert_eq!(body["status"], "missing");
-    }
-
-    fn cluster_missing() -> MemoryCluster {
-        signed_in("zeabur:nobody")
-    }
-
-    #[tokio::test]
-    async fn your_own_link_lasts_an_hour() {
-        let cluster = signed_in("zeabur:ada");
-        let (status, body) = call(&cluster, "POST", "/api/v1/account/setup-links", None).await;
-        assert_eq!(status, StatusCode::CREATED, "{body}");
-        assert_eq!(body["username"], "ada");
-        assert!(
-            body["url"]
-                .as_str()
-                .unwrap()
-                .starts_with("https://id.example.com/setup#token=inv-")
-        );
+        assert_eq!(status, StatusCode::NOT_FOUND);
     }
 
     #[tokio::test]

@@ -31,6 +31,8 @@ pub struct AppState {
     pub resolver: Arc<dyn crate::resolve::Resolve>,
     /// The open terminals of tools pods (see [`crate::tools`]).
     pub tools: Arc<crate::tools::Sessions>,
+    /// Where the issuer lets people manage how they sign in (see [`crate::account`]).
+    pub sign_in: Arc<dyn crate::account::SignInPage>,
 }
 
 impl std::fmt::Debug for AppState {

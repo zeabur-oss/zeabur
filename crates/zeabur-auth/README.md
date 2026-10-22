@@ -11,6 +11,9 @@ own page's requests from other sites'.
   already ships (hyper, rustls with aws-lc-rs); there is no OpenID Connect or JOSE library, and
   no ID token is verified: who the person is comes from kube-apiserver (`SelfSubjectReview` with
   the access token), which validated the token itself.
+- **Where people manage how they sign in** ([`passkey`]): the `manage` URL of the issuer's
+  `/.well-known/passkey-endpoints` (W3C Passkey Endpoints), read with a short deadline and kept
+  for a while. Zeabur holds no credentials of its own.
 - **The sign-in in progress** ([`flow`]): `state`, the PKCE verifier and where to go afterwards,
   sealed into a short-lived cookie, so nothing is stored for a visitor who has not signed in.
 - **Sessions** ([`session`]): an opaque random identifier in a cookie; the tokens stay in this

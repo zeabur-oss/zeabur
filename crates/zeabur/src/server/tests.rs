@@ -130,6 +130,7 @@ impl Rig {
                 &auth,
                 PlanKey::from_bytes([3; 32]),
                 zeabur_api::Settings::default(),
+                Arc::new(zeabur_api::account::Fixed(None)),
             ),
             now,
         }

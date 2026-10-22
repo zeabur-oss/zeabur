@@ -184,6 +184,7 @@ why. Add a row before introducing a new concept.
 | policy | 政策 | 策略 | |
 | permission, rights | 權限 | 权限 | |
 | admin rights | 管理員權限 | 管理员权限 | |
+| Admin / Developer / Viewer (a role in a project) | 管理員／開發者／檢視者 | 管理员／开发者／查看者 | |
 | session | 工作階段 | 会话 | |
 | credential | 認證資訊 | 凭证 | zh-TW 憑證 is a certificate |
 | certificate | 憑證 | 证书 | |

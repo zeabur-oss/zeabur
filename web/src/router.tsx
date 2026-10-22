@@ -66,8 +66,8 @@ import {
 //                                              Settings' parts as #anchors; a former ?tab=status…
 //                                              redirects to its place
 //   /settings                                  preferences, the signed-in person, About
-//   /account                                   your account: passkeys, linked accounts, a link
-//                                              that adds a passkey
+//   /account                                   your account: who you are, your role in each
+//                                              project, a link to manage how you sign in
 //   /members                                   everyone Zeabur Identity signs in: invite, setup
 //                                              links, reset, remove
 //   /settings/components                       moved: redirects to /cluster/components

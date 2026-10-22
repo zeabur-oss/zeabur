@@ -1,7 +1,6 @@
 import { useMutation } from "@tanstack/react-query"
 import { useId, useState } from "react"
 import { toast } from "sonner"
-import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 
 import { createSetupLink, inviteMember, refreshMembers, type SetupLink } from "@/api/members"
 import { AccessFields, type Chosen } from "@/components/members/access"
@@ -86,7 +85,7 @@ export function ConfirmDialog({
 }
 
 /** A link just made: shown once, since only its hash is kept. */
-function LinkShown({ link, lead, open }: { link: SetupLink; lead: string; open?: boolean }) {
+function LinkShown({ link, lead }: { link: SetupLink; lead: string }) {
   const t = useT()
   const { locale } = useI18n()
   return (
@@ -96,18 +95,6 @@ function LinkShown({ link, lead, open }: { link: SetupLink; lead: string; open?:
       <p className="text-muted-foreground">
         {t("link.expires", formatTime(link.expiresAt, locale))} {t("link.once")}
       </p>
-      {open ? (
-        <a
-          href={link.url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex w-fit items-center gap-1.5 font-medium text-brand hover:underline"
-        >
-          {t("link.open")}
-          <ArrowSquareOutIcon aria-hidden="true" className="size-3.5" />
-          <span className="sr-only">{t("common.newTab")}</span>
-        </a>
-      ) : null}
     </>
   )
 }
@@ -118,20 +105,6 @@ function DoneButton({ onClose }: { onClose: () => void }) {
     <Button size="sm" onClick={onClose}>
       {t("link.done")}
     </Button>
-  )
-}
-
-/** Your own link, opened in a new tab where the setup page asks the browser for a passkey. */
-export function OwnLinkDialog({ link, onClose }: { link: SetupLink; onClose: () => void }) {
-  const t = useT()
-  return (
-    <Frame
-      title={t("account.addPasskey")}
-      onClose={onClose}
-      footer={<DoneButton onClose={onClose} />}
-    >
-      <LinkShown link={link} lead={t("link.own")} open />
-    </Frame>
   )
 }
 
