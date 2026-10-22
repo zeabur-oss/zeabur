@@ -1862,6 +1862,11 @@ export interface components {
     }
     /** @description A database's backups. */
     DatabaseBackups: {
+      /**
+       * @description A backup can start now: the database runs with its store. False between setting up
+       *     backups and the operator restarting the members with them.
+       */
+      ready: boolean
       /** @description Its backups, newest first. */
       runs: components["schemas"]["BackupRun"][]
       /** @description The schedules that back it up. */

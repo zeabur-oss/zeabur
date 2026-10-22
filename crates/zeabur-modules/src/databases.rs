@@ -109,6 +109,9 @@ pub struct Backups {
     pub schedules: Vec<Schedule>,
     /// Its backups, newest first.
     pub runs: Vec<Run>,
+    /// A backup can start now: the database runs with its store. False between setting up
+    /// backups and the operator restarting the members with them.
+    pub ready: bool,
 }
 
 /// One database cluster.

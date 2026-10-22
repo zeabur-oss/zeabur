@@ -3430,7 +3430,13 @@ components:
       required:
       - schedules
       - runs
+      - ready
       properties:
+        ready:
+          type: boolean
+          description: |-
+            A backup can start now: the database runs with its store. False between setting up
+            backups and the operator restarting the members with them.
         runs:
           type: array
           items:

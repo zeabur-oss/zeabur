@@ -182,10 +182,25 @@ fn backups_of(
         })
         .collect();
     newest(&mut runs, 20);
+    // The operator has seen this spec, restarted the members with the backup agents and given
+    // them the storage: `PBMReady` is "PBMConfigurationIsUpToDate".
+    let seen = cluster.metadata.generation.is_some()
+        && databases::int(cluster, "/status/observedGeneration") == cluster.metadata.generation;
+    let pbm = cluster
+        .data
+        .pointer("/status/conditions")
+        .and_then(Value::as_array)
+        .is_some_and(|all| {
+            all.iter()
+                .any(|c| c["type"] == "PBMReady" && c["status"] == "True")
+        });
+    let ready =
+        enabled && seen && pbm && text(cluster, "/status/state").as_deref() == Some("ready");
     Backups {
         store,
         schedules,
         runs,
+        ready,
     }
 }
 
@@ -267,7 +282,7 @@ mod tests {
     fn a_single_member_replica_set_with_backups_to_s3() {
         let cluster = object(serde_json::json!({
             "apiVersion": "psmdb.percona.com/v1", "kind": "PerconaServerMongoDB",
-            "metadata": {"name": "mongo", "namespace": "shop"},
+            "metadata": {"name": "mongo", "namespace": "shop", "generation": 2},
             "spec": {
                 "image": "percona/percona-server-mongodb:8.0.32-14",
                 "unsafeFlags": {"replsetSize": true},
@@ -283,7 +298,8 @@ mod tests {
                                "retention": {"type": "count", "count": 7, "deleteFromStorage": true}}]
                 }
             },
-            "status": {"state": "ready", "mongoVersion": "8.0.32-14",
+            "status": {"state": "ready", "mongoVersion": "8.0.32-14", "observedGeneration": 2,
+                       "conditions": [{"type": "PBMReady", "status": "True"}],
                        "replsets": {"rs0": {"ready": 1, "size": 1, "status": "ready"}}}
         }));
         let backup = object(serde_json::json!({
@@ -302,10 +318,16 @@ mod tests {
         assert_eq!(store.destination.as_deref(), Some("s3://b/shop"));
         assert_eq!(store.retention.as_deref(), Some("7"));
         assert!(store.in_use);
+        assert!(db.backups.ready);
         assert_eq!(db.backups.schedules[0].cron, "0 3 * * *");
         assert!(!db.backups.schedules[0].paused);
         assert_eq!(db.backups.runs[0].outcome, Outcome::Failed);
         assert_eq!(db.backups.runs[0].message.as_deref(), Some("access denied"));
+
+        // Backups just set up: the operator has not seen the spec yet.
+        let mut changed = cluster;
+        changed.metadata.generation = Some(3);
+        assert!(!database("shop", &changed, &[]).backups.ready);
     }
 
     #[test]
@@ -321,5 +343,6 @@ mod tests {
         assert_eq!(db.state, State::Progressing);
         assert!(db.backups.schedules[0].paused);
         assert!(db.backups.store.is_none());
+        assert!(!db.backups.ready);
     }
 }

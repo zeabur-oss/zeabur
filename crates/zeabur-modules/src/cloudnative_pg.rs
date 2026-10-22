@@ -144,6 +144,33 @@ fn plugin_store(cluster: &DynamicObject) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// When the condition `kind` last turned true, if it is true.
+fn true_since(cluster: &DynamicObject, kind: &str) -> Option<String> {
+    cluster
+        .data
+        .pointer("/status/conditions")?
+        .as_array()?
+        .iter()
+        .find(|c| c["type"] == kind && c["status"] == "True")
+        .and_then(|c| c["lastTransitionTime"].as_str())
+        .map(str::to_owned)
+}
+
+/// A backup can start: the instances run with the plugin's sidecar. `ContinuousArchiving` is
+/// true even without an archiver, so the cluster must also have become ready again after the
+/// store was made (the operator restarts the instances to add the sidecar), or have finished a
+/// backup since. Times are the API's second-precision RFC 3339, which sort as text.
+fn backups_ready(cluster: &DynamicObject, store_created: Option<&str>, runs: &[Run]) -> bool {
+    let Some(created) = store_created else {
+        return true_since(cluster, "ContinuousArchiving").is_some();
+    };
+    true_since(cluster, "ContinuousArchiving").is_some()
+        && (true_since(cluster, "Ready").is_some_and(|t| t.as_str() > created)
+            || runs
+                .iter()
+                .any(|r| r.outcome == Outcome::Succeeded && r.time().is_some_and(|t| t > created)))
+}
+
 fn store(object: &DynamicObject, in_use: bool) -> Store {
     Store {
         name: object.metadata.name.clone().unwrap_or_default(),
@@ -220,6 +247,11 @@ pub fn database(
     let scheduled: Vec<DynamicObject> = scheduled.iter().filter(mine).cloned().collect();
     let backups: Vec<DynamicObject> = backups.iter().filter(mine).cloned().collect();
     let found = findings_limited(namespace, &scheduled, &backups, 20);
+    let state = state(phase.as_deref(), members, ready);
+    let store_created = plugin_store(cluster)
+        .and_then(|wanted| named(&wanted))
+        .and_then(|s| s.metadata.creation_timestamp.as_ref())
+        .map(|t| t.0.to_string());
     Database {
         origin: zeabur_model::Origin::complete(
             "postgresql.cnpg.io/v1",
@@ -232,7 +264,7 @@ pub fn database(
         api_version: "postgresql.cnpg.io/v1".to_owned(),
         kind: "Cluster".to_owned(),
         resource: "clusters".to_owned(),
-        state: state(phase.as_deref(), members, ready),
+        state,
         message: text(cluster, "/status/phaseReason"),
         phase,
         members,
@@ -254,6 +286,9 @@ pub fn database(
             options: None,
         },
         backups: Backups {
+            ready: state == State::Ready
+                && store.as_ref().is_some_and(|s| s.in_use)
+                && backups_ready(cluster, store_created.as_deref(), &found.runs),
             store,
             schedules: found.schedules,
             runs: found.runs,
@@ -373,12 +408,17 @@ mod tests {
             "status": {
                 "phase": "Cluster in healthy state", "readyInstances": 2, "currentPrimary": "pg-1",
                 "image": "ghcr.io/cloudnative-pg/postgresql:18-standard-trixie",
-                "instanceNames": ["pg-1", "pg-2"]
+                "instanceNames": ["pg-1", "pg-2"],
+                "conditions": [
+                    {"type": "ContinuousArchiving", "status": "True", "lastTransitionTime": "2026-10-22T16:02:32Z"},
+                    {"type": "Ready", "status": "True", "lastTransitionTime": "2026-10-22T16:02:41Z"}
+                ]
             },
         }));
         let store = object(serde_json::json!({
             "apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore",
-            "metadata": {"name": "pg-backups", "namespace": "shop"},
+            "metadata": {"name": "pg-backups", "namespace": "shop",
+                         "creationTimestamp": "2026-10-22T16:02:24Z"},
             "spec": {"retentionPolicy": "30d", "configuration": {
                 "destinationPath": "s3://bucket/shop", "endpointURL": "http://s3:8333",
                 "s3Credentials": {"secretAccessKey": {"name": "pg-backups-s3", "key": "secret"}}}}
@@ -409,6 +449,30 @@ mod tests {
         assert_eq!(store.secret.as_deref(), Some("pg-backups-s3"));
         assert_eq!(db.backups.runs.len(), 1);
         assert_eq!(db.backups.runs[0].outcome, Outcome::Running);
+        assert!(db.backups.ready);
+
+        // Before the operator restarts the instances, archiving reads true without an archiver.
+        let mut before = pg;
+        before.data["status"]["conditions"][1]["lastTransitionTime"] =
+            serde_json::json!("2026-10-22T16:02:02Z");
+        let store = object(serde_json::json!({
+            "apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore",
+            "metadata": {"name": "pg-backups", "namespace": "shop",
+                         "creationTimestamp": "2026-10-22T16:02:24Z"}
+        }));
+        let db = database("shop", &before, std::slice::from_ref(&store), &[], &[]);
+        assert!(!db.backups.ready);
+        let done = object(serde_json::json!({
+            "apiVersion": "postgresql.cnpg.io/v1", "kind": "Backup",
+            "metadata": {"name": "pg-2", "namespace": "shop"},
+            "spec": {"cluster": {"name": "pg"}},
+            "status": {"phase": "completed", "stoppedAt": "2026-10-22T17:00:00Z"}
+        }));
+        assert!(
+            database("shop", &before, &[store], &[], &[done])
+                .backups
+                .ready
+        );
     }
 
     #[test]
@@ -443,6 +507,7 @@ mod tests {
         }));
         let db = database("shop", &pg, &[store], &[], &[]);
         assert_eq!(db.state, State::Unknown);
+        assert!(!db.backups.ready);
         assert!(!db.backups.store.unwrap().in_use);
     }
 }
