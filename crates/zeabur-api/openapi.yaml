@@ -5520,6 +5520,7 @@ components:
       - inputs
       - manifests
       - noHelmController
+      - installed
     HistorySource:
       type: object
       description: The store a history came from.

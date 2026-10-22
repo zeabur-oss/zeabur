@@ -1470,6 +1470,7 @@ export const zhCN: Messages = {
   "install.here.manifests":
     "这个组件不由 Zeabur 直接安装：其中有一部分是普通 manifest，不是 chart。",
   "install.here.noHelmController": "这个集群没有 Helm 控制器，所以 Zeabur 不直接安装组件。",
+  "install.here.installed": "已经安装：它的 HelmChart 对象在 kube-system 中，要调整请直接改那里。",
   "reach.title": "连接规则",
   "reach.addPolicy": "添加规则",
   "reach.isolate": "隔离这个服务",

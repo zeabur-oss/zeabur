@@ -1615,6 +1615,8 @@ export const en = {
     "Zeabur doesn't install this one itself: part of it is plain manifests, not a chart.",
   "install.here.noHelmController":
     "This cluster has no Helm controller, so Zeabur doesn't install components itself.",
+  "install.here.installed":
+    "Already installed: its HelmChart objects are in kube-system. To change it, edit them there.",
   "reach.title": "Connection rules",
   "reach.addPolicy": "Add rule",
   "reach.isolate": "Isolate this service",

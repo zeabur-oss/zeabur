@@ -463,4 +463,38 @@ stringData:
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(objects.len()));
     }
+
+    /// Once one of its `HelmChart`s exists, the answer says so instead of offering a plan whose
+    /// create can only be refused.
+    #[tokio::test]
+    async fn a_component_whose_helm_charts_exist_is_not_offered_again() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.served.push(ServedResource {
+                verbs: ["create", "get", "list"].map(str::to_owned).to_vec(),
+                ..ServedResource::readable("helm.cattle.io", "v1", "helmcharts", "HelmChart", true)
+            });
+            s.namespaces.push(
+                serde_json::from_value(json!({"metadata": {"name": "kube-system"}})).unwrap(),
+            );
+        });
+        let app = app(&cluster);
+        let path = "/api/v1/cluster/components/databases/cloudnative-pg/install";
+        let (_, guide) = send(&app, "GET", path, None).await;
+        let object: Value =
+            serde_saphyr::from_str(guide["here"]["objects"][0].as_str().unwrap()).unwrap();
+        cluster.update(|s| {
+            s.dynamic.push(
+                serde_json::from_value(json!({
+                    "apiVersion": "helm.cattle.io/v1", "kind": "HelmChart",
+                    "metadata": {"name": object["metadata"]["name"], "namespace": "kube-system"}
+                }))
+                .unwrap(),
+            );
+        });
+        let (status, guide) = send(&app, "GET", path, None).await;
+        assert_eq!(status, StatusCode::OK, "{guide}");
+        assert_eq!(guide["here"]["blocked"], "installed");
+        assert_eq!(guide["here"]["objects"], json!([]));
+    }
 }

@@ -84,6 +84,9 @@ pub struct InstallHere {
     /// Why Zeabur cannot install it itself; the texts still work.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub blocked: Option<HereBlocked>,
+    /// The objects' names, in the same order.
+    #[serde(skip)]
+    pub names: Vec<String>,
 }
 
 /// Why a component is not installed by Zeabur itself.
@@ -98,6 +101,8 @@ pub enum HereBlocked {
     Manifests,
     /// The cluster has no Helm controller (`helmcharts.helm.cattle.io`): it is not k3s.
     NoHelmController,
+    /// Its `HelmChart` objects already exist in `kube-system`.
+    Installed,
 }
 
 /// What a component's RBAC and network access amount to, from the catalogue.
@@ -762,17 +767,24 @@ impl<'a> Rendered<'a> {
         } else {
             None
         };
-        let objects = if blocked.is_some() {
-            Vec::new()
+        let (names, objects) = if blocked.is_some() {
+            (Vec::new(), Vec::new())
         } else {
             self.file
                 .releases
                 .iter()
                 .zip(&self.merged)
-                .filter_map(|(release, merged)| Self::helm_chart_object(release, merged))
-                .collect()
+                .filter_map(|(release, merged)| {
+                    Self::helm_chart_object(release, merged)
+                        .map(|object| (release.release_name().to_owned(), object))
+                })
+                .unzip()
         };
-        InstallHere { objects, blocked }
+        InstallHere {
+            objects,
+            blocked,
+            names,
+        }
     }
 
     /// Flux sources and `HelmRelease`s.

@@ -1474,6 +1474,7 @@ export const zhTW: Messages = {
   "install.here.manifests":
     "這個元件不由 Zeabur 直接安裝：其中有一部分是一般 manifest，不是 chart。",
   "install.here.noHelmController": "這個叢集沒有 Helm 控制器，所以 Zeabur 不直接安裝元件。",
+  "install.here.installed": "已經安裝：它的 HelmChart 物件在 kube-system 裡，要調整請直接改那裡。",
   "reach.title": "連線規則",
   "reach.addPolicy": "新增規則",
   "reach.isolate": "隔離這個服務",

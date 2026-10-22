@@ -2869,7 +2869,7 @@ export interface components {
      * @description Why a component is not installed by Zeabur itself.
      * @enum {string}
      */
-    HereBlocked: "k3sPackaged" | "inputs" | "manifests" | "noHelmController"
+    HereBlocked: "k3sPackaged" | "inputs" | "manifests" | "noHelmController" | "installed"
     /** @description The store a history came from. */
     HistorySource: {
       /** @description Its Service port, `namespace/name:port`. */

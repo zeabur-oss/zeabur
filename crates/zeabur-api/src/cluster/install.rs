@@ -18,7 +18,7 @@ use zeabur_catalog::install::{
 };
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Node;
-use zeabur_kube::{Cluster, ClusterExt as _};
+use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
 
 use crate::error::ApiError;
 use crate::handlers::Person;
@@ -74,12 +74,37 @@ pub(crate) async fn guide_for(
         guide.here = InstallHere {
             objects: Vec::new(),
             blocked: Some(HereBlocked::NoHelmController),
+            names: Vec::new(),
+        };
+    } else if guide.here.blocked.is_none() && any_exists(cluster.as_ref(), &guide.here.names).await
+    {
+        guide.here = InstallHere {
+            objects: Vec::new(),
+            blocked: Some(HereBlocked::Installed),
+            names: Vec::new(),
         };
     }
     Ok(Json(InstallAnswer {
         guide,
         default_profile: default_profile.to_owned(),
     }))
+}
+
+/// Whether any `HelmChart` of `names` exists in `kube-system`; false when it cannot be read, so
+/// the plan says why.
+async fn any_exists(cluster: &dyn Cluster, names: &[String]) -> bool {
+    let resource = ResourceRef::new("helm.cattle.io", "v1", "helmcharts", "HelmChart");
+    for name in names {
+        if matches!(
+            cluster
+                .find_object(&resource, Some("kube-system"), name)
+                .await,
+            Ok(Some(_))
+        ) {
+            return true;
+        }
+    }
+    false
 }
 
 /// Whether the cluster serves k3s's `HelmChart`; true when discovery fails, so the plan says why.
