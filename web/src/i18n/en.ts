@@ -622,8 +622,8 @@ export const en = {
   "builds.rebuild": "Build again",
   "builds.managedDeploy": (tool: string) =>
     `${tool} sets this service's image and would set it back. Change it at ${tool}'s source.`,
-  "builds.autoUpdate": "Deploy new images automatically",
-  "builds.autoUpdateHint": "Keel deploys each new image as soon as it is built.",
+  "builds.autoUpdate": "Auto-deploy new builds",
+  "builds.autoUpdateHint": "Each new build goes live as soon as it finishes.",
   "builds.autoUpdatePolicy": (policy: string) =>
     `Keel updates this service with its ${policy} policy, set outside Zeabur.`,
   "builds.keelMissing": "Deploying automatically needs Keel, which this cluster does not have.",
@@ -1307,7 +1307,7 @@ export const en = {
   "confirm.rebuild": (build: string) =>
     `Zeabur Builder builds ${build} again from the newest commit of its branch.`,
   "confirm.autoUpdateOn": (service: string) =>
-    `Keel will deploy each new image of ${service} as soon as it is built.`,
+    `Each new build of ${service} will go live as soon as it finishes.`,
   "confirm.autoUpdateOff": (service: string) =>
     `New images of ${service} will wait for you to deploy them.`,
   "confirm.renameDomain": (from: string) => `Links to ${from} stop working.`,

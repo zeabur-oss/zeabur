@@ -563,8 +563,8 @@ export const zhTW: Messages = {
   "builds.rebuild": "重新建置",
   "builds.managedDeploy": (tool) =>
     `${tool} 管理這個服務的映像檔，會改回去。要在 ${tool} 的來源修改。`,
-  "builds.autoUpdate": "自動部署新映像檔",
-  "builds.autoUpdateHint": "每個新映像檔建置完成後，Keel 會立刻部署。",
+  "builds.autoUpdate": "新建置完成後自動部署",
+  "builds.autoUpdateHint": "每次建置完成就立刻上線。",
   "builds.autoUpdatePolicy": (policy) =>
     `Keel 依 ${policy} 規則更新這個服務，這個設定不是在 Zeabur 設的。`,
   "builds.keelMissing": "自動部署需要 Keel，這個叢集還沒有安裝。",
@@ -1182,7 +1182,7 @@ export const zhTW: Messages = {
   "confirm.addDomain": (host, service) => `${host} 會連到 ${service}。`,
   "confirm.image": (service, tag) => `${service} 會改為執行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 會用分支最新的提交重新建置 ${build}。`,
-  "confirm.autoUpdateOn": (service) => `${service} 的新映像檔建置完成後，Keel 會立刻部署。`,
+  "confirm.autoUpdateOn": (service) => `${service} 每次建置完成就會立刻上線。`,
   "confirm.autoUpdateOff": (service) => `${service} 的新映像檔會等你手動部署。`,
   "confirm.renameDomain": (from) => `連到 ${from} 的連結會失效。`,
   "confirm.removeDomain": (host) => `送到 ${host} 的請求不會再到達這個專案。`,
