@@ -117,6 +117,12 @@ spec:
             - name: ZEABUR_ACCOUNT_URL
               value: {{ . | quote }}
             {{- end }}
+            {{- if .Values.proxy.enabled }}
+            - name: ZEABUR_PROXY_URL
+              value: "https://{{ include "zeabur.proxyName" . }}.{{ .Release.Namespace }}.svc"
+            - name: ZEABUR_PROXY_CA_FILE
+              value: /etc/zeabur/proxy-ca/ca.crt
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080
@@ -152,6 +158,11 @@ spec:
             {{- if $issuer.caBundle.configMap }}
             - name: issuer-ca
               mountPath: /etc/zeabur/issuer-ca
+              readOnly: true
+            {{- end }}
+            {{- if .Values.proxy.enabled }}
+            - name: proxy-ca
+              mountPath: /etc/zeabur/proxy-ca
               readOnly: true
             {{- end }}
       volumes:
@@ -195,6 +206,16 @@ spec:
             items:
               - key: {{ $issuer.caBundle.key }}
                 path: {{ $issuer.caBundle.key }}
+        {{- end }}
+        {{- if .Values.proxy.enabled }}
+        # Only the CA of Zeabur Proxy's certificate, not its key.
+        - name: proxy-ca
+          secret:
+            secretName: {{ include "zeabur.proxyTlsSecret" . }}
+            defaultMode: 0440
+            items:
+              - key: ca.crt
+                path: ca.crt
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

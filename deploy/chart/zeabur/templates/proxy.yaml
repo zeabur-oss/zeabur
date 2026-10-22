@@ -1,0 +1,247 @@
+{{- if .Values.proxy.enabled }}
+{{- $proxy := .Values.proxy }}
+{{- $name := include "zeabur.proxyName" . }}
+{{- if not $proxy.tls.existingSecret }}
+{{- $secret := include "zeabur.proxyTlsSecret" . }}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $secret }}
+{{- $data := dict }}
+{{- if and $existing (index ($existing.data | default dict) "tls.key") }}
+{{- $data = $existing.data }}
+{{- else }}
+{{- /* A CA of the release's own, and a certificate for the proxy's Service names. `lookup` sees
+       nothing under `helm template` or a client-side dry run, so those print new ones each time;
+       a real upgrade keeps them. */}}
+{{- $service := printf "%s.%s.svc" $name .Release.Namespace }}
+{{- $ca := genCA (printf "%s CA" $name) 3650 }}
+{{- $cert := genSignedCert $service nil (list $name (printf "%s.%s" $name .Release.Namespace) $service (printf "%s.cluster.local" $service)) 3650 $ca }}
+{{- $data = dict "ca.crt" ($ca.Cert | b64enc) "tls.crt" ($cert.Cert | b64enc) "tls.key" ($cert.Key | b64enc) }}
+{{- end }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secret }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.proxyLabels" . | nindent 4 }}
+type: kubernetes.io/tls
+data:
+  ca.crt: {{ index $data "ca.crt" }}
+  tls.crt: {{ index $data "tls.crt" }}
+  tls.key: {{ index $data "tls.key" }}
+---
+{{- end }}
+# The proxy's identity, which no Role or ClusterRole is bound to: it asks kube-apiserver with the
+# token of the person who sent the query.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.proxyLabels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.proxyLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "zeabur.proxySelectorLabels" . | nindent 4 }}
+  ports:
+    - name: https
+      port: 443
+      targetPort: https
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.proxyLabels" . | nindent 4 }}
+spec:
+  replicas: {{ $proxy.replicas }}
+  selector:
+    matchLabels:
+      {{- include "zeabur.proxySelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "zeabur.proxyLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: proxy
+          {{- if $proxy.image.digest }}
+          image: "{{ $proxy.image.repository }}@{{ $proxy.image.digest }}"
+          {{- else }}
+          image: "{{ $proxy.image.repository }}:{{ $proxy.image.tag | default .Chart.AppVersion }}"
+          {{- end }}
+          imagePullPolicy: {{ $proxy.image.pullPolicy }}
+          env:
+            - name: ZEABUR_PROXY_LISTEN
+              value: "[::]:8443"
+            - name: ZEABUR_PROXY_TLS_CERT
+              value: /etc/zeabur-proxy/tls/tls.crt
+            - name: ZEABUR_PROXY_TLS_KEY
+              value: /etc/zeabur-proxy/tls/tls.key
+            - name: ZEABUR_PROXY_LOGS_URL
+              value: {{ $proxy.logs.url | quote }}
+            - name: ZEABUR_PROXY_LOGS_MAX_LIMIT
+              value: {{ $proxy.logs.maxLimit | int | quote }}
+            - name: ZEABUR_PROXY_LOGS_MAX_HOURS
+              value: {{ $proxy.logs.maxHours | int | quote }}
+          ports:
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: https
+              scheme: HTTPS
+            periodSeconds: 5
+          resources:
+            {{- toYaml $proxy.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: kube-api
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            - name: tls
+              mountPath: /etc/zeabur-proxy/tls
+              readOnly: true
+      volumes:
+        # kube-apiserver's address and CA without a token, as for Zeabur (deployment.yaml).
+        - name: kube-api
+          projected:
+            defaultMode: 0444
+            sources:
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace
+        - name: tls
+          secret:
+            secretName: {{ include "zeabur.proxyTlsSecret" . }}
+            defaultMode: 0440
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+# Only Zeabur reaches the proxy, and the proxy reaches only DNS, kube-apiserver and the logs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.proxyLabels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "zeabur.proxySelectorLabels" . | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "zeabur.selectorLabels" . | nindent 14 }}
+      ports:
+        - port: https
+          protocol: TCP
+  egress:
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $proxy.logs.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $proxy.logs.podLabels | nindent 14 }}
+      ports:
+        - port: {{ $proxy.logs.port }}
+          protocol: TCP
+    {{- /* NetworkPolicies match kube-apiserver's own addresses and port, after the Service
+           `kubernetes` is translated, so the rule names its endpoints. */}}
+    {{- $apiServer := $proxy.apiServer }}
+    {{- $ports := list }}
+    {{- if not $apiServer }}
+    {{- $slice := lookup "discovery.k8s.io/v1" "EndpointSlice" "default" "kubernetes" }}
+    {{- if $slice }}
+    {{- range $slice.endpoints }}
+    {{- range .addresses }}
+    {{- $apiServer = append $apiServer (ternary (printf "%s/128" .) (printf "%s/32" .) (contains ":" .)) }}
+    {{- end }}
+    {{- end }}
+    {{- range $slice.ports }}
+    {{- $ports = append $ports .port }}
+    {{- end }}
+    {{- end }}
+    {{- end }}
+    {{- if not $ports }}
+    {{- $ports = list 443 6443 }}
+    {{- end }}
+    - ports:
+        {{- range $ports }}
+        - port: {{ . }}
+          protocol: TCP
+        {{- end }}
+      {{- with $apiServer }}
+      to:
+        {{- range . }}
+        - ipBlock:
+            cidr: {{ . }}
+        {{- end }}
+      {{- end }}
+{{- end }}

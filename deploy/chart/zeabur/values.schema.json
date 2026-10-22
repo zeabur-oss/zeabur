@@ -153,6 +153,61 @@
         }
       }
     },
+    "proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository"],
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "tag": { "type": "string" },
+            "digest": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64})?$" },
+            "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+          }
+        },
+        "logs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["url", "namespace", "podLabels", "port"],
+          "properties": {
+            "url": {
+              "description": "VictoriaLogs' HTTP API: http://host[:port], no path.",
+              "type": "string",
+              "pattern": "^http://[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:[0-9]{1,5})?$"
+            },
+            "namespace": { "$ref": "#/definitions/name" },
+            "podLabels": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": { "type": "string" }
+            },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "maxLimit": { "type": "integer", "minimum": 1, "maximum": 100000 },
+            "maxHours": { "type": "integer", "minimum": 1, "maximum": 8784 }
+          }
+        },
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": { "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }] }
+          }
+        },
+        "apiServer": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F.:]+/[0-9]{1,3}$"
+          }
+        },
+        "replicas": { "type": "integer", "minimum": 1 },
+        "resources": { "type": "object" }
+      }
+    },
     "service": {
       "type": "object",
       "additionalProperties": false,

@@ -37,3 +37,25 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
 {{- join "," $pairs -}}
 {{- end -}}
+
+{{/* Zeabur Proxy's objects. Its pods carry `app.kubernetes.io/name: zeabur-proxy`, which Zeabur
+     Catalog's NetworkPolicy for VictoriaLogs admits from the namespace `zeabur`. */}}
+{{- define "zeabur.proxyName" -}}
+{{- printf "%s-proxy" (include "zeabur.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "zeabur.proxySelectorLabels" -}}
+app.kubernetes.io/name: zeabur-proxy
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+{{- define "zeabur.proxyLabels" -}}
+{{ include "zeabur.proxySelectorLabels" . }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
+{{- end -}}
+
+{{- define "zeabur.proxyTlsSecret" -}}
+{{- .Values.proxy.tls.existingSecret | default (printf "%s-tls" (include "zeabur.proxyName" .)) -}}
+{{- end -}}

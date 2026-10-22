@@ -35,6 +35,15 @@ ingress:
   className: traefik
   tls:
     secretName: zeabur-tls
+proxy:
+  enabled: true
+  image:
+    repository: registry.example.test/proxy
+    tag: v0.0.0-test
+  tls:
+    existingSecret: zeabur-proxy-cert
+  apiServer:
+    - 192.0.2.10/32
 httpRoute:
   enabled: true
   parentRefs:

@@ -2,7 +2,13 @@
 # The roles Zeabur gives members: zeabur-member to each one cluster-wide, a project role in each
 # project they are given. Zeabur binds them as the admin who invites or edits the member; the
 # chart binds nothing. Rules: files/member-roles.yaml.
+#
+# A project role aggregates the ClusterRoles labelled `zeabur.com/aggregate-to-<role>`: its own
+# rules (`<role>-rules`) and those of components installed next to it, such as Zeabur Proxy's
+# zeabur-proxy-logs-reader. kube-controller-manager writes the aggregate's rules
+# (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
 {{- range $name, $rules := .Files.Get "files/member-roles.yaml" | fromYaml }}
+{{- if eq $name "zeabur-member" }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -12,5 +18,49 @@ metadata:
     {{- include "zeabur.labels" $ | nindent 4 }}
 rules:
   {{- toYaml $rules | nindent 2 }}
+{{- else }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "zeabur.labels" $ | nindent 4 }}
+aggregationRule:
+  clusterRoleSelectors:
+    - matchLabels:
+        zeabur.com/aggregate-to-{{ $name }}: "true"
+rules: []
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $name }}-rules
+  labels:
+    {{- include "zeabur.labels" $ | nindent 4 }}
+    zeabur.com/aggregate-to-{{ $name }}: "true"
+rules:
+  {{- toYaml $rules | nindent 2 }}
 {{- end }}
+{{- end }}
+{{- end }}
+{{- if or .Values.memberRoles.enabled .Values.proxy.enabled }}
+---
+# Reading a project's log history through Zeabur Proxy, which asks kube-apiserver whether the
+# person may `get` this resource in the namespace. Every project role has it, and so does
+# Kubernetes' view (and through it edit and admin), which already reads the same pods' logs
+# (`pods/log`).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zeabur-proxy-logs-reader
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+    zeabur.com/aggregate-to-zeabur-project-viewer: "true"
+    zeabur.com/aggregate-to-zeabur-project-developer: "true"
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups: [proxy.zeabur.com]
+    resources: [logs]
+    verbs: [get]
 {{- end }}
