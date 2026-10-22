@@ -163,6 +163,7 @@ mod tests {
             replica_sets: &replica_sets,
             reclaim_policies: &reclaim_policies,
             namespace: None,
+            reloader: params.get("reloader").and_then(Value::as_bool),
         };
         match plan(input, &request) {
             Ok(plan) => to_value(plan).unwrap(),

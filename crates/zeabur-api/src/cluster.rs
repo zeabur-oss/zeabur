@@ -14,6 +14,7 @@
 //! | `GET /cluster/health` | `/readyz?verbose`; the scheduler's and controller manager's leases when allowed | nothing: every signed-in person (`system:public-info-viewer`); `get leases.coordination.k8s.io` in `kube-system` adds the leases |
 //! | `GET /cluster/events` | `events.k8s.io` events, all namespaces (`scope=cluster` keeps those about the cluster) | `list events.events.k8s.io` |
 //! | `GET /cluster/alerts` | Falco's `ClusterPolicyReport`s (`zeabur_modules::falco`) | `list clusterpolicyreports.wgpolicyk8s.io`; refused or not installed is a state, not an error |
+//! | `GET /cluster/config-reload` | Deployments' metadata, all namespaces; Reloader's Deployment | nothing: `unknown` when refused (see [`config_reload`]) |
 //! | `GET /cluster/capabilities` | CRDs, APIServices, classes, `HelmChart`s, Helm release Secrets' labels, workloads | all of them: in practice a cluster administrator |
 //!
 //! The page shows the cluster itself, not its projects: Home lists those from `GET /projects`
@@ -48,6 +49,7 @@
 //! one (see `zeabur_kube`'s cluster-wide reads).
 
 pub(crate) mod capacity;
+pub mod config_reload;
 pub(crate) mod disks;
 pub(crate) mod health;
 pub mod install;

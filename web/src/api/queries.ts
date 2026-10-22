@@ -225,6 +225,13 @@ export const capabilitiesQuery = queryOptions({
   retryOnMount: false,
 })
 
+export const configReloadQuery = queryOptions({
+  queryKey: ["cluster", "config-reload"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/config-reload", { signal })),
+  staleTime: 60_000,
+  retryOnMount: false,
+})
+
 export const projectGapsQuery = (project: string) =>
   queryOptions({
     queryKey: ["project", project, "gaps"],

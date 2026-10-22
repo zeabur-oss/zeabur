@@ -942,6 +942,8 @@ export const zhCN: Messages = {
   "plan.filter": "筛选变更",
   "plan.noMatch": "没有匹配的变更。",
   "plan.showAll": (n) => `显示全部 ${n} 个`,
+  "plan.alsoRestart": () => "一并重启",
+  "plan.restartByItself": "下次自动重启",
   "plan.other": "其他字段",
   "plan.field.size": "大小",
   "plan.col.field": "字段",
@@ -1003,7 +1005,8 @@ export const zhCN: Messages = {
   "warn.toolsCredentialExposed": (namespace: string) =>
     `在这个终端的容器运行期间，能在 ${namespace} 的容器里执行命令的人，都能使用你的凭证。`,
   "warn.restartNeeded": (names: string) => `重启后才会生效：${names}`,
-  "warn.restartAdded": (names: string) => `也会重启 ${names}`,
+  "warn.reloaderRestarts": (names: string) => `Reloader 会重启 ${names}`,
+  "warn.reloaderMayRestart": (names: string) => `如果这个集群运行着 Reloader，会重启 ${names}`,
   "warn.tlsHostChanged": (host: string, route: string) =>
     `${route} 的 HTTPS 配置仍是旧域名；${host} 需要新的证书`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
@@ -1057,6 +1060,12 @@ export const zhCN: Messages = {
       .join("，")}。${removed ? "删除的值无法在这里恢复。" : ""}`,
   "confirm.keepsOld": (names) => `${names} 在重启前仍使用旧值。`,
   "confirm.readersKeepOld": (names, object) => `${names} 读取 ${object}，在重启前仍使用旧值。`,
+  "confirm.reloaderRestarts": (names) => `随后 Reloader 会用新的值重启 ${names}。`,
+  "confirm.reloaderMayRestart": (names) =>
+    `${names} 已设置由 Reloader 重启；Zeabur 无法确认这个集群是否运行着 Reloader。`,
+  "confirm.configReloadOn": (name) =>
+    `${name} 读取的 ConfigMap 或 Secret 变更时会自动重启。现在不会重启。`,
+  "confirm.configReloadOff": (name) => `${name} 的 ConfigMap 或 Secret 变更时，不再自动重启。`,
   "confirm.alsoReads": (names, object) => `也会影响 ${names}（读取 ${object}）。`,
   "confirm.alsoAffects": (names) => `也会影响 ${names}。`,
   "confirm.addDomain": (host, service) => `${host} 会指向 ${service}。`,
@@ -1097,7 +1106,8 @@ export const zhCN: Messages = {
   "action.restart": "重启",
   "action.saveVariables": "保存环境变量",
   "action.saveValues": "保存值",
-  "action.saveAndRestart": "保存并重启",
+  "action.turnOn": "开启",
+  "action.turnOff": "关闭",
   "action.addDomain": "添加域名",
   "action.renameDomain": "更改域名",
   "action.removeDomain": "移除域名",
@@ -1135,6 +1145,7 @@ export const zhCN: Messages = {
   "title.env": (service: string) => `${service} 的环境变量`,
   "title.data": (kind: string, name: string) => `${kind} ${name}`,
   "title.restart": (service: string) => `重启 ${service}`,
+  "title.configReload": (service: string) => `配置变更时重启 ${service}`,
   "title.addDomain": (host: string) => `添加 ${host}`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `移除 ${host}`,
@@ -1252,8 +1263,19 @@ export const zhCN: Messages = {
   "vars.container": "容器",
   "data.addKey": "添加键",
   "data.key": "键",
-  "data.restartAfter": "应用后重启读取它的服务",
   "data.readers": "读取者",
+  "reload.switch": "配置变更时自动重启",
+  "reload.on": "它读取的 ConfigMap 或 Secret 一有变更就会重启，不论是谁改的。",
+  "reload.off": "重启前会继续使用旧的值。",
+  "reload.notInstalled":
+    "这个集群没有安装 Reloader，所以还不会重启。请集群管理员安装 Stakater Reloader。",
+  "reload.stopped": "Reloader 已安装但没有运行，恢复运行前不会重启。",
+  "reload.how": "工作方式",
+  "reload.mechanism":
+    "由集群里的 Stakater Reloader 重启。这个设置是工作负载上的 reloader.stakater.com/auto 注解，本身不会重启任何东西。",
+  "reload.named": (names) => `它的注解也指定了 ${names}，不论这里是否开启，这些变更都会让它重启。`,
+  "reload.unknown": "以你的权限，Zeabur 看不到这个集群是否运行着 Reloader。",
+  "reload.running": "这个集群运行着 Reloader。",
   "data.reveal": "显示值",
   "data.binary": "二进制",
   "data.noChanges": "没有变更。",
@@ -1985,6 +2007,7 @@ export const zhCN: Messages = {
   "preview.removal": (path, name) => `会从 ${name} 移除 ${path}，当前是`,
   "preview.leftOut": "（你编辑时没有保留）",
   "env.pendingRestart": "重新启动前可能仍在使用旧的值",
+  "env.restartByItself": "自动重启",
   "env.pendingRestartDetail": (pod) => `这个值在 ${pod} 启动后才变更。重新启动服务才会使用新的值。`,
   // ia:end
   // files:start

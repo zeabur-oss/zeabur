@@ -287,7 +287,6 @@ fn releases(workload: &WorkloadRef, releases: &[Release]) -> Vec<TimelineEntry> 
                         workload: workload.clone(),
                         revision: before.revision,
                     }],
-                    restart_after: false,
                 });
             let mut message = Message::new("timeline.release")
                 .with("revision", release.revision.to_string())
@@ -664,7 +663,6 @@ mod tests {
                     workload: web,
                     revision: 1
                 }],
-                restart_after: false,
             })
         );
         assert_eq!(entries[1].revert, None);

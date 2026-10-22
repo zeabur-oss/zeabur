@@ -148,6 +148,10 @@ pub struct Service {
     /// are a convention, so this is a hint for how to show the service, not a fact about it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_store: Option<DataStore>,
+    /// Which of its ConfigMaps and Secrets Stakater Reloader restarts it for, from its
+    /// annotations; absent when they ask for none. Whether Reloader runs is the cluster's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_reload: Option<crate::ConfigReload>,
     /// What is going wrong with it, in plain words, sorted by kind then container. The
     /// projection leaves this empty: diagnoses need the namespace's events and the time of the
     /// read, so the API fills it in when it serves the project document.

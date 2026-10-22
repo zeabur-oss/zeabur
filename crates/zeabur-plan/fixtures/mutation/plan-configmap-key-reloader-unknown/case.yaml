@@ -1,0 +1,3 @@
+description: "When whether Reloader runs could not be read, the followers are still said to be restarted by Reloader, unconfirmed."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "data", "kind": "ConfigMap", "name": "settings", "changes": [{"op": "set", "key": "MODE", "value": "maintenance"}]}]}}

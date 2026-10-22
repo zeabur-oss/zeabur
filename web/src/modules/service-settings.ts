@@ -3,8 +3,8 @@ import type { ComponentType } from "react"
 
 import type { PlanAsk } from "@/components/plan/planner"
 import type { Service } from "@/model/service"
+import { reloaderSection } from "@/modules/reloader"
 
-/** @public No module is compiled in yet. */
 export interface ServiceSettingsProps {
   project: string
   service: Service
@@ -20,4 +20,4 @@ export interface ServiceSettingsSection {
   Section: ComponentType<ServiceSettingsProps>
 }
 
-export const serviceSettingsSections: readonly ServiceSettingsSection[] = []
+export const serviceSettingsSections: readonly ServiceSettingsSection[] = [reloaderSection]

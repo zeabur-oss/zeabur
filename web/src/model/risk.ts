@@ -109,6 +109,7 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "renameDomain":
     case "probe":
     case "resources":
+    case "configReload":
     case "unadopt":
     case "debugContainer":
     case "clusterTools":
@@ -228,6 +229,7 @@ export function destinationOf(
       return tab(change.workload, "variables")
     case "scale":
     case "resources":
+    case "configReload":
       return tab(change.workload, "settings#compute")
     case "probe":
       return tab(change.workload, "settings#health-checks")

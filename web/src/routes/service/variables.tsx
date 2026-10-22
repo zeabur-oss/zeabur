@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import { lazy, Suspense, useRef, useState, type ClipboardEvent, type ReactNode } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import ArrowRightIcon from "~icons/ph/arrow-right"
@@ -193,6 +194,12 @@ export function VariablesTab({
     ...fromObjects.flatMap(({ env }) => (env.pendingRestart ? [env.pendingRestart] : [])),
     ...imported.flatMap(({ imported: i }) => (i.pendingRestart ? [i.pendingRestart] : [])),
   ]
+  const navigate = useNavigate()
+  const reloads =
+    !service.configReload?.auto &&
+    (service.kind === "Deployment" ||
+      service.kind === "StatefulSet" ||
+      service.kind === "DaemonSet")
   const restart = () =>
     planner.plan({
       title: t("title.restart", service.name),
@@ -482,6 +489,19 @@ export function VariablesTab({
                   {t("title.restart", service.name)}
                 </Button>
               </ManagedTip>
+              {reloads ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    void navigate({
+                      href: `/projects/${encodeURIComponent(project)}/services/${service.kind}/${encodeURIComponent(service.name)}?tab=settings#compute`,
+                    })
+                  }
+                >
+                  {t("env.restartByItself")}
+                </Button>
+              ) : null}
             </span>
           </AlertDescription>
         </Alert>

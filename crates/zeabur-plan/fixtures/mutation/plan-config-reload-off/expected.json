@@ -1,0 +1,25 @@
+{
+  "objects": [
+    {
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/generation",
+            "value": 3
+          },
+          {
+            "op": "test",
+            "path": "/metadata/annotations/reloader.stakater.com~1auto",
+            "value": "true"
+          },
+          {
+            "op": "remove",
+            "path": "/metadata/annotations/reloader.stakater.com~1auto"
+          }
+        ]
+      }
+    }
+  ]
+}

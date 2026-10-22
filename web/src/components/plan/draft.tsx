@@ -33,7 +33,6 @@ export function covers(scope: Scope, change: Schemas["Change"]): boolean {
 
 export interface Draft {
   changes: Schemas["Change"][]
-  restartAfter: boolean
   count: number
   parts: DraftPart[]
   /** Changes when the draft is applied or discarded, so forms start again from the cluster. */
@@ -60,7 +59,6 @@ export const useDraft = () => useContext(DraftContext)
 
 export function useDraftState(): Draft {
   const [changes, setChanges] = useState<Schemas["Change"][]>([])
-  const [restartAfter, setRestartAfter] = useState(false)
   const [generation, setGeneration] = useState(0)
   const [holds, setHolds] = useState<Record<string, Held>>({})
   const hold = useCallback(
@@ -82,21 +80,18 @@ export function useDraftState(): Draft {
   const reset = () => {
     setHolds({})
     setChanges([])
-    setRestartAfter(false)
     setGeneration((g) => g + 1)
   }
   const all = withHeld()
   const parts = [...new Set(all.map(partOf).filter((p): p is DraftPart => p !== undefined))]
   return {
     changes,
-    restartAfter,
     count: editCount(all),
     parts,
     generation,
     stage: (ask) => {
       if (!draftable(ask.changes)) return false
       setChanges((staged) => mergeChanges(staged, ask.changes))
-      if (ask.restartAfter) setRestartAfter(true)
       return true
     },
     unstage: (dropped) => setChanges((staged) => dropChanges(staged, dropped)),

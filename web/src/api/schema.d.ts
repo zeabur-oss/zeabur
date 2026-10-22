@@ -106,6 +106,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/config-reload": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Whether Stakater Reloader runs in the cluster, so a workload's Reloader annotation takes
+     *     effect. Always answers: `unknown` when the person may not list Deployments in every
+     *     namespace.
+     */
+    get: operations["getConfigReload"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/events": {
     parameters: {
       query?: never
@@ -1556,6 +1577,14 @@ export interface components {
           workload: components["schemas"]["WorkloadRef"]
         }
       | {
+          /** @description On or off. */
+          enabled: boolean
+          /** @enum {string} */
+          op: "configReload"
+          /** @description The workload: a Deployment, StatefulSet or DaemonSet. */
+          workload: components["schemas"]["WorkloadRef"]
+        }
+      | {
           /** @enum {string} */
           op: "scale"
           /**
@@ -1774,6 +1803,40 @@ export interface components {
       id: string
       /** @description The ConfigMap. */
       origin: components["schemas"]["Origin"]
+    }
+    /**
+     * @description What a workload's Reloader annotations ask for [reloader]: its pods are replaced when one of
+     *     these ConfigMaps or Secrets changes, whoever changed it, while Reloader runs in the cluster.
+     *
+     *     Reloader also reads `reloader.stakater.com/search` with `reloader.stakater.com/match` on the
+     *     ConfigMap or Secret, and `reloader.stakater.com/ignore`; those live on the data objects and
+     *     are not part of this.
+     *
+     *     [reloader]: https://github.com/stakater/Reloader#how-to-use-reloader
+     */
+    ConfigReload: {
+      /** @description `configmap.reloader.stakater.com/auto: "true"`: every ConfigMap it reads. */
+      allConfigMaps: boolean
+      /** @description `secret.reloader.stakater.com/auto: "true"`: every Secret it reads. */
+      allSecrets: boolean
+      /**
+       * @description `reloader.stakater.com/auto: "true"`: every ConfigMap and Secret it reads. This is what
+       *     Zeabur's setting writes.
+       */
+      auto: boolean
+      /** @description ConfigMaps named in `configmap.reloader.stakater.com/reload`. */
+      configMaps: string[]
+      /** @description Secrets named in `secret.reloader.stakater.com/reload`. */
+      secrets: string[]
+    }
+    /** @description Whether the cluster restarts workloads when their configuration changes. */
+    ConfigReloadView: {
+      /** @description Its Deployments, when found. */
+      deployments: components["schemas"]["Origin"][]
+      /** @description `cluster/config-reload`. */
+      id: string
+      /** @description Whether Reloader runs. */
+      reloader: components["schemas"]["ReloaderState"]
     }
     /**
      * @description One service appearing to call another.
@@ -3358,11 +3421,6 @@ export interface components {
     PlanRequest: {
       /** @description The changes, applied in order. */
       changes: components["schemas"]["Change"][]
-      /**
-       * @description Also restart the workloads that read a changed ConfigMap or Secret into environment
-       *     variables, which a running container only reads when it starts.
-       */
-      restartAfter?: boolean
     }
     /** @description A plan and the token that applies it. */
     PlanResponse: components["schemas"]["Plan"] & {
@@ -3397,7 +3455,12 @@ export interface components {
         }
       | {
           /** @enum {string} */
-          code: "restartAdded"
+          code: "reloaderRestarts"
+          /**
+           * @description Whether Reloader was seen running in the cluster; `false` when that could not be
+           *     read with the person's rights.
+           */
+          confirmed: boolean
           /** @description The workloads. */
           workloads: components["schemas"]["WorkloadRef"][]
         }
@@ -4131,6 +4194,11 @@ export interface components {
        */
       revision: number
     }
+    /**
+     * @description Whether Reloader runs.
+     * @enum {string}
+     */
+    ReloaderState: "running" | "stopped" | "notInstalled" | "unknown"
     /** @description A field the plan removes. */
     Removal: {
       /** @description Its value now (redacted for a Secret). */
@@ -4446,6 +4514,7 @@ export interface components {
         }
     /** @description A workload and what it uses: what people think of as "a service". */
     Service: components["schemas"]["WorkloadSummary"] & {
+      configReload?: components["schemas"]["ConfigReload"] | null
       /** @description Its init and regular containers, in that order. */
       containers: components["schemas"]["Container"][]
       dataStore?: components["schemas"]["DataStore"] | null
@@ -5179,6 +5248,33 @@ export interface operations {
         }
       }
       404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getConfigReload: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ConfigReloadView"]
+        }
+      }
+      401: {
         headers: {
           [name: string]: unknown
         }

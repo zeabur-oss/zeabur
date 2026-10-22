@@ -25,7 +25,6 @@ import {
 } from "@zeabur/design-system/components/dialog"
 import { Input } from "@zeabur/design-system/components/input"
 import { Spinner } from "@zeabur/design-system/components/spinner"
-import { Switch } from "@zeabur/design-system/components/switch"
 import { Textarea } from "@zeabur/design-system/components/textarea"
 import { useT } from "@/i18n"
 import { useScrollOnce } from "@/lib/in-view"
@@ -38,10 +37,9 @@ type Edit = { op: "set"; value: string } | { op: "remove" }
 interface Draft {
   edits: Record<string, Edit>
   added: { key: string; value: string }[]
-  restartAfter: boolean
 }
 
-const blank: Draft = { edits: {}, added: [], restartAfter: false }
+const blank: Draft = { edits: {}, added: [] }
 
 function changesOf({ edits, added }: Draft): Schemas["DataEdit"][] {
   return [
@@ -104,7 +102,6 @@ export function DataEditor({
       const staged = planner.plan({
         title: t("title.data", kind, name),
         changes: [{ op: "data", kind, name, changes: changesOf(value) }],
-        restartAfter: value.restartAfter,
         service,
       })
       if (staged) onClose()
@@ -350,18 +347,6 @@ export function DataEditor({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 border-t px-5 py-3">
-          <form.Field name="restartAfter">
-            {(f) => (
-              <label className="flex items-center gap-2 text-sm">
-                <Switch
-                  checked={f.state.value}
-                  onCheckedChange={f.handleChange}
-                  disabled={Boolean(managed)}
-                />
-                {t("data.restartAfter")}
-              </label>
-            )}
-          </form.Field>
           <form.Subscribe selector={(s) => changesOf(s.values).length}>
             {(count) => (
               <span className="ml-auto flex items-center gap-2">

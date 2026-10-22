@@ -130,6 +130,10 @@ function sentenceOf(
     }
     case "probe":
       return probeSentence(t, change.probe, change.set ?? undefined)
+    case "configReload":
+      return change.enabled
+        ? t("confirm.configReloadOn", change.workload.name)
+        : t("confirm.configReloadOff", change.workload.name)
     case "scale": {
       if (change.replicas === 0) return t("confirm.scaleZero", change.workload.name)
       const from = podsOf(change.workload)?.desired
@@ -265,11 +269,12 @@ export interface Description {
   facts?: Fact[]
   edits?: EditGroup[]
   outcomes?: OutcomeGroup[]
+  /** The lines already say which fields go: a removal is what was asked. */
+  removalsSaid?: boolean
 }
 
 export interface Asked {
   changes: readonly Change[]
-  restartAfter?: boolean
   service?: WorkloadRef
 }
 
@@ -330,6 +335,19 @@ export function describe(
             : t("confirm.keepsOld", names, waiting.length),
       ),
     )
+  const reloader = plan.warnings.find((w) => w.code === "reloaderRestarts")
+  const reloaded = reloader?.code === "reloaderRestarts" ? reloader.workloads : []
+  said.push(...reloaded)
+  if (reloader?.code === "reloaderRestarts")
+    lines.push(
+      named(
+        reloaded.map((w) => w.name),
+        (names) =>
+          reloader.confirmed
+            ? t("confirm.reloaderRestarts", names, reloaded.length)
+            : t("confirm.reloaderMayRestart", names, reloaded.length),
+      ),
+    )
   // A deleted workload gets its own sentence, not an "also affects" one.
   const deleted = ask.changes.flatMap((c) => (c.op === "delete" ? [c.name] : []))
   const others = plan.impact.filter(
@@ -337,9 +355,11 @@ export function describe(
       !(ask.service && same(w, ask.service)) &&
       !deleted.includes(w.name) &&
       !replaced(plan).some((r) => same(r, w)) &&
-      !waiting.some((r) => same(r, w)),
+      !waiting.some((r) => same(r, w)) &&
+      !reloaded.some((r) => same(r, w)),
   )
-  if (others.length > 0 && !ask.changes.some((c) => c.op === "restart" || c.op === "scale"))
+  const acting = new Set(["restart", "scale", "configReload"])
+  if (others.length > 0 && !ask.changes.some((c) => acting.has(c.op)))
     lines.push(
       named(
         others.map((w) => w.name),
@@ -354,7 +374,7 @@ export function describe(
     risk: ask.changes.length > 1 ? riskOf(t, reasons, ask, podsOf, named) : undefined,
     lines,
     more,
-    action: actionOf(t, ask, plan),
+    action: actionOf(t, ask),
     said,
     cost: costOf(t, ask, plan, podsOf, mountsOf),
     facts: outcomes
@@ -364,6 +384,7 @@ export function describe(
         : undefined,
     edits,
     outcomes,
+    removalsSaid: ask.changes.every((c) => c.op === "configReload") || undefined,
   }
 }
 
@@ -552,7 +573,7 @@ export function undoTitle(t: Translate, undo: readonly Change[], asked: readonly
 
 const storageOps = new Set<Change["op"]>(["addVolume", "expandVolume", "editMount", "removeVolume"])
 
-export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
+export function actionOf(t: Translate, ask: Asked): string {
   const ops = new Set(ask.changes.map((c) => c.op))
   const [change] = ask.changes
   if (!change) return t("plan.apply")
@@ -568,9 +589,9 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
     case "env":
       return t("action.saveVariables")
     case "data":
-      return ask.restartAfter && plan && hasWarning(plan, "restartAdded")
-        ? t("action.saveAndRestart")
-        : t("action.saveValues")
+      return t("action.saveValues")
+    case "configReload":
+      return change.enabled ? t("action.turnOn") : t("action.turnOff")
     case "addDomain":
       return t("action.addDomain")
     case "renameDomain":

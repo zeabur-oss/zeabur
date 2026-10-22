@@ -454,7 +454,6 @@ function ServiceView({
                 reviewer.plan({
                   title: t("draft.title", service.name),
                   changes: draft.withHeld(),
-                  restartAfter: draft.restartAfter || undefined,
                   service: { kind: service.kind, name: service.name },
                 })
               }

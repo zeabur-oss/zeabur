@@ -138,6 +138,16 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         set: Option<ProbeRequest>,
     },
+    /// Have Stakater Reloader replace a workload's pods when a ConfigMap or Secret it reads
+    /// changes, or stop it: the workload's `reloader.stakater.com/auto` annotation (see the
+    /// `reload` module).
+    #[serde(rename_all = "camelCase")]
+    ConfigReload {
+        /// The workload: a Deployment, StatefulSet or DaemonSet.
+        workload: WorkloadRef,
+        /// On or off.
+        enabled: bool,
+    },
     /// Run this many pods of a Deployment or StatefulSet.
     #[serde(rename_all = "camelCase")]
     Scale {
@@ -334,10 +344,6 @@ pub enum RouteKind {
 pub struct PlanRequest {
     /// The changes, applied in order.
     pub changes: Vec<Change>,
-    /// Also restart the workloads that read a changed ConfigMap or Secret into environment
-    /// variables, which a running container only reads when it starts.
-    #[serde(default)]
-    pub restart_after: bool,
 }
 
 /// The object a planned write addresses.
@@ -488,11 +494,15 @@ pub enum Warning {
         /// The workloads.
         workloads: Vec<WorkloadRef>,
     },
-    /// These workloads are restarted by the plan, because `restartAfter` asked for it.
+    /// These workloads read a changed ConfigMap or Secret and ask Stakater Reloader to replace
+    /// their pods when it changes, so Reloader restarts them after the apply.
     #[serde(rename_all = "camelCase")]
-    RestartAdded {
+    ReloaderRestarts {
         /// The workloads.
         workloads: Vec<WorkloadRef>,
+        /// Whether Reloader was seen running in the cluster; `false` when that could not be
+        /// read with the person's rights.
+        confirmed: bool,
     },
     /// A changed hostname was also listed for HTTPS; its certificate must be issued again for
     /// the new name.

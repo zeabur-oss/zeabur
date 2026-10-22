@@ -1,0 +1,42 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "changes": [
+        {
+          "after": "true",
+          "path": "metadata.annotations.reloader.stakater.com/auto"
+        }
+      ],
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/generation",
+            "value": 3
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations",
+            "value": {
+              "reloader.stakater.com/auto": "true"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}

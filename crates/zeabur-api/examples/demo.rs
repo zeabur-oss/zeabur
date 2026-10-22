@@ -410,6 +410,10 @@ fn shop() -> NamespaceObjects {
     {
         container.env_from = Some(vec![from(json!({"configMapRef": {"name": "web-config"}}))]);
     }
+    web.metadata.annotations = Some(BTreeMap::from([(
+        zeabur_model::ConfigReload::AUTO.to_owned(),
+        "true".to_owned(),
+    )]));
     let db = stateful_set(
         "db",
         "postgres:18",
@@ -1191,6 +1195,12 @@ fn state() -> State {
             usage("vps-1", "1420m", "1730Mi"),
             usage("vps-2", "310m", "2210Mi"),
             usage("vps-3", "180m", "940Mi"),
+            from(json!({
+                "apiVersion": "apps/v1", "kind": "Deployment",
+                "metadata": {"name": "reloader", "namespace": "reloader",
+                    "labels": {"app.kubernetes.io/name": "reloader"}},
+                "status": {"replicas": 1, "readyReplicas": 1, "availableReplicas": 1}
+            })),
             from(json!({
                 "apiVersion": "upgrade.cattle.io/v1", "kind": "Plan",
                 "metadata": {"name": "server", "namespace": "system-upgrade"},

@@ -196,10 +196,7 @@ mod tests {
                 objects: &objects,
                 ..Input::new(snapshot, "2026-10-15T00:00:00Z")
             },
-            &PlanRequest {
-                changes,
-                restart_after: false,
-            },
+            &PlanRequest { changes },
         )
         .unwrap()
     }

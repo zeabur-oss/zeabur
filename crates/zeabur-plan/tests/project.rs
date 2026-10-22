@@ -43,10 +43,7 @@ mod tests {
                 namespace,
                 ..Input::new(&snapshot, "2026-10-15T00:00:00Z")
             },
-            &PlanRequest {
-                changes,
-                restart_after: false,
-            },
+            &PlanRequest { changes },
         )
     }
 
@@ -312,7 +309,6 @@ mod tests {
         let stored = shop(false);
         let request = |change| PlanRequest {
             changes: vec![change],
-            restart_after: false,
         };
         let input = Input {
             storage_classes: None,

@@ -1,0 +1,27 @@
+{
+  "warnings": [
+    {
+      "code": "reloaderRestarts",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "proxy"
+        },
+        {
+          "kind": "Deployment",
+          "name": "web"
+        }
+      ],
+      "confirmed": false
+    },
+    {
+      "code": "restartNeeded",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "worker"
+        }
+      ]
+    }
+  ]
+}

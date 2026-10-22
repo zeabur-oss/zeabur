@@ -1,0 +1,3 @@
+description: "With Reloader running, the readers whose annotations follow the changed ConfigMap are restarted by Reloader, by environment or by volume, and the plan restarts nothing itself; a reader that does not follow it still needs a restart."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "data", "kind": "ConfigMap", "name": "settings", "changes": [{"op": "set", "key": "MODE", "value": "maintenance"}]}]}, "reloader": true}

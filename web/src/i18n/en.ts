@@ -1034,6 +1034,9 @@ export const en = {
   "plan.filter": "Filter changes",
   "plan.noMatch": "No change matches.",
   "plan.showAll": (n: number) => `Show all ${n}`,
+  "plan.alsoRestart": (count: number): string =>
+    count === 1 ? "Restart it too" : "Restart them too",
+  "plan.restartByItself": "Restart automatically next time",
   "plan.other": "Other fields",
   "plan.field.size": "Size",
   "plan.col.field": "Field",
@@ -1101,7 +1104,9 @@ export const en = {
   "warn.toolsCredentialExposed": (namespace: string) =>
     `Anyone who can run commands in the containers of ${namespace} can use your credential while this terminal's container runs.`,
   "warn.restartNeeded": (names: string) => `Takes effect after a restart: ${names}`,
-  "warn.restartAdded": (names: string) => `Also restarts ${names}`,
+  "warn.reloaderRestarts": (names: string) => `Reloader restarts ${names}`,
+  "warn.reloaderMayRestart": (names: string) =>
+    `Reloader restarts ${names}, if it runs in this cluster`,
   "warn.tlsHostChanged": (host: string, route: string) =>
     `${route} lists the old host for HTTPS; ${host} needs a new certificate`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
@@ -1169,6 +1174,14 @@ export const en = {
     `${names} ${count === 1 ? "keeps" : "keep"} the old value until restarted.`,
   "confirm.readersKeepOld": (names: string, object: string, count: number) =>
     `${names} ${count === 1 ? "reads" : "read"} ${object} and ${count === 1 ? "keeps" : "keep"} the old value until restarted.`,
+  "confirm.reloaderRestarts": (names: string, count: number) =>
+    `Reloader then restarts ${names} with the new ${count === 1 ? "value" : "values"}.`,
+  "confirm.reloaderMayRestart": (names: string, count: number) =>
+    `${names} ${count === 1 ? "is" : "are"} set to restart with Reloader; Zeabur can't see whether it runs in this cluster.`,
+  "confirm.configReloadOn": (name: string) =>
+    `${name} restarts when a ConfigMap or Secret it reads changes. Nothing restarts now.`,
+  "confirm.configReloadOff": (name: string) =>
+    `${name} no longer restarts when its ConfigMaps or Secrets change.`,
   "confirm.alsoReads": (names: string, object: string, count: number) =>
     `Also affects ${names} (${count === 1 ? "it reads" : "they read"} ${object}).`,
   "confirm.alsoAffects": (names: string) => `Also affects ${names}.`,
@@ -1219,7 +1232,8 @@ export const en = {
   "action.restart": "Restart",
   "action.saveVariables": "Save variables",
   "action.saveValues": "Save values",
-  "action.saveAndRestart": "Save and restart",
+  "action.turnOn": "Turn on",
+  "action.turnOff": "Turn off",
   "action.addDomain": "Add domain",
   "action.renameDomain": "Rename domain",
   "action.removeDomain": "Remove domain",
@@ -1257,6 +1271,7 @@ export const en = {
   "title.env": (service: string) => `Variables for ${service}`,
   "title.data": (kind: string, name: string) => `${kind} ${name}`,
   "title.restart": (service: string) => `Restart ${service}`,
+  "title.configReload": (service: string) => `Auto-restart ${service}`,
   "title.addDomain": (host: string) => `Add ${host}`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `Remove ${host}`,
@@ -1376,8 +1391,21 @@ export const en = {
   "vars.container": "Container",
   "data.addKey": "Add key",
   "data.key": "Key",
-  "data.restartAfter": "Restart readers after applying",
   "data.readers": "Read by",
+  "reload.switch": "Restart when its configuration changes",
+  "reload.on": "A change to a ConfigMap or Secret it reads restarts it, whoever makes the change.",
+  "reload.off": "It keeps the old values until it is restarted.",
+  "reload.notInstalled":
+    "Reloader isn't installed in this cluster, so nothing restarts yet. Ask a cluster administrator to install Stakater Reloader.",
+  "reload.stopped":
+    "Reloader is installed but not running, so nothing restarts until it runs again.",
+  "reload.how": "How it works",
+  "reload.mechanism":
+    "Stakater Reloader, running in the cluster, restarts it. This setting is the annotation reloader.stakater.com/auto on the workload; it restarts nothing by itself.",
+  "reload.named": (names: string) =>
+    `Its annotations also name ${names}, which restart it whether this is on or not.`,
+  "reload.unknown": "With your rights, Zeabur can't see whether Reloader runs in this cluster.",
+  "reload.running": "Reloader runs in this cluster.",
   "data.reveal": "Reveal values",
   "data.binary": "Binary",
   "data.noChanges": "No changes.",
@@ -2178,6 +2206,7 @@ export const en = {
   "preview.removal": (path: string, name: string) => `Removes ${path} from ${name}, now`,
   "preview.leftOut": "(left out of your edit)",
   "env.pendingRestart": "May still use the old value until restarted",
+  "env.restartByItself": "Restart automatically",
   "env.pendingRestartDetail": (pod: string) =>
     `Changed after ${pod} started. Restart the service to use the new value.`,
   // ia:end

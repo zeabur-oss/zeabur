@@ -367,7 +367,6 @@ pub(crate) async fn rollout(
                 workload: me.clone(),
                 revision: before.revision,
             }],
-            restart_after: false,
         });
     let message = match (status, reason) {
         (RolloutStatus::Stuck, Some(reason)) => {

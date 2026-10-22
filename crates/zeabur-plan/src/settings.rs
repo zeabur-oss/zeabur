@@ -813,7 +813,6 @@ impl<'a> Planner<'a> {
         resource: &ResourceRef,
         name: &str,
         yaml: &str,
-        restart_after: bool,
     ) -> Result<(), PlanError> {
         let edited: Value = serde_saphyr::from_str(yaml).map_err(|e| {
             error(
@@ -924,7 +923,7 @@ impl<'a> Planner<'a> {
             self.patch(index, operation.operations)?;
         }
         if let Some((data_kind, edits)) = key_edits {
-            self.data(data_kind, name, &edits, restart_after)?;
+            self.data(data_kind, name, &edits)?;
         }
         if let Some(workload) = WorkloadKind::parse(&kind) {
             self.impact.insert(WorkloadRef {

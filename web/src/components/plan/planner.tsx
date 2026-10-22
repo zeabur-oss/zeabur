@@ -14,8 +14,6 @@ const PlanDialog = lazy(() =>
 export interface PlanAsk {
   title: string
   changes: Schemas["Change"][]
-  /** Also restart the services that read a changed ConfigMap or Secret into variables. */
-  restartAfter?: boolean
   /** When the changes do not name it (a ConfigMap, a route, a policy). */
   service?: Schemas["WorkloadRef"]
   /** Services the changes leave out because another tool manages them. */

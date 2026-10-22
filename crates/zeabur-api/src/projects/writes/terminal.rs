@@ -80,6 +80,7 @@ pub(crate) async fn compute(
         | Change::RemoveVolume { .. }
         | Change::Probe { .. }
         | Change::Scale { .. }
+        | Change::ConfigReload { .. }
         | Change::Resources { .. }
         | Change::Edit { .. }
         | Change::Create { .. }

@@ -11,6 +11,7 @@ pub mod id;
 mod network;
 mod project;
 mod provenance;
+mod reload;
 mod source;
 mod trace;
 mod workload;
@@ -39,6 +40,7 @@ pub use project::{
     ResourceKind, Service,
 };
 pub use provenance::{Provenance, Tool};
+pub use reload::ConfigReload;
 pub use source::{ObjectRef, Origin, Source, SourceKind};
 pub use trace::{AddressKind, Hop, HopStatus, HopStep, RouteTrace};
 pub use workload::{

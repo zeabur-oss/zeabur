@@ -4,6 +4,10 @@ metadata:
   name: web
   namespace: demo
   resourceVersion: "41"
+  generation: 3
+  annotations:
+    reloader.stakater.com/auto: "true"
+    team: a
 spec:
   selector:
     matchLabels: {app: web}
@@ -14,16 +18,3 @@ spec:
       containers:
         - name: app
           image: example/web:1.0
-          env:
-            - name: MODE
-              valueFrom:
-                configMapKeyRef: {name: settings, key: MODE}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: settings
-  namespace: demo
-  resourceVersion: "7"
-data:
-  MODE: production

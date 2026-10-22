@@ -70,7 +70,7 @@ export function PlanDialog({
       unwrap(
         await api.POST("/api/v1/projects/{project}/plan", {
           params: { path: { project } },
-          body: { changes: ask.changes, restartAfter: ask.restartAfter },
+          body: { changes: ask.changes },
           signal,
         }),
       ),
@@ -156,6 +156,18 @@ export function PlanDialog({
               skipped={ask.skipped}
               description={description}
               alerted={!grouped && !description.risk && weight.risk === "high"}
+            />
+          ) : null}
+          {plan.data && !plan.isFetching ? (
+            <Readers
+              project={project}
+              ask={ask}
+              plan={plan.data}
+              reopen={reopen}
+              go={(href) => {
+                onClose()
+                void navigate({ href })
+              }}
             />
           ) : null}
           {named !== undefined && plan.data ? (
@@ -300,10 +312,56 @@ function Line({ said, className }: { said: Said; className?: string }) {
   )
 }
 
+/** The services a data change leaves on old values: restart them in the same plan, or, for one,
+ * open its setting that restarts it on the next change. */
+function Readers({
+  project,
+  ask,
+  plan,
+  reopen,
+  go,
+}: {
+  project: string
+  ask: PlanAsk
+  plan: Schemas["PlanResponse"]
+  reopen: (ask: PlanAsk) => void
+  go: (href: string) => void
+}) {
+  const t = useT()
+  const waiting = plan.warnings.flatMap((w) => (w.code === "restartNeeded" ? w.workloads : []))
+  const [one] = waiting
+  if (!one || ask.changes.some((c) => c.op === "restart")) return null
+  const restarts = waiting.map((workload): Schemas["Change"] => ({ op: "restart", workload }))
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => reopen({ ...ask, changes: [...ask.changes, ...restarts] })}
+      >
+        {t("plan.alsoRestart", waiting.length)}
+      </Button>
+      {waiting.length === 1 ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() =>
+            go(
+              `/projects/${encodeURIComponent(project)}/services/${one.kind}/${encodeURIComponent(one.name)}?tab=settings#compute`,
+            )
+          }
+        >
+          {t("plan.restartByItself")}
+        </Button>
+      ) : null}
+    </div>
+  )
+}
+
 /** Warnings the plain sentences already say. */
 const sentenced = new Set<Schemas["PlanWarning"]["code"]>([
   "restartNeeded",
-  "restartAdded",
+  "reloaderRestarts",
   "configNotRolledBack",
   "debugContainerStays",
   "debugContainerReused",
@@ -361,7 +419,7 @@ function PlanBody({
         )}
         said={description.said}
         rollouts={!description.outcomes}
-        removals={!description.edits}
+        removals={!description.edits && !description.removalsSaid}
       />
       {warnings.length > 0 ? (
         <ul className="flex flex-col gap-1.5" aria-label={t("plan.warnings")}>
@@ -468,7 +526,7 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
         (list) => t("warn.rightsMissing", list),
       )
     case "restartNeeded":
-    case "restartAdded":
+    case "reloaderRestarts":
     case "stillUsed": {
       const all = warning.workloads.map((w) => w.name)
       const cut = bounded(t, all).rest.length > 0
@@ -486,8 +544,10 @@ function warningSentence(
   switch (warning.code) {
     case "restartNeeded":
       return t("warn.restartNeeded", names(t, warning.workloads))
-    case "restartAdded":
-      return t("warn.restartAdded", names(t, warning.workloads))
+    case "reloaderRestarts":
+      return warning.confirmed
+        ? t("warn.reloaderRestarts", names(t, warning.workloads))
+        : t("warn.reloaderMayRestart", names(t, warning.workloads))
     case "tlsHostChanged":
       return t("warn.tlsHostChanged", warning.hostname, warning.route)
     case "gatewayChosen":
