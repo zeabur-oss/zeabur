@@ -11,54 +11,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /**
-     * Your account: who you are, your passkeys and linked accounts. Reading passkeys needs the
-     *     rights to read Zeabur Identity's credentials, which only admins have by default.
-     */
+    /** Who you are, your role in each project, and where to manage how you sign in. */
     get: operations["getAccount"]
     put?: never
     post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  "/api/v1/account/passkeys/{id}": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    /**
-     * Removes one of your passkeys or linked accounts. Your last passkey is refused: admin rights
-     *     need one, and without it you could not sign in again.
-     */
-    delete: operations["removePasskey"]
-    options?: never
-    head?: never
-    /** Renames one of your passkeys; an empty name goes back to the one given when it was added. */
-    patch: operations["renamePasskey"]
-    trace?: never
-  }
-  "/api/v1/account/setup-links": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * A one-time link that adds a passkey to your account, valid for an hour. Open it on the device
-     *     or in the password manager that should hold the passkey.
-     */
-    post: operations["createOwnSetupLink"]
     delete?: never
     options?: never
     head?: never
@@ -1093,27 +1049,20 @@ export interface components {
      * @enum {string}
      */
     AccessMode: "ReadWriteOnce" | "ReadWriteOncePod" | "ReadWriteMany" | "ReadOnlyMany"
-    /**
-     * @description Whether the person is a Zeabur Identity user Zeabur can show.
-     * @enum {string}
-     */
-    AccountStatus: "identity" | "missing" | "kubernetes" | "not-installed"
-    /** @description The person's own account. */
+    /** @description Who you are, what you may do, and where to manage how you sign in. */
     AccountView: {
-      /**
-       * @description Whether the person may create invitations (and so add a passkey), as far as their rules
-       *     tell.
-       */
-      canManage: components["schemas"]["Permission"]
+      /** @description Whether you may do anything anywhere: Admin in every project. */
+      clusterAdmin: boolean
+      /** @description Your groups, as kube-apiserver authenticated you. */
+      groups: string[]
       /** @description `account`. */
       id: string
-      /** @description Who the cluster says the person is. */
-      kubernetesUsername: string
-      member?: components["schemas"]["MemberView"] | null
-      /** @description Whether setup links can be made and redeemed. */
-      setupLinks: components["schemas"]["SetupLinks"]
-      /** @description Whether Zeabur Identity holds the account. */
-      status: components["schemas"]["AccountStatus"]
+      /** @description The issuer's page for your sign-in methods, when it names one. */
+      manageSignInUrl?: string | null
+      /** @description Your role in each adopted project, by name; absent when the projects could not be listed. */
+      projects?: components["schemas"]["ProjectAccess"][] | null
+      /** @description Your user name, as kube-apiserver authenticated you. */
+      username: string
     }
     /**
      * @description What kind of address a trace follows.
@@ -2886,11 +2835,6 @@ export interface components {
      * @enum {string}
      */
     Ownership: "owned" | "shared" | "orphan"
-    /** @description A passkey's new name. */
-    PasskeyLabel: {
-      /** @description At most 64 characters; empty or `null` goes back to the name given at enrolment. */
-      label?: string | null
-    }
     /** @description A passkey: a way to sign in that lives on a device or in a password manager. */
     PasskeyView: {
       /** @description The authenticator model (AAGUID), when it reported one. */
@@ -3470,6 +3414,14 @@ export interface components {
       /** @description One service per workload, sorted by kind then name. */
       services: components["schemas"]["Service"][]
     }
+    /** @description Your role in one adopted project. */
+    ProjectAccess: {
+      /** @description The name shown instead, when one was given. */
+      displayName?: string | null
+      /** @description The Namespace's name. */
+      name: string
+      role?: components["schemas"]["ProjectRole"] | null
+    }
     /** @description A project's backups across providers. */
     ProjectBackups: {
       /** @description One row per claim, then per database, then the namespace. */
@@ -3570,6 +3522,11 @@ export interface components {
       /** @description Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
       system: boolean
     }
+    /**
+     * @description A product role in a project, from the person's rights there.
+     * @enum {string}
+     */
+    ProjectRole: "none" | "viewer" | "developer" | "admin"
     /** @description A project in the list. */
     ProjectSummary: components["schemas"]["ProjectDetails"] & {
       /**
@@ -4639,149 +4596,6 @@ export interface operations {
         }
       }
       401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  removePasskey: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        /** @description The `Credential` object's name */
-        id: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      409: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  renamePasskey: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        /** @description The `Credential` object's name */
-        id: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["PasskeyLabel"]
-      }
-    }
-    responses: {
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      400: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  createOwnSetupLink: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/json": components["schemas"]["SetupLinkView"]
-        }
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      409: {
         headers: {
           [name: string]: unknown
         }

@@ -1568,34 +1568,45 @@ export const en = {
   "shell.members": "Members",
   "account.title": "Account",
   "account.you": "You",
-  "account.name": "Name",
   "account.username": "User name",
   "account.role": "Role",
-  "account.kubernetesUser": "Kubernetes user",
   "account.passkeys": "Passkeys",
-  "account.yourPasskeys": "your passkeys",
-  "account.addPasskey": "Add a passkey",
-  "account.adding": "Adding a passkey",
-  "account.denied":
-    "Adding a passkey needs rights you don't have here. Ask a cluster administrator.",
   "account.backup": "Add a backup passkey on your phone; one lost device must not lock you out.",
-  "account.noPasskey":
-    "You have no passkey. Add one, or you can't sign in again once this session ends.",
   "account.linked": "Linked accounts",
-  "account.kubernetes": (user: string) =>
-    `You're signed in as ${user} with a kubeconfig, not with Zeabur Identity, so there are no passkeys to manage here.`,
-  "account.missing": (user: string) => `Zeabur Identity has no account for ${user}.`,
-  "account.notInstalled":
-    "Zeabur Identity isn't installed in this cluster, so there are no passkeys to manage here.",
+  "account.yours": "your account",
+  "account.groups": "Groups",
+  "account.access": "Project access",
+  "account.clusterAdmin": "You're a cluster administrator, so you're Admin in every project.",
+  "account.unlisted": "You can't list projects here, so your role in each isn't shown.",
+  "account.noProjects": "No projects yet.",
+  "account.unread": "Couldn't read your access",
+  "account.unreadCount": (n: number) =>
+    `Your access to ${n === 1 ? "1 project" : `${n} projects`} couldn't be read. Reload to try again.`,
+  "account.roleIn": (role: string, n: number) =>
+    `${role} in ${n === 1 ? "1 project" : `${n} projects`}`,
+  "account.summary": (parts: string[]) => `You're ${new Intl.ListFormat("en").format(parts)}.`,
+  "account.noRole": (names: string[]) => `No role in ${new Intl.ListFormat("en").format(names)}.`,
+  "account.noRoleCount": (n: number, all: boolean) =>
+    all
+      ? `You have no role in ${n === 1 ? "the project" : `any of the ${n} projects`}.`
+      : `No role in ${n} other projects.`,
+  "account.filter": "Filter projects",
+  "account.noMatch": "No projects match.",
+  "account.role.admin": "Admin",
+  "account.role.developer": "Developer",
+  "account.role.viewer": "Viewer",
+  "account.means.admin": "Everything a Developer can, and gives others access.",
+  "account.means.developer":
+    "Everything a Viewer can, and changes services, opens terminals and reads secrets.",
+  "account.means.viewer": "Sees services, replicas and logs.",
+  "account.signIn": "Sign-in methods",
+  "account.signInWhere": "Your passkeys and linked accounts are managed where you sign in.",
+  "account.manageSignIn": "Manage sign-in methods",
   "passkey.unnamed": "Passkey",
-  "passkey.nameLabel": "Passkey name",
   "passkey.added": (date: string) => `Added ${date}`,
   "passkey.lastUsed": "Last used",
   "passkey.none": "No passkeys.",
-  "passkey.rename": "Rename",
-  "passkey.save": "Save",
   "passkey.remove": "Remove",
-  "passkey.renamed": "Passkey renamed",
   "passkey.removed": "Passkey removed",
   "passkey.lastKept": "Your only passkey can't be removed. Add another first.",
   "passkey.removeTitle": (name: string) => `Remove ${name}?`,
@@ -1614,12 +1625,9 @@ export const en = {
   "linked.removeOther": (member: string, provider: string) =>
     `${member} can no longer sign in with this ${provider} account.`,
   "link.copy": "Copy link",
-  "link.open": "Open the setup page",
   "link.done": "Done",
   "link.expires": (when: string) => `Works once, until ${when}.`,
   "link.once": "It isn't shown again.",
-  "link.own":
-    "The setup page opened in a new tab: finish there. To keep a backup on your phone, open this link on the phone instead.",
   "link.send": (user: string) =>
     `Send this link to ${user}. Whoever opens it first adds a passkey to ${user}'s account.`,
   "members.title": "Members",

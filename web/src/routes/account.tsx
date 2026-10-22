@@ -1,152 +1,207 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import { useState } from "react"
-import PlusIcon from "~icons/ph/plus"
-import ShieldWarningIcon from "~icons/ph/shield-warning"
+import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
+import WarningIcon from "~icons/ph/warning"
 
-import { accountQuery, createOwnSetupLink, refreshMembers, type SetupLink } from "@/api/members"
+import type { Schemas } from "@/api/client"
+import { accountQuery } from "@/api/members"
 import { Panel, Row, Rows } from "@/components/bits"
-import { LinkedList, PasskeyList } from "@/components/members/credentials"
-import { LinksUnavailable, ManageDenied, OwnLinkDialog } from "@/components/members/dialogs"
+import { FilterField } from "@/components/filter-field"
 import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
-import { linkState, memberName, needsBackup, type Member } from "@/model/members"
+import { cn } from "@/lib/utils"
+import {
+  accessCounts,
+  accessLayout,
+  accessRows,
+  filterAccess,
+  projectName,
+  roles,
+  type ProjectAccess,
+} from "@/model/account"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
+import { Badge } from "@zeabur/design-system/components/badge"
+import { buttonVariants } from "@zeabur/design-system/components/button"
+import { Empty, EmptyHeader, EmptyTitle } from "@zeabur/design-system/components/empty"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 
-type Account = NonNullable<ReturnType<typeof useAccount>["data"]>
-
-function useAccount() {
-  return useQuery(accountQuery)
-}
+type Account = Schemas["AccountView"]
 
 export function AccountPage() {
   const t = useT()
-  const account = useAccount()
+  const account = useQuery(accountQuery)
   return (
     <PageColumn width="content" gap="md" className="my-6 md:my-8">
       <PageHeader title={t("account.title")} />
       {account.isPending ? (
         <Skeleton variant="card" className="h-40" />
       ) : account.isError ? (
-        <Problem error={account.error} what={t("refused.see", t("account.yourPasskeys"))} />
-      ) : account.data.member ? (
-        <Identity account={account.data} member={account.data.member} />
+        <Problem error={account.error} what={t("refused.see", t("account.yours"))} />
       ) : (
-        <Panel title={t("account.you")}>
-          <p className="text-sm text-muted-foreground">
-            {account.data.status === "kubernetes"
-              ? t("account.kubernetes", account.data.kubernetesUsername)
-              : account.data.status === "not-installed"
-                ? t("account.notInstalled")
-                : t("account.missing", account.data.kubernetesUsername)}
-          </p>
-        </Panel>
+        <>
+          <You account={account.data} />
+          <Panel title={t("account.access")}>
+            <Access account={account.data} />
+          </Panel>
+          {account.data.manageSignInUrl ? <SignIn url={account.data.manageSignInUrl} /> : null}
+        </>
       )}
     </PageColumn>
   )
 }
 
-/** Adds a passkey: a one-time link opened in a new tab, since the passkey must be made on
- * Zeabur Identity's own address. */
-function useAddPasskey() {
-  const [link, setLink] = useState<SetupLink>()
-  const add = useMutation({
-    mutationFn: async () => {
-      // Opened while the click still counts, so a popup blocker lets it through.
-      const tab = window.open("", "_blank")
-      try {
-        const made = await createOwnSetupLink()
-        if (tab) {
-          tab.opener = null
-          tab.location.href = made.url
-        }
-        return made
-      } catch (error) {
-        tab?.close()
-        throw error
-      }
-    },
-    onSuccess: (made) => {
-      setLink(made)
-      refreshMembers()
-    },
-  })
-  return { add, link, close: () => setLink(undefined) }
+function You({ account }: { account: Account }) {
+  const t = useT()
+  return (
+    <Panel title={t("account.you")}>
+      <Rows>
+        <Row label={t("account.username")}>
+          <span className="font-mono text-xs" translate="no">
+            {account.username}
+          </span>
+        </Row>
+        {account.groups.length > 0 ? (
+          <Row label={t("account.groups")}>
+            <span className="flex flex-wrap gap-1.5">
+              {account.groups.map((group) => (
+                <span
+                  key={group}
+                  className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-xs"
+                  translate="no"
+                >
+                  {group}
+                </span>
+              ))}
+            </span>
+          </Row>
+        ) : null}
+      </Rows>
+    </Panel>
+  )
 }
 
-function Identity({ account, member }: { account: Account; member: Member }) {
+function Note({ children }: { children: string }) {
+  return <p className="text-sm text-muted-foreground">{children}</p>
+}
+
+function Access({ account }: { account: Account }) {
   const t = useT()
-  const { add, link, close } = useAddPasskey()
-  const ready = linkState(account.setupLinks) === "ready"
-  const addButton = (
-    <Button
-      size="sm"
-      variant="outline"
-      disabled={!ready}
-      loading={add.isPending}
-      onClick={() => add.mutate()}
-    >
-      <PlusIcon aria-hidden="true" data-icon="inline-start" />
-      {t("account.addPasskey")}
-    </Button>
-  )
+  const projects = account.projects
+  if (account.clusterAdmin) return <Note>{t("account.clusterAdmin")}</Note>
+  if (!projects) return <Note>{t("account.unlisted")}</Note>
+  if (projects.length === 0)
+    return (
+      <Empty size="inline">
+        <EmptyHeader>
+          <EmptyTitle>{t("account.noProjects")}</EmptyTitle>
+        </EmptyHeader>
+      </Empty>
+    )
+  const counts = accessCounts(projects)
+  const { rows, without } = accessRows(projects)
+  const held = roles.filter((role) => counts[role] > 0)
   return (
-    <>
-      <Panel title={t("account.you")}>
-        <Rows>
-          <Row label={t("account.name")}>{memberName(member)}</Row>
-          <Row label={t("account.username")}>
-            <span className="font-mono text-xs" translate="no">
-              {member.username}
-            </span>
-          </Row>
-          <Row label={t("account.role")}>
-            {member.role === "admin" ? t("members.role.admin") : t("members.role.member")}
-          </Row>
-          <Row label={t("account.kubernetesUser")}>
-            <span className="font-mono text-xs" translate="no">
-              {account.kubernetesUsername}
-            </span>
-          </Row>
-        </Rows>
-      </Panel>
+    <div className="flex flex-col gap-4">
+      {counts.unreadable > 0 ? (
+        <Alert variant="warn">
+          <WarningIcon aria-hidden="true" />
+          <AlertDescription>{t("account.unreadCount", counts.unreadable)}</AlertDescription>
+        </Alert>
+      ) : null}
+      {held.length > 0 ? (
+        <p className="text-sm">
+          {t(
+            "account.summary",
+            held.map((role) => t("account.roleIn", t(`account.role.${role}`), counts[role])),
+          )}
+        </p>
+      ) : null}
+      {rows.length > 0 ? <AccessList rows={rows} /> : null}
+      {without.count > 0 ? (
+        <Note>
+          {rows.length === 0
+            ? t("account.noRoleCount", without.count, true)
+            : without.named.length > 0
+              ? t("account.noRole", without.named)
+              : t("account.noRoleCount", without.count, false)}
+        </Note>
+      ) : null}
+      {held.length > 0 ? (
+        <dl className="flex flex-col gap-1 border-t border-main pt-3 type-meta text-muted-foreground">
+          {held.map((role) => (
+            <div key={role} className="flex flex-wrap gap-x-2">
+              <dt className="font-medium text-secondary">{t(`account.role.${role}`)}</dt>
+              <dd>{t(`account.means.${role}`)}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </div>
+  )
+}
 
-      <Panel
-        title={t("account.passkeys")}
-        action={account.canManage === "denied" ? undefined : addButton}
+function AccessList({ rows }: { rows: ProjectAccess[] }) {
+  const t = useT()
+  const [query, setQuery] = useState("")
+  const table = accessLayout(rows.length) === "table"
+  const shown = table ? filterAccess(rows, query) : rows
+  return (
+    <div className="flex flex-col gap-3">
+      {table ? <FilterField value={query} onChange={setQuery} label={t("account.filter")} /> : null}
+      <div
+        className={cn(
+          "rounded-xl border border-main text-sm",
+          table && "max-h-96 overflow-y-auto overscroll-contain",
+        )}
       >
-        <div className="flex flex-col gap-4">
-          {needsBackup(member) ? (
-            <Alert variant="warn">
-              <ShieldWarningIcon aria-hidden="true" />
-              <AlertDescription>{t("account.backup")}</AlertDescription>
-            </Alert>
-          ) : null}
-          {member.passkeys.length === 0 ? (
-            <Alert variant="warn">
-              <ShieldWarningIcon aria-hidden="true" />
-              <AlertDescription>{t("account.noPasskey")}</AlertDescription>
-            </Alert>
-          ) : null}
-          <LinksUnavailable links={account.setupLinks} />
-          <ManageDenied
-            hint={account.canManage}
-            what={t("account.adding")}
-            denied={t("account.denied")}
-          />
-          {add.isError ? <Problem error={add.error} /> : null}
-          <PasskeyList member={member} own />
-        </div>
-      </Panel>
+        {shown.length === 0 ? (
+          <p className="px-4 py-3 text-muted-foreground">{t("account.noMatch")}</p>
+        ) : (
+          <ul className="divide-y divide-main">
+            {shown.map((project) => (
+              <li key={project.name} className="flex min-w-0 items-center gap-3 px-4 py-2.5">
+                <Link
+                  to="/projects/$project"
+                  params={{ project: project.name }}
+                  className="min-w-0 flex-1 truncate font-medium hover:underline"
+                  translate="no"
+                >
+                  {projectName(project)}
+                </Link>
+                {project.role && project.role !== "none" ? (
+                  <Badge variant="secondary">{t(`account.role.${project.role}`)}</Badge>
+                ) : (
+                  <Badge variant="warn">{t("account.unread")}</Badge>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
 
-      <Panel title={t("account.linked")}>
-        <LinkedList member={member} own />
-      </Panel>
-
-      {link ? <OwnLinkDialog link={link} onClose={close} /> : null}
-    </>
+function SignIn({ url }: { url: string }) {
+  const t = useT()
+  return (
+    <Panel title={t("account.signIn")}>
+      <div className="flex flex-col items-start gap-3">
+        <Note>{t("account.signInWhere")}</Note>
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+        >
+          {t("account.manageSignIn")}
+          <ArrowSquareOutIcon aria-hidden="true" data-icon="inline-end" />
+          <span className="sr-only">{t("common.newTab")}</span>
+        </a>
+      </div>
+    </Panel>
   )
 }
