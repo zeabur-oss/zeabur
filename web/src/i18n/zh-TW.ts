@@ -1474,7 +1474,7 @@ export const zhTW: Messages = {
   "account.unread": "無法讀取你的權限",
   "account.unreadCount": (n) => `無法讀取你在 ${n} 個專案的權限。重新載入以再試一次。`,
   "account.roleIn": (role, n) => `${n} 個專案的${role}`,
-  "account.summary": (parts) => `你是${listZh("zh-TW", parts)}。`,
+  "account.summary": (parts) => `你是 ${listZh("zh-TW", parts)}。`,
   "account.noRole": (names) => `你在${listZh("zh-TW", names)}沒有角色。`,
   "account.noRoleCount": (n, all) =>
     all

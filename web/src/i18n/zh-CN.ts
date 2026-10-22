@@ -1472,7 +1472,7 @@ export const zhCN: Messages = {
   "account.unread": "无法读取你的权限",
   "account.unreadCount": (n) => `无法读取你在 ${n} 个项目的权限。重新加载以再试一次。`,
   "account.roleIn": (role, n) => `${n} 个项目的${role}`,
-  "account.summary": (parts) => `你是${listZh("zh-CN", parts)}。`,
+  "account.summary": (parts) => `你是 ${listZh("zh-CN", parts)}。`,
   "account.noRole": (names) => `你在${listZh("zh-CN", names)}没有角色。`,
   "account.noRoleCount": (n, all) =>
     all
