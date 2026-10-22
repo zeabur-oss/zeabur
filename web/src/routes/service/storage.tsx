@@ -9,7 +9,12 @@ import TrashIcon from "~icons/ph/trash"
 
 import type { Schemas } from "@/api/client"
 import { VolumeBackups } from "@/components/backups"
-import { useVolumeFills, VolumeFullNote, VolumeUse } from "@/components/volume-use"
+import {
+  useVolumeFills,
+  VolumeFullNote,
+  VolumeUse,
+  VolumeUseMissing,
+} from "@/components/volume-use"
 import { ManagedTip, Panel } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
@@ -283,6 +288,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
             ) : null}
           </div>
         )}
+        {rows ? null : <VolumeUseMissing reason={volumes.missing} />}
         {editable && !addable && mounts.length > 0 ? (
           <p className="type-meta text-secondary">{t("form.statefulVolumes")}</p>
         ) : null}

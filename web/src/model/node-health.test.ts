@@ -12,7 +12,7 @@ import {
   nodeIssues,
   worstNode,
 } from "@/model/node-health"
-import { volumeFill } from "@/model/volume-use"
+import { missingReason, volumeFill } from "@/model/volume-use"
 
 const GiB = 2 ** 30
 
@@ -176,8 +176,6 @@ describe("nodes, worst first", () => {
 
 const volume = (claim: string, capacity: number, available: number): Schemas["VolumeUsage"] => ({
   claim,
-  pod: claim,
-  node: "vps-1",
   capacityBytes: capacity * GiB,
   availableBytes: available * GiB,
   usedBytes: (capacity - available) * GiB,
@@ -204,6 +202,14 @@ describe("a volume's fill", () => {
     ]
     const fill = volumeFill(items, "data", "db")
     expect(fill).toMatchObject({ claim: "data-db-1", replicas: 3, health: "fail" })
+  })
+
+  test("a volume without a fill says why, never zero", () => {
+    const fill = volumeFill([volume("uploads", 10, 2.4)], "uploads", "web")
+    expect(missingReason("available", [fill])).toBeUndefined()
+    expect(missingReason("available", [fill, undefined])).toBe("not-collected")
+    expect(missingReason("not-configured", [undefined])).toBe("not-configured")
+    expect(missingReason("unreadable", [undefined])).toBe("unreadable")
   })
 })
 

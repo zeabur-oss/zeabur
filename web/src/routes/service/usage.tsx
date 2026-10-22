@@ -5,7 +5,12 @@ import { lazy, Suspense, type ReactNode } from "react"
 import { historyQuery, usageQuery } from "@/api/queries"
 import { Hint, Panel, Segmented } from "@/components/bits"
 import { Refused } from "@/components/refused"
-import { useVolumeFills, VolumeFullNote, VolumeUse } from "@/components/volume-use"
+import {
+  useVolumeFills,
+  VolumeFullNote,
+  VolumeUse,
+  VolumeUseMissing,
+} from "@/components/volume-use"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
@@ -144,7 +149,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
   )
 }
 
-/** How full each volume the service mounts is, when the kubelets say. */
+/** How full each volume the service mounts is, or why that is not shown. */
 function VolumesBlock({ project, service }: { project: string; service: Service }) {
   const t = useT()
   const mounts = claimMounts(service)
@@ -157,21 +162,24 @@ function VolumesBlock({ project, service }: { project: string; service: Service 
     const fill = volumes.fill(claimOf(mount))
     return fill ? [{ path: mount.mountPath, fill }] : []
   })
-  if (filled.length === 0) return null
+  if (filled.length === 0 && !volumes.missing) return null
   return (
     <div className="flex flex-col gap-3 border-t px-5 py-4">
       <span className="type-meta text-muted-foreground">{t("storage.title")}</span>
-      <ul className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
-        {filled.map(({ path, fill }) => (
-          <li key={path} className="flex min-w-0 flex-col gap-1">
-            <span className="truncate font-mono type-body" translate="no" title={path}>
-              {path}
-            </span>
-            <VolumeUse fill={fill} />
-            <VolumeFullNote fill={fill} />
-          </li>
-        ))}
-      </ul>
+      {filled.length > 0 ? (
+        <ul className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
+          {filled.map(({ path, fill }) => (
+            <li key={path} className="flex min-w-0 flex-col gap-1">
+              <span className="truncate font-mono type-body" translate="no" title={path}>
+                {path}
+              </span>
+              <VolumeUse fill={fill} />
+              <VolumeFullNote fill={fill} />
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <VolumeUseMissing reason={volumes.missing} />
     </div>
   )
 }
