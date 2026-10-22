@@ -2499,6 +2499,9 @@ version = "0.0.1"
 dependencies = [
  "futures-util",
  "http",
+ "hyper",
+ "hyper-rustls",
+ "hyper-timeout",
  "hyper-util",
  "k8s-openapi",
  "kube",
@@ -2508,6 +2511,8 @@ dependencies = [
  "thiserror",
  "tokio",
  "tower",
+ "tower-http",
+ "tracing",
  "zeabur-core",
  "zeabur-kube",
  "zeabur-test-support",
