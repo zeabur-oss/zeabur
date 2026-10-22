@@ -1391,6 +1391,7 @@ export const en = {
   "install.singleNode": "Single node",
   "install.multiNode": "Several nodes",
   "install.forCluster": "fits this cluster",
+  "install.notes": "Notes",
   "install.needs": "Install first",
   "install.security": "Permissions",
   "install.clusterWide": "Cluster-wide RBAC",

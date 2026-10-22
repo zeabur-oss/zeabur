@@ -59,6 +59,12 @@ for (const [key, value] of Object.entries(zhTW)) {
   else print(key, key.startsWith("sentence.") ? String(value(params)) : call(value))
 }
 
+const { summaries } = (await load("component-summaries.ts")) as {
+  summaries: Record<string, { "zh-TW"?: string }>
+}
+for (const [key, summary] of Object.entries(summaries))
+  if (summary["zh-TW"]) print(key, summary["zh-TW"])
+
 // The sign-in pages: the string on a `Lang::ZhTw` arm, on its line or the next.
 const pages = readFileSync(
   resolve(import.meta.dirname, "../../crates/zeabur/src/pages.rs"),
