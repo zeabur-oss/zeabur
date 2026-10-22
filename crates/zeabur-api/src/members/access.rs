@@ -378,6 +378,10 @@ pub(crate) async fn remove_all(cluster: &dyn Cluster, username: &str) -> Result<
 
 #[cfg(test)]
 mod tests {
+    use zeabur_core::names::{
+        ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON, LABEL_PROJECT,
+        MANAGE_VERB,
+    };
     use zeabur_kube::{AccessRule, AccessRules};
 
     use super::*;
@@ -597,7 +601,7 @@ mod tests {
     }
 
     #[test]
-    fn secrets_and_shells_are_developers_and_nobody_gets_rbac_kubelets_or_namespaces() {
+    fn secrets_shells_and_patching_the_namespace_are_developers_and_nobody_gets_rbac_or_kubelets() {
         let roles = roles();
         let sensitive = [
             ("list", "secrets"),
@@ -633,7 +637,16 @@ mod tests {
             assert!(!allows(role, "impersonate", "users"), "{name}");
             assert!(!allows(role, "impersonate", "serviceaccounts"), "{name}");
             assert!(!allows(role, "create", "serviceaccounts/token"), "{name}");
-            for verb in ["create", "delete", "update", "patch"] {
+            // The patch reaches only the project's own Namespace (RoleBinding), and the chart's
+            // admission policy keeps it to the details without `zeabur-manage`.
+            assert_eq!(allows(role, "patch", "namespaces"), developer, "{name}");
+            for verb in [
+                "create",
+                "delete",
+                "update",
+                "deletecollection",
+                MANAGE_VERB,
+            ] {
                 assert!(!allows(role, verb, "namespaces"), "{name} {verb}");
             }
         }
@@ -643,5 +656,17 @@ mod tests {
             assert!(allows(baseline, verb, "namespaces"));
         }
         assert!(!allows(baseline, "list", "pods"));
+    }
+
+    #[test]
+    fn the_namespace_policy_lets_through_exactly_the_details_and_the_manage_verb() {
+        let policy =
+            include_str!("../../../../deploy/chart/zeabur/templates/namespace-policy.yaml");
+        let details = format!(
+            "['{ANNOTATION_DISPLAY_NAME}', '{ANNOTATION_DESCRIPTION}', '{ANNOTATION_ICON}']"
+        );
+        assert!(policy.contains(&details), "{details}");
+        assert!(policy.contains(&format!(".check('{MANAGE_VERB}')")));
+        assert!(!policy.contains(LABEL_PROJECT));
     }
 }

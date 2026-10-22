@@ -51,8 +51,10 @@ elevation:
 
 # Members who are not admins: the ClusterRoles zeabur-member (node names and status, every
 # project's name), zeabur-project-developer and zeabur-project-viewer (files/member-roles.yaml).
-# Zeabur binds them per member when an admin invites or edits one. Off: no ClusterRoles, and
-# Members offers only admin or no rights.
+# Zeabur binds them per member when an admin invites or edits one. With them, the
+# ValidatingAdmissionPolicy zeabur-project-namespace (Kubernetes 1.30+) keeps a Developer's patch
+# of their project's Namespace to its details. Off: neither, and Members offers only admin or no
+# rights.
 memberRoles:
   enabled: true
 

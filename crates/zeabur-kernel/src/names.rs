@@ -29,6 +29,13 @@ pub const ANNOTATION_DESCRIPTION: &str = "zeabur.com/description";
 /// Annotation on a project's namespace: its icon, by name, one of Zeabur's built-in set.
 pub const ANNOTATION_ICON: &str = "zeabur.com/icon";
 
+/// The RBAC verb on a namespace that lets a patch change more than the project's details.
+///
+/// The chart's admission policy asks for it before a patch changes the labels, which adopting
+/// writes, or annotations other than the details. No built-in role names it; `*`
+/// (`cluster-admin`) covers it.
+pub const MANAGE_VERB: &str = "zeabur-manage";
+
 /// The name of every debug container Zeabur adds starts with this.
 pub const DEBUG_PREFIX: &str = "zeabur-debug-";
 

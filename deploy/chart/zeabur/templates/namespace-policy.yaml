@@ -1,0 +1,74 @@
+{{- if .Values.memberRoles.enabled }}
+# A Developer may patch their project's Namespace (files/member-roles.yaml), and RBAC cannot narrow
+# that to some fields. This keeps such a patch to the project's details: labels select the
+# namespace for Pod Security admission and for NetworkPolicies, and Zeabur's project label is
+# what adopting writes.
+#
+# It skips whoever may `zeabur-manage` the Namespace (cluster-admin's `*` covers it) or patch or
+# update every namespace, so admins, controllers and Helm are not held to it. The namespace
+# controller writes only the `status` and `finalize` subresources, which it does not match.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: zeabur-project-namespace
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [UPDATE]
+        resources: [namespaces]
+  matchConditions:
+    - name: not-a-manager
+      expression: >-
+        !authorizer.group('').resource('namespaces').namespace(object.metadata.name)
+        .name(object.metadata.name).check('zeabur-manage').allowed()
+    - name: not-cluster-wide
+      expression: >-
+        !authorizer.group('').resource('namespaces').check('patch').allowed() &&
+        !authorizer.group('').resource('namespaces').check('update').allowed()
+  variables:
+    - name: details
+      expression: "['zeabur.com/display-name', 'zeabur.com/description', 'zeabur.com/icon']"
+    - name: before
+      expression: "has(oldObject.metadata.annotations) ? oldObject.metadata.annotations : {}"
+    - name: after
+      expression: "has(object.metadata.annotations) ? object.metadata.annotations : {}"
+  validations:
+    - expression: >-
+        (has(object.metadata.labels) ? object.metadata.labels : {}) ==
+        (has(oldObject.metadata.labels) ? oldObject.metadata.labels : {})
+      reason: Forbidden
+      message: >-
+        Only an admin can change the namespace's labels, which adopting it or removing it from
+        Zeabur does. You can change the project's name, description and icon.
+    - expression: >-
+        variables.after.all(k, k in variables.details ||
+        (k in variables.before && variables.before[k] == variables.after[k])) &&
+        variables.before.all(k, k in variables.details || k in variables.after)
+      reason: Forbidden
+      message: >-
+        Only an admin can change the namespace's annotations other than the project's name,
+        description and icon.
+    - expression: >-
+        (has(object.metadata.finalizers) ? object.metadata.finalizers : []) ==
+        (has(oldObject.metadata.finalizers) ? oldObject.metadata.finalizers : []) &&
+        (has(object.metadata.ownerReferences) ? object.metadata.ownerReferences : []) ==
+        (has(oldObject.metadata.ownerReferences) ? oldObject.metadata.ownerReferences : []) &&
+        has(object.spec) == has(oldObject.spec) && (!has(object.spec) || object.spec == oldObject.spec)
+      reason: Forbidden
+      message: Only an admin can change the namespace's finalizers, owners or spec.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: zeabur-project-namespace
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  policyName: zeabur-project-namespace
+  validationActions: [Deny]
+{{- end }}
