@@ -215,10 +215,10 @@ fn app_user(cluster: &DynamicObject, name: &str) -> Option<AppUser> {
     let secret = reference
         .and_then(|r| r["name"].as_str())
         .map_or_else(|| format!("{name}-custom-user-secret"), str::to_owned);
-    let password_key = match reference {
-        Some(r) => r["key"].as_str().unwrap_or("password").to_owned(),
-        None => username.clone(),
-    };
+    let password_key = reference.map_or_else(
+        || username.clone(),
+        |r| r["key"].as_str().unwrap_or("password").to_owned(),
+    );
     Some(AppUser {
         username,
         database,

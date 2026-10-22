@@ -191,6 +191,16 @@ pub fn store_name(cluster: &str) -> String {
     format!("{cluster}-backups")
 }
 
+/// Only the Secret CloudNativePG makes has `uri` and the other keys a service reads.
+fn app_user(name: &str, own: Option<&str>, username: &str, database: &str) -> Option<AppUser> {
+    own.is_none().then(|| AppUser {
+        username: username.to_owned(),
+        database: database.to_owned(),
+        secret: format!("{name}-app"),
+        password_key: "password".to_owned(),
+    })
+}
+
 /// One `Cluster` as a database, with its backups from the namespace's `ObjectStore`s,
 /// `ScheduledBackup`s and `Backup`s. Runs are the newest twenty.
 ///
@@ -220,13 +230,7 @@ pub fn database(
     let username =
         text(cluster, "/spec/bootstrap/initdb/owner").unwrap_or_else(|| database.clone());
     let own_secret = text(cluster, "/spec/bootstrap/initdb/secret/name");
-    // Only the Secret CloudNativePG makes has `uri` and the other keys a service reads.
-    let app = own_secret.is_none().then(|| AppUser {
-        username: username.clone(),
-        database: database.clone(),
-        secret: format!("{name}-app"),
-        password_key: "password".to_owned(),
-    });
+    let app = app_user(&name, own_secret.as_deref(), &username, &database);
     let secret = own_secret.unwrap_or_else(|| format!("{name}-app"));
     let service = text(cluster, "/status/writeService").unwrap_or_else(|| format!("{name}-rw"));
     let named = |wanted: &str| {
