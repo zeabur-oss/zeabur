@@ -45,6 +45,7 @@ use crate::change::{
     Target, Warning, Write,
 };
 use crate::checks::ResourceRef;
+use crate::create::ServedKind;
 use crate::fields::{Step, owners, reapplying_tool};
 use crate::json::{add, apply_patch, pointer, remove, replace, test};
 use crate::releases::Release;
@@ -99,6 +100,9 @@ pub struct Input<'a> {
     /// The project's Namespace, as read, with `managedFields`: needed to adopt it, let it go
     /// or change its details; `None` when the request does none of these.
     pub namespace: Option<&'a Value>,
+    /// The kinds the cluster serves, from discovery: what a `create` may make. Empty: only the
+    /// kinds [`CREATABLE`] lists.
+    pub kinds: &'a [ServedKind],
 }
 
 impl<'a> Input<'a> {
@@ -122,6 +126,7 @@ impl<'a> Input<'a> {
             replica_sets: &[],
             reclaim_policies: &NO_RECLAIM_POLICIES,
             namespace: None,
+            kinds: &[],
         }
     }
 }
@@ -162,6 +167,12 @@ pub struct PlanError {
     pub detail: String,
     /// The tool that manages the object or owns the field, when that is why it was refused.
     pub managed_by: Option<Tool>,
+    /// The index of the change it concerns in the request.
+    pub change: Option<usize>,
+    /// The line of that change's YAML it concerns, from 1.
+    pub line: Option<u64>,
+    /// The field it concerns, as kube-apiserver writes it (`metadata.namespace`).
+    pub field: Option<String>,
 }
 
 /// The kinds of [`PlanError`], which map onto problem kinds.
@@ -185,6 +196,9 @@ pub(crate) fn error(kind: ErrorKind, code: &str, detail: impl Into<String>) -> P
         kind,
         detail: detail.into(),
         managed_by: None,
+        change: None,
+        line: None,
+        field: None,
     }
 }
 
@@ -209,6 +223,8 @@ pub(crate) struct Planner<'a> {
     pub(crate) restarts: BTreeSet<WorkloadRef>,
     pub(crate) impact: BTreeSet<WorkloadRef>,
     pub(crate) warnings: Vec<Warning>,
+    /// The objects `create` changes make, with the index of their change.
+    pub(crate) created: Vec<(Target, usize)>,
 }
 
 /// The plan for `request` against `input`.
@@ -259,15 +275,29 @@ pub fn plan_with(
         restarts: BTreeSet::new(),
         impact: BTreeSet::new(),
         warnings: Vec::new(),
+        created: Vec::new(),
     };
-    for change in &request.changes {
-        planner.change(change, request.restart_after)?;
+    for index in crate::create::order(&request.changes) {
+        let Some(change) = request.changes.get(index) else {
+            continue;
+        };
+        planner
+            .change(change, index, request.restart_after)
+            .map_err(|e| PlanError {
+                change: Some(index),
+                ..e
+            })?;
     }
     planner.finish()
 }
 
 impl<'a> Planner<'a> {
-    fn change(&mut self, change: &Change, restart_after: bool) -> Result<(), PlanError> {
+    fn change(
+        &mut self,
+        change: &Change,
+        index: usize,
+        restart_after: bool,
+    ) -> Result<(), PlanError> {
         match change {
             Change::Env {
                 workload,
@@ -282,7 +312,7 @@ impl<'a> Planner<'a> {
             Change::AddDomain { workload, hostname } => self.add_domain(workload, hostname),
             Change::RenameDomain { route, from, to } => self.rename_domain(route, from, to),
             Change::RemoveDomain { route, hostname } => self.remove_domain(route, hostname),
-            Change::Create { object } => self.create(object),
+            Change::Create { .. } => self.create(change, index),
             Change::Restart { workload } => {
                 let found = self.workload(workload)?;
                 if matches!(found.kind(), WorkloadKind::Job | WorkloadKind::CronJob) {
@@ -1017,80 +1047,6 @@ impl<'a> Planner<'a> {
         Ok(())
     }
 
-    /// A new object of a [`CREATABLE`] kind, in the project's namespace, created with a `POST` to
-    /// its collection. kube-apiserver refuses it with `409 AlreadyExists` when an object of that
-    /// name appeared since the plan, so nothing is overwritten.
-    fn create(&mut self, object: &Value) -> Result<(), PlanError> {
-        let text = |path: &str| {
-            object
-                .pointer(path)
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-        };
-        let (api_version, kind, name) =
-            (text("/apiVersion"), text("/kind"), text("/metadata/name"));
-        let Some(plural) = creatable(api_version, kind) else {
-            return Err(error(
-                ErrorKind::Invalid,
-                "not_creatable",
-                format!("Zeabur does not create {kind} objects ({api_version})."),
-            ));
-        };
-        if validate_hostname(name).is_err() || name.contains('.') {
-            return Err(error(
-                ErrorKind::BadRequest,
-                "invalid_name",
-                format!("{name:?} is not a valid {kind} name."),
-            ));
-        }
-        let namespace = &self.input.snapshot.namespace;
-        match object
-            .pointer("/metadata/namespace")
-            .and_then(Value::as_str)
-        {
-            Some(other) if other != namespace => {
-                return Err(error(
-                    ErrorKind::Invalid,
-                    "other_namespace",
-                    format!(
-                        "{kind} {name} names namespace {other}, not the project's ({namespace})."
-                    ),
-                ));
-            }
-            _ => {}
-        }
-        let mut metadata = serde_json::Map::new();
-        metadata.insert("name".to_owned(), json!(name));
-        metadata.insert("namespace".to_owned(), json!(namespace));
-        for key in ["labels", "annotations"] {
-            if let Some(value) = object.pointer(&format!("/metadata/{key}")) {
-                metadata.insert(key.to_owned(), value.clone());
-            }
-        }
-        let mut body = json!({"apiVersion": api_version, "kind": kind, "metadata": metadata});
-        if let (Some(fields), Some(out)) = (object.as_object(), body.as_object_mut()) {
-            for (key, value) in fields {
-                if !matches!(key.as_str(), "apiVersion" | "kind" | "metadata" | "status") {
-                    out.insert(key.clone(), value.clone());
-                }
-            }
-        }
-        self.objects.push(Working {
-            target: Target {
-                api_version: api_version.to_owned(),
-                kind: kind.to_owned(),
-                plural: plural.to_owned(),
-                name: name.to_owned(),
-            },
-            original: None,
-            current: body,
-            operations: Vec::new(),
-            owners: Vec::new(),
-            deleted: false,
-        });
-        Ok(())
-    }
-
     /// The route object `route`, its metadata and the Services it routes to.
     fn route(&self, route: &RouteRef) -> Result<(Value, ObjectMeta, BTreeSet<String>), PlanError> {
         let missing = || {
@@ -1377,6 +1333,11 @@ impl<'a> Planner<'a> {
                 operations.extend(working.operations);
                 Write::Patch { operations }
             };
+            let change = self
+                .created
+                .iter()
+                .find(|(target, _)| *target == working.target)
+                .map(|(_, index)| *index);
             let before = working.original.as_ref().map(shown);
             let after = Some(shown(&working.current));
             let changes = diff(working.original.as_ref(), &working.current);
@@ -1390,6 +1351,7 @@ impl<'a> Planner<'a> {
                 owners: working.owners,
                 resource_version,
                 write,
+                change,
                 raw_after: working.current,
             });
         }

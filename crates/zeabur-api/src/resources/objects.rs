@@ -54,7 +54,7 @@ const CONCURRENCY: usize = 8;
 const CORE: &str = "core";
 
 /// Kinds controllers create on their own, as `(group, resource)`.
-const GENERATED: [(&str, &str); 6] = [
+pub(crate) const GENERATED: [(&str, &str); 6] = [
     ("apps", "replicasets"),
     ("apps", "controllerrevisions"),
     ("discovery.k8s.io", "endpointslices"),

@@ -2,4 +2,5 @@
 //! on request.
 
 pub(crate) mod config;
+pub mod creatable;
 pub mod objects;
