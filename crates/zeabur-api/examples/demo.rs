@@ -390,6 +390,7 @@ fn shop() -> NamespaceObjects {
         &json!([
             {"name": "DATABASE_HOST", "value": "db"},
             {"name": "DATABASE_PASSWORD", "valueFrom": secret("db-credentials", "password")},
+            {"name": "ORDERS_DATABASE_URL", "valueFrom": secret("orders-app", "uri")},
             {"name": "REDIS_URL", "value": "redis://redis:6379/0"},
             {"name": "LOG_LEVEL", "value": "info"}
         ]),
@@ -1186,6 +1187,36 @@ fn state() -> State {
                 true,
             ),
             ServedResource::readable("upgrade.cattle.io", "v1", "plans", "Plan", true),
+            ServedResource::readable("postgresql.cnpg.io", "v1", "clusters", "Cluster", true),
+            ServedResource::readable(
+                "postgresql.cnpg.io",
+                "v1",
+                "scheduledbackups",
+                "ScheduledBackup",
+                true,
+            ),
+            ServedResource::readable("postgresql.cnpg.io", "v1", "backups", "Backup", true),
+            ServedResource::readable(
+                "barmancloud.cnpg.io",
+                "v1",
+                "objectstores",
+                "ObjectStore",
+                true,
+            ),
+            ServedResource::readable(
+                "psmdb.percona.com",
+                "v1",
+                "perconaservermongodbs",
+                "PerconaServerMongoDB",
+                true,
+            ),
+            ServedResource::readable(
+                "psmdb.percona.com",
+                "v1",
+                "perconaservermongodbbackups",
+                "PerconaServerMongoDBBackup",
+                true,
+            ),
             ServedResource::readable("identity.zeabur.com", "v1alpha1", "users", "User", true),
             ServedResource::readable(
                 "identity.zeabur.com",
@@ -1226,6 +1257,26 @@ fn state() -> State {
                 "metadata": {"name": "reloader", "namespace": "reloader",
                     "labels": {"app.kubernetes.io/name": "reloader"}},
                 "status": {"replicas": 1, "readyReplicas": 1, "availableReplicas": 1}
+            })),
+            // Shop's databases: a PostgreSQL the API reads, and an older MongoDB without an app
+            // user.
+            from(json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                "metadata": {"name": "orders", "namespace": "shop",
+                    "creationTimestamp": created("orders")},
+                "spec": {"instances": 1, "imageName": "ghcr.io/cloudnative-pg/postgresql:17-standard-trixie",
+                    "storage": {"size": "5Gi"}},
+                "status": {"phase": "Cluster in healthy state", "readyInstances": 1,
+                    "currentPrimary": "orders-1", "writeService": "orders-rw"}
+            })),
+            from(json!({
+                "apiVersion": "psmdb.percona.com/v1", "kind": "PerconaServerMongoDB",
+                "metadata": {"name": "sessions", "namespace": "shop",
+                    "creationTimestamp": created("sessions")},
+                "spec": {"image": "percona/percona-server-mongodb:8.0.12-4",
+                    "replsets": [{"name": "rs0", "size": 3}]},
+                "status": {"state": "ready", "mongoVersion": "8.0.12-4",
+                    "replsets": {"rs0": {"ready": 3, "size": 3, "status": "ready"}}}
             })),
             from(json!({
                 "apiVersion": "upgrade.cattle.io/v1", "kind": "Plan",
