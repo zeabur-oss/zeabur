@@ -4,7 +4,10 @@ import type { Schemas } from "@/api/client"
 import { logsReadable } from "@/api/logs-access"
 import { diagnosisAction, type Diagnosis } from "@/components/diagnoses"
 import { en } from "@/i18n/en"
+import { unknownRights } from "@/model/rights"
 import { reasonWord, statusOf, type Service } from "@/model/service"
+
+const withLogs = (readLogs: Schemas["Permission"]) => ({ can: { ...unknownRights(), readLogs } })
 
 const diagnosis = (kind: Diagnosis["kind"], cause: string): Diagnosis => ({
   kind,
@@ -31,8 +34,8 @@ describe("a diagnosis's action", () => {
       pod: "web-1",
     })
     expect(diagnosisAction(diagnosis("outOfMemory", "x"), false).tab).toBe("compute")
-    expect(logsReadable({ canReadLogs: "denied" })).toBe(false)
-    expect(logsReadable({ canReadLogs: "unknown" })).toBe(true)
+    expect(logsReadable(withLogs("denied"))).toBe(false)
+    expect(logsReadable(withLogs("unknown"))).toBe(true)
     expect(logsReadable(undefined)).toBe(true)
   })
 

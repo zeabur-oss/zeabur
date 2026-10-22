@@ -1695,6 +1695,7 @@ export const en = {
   "add.button": "New",
   "add.inProject": (project: string) => `New in ${project}`,
   "add.image": "Docker image",
+  "add.database": "Database",
   "add.advanced": "Advanced",
   "add.yaml": "From YAML…",
   "add.needsComponent": "Install its component first",
@@ -2042,6 +2043,8 @@ export const en = {
   "account.role.admin": "Admin",
   "account.role.developer": "Developer",
   "account.role.viewer": "Viewer",
+  "rights.needs": (role: string) => `Needs ${role} access`,
+  "rights.needsRule": (rule: string) => `Your Kubernetes rights don't include ${rule}`,
   "account.means.admin": "Everything a Developer can, and gives others access.",
   "account.means.developer":
     "Everything a Viewer can, and reads logs, changes services, opens terminals and reads secrets.",
