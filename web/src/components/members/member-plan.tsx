@@ -148,9 +148,7 @@ function Writes({ writes }: { writes: MemberWrite[] }) {
       <CollapsibleTrigger variant="disclosure" className="mt-1">
         <CaretRightIcon aria-hidden="true" />
         {t("plan.details")}
-        <span className="font-normal text-muted-foreground">
-          {said.join(t("common.sep"))}
-        </span>
+        <span className="font-normal text-muted-foreground">{said.join(t("common.sep"))}</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
         <div className="flex flex-col gap-4 pt-3">
