@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router"
 
+import { useLogsReadable } from "@/api/logs-access"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { podLogsLink } from "@/lib/place"
@@ -50,6 +51,7 @@ export function PodCells({
 }) {
   const t = useT()
   const label = usePodLabel()
+  const logs = useLogsReadable(project)
   const { ready, desired } = replicaCounts(service)
   if (service.pods.length === 0 && desired === 0)
     return <span className="text-xs text-muted-foreground">—</span>
@@ -68,7 +70,7 @@ export function PodCells({
           )
           return (
             <li key={pod.name} className="flex">
-              {project ? (
+              {project && logs ? (
                 <Tooltip content={label(pod)}>
                   <Link
                     {...podLogsLink(project, service, pod.name)}

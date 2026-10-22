@@ -212,6 +212,8 @@ mod tests {
             ),
             (&json!("allowed"), &json!("denied"), &json!(true))
         );
+        // The rules hold no `pods/log`, as for a Viewer.
+        assert_eq!(guarded["canReadLogs"], "denied");
         let (_, open) = send(&app_with(&cluster, with_roles(false)), "GET", uri, None).await;
         assert_eq!(
             (

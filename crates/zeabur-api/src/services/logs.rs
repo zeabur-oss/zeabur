@@ -6,9 +6,9 @@
 //! VictoriaLogs keeps every namespace's lines and has no notion of people, so Zeabur never
 //! reads it itself. Zeabur Proxy does, as the person: Zeabur hands it the person's token, the
 //! proxy asks kube-apiserver whether they may `get` `logs.proxy.zeabur.com` in the project's
-//! namespace, and reads that namespace's lines only. Viewers, developers and anyone with
-//! Kubernetes' `view` have that right (the chart's `zeabur-proxy-logs-reader`), the same people
-//! who may read the pods' logs (`pods/log`).
+//! namespace, and reads that namespace's lines only. Developers and anyone with Kubernetes'
+//! `view` have that right (the chart's `zeabur-proxy-logs-reader`), the same people who may read
+//! the pods' logs (`pods/log`); Viewers do not.
 
 use std::future::Future;
 use std::pin::Pin;

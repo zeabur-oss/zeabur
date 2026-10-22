@@ -13,13 +13,13 @@ zeabur-member:
     resources: [nodes, namespaces]
     verbs: [get, list]
 
-# Read what a project runs. Like the built-in `view`, without Secrets: a list returns their
-# values. https://kubernetes.io/docs/concepts/security/rbac-good-practices/#listing-secrets
+# Read what a project runs. Like the built-in `view`, without Secrets (a list returns their
+# values) or logs (they often carry what Secrets hold).
+# https://kubernetes.io/docs/concepts/security/rbac-good-practices/#listing-secrets
 zeabur-project-viewer:
   - apiGroups: [""]
     resources:
       - pods
-      - pods/log
       - services
       - endpoints
       - configmaps
@@ -69,7 +69,7 @@ zeabur-project-viewer:
     resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
     verbs: [get, list, watch]
 
-# Run and change a project: the viewer's reads, plus what deploying, variables, restarts and
+# Run and change a project: the viewer's reads and logs, plus what deploying, variables, restarts and
 # terminals write. Narrower than the built-in `edit`: no ServiceAccount writes or impersonation,
 # no service or pod proxy, no deletecollection.
 zeabur-project-developer:

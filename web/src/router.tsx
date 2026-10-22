@@ -105,7 +105,7 @@ const load = (...reads: Promise<unknown>[]) =>
 
 /** The project document and its newest events, which every project page reads. */
 const loadProject = (project: string) =>
-  load(ensure(projectQuery(project)), ensure(eventsQuery(project)))
+  load(ensure(projectQuery(project)), ensure(eventsQuery(project)), ensure(namespaceQuery(project)))
 
 const rootRoute = createRootRoute({
   component: AppShell,

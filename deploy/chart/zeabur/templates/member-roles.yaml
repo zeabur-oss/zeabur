@@ -43,16 +43,15 @@ rules: []
 {{- if or .Values.memberRoles.enabled .Values.proxy.enabled }}
 ---
 # Reading a project's log history through Zeabur Proxy, which asks kube-apiserver whether the
-# person may `get` this resource in the namespace. Every project role has it, and so does
-# Kubernetes' view (and through it edit and admin), which already reads the same pods' logs
-# (`pods/log`).
+# person may `get` this resource in the namespace. The developer has it, and so does
+# Kubernetes' view (and through it edit and admin): both already read the same pods' logs
+# (`pods/log`). The viewer reads no logs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: zeabur-proxy-logs-reader
   labels:
     {{- include "zeabur.labels" . | nindent 4 }}
-    zeabur.com/aggregate-to-zeabur-project-viewer: "true"
     zeabur.com/aggregate-to-zeabur-project-developer: "true"
     rbac.authorization.k8s.io/aggregate-to-view: "true"
 rules:

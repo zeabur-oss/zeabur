@@ -6,6 +6,7 @@ import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import GlobeIcon from "~icons/ph/globe"
 import XIcon from "~icons/ph/x"
 
+import { useLogsReadable } from "@/api/logs-access"
 import { EventList } from "@/components/events"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus, StatusDot } from "@/components/status"
@@ -46,6 +47,7 @@ export function QuickLook({
   onSelect: (id: string) => void
 }) {
   const t = useT()
+  const logs = useLogsReadable(project)
   const { upstream, downstream } = neighboursOf(edges, service)
   const mine = eventsFor(events, service)
 
@@ -143,12 +145,14 @@ export function QuickLook({
                 <span className="ml-auto shrink-0 text-muted-foreground tabular-nums">
                   ↻ {pod.restarts}
                 </span>
-                <Link
-                  {...podLogsLink(project, service, pod.name)}
-                  className="shrink-0 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  {t("tab.logs")}
-                </Link>
+                {logs ? (
+                  <Link
+                    {...podLogsLink(project, service, pod.name)}
+                    className="shrink-0 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    {t("tab.logs")}
+                  </Link>
+                ) : null}
               </li>
             ))}
           </ul>

@@ -6,6 +6,7 @@ import TerminalWindowIcon from "~icons/ph/terminal-window"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
 import type { Schemas } from "@/api/client"
+import { useLogsReadable } from "@/api/logs-access"
 import { evidenceQuery, projectIncidentsQuery, queryClient } from "@/api/queries"
 import { CopyText } from "@/components/copy-text"
 import { fixLead, originSentence } from "@/components/origin"
@@ -56,7 +57,15 @@ export interface DiagnosisAction {
   pod?: string
 }
 
-export function diagnosisAction(d: Diagnosis): DiagnosisAction {
+/** The step that fixes `d`; without `logs`, the events instead of the logs. */
+export function diagnosisAction(d: Diagnosis, logs = true): DiagnosisAction {
+  const action = actionOf(d)
+  return action.tab === "logs" && !logs
+    ? { tab: "events", label: "diagnosis.action.events", pod: action.pod }
+    : action
+}
+
+function actionOf(d: Diagnosis): DiagnosisAction {
   const pod = d.pods[0]
   const cause = d.cause.key
   switch (d.kind) {
@@ -156,6 +165,7 @@ export function Diagnoses({
 }) {
   const t = useT()
   const write = useSentence()
+  const logs = useLogsReadable(project)
   if (!diagnoses || diagnoses.length === 0) return null
   const button = buttonVariants({ variant: "outline", size: "sm" })
   const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
@@ -174,7 +184,7 @@ export function Diagnoses({
       </h2>
       <ul className="flex flex-col">
         {diagnoses.map((d, i) => {
-          const action = diagnosisAction(d)
+          const action = diagnosisAction(d, logs)
           const raw = rawRows(t, d, service)
           const pod = action.pod ?? d.pods[0]
           const { origin, fixer } = originOf(d)
@@ -226,7 +236,7 @@ export function Diagnoses({
                       >
                         {t(action.label)}
                       </Link>
-                      {action.tab === "logs" ? null : (
+                      {action.tab === "logs" || !logs ? null : (
                         <Link
                           {...serviceLink(project, service, { tab: "logs", pod })}
                           className={button}

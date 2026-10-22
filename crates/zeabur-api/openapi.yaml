@@ -8592,6 +8592,7 @@ components:
         - system
         - canChange
         - canAdopt
+        - canReadLogs
         - labelsGuarded
         properties:
           adopted:
@@ -8605,6 +8606,11 @@ components:
           canChange:
             $ref: "#/components/schemas/Permission"
             description: "Whether the person may patch the Namespace: change its details."
+          canReadLogs:
+            $ref: "#/components/schemas/Permission"
+            description: |-
+              Whether the person may read the logs of the project's pods (`get` on `pods/log`). A
+              project Viewer may not.
           labelsGuarded:
             type: boolean
             description: |-

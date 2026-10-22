@@ -182,8 +182,8 @@ With `proxy.enabled=true`, the Logs tab also shows lines from replicas that are 
 VictoriaLogs (Zeabur Catalog's logs capability; `proxy.logs`). VictoriaLogs holds every
 namespace's lines, so Zeabur never reads it. Zeabur Proxy does, as the person: it reads only
 the project's namespace, and only for people who may `get` `logs.proxy.zeabur.com` there.
-The chart's `zeabur-proxy-logs-reader` gives that to project Viewers and Developers and to
-Kubernetes' `view`, `edit` and `admin`.
+The chart's `zeabur-proxy-logs-reader` gives that to project Developers and to Kubernetes'
+`view`, `edit` and `admin`, who already read the pods' logs. Viewers read no logs.
 
 Zeabur reaches the proxy over TLS with a certificate the chart makes and keeps across upgrades.
 To use your own, for example a cert-manager Certificate, name its Secret in
@@ -209,7 +209,7 @@ projects:
 |---|---|---|---|
 | Admin | The cluster | What Zeabur Identity's `admins` group may do, with admin rights when asked for | — |
 | Developer | Chosen projects | Deploy, change variables, restart, read logs, open terminals, read Secret values, change the project's name, description and icon | Other projects, nodes, members, adopting or removing projects |
-| Viewer | Chosen projects | See status, logs and events | Change anything, open a terminal, read Secret values |
+| Viewer | Chosen projects | See status and events | Read logs, change anything, open a terminal, read Secret values |
 
 Every member may also list nodes and namespaces, so the interface can show node names and every
 project's name and details; a project without a role says an admin can give one. Listing
@@ -238,7 +238,8 @@ has RBAC objects, namespace creation or deletion, `nodes/proxy`, or `escalate`, 
 ([RBAC good practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks)).
 
 Compared with Kubernetes' built-in roles, Viewer reads what `view` reads that Zeabur shows, and
-like `view` no Secrets. Developer is narrower than `edit`: no ServiceAccount writes or
+like `view` no Secrets. Unlike `view`, it reads no logs (`pods/log`): logs often carry what
+Secrets hold. Developer is narrower than `edit`: no ServiceAccount writes or
 impersonation, no service or pod proxy, no `deletecollection`. What the Developer's sensitive
 rights mean:
 

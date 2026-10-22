@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import FileTextIcon from "~icons/ph/file-text"
 
+import { useLogsReadable } from "@/api/logs-access"
 import { diagnosisAction, DiagnosisLine } from "@/components/diagnoses"
 import { FixerLine } from "@/components/origin"
 import { ServiceIcon } from "@/components/service-icon"
@@ -28,8 +29,9 @@ export function ProblemRow({
   const t = useT()
   const status = statusOf(service)
   const pod = worstPod(service)
+  const logs = useLogsReadable(project)
   const first = service.diagnoses?.[0]
-  const action = first ? diagnosisAction(first) : undefined
+  const action = first ? diagnosisAction(first, logs) : undefined
   const restarts = restartsOf(service)
   const facts = [
     status.desired !== undefined ? t("attention.ready", status.ready ?? 0, status.desired) : "",
@@ -87,14 +89,16 @@ export function ProblemRow({
             {t(action.label)}
           </Link>
         ) : null}
-        <Link
-          {...serviceLink(project, service, { tab: "logs", pod: action?.pod ?? pod?.name })}
-          className={button}
-          aria-label={t("attention.logsOf", action?.pod ?? pod?.name ?? service.name)}
-        >
-          <FileTextIcon aria-hidden="true" data-icon="inline-start" />
-          {t("tab.logs")}
-        </Link>
+        {logs ? (
+          <Link
+            {...serviceLink(project, service, { tab: "logs", pod: action?.pod ?? pod?.name })}
+            className={button}
+            aria-label={t("attention.logsOf", action?.pod ?? pod?.name ?? service.name)}
+          >
+            <FileTextIcon aria-hidden="true" data-icon="inline-start" />
+            {t("tab.logs")}
+          </Link>
+        ) : null}
         {action ? null : (
           <Link
             {...serviceLink(project, service, { tab: "events", pod: pod?.name })}

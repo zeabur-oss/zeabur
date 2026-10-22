@@ -105,15 +105,26 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
     expect(refused.status).toBe(403)
     expect(refused.body.kind).toBe("policy-denied")
     expect(refused.body.why?.params?.policy).toBe("zeabur-project-namespace")
+
+    // Zeabur Proxy reads log history as the person: past its review in their project (without
+    // a log store, nothing answers it there).
+    const history = await developer.request.get(
+      `/api/v1/projects/${encodeURIComponent(first)}/services/deployment/${service}/logs/history`,
+    )
+    expect(["available", "unavailable"]).toContain(
+      ((await history.json()) as { state: string }).state,
+    )
     await developer.context().close()
   })
 
-  await test.step("the Viewer sees their project's service but cannot open a terminal", async () => {
+  await test.step("the Viewer sees their project's service but no logs and cannot open a terminal", async () => {
     const viewer = await member(browser, viewerLink, "e2e-viewer", zeabur)
     await viewer.goto(servicePage(second))
     await expect(viewer.getByRole("heading", { level: 1, name: service })).toBeVisible({
       timeout: 30_000,
     })
+    await expect(viewer.getByRole("tab", { name: "Overview" })).toBeVisible()
+    await expect(viewer.getByRole("tab", { name: "Logs" })).toHaveCount(0)
     await viewer
       .locator("main header")
       .first()
@@ -127,8 +138,7 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
     })
     await expect(dock.getByRole("status").filter({ hasText: "Connected" })).toBeHidden()
 
-    // Zeabur Proxy reads log history as the person: past its review in their project (without
-    // a log store, nothing answers it there), refused in the other.
+    // Zeabur Proxy reads log history as the person; a Viewer may read it in no project.
     const logHistory = async (project: string) =>
       (
         (await (
@@ -137,7 +147,7 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
           )
         ).json()) as { state: string }
       ).state
-    expect(["available", "unavailable"]).toContain(await logHistory(second))
+    expect(await logHistory(second)).toBe("unreadable")
     expect(await logHistory(first)).toBe("unreadable")
     await viewer.context().close()
   })

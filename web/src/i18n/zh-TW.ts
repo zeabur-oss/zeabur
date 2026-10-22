@@ -636,7 +636,7 @@ export const zhTW: Messages = {
     "目前只能看執行中副本的日誌。叢集管理員可以用 Helm chart 的 proxy.enabled 開啟歷史紀錄。",
   "logs.whatHistory": "讀取這個專案的日誌歷史紀錄",
   "logs.historyRoles":
-    "專案的檢視者與開發者都有這個權限，命名空間內有 Kubernetes view 角色的人也有。",
+    "專案的開發者有這個權限，命名空間內有 Kubernetes view 角色的人也有。檢視者不能讀取日誌。",
   "logs.historyUnavailable": "日誌儲存服務沒有回應。",
   "logs.count": (n) => `${n} 行`,
   "logs.of": (n) => `共 ${n} 行`,
@@ -1760,8 +1760,8 @@ export const zhTW: Messages = {
   "account.role.developer": "開發者",
   "account.role.viewer": "檢視者",
   "account.means.admin": "開發者能做的都能做，還能讓其他人存取。",
-  "account.means.developer": "檢視者能做的都能做，還能變更服務、開啟終端機和讀取機密。",
-  "account.means.viewer": "檢視服務、副本和日誌。",
+  "account.means.developer": "檢視者能做的都能做，還能讀取日誌、變更服務、開啟終端機和讀取機密。",
+  "account.means.viewer": "檢視服務和副本。",
   "account.signIn": "登入方式",
   "account.signInWhere":
     "通行密鑰、連結的帳號和工作階段都由 Zeabur Identity 管理，可以在那裡新增或移除通行密鑰、登出其他裝置。",
@@ -1844,9 +1844,10 @@ export const zhTW: Messages = {
   "roles.projectsHint": "在下方勾選的專案裡擔任開發者或檢視者。每位成員也都看得到節點和專案名稱。",
   "roles.developer": "開發者",
   "roles.viewer": "檢視者",
-  "roles.developerHint": "開發者可以部署、修改變數、重新啟動、開啟終端機，也能讀取 Secret 的值。",
+  "roles.developerHint":
+    "開發者可以部署、修改變數、重新啟動、讀取日誌、開啟終端機，也能讀取 Secret 的值。",
   "roles.viewerHint":
-    "檢視者可以看狀態、日誌和事件，不能做任何修改、開啟終端機或讀取 Secret 的值。",
+    "檢視者可以看狀態和事件，不能讀取日誌、做任何修改、開啟終端機或讀取 Secret 的值。",
   "roles.filter": "篩選專案",
   "roles.noProjects": "目前還沒有專案。",
   "roles.noMatch": "沒有符合的專案。",

@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router"
 import { Fragment, useState } from "react"
 import FileTextIcon from "~icons/ph/file-text"
 
+import { useLogsReadable } from "@/api/logs-access"
 import { diagnosisAction } from "@/components/diagnoses"
 import { FixerLine } from "@/components/origin"
 import { ProblemRow } from "@/components/problem-row"
@@ -22,12 +23,13 @@ export function ProblemGroupRow({ project, group }: { project: string; group: Pr
   const t = useT()
   const write = useSentence()
   const [expanded, setExpanded] = useState(false)
+  const logs = useLogsReadable(project)
   const [first] = group.services
   if (!first) return null
   if (group.services.length === 1) return <ProblemRow project={project} service={first} />
   const d = group.diagnosis
   const cause = d ? sharedCause(d.cause, t("attention.eachOne")) : undefined
-  const action = d ? diagnosisAction(d) : undefined
+  const action = d ? diagnosisAction(d, logs) : undefined
   const pod = action?.pod ?? worstPod(first)?.name
   const names = expanded ? group.services : group.services.slice(0, NAMES)
   const hidden = group.services.length - names.length
@@ -79,7 +81,7 @@ export function ProblemGroupRow({ project, group }: { project: string; group: Pr
           >
             {t(action.label)}
           </Link>
-        ) : (
+        ) : logs ? (
           <Link
             {...serviceLink(project, first, { tab: "logs", pod })}
             className={button}
@@ -87,6 +89,14 @@ export function ProblemGroupRow({ project, group }: { project: string; group: Pr
           >
             <FileTextIcon aria-hidden="true" data-icon="inline-start" />
             {t("tab.logs")}
+          </Link>
+        ) : (
+          <Link
+            {...serviceLink(project, first, { tab: "events", pod })}
+            className={button}
+            aria-label={t("attention.eventsOf", first.name)}
+          >
+            {t("tab.events")}
           </Link>
         )}
       </div>

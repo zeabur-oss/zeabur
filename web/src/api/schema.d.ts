@@ -4427,6 +4427,11 @@ export interface components {
       /** @description Whether the person may patch the Namespace: change its details. */
       canChange: components["schemas"]["Permission"]
       /**
+       * @description Whether the person may read the logs of the project's pods (`get` on `pods/log`). A
+       *     project Viewer may not.
+       */
+      canReadLogs: components["schemas"]["Permission"]
+      /**
        * @description The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
        *     changes only its details.
        */

@@ -1,6 +1,7 @@
 import { describe, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
+import { logsReadable } from "@/api/logs-access"
 import { diagnosisAction, type Diagnosis } from "@/components/diagnoses"
 import { en } from "@/i18n/en"
 import { reasonWord, statusOf, type Service } from "@/model/service"
@@ -20,6 +21,19 @@ describe("a diagnosis's action", () => {
     expect(diagnosisAction(held).tab).toBe("yaml")
     const oom = { ...diagnosis("unexplained", "x"), fix: { key: "fix.outOfMemory" } }
     expect(diagnosisAction(oom).label).toBe("diagnosis.action.memory")
+  })
+
+  test("opens the events instead of logs for someone who may not read logs", () => {
+    const crash = diagnosis("crashLoop", "diagnosis.crashLoop.cause.exitCode")
+    expect(diagnosisAction(crash, false)).toStrictEqual({
+      tab: "events",
+      label: "diagnosis.action.events",
+      pod: "web-1",
+    })
+    expect(diagnosisAction(diagnosis("outOfMemory", "x"), false).tab).toBe("compute")
+    expect(logsReadable({ canReadLogs: "denied" })).toBe(false)
+    expect(logsReadable({ canReadLogs: "unknown" })).toBe(true)
+    expect(logsReadable(undefined)).toBe(true)
   })
 
   test("opens the tab its fix is done in", () => {

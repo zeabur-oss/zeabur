@@ -49,10 +49,13 @@ for values in "$chart"/ci/*-values.yaml; do
     "zeabur-project-developer=zeabur.com/aggregate-to-zeabur-project-developer0,zeabur-project-viewer=zeabur.com/aggregate-to-zeabur-project-viewer0"
   expect "$name" "$out" \
     "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .metadata.labels | keys | .[] | select(test(\"aggregate-to\")) | \$n + \">\" + sub(\".*aggregate-to-\"; \"\")] | join(\",\")" \
-    "zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view"
+    "zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view"
   expect "$name" "$out" \
     'select(.kind == "ClusterRole" and .metadata.name == "zeabur-proxy-logs-reader") | .rules[] | [.apiGroups, .resources, .verbs] | map(join(",")) | join("|")' \
     'proxy.zeabur.com|logs|get'
+  # Viewers read no logs: neither the pods' nor the log history's.
+  expect "$name" "$out" \
+    '[select(.kind == "ClusterRole" and .metadata.name == "zeabur-project-viewer-rules") | .rules[].resources[] | select(. == "pods/log")] | length' 0
   roles='select(.kind == "ClusterRole") | .rules[]'
   # Every rule names its groups, resources and verbs.
   expect "$name" "$out" "[$roles | (.apiGroups + .resources + .verbs)[] | select(test(\"^[*]$\"))] | length" 0

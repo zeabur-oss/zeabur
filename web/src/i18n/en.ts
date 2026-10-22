@@ -701,7 +701,7 @@ export const en = {
     "Logs come from running replicas only. A cluster administrator turns history on with the Helm chart's proxy.enabled.",
   "logs.whatHistory": "Reading this project's log history",
   "logs.historyRoles":
-    "Project viewers and developers have it, as does anyone with Kubernetes' view role in the namespace.",
+    "Project developers have it, as does anyone with Kubernetes' view role in the namespace. Viewers read no logs.",
   "logs.historyUnavailable": "The log store did not respond.",
   "dock.label": "Terminal",
   "dock.show": "Show terminal",
@@ -1920,8 +1920,8 @@ export const en = {
   "account.role.viewer": "Viewer",
   "account.means.admin": "Everything a Developer can, and gives others access.",
   "account.means.developer":
-    "Everything a Viewer can, and changes services, opens terminals and reads secrets.",
-  "account.means.viewer": "Sees services, replicas and logs.",
+    "Everything a Viewer can, and reads logs, changes services, opens terminals and reads secrets.",
+  "account.means.viewer": "Sees services and replicas.",
   "account.signIn": "Sign-in methods",
   "account.signInWhere":
     "Zeabur Identity manages your passkeys, linked accounts and sessions: add or remove a passkey there, or sign out other devices.",
@@ -2012,9 +2012,9 @@ export const en = {
   "roles.developer": "Developer",
   "roles.viewer": "Viewer",
   "roles.developerHint":
-    "Developers deploy, change variables, restart and open terminals, and can read Secret values.",
+    "Developers deploy, change variables, restart, read logs and open terminals, and can read Secret values.",
   "roles.viewerHint":
-    "Viewers see status, logs and events. They can't change anything, open a terminal or read Secret values.",
+    "Viewers see status and events. They can't read logs, change anything, open a terminal or read Secret values.",
   "roles.filter": "Filter projects",
   "roles.noProjects": "There are no projects yet.",
   "roles.noMatch": "No projects match.",

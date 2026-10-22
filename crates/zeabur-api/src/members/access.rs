@@ -45,7 +45,7 @@ const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
 pub enum ProjectRole {
     /// Deploys, changes variables, restarts, reads logs and Secrets, opens terminals.
     Developer,
-    /// Reads status, logs and events.
+    /// Reads status and events.
     Viewer,
 }
 
@@ -609,7 +609,8 @@ mod tests {
                 "developer lists {resource}"
             );
         }
-        assert!(allows(viewer, "get", "pods/log"));
+        assert!(!allows(viewer, "get", "pods/log"), "viewers read no logs");
+        assert!(allows(developer, "get", "pods/log"));
         for (verb, resource) in [
             ("patch", "deployments.apps"),
             ("delete", "pods"),

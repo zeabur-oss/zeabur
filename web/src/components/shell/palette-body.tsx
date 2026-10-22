@@ -19,7 +19,8 @@ import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import TranslateIcon from "~icons/ph/translate"
 
-import { projectQuery, projectsQuery, toolsQuery } from "@/api/queries"
+import { logsReadable } from "@/api/logs-access"
+import { namespaceQuery, projectQuery, projectsQuery, toolsQuery } from "@/api/queries"
 import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot } from "@/components/status"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
@@ -70,6 +71,14 @@ export function PaletteBody() {
       enabled: deep || p.name === place.project,
     })),
   })
+  const namespaces = useQueries({
+    queries: adopted.map((p) => ({
+      ...namespaceQuery(p.name),
+      enabled: deep || p.name === place.project,
+    })),
+  })
+  const logs = (project: string) =>
+    logsReadable(namespaces.find((n) => n.data?.name === project)?.data)
   const recents = recent.useValue()
   const tools = useQuery({ ...toolsQuery(place.project ?? ""), enabled: !!place.project })
 
@@ -99,14 +108,18 @@ export function PaletteBody() {
   const current = currentProject?.services.find((s) => serviceId(s) === currentKey)
   // Verbs for the service on screen; for the others, they show once the query names them.
   const verbs = (project: string, s: Service, prefix: string) => [
-    {
-      id: `${prefix}:logs`,
-      keywords: `logs log ${s.name}`,
-      group: g.actions,
-      label: t("palette.openLogs", s.name),
-      icon: TextAlignLeftIcon,
-      href: href(project, s, { tab: "logs" }),
-    },
+    ...(logs(project)
+      ? [
+          {
+            id: `${prefix}:logs`,
+            keywords: `logs log ${s.name}`,
+            group: g.actions,
+            label: t("palette.openLogs", s.name),
+            icon: TextAlignLeftIcon,
+            href: href(project, s, { tab: "logs" }),
+          },
+        ]
+      : []),
     ...(isTask(s.kind)
       ? []
       : [
@@ -211,7 +224,10 @@ export function PaletteBody() {
           label: pod.name,
           hint: `${t("palette.in", s.name, data.namespace)}${pod.ready ? "" : `${t("common.sep")}${pod.reason ?? t("pod.notReady")}`}`,
           icon: CubeIcon,
-          href: href(data.namespace, s, { tab: "logs", pod: pod.name }),
+          href: href(data.namespace, s, {
+            tab: logs(data.namespace) ? "logs" : "events",
+            pod: pod.name,
+          }),
         })
       for (const { host } of domainsOf(data, s))
         items.push({

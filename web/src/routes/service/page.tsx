@@ -19,6 +19,7 @@ import CopyIcon from "~icons/ph/copy"
 import TrashIcon from "~icons/ph/trash"
 
 import type { Schemas } from "@/api/client"
+import { useLogsReadable } from "@/api/logs-access"
 import { evidenceQuery, projectQuery, queryClient } from "@/api/queries"
 import { Freshness } from "@/components/freshness"
 import { LoadingRows } from "@/components/page"
@@ -154,7 +155,8 @@ function ServiceView({
   const events = useProjectEvents(project)
   const edges = edgesOf(data)
   const mine = eventsFor(events, service)
-  const tab: Page = search.tab ?? "overview"
+  const logs = useLogsReadable(project)
+  const tab: Page = search.tab === "logs" && !logs ? "overview" : (search.tab ?? "overview")
   const mode = search.mode
   const fresh = useQuery(projectQuery(project))
   const go = (place: ServicePlace, pod?: string) =>
@@ -212,7 +214,9 @@ function ServiceView({
   const id = `${service.kind}/${service.name}`
   // Builds shows only for a service a Zeabur Builder Build makes an image of.
   const built = useServiceBuilds(project, service).built.length > 0
-  const shown = serviceTabs.filter((value) => value !== "builds" || built || tab === "builds")
+  const shown = serviceTabs.filter(
+    (value) => (value !== "builds" || built || tab === "builds") && (value !== "logs" || logs),
+  )
   const wide = tab === "logs"
   const pendingIn = new Set(draft.parts.map((part) => tabOfPart[part]))
   const kept = (value: Page) => editing.includes(value) && opened.includes(value)

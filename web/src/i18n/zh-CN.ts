@@ -634,7 +634,7 @@ export const zhCN: Messages = {
     "目前只能看运行中副本的日志。集群管理员可以用 Helm chart 的 proxy.enabled 开启历史记录。",
   "logs.whatHistory": "读取这个项目的日志历史记录",
   "logs.historyRoles":
-    "项目的查看者和开发者都有这个权限，命名空间内有 Kubernetes view 角色的人也有。",
+    "项目的开发者有这个权限，命名空间内有 Kubernetes view 角色的人也有。查看者不能读取日志。",
   "logs.historyUnavailable": "日志存储服务没有响应。",
   "logs.count": (n) => `${n} 行`,
   "logs.of": (n) => `共 ${n} 行`,
@@ -1756,8 +1756,8 @@ export const zhCN: Messages = {
   "account.role.developer": "开发者",
   "account.role.viewer": "查看者",
   "account.means.admin": "开发者能做的都能做，还能让其他人访问。",
-  "account.means.developer": "查看者能做的都能做，还能更改服务、打开终端和读取机密。",
-  "account.means.viewer": "查看服务、副本和日志。",
+  "account.means.developer": "查看者能做的都能做，还能读取日志、更改服务、打开终端和读取机密。",
+  "account.means.viewer": "查看服务和副本。",
   "account.signIn": "登录方式",
   "account.signInWhere":
     "通行密钥、关联的账号和会话都由 Zeabur Identity 管理，可以在那里添加或移除通行密钥、退出其他设备的登录。",
@@ -1840,8 +1840,10 @@ export const zhCN: Messages = {
   "roles.projectsHint": "在下方勾选的项目里担任开发者或查看者。每位成员也都能看到节点和项目名称。",
   "roles.developer": "开发者",
   "roles.viewer": "查看者",
-  "roles.developerHint": "开发者可以部署、修改变量、重启、打开终端，也能读取 Secret 的值。",
-  "roles.viewerHint": "查看者可以看状态、日志和事件，不能做任何修改、打开终端或读取 Secret 的值。",
+  "roles.developerHint":
+    "开发者可以部署、修改变量、重启、读取日志、打开终端，也能读取 Secret 的值。",
+  "roles.viewerHint":
+    "查看者可以看状态和事件，不能读取日志、做任何修改、打开终端或读取 Secret 的值。",
   "roles.filter": "筛选项目",
   "roles.noProjects": "目前还没有项目。",
   "roles.noMatch": "没有匹配的项目。",

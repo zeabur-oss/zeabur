@@ -9,6 +9,7 @@ import GitBranchIcon from "~icons/ph/git-branch"
 import GlobeIcon from "~icons/ph/globe"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
+import { useLogsReadable } from "@/api/logs-access"
 import { clusterQuery, projectAlertsQuery, rolloutQuery, traceQuery } from "@/api/queries"
 import { AlertList, RecentNote } from "@/components/alerts"
 import { Ago, CopyButton } from "@/components/bits"
@@ -368,7 +369,9 @@ function Summary({
           <SummaryCardWord>
             <SwapText>{word(status)}</SwapText>
           </SummaryCardWord>
-          {status.desired !== undefined ? <Replicas service={service} onTab={onTab} /> : null}
+          {status.desired !== undefined ? (
+            <Replicas project={project} service={service} onTab={onTab} />
+          ) : null}
         </SummaryCardStatus>
         {since ? (
           <SummaryCardSince>
@@ -462,8 +465,17 @@ function Exceptions({ service }: { service: Service }) {
   )
 }
 
-function Replicas({ service, onTab }: { service: Service; onTab: OnTab }) {
+function Replicas({
+  project,
+  service,
+  onTab,
+}: {
+  project: string
+  service: Service
+  onTab: OnTab
+}) {
   const t = useT()
+  const logs = useLogsReadable(project)
   const { ready, desired } = replicaCounts(service)
   const task = isTask(service.kind)
   const scalable = service.kind === "Deployment" || service.kind === "StatefulSet"
@@ -492,14 +504,16 @@ function Replicas({ service, onTab }: { service: Service; onTab: OnTab }) {
                     <span className="min-w-0 flex-1 truncate font-mono" translate="no">
                       {pod.name}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => onTab("logs", pod.name)}
-                      className="shrink-0 rounded px-1 text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
-                      aria-label={t("pod.logsOf", pod.name)}
-                    >
-                      {t("tab.logs")}
-                    </button>
+                    {logs ? (
+                      <button
+                        type="button"
+                        onClick={() => onTab("logs", pod.name)}
+                        className="shrink-0 rounded px-1 text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
+                        aria-label={t("pod.logsOf", pod.name)}
+                      >
+                        {t("tab.logs")}
+                      </button>
+                    ) : null}
                   </span>
                   <span className="flex flex-wrap gap-x-2 pl-3.5 type-meta text-muted-foreground">
                     <span className={health === "ok" ? undefined : "text-foreground"}>

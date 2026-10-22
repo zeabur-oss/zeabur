@@ -16,8 +16,8 @@
 //!
 //! | Role | Key rights |
 //! |---|---|
-//! | Viewer | `get` and `list` on `pods`, `get` on `pods/log` |
-//! | Developer | `patch` on `deployments.apps`, `create` on `pods/exec`, `get` on `secrets` |
+//! | Viewer | `get` and `list` on `pods` |
+//! | Developer | `get` on `pods/log`, `patch` on `deployments.apps`, `create` on `pods/exec`, `get` on `secrets` |
 //! | Admin | `create` on `rolebindings.rbac.authorization.k8s.io` |
 //!
 //! Rights short of Viewer are no role. A project whose review fails says so, without a role.
@@ -128,13 +128,10 @@ pub fn role(rules: &AccessRules) -> AccountRole {
             .iter()
             .all(|(verb, resource)| rules.allows(verb, resource, "") == Access::Allowed)
     };
-    let viewer = all(&[
-        ("get", core("pods")),
-        ("list", core("pods")),
-        ("get", core("pods/log")),
-    ]);
+    let viewer = all(&[("get", core("pods")), ("list", core("pods"))]);
     let developer = viewer
         && all(&[
+            ("get", core("pods/log")),
             (
                 "patch",
                 ResourceRef::new("apps", "v1", "deployments", "Deployment"),
@@ -279,14 +276,16 @@ mod tests {
     }
 
     fn viewer() -> Vec<AccessRule> {
-        vec![
-            rule(&["get", "list", "watch"], &[""], &["pods", "services"]),
-            rule(&["get"], &[""], &["pods/log"]),
-        ]
+        vec![rule(
+            &["get", "list", "watch"],
+            &[""],
+            &["pods", "services"],
+        )]
     }
 
     fn developer() -> Vec<AccessRule> {
         let mut rules = viewer();
+        rules.push(rule(&["get"], &[""], &["pods/log"]));
         rules.push(rule(
             &["get", "patch", "update"],
             &["apps"],
@@ -309,16 +308,19 @@ mod tests {
             &["rolebindings"],
         ));
         assert_eq!(role(&rules(admin)), AccountRole::Admin);
-        // Binding others without reading logs is not a role the product gives.
+        // Binding others without reading pods is not a role the product gives.
         let odd = vec![rule(
             &["create"],
             &["rbac.authorization.k8s.io"],
             &["rolebindings"],
         )];
         assert_eq!(role(&rules(odd)), AccountRole::None);
-        // Logs are a subresource: `pods` alone does not reach them.
-        let no_logs = vec![rule(&["get", "list"], &[""], &["pods"])];
-        assert_eq!(role(&rules(no_logs)), AccountRole::None);
+        // Logs are a subresource: `pods` alone does not reach them, so no Developer without them.
+        let no_logs: Vec<_> = developer()
+            .into_iter()
+            .filter(|r| r.resources != ["pods/log"])
+            .collect();
+        assert_eq!(role(&rules(no_logs)), AccountRole::Viewer);
         assert_eq!(role(&AccessRules::default()), AccountRole::None);
     }
 

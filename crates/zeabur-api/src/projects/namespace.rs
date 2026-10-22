@@ -96,6 +96,9 @@ pub struct ProjectNamespace {
     /// Whether the person may adopt it or let it go: patch it, and where the admission policy
     /// guards its labels, also `zeabur-manage` it.
     pub can_adopt: Permission,
+    /// Whether the person may read the logs of the project's pods (`get` on `pods/log`). A
+    /// project Viewer may not.
+    pub can_read_logs: Permission,
     /// The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
     /// changes only its details.
     pub labels_guarded: bool,
@@ -130,16 +133,27 @@ pub(crate) async fn get(
         })?;
     let metadata = namespace.metadata;
     let guarded = state.settings.identity.project_roles;
-    let (can_change, can_adopt) =
-        rules.map_or((Permission::Unknown, Permission::Unknown), |rules| {
+    let logs = ResourceRef::new("", "v1", "pods/log", "");
+    let (can_change, can_adopt, can_read_logs) = rules.map_or(
+        (
+            Permission::Unknown,
+            Permission::Unknown,
+            Permission::Unknown,
+        ),
+        |rules| {
             let patch = Permission::from(rules.allows("patch", &resource, &project));
             let manage = if guarded {
                 rules.allows(MANAGE_VERB, &resource, &project).into()
             } else {
                 Permission::Allowed
             };
-            (patch, patch.and(manage))
-        });
+            (
+                patch,
+                patch.and(manage),
+                rules.allows("get", &logs, "").into(),
+            )
+        },
+    );
     Ok(Json(ProjectNamespace {
         origin: Origin::complete("v1", "Namespace", None, &project),
         adopted: metadata
@@ -150,6 +164,7 @@ pub(crate) async fn get(
         details: ProjectDetails::from_annotations(metadata.annotations.as_ref()),
         can_change,
         can_adopt,
+        can_read_logs,
         labels_guarded: guarded,
         name: project,
     }))
