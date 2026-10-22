@@ -434,6 +434,33 @@ function costOf(
   return parts.length > 0 ? parts.join(" ") : undefined
 }
 
+/** What happens when the new pods do not fit, and how to make room; undefined when they fit. */
+export function shortfall(
+  t: Translate,
+  preview: Schemas["Preview"],
+): { cost: string; fix: string } | undefined {
+  const { fit } = preview
+  if (fit.status !== "blocked") return undefined
+  const blockers = fit.blockers ?? []
+  const quota = blockers.some((b) => b.kind === "quota")
+  const nodes = blockers.some((b) => b.kind === "node")
+  const down = preview.rollouts
+    .filter(
+      (r) =>
+        r.actions.includes("start") ||
+        (r.actions.includes("roll") && r.downtime) ||
+        (r.actions.includes("scale") && r.fromReplicas === 0),
+    )
+    .map((r) => r.workload.name)
+  const names = bounded(t, down).text
+  return {
+    cost: quota
+      ? t("plan.short.quota", names, down.length)
+      : t("plan.short.nodes", names, down.length),
+    fix: t("plan.short.fix", quota, nodes),
+  }
+}
+
 function fitFact(t: Translate, plan: Plan): Fact[] {
   return plan.preview?.fit.status === "fits" ? [{ text: t("plan.fact.fits"), tone: "ok" }] : []
 }

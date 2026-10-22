@@ -1,7 +1,7 @@
 import { describe as group, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { actionOf, describe, failureOf, replaced } from "@/components/plan/describe"
+import { actionOf, describe, failureOf, replaced, shortfall } from "@/components/plan/describe"
 import { translator, type Translate } from "@/i18n"
 import { en } from "@/i18n/en"
 import { zhTW } from "@/i18n/zh-TW"
@@ -516,5 +516,69 @@ group("terminals", () => {
       "confirm.toolsCredential(30)",
       "confirm.toolsStops(30, 1)",
     ])
+  })
+})
+
+group("pods that do not fit", () => {
+  type Rollout = Schemas["Rollout"]
+  const roll = (name: string, over: Partial<Rollout> = {}): Rollout => ({
+    workload: { kind: "Deployment", name },
+    actions: ["roll"],
+    downtime: false,
+    ...over,
+  })
+  const preview = (blockers: Schemas["Blocker"][], rollouts: Rollout[]): Schemas["Preview"] => ({
+    dataLoss: [],
+    removals: [],
+    unreadable: [],
+    rollouts,
+    fit: {
+      status: blockers.length > 0 ? "blocked" : "fits",
+      pods: 1,
+      cpuMillicores: 500,
+      memoryBytes: 0,
+      blockers,
+    },
+  })
+  const nodes = { kind: "node", resource: "cpu", need: 500, available: 200 } as const
+  const quota = { kind: "quota", name: "q", resource: "pods", need: 2, available: 0 } as const
+
+  test("nothing to say when they fit", () => {
+    expect(shortfall(t, preview([], [roll("api")]))).toBeUndefined()
+  })
+
+  test("a rolling restart keeps the old pods, so the cost is an unfinished change", () => {
+    expect(shortfall(t, preview([nodes], [roll("api")]))).toEqual({
+      cost: "plan.short.nodes(common.list([]), 0)",
+      fix: "plan.short.fix(false, true)",
+    })
+  })
+
+  test("a quota refuses the pods first and its fix raises it", () => {
+    expect(shortfall(t, preview([quota, nodes], [roll("api")]))).toEqual({
+      cost: "plan.short.quota(common.list([]), 0)",
+      fix: "plan.short.fix(true, true)",
+    })
+  })
+
+  test("what stops first or starts from nothing is named as not running until there is room", () => {
+    const said = shortfall(
+      t,
+      preview(
+        [nodes],
+        [
+          roll("api", { downtime: true, strategy: "Recreate" }),
+          roll("web"),
+          roll("worker", { actions: ["scale"], fromReplicas: 0, replicas: 1 }),
+        ],
+      ),
+    )
+    expect(said?.cost).toBe("plan.short.nodes(common.list([api, worker]), 2)")
+  })
+
+  test("English says the old pods keep running and how to make room", () => {
+    const said = shortfall(english, preview([nodes], [roll("api")]))
+    expect(said?.cost).toContain("The old ones keep running")
+    expect(said?.fix).toBe("To finish it, free up room on a node or reserve less per replica.")
   })
 })

@@ -908,7 +908,21 @@ export const zhCN: Messages = {
   "plan.col.service": "服务",
   "plan.col.replicas": "副本",
   "plan.col.effect": "影响",
-  "plan.blockedReason": "集群资源不足",
+  "plan.short.title": "空间不足",
+  "plan.short.nodes": (names, n) =>
+    n === 0
+      ? "新的 Pod 会停在 Pending，等节点有空间才启动。旧的 Pod 会继续运行，服务不中断，但变更要到那时才完成。"
+      : `新的 Pod 会停在 Pending，等节点有空间才启动。在那之前，${names}${latinEnd(names)}不会运行。`,
+  "plan.short.quota": (names, n) =>
+    n === 0
+      ? "配额会拒绝新的 Pod，直到配额有空间。旧的 Pod 会继续运行，服务不中断，但变更要到那时才完成。"
+      : `配额会拒绝新的 Pod，直到配额有空间。在那之前，${names}${latinEnd(names)}不会运行。`,
+  "plan.short.fix": (quota, nodes) =>
+    quota && nodes
+      ? "要完成变更，调高配额并腾出节点空间，或调低每个副本的预留量。"
+      : quota
+        ? "要完成变更，调高配额或调低每个副本的预留量。"
+        : "要完成变更，腾出节点空间或调低每个副本的预留量。",
   "plan.fact.removed": (n) => `移除 ${n} 项`,
   "plan.fact.changed": (n) => `更改 ${n} 项`,
   "plan.fact.added": (n) => `添加 ${n} 项`,
@@ -1855,7 +1869,6 @@ export const zhCN: Messages = {
   "preview.cores": (n) => `${n} 核 CPU`,
   "preview.fits": (pods, cpu, memory) =>
     `资源足够：峰值时会多出 ${pods} 个 Pod、${cpu} 和 ${memory}。`,
-  "preview.blocked": "资源不足的原因",
   "preview.blockedQuota": (name, resource, need, left) =>
     resource === "pods"
       ? `配额 ${name} 只允许再多 ${left} 个 Pod，这次需要 ${need} 个。`

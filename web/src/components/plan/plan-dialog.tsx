@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
-import ProhibitIcon from "~icons/ph/prohibit"
 import WarningFillIcon from "~icons/ph/warning-fill"
 import XIcon from "~icons/ph/x"
 
@@ -14,7 +13,7 @@ import { bounded, type MountsOf } from "@/components/plan/groups"
 import { PlanGroups } from "@/components/plan/groups-view"
 import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk } from "@/components/plan/planner"
-import { PlanPreview, useBlockers } from "@/components/plan/preview"
+import { PlanPreview, useShortfall } from "@/components/plan/preview"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
@@ -95,10 +94,7 @@ export function PlanDialog({
     : undefined
   const grouped = !!description?.facts
   const light = weight.risk === "low" && !grouped
-  const blockers = useBlockers(
-    plan.data?.preview.fit ?? { status: "notNeeded", pods: 0, cpuMillicores: 0, memoryBytes: 0 },
-  )
-  const blocked = blockers.length > 0
+  const short = useShortfall(plan.data?.preview)
   const named = typedName(ask.changes)
   const [typed, setTyped] = useState("")
   const unconfirmed = awaitsName(ask.changes, typed)
@@ -144,7 +140,7 @@ export function PlanDialog({
         {ready ? (
           <Conclusion
             description={description}
-            blockers={blockers}
+            short={short}
             high={weight.risk === "high"}
             grouped={grouped}
           />
@@ -177,11 +173,7 @@ export function PlanDialog({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t px-5 py-3">
-          {plan.data && blocked ? (
-            <span id="plan-blocked" className="type-meta text-fail-strong">
-              {t("plan.blockedReason")}
-            </span>
-          ) : plan.data && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
+          {plan.data && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
             <span className="type-meta text-muted-foreground tabular-nums">
               {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
             </span>
@@ -198,8 +190,7 @@ export function PlanDialog({
               <Button
                 size="sm"
                 variant={weight.risk === "high" ? "destructive" : "default"}
-                disabled={!plan.data || plan.isFetching || unconfirmed || blocked}
-                aria-describedby={blocked ? "plan-blocked" : undefined}
+                disabled={!plan.data || plan.isFetching || unconfirmed}
                 onClick={confirm}
               >
                 {description?.action ?? actionOf(t, ask)}
@@ -225,32 +216,34 @@ function clock(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
 }
 
-/** What stays in view above the scrolling body: what blocks the plan, what it puts at risk and,
- * for many changes, the summary and its cost. */
+/** What stays in view above the scrolling body: new pods that do not fit, what the plan puts at
+ * risk and, for many changes, the summary and its cost. */
 function Conclusion({
   description,
-  blockers,
+  short,
   high,
   grouped,
 }: {
   description: Description
-  blockers: string[]
+  short?: ReturnType<typeof useShortfall>
   high: boolean
   grouped: boolean
 }) {
   const t = useT()
   const risk = description.risk ?? (high && grouped ? description.consequence : undefined)
-  if (blockers.length === 0 && !risk && !grouped) return null
+  if (!short && !risk && !grouped) return null
   return (
     <div className="flex flex-col gap-3 border-b px-5 py-3">
-      {blockers.length > 0 ? (
-        <Alert variant="destructive" aria-label={t("preview.blocked")}>
-          <ProhibitIcon aria-hidden="true" />
-          <AlertTitle>{t("plan.blockedReason")}</AlertTitle>
+      {short ? (
+        <Alert variant="warn" role="note">
+          <WarningFillIcon aria-hidden="true" />
+          <AlertTitle>{t("plan.short.title")}</AlertTitle>
           <AlertDescription>
-            {blockers.map((line) => (
+            <p>{short.cost}</p>
+            {short.reasons.map((line) => (
               <p key={line}>{line}</p>
             ))}
+            <p>{short.fix}</p>
           </AlertDescription>
         </Alert>
       ) : null}
