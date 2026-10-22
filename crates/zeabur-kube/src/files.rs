@@ -826,21 +826,26 @@ async fn stat_all(
     paths: &[FilePath],
     follow: bool,
 ) -> Result<Vec<Option<Stat>>, FileError> {
-    let answers: Vec<Result<Vec<Option<Stat>>, FileError>> =
-        futures_util::stream::iter(batches(paths))
-            .map(|batch| async move {
-                // `stat` exits 1 when a path has gone; the others are still printed.
-                let output = run(target, &stat_command(batch, follow), usize::MAX).await?;
-                Ok(parse_stats(&output.stdout, batch))
-            })
-            .buffered(STAT_CONCURRENCY)
-            .collect()
-            .await;
     let mut all = Vec::with_capacity(paths.len());
-    for answer in answers {
-        all.extend(answer?);
+    for group in batches(paths).chunks(STAT_CONCURRENCY) {
+        let answers =
+            futures_util::future::join_all(group.iter().map(|b| stat_batch(target, b, follow)))
+                .await;
+        for answer in answers {
+            all.extend(answer?);
+        }
     }
     Ok(all)
+}
+
+async fn stat_batch(
+    target: Target<'_>,
+    batch: &[FilePath],
+    follow: bool,
+) -> Result<Vec<Option<Stat>>, FileError> {
+    // `stat` exits 1 when a path has gone; the others are still printed.
+    let output = run(target, &stat_command(batch, follow), usize::MAX).await?;
+    Ok(parse_stats(&output.stdout, batch))
 }
 
 /// What `path` is; `None` when it does not exist. Links are not followed.
@@ -863,7 +868,21 @@ pub async fn stat(target: Target<'_>, path: &FilePath) -> Result<Option<Stat>, F
 ///
 /// When the path does not exist or a command fails.
 pub async fn resolve(target: Target<'_>, path: &FilePath) -> Result<FilePath, FileError> {
-    let output = succeed(target, &resolve_command(path), MAX_PATH + 1).await?;
+    // `readlink -f` fails without a word when a folder on the way does not exist.
+    let output = succeed(target, &resolve_command(path), MAX_PATH + 1)
+        .await
+        .map_err(|e| match e {
+            FileError::Failed { message, .. } if message.is_empty() => FileError::Failed {
+                failure: Failure::NotFound,
+                message: format!("{path}: No such file or directory"),
+            },
+            FileError::Cluster(_)
+            | FileError::CommandNotFound(_)
+            | FileError::Failed { .. }
+            | FileError::NotAFile(_)
+            | FileError::TooLarge { .. }
+            | FileError::Protocol(_) => e,
+        })?;
     let text = String::from_utf8_lossy(&output);
     let text = text.strip_suffix('\n').unwrap_or(&text);
     FilePath::parse(text).ok_or_else(|| FileError::Protocol(format!("readlink printed {text:?}")))
