@@ -105,6 +105,46 @@ group("describe", () => {
     ])
   })
 
+  test("readers Reloader restarts get no restart warning; the plan says Reloader restarts them", () => {
+    const d = describe(
+      t,
+      {
+        changes: [
+          {
+            op: "data",
+            kind: "ConfigMap",
+            name: "shop-config",
+            changes: [{ op: "set", key: "mode", value: "green" }],
+          },
+        ],
+      },
+      plan({
+        impact: [api, web, worker],
+        warnings: [
+          { code: "reloaderRestarts", workloads: [web, worker], confirmed: true },
+          { code: "restartNeeded", workloads: [api] },
+        ],
+      }),
+      pods({}),
+    )
+    expect(d.lines).toStrictEqual([
+      "confirm.data(, , common.list([mode]), ConfigMap, shop-config)",
+      "confirm.readersKeepOld(common.list([api]), shop-config, 1)",
+      "confirm.reloaderRestarts(common.list([web, worker]), 2)",
+    ])
+  })
+
+  test("turning Reloader on restarts nothing now", () => {
+    const d = describe(
+      t,
+      { changes: [{ op: "configReload", workload: api, enabled: true }] },
+      plan({ impact: [api] }),
+      pods({}),
+    )
+    expect(d.lines).toStrictEqual(["confirm.configReloadOn(api)"])
+    expect(d.action).toBe("action.turnOn")
+  })
+
   test("variables replace the pods of their service", () => {
     const d = describe(
       t,

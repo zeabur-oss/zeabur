@@ -196,7 +196,6 @@ function AlsoMeans({
                 void planner.plan({
                   title: t("rollout.rollBack", service.name),
                   changes: rollback.changes,
-                  restartAfter: rollback.restartAfter,
                   service: { kind: service.kind, name: service.name },
                 })
               }
@@ -274,7 +273,6 @@ function Rollout({
               void planner.plan({
                 title: t("rollout.rollBack", service.name),
                 changes: rollback.changes,
-                restartAfter: rollback.restartAfter,
                 service: { kind: service.kind, name: service.name },
               })
             }
@@ -551,7 +549,6 @@ function Reachability({
                     void planner.plan({
                       title: t("trace.fixTitle", route.address),
                       changes: fix.changes,
-                      restartAfter: fix.restartAfter,
                       service: { kind: service.kind, name: service.name },
                     })
                 : undefined

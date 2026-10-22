@@ -918,6 +918,8 @@ export const zhTW: Messages = {
   "plan.filter": "篩選變更",
   "plan.noMatch": "沒有符合的變更。",
   "plan.showAll": (n) => `顯示全部 ${n} 個`,
+  "plan.alsoRestart": () => "一併重新啟動",
+  "plan.restartByItself": "下次自動重新啟動",
   "plan.other": "其他欄位",
   "plan.field.size": "大小",
   "plan.col.field": "欄位",
@@ -979,7 +981,8 @@ export const zhTW: Messages = {
   "warn.toolsCredentialExposed": (namespace: string) =>
     `這個終端機的容器執行期間，只要有權在 ${namespace} 的容器裡執行指令，就能使用你的認證資訊。`,
   "warn.restartNeeded": (names: string) => `重新啟動後才會生效：${names}`,
-  "warn.restartAdded": (names: string) => `也會重新啟動 ${names}`,
+  "warn.reloaderRestarts": (names: string) => `Reloader 會重新啟動 ${names}`,
+  "warn.reloaderMayRestart": (names: string) => `若這個叢集有執行 Reloader，會重新啟動 ${names}`,
   "warn.tlsHostChanged": (host: string, route: string) =>
     `${route} 的 HTTPS 設定仍是舊網域；${host} 需要新的憑證`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
@@ -1033,6 +1036,12 @@ export const zhTW: Messages = {
       .join("，")}。${removed ? "刪除的值無法在這裡復原。" : ""}`,
   "confirm.keepsOld": (names) => `${names} 在重新啟動前仍使用舊值。`,
   "confirm.readersKeepOld": (names, object) => `${names} 讀取 ${object}，在重新啟動前仍使用舊值。`,
+  "confirm.reloaderRestarts": (names) => `接著 Reloader 會以新的值重新啟動 ${names}。`,
+  "confirm.reloaderMayRestart": (names) =>
+    `${names} 已設定由 Reloader 重新啟動；Zeabur 無法確認這個叢集有沒有執行 Reloader。`,
+  "confirm.configReloadOn": (name) =>
+    `${name} 讀取的 ConfigMap 或 Secret 變更時會自動重新啟動。現在不會重新啟動。`,
+  "confirm.configReloadOff": (name) => `${name} 的 ConfigMap 或 Secret 變更時，不再自動重新啟動。`,
   "confirm.alsoReads": (names, object) => `也會影響 ${names}（讀取 ${object}）。`,
   "confirm.alsoAffects": (names) => `也會影響 ${names}。`,
   "confirm.addDomain": (host, service) => `${host} 會連到 ${service}。`,
@@ -1073,7 +1082,8 @@ export const zhTW: Messages = {
   "action.restart": "重新啟動",
   "action.saveVariables": "儲存環境變數",
   "action.saveValues": "儲存值",
-  "action.saveAndRestart": "儲存並重新啟動",
+  "action.turnOn": "開啟",
+  "action.turnOff": "關閉",
   "action.addDomain": "新增網域",
   "action.renameDomain": "更改網域",
   "action.removeDomain": "移除網域",
@@ -1111,6 +1121,7 @@ export const zhTW: Messages = {
   "title.env": (service: string) => `${service} 的環境變數`,
   "title.data": (kind: string, name: string) => `${kind} ${name}`,
   "title.restart": (service: string) => `重新啟動 ${service}`,
+  "title.configReload": (service: string) => `設定變更時重新啟動 ${service}`,
   "title.addDomain": (host: string) => `新增 ${host}`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `移除 ${host}`,
@@ -1228,8 +1239,20 @@ export const zhTW: Messages = {
   "vars.container": "容器",
   "data.addKey": "新增鍵",
   "data.key": "鍵",
-  "data.restartAfter": "套用後重新啟動讀取它的服務",
   "data.readers": "讀取者",
+  "reload.switch": "設定變更時自動重新啟動",
+  "reload.on": "它讀取的 ConfigMap 或 Secret 一有變更就會重新啟動，不論是誰改的。",
+  "reload.off": "重新啟動前會繼續使用舊的值。",
+  "reload.notInstalled":
+    "這個叢集沒有安裝 Reloader，所以還不會重新啟動。請叢集管理員安裝 Stakater Reloader。",
+  "reload.stopped": "Reloader 已安裝但沒有在執行，恢復執行前不會重新啟動。",
+  "reload.how": "運作方式",
+  "reload.mechanism":
+    "由叢集裡的 Stakater Reloader 重新啟動。這個設定是工作負載上的 reloader.stakater.com/auto 註解，本身不會重新啟動任何東西。",
+  "reload.named": (names) =>
+    `它的註解也指定了 ${names}，不論這裡是否開啟，這些變更都會讓它重新啟動。`,
+  "reload.unknown": "以你的權限，Zeabur 看不到這個叢集有沒有執行 Reloader。",
+  "reload.running": "這個叢集有執行 Reloader。",
   "data.reveal": "顯示值",
   "data.binary": "二進位",
   "data.noChanges": "沒有變更。",
@@ -1950,6 +1973,7 @@ export const zhTW: Messages = {
   "preview.removal": (path, name) => `會從 ${name} 移除 ${path}，目前是`,
   "preview.leftOut": "（你編輯時沒有保留）",
   "env.pendingRestart": "重新啟動前可能仍在使用舊的值",
+  "env.restartByItself": "自動重新啟動",
   "env.pendingRestartDetail": (pod) => `這個值在 ${pod} 啟動後才變更。重新啟動服務才會使用新的值。`,
   // ia:end
 }
