@@ -12,9 +12,10 @@
 //! 3. **Controller.** The controller of the Ingress's class has a ready replica (see
 //!    [`crate::incidents`]); an `ingressClassName` no IngressClass has fails.
 //! 4. **Certificate.** For a host listed under `spec.tls`: cert-manager's `Certificate` for its
-//!    `secretName` is `Ready` [cert-manager-certificate]. Without such a `Certificate`, the Secret
-//!    is not checked further, and a missing one is unknown too: the controller then serves its
-//!    default certificate, which may be a valid wildcard Zeabur cannot read.
+//!    `secretName` is `Ready` [cert-manager-certificate]; one still being issued is unknown, not
+//!    failed. Without such a `Certificate`, the Secret is not checked further, and a missing one is
+//!    unknown too: the controller then serves its default certificate, which may be a valid
+//!    wildcard Zeabur cannot read.
 //! 5. **Route.** An Ingress is taken up once its controller writes an address into its status; an
 //!    `HTTPRoute` once a Gateway sets `Accepted` (and `ResolvedRefs` is not `False`)
 //!    [gateway-route-status]. Ingress controllers that never write status leave this unknown.
@@ -23,6 +24,9 @@
 //! 7. **Target port.** The Service's `targetPort` is a port of the containers, as the diagnosis
 //!    reads it.
 //! 8. **Ready.** At least one pod is ready; a Service sends only to ready pods.
+//!
+//! A domain with a host also gets a [`DomainCheck`]: the address its DNS should point to, whether
+//! it does, and its certificate, for a page that says what to set up rather than which hop failed.
 //!
 //! The private address `<service>.<namespace>.svc.cluster.local` has the last three. Whether the
 //! program listens on all interfaces rather than `127.0.0.1` is not traced: it can only be seen
@@ -40,8 +44,8 @@ use k8s_openapi::api::networking::v1::{Ingress, IngressServiceBackend};
 use serde_json::Value;
 use zeabur_graph::Snapshot;
 use zeabur_model::{
-    AddressKind, Diagnosis, DiagnosisKind, Health, Hop, HopStatus, HopStep, HttpRoute, Message,
-    Origin, RouteTrace, Service,
+    AddressKind, CertificateCheck, CertificateState, Diagnosis, DiagnosisKind, DnsState,
+    DomainCheck, Health, Hop, HopStatus, HopStep, HttpRoute, Message, Origin, RouteTrace, Service,
 };
 
 use crate::diagnose::fault::fault;
@@ -83,6 +87,8 @@ pub struct TraceInput<'a> {
     pub components: Option<&'a [Component]>,
     /// The namespace's Certificates.
     pub certificates: Certificates<'a>,
+    /// The namespace's ACME `Challenges`; empty when none is under way or they were not read.
+    pub challenges: &'a [Value],
     /// The names looked up, by name.
     pub resolved: &'a BTreeMap<String, Resolved>,
     /// Whether the Services could be listed.
@@ -109,7 +115,7 @@ pub fn names_to_resolve(input: &TraceInput<'_>, service: &Service) -> Vec<String
                 .filter(|h| !h.contains('*')),
         );
         out.extend(
-            load_balancer(ingress)
+            entry(input, ingress)
                 .into_iter()
                 .filter(|a| a.parse::<std::net::IpAddr>().is_err()),
         );
@@ -204,6 +210,100 @@ fn load_balancer(ingress: &Ingress) -> Vec<String> {
         .collect()
 }
 
+fn class_of(ingress: &Ingress) -> Option<String> {
+    ingress
+        .spec
+        .as_ref()
+        .and_then(|s| s.ingress_class_name.clone())
+        .or_else(|| {
+            ingress
+                .metadata
+                .annotations
+                .as_ref()?
+                .get("kubernetes.io/ingress.class")
+                .cloned()
+        })
+}
+
+/// The addresses a domain of `ingress` should point to: its own status, or, until its controller
+/// writes one, the status of the namespace's other Ingresses of the same class.
+fn entry(input: &TraceInput<'_>, ingress: &Ingress) -> Vec<String> {
+    let own = load_balancer(ingress);
+    if !own.is_empty() {
+        return own;
+    }
+    let class = class_of(ingress);
+    let mut out = BTreeSet::new();
+    for other in &input.snapshot.ingresses {
+        if class_of(other) == class {
+            out.extend(load_balancer(other));
+        }
+    }
+    out.into_iter().collect()
+}
+
+/// The addresses the namespace's Ingresses are served on, for a domain not added yet.
+#[must_use]
+pub fn ingress_addresses(snapshot: &Snapshot) -> Vec<String> {
+    snapshot
+        .ingresses
+        .iter()
+        .flat_map(load_balancer)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+/// `target` and the addresses its hostnames resolved to: any of them is the cluster's.
+fn wanted(input: &TraceInput<'_>, target: &[String]) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    for address in target {
+        out.insert(address.clone());
+        if let Some(Resolved::Addresses(more)) = input.resolved.get(address) {
+            out.extend(more.iter().cloned());
+        }
+    }
+    out
+}
+
+/// What setting up `host` needs, for a host that is not a wildcard.
+fn domain_check(
+    input: &TraceInput<'_>,
+    ingress: &Ingress,
+    host: &str,
+    certificate: Option<&CertificateCheck>,
+) -> Option<DomainCheck> {
+    if host.contains('*') {
+        return None;
+    }
+    let target = entry(input, ingress);
+    let (dns, resolved) = dns_state(input, host, &target);
+    Some(DomainCheck {
+        target,
+        dns,
+        resolved,
+        certificate: certificate.cloned(),
+    })
+}
+
+fn dns_state(input: &TraceInput<'_>, host: &str, target: &[String]) -> (DnsState, Vec<String>) {
+    match input.resolved.get(host) {
+        Some(Resolved::Addresses(addresses)) if !addresses.is_empty() => {
+            let wanted = wanted(input, target);
+            let state = if wanted.is_empty() {
+                DnsState::Unknown
+            } else if addresses.iter().any(|a| wanted.contains(a)) {
+                DnsState::PointsHere
+            } else {
+                DnsState::Elsewhere
+            };
+            (state, addresses.clone())
+        }
+        Some(Resolved::NotFound(_)) => (DnsState::Missing, Vec::new()),
+        _ => (DnsState::Unknown, Vec::new()),
+    }
+}
+
 fn hop(step: HopStep, status: HopStatus, variant: &str) -> Hop {
     Hop {
         step,
@@ -267,9 +367,11 @@ pub fn trace(input: &TraceInput<'_>, service: &Service) -> Vec<RouteTrace> {
             let resolved = host.as_deref().and_then(|h| dns(input, h, &mut hops));
             hops.push(address(input, ingress, resolved.as_deref()));
             hops.push(controller(input, ingress));
-            if let Some(host) = &host {
-                hops.extend(certificate(input, ingress, host));
-            }
+            let certified = host.as_deref().and_then(|h| certificate(input, ingress, h));
+            let domain = host
+                .as_deref()
+                .and_then(|h| domain_check(input, ingress, h, certified.as_ref().map(|(_, c)| c)));
+            hops.extend(certified.map(|(hop, _)| hop));
             let lb = load_balancer(ingress);
             hops.push(if lb.is_empty() {
                 hop(HopStep::Route, HopStatus::Unknown, "noStatus").with("route", name)
@@ -291,12 +393,14 @@ pub fn trace(input: &TraceInput<'_>, service: &Service) -> Vec<RouteTrace> {
                 &origin,
                 &mut hops,
             );
-            out.push(finish(
+            let mut trace = finish(
                 AddressKind::Domain,
                 host.unwrap_or_else(|| "*".to_owned()),
                 Origin::object("Ingress", name),
                 hops,
-            ));
+            );
+            trace.domain = domain;
+            out.push(trace);
         }
     }
     for route in http_routes(input.http_routes) {
@@ -359,6 +463,7 @@ fn finish(kind: AddressKind, address: String, via: Origin, hops: Vec<Hop>) -> Ro
         via,
         hops,
         status,
+        domain: None,
     }
 }
 
@@ -404,13 +509,7 @@ fn address(input: &TraceInput<'_>, ingress: &Ingress, resolved: Option<&[String]
             .expected(lb.join(", "))
             .evidence(evidence);
     };
-    let mut wanted: BTreeSet<String> = BTreeSet::new();
-    for address in &lb {
-        wanted.insert(address.clone());
-        if let Some(Resolved::Addresses(more)) = input.resolved.get(address) {
-            wanted.extend(more.iter().cloned());
-        }
-    }
+    let wanted = wanted(input, &lb);
     let base = |status, variant| {
         hop(HopStep::Address, status, variant)
             .with("route", name)
@@ -427,18 +526,7 @@ fn address(input: &TraceInput<'_>, ingress: &Ingress, resolved: Option<&[String]
 
 fn controller(input: &TraceInput<'_>, ingress: &Ingress) -> Hop {
     let name = ingress.metadata.name.as_deref().unwrap_or_default();
-    let class = ingress
-        .spec
-        .as_ref()
-        .and_then(|s| s.ingress_class_name.clone())
-        .or_else(|| {
-            ingress
-                .metadata
-                .annotations
-                .as_ref()?
-                .get("kubernetes.io/ingress.class")
-                .cloned()
-        });
+    let class = class_of(ingress);
     let evidence = Origin::field("Ingress", name, "spec.ingressClassName".to_owned());
     let controller_name = match (&class, input.classes) {
         (_, None) => {
@@ -510,7 +598,65 @@ fn controller(input: &TraceInput<'_>, ingress: &Ingress) -> Hop {
     }
 }
 
-fn certificate(input: &TraceInput<'_>, ingress: &Ingress, host: &str) -> Option<Hop> {
+const fn not_checked() -> CertificateCheck {
+    CertificateCheck {
+        state: CertificateState::NotChecked,
+        name: None,
+        reason: None,
+        message: None,
+        not_after: None,
+    }
+}
+
+fn condition<'a>(certificate: &'a Value, kind: &str) -> Option<&'a Value> {
+    certificate
+        .pointer("/status/conditions")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .find(|c| c.get("type").and_then(Value::as_str) == Some(kind))
+}
+
+fn text(value: Option<&Value>, key: &str) -> String {
+    value
+        .and_then(|v| v.get(key))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned()
+}
+
+/// The ACME challenge cert-manager runs for `host`, if one is under way.
+fn challenge<'a>(input: &TraceInput<'a>, host: &str) -> Option<&'a Value> {
+    input.challenges.iter().find(|c| {
+        c.pointer("/spec/dnsName")
+            .and_then(Value::as_str)
+            .is_some_and(|name| {
+                name == host
+                    || name
+                        .strip_prefix("*.")
+                        .is_some_and(|base| host.split_once('.').is_some_and(|(_, r)| r == base))
+            })
+    })
+}
+
+/// The certificate hop of `host` and how its certificate stands, when `ingress` lists the host
+/// for HTTPS.
+///
+/// cert-manager sets `Issuing` while it requests a certificate and `Ready` once one is valid; a
+/// failed request leaves `Issuing` `False` with reason `Failed` until it retries
+/// [cert-manager-conditions]. While it issues, the ACME `Challenge` for the host says what it
+/// waits for, such as an HTTP-01 self check the domain does not pass yet.
+///
+/// [cert-manager-conditions]: https://cert-manager.io/docs/reference/api-docs/#cert-manager.io/v1.CertificateCondition
+#[expect(
+    clippy::too_many_lines,
+    reason = "one hop, each state of cert-manager in turn"
+)]
+fn certificate(
+    input: &TraceInput<'_>,
+    ingress: &Ingress,
+    host: &str,
+) -> Option<(Hop, CertificateCheck)> {
     let name = ingress.metadata.name.as_deref().unwrap_or_default();
     let (index, tls) = ingress
         .spec
@@ -522,7 +668,7 @@ fn certificate(input: &TraceInput<'_>, ingress: &Ingress, host: &str) -> Option<
         .find(|(_, tls)| tls.hosts.iter().flatten().any(|h| h == host))?;
     let field = format!("spec.tls[{index}].secretName");
     let Some(secret) = tls.secret_name.as_deref() else {
-        return Some(
+        return Some((
             hop(
                 HopStep::Certificate,
                 HopStatus::Unknown,
@@ -531,7 +677,8 @@ fn certificate(input: &TraceInput<'_>, ingress: &Ingress, host: &str) -> Option<
             .with("host", host)
             .with("route", name)
             .evidence(Origin::field("Ingress", name, field)),
-        );
+            not_checked(),
+        ));
     };
     let base = |status, variant| {
         hop(HopStep::Certificate, status, variant)
@@ -548,19 +695,8 @@ fn certificate(input: &TraceInput<'_>, ingress: &Ingress, host: &str) -> Option<
             .pointer("/metadata/name")
             .and_then(Value::as_str)
             .unwrap_or_default();
-        let ready = certificate
-            .pointer("/status/conditions")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .find(|c| c.get("type").and_then(Value::as_str) == Some("Ready"));
-        let text = |key: &str| {
-            ready
-                .and_then(|c| c.get(key))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned()
-        };
+        let ready = condition(certificate, "Ready");
+        let issuing = condition(certificate, "Issuing");
         let origin = Origin::complete(
             "cert-manager.io/v1",
             "Certificate",
@@ -568,25 +704,76 @@ fn certificate(input: &TraceInput<'_>, ingress: &Ingress, host: &str) -> Option<
             certificate_name,
         )
         .with_field("status.conditions[type=Ready]".to_owned());
-        let hop = match text("status").as_str() {
-            "True" => {
-                let until = certificate
-                    .pointer("/status/notAfter")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default();
-                base(HopStatus::Ok, "ok").with("until", until).saw("True")
-            }
-            "False" => base(HopStatus::Failed, "notReady")
-                .with("certificate", certificate_name)
-                .with("reason", text("reason"))
-                .expected("True")
-                .saw(format!("False: {}", text("message"))),
-            _ => base(HopStatus::Unknown, "pending").with("certificate", certificate_name),
+        let not_after = certificate
+            .pointer("/status/notAfter")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let check = |state, reason: String, message: String| CertificateCheck {
+            state,
+            name: Some(certificate_name.to_owned()),
+            reason: (!reason.is_empty()).then_some(reason),
+            message: (!message.is_empty()).then_some(message),
+            not_after: not_after.clone(),
         };
-        return Some(hop.evidence(origin.with_value(text("status"))));
+        let challenge = challenge(input, host);
+        let challenge_state = text(challenge.and_then(|c| c.get("status")), "state");
+        let challenge_reason = text(challenge.and_then(|c| c.get("status")), "reason");
+        let challenge_failed = matches!(challenge_state.as_str(), "invalid" | "errored");
+        let issuing_now = text(issuing, "status") == "True";
+        let (hop, check) = if text(ready, "status") == "True" {
+            (
+                base(HopStatus::Ok, "ok")
+                    .with("until", not_after.clone().unwrap_or_default())
+                    .saw("True"),
+                check(CertificateState::Ready, String::new(), String::new()),
+            )
+        } else if issuing_now && challenge_failed {
+            (
+                base(HopStatus::Failed, "notReady")
+                    .with("certificate", certificate_name)
+                    .with("reason", &challenge_state)
+                    .expected("True")
+                    .saw(format!("{challenge_state}: {challenge_reason}")),
+                check(CertificateState::Failed, challenge_state, challenge_reason),
+            )
+        } else if issuing_now {
+            let (reason, message) = if challenge.is_some() {
+                (challenge_state, challenge_reason)
+            } else {
+                (text(issuing, "reason"), text(issuing, "message"))
+            };
+            (
+                base(HopStatus::Unknown, "issuing").with("certificate", certificate_name),
+                check(CertificateState::Issuing, reason, message),
+            )
+        } else if text(ready, "status") == "False" {
+            let source = if text(issuing, "status") == "False" {
+                issuing
+            } else {
+                ready
+            };
+            let (reason, message) = (text(source, "reason"), text(source, "message"));
+            (
+                base(HopStatus::Failed, "notReady")
+                    .with("certificate", certificate_name)
+                    .with("reason", &reason)
+                    .expected("True")
+                    .saw(format!("False: {message}")),
+                check(CertificateState::Failed, reason, message),
+            )
+        } else {
+            (
+                base(HopStatus::Unknown, "pending").with("certificate", certificate_name),
+                check(CertificateState::Issuing, String::new(), String::new()),
+            )
+        };
+        return Some((
+            hop.evidence(origin.with_value(text(ready, "status"))),
+            check,
+        ));
     }
     if !input.secrets_readable {
-        return Some(base(HopStatus::Unknown, "unreadable"));
+        return Some((base(HopStatus::Unknown, "unreadable"), not_checked()));
     }
     let present = input
         .snapshot
@@ -594,11 +781,17 @@ fn certificate(input: &TraceInput<'_>, ingress: &Ingress, host: &str) -> Option<
         .iter()
         .any(|s| s.metadata.name.as_deref() == Some(secret));
     Some(if present {
-        base(HopStatus::Unknown, "notChecked").evidence(Origin::object("Secret", secret))
+        (
+            base(HopStatus::Unknown, "notChecked").evidence(Origin::object("Secret", secret)),
+            not_checked(),
+        )
     } else {
-        base(HopStatus::Unknown, "secretMissing")
-            .expected(secret)
-            .evidence(Origin::field("Ingress", name, field))
+        (
+            base(HopStatus::Unknown, "secretMissing")
+                .expected(secret)
+                .evidence(Origin::field("Ingress", name, field)),
+            not_checked(),
+        )
     })
 }
 

@@ -47,10 +47,26 @@ pub struct ServiceTrace {
     pub diagnoses: Vec<Diagnosis>,
     /// Reads the person was refused; hops that needed them are unknown.
     pub unreadable: Vec<UnreadableView>,
+    /// The addresses the project's Ingresses are served on: where a new domain's DNS should
+    /// point. Empty when no Ingress has an address in its status.
+    pub ingress_addresses: Vec<String>,
 }
 
 fn certificates() -> ResourceRef {
     ResourceRef::new("cert-manager.io", "v1", "certificates", "Certificate")
+}
+
+fn challenges() -> ResourceRef {
+    ResourceRef::new("acme.cert-manager.io", "v1", "challenges", "Challenge")
+}
+
+fn ready(certificate: &serde_json::Value) -> bool {
+    certificate
+        .pointer("/status/conditions")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .any(|c| c["type"] == "Ready" && c["status"] == "True")
 }
 
 /// The way traffic travels to one service, hop by hop: DNS, the ingress controller's address and
@@ -117,6 +133,28 @@ pub(crate) async fn of_service(
         Some(listed) => Certificates::Listed(listed),
         None => Certificates::NotInstalled,
     };
+    // The challenges say what an issuing certificate waits for; read only while one is.
+    let mut challenge_values = Vec::new();
+    if let Certificates::Listed(listed) = certificates
+        && listed.iter().any(|c| !ready(c))
+    {
+        let resource = challenges();
+        match cluster.list_objects(&resource, Some(project)).await {
+            Ok(Some(objects)) => {
+                challenge_values = objects
+                    .into_iter()
+                    .filter_map(|o| serde_json::to_value(o).ok())
+                    .collect();
+            }
+            Ok(None) => {}
+            Err(error) => {
+                let refusal = error
+                    .into_unreadable(&resource.key())
+                    .map_err(|other| ApiError::from(other.into_problem("Challenges")))?;
+                unreadable.push(refusal.into());
+            }
+        }
+    }
     let readable = |resource: &str| {
         !read
             .document
@@ -130,6 +168,7 @@ pub(crate) async fn of_service(
         classes: classes_readable.then_some(classes.as_slice()),
         components: components.as_deref(),
         certificates,
+        challenges: &challenge_values,
         resolved: &std::collections::BTreeMap::new(),
         services_readable: readable("services"),
         secrets_readable: readable("secrets"),
@@ -154,6 +193,7 @@ pub(crate) async fn of_service(
         routes,
         diagnoses,
         unreadable,
+        ingress_addresses: zeabur_gaps::ingress_addresses(&read.snapshot),
     })
 }
 

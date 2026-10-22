@@ -23,6 +23,7 @@ pub use rules::{
 };
 pub use snippet::snippet;
 pub use trace::{
-    Certificates, Resolved, TraceInput, diagnoses as trace_diagnoses, names_to_resolve, trace,
+    Certificates, Resolved, TraceInput, diagnoses as trace_diagnoses, ingress_addresses,
+    names_to_resolve, trace,
 };
 pub use zeabur_kernel::names::GatewayRef;

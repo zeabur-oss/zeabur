@@ -160,6 +160,7 @@ export default sentences({
     "trace.certificate.defaultCertificate": "${route} lists ${host} for HTTPS without a secret, so the controller serves its default certificate.",
     "trace.certificate.ok": "The certificate for ${host} is issued${until, select, none {} other {, valid until ${until}}}.",
     "trace.certificate.notReady": "Certificate ${certificate} for ${host} isn't issued${reason, select, none {} other { (${reason})}}.",
+    "trace.certificate.issuing": "cert-manager is issuing certificate ${certificate} for ${host}.",
     "trace.certificate.pending": "Certificate ${certificate} for ${host} has no result yet.",
     "trace.certificate.unreadable": "Zeabur can't read the project's secrets, so it can't check the certificate for ${host} in secret ${secret}.",
     "trace.certificate.notChecked": "Secret ${secret} holds the certificate for ${host}; Zeabur doesn't check it further.",

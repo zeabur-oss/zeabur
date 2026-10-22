@@ -157,6 +157,7 @@
     "trace.certificate.defaultCertificate": "${route} 為 ${host} 啟用 HTTPS，卻沒有指定機密，所以控制器會提供它的預設憑證。",
     "trace.certificate.ok": "${host} 的憑證已簽發${until, select, none {} other {，有效期限到 ${until}}}。",
     "trace.certificate.notReady": "${host} 的憑證 ${certificate} 尚未簽發${reason, select, none {} other {（${reason}）}}。",
+    "trace.certificate.issuing": "cert-manager 正在為 ${host} 簽發憑證 ${certificate}。",
     "trace.certificate.pending": "${host} 的憑證 ${certificate} 還沒有結果。",
     "trace.certificate.unreadable": "Zeabur 無法讀取專案的機密，因此無法檢查機密 ${secret} 裡 ${host} 的憑證。",
     "trace.certificate.notChecked": "機密 ${secret} 存有 ${host} 的憑證；Zeabur 不會進一步檢查。",

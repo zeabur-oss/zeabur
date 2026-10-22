@@ -42,7 +42,10 @@ pub use project::{
 pub use provenance::{Provenance, Tool};
 pub use reload::ConfigReload;
 pub use source::{ObjectRef, Origin, Source, SourceKind};
-pub use trace::{AddressKind, Hop, HopStatus, HopStep, RouteTrace};
+pub use trace::{
+    AddressKind, CertificateCheck, CertificateState, DnsState, DomainCheck, Hop, HopStatus,
+    HopStep, RouteTrace,
+};
 pub use workload::{
     Classification, ContainerStatusSummary, ContainerTermination, ContainerWaiting, ManagedBy,
     Phase, PodSummary, Replicas, WorkloadKind, WorkloadSummary,

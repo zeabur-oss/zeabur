@@ -15,7 +15,7 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod, Secret, Service};
     use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{DynamicObject, NamespaceObjects, SecretSummary};
+    use zeabur_kube::{DynamicObject, NamespaceObjects, SecretSummary, ServedResource};
 
     use crate::common::send;
 
@@ -234,5 +234,56 @@ mod tests {
         );
         assert_eq!(domain["hops"][2]["status"], "unknown");
         assert_eq!(trace["unreadable"][0]["resource"], "deployments.apps");
+    }
+
+    #[tokio::test]
+    async fn a_domain_names_its_dns_target_and_what_its_certificate_waits_for() {
+        let cluster = cluster(1);
+        cluster.update(|s| {
+            s.served.push(ServedResource::readable(
+                "cert-manager.io",
+                "v1",
+                "certificates",
+                "Certificate",
+                true,
+            ));
+            s.served.push(ServedResource::readable(
+                "acme.cert-manager.io",
+                "v1",
+                "challenges",
+                "Challenge",
+                true,
+            ));
+            s.dynamic.push(from(json!({
+                "apiVersion": "cert-manager.io/v1", "kind": "Certificate",
+                "metadata": {"name": "web-tls", "namespace": "shop"},
+                "spec": {"secretName": "web-tls", "dnsNames": ["shop.example.test"]},
+                "status": {"conditions": [
+                    {"type": "Ready", "status": "False", "reason": "DoesNotExist"},
+                    {"type": "Issuing", "status": "True", "reason": "DoesNotExist"}]}
+            })));
+            s.dynamic.push(from(json!({
+                "apiVersion": "acme.cert-manager.io/v1", "kind": "Challenge",
+                "metadata": {"name": "web-tls-1-2-3", "namespace": "shop"},
+                "spec": {"dnsName": "shop.example.test", "type": "HTTP-01"},
+                "status": {"state": "pending",
+                    "reason": "Waiting for HTTP-01 challenge propagation: connection refused"}
+            })));
+        });
+        let app = app(&cluster, &[("shop.example.test", "198.51.100.7")]);
+        let (status, trace) = send(&app, "GET", TRACE, None).await;
+        assert_eq!(status, StatusCode::OK, "{trace}");
+        assert_eq!(trace["ingressAddresses"], json!(["203.0.113.10"]));
+        let domain = &trace["routes"][0]["domain"];
+        assert_eq!(domain["target"], json!(["203.0.113.10"]), "{trace}");
+        assert_eq!(domain["dns"], "elsewhere");
+        assert_eq!(domain["resolved"], json!(["198.51.100.7"]));
+        assert_eq!(domain["certificate"]["state"], "issuing");
+        assert_eq!(domain["certificate"]["name"], "web-tls");
+        assert_eq!(
+            domain["certificate"]["message"],
+            "Waiting for HTTP-01 challenge propagation: connection refused"
+        );
+        assert!(trace["routes"][1].get("domain").is_none());
     }
 }

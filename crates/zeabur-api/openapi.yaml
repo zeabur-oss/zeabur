@@ -2928,6 +2928,43 @@ components:
           items:
             $ref: "#/components/schemas/Capability"
           description: "Each capability, sorted by name: existing (with evidence) or not (with what to install)."
+    CertificateCheck:
+      type: object
+      description: A domain's certificate, as cert-manager reports it.
+      required:
+      - state
+      properties:
+        message:
+          type:
+          - string
+          - "null"
+          description: cert-manager's own words, in English.
+        name:
+          type:
+          - string
+          - "null"
+          description: The `Certificate`, when one manages it.
+        notAfter:
+          type:
+          - string
+          - "null"
+          description: When it expires (`status.notAfter`).
+        reason:
+          type:
+          - string
+          - "null"
+          description: cert-manager's reason (`Failed`, `DoesNotExist`) or the ACME challenge's state.
+        state:
+          $ref: "#/components/schemas/CertificateState"
+          description: How it stands.
+    CertificateState:
+      type: string
+      description: How a domain's certificate stands.
+      enum:
+      - ready
+      - issuing
+      - failed
+      - notChecked
     Change:
       oneOf:
       - type: object
@@ -4730,6 +4767,43 @@ components:
           format: int64
           description: In use.
           minimum: 0
+    DnsState:
+      type: string
+      description: >-
+        Whether a domain's DNS sends it to the cluster, as looked up from where Zeabur
+        runs.
+      enum:
+      - pointsHere
+      - elsewhere
+      - missing
+      - unknown
+    DomainCheck:
+      type: object
+      description: What setting up a domain needs and how far it is.
+      required:
+      - target
+      - dns
+      properties:
+        certificate:
+          oneOf:
+          - $ref: "#/components/schemas/CertificateCheck"
+            description: Its certificate, when the route lists the host for HTTPS.
+          - type: "null"
+        dns:
+          $ref: "#/components/schemas/DnsState"
+          description: Whether it points there.
+        resolved:
+          type: array
+          items:
+            type: string
+          description: The addresses it resolved to.
+        target:
+          type: array
+          items:
+            type: string
+          description: |-
+            The addresses the domain's DNS should point to: the route's `status.loadBalancer`, or
+            another route's of the same class while it has none. Empty when none is known.
     DomainSettings:
       type: object
       description: |-
@@ -9630,6 +9704,13 @@ components:
           description: >-
             The domain (`*` for a rule without a host) or the Service's DNS name, with its
             port.
+        domain:
+          oneOf:
+          - $ref: "#/components/schemas/DomainCheck"
+            description: |-
+              For a domain with a host: where its DNS should point, where it points, and its
+              certificate.
+          - type: "null"
         hops:
           type: array
           items:
@@ -10036,6 +10117,7 @@ components:
       - routes
       - diagnoses
       - unreadable
+      - ingressAddresses
       properties:
         diagnoses:
           type: array
@@ -10045,6 +10127,13 @@ components:
         id:
           type: string
           description: "`projects/<project>/services/<kind>/<name>/trace`."
+        ingressAddresses:
+          type: array
+          items:
+            type: string
+          description: |-
+            The addresses the project's Ingresses are served on: where a new domain's DNS should
+            point. Empty when no Ingress has an address in its status.
         routes:
           type: array
           items:

@@ -160,6 +160,7 @@ export default sentences({
     "trace.certificate.defaultCertificate": "${route} 为 ${host} 启用 HTTPS，却没有指定机密，所以控制器会提供它的默认证书。",
     "trace.certificate.ok": "${host} 的证书已签发${until, select, none {} other {，有效期至 ${until}}}。",
     "trace.certificate.notReady": "${host} 的证书 ${certificate} 尚未签发${reason, select, none {} other {（${reason}）}}。",
+    "trace.certificate.issuing": "cert-manager 正在为 ${host} 签发证书 ${certificate}。",
     "trace.certificate.pending": "${host} 的证书 ${certificate} 还没有结果。",
     "trace.certificate.unreadable": "Zeabur 无法读取项目的机密，因此无法检查机密 ${secret} 里 ${host} 的证书。",
     "trace.certificate.notChecked": "机密 ${secret} 存有 ${host} 的证书；Zeabur 不会进一步检查。",

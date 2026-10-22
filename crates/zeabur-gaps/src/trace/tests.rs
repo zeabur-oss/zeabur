@@ -49,6 +49,7 @@ fn input<'a>(
         classes: Some(&[]),
         components: Some(&[]),
         certificates,
+        challenges: &[],
         resolved,
         services_readable: true,
         secrets_readable: true,
@@ -204,6 +205,158 @@ fn hops_that_could_not_be_checked_make_no_diagnosis() {
             hop(HopStep::Ready, HopStatus::Ok, "ok"),
         ],
         status: HopStatus::Unknown,
+        domain: None,
     };
     assert_eq!(diagnoses(&[unknown], &project.services[0]), []);
+}
+
+fn with_status(mut snapshot: Snapshot, address: &Value) -> Snapshot {
+    snapshot.ingresses[0].status =
+        Some(serde_json::from_value(json!({"loadBalancer": {"ingress": [address]}})).unwrap());
+    snapshot
+}
+
+fn domain_of(traces: &[RouteTrace]) -> &DomainCheck {
+    traces
+        .iter()
+        .find_map(|t| t.domain.as_ref())
+        .expect("a domain check")
+}
+
+#[test]
+fn a_domain_says_where_its_dns_should_point_and_whether_it_does() {
+    let snapshot = with_status(snapshot(), &json!({"ip": "203.0.113.10"}));
+    let project = zeabur_graph::project(&snapshot);
+    let service = &project.services[0];
+    let check = |answer: Option<Resolved>| {
+        let resolved: BTreeMap<_, _> = answer
+            .into_iter()
+            .map(|a| ("shop.example.test".to_owned(), a))
+            .collect();
+        let input = input(&snapshot, &[], Certificates::NotInstalled, &resolved);
+        domain_of(&trace(&input, service)).clone()
+    };
+    let here = check(Some(Resolved::Addresses(vec!["203.0.113.10".to_owned()])));
+    assert_eq!(here.target, ["203.0.113.10"]);
+    assert_eq!(here.dns, DnsState::PointsHere);
+    let elsewhere = check(Some(Resolved::Addresses(vec!["198.51.100.7".to_owned()])));
+    assert_eq!(elsewhere.dns, DnsState::Elsewhere);
+    assert_eq!(elsewhere.resolved, ["198.51.100.7"]);
+    let missing = check(Some(Resolved::NotFound("no such host".to_owned())));
+    assert_eq!(missing.dns, DnsState::Missing);
+    assert_eq!(check(None).dns, DnsState::Unknown);
+}
+
+#[test]
+fn a_new_ingress_without_status_borrows_the_address_of_one_of_its_class() {
+    let mut snapshot = snapshot();
+    snapshot.ingresses.push(
+        serde_json::from_value(json!({
+            "metadata": {"name": "other", "namespace": "shop"},
+            "spec": {"rules": [{"host": "other.example.test"}]},
+            "status": {"loadBalancer": {"ingress": [{"hostname": "lb.example.net"}]}}
+        }))
+        .unwrap(),
+    );
+    let project = zeabur_graph::project(&snapshot);
+    let service = &project.services[0];
+    let resolved = BTreeMap::from([
+        (
+            "shop.example.test".to_owned(),
+            Resolved::Addresses(vec!["192.0.2.5".to_owned()]),
+        ),
+        (
+            "lb.example.net".to_owned(),
+            Resolved::Addresses(vec!["192.0.2.5".to_owned()]),
+        ),
+    ]);
+    let input = input(&snapshot, &[], Certificates::NotInstalled, &resolved);
+    assert_eq!(
+        names_to_resolve(&input, service),
+        ["lb.example.net", "shop.example.test"]
+    );
+    let domain = domain_of(&trace(&input, service)).clone();
+    assert_eq!(domain.target, ["lb.example.net"]);
+    assert_eq!(domain.dns, DnsState::PointsHere);
+    assert_eq!(ingress_addresses(&snapshot), ["lb.example.net"]);
+}
+
+#[test]
+fn a_certificate_being_issued_is_not_a_failure_and_says_what_its_challenge_waits_for() {
+    let snapshot = snapshot();
+    let project = zeabur_graph::project(&snapshot);
+    let certificates = [json!({
+        "metadata": {"name": "web-tls"},
+        "spec": {"secretName": "web-tls"},
+        "status": {"conditions": [
+            {"type": "Ready", "status": "False", "reason": "DoesNotExist"},
+            {"type": "Issuing", "status": "True", "reason": "DoesNotExist"}]}
+    })];
+    let challenges = [json!({
+        "metadata": {"name": "web-tls-1-2-3"},
+        "spec": {"dnsName": "shop.example.test", "type": "HTTP-01"},
+        "status": {"state": "pending",
+            "reason": "Waiting for HTTP-01 challenge propagation: wrong status code '404'"}
+    })];
+    let resolved = BTreeMap::new();
+    let mut input = input(
+        &snapshot,
+        &[],
+        Certificates::Listed(&certificates),
+        &resolved,
+    );
+    input.challenges = &challenges;
+    let traces = trace(&input, &project.services[0]);
+    let hop = traces[0]
+        .hops
+        .iter()
+        .find(|h| h.step == HopStep::Certificate)
+        .unwrap();
+    assert_eq!(hop.status, HopStatus::Unknown);
+    let certificate = domain_of(&traces).certificate.clone().unwrap();
+    assert_eq!(certificate.state, CertificateState::Issuing);
+    assert_eq!(certificate.name.as_deref(), Some("web-tls"));
+    assert_eq!(certificate.reason.as_deref(), Some("pending"));
+    assert!(
+        certificate
+            .message
+            .unwrap()
+            .contains("wrong status code '404'")
+    );
+    assert!(
+        diagnoses(&traces, &project.services[0])
+            .iter()
+            .all(|d| !d.cause.key.ends_with(".certificateNotReady"))
+    );
+}
+
+#[test]
+fn a_failed_issuance_reports_cert_managers_reason_and_words() {
+    let snapshot = snapshot();
+    let project = zeabur_graph::project(&snapshot);
+    let certificates = [json!({
+        "metadata": {"name": "web-tls"},
+        "spec": {"secretName": "web-tls"},
+        "status": {"conditions": [
+            {"type": "Ready", "status": "False", "reason": "DoesNotExist"},
+            {"type": "Issuing", "status": "False", "reason": "Failed",
+                "message": "The certificate request has failed to complete and will be retried"}]}
+    })];
+    let resolved = BTreeMap::new();
+    let input = input(
+        &snapshot,
+        &[],
+        Certificates::Listed(&certificates),
+        &resolved,
+    );
+    let traces = trace(&input, &project.services[0]);
+    let certificate = domain_of(&traces).certificate.clone().unwrap();
+    assert_eq!(certificate.state, CertificateState::Failed);
+    assert_eq!(certificate.reason.as_deref(), Some("Failed"));
+    assert!(
+        certificate
+            .message
+            .unwrap()
+            .starts_with("The certificate request")
+    );
 }

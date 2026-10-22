@@ -1525,6 +1525,24 @@ export interface components {
       /** @description Each capability, sorted by name: existing (with evidence) or not (with what to install). */
       items: components["schemas"]["Capability"][]
     }
+    /** @description A domain's certificate, as cert-manager reports it. */
+    CertificateCheck: {
+      /** @description cert-manager's own words, in English. */
+      message?: string | null
+      /** @description The `Certificate`, when one manages it. */
+      name?: string | null
+      /** @description When it expires (`status.notAfter`). */
+      notAfter?: string | null
+      /** @description cert-manager's reason (`Failed`, `DoesNotExist`) or the ACME challenge's state. */
+      reason?: string | null
+      /** @description How it stands. */
+      state: components["schemas"]["CertificateState"]
+    }
+    /**
+     * @description How a domain's certificate stands.
+     * @enum {string}
+     */
+    CertificateState: "ready" | "issuing" | "failed" | "notChecked"
     /** @description One change a person asks for. */
     Change:
       | {
@@ -2433,6 +2451,24 @@ export interface components {
        * @description In use.
        */
       usedBytes: number
+    }
+    /**
+     * @description Whether a domain's DNS sends it to the cluster, as looked up from where Zeabur runs.
+     * @enum {string}
+     */
+    DnsState: "pointsHere" | "elsewhere" | "missing" | "unknown"
+    /** @description What setting up a domain needs and how far it is. */
+    DomainCheck: {
+      certificate?: components["schemas"]["CertificateCheck"] | null
+      /** @description Whether it points there. */
+      dns: components["schemas"]["DnsState"]
+      /** @description The addresses it resolved to. */
+      resolved?: string[]
+      /**
+       * @description The addresses the domain's DNS should point to: the route's `status.loadBalancer`, or
+       *     another route's of the same class while it has none. Empty when none is known.
+       */
+      target: string[]
     }
     /**
      * @description How a new service's public URL is made, as an administrator installed Zeabur (the chart's
@@ -4972,6 +5008,7 @@ export interface components {
     RouteTrace: {
       /** @description The domain (`*` for a rule without a host) or the Service's DNS name, with its port. */
       address: string
+      domain?: components["schemas"]["DomainCheck"] | null
       /** @description The hops, in the order traffic takes them. */
       hops: components["schemas"]["Hop"][]
       /** @description A domain or the private address. */
@@ -5184,6 +5221,11 @@ export interface components {
       diagnoses: components["schemas"]["Diagnosis"][]
       /** @description `projects/<project>/services/<kind>/<name>/trace`. */
       id: string
+      /**
+       * @description The addresses the project's Ingresses are served on: where a new domain's DNS should
+       *     point. Empty when no Ingress has an address in its status.
+       */
+      ingressAddresses: string[]
       /** @description Its domains, by route and host, then its private addresses. */
       routes: components["schemas"]["RouteTraceView"][]
       /** @description Reads the person was refused; hops that needed them are unknown. */
