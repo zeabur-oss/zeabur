@@ -61,13 +61,18 @@ use crate::rules::{
 /// - ready-made NetworkPolicy objects;
 /// - a database and its backups: CloudNativePG's `Cluster`, `ScheduledBackup` and `Backup`, the
 ///   Barman Cloud plugin's `ObjectStore`, the Percona Operator for MongoDB's `PerconaServerMongoDB`
-///   and `PerconaServerMongoDBBackup`, and the Secret holding the backup bucket's access keys.
+///   and `PerconaServerMongoDBBackup`, and the Secret holding the backup bucket's access keys;
+/// - a service from a container image: its Deployment, Service, Ingress, volume claim and Secrets.
 ///
 /// The object is created as the person, so kube-apiserver's RBAC and admission decide, as for
 /// `kubectl create`; the plan only keeps it in the project's namespace.
 pub const CREATABLE: &[(&str, &str, &str)] = &[
     ("networking.k8s.io/v1", "NetworkPolicy", "networkpolicies"),
     ("v1", "Secret", "secrets"),
+    ("v1", "PersistentVolumeClaim", "persistentvolumeclaims"),
+    ("v1", "Service", "services"),
+    ("apps/v1", "Deployment", "deployments"),
+    ("networking.k8s.io/v1", "Ingress", "ingresses"),
     ("postgresql.cnpg.io/v1", "Cluster", "clusters"),
     (
         "postgresql.cnpg.io/v1",

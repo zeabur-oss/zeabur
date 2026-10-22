@@ -153,6 +153,56 @@ stringData:
         assert_eq!(secret["metadata"]["namespace"], "shop");
     }
 
+    /// The "Docker image" form sends objects, not YAML, so nothing asks discovery: a Deployment,
+    /// its Service, an Ingress asking cert-manager for HTTPS, and a volume claim are planned and
+    /// created claim first, Ingress last, with the annotation and `tls` block as sent.
+    #[tokio::test]
+    async fn a_service_from_an_image_is_created_without_discovery() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let labels = json!({"app.kubernetes.io/name": "site"});
+        let objects = [
+            json!({"apiVersion": "apps/v1", "kind": "Deployment",
+                   "metadata": {"name": "site", "labels": labels},
+                   "spec": {"replicas": 1, "strategy": {"type": "Recreate"},
+                            "selector": {"matchLabels": labels},
+                            "template": {"metadata": {"labels": labels},
+                                         "spec": {"containers": [{"name": "site", "image": "ghcr.io/acme/site:1.4",
+                                                                  "ports": [{"containerPort": 8080}]}]}}}}),
+            json!({"apiVersion": "v1", "kind": "Service", "metadata": {"name": "site", "labels": labels},
+                   "spec": {"selector": labels, "ports": [{"name": "http", "port": 8080, "targetPort": 8080}]}}),
+            json!({"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+                   "metadata": {"name": "site", "labels": labels,
+                                "annotations": {"cert-manager.io/cluster-issuer": "letsencrypt"}},
+                   "spec": {"tls": [{"hosts": ["site-shop.apps.example.com"], "secretName": "site-tls"}],
+                            "rules": [{"host": "site-shop.apps.example.com", "http": {"paths": [{
+                                "path": "/", "pathType": "Prefix",
+                                "backend": {"service": {"name": "site", "port": {"number": 8080}}}}]}}]}}),
+            json!({"apiVersion": "v1", "kind": "PersistentVolumeClaim", "metadata": {"name": "site-data", "labels": labels},
+                   "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "1Gi"}}}}),
+        ];
+        let request = json!({"changes": objects.iter().map(|o| json!({"op": "create", "object": o})).collect::<Vec<_>>()});
+        let (status, planned) = plan(&app, &request).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let (status, applied) = apply(&app, &planned).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        let kinds: Vec<&str> = writes.iter().map(|w| w.target.kind.as_str()).collect();
+        assert_eq!(
+            kinds,
+            ["PersistentVolumeClaim", "Service", "Deployment", "Ingress"]
+        );
+        let WriteBody::Create(ingress) = &writes[3].body else {
+            panic!("a creation is a POST");
+        };
+        assert_eq!(
+            ingress["metadata"]["annotations"]["cert-manager.io/cluster-issuer"],
+            "letsencrypt"
+        );
+        assert_eq!(ingress["spec"]["tls"][0]["secretName"], "site-tls");
+        assert_eq!(ingress["metadata"]["namespace"], "shop");
+    }
+
     /// A create the person's rights do not allow is refused at the plan's dry run, at its
     /// document, with what was denied.
     #[tokio::test]
