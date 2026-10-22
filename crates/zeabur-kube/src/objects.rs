@@ -445,6 +445,13 @@ pub(crate) async fn review_access(
         Some((resource, subresource)) => (resource, Some(subresource.to_owned())),
         None => (request.resource.as_str(), None),
     };
+    // kube-apiserver authorises `namespaces/{name}` in namespace `name`, so a RoleBinding there
+    // counts: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/request/requestinfo.go
+    let namespace = if request.group.is_empty() && resource == "namespaces" {
+        request.namespace.clone().or_else(|| request.name.clone())
+    } else {
+        request.namespace.clone()
+    };
     let review = SelfSubjectAccessReview {
         spec: SelfSubjectAccessReviewSpec {
             resource_attributes: Some(ResourceAttributes {
@@ -453,7 +460,7 @@ pub(crate) async fn review_access(
                 resource: Some(resource.to_owned()),
                 subresource,
                 name: request.name.clone(),
-                namespace: request.namespace.clone(),
+                namespace,
                 ..ResourceAttributes::default()
             }),
             ..SelfSubjectAccessReviewSpec::default()

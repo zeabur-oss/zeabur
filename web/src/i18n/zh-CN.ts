@@ -804,6 +804,10 @@ export const zhCN: Messages = {
   "access.title": (ns) => `无法更改 ${ns}`,
   "access.you": "<你的用户名>",
   "access.ask": (ns) => `向集群管理员申请 Namespace ${ns} 的 patch 权限。`,
+  "access.askManage": (ns) =>
+    `向集群管理员申请 Namespace ${ns} 的 patch 与 zeabur-manage 权限。少了 zeabur-manage，patch 只能修改项目的名称、描述和图标，这是 Zeabur 准入策略的限制。`,
+  "access.detailsOnly":
+    "有了这项权限，可以修改项目的名称、描述和图标；Namespace 的标签受 Zeabur 准入策略保护，不会变。",
   "access.alsoLabels":
     "这项权限也能修改 Namespace 的其他标签，包括 Pod 安全级别（pod-security.kubernetes.io/*）。Kubernetes 无法只限定一个标签。",
   "access.role": "用 resourceNames 限定到这个 Namespace 的 ClusterRole：",

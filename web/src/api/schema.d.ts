@@ -3576,8 +3576,18 @@ export interface components {
     ProjectNamespace: components["schemas"]["ProjectDetails"] & {
       /** @description It carries Zeabur's project label. */
       adopted: boolean
-      /** @description Whether the person may patch the Namespace: adopt it, let it go, change its details. */
+      /**
+       * @description Whether the person may adopt it or let it go: patch it, and where the admission policy
+       *     guards its labels, also `zeabur-manage` it.
+       */
+      canAdopt: components["schemas"]["Permission"]
+      /** @description Whether the person may patch the Namespace: change its details. */
       canChange: components["schemas"]["Permission"]
+      /**
+       * @description The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
+       *     changes only its details.
+       */
+      labelsGuarded: boolean
       /** @description Its name. */
       name: string
       /** @description The Namespace. */
