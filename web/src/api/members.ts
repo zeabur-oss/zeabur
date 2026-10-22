@@ -25,8 +25,20 @@ function done(result: { data?: unknown; error?: unknown; response: Response }): 
   if (!result.response.ok) unwrap(result)
 }
 
-export async function inviteMember(body: Schemas["InviteRequest"]): Promise<SetupLink> {
-  return unwrap(await api.POST("/api/v1/members/invitations", { body }))
+export type MemberChange = Schemas["MemberChange"]
+export type MemberPlan = Schemas["MemberPlan"]
+export type MemberWrite = Schemas["MemberWrite"]
+
+/** The objects a change to the members writes, and the token that applies them; writes nothing. */
+export async function planMemberChange(
+  change: MemberChange,
+  signal?: AbortSignal,
+): Promise<MemberPlan> {
+  return unwrap(await api.POST("/api/v1/members/plan", { body: change, signal }))
+}
+
+export async function applyMemberChange(token: string): Promise<Schemas["MemberApplied"]> {
+  return unwrap(await api.POST("/api/v1/members/apply", { body: { token } }))
 }
 
 export async function revokeInvitation(name: string): Promise<void> {
@@ -48,15 +60,4 @@ export async function removeCredential(username: string, id: string): Promise<vo
       params: { path: { username, id } },
     }),
   )
-}
-
-export async function setMemberAccess(
-  username: string,
-  body: Schemas["AccessRequest"],
-): Promise<void> {
-  done(await api.PUT("/api/v1/members/{username}/access", { params: { path: { username } }, body }))
-}
-
-export async function removeMember(username: string): Promise<void> {
-  done(await api.DELETE("/api/v1/members/{username}", { params: { path: { username } } }))
 }

@@ -2,9 +2,10 @@ import { useMutation } from "@tanstack/react-query"
 import { useId, useState } from "react"
 import { toast } from "sonner"
 
-import { createSetupLink, inviteMember, refreshMembers, type SetupLink } from "@/api/members"
-import { AccessFields, type Chosen } from "@/components/members/access"
+import { createSetupLink, refreshMembers, type MemberChange, type SetupLink } from "@/api/members"
+import { AccessFields, useRoleLine, type Chosen } from "@/components/members/access"
 import { Consequence, Frame } from "@/components/members/frame"
+import { MemberPlan } from "@/components/members/member-plan"
 import type { Schemas } from "@/api/client"
 import { Problem } from "@/components/problem"
 import { RefusedHint, useHintOffersElevation } from "@/components/refused"
@@ -124,24 +125,49 @@ export function InviteDialog({
   const [displayName, setDisplayName] = useState("")
   const [admin, setAdmin] = useState(false)
   const [chosen, setChosen] = useState<Chosen>(new Map())
+  const [reviewing, setReviewing] = useState(false)
+  const [link, setLink] = useState<SetupLink | undefined>(undefined)
+  const roleLine = useRoleLine()
   const target = inviteTarget(members, username)
-  const invite = useMutation({
-    mutationFn: () =>
-      inviteMember({
-        username: username.trim(),
-        displayName: displayName.trim() || null,
-        admin,
-        projects: admin || !projectRoles ? [] : grantsOf(chosen),
-      }),
-    onSuccess: refreshMembers,
-  })
-  if (invite.data)
+  const name = username.trim()
+  if (link)
     return (
       <Frame title={t("invite.title")} onClose={onClose} footer={<DoneButton onClose={onClose} />}>
-        <LinkShown link={invite.data} lead={t("link.send", invite.data.username)} />
+        <LinkShown link={link} lead={t("link.send", link.username)} />
       </Frame>
     )
-  const typed = username.trim() !== ""
+  if (reviewing) {
+    const existing = target === "existing"
+    const projects = admin || !projectRoles ? [] : grantsOf(chosen)
+    const change: MemberChange = existing
+      ? { op: "invite", username: name }
+      : { op: "invite", username: name, displayName: displayName.trim() || null, admin, projects }
+    const lines = existing
+      ? [t("members.plan.keeps", name)]
+      : [
+          t("members.plan.adds", name),
+          ...(admin
+            ? []
+            : projects.length > 0
+              ? [t("members.plan.gets", name, roleLine(projects))]
+              : projectRoles
+                ? [t("members.plan.noProjects", name)]
+                : []),
+        ]
+    return (
+      <MemberPlan
+        title={t("invite.title")}
+        change={change}
+        consequence={!existing && admin ? t("roles.becomesAdmin", name) : undefined}
+        lines={[...lines, t("members.plan.link")]}
+        action={existing ? t("invite.create") : t("invite.action", name)}
+        onBack={() => setReviewing(false)}
+        onClose={onClose}
+        onApplied={(applied) => (applied.link ? setLink(applied.link) : onClose())}
+      />
+    )
+  }
+  const typed = name !== ""
   return (
     <Frame
       title={t("invite.title")}
@@ -154,11 +180,10 @@ export function InviteDialog({
           </Button>
           <Button
             size="sm"
-            disabled={target === "invalid"}
-            loading={invite.isPending}
-            onClick={() => invite.mutate()}
+            disabled={!typed || target === "invalid"}
+            onClick={() => setReviewing(true)}
           >
-            {t("invite.create")}
+            {t("create.review")}
           </Button>
         </>
       }
@@ -179,7 +204,7 @@ export function InviteDialog({
           {typed && target === "invalid"
             ? t("invite.invalid")
             : target === "existing"
-              ? t("invite.existing", username.trim())
+              ? t("invite.existing", name)
               : t("invite.usernameHint")}
         </p>
       </div>
@@ -206,7 +231,6 @@ export function InviteDialog({
           />
         </>
       )}
-      {invite.isError ? <Problem error={invite.error} /> : null}
     </Frame>
   )
 }

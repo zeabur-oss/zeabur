@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { createPortal } from "react-dom"
 import CaretLeftIcon from "~icons/ph/caret-left"
 import CaretRightIcon from "~icons/ph/caret-right"
@@ -19,6 +19,7 @@ import {
 } from "@/components/plan/describe"
 import { bounded, type MountsOf } from "@/components/plan/groups"
 import { PlanGroups } from "@/components/plan/groups-view"
+import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
 import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk, PlanHooks } from "@/components/plan/planner"
 import { PlanPreview, useShortfall } from "@/components/plan/preview"
@@ -44,8 +45,6 @@ import { useI18n, useT, writeSentence, type Translate } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { toolNotes, type Skipped, type ToolNote } from "@/model/managed"
 import { awaitsName, destinationOf, typedName, undoOf, weigh, type PodsOf } from "@/model/risk"
-
-const COUNTDOWN_FROM_SECONDS = 120
 
 /** A sentence, and the full names behind its "and N more". */
 interface Said {
@@ -277,19 +276,6 @@ export function PlanStep({ footer, ...props }: PlanProps & { footer: HTMLElement
         : null}
     </div>
   )
-}
-
-function useSecondsLeft(expiresAt?: string): number | undefined {
-  const [now, setNow] = useState(Date.now)
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [])
-  return expiresAt ? Math.max(0, Math.round((Date.parse(expiresAt) - now) / 1000)) : undefined
-}
-
-function clock(seconds: number): string {
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
 }
 
 /** What stays in view above the scrolling body: new pods that do not fit, what the plan puts at

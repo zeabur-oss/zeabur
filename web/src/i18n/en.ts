@@ -2111,6 +2111,23 @@ export const en = {
   "invite.optional": "(optional)",
   "invite.admin": "Admin",
   "invite.create": "Create link",
+  "invite.action": (name: string) => `Invite ${name}`,
+  "members.plan.adds": (name: string) => `Adds ${name} as a member.`,
+  "members.plan.keeps": (name: string) =>
+    `${name} is already a member and keeps their access. The link adds a passkey to their account.`,
+  "members.plan.gets": (name: string, roles: string) => `${name} gets ${roles}.`,
+  "members.plan.raised": (name: string, projects: string) => `${name} can now change ${projects}.`,
+  "members.plan.noProjects": (name: string) =>
+    `${name} can sign in and see project names, nothing more.`,
+  "members.plan.link":
+    "Makes a setup link that works for 7 days. It's shown once, after you confirm.",
+  "members.plan.nothing": "Nothing changes.",
+  "members.plan.creates": (n: number) => `${n} new`,
+  "members.plan.changes": (n: number) => `${n} changed`,
+  "members.plan.deletes": (n: number) => `${n} deleted`,
+  "members.plan.changed": "Changed",
+  "members.plan.in": (namespace: string) => `in ${namespace}`,
+  "members.plan.notShown": "Its contents aren't shown.",
   "roles.legend": "Access",
   "roles.projects": "Chosen projects",
   "roles.projectsHint":

@@ -11,7 +11,7 @@ import UserGearIcon from "~icons/ph/user-gear"
 import UserPlusIcon from "~icons/ph/user-plus"
 import XIcon from "~icons/ph/x"
 
-import { membersQuery, refreshMembers, removeMember, revokeInvitation } from "@/api/members"
+import { membersQuery, refreshMembers, revokeInvitation } from "@/api/members"
 import { Ago } from "@/components/bits"
 import {
   AccessDialog,
@@ -20,8 +20,8 @@ import {
   useProjectTitle,
 } from "@/components/members/access"
 import { LinkedList, PasskeyList } from "@/components/members/credentials"
+import { MemberPlan } from "@/components/members/member-plan"
 import {
-  ConfirmDialog,
   InviteDialog,
   LinksUnavailable,
   ManageDenied,
@@ -447,14 +447,18 @@ function RemoveMember({ member, onClose }: { member: Member; onClose: () => void
   const t = useT()
   const name = memberName(member)
   return (
-    <ConfirmDialog
+    <MemberPlan
       title={t("remove.title", name)}
+      change={{ op: "remove", username: member.username }}
       consequence={t("remove.consequence", name)}
       lines={[t("remove.stays", `zeabur:${member.username}`)]}
       action={t("remove.action", name)}
-      done={t("remove.done", name)}
-      run={() => removeMember(member.username)}
+      destructive
       onClose={onClose}
+      onApplied={() => {
+        toast.success(t("remove.done", name))
+        onClose()
+      }}
     />
   )
 }

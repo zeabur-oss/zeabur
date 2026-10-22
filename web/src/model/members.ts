@@ -186,6 +186,42 @@ export function accessLosses(
   }
 }
 
+/** What a change of access gives, for the plan's sentences: admin rights, a role in each project
+ * in `added`, and the projects in `raised` (Viewer to Developer). A new member holds nothing. */
+export function accessGains(
+  member: Pick<Member, "role" | "projects"> | undefined,
+  admin: boolean,
+  chosen: ReadonlyMap<string, ProjectRole>,
+): { admin: boolean; added: ProjectGrant[]; raised: string[] } {
+  const held = new Map((member?.projects ?? []).map((p) => [p.project, p.role]))
+  if (admin) return { admin: member?.role !== "admin", added: [], raised: [] }
+  return {
+    admin: false,
+    added: grantsOf(chosen).filter((g) => !held.has(g.project)),
+    raised: grantsOf(chosen)
+      .filter((g) => g.role === "developer" && held.get(g.project) === "viewer")
+      .map((g) => g.project),
+  }
+}
+
+export type MemberWrite = Schemas["MemberWrite"]
+
+/** A planned write's object as the plan names it: the invitation's random name is made at apply. */
+export function writtenName(write: Pick<MemberWrite, "kind" | "name">): string {
+  return write.kind === "Invitation" && write.name.endsWith("-") ? `${write.name}…` : write.name
+}
+
+/** How many writes of each action a plan has. */
+export function writeCounts(writes: readonly Pick<MemberWrite, "action">[]): {
+  create: number
+  patch: number
+  delete: number
+} {
+  const counts = { create: 0, patch: 0, delete: 0 }
+  for (const w of writes) counts[w.action] += 1
+  return counts
+}
+
 /** Whether a member's access can be changed from what is known: not when their roles could not be
  * read, since saving would replace roles nobody saw. */
 export function canChangeAccess(

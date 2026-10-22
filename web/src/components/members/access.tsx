@@ -1,13 +1,14 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { useId, useState } from "react"
 import { toast } from "sonner"
 
-import { refreshMembers, setMemberAccess } from "@/api/members"
 import { projectsQuery } from "@/api/queries"
-import { Consequence, Frame } from "@/components/members/frame"
+import { Frame } from "@/components/members/frame"
+import { MemberPlan } from "@/components/members/member-plan"
 import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
 import {
+  accessGains,
   accessLosses,
   accessSummary,
   chosenOf,
@@ -17,6 +18,7 @@ import {
   pickerHasFilter,
   pickerProjects,
   type Member,
+  type ProjectGrant,
   type ProjectRole,
 } from "@/model/members"
 import { projectTitle } from "@/model/project"
@@ -231,7 +233,18 @@ function ProjectPicker({
   )
 }
 
-/** Change a member's access: what they lose first, then the choice. */
+/** Roles in projects in a few words: "Developer in shop and Viewer in blog". */
+export function useRoleLine(): (grants: readonly ProjectGrant[]) => string {
+  const t = useT()
+  const title = useProjectTitle()
+  return (grants) =>
+    t(
+      "common.list",
+      grants.map((g) => t("roles.in", t(`roles.${g.role}`), title(g.project))),
+    )
+}
+
+/** Change a member's access, then review its plan: what they lose first, then what they get. */
 export function AccessDialog({
   member,
   projectRoles,
@@ -245,27 +258,51 @@ export function AccessDialog({
   const name = memberName(member)
   const [admin, setAdmin] = useState(member.role === "admin")
   const [chosen, setChosen] = useState<Chosen>(() => chosenOf(member))
+  const [reviewing, setReviewing] = useState(false)
   const held = (member.projects ?? []).map((p) => p.project)
   const title = useProjectTitle()
-  const lost = accessLosses(member, admin, chosen)
+  const roleLine = useRoleLine()
   const titles = (names: string[]) => t("common.list", names.map(title))
-  const consequences = [
-    lost.admin ? t("roles.losesAdmin", name) : "",
-    lost.removed.length > 0 ? t("roles.losesProjects", name, titles(lost.removed)) : "",
-    lost.lowered.length > 0 ? t("roles.losesChanges", name, titles(lost.lowered)) : "",
-  ].filter(Boolean)
-  const save = useMutation({
-    mutationFn: () =>
-      setMemberAccess(member.username, {
-        admin,
-        projects: admin || !projectRoles ? [] : grantsOf(chosen),
-      }),
-    onSuccess: () => {
-      toast.success(t("roles.saved", name))
-      refreshMembers()
-      onClose()
-    },
-  })
+  if (reviewing) {
+    const lost = accessLosses(member, admin, chosen)
+    const gained = accessGains(member, admin, chosen)
+    const consequences = [
+      lost.admin ? t("roles.losesAdmin", name) : "",
+      lost.removed.length > 0 ? t("roles.losesProjects", name, titles(lost.removed)) : "",
+      lost.lowered.length > 0 ? t("roles.losesChanges", name, titles(lost.lowered)) : "",
+    ].filter(Boolean)
+    const consequence =
+      consequences.length > 0
+        ? `${consequences.join(" ")} ${t("roles.openTerminals")}`
+        : gained.admin
+          ? t("roles.becomesAdmin", name)
+          : undefined
+    const lines = [
+      gained.added.length > 0 ? t("members.plan.gets", name, roleLine(gained.added)) : "",
+      gained.raised.length > 0 ? t("members.plan.raised", name, titles(gained.raised)) : "",
+    ].filter(Boolean)
+    return (
+      <MemberPlan
+        title={t("roles.title", name)}
+        change={{
+          op: "access",
+          username: member.username,
+          admin,
+          projects: admin || !projectRoles ? [] : grantsOf(chosen),
+        }}
+        consequence={consequence}
+        lines={lines}
+        action={t("roles.save")}
+        destructive={consequences.length > 0}
+        onBack={() => setReviewing(false)}
+        onClose={onClose}
+        onApplied={() => {
+          toast.success(t("roles.saved", name))
+          onClose()
+        }}
+      />
+    )
+  }
   return (
     <Frame
       title={t("roles.title", name)}
@@ -276,24 +313,12 @@ export function AccessDialog({
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t("plan.cancel")}
           </Button>
-          <Button
-            size="sm"
-            variant={consequences.length > 0 ? "destructive" : "default"}
-            loading={save.isPending}
-            onClick={() => save.mutate()}
-          >
-            {t("roles.save")}
+          <Button size="sm" onClick={() => setReviewing(true)}>
+            {t("create.review")}
           </Button>
         </>
       }
     >
-      {consequences.length > 0 ? (
-        <Consequence>
-          {consequences.join(" ")} {t("roles.openTerminals")}
-        </Consequence>
-      ) : !lost.admin && admin && member.role !== "admin" ? (
-        <Consequence>{t("roles.becomesAdmin", name)}</Consequence>
-      ) : null}
       <AccessFields
         projectRoles={projectRoles}
         admin={admin}
@@ -302,7 +327,6 @@ export function AccessDialog({
         onChosen={setChosen}
         held={held}
       />
-      {save.isError ? <Problem error={save.error} /> : null}
     </Frame>
   )
 }

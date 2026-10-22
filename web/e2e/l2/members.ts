@@ -29,22 +29,28 @@ export async function signInAsAdmin(page: Page, link: string) {
   await expect(nodes.getByRole("list", { name: "Nodes" })).toBeVisible({ timeout: 30_000 })
 }
 
-/** Invites `username` with Zeabur's API from the page, as the interface does. */
+/** Invites `username` with Zeabur's API from the page, as the interface does: plans the
+ * invitation, then applies it. */
 export async function invite(page: Page, username: string, projects: Grant[]): Promise<string> {
   const answer = await page.evaluate(
-    async (body) => {
-      const response = await fetch("/api/v1/members/invitations", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "content-type": "application/json", "zeabur-request": "1" },
-        body: JSON.stringify(body),
-      })
-      return { status: response.status, body: (await response.json()) as unknown }
+    async (change) => {
+      const post = async (path: string, body: unknown) => {
+        const response = await fetch(`/api/v1/members/${path}`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json", "zeabur-request": "1" },
+          body: JSON.stringify(body),
+        })
+        return { status: response.status, body: (await response.json()) as Record<string, unknown> }
+      }
+      const plan = await post("plan", change)
+      if (plan.status !== 200) return plan
+      return post("apply", { token: plan.body.token })
     },
-    { username, projects },
+    { op: "invite", username, projects },
   )
-  expect(answer.status, JSON.stringify(answer.body)).toBe(201)
-  const link = answer.body as { url: string; createdMember: boolean }
+  expect(answer.status, JSON.stringify(answer.body)).toBe(200)
+  const link = answer.body.link as { url: string; createdMember: boolean }
   expect(link.createdMember).toBe(true)
   return link.url
 }

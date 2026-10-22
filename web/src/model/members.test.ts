@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 
 import type { Problem } from "@/api/client"
 import {
+  accessGains,
   accessLosses,
   accessSummary,
   canChangeAccess,
@@ -23,6 +24,8 @@ import {
   pickerHasFilter,
   pickerProjects,
   sortMembers,
+  writeCounts,
+  writtenName,
   type Member,
   type Passkey,
   type ProjectGrant,
@@ -233,6 +236,34 @@ describe("project roles", () => {
     )
     expect(grantsOf(chosen)).toStrictEqual([grant("blog", "viewer"), grant("shop", "developer")])
     expect(chosenOf(member("bob")).size).toBe(0)
+  })
+
+  it("names what a change of access gives", () => {
+    const bob = member("bob", { projects: [grant("shop", "viewer"), grant("blog", "viewer")] })
+    expect(
+      accessGains(
+        bob,
+        false,
+        new Map([
+          ["shop", "developer"],
+          ["blog", "viewer"],
+          ["api", "viewer"],
+        ]),
+      ),
+    ).toStrictEqual({ admin: false, added: [grant("api", "viewer")], raised: ["shop"] })
+    expect(accessGains(undefined, false, new Map([["shop", "developer"]])).added).toStrictEqual([
+      grant("shop", "developer"),
+    ])
+    expect(accessGains(bob, true, new Map()).admin).toBe(true)
+    expect(accessGains(member("ada", { role: "admin" }), true, new Map()).admin).toBe(false)
+  })
+
+  it("names a plan's objects and counts its writes", () => {
+    expect(writtenName({ kind: "Invitation", name: "inv-" })).toBe("inv-…")
+    expect(writtenName({ kind: "RoleBinding", name: "zeabur-member-cy" })).toBe("zeabur-member-cy")
+    expect(
+      writeCounts([{ action: "delete" }, { action: "create" }, { action: "delete" }]),
+    ).toStrictEqual({ create: 1, patch: 0, delete: 2 })
   })
 
   it("names what a change of access takes away", () => {

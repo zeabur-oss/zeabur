@@ -280,7 +280,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  "/api/v1/members/invitations": {
+  "/api/v1/members/apply": {
     parameters: {
       query?: never
       header?: never
@@ -289,8 +289,11 @@ export interface paths {
     }
     get?: never
     put?: never
-    /** Invites someone: a one-time link that adds a passkey to their account, made a member if new. */
-    post: operations["inviteMember"]
+    /**
+     * Carries out a member plan by its token: checks it, dry-runs every write, then writes, and
+     *     makes the invitation's link last.
+     */
+    post: operations["applyMemberChange"]
     delete?: never
     options?: never
     head?: never
@@ -314,7 +317,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  "/api/v1/members/{username}": {
+  "/api/v1/members/plan": {
     parameters: {
       query?: never
       header?: never
@@ -323,32 +326,8 @@ export interface paths {
     }
     get?: never
     put?: never
-    post?: never
-    /**
-     * Removes a member: the role bindings Zeabur made for them, their links, passkeys, linked
-     *     accounts and sessions, then the member. Projects and everything in them stay, and so do RBAC
-     *     bindings made outside Zeabur.
-     */
-    delete: operations["removeMember"]
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  "/api/v1/members/{username}/access": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    /**
-     * Changes what a member may do: admin rights, or roles in chosen projects (a project left out
-     *     loses theirs). Nobody takes their own admin rights away.
-     */
-    put: operations["setMemberAccess"]
-    post?: never
+    /** Works out the objects a change to the members writes, and a token to apply it; writes nothing. */
+    post: operations["planMemberChange"]
     delete?: never
     options?: never
     head?: never
@@ -1355,13 +1334,6 @@ export interface components {
      * @enum {string}
      */
     AccessMode: "ReadWriteOnce" | "ReadWriteOncePod" | "ReadWriteMany" | "ReadOnlyMany"
-    /** @description What a member may do: admin rights, or roles in chosen projects. */
-    AccessRequest: {
-      /** @description May take on admin rights, which cover every project. */
-      admin: boolean
-      /** @description Roles in projects; empty for an admin. A project left out loses the member's role there. */
-      projects?: components["schemas"]["ProjectGrant"][]
-    }
     /**
      * @description A product role in a project, from the person's rights there.
      * @enum {string}
@@ -3097,20 +3069,6 @@ export interface components {
       /** @description Who it enrols a passkey for. */
       username: string
     }
-    /** @description Someone to invite. */
-    InviteRequest: {
-      /** @description Whether a new member may take on admin rights (groups and elevated groups `admins`). */
-      admin?: boolean
-      /** @description Name shown in the interface, for a new member. */
-      displayName?: string | null
-      /** @description A new member's roles in projects, when they are not an admin. */
-      projects?: components["schemas"]["ProjectGrant"][]
-      /**
-       * @description Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. An existing
-       *     member gets a link that adds a passkey; their name and role stay.
-       */
-      username: string
-    }
     /** @description A workload's Keel policy. */
     KeelPolicy: {
       /** @description `Deployment`, `StatefulSet` or `DaemonSet`. */
@@ -3260,6 +3218,61 @@ export interface components {
       | "autoscaler"
       | "controller"
       | "other"
+    /** @description What an applied member plan made. */
+    MemberApplied: {
+      link?: components["schemas"]["SetupLinkView"] | null
+    }
+    /** @description The token of a member plan to apply. */
+    MemberApplyRequest: {
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description A change to the members, as a person asks for it. */
+    MemberChange:
+      | {
+          /** @description Whether a new member may take on admin rights. */
+          admin?: boolean
+          /** @description Name shown in the interface, for a new member. */
+          displayName?: string | null
+          /** @enum {string} */
+          op: "invite"
+          /** @description A new member's roles in projects, when they are not an admin. */
+          projects?: components["schemas"]["ProjectGrant"][]
+          /** @description Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. */
+          username: string
+        }
+      | {
+          /** @description May take on admin rights, which cover every project. */
+          admin: boolean
+          /** @enum {string} */
+          op: "access"
+          /** @description Roles in projects; empty for an admin. */
+          projects?: components["schemas"]["ProjectGrant"][]
+          /** @description The member. */
+          username: string
+        }
+      | {
+          /** @enum {string} */
+          op: "remove"
+          /** @description The member. */
+          username: string
+        }
+    /** @description A member plan and the token that applies it. */
+    MemberPlan: {
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /**
+       * Format: int64
+       * @description For an invitation: how long its link will work once made, in seconds.
+       */
+      linkSeconds?: number | null
+      /** @description For an invitation: whether it makes a new member. */
+      newMember: boolean
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /** @description The writes, in order. */
+      writes: components["schemas"]["MemberWrite"][]
+    }
     /**
      * @description What a member may do in the cluster, as far as Zeabur Identity grants it.
      * @enum {string}
@@ -3299,6 +3312,28 @@ export interface components {
       /** @description Whether this is the person asking. */
       you: boolean
     }
+    /** @description One object a member plan writes. */
+    MemberWrite: {
+      /** @description The write. */
+      action: components["schemas"]["MemberWriteAction"]
+      /** @description The object as it will be, YAML; absent when it is deleted. */
+      afterYaml?: string | null
+      /** @description `apiVersion`. */
+      apiVersion: string
+      /** @description The object as it is, YAML; absent when it is created or not shown. */
+      beforeYaml?: string | null
+      /** @description The kind. */
+      kind: string
+      /** @description Its name; for the invitation, the prefix its random name starts with. */
+      name: string
+      /** @description Its namespace; absent for a cluster-scoped object. */
+      namespace?: string | null
+    }
+    /**
+     * @description How a planned write changes its object.
+     * @enum {string}
+     */
+    MemberWriteAction: "create" | "patch" | "delete"
     /** @description Everyone who can sign in, and the links waiting to be used. */
     MembersView: {
       /** @description Whether the person may create invitations, as far as their rules tell. */
@@ -6017,7 +6052,7 @@ export interface operations {
       }
     }
   }
-  inviteMember: {
+  applyMemberChange: {
     parameters: {
       query?: never
       header?: never
@@ -6026,16 +6061,16 @@ export interface operations {
     }
     requestBody: {
       content: {
-        "application/json": components["schemas"]["InviteRequest"]
+        "application/json": components["schemas"]["MemberApplyRequest"]
       }
     }
     responses: {
-      201: {
+      200: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          "application/json": components["schemas"]["SetupLinkView"]
+          "application/json": components["schemas"]["MemberApplied"]
         }
       }
       400: {
@@ -6055,6 +6090,14 @@ export interface operations {
         }
       }
       409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
         headers: {
           [name: string]: unknown
         }
@@ -6092,71 +6135,26 @@ export interface operations {
       }
     }
   }
-  removeMember: {
+  planMemberChange: {
     parameters: {
       query?: never
       header?: never
-      path: {
-        /** @description The member's user name */
-        username: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      409: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  setMemberAccess: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        /** @description The member's user name */
-        username: string
-      }
+      path?: never
       cookie?: never
     }
     requestBody: {
       content: {
-        "application/json": components["schemas"]["AccessRequest"]
+        "application/json": components["schemas"]["MemberChange"]
       }
     }
     responses: {
-      204: {
+      200: {
         headers: {
           [name: string]: unknown
         }
-        content?: never
+        content: {
+          "application/json": components["schemas"]["MemberPlan"]
+        }
       }
       400: {
         headers: {
