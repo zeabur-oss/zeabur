@@ -4,7 +4,9 @@ import { useState } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 
 import { isStatus, isUnreachable, type Schemas } from "@/api/client"
-import { clusterGapsQuery, clusterWarningsQuery } from "@/api/queries"
+import { clusterAlertsQuery, clusterGapsQuery, clusterWarningsQuery } from "@/api/queries"
+import { AlertList, RecentNote } from "@/components/alerts"
+import { folded } from "@/model/alerts"
 import { Ago } from "@/components/bits"
 import { GapList } from "@/components/gaps"
 import { LoadingRows } from "@/components/page"
@@ -27,7 +29,25 @@ export function ClusterPage() {
       <ClusterGaps />
       <NodesSection />
       <WarningsSection />
+      <NodeAlerts />
     </ClusterFrame>
+  )
+}
+
+const ALERTS_SHOWN = 20
+
+/** Falco's alerts about no namespace: a node's own processes. Shown only when there are some. */
+function NodeAlerts() {
+  const t = useT()
+  const data = useQuery(clusterAlertsQuery).data
+  if (data?.state !== "installed" || data.items.length === 0) return null
+  return (
+    <Section id="cluster-alerts" title={t("alerts.nodes")} count={folded(data.items).length}>
+      <div className="flex flex-col gap-2">
+        <AlertList alerts={data.items} limit={ALERTS_SHOWN} />
+        <RecentNote />
+      </div>
+    </Section>
   )
 }
 

@@ -85,6 +85,7 @@
 
 pub mod access;
 pub mod account;
+pub mod alerts;
 mod cache;
 pub mod cluster;
 mod error;
@@ -176,6 +177,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::nodes))
         .routes(routes!(cluster::upgrades))
         .routes(routes!(cluster::events))
+        .routes(routes!(alerts::cluster))
         .routes(routes!(gaps::cluster))
         .routes(routes!(incidents::cluster))
         .routes(routes!(projects::list))
@@ -205,6 +207,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::writes::plan))
         .routes(routes!(projects::writes::apply))
         .routes(routes!(projects::backups::get))
+        .routes(routes!(alerts::project))
         .routes(routes!(projects::network_policy::presets))
         .routes(routes!(projects::usage::get))
         .routes(routes!(projects::usage::volumes))

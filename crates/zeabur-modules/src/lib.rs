@@ -5,6 +5,7 @@ use zeabur_kube::{DynamicObject, ResourceRef};
 
 pub mod backups;
 pub mod cloudnative_pg;
+pub mod falco;
 pub mod k8up;
 pub mod metrics_server;
 pub mod network_policy;
@@ -112,6 +113,7 @@ pub fn modules() -> Vec<&'static Module> {
         &k8up::MODULE,
         &velero::MODULE,
         &cloudnative_pg::MODULE,
+        &falco::MODULE,
     ]
 }
 

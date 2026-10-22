@@ -33,6 +33,8 @@ pub(crate) const OBJECT: &str =
     "/api/v1/projects/{project}/objects/{group}/{version}/{resource}/{name}";
 /// What a project's pods use now.
 pub(crate) const USAGE: &str = "/api/v1/projects/{project}/usage";
+/// Falco's recent alerts about a project's pods.
+pub(crate) const ALERTS: &str = "/api/v1/projects/{project}/alerts";
 /// What a service's pods used over a range.
 pub(crate) const HISTORY: &str = "/api/v1/projects/{project}/services/{kind}/{name}/history";
 
@@ -51,6 +53,7 @@ pub const ALLOWLIST: &[&str] = &[
     OBJECT,
     USAGE,
     HISTORY,
+    ALERTS,
 ];
 
 /// The longest value accepted for a parameter: a DNS subdomain name, the longest Kubernetes

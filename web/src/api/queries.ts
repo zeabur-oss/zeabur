@@ -440,6 +440,27 @@ export const backupsQuery = (project: string) =>
     refetchIntervalInBackground: false,
   })
 
+export const projectAlertsQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "alerts"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/alerts", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+  })
+
+export const clusterAlertsQuery = queryOptions({
+  queryKey: ["cluster", "alerts"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/alerts", { signal })),
+  refetchInterval: CLUSTER_POLL,
+  refetchIntervalInBackground: false,
+})
+
 export const networkPresetsQuery = (project: string, service: string) =>
   queryOptions({
     queryKey: ["project", project, "network-presets", service],

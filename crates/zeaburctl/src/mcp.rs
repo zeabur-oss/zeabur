@@ -218,6 +218,7 @@ mod tests {
                     "list_projects",
                     "object_yaml",
                     "pod_logs",
+                    "project_alerts",
                     "project_events",
                     "project_usage",
                     "service_history"
@@ -312,6 +313,7 @@ mod tests {
                 json!({"project": "shop", "group": "core", "version": "v1",
                     "resource": "secrets", "name": "db"}),
             ),
+            ("project_alerts", json!({"project": "shop"})),
             ("project_usage", json!({"project": "shop"})),
             (
                 "service_history",

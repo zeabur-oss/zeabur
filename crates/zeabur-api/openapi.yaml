@@ -54,6 +54,25 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/alerts:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Falco's recent alerts that concern no namespace (a node's own processes), newest first, read
+        as the person.
+      operationId: getClusterAlerts
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuntimeAlerts"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/capabilities:
     get:
       tags:
@@ -536,6 +555,30 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProjectDocument"
         "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/alerts":
+    get:
+      tags:
+      - projects
+      summary: Falco's recent alerts about a project's pods, newest first, read as the person.
+      operationId: getProjectAlerts
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuntimeAlerts"
+        "401":
           content:
             application/problem+json:
               schema:
@@ -3728,6 +3771,65 @@ components:
       enum:
       - command-not-found
       - failed
+    FalcoAlert:
+      type: object
+      description: One alert.
+      required:
+      - rule
+      - severity
+      - output
+      - source
+      - origin
+      properties:
+        command:
+          type:
+          - string
+          - "null"
+          description: The command line that triggered it.
+        container:
+          type:
+          - string
+          - "null"
+          description: The container it concerns.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The report result it was read from.
+        output:
+          type: string
+          description: Falco's own sentence, with every field it names.
+        pod:
+          type:
+          - string
+          - "null"
+          description: The pod it concerns.
+        rule:
+          type: string
+          description: The rule that fired (`Terminal shell in container`).
+        severity:
+          $ref: "#/components/schemas/FalcoSeverity"
+          description: How serious Falco's rule says it is.
+        source:
+          type: string
+          description: Falco's event source (`syscall`, `k8s_audit`).
+        time:
+          type:
+          - string
+          - "null"
+          description: When it happened, RFC 3339.
+        user:
+          type:
+          - string
+          - "null"
+          description: The user it ran as.
+    FalcoSeverity:
+      type: string
+      description: Falco's priority as falcosidekick maps it to a report severity.
+      enum:
+      - info
+      - low
+      - medium
+      - high
+      - critical
     Fault:
       type: object
       description: Where a failure's cause lies, and who can fix it.
@@ -7638,6 +7740,29 @@ components:
       description: >-
         One address's way, and the plan that fixes where it stops when Zeabur can write
         one.
+    RuntimeAlerts:
+      type: object
+      description: Falco's recent alerts in one place.
+      required:
+      - state
+      - items
+      - unreadable
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FalcoAlert"
+          description: |-
+            Newest first. A report keeps its newest alerts only (1000 by default), so older ones may
+            be gone.
+        state:
+          $ref: "#/components/schemas/ProviderState"
+          description: Whether the reports could be read.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
     SecretValue:
       type: object
       description: One value of a revealed Secret.
