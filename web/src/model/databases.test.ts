@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   backUpNow,
   backupName,
+  blockedVersions,
   commands,
   connectionUri,
   createDatabase,
@@ -38,7 +39,7 @@ const postgres: Database = {
     usernameKey: "username",
     passwordKey: "password",
   },
-  backups: { schedules: [], runs: [] },
+  backups: { schedules: [], runs: [], ready: false },
   object: {
     apiVersion: "postgresql.cnpg.io/v1",
     kind: "Cluster",
@@ -88,6 +89,14 @@ describe("a new database", () => {
     expect(newDatabase("mongodb", 3).members).toBe(3)
   })
 
+  test("MongoDB 8 is not offered on Linux 6.19 and newer", () => {
+    expect(blockedVersions("mongodb", ["6.8.0-45-generic"])).toEqual([])
+    expect(blockedVersions("mongodb", ["6.8.0-45-generic", "6.19.2"])).toEqual(["8.0"])
+    expect(blockedVersions("mongodb", ["7.0.0-38-generic"])).toEqual(["8.0"])
+    expect(blockedVersions("postgresql", ["7.0.0-38-generic"])).toEqual([])
+    expect(newDatabase("mongodb", 1, ["8.0"]).version).toBe("7.0")
+  })
+
   test("PostgreSQL is a Cluster with the chosen image, size and resources", () => {
     const [change] = createDatabase({ ...newDatabase("postgresql", 1), name: "db", version: "17" })
     expect(change).toEqual({
@@ -128,6 +137,8 @@ describe("a new database", () => {
 
   test("a preset is recognised from the resources", () => {
     expect(presetOf("mongodb", presetResources.mongodb.large)).toBe("large")
+    const { requests, limits } = presetResources.postgresql.small
+    expect(presetOf("postgresql", { limits, requests })).toBe("small")
     expect(presetOf("mongodb", { requests: { cpu: "3" } })).toBeUndefined()
   })
 })

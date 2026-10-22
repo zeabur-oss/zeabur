@@ -36,8 +36,9 @@ import {
   OperatorNotes,
   useDatabases,
 } from "@/components/databases"
+import type { Database } from "@/model/databases"
 import { useSentence, useT, type Translate } from "@/i18n"
-import { podEventsLink, serviceLink } from "@/lib/place"
+import { databaseLink, podEventsLink, serviceLink } from "@/lib/place"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
@@ -515,9 +516,14 @@ interface Sized {
   bytes?: number
   /** Its part of the meter. */
   part: number
+  /** The database whose members use it, when no workload does (CloudNativePG's pods). */
+  database?: Database
 }
 
-function useVolumes(data: Project) {
+const unusedVolume = (v: Sized) => v.claim.services.length === 0 && !v.database
+
+function useVolumes(project: string, data: Project) {
+  const databases = useDatabases(project).data?.items ?? []
   const claims = claimsOf(data)
   const largest = claims
     .filter((c) => c.sizeBytes)
@@ -530,12 +536,13 @@ function useVolumes(data: Project) {
         claim,
         bytes: claim.sizeBytes ?? undefined,
         part: rank < 0 ? -1 : Math.min(rank, METER_PARTS),
+        database: databases.find((d) => d.claims.includes(claim.name)),
       }
     })
     // Unused first, then the largest.
     .toSorted(
       (a, b) =>
-        Number(b.claim.services.length === 0) - Number(a.claim.services.length === 0) ||
+        Number(unusedVolume(b)) - Number(unusedVolume(a)) ||
         (b.bytes ?? 0) - (a.bytes ?? 0) ||
         a.claim.name.localeCompare(b.claim.name),
     )
@@ -547,7 +554,7 @@ function useVolumes(data: Project) {
     parts,
     total: sized.reduce((sum, c) => sum + (c.bytes ?? 0), 0),
     known: sized.some((c) => c.bytes !== undefined),
-    unused: sized.filter((s) => s.claim.services.length === 0).length,
+    unused: sized.filter(unusedVolume).length,
   }
 }
 
@@ -584,9 +591,19 @@ function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
               </span>
             ))}
           </span>
+        ) : volume.database ? (
+          <span className="truncate type-meta text-muted-foreground">
+            <Link
+              {...databaseLink(project, volume.database)}
+              className="hover:text-foreground hover:underline"
+              translate="no"
+            >
+              {volume.database.name}
+            </Link>
+          </span>
         ) : null}
       </div>
-      {claim.services.length === 0 ? (
+      {unusedVolume(volume) ? (
         <Tooltip content={t("storage.notMounted")}>
           <span className="flex shrink-0">
             <StatusPill health="warn" size="sm" dot={false}>
@@ -649,7 +666,7 @@ export function Storage({
   const t = useT()
   const { memoryParts } = useQuantityFormat()
   const [query, setQuery] = useState("")
-  const { sized, parts, total, known, unused } = useVolumes(data)
+  const { sized, parts, total, known, unused } = useVolumes(project, data)
   const [totalValue, totalUnit] = memoryParts(total)
   if (sized.length === 0 && refused.length === 0) return null
   const size = `${totalValue} ${totalUnit}`

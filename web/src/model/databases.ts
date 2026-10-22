@@ -61,9 +61,17 @@ export const presetResources: Record<Engine, Record<SizePreset, Resources>> = {
 
 /** The preset whose numbers the database asks for, if any. */
 export function presetOf(engine: Engine, resources: unknown): SizePreset | undefined {
-  const asked = JSON.stringify(resources ?? null)
-  return sizePresets.find((p) => JSON.stringify(presetResources[engine][p]) === asked)
+  const asked = sorted(resources ?? null)
+  return sizePresets.find((p) => sorted(presetResources[engine][p]) === asked)
 }
+
+/** JSON with object keys in order: the API may return them in another. */
+const sorted = (value: unknown): string =>
+  JSON.stringify(value, (_, v: unknown) =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+      : v,
+  )
 
 export interface NewDatabase {
   engine: Engine
@@ -76,11 +84,22 @@ export interface NewDatabase {
 }
 
 /** Defaults for the form: one member on a single node, else three. */
-export function newDatabase(engine: Engine, nodes: number): NewDatabase {
+/** Versions that do not start on these kernels: MongoDB 8 refuses Linux 6.19 and newer
+ * (https://jira.mongodb.org/browse/SERVER-121912). */
+export function blockedVersions(engine: Engine, kernels: string[]): string[] {
+  if (engine !== "mongodb") return []
+  const tooNew = kernels.some((kernel) => {
+    const [major = 0, minor = 0] = kernel.split(/[.-]/).map(Number)
+    return major > 6 || (major === 6 && minor >= 19)
+  })
+  return tooNew ? versions.mongodb.filter((v) => v.label.startsWith("8.")).map((v) => v.label) : []
+}
+
+export function newDatabase(engine: Engine, nodes: number, blocked: string[] = []): NewDatabase {
   return {
     engine,
     name: engine === "postgresql" ? "postgres" : "mongodb",
-    version: versions[engine][0]?.label ?? "",
+    version: versions[engine].find((v) => !blocked.includes(v.label))?.label ?? "",
     members: engine === "postgresql" || nodes <= 1 ? 1 : 3,
     storage: engine === "postgresql" ? "5Gi" : "10Gi",
     size: "small",

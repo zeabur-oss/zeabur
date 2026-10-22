@@ -9,6 +9,7 @@ import type { Schemas } from "@/api/client"
 import { projectGapsQuery, projectIncidentsQuery, projectQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
 import { CopyText } from "@/components/copy-text"
+import { NewDatabaseButton, useDatabases } from "@/components/databases"
 import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { Freshness } from "@/components/freshness"
 import { GapList } from "@/components/gaps"
@@ -156,6 +157,7 @@ function Header({ project, data, view }: { project: string; data: Project; view?
                 failed={document.isRefetchError}
               />
               <Suggestions project={project} data={data} />
+              {view === "map" ? <MapNewDatabase project={project} /> : null}
               {view ? (
                 <Segmented
                   label={t("project.view")}
@@ -189,6 +191,11 @@ function Header({ project, data, view }: { project: string; data: Project; view?
       </PageColumn>
     </header>
   )
+}
+
+function MapNewDatabase({ project }: { project: string }) {
+  const data = useDatabases(project).data
+  return data ? <NewDatabaseButton project={project} data={data} size="sm" /> : null
 }
 
 function HealthPill({ data }: { data: Project }) {

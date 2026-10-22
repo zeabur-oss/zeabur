@@ -1362,8 +1362,11 @@ export const zhCN: Messages = {
   "db.name.long": "最多 30 个字符。",
   "db.name.taken": "已经有同名的数据库。",
   "db.storageHint": "之后可以扩容，不能缩小。",
-  "db.noRedundancy": "只有一个成员：它故障时没有其他成员接手，数据也只在一个卷上。请设置备份。",
+  "db.noRedundancy": (backedUp: boolean) =>
+    `只有一个成员：它故障时没有其他成员接手，数据也只在一个卷上。${backedUp ? "" : "请设置备份。"}`,
   "db.replicaSetHint": "副本集有三个成员时，坏掉一个也能继续运行。",
+  "db.kernelBlocked": (versions: string) =>
+    `这个集群的节点内核是 Linux 6.19 及以上，${versions} 无法在上面启动。`,
   "db.onOneNode": "这个集群只有一个节点，所以默认一个成员。",
   "db.planCreate": (name) => `创建数据库 ${name}`,
   "db.noOperator": "要创建数据库，请先安装数据库组件。",
@@ -1428,6 +1431,7 @@ export const zhCN: Messages = {
   "db.backup.problem.keep": "1 到 365 天。",
   "db.backup.plan": (name) => `备份 ${name}`,
   "db.backup.now": "立即备份",
+  "db.backup.starting": "数据库带着备份设置重启后就能用",
   "db.backup.planNow": (name) => `立即备份 ${name}`,
   "db.backup.destination": "目的地",
   "db.backup.endpointFact": "端点",

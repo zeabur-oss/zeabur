@@ -18,6 +18,7 @@ import {
   lastRun,
   memberChoices,
   nameProblem,
+  blockedVersions,
   newDatabase,
   presetResources,
   sizePresets,
@@ -159,9 +160,14 @@ function NewDatabaseDrawer({
   onClose: () => void
 }) {
   const t = useT()
-  const nodes = useQuery(nodesQuery).data?.items.length ?? 1
+  const nodeList = useQuery(nodesQuery).data?.items ?? []
+  const nodes = nodeList.length || 1
+  const kernels = nodeList.map((n) => n.kernelVersion)
   const first = engines.find((e) => available.includes(e)) ?? "postgresql"
-  const [form, setForm] = useState<NewDatabase>(() => newDatabase(first, nodes))
+  const [form, setForm] = useState<NewDatabase>(() =>
+    newDatabase(first, nodes, blockedVersions(first, kernels)),
+  )
+  const blocked = blockedVersions(form.engine, kernels)
   const [tried, setTried] = useState(false)
   const planner = usePlanner(project, onClose)
   const set = (patch: Partial<NewDatabase>) => setForm((f) => ({ ...f, ...patch }))
@@ -209,7 +215,14 @@ function NewDatabaseDrawer({
               size="sm"
               value={form.engine}
               onValueChange={(engine) =>
-                setForm({ ...newDatabase(engine as Engine, nodes), name: form.name })
+                setForm({
+                  ...newDatabase(
+                    engine as Engine,
+                    nodes,
+                    blockedVersions(engine as Engine, kernels),
+                  ),
+                  name: form.name,
+                })
               }
               items={available.map((e) => ({ value: e, label: t(`db.engine.${e}`) }))}
             />
@@ -229,16 +242,25 @@ function NewDatabaseDrawer({
           />
         </FormField>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField label={t("db.field.version")}>
+          <FormField
+            label={t("db.field.version")}
+            hint={
+              blocked.length > 0
+                ? t("db.kernelBlocked", `${engineName(form.engine)} ${blocked.join(", ")}`)
+                : undefined
+            }
+          >
             <Select
               size="sm"
               value={form.version}
               onValueChange={(version) => set({ version })}
               translate="no"
-              items={versions[form.engine].map((v) => ({
-                value: v.label,
-                label: `${engineName(form.engine)} ${v.label}`,
-              }))}
+              items={versions[form.engine]
+                .filter((v) => !blocked.includes(v.label))
+                .map((v) => ({
+                  value: v.label,
+                  label: `${engineName(form.engine)} ${v.label}`,
+                }))}
             />
           </FormField>
           <FormField
@@ -293,7 +315,7 @@ function NewDatabaseDrawer({
         {form.members === 1 ? (
           <Alert variant="warn">
             <WarningIcon aria-hidden="true" />
-            <AlertDescription>{t("db.noRedundancy")}</AlertDescription>
+            <AlertDescription>{t("db.noRedundancy", false)}</AlertDescription>
           </Alert>
         ) : null}
       </form>

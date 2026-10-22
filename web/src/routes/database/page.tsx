@@ -185,11 +185,19 @@ function Body({
 function BackUpNow({ project, database }: { project: string; database: Database }) {
   const t = useT()
   const planner = usePlanner(project)
+  const starting = !database.backups.ready
   return (
     <>
+      {starting ? (
+        <span id="db-backups-starting" className="type-meta text-muted-foreground">
+          {t("db.backup.starting")}
+        </span>
+      ) : null}
       <Button
         variant="outline"
         size="sm"
+        disabled={starting}
+        aria-describedby={starting ? "db-backups-starting" : undefined}
         onClick={() =>
           planner.plan({
             title: t("db.backup.planNow", database.name),
@@ -281,7 +289,9 @@ function Overview({ project, database }: { project: string; database: Database }
       {database.members === 1 ? (
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
-          <AlertDescription>{t("db.noRedundancy")}</AlertDescription>
+          <AlertDescription>
+            {t("db.noRedundancy", Boolean(database.backups.store?.inUse))}
+          </AlertDescription>
         </Alert>
       ) : null}
       <Connection project={project} database={database} />

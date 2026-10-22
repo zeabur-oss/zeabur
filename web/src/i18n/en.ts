@@ -1494,9 +1494,11 @@ export const en = {
   "db.name.long": "At most 30 characters.",
   "db.name.taken": "A database of this name exists.",
   "db.storageHint": "It can grow later, not shrink.",
-  "db.noRedundancy":
-    "One member: nothing takes over if it fails, and its data is on one volume. Set up backups.",
+  "db.noRedundancy": (backedUp: boolean) =>
+    `One member: nothing takes over if it fails, and its data is on one volume.${backedUp ? "" : " Set up backups."}`,
   "db.replicaSetHint": "A replica set keeps running through one failure with three members.",
+  "db.kernelBlocked": (versions: string) =>
+    `This cluster's nodes run Linux 6.19 or newer, where ${versions} does not start.`,
   "db.onOneNode": "This cluster has one node, so one member.",
   "db.planCreate": (name: string) => `Create database ${name}`,
   "db.noOperator": "To create databases, install a database component.",
@@ -1562,6 +1564,7 @@ export const en = {
   "db.backup.problem.keep": "From 1 to 365 days.",
   "db.backup.plan": (name: string) => `Back up ${name}`,
   "db.backup.now": "Back up now",
+  "db.backup.starting": "Ready once the database restarts with backups",
   "db.backup.planNow": (name: string) => `Back up ${name} now`,
   "db.backup.destination": "Destination",
   "db.backup.endpointFact": "Endpoint",

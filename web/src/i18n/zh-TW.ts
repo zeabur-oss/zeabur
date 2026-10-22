@@ -1365,8 +1365,11 @@ export const zhTW: Messages = {
   "db.name.long": "最多 30 個字元。",
   "db.name.taken": "已經有同名的資料庫。",
   "db.storageHint": "之後可以擴充，不能縮小。",
-  "db.noRedundancy": "只有一個成員：它故障時沒有其他成員接手，資料也只在一個磁碟區上。請設定備份。",
+  "db.noRedundancy": (backedUp: boolean) =>
+    `只有一個成員：它故障時沒有其他成員接手，資料也只在一個磁碟區上。${backedUp ? "" : "請設定備份。"}`,
   "db.replicaSetHint": "副本集有三個成員時，壞掉一個也能繼續運作。",
+  "db.kernelBlocked": (versions: string) =>
+    `這個叢集的節點核心是 Linux 6.19 以上，${versions} 無法在上面啟動。`,
   "db.onOneNode": "這個叢集只有一個節點，所以預設一個成員。",
   "db.planCreate": (name) => `建立資料庫 ${name}`,
   "db.noOperator": "要建立資料庫，請先安裝資料庫元件。",
@@ -1432,6 +1435,7 @@ export const zhTW: Messages = {
   "db.backup.problem.keep": "1 到 365 天。",
   "db.backup.plan": (name) => `備份 ${name}`,
   "db.backup.now": "立即備份",
+  "db.backup.starting": "資料庫帶著備份設定重新啟動後就能用",
   "db.backup.planNow": (name) => `立即備份 ${name}`,
   "db.backup.destination": "目的地",
   "db.backup.endpointFact": "端點",
