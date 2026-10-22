@@ -27,6 +27,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
 
 mod adapter;
+pub mod files;
 mod logs;
 #[cfg(feature = "memory")]
 pub mod memory;
@@ -43,9 +44,10 @@ pub use logs::unavailable_log;
 pub use objects::{Access, AccessRule, AccessRules, ResourceRef, ServedResource};
 pub use port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterExt, ClusterFacts, ClusterPod,
-    ClusterPods, ContainerResources, ExecRequest, ExecSession, ExitStatus, FIELD_MANAGER,
-    GatewayRef, Identity, LogLines, LogOptions, NamespaceObjects, ObjectTarget, Preconditions,
-    Resize, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody, WriteRequest, Written,
+    ClusterPods, ContainerResources, ExecRequest, ExecSession, ExecStream, ExitStatus,
+    FIELD_MANAGER, GatewayRef, Identity, LogLines, LogOptions, NamespaceObjects, ObjectTarget,
+    Preconditions, Resize, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody,
+    WriteRequest, Written,
 };
 use secrecy::SecretString;
 

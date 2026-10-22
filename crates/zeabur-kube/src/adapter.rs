@@ -29,10 +29,14 @@ use zeabur_core::problem::{Denied, FieldCause, KubernetesStatus, StatusDetails};
 use crate::objects::{self, AccessRules, ResourceRef, ServedResource};
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
-    ExecSession, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects, SecretSummary,
-    ServicePort, TerminalSize, Unreadable, WriteRequest, Written,
+    ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects,
+    SecretSummary, ServicePort, TerminalSize, Unreadable, WriteRequest, Written,
 };
 use crate::{UserClient, names, wide};
+
+/// The buffer of each of [`Cluster::stream`]'s pipes: large enough that a file moves in
+/// WebSocket frames of tens of kilobytes rather than kube's default kilobyte.
+const STREAM_BUFFER: usize = 64 * 1024;
 
 impl From<kube::Error> for ClusterError {
     #[expect(
@@ -529,6 +533,46 @@ impl Cluster for UserClient {
             let status = status.await;
             drop(process);
             Ok(exit_status(status))
+        })
+    }
+
+    fn stream<'a>(
+        &'a self,
+        namespace: &'a str,
+        pod: &'a str,
+        container: &'a str,
+        command: &'a [String],
+    ) -> Answer<'a, ExecStream> {
+        Box::pin(async move {
+            names::namespace(namespace)?;
+            names::name(pod)?;
+            let params = AttachParams::default()
+                .container(container)
+                .stdin(true)
+                .stdout(true)
+                .stderr(true)
+                .max_stdin_buf_size(STREAM_BUFFER)
+                .max_stdout_buf_size(STREAM_BUFFER)
+                .max_stderr_buf_size(STREAM_BUFFER);
+            let mut process = Api::<Pod>::namespaced(self.kube().clone(), namespace)
+                .exec(pod, command.to_vec(), &params)
+                .await?;
+            let missing =
+                |what: &str| ClusterError::Decode(format!("the exec stream has no {what}"));
+            let input = process.stdin().ok_or_else(|| missing("stdin"))?;
+            let output = process.stdout().ok_or_else(|| missing("stdout"))?;
+            let error = process.stderr().ok_or_else(|| missing("stderr"))?;
+            let status = process.take_status().ok_or_else(|| missing("status"))?;
+            Ok(ExecStream {
+                input: Box::pin(input),
+                output: Box::pin(output),
+                error: Box::pin(error),
+                exit: Box::pin(async move {
+                    let status = status.await;
+                    drop(process);
+                    exit_status(status)
+                }),
+            })
         })
     }
 
