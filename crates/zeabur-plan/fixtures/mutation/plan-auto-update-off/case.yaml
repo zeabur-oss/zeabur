@@ -1,0 +1,6 @@
+description: "Turning automatic updates off removes the Keel policy and leaves the Build as it is."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: autoUpdate, workload: {kind: Deployment, name: web}, enabled: false}

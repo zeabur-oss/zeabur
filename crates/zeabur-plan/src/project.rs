@@ -228,18 +228,18 @@ fn validate(
 }
 
 /// The `managedFields` steps of one label or annotation.
-fn steps(map: &str, key: &str) -> Vec<Step> {
+pub(crate) fn steps(map: &str, key: &str) -> Vec<Step> {
     vec![Step::field("metadata"), Step::field(map), Step::field(key)]
 }
 
 /// The field as a plan names it.
-fn shown(map: &str, key: &str) -> String {
+pub(crate) fn shown(map: &str, key: &str) -> String {
     format!("metadata.{map}.{key}")
 }
 
 /// The operations adding `key: value` to the metadata map `map` (`labels`, `annotations`), which
 /// may not exist yet.
-fn set_key(object: &Value, map: &str, key: &str, value: &str) -> Vec<Value> {
+pub(crate) fn set_key(object: &Value, map: &str, key: &str, value: &str) -> Vec<Value> {
     if object.pointer(&pointer(&["metadata", map])).is_some() {
         vec![add(&pointer(&["metadata", map, key]), json!(value))]
     } else {

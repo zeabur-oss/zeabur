@@ -53,10 +53,10 @@ use crate::plan::{
 use crate::rules::{REDACTED, Refusal};
 
 /// A container of a workload: its name, position and spec.
-struct Found {
-    name: String,
-    position: usize,
-    spec: Container,
+pub(crate) struct Found {
+    pub(crate) name: String,
+    pub(crate) position: usize,
+    pub(crate) spec: Container,
 }
 
 #[expect(
@@ -83,7 +83,7 @@ impl<'a> Planner<'a> {
     // ── Shared lookups ───────────────────────────────────────────────────────────────────────
 
     /// The workload, refused when its template cannot change or a tool manages it.
-    fn editable_workload(&self, reference: &WorkloadRef) -> Result<Workload<'a>, PlanError> {
+    pub(crate) fn editable_workload(&self, reference: &WorkloadRef) -> Result<Workload<'a>, PlanError> {
         let found = self.workload(reference)?;
         if found.kind() == WorkloadKind::Job {
             return Err(error(
@@ -96,7 +96,7 @@ impl<'a> Planner<'a> {
         Ok(found)
     }
 
-    fn container(
+    pub(crate) fn container(
         found: Workload<'_>,
         reference: &WorkloadRef,
         container: Option<&str>,
@@ -136,7 +136,7 @@ impl<'a> Planner<'a> {
     }
 
     /// The working copy of the workload, its container's JSON pointer and `managedFields` steps.
-    fn container_slot(
+    pub(crate) fn container_slot(
         &mut self,
         found: Workload<'_>,
         container: &Found,

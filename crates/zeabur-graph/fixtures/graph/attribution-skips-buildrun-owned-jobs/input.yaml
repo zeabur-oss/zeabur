@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: demo
+  ownerReferences:
+    - apiVersion: example.com/v1
+      kind: BuildRun
+      name: migrate
+      uid: 1f0c2d3e-4a5b-4c6d-8e7f-90a1b2c3d4e5
+      controller: true
+spec:
+  template:
+    spec:
+      containers:
+        - name: task
+          image: task:1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: web-1761059900
+  namespace: demo
+  ownerReferences:
+    - apiVersion: builder.zeabur.com/v1alpha1
+      kind: BuildRun
+      name: web-1761059900
+      uid: 6b2e9f10-3c4d-4e5f-a6b7-c8d9e0f1a2b3
+      controller: true
+spec:
+  template:
+    spec:
+      containers:
+        - name: build
+          image: moby/buildkit:v0.23.2

@@ -283,23 +283,7 @@ impl<'a> Planner<'a> {
             Change::RenameDomain { route, from, to } => self.rename_domain(route, from, to),
             Change::RemoveDomain { route, hostname } => self.remove_domain(route, hostname),
             Change::Create { object } => self.create(object),
-            Change::Restart { workload } => {
-                let found = self.workload(workload)?;
-                if matches!(found.kind(), WorkloadKind::Job | WorkloadKind::CronJob) {
-                    return Err(error(
-                        ErrorKind::Invalid,
-                        "not_restartable",
-                        format!(
-                            "{} {} runs to completion; it has no pods to replace.",
-                            workload.kind.as_str(),
-                            workload.name
-                        ),
-                    ));
-                }
-                self.restarts.insert(workload.clone());
-                self.impact.insert(workload.clone());
-                Ok(())
-            }
+            Change::Restart { workload } => self.restart_workload(workload),
             Change::Rollback { workload, revision } => self.rollback(workload, *revision),
             Change::ExpandVolume { claim, size } => self.expand_volume(claim, size),
             Change::AddVolume {
@@ -331,6 +315,18 @@ impl<'a> Planner<'a> {
                 probe,
                 set,
             } => self.probe(workload, container.as_deref(), *probe, set.as_ref()),
+            Change::Image {
+                workload,
+                container,
+                image,
+            } => self.image(workload, container.as_deref(), image),
+            Change::Rebuild { build } => self.rebuild(build),
+            Change::AutoUpdate {
+                workload,
+                enabled,
+                build,
+                webhook,
+            } => self.auto_update(workload, *enabled, build.as_deref(), webhook.as_deref()),
             Change::Scale { workload, replicas } => self.scale(workload, *replicas),
             Change::Resources {
                 workload,
@@ -362,6 +358,24 @@ impl<'a> Planner<'a> {
                  pod or the person's session says.",
             )),
         }
+    }
+
+    fn restart_workload(&mut self, workload: &WorkloadRef) -> Result<(), PlanError> {
+        let found = self.workload(workload)?;
+        if matches!(found.kind(), WorkloadKind::Job | WorkloadKind::CronJob) {
+            return Err(error(
+                ErrorKind::Invalid,
+                "not_restartable",
+                format!(
+                    "{} {} runs to completion; it has no pods to replace.",
+                    workload.kind.as_str(),
+                    workload.name
+                ),
+            ));
+        }
+        self.restarts.insert(workload.clone());
+        self.impact.insert(workload.clone());
+        Ok(())
     }
 
     // ── Lookups ──────────────────────────────────────────────────────────────────────────────

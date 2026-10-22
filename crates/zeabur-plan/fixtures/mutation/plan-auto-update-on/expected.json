@@ -1,0 +1,186 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "after": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "annotations": {
+            "keel.sh/policy": "force"
+          },
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2",
+                  "name": "app"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "afterYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\n  annotations:\n    keel.sh/policy: force\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2\n        name: app\n",
+      "before": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2",
+                  "name": "app"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2\n        name: app\n",
+      "changes": [
+        {
+          "after": "force",
+          "path": "metadata.annotations.keel.sh/policy"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/generation",
+            "value": 3
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations",
+            "value": {
+              "keel.sh/policy": "force"
+            }
+          }
+        ],
+        "type": "patch"
+      }
+    },
+    {
+      "after": {
+        "apiVersion": "builder.zeabur.com/v1alpha1",
+        "kind": "Build",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "builderRef": "dockerfile",
+          "notify": [
+            {
+              "type": "keel",
+              "url": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"
+            }
+          ],
+          "source": {
+            "git": {
+              "ref": "main",
+              "url": "https://example.com/acme/web"
+            }
+          }
+        }
+      },
+      "afterYaml": "apiVersion: builder.zeabur.com/v1alpha1\nkind: Build\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  builderRef: dockerfile\n  notify:\n  - type: keel\n    url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native\n  source:\n    git:\n      ref: main\n      url: https://example.com/acme/web\n",
+      "before": {
+        "apiVersion": "builder.zeabur.com/v1alpha1",
+        "kind": "Build",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "builderRef": "dockerfile",
+          "source": {
+            "git": {
+              "ref": "main",
+              "url": "https://example.com/acme/web"
+            }
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: builder.zeabur.com/v1alpha1\nkind: Build\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  builderRef: dockerfile\n  source:\n    git:\n      ref: main\n      url: https://example.com/acme/web\n",
+      "changes": [
+        {
+          "after": "keel",
+          "path": "spec.notify[0].type"
+        },
+        {
+          "after": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native",
+          "path": "spec.notify[0].url"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "7",
+      "target": {
+        "apiVersion": "builder.zeabur.com/v1alpha1",
+        "kind": "Build",
+        "name": "web",
+        "plural": "builds"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/generation",
+            "value": 2
+          },
+          {
+            "op": "add",
+            "path": "/spec/notify",
+            "value": [
+              {
+                "type": "keel",
+                "url": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"
+              }
+            ]
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

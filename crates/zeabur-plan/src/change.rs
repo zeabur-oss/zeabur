@@ -138,6 +138,37 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         set: Option<ProbeRequest>,
     },
+    /// Run another image in one container of a workload.
+    #[serde(rename_all = "camelCase")]
+    Image {
+        /// The workload.
+        workload: WorkloadRef,
+        /// The container; may be left out when the workload has only one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        container: Option<String>,
+        /// The image reference, such as a Zeabur Builder `Build`'s `status.latestImage`.
+        image: String,
+    },
+    /// Build a Zeabur Builder `Build`'s current commit again (see the `builds` module).
+    #[serde(rename_all = "camelCase")]
+    Rebuild {
+        /// The `Build`.
+        build: String,
+    },
+    /// Have Keel move a workload to each new image, or stop it (see the `builds` module).
+    #[serde(rename_all = "camelCase")]
+    AutoUpdate {
+        /// The workload: a Deployment, StatefulSet or DaemonSet.
+        workload: WorkloadRef,
+        /// On or off.
+        enabled: bool,
+        /// The `Build` whose new images Keel is told of, when turning it on.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        build: Option<String>,
+        /// Keel's native webhook, `…/v1/webhooks/native`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        webhook: Option<String>,
+    },
     /// Run this many pods of a Deployment or StatefulSet.
     #[serde(rename_all = "camelCase")]
     Scale {

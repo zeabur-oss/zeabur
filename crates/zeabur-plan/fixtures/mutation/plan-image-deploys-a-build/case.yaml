@@ -1,0 +1,6 @@
+description: "Deploying a build sets the container's image, testing the one it replaces; the pods are replaced."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: image, workload: {kind: Deployment, name: web}, image: 'zot.zot.svc.cluster.local:5000/demo/web:main-1761059900-9f00aa1@sha256:1111111111111111111111111111111111111111111111111111111111111111'}

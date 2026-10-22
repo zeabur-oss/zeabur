@@ -1,0 +1,12 @@
+{
+  "configMaps": {},
+  "secrets": {},
+  "persistentVolumeClaims": {},
+  "services": {},
+  "workloads": [
+    {
+      "kind": "Job",
+      "name": "migrate"
+    }
+  ]
+}

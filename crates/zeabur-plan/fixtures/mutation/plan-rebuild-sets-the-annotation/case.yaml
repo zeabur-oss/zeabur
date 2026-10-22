@@ -1,0 +1,7 @@
+description: "Building again sets the Build's rebuild annotation to the plan's time; nothing else changes."
+operation: mutation.plan
+params:
+  now: '2026-10-23T08:00:00Z'
+  request:
+    changes:
+      - {op: rebuild, build: web}
