@@ -672,6 +672,127 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/pods/{pod}/files": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * A container's mounts and how its files are reached.
+     * @description Probes the container for `tar`. Without it, `reader` names a running debug container of
+     *     Zeabur's that mounts the container's volumes, or says none does yet (`none`), and whether the
+     *     person may add one with the `debugContainer` change.
+     */
+    get: operations["getFiles"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/pods/{pod}/files/content": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * A file's contents, streamed as the container reads it, up to [`MAX_TRANSFER`] bytes.
+     * @description A file in a Secret's volume, also through a link, is refused; a folder is not downloaded.
+     */
+    get: operations["downloadFile"]
+    /**
+     * Writes the request's body as the file `path`, up to [`MAX_TRANSFER`] bytes.
+     * @description The body is the file's bytes and `Content-Length` its size. A file of that name is replaced
+     *     only with `replace=true`; otherwise it is a `409` (`files.exists`).
+     */
+    put: operations["uploadFile"]
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/pods/{pod}/files/entries": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * A folder's entries: the first [`MAX_ENTRIES`] by name, folders first.
+     * @description In a Secret's volume the sizes are left out. The kubelet's own entries in a ConfigMap, Secret
+     *     or projected volume (`..data` and the timestamped folder it points to) are left out too: the
+     *     keys are what the volume holds.
+     */
+    get: operations["listFiles"]
+    put?: never
+    post?: never
+    /** Deletes a file, or a folder with everything in it. */
+    delete: operations["deleteFile"]
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/pods/{pod}/files/folders": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Makes a folder. */
+    post: operations["makeFolder"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/pods/{pod}/files/moves": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Renames a file or folder within its folder; refused when the new name is taken. */
+    post: operations["renameFile"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/pods/{pod}/files/preview": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** A file as text, up to [`MAX_PREVIEW`] bytes; `text` is absent when it is not UTF-8 text. */
+    get: operations["previewFile"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/pods/{pod}/logs": {
     parameters: {
       query?: never
@@ -2130,6 +2251,146 @@ export interface components {
       before?: string | null
       /** @description The field, dotted; keyed list entries as `[name=app]`, others by position. */
       path: string
+    }
+    /** @description One entry of a folder. */
+    FileEntry: {
+      /** @description It is a symbolic link. */
+      link: boolean
+      /**
+       * Format: int64
+       * @description When it was last modified, in seconds since 1970.
+       */
+      modified: number
+      /** @description Its name. */
+      name: string
+      /**
+       * Format: int64
+       * @description Its size in bytes; absent for a folder, and in a Secret's volume.
+       */
+      size?: number | null
+      /** @description What it is, or what its link points to. */
+      type: components["schemas"]["FileEntryType"]
+    }
+    /**
+     * @description What an entry is.
+     * @enum {string}
+     */
+    FileEntryType: "file" | "directory" | "brokenLink" | "other"
+    /** @description The limits of this server. */
+    FileLimits: {
+      /** @description The most entries a listing returns. */
+      entries: number
+      /**
+       * Format: int64
+       * @description The largest text preview, in bytes.
+       */
+      preview: number
+      /**
+       * Format: int64
+       * @description The largest download or upload, in bytes.
+       */
+      transfer: number
+    }
+    /** @description A folder's entries. */
+    FileList: {
+      /** @description Its first entries by name, folders first, at most `limits.entries`. */
+      items: components["schemas"]["FileEntry"][]
+      /** @description It has more names than Zeabur reads; `totalSize` counts those read. */
+      more: boolean
+      /** @description The folder. */
+      path: string
+      /** @description How many entries it has (that match `filter`). */
+      totalSize: number
+    }
+    /**
+     * @description When a mount's files go away.
+     * @enum {string}
+     */
+    FileLost: "replaced" | "restart"
+    /** @description A place in the container's file system. */
+    FileMount: {
+      /** @description What it is. */
+      kind: components["schemas"]["FileMountKind"]
+      lost?: components["schemas"]["FileLost"] | null
+      /** @description The claim, ConfigMap or Secret behind it. */
+      object?: string | null
+      /** @description Only part of the volume is mounted (`subPath`). */
+      part: boolean
+      /** @description Where it is mounted. */
+      path: string
+      /** @description Writes are refused. */
+      readOnly: boolean
+      /** @description The volume's name in the pod; absent for the image. */
+      volume?: string | null
+    }
+    /**
+     * @description What a mount is.
+     * @enum {string}
+     */
+    FileMountKind: "claim" | "configMap" | "secret" | "emptyDir" | "image" | "other"
+    /** @description A folder to make. */
+    FileNewFolder: {
+      /** @description The container. */
+      container?: string | null
+      /** @description The folder's absolute path. */
+      path: string
+      /** @description Zeabur's debug container to write through. */
+      via?: string | null
+    }
+    /** @description A file shown as text. */
+    FilePreview: {
+      /** @description The file, links resolved. */
+      path: string
+      /**
+       * Format: int64
+       * @description Its size in bytes.
+       */
+      size: number
+      /** @description Its text; absent when it is not text or larger than `limits.preview`. */
+      text?: string | null
+      /** @description Larger than `limits.preview`. */
+      tooLarge: boolean
+    }
+    /** @description How the files are reached, and what is missing when they are not. */
+    FileReader: {
+      /**
+       * @description For `none`: whether the person may add a debug container (`patch` on
+       *     `pods/ephemeralcontainers`); absent when the cluster would not say.
+       */
+      canAddDebugContainer?: boolean | null
+      /** @description How. */
+      kind: components["schemas"]["FileReaderKind"]
+      /** @description The debug container to pass as `via`. */
+      via?: string | null
+    }
+    /**
+     * @description How the files are reached.
+     * @enum {string}
+     */
+    FileReaderKind: "container" | "debugContainer" | "none"
+    /** @description A rename within a folder. */
+    FileRename: {
+      /** @description The container. */
+      container?: string | null
+      /** @description Its new name, in the same folder. */
+      name: string
+      /** @description The entry's absolute path. */
+      path: string
+      /** @description Zeabur's debug container to write through. */
+      via?: string | null
+    }
+    /** @description A container's mounts and how its files are reached. */
+    Files: {
+      /** @description The container. */
+      container: string
+      /** @description The limits. */
+      limits: components["schemas"]["FileLimits"]
+      /** @description Its mounts, by path, the image's last. */
+      mounts: components["schemas"]["FileMount"][]
+      /** @description The pod. */
+      pod: string
+      /** @description How the files are reached. */
+      reader: components["schemas"]["FileReader"]
     }
     /** @description Whether the plan's new pods fit, and what blocks them. */
     Fit: {
@@ -5989,6 +6250,465 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getFiles: {
+    parameters: {
+      query?: {
+        /** @description The container; by default the pod's default container. */
+        container?: string
+        /** @description Zeabur's debug container to read through (`reader.via`). */
+        via?: string
+        /** @description The absolute path. */
+        path?: string
+        /** @description Only names that contain this, ignoring case (a listing). */
+        filter?: string
+        /** @description Replace a file of the same name (an upload). */
+        replace?: boolean
+      }
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Files"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  downloadFile: {
+    parameters: {
+      query?: {
+        /** @description The container; by default the pod's default container. */
+        container?: string
+        /** @description Zeabur's debug container to read through (`reader.via`). */
+        via?: string
+        /** @description The absolute path. */
+        path?: string
+        /** @description Only names that contain this, ignoring case (a listing). */
+        filter?: string
+        /** @description Replace a file of the same name (an upload). */
+        replace?: boolean
+      }
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The file's bytes */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/octet-stream": unknown
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  uploadFile: {
+    parameters: {
+      query?: {
+        /** @description The container; by default the pod's default container. */
+        container?: string
+        /** @description Zeabur's debug container to read through (`reader.via`). */
+        via?: string
+        /** @description The absolute path. */
+        path?: string
+        /** @description Only names that contain this, ignoring case (a listing). */
+        filter?: string
+        /** @description Replace a file of the same name (an upload). */
+        replace?: boolean
+      }
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/octet-stream": number[]
+      }
+    }
+    responses: {
+      /** @description Written */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listFiles: {
+    parameters: {
+      query?: {
+        /** @description The container; by default the pod's default container. */
+        container?: string
+        /** @description Zeabur's debug container to read through (`reader.via`). */
+        via?: string
+        /** @description The absolute path. */
+        path?: string
+        /** @description Only names that contain this, ignoring case (a listing). */
+        filter?: string
+        /** @description Replace a file of the same name (an upload). */
+        replace?: boolean
+      }
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["FileList"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  deleteFile: {
+    parameters: {
+      query?: {
+        /** @description The container; by default the pod's default container. */
+        container?: string
+        /** @description Zeabur's debug container to read through (`reader.via`). */
+        via?: string
+        /** @description The absolute path. */
+        path?: string
+        /** @description Only names that contain this, ignoring case (a listing). */
+        filter?: string
+        /** @description Replace a file of the same name (an upload). */
+        replace?: boolean
+      }
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Deleted */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  makeFolder: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FileNewFolder"]
+      }
+    }
+    responses: {
+      /** @description Made */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  renameFile: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FileRename"]
+      }
+    }
+    responses: {
+      /** @description Renamed */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  previewFile: {
+    parameters: {
+      query?: {
+        /** @description The container; by default the pod's default container. */
+        container?: string
+        /** @description Zeabur's debug container to read through (`reader.via`). */
+        via?: string
+        /** @description The absolute path. */
+        path?: string
+        /** @description Only names that contain this, ignoring case (a listing). */
+        filter?: string
+        /** @description Replace a file of the same name (an upload). */
+        replace?: boolean
+      }
+      header?: never
+      path: {
+        project: string
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["FilePreview"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
         headers: {
           [name: string]: unknown
         }

@@ -1095,6 +1095,525 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/files":
+    get:
+      tags:
+      - pods
+      summary: A container's mounts and how its files are reached.
+      description: |-
+        Probes the container for `tar`. Without it, `reader` names a running debug container of
+        Zeabur's that mounts the container's volumes, or says none does yet (`none`), and whether the
+        person may add one with the `debugContainer` change.
+      operationId: getFiles
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container; by default the pod's default container.
+        required: false
+        schema:
+          type: string
+      - name: via
+        in: query
+        description: Zeabur's debug container to read through (`reader.via`).
+        required: false
+        schema:
+          type: string
+      - name: path
+        in: query
+        description: The absolute path.
+        required: false
+        schema:
+          type: string
+      - name: filter
+        in: query
+        description: Only names that contain this, ignoring case (a listing).
+        required: false
+        schema:
+          type: string
+      - name: replace
+        in: query
+        description: Replace a file of the same name (an upload).
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Files"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/files/content":
+    get:
+      tags:
+      - pods
+      summary: >-
+        A file's contents, streamed as the container reads it, up to [`MAX_TRANSFER`]
+        bytes.
+      description: >-
+        A file in a Secret's volume, also through a link, is refused; a folder is not
+        downloaded.
+      operationId: downloadFile
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container; by default the pod's default container.
+        required: false
+        schema:
+          type: string
+      - name: via
+        in: query
+        description: Zeabur's debug container to read through (`reader.via`).
+        required: false
+        schema:
+          type: string
+      - name: path
+        in: query
+        description: The absolute path.
+        required: false
+        schema:
+          type: string
+      - name: filter
+        in: query
+        description: Only names that contain this, ignoring case (a listing).
+        required: false
+        schema:
+          type: string
+      - name: replace
+        in: query
+        description: Replace a file of the same name (an upload).
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          description: The file's bytes
+          content:
+            application/octet-stream: {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    put:
+      tags:
+      - pods
+      summary: Writes the request's body as the file `path`, up to [`MAX_TRANSFER`] bytes.
+      description: |-
+        The body is the file's bytes and `Content-Length` its size. A file of that name is replaced
+        only with `replace=true`; otherwise it is a `409` (`files.exists`).
+      operationId: uploadFile
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container; by default the pod's default container.
+        required: false
+        schema:
+          type: string
+      - name: via
+        in: query
+        description: Zeabur's debug container to read through (`reader.via`).
+        required: false
+        schema:
+          type: string
+      - name: path
+        in: query
+        description: The absolute path.
+        required: false
+        schema:
+          type: string
+      - name: filter
+        in: query
+        description: Only names that contain this, ignoring case (a listing).
+        required: false
+        schema:
+          type: string
+      - name: replace
+        in: query
+        description: Replace a file of the same name (an upload).
+        required: false
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              type: array
+              items:
+                type: integer
+                format: int32
+                minimum: 0
+        required: true
+      responses:
+        "204":
+          description: Written
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/files/entries":
+    get:
+      tags:
+      - pods
+      summary: "A folder's entries: the first [`MAX_ENTRIES`] by name, folders first."
+      description: |-
+        In a Secret's volume the sizes are left out. The kubelet's own entries in a ConfigMap, Secret
+        or projected volume (`..data` and the timestamped folder it points to) are left out too: the
+        keys are what the volume holds.
+      operationId: listFiles
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container; by default the pod's default container.
+        required: false
+        schema:
+          type: string
+      - name: via
+        in: query
+        description: Zeabur's debug container to read through (`reader.via`).
+        required: false
+        schema:
+          type: string
+      - name: path
+        in: query
+        description: The absolute path.
+        required: false
+        schema:
+          type: string
+      - name: filter
+        in: query
+        description: Only names that contain this, ignoring case (a listing).
+        required: false
+        schema:
+          type: string
+      - name: replace
+        in: query
+        description: Replace a file of the same name (an upload).
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    delete:
+      tags:
+      - pods
+      summary: Deletes a file, or a folder with everything in it.
+      operationId: deleteFile
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container; by default the pod's default container.
+        required: false
+        schema:
+          type: string
+      - name: via
+        in: query
+        description: Zeabur's debug container to read through (`reader.via`).
+        required: false
+        schema:
+          type: string
+      - name: path
+        in: query
+        description: The absolute path.
+        required: false
+        schema:
+          type: string
+      - name: filter
+        in: query
+        description: Only names that contain this, ignoring case (a listing).
+        required: false
+        schema:
+          type: string
+      - name: replace
+        in: query
+        description: Replace a file of the same name (an upload).
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/files/folders":
+    post:
+      tags:
+      - pods
+      summary: Makes a folder.
+      operationId: makeFolder
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FileNewFolder"
+        required: true
+      responses:
+        "204":
+          description: Made
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/files/moves":
+    post:
+      tags:
+      - pods
+      summary: Renames a file or folder within its folder; refused when the new name is taken.
+      operationId: renameFile
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FileRename"
+        required: true
+      responses:
+        "204":
+          description: Renamed
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/pods/{pod}/files/preview":
+    get:
+      tags:
+      - pods
+      summary: >-
+        A file as text, up to [`MAX_PREVIEW`] bytes; `text` is absent when it is not
+        UTF-8 text.
+      operationId: previewFile
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: The container; by default the pod's default container.
+        required: false
+        schema:
+          type: string
+      - name: via
+        in: query
+        description: Zeabur's debug container to read through (`reader.via`).
+        required: false
+        schema:
+          type: string
+      - name: path
+        in: query
+        description: The absolute path.
+        required: false
+        schema:
+          type: string
+      - name: filter
+        in: query
+        description: Only names that contain this, ignoring case (a listing).
+        required: false
+        schema:
+          type: string
+      - name: replace
+        in: query
+        description: Replace a file of the same name (an upload).
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FilePreview"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/pods/{pod}/logs":
     get:
       tags:
@@ -3904,6 +4423,264 @@ components:
         path:
           type: string
           description: The field, dotted; keyed list entries as `[name=app]`, others by position.
+    FileEntry:
+      type: object
+      description: One entry of a folder.
+      required:
+      - name
+      - type
+      - link
+      - modified
+      properties:
+        link:
+          type: boolean
+          description: It is a symbolic link.
+        modified:
+          type: integer
+          format: int64
+          description: When it was last modified, in seconds since 1970.
+        name:
+          type: string
+          description: Its name.
+        size:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: Its size in bytes; absent for a folder, and in a Secret's volume.
+          minimum: 0
+        type:
+          $ref: "#/components/schemas/FileEntryType"
+          description: What it is, or what its link points to.
+    FileEntryType:
+      type: string
+      description: What an entry is.
+      enum:
+      - file
+      - directory
+      - brokenLink
+      - other
+    FileLimits:
+      type: object
+      description: The limits of this server.
+      required:
+      - entries
+      - transfer
+      - preview
+      properties:
+        entries:
+          type: integer
+          description: The most entries a listing returns.
+          minimum: 0
+        preview:
+          type: integer
+          format: int64
+          description: The largest text preview, in bytes.
+          minimum: 0
+        transfer:
+          type: integer
+          format: int64
+          description: The largest download or upload, in bytes.
+          minimum: 0
+    FileList:
+      type: object
+      description: A folder's entries.
+      required:
+      - path
+      - items
+      - totalSize
+      - more
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileEntry"
+          description: Its first entries by name, folders first, at most `limits.entries`.
+        more:
+          type: boolean
+          description: It has more names than Zeabur reads; `totalSize` counts those read.
+        path:
+          type: string
+          description: The folder.
+        totalSize:
+          type: integer
+          description: How many entries it has (that match `filter`).
+          minimum: 0
+    FileLost:
+      type: string
+      description: When a mount's files go away.
+      enum:
+      - replaced
+      - restart
+    FileMount:
+      type: object
+      description: A place in the container's file system.
+      required:
+      - path
+      - kind
+      - readOnly
+      - part
+      properties:
+        kind:
+          $ref: "#/components/schemas/FileMountKind"
+          description: What it is.
+        lost:
+          oneOf:
+          - $ref: "#/components/schemas/FileLost"
+            description: When its files go away; absent when they stay.
+          - type: "null"
+        object:
+          type:
+          - string
+          - "null"
+          description: The claim, ConfigMap or Secret behind it.
+        part:
+          type: boolean
+          description: Only part of the volume is mounted (`subPath`).
+        path:
+          type: string
+          description: Where it is mounted.
+        readOnly:
+          type: boolean
+          description: Writes are refused.
+        volume:
+          type:
+          - string
+          - "null"
+          description: The volume's name in the pod; absent for the image.
+    FileMountKind:
+      type: string
+      description: What a mount is.
+      enum:
+      - claim
+      - configMap
+      - secret
+      - emptyDir
+      - image
+      - other
+    FileNewFolder:
+      type: object
+      description: A folder to make.
+      required:
+      - path
+      properties:
+        container:
+          type:
+          - string
+          - "null"
+          description: The container.
+        path:
+          type: string
+          description: The folder's absolute path.
+        via:
+          type:
+          - string
+          - "null"
+          description: Zeabur's debug container to write through.
+      additionalProperties: false
+    FilePreview:
+      type: object
+      description: A file shown as text.
+      required:
+      - path
+      - size
+      - tooLarge
+      properties:
+        path:
+          type: string
+          description: The file, links resolved.
+        size:
+          type: integer
+          format: int64
+          description: Its size in bytes.
+          minimum: 0
+        text:
+          type:
+          - string
+          - "null"
+          description: Its text; absent when it is not text or larger than `limits.preview`.
+        tooLarge:
+          type: boolean
+          description: Larger than `limits.preview`.
+    FileReader:
+      type: object
+      description: How the files are reached, and what is missing when they are not.
+      required:
+      - kind
+      properties:
+        canAddDebugContainer:
+          type:
+          - boolean
+          - "null"
+          description: |-
+            For `none`: whether the person may add a debug container (`patch` on
+            `pods/ephemeralcontainers`); absent when the cluster would not say.
+        kind:
+          $ref: "#/components/schemas/FileReaderKind"
+          description: How.
+        via:
+          type:
+          - string
+          - "null"
+          description: The debug container to pass as `via`.
+    FileReaderKind:
+      type: string
+      description: How the files are reached.
+      enum:
+      - container
+      - debugContainer
+      - none
+    FileRename:
+      type: object
+      description: A rename within a folder.
+      required:
+      - path
+      - name
+      properties:
+        container:
+          type:
+          - string
+          - "null"
+          description: The container.
+        name:
+          type: string
+          description: Its new name, in the same folder.
+        path:
+          type: string
+          description: The entry's absolute path.
+        via:
+          type:
+          - string
+          - "null"
+          description: Zeabur's debug container to write through.
+      additionalProperties: false
+    Files:
+      type: object
+      description: A container's mounts and how its files are reached.
+      required:
+      - pod
+      - container
+      - mounts
+      - reader
+      - limits
+      properties:
+        container:
+          type: string
+          description: The container.
+        limits:
+          $ref: "#/components/schemas/FileLimits"
+          description: The limits.
+        mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileMount"
+          description: Its mounts, by path, the image's last.
+        pod:
+          type: string
+          description: The pod.
+        reader:
+          $ref: "#/components/schemas/FileReader"
+          description: How the files are reached.
     Fit:
       type: object
       description: Whether the plan's new pods fit, and what blocks them.
@@ -8952,7 +9729,7 @@ tags:
 - name: services
   description: "A project's services (workloads): releases and usage history"
 - name: pods
-  description: "A pod's containers: logs, and a terminal over a WebSocket"
+  description: "A pod's containers: logs, a terminal over a WebSocket, and their files"
 - name: resources
   description: A project's resources and objects of any kind, as YAML
 - name: settings

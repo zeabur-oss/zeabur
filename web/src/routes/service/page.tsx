@@ -7,6 +7,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
 import ChartBarIcon from "~icons/ph/chart-bar"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
+import FolderIcon from "~icons/ph/folder"
 import DotsThreeIcon from "~icons/ph/dots-three"
 import GearSixIcon from "~icons/ph/gear-six"
 import GlobeIcon from "~icons/ph/globe"
@@ -63,6 +64,7 @@ import {
   type ServiceTab as Page,
 } from "@/routes/search"
 import { DeploymentsTab } from "@/routes/service/deployments"
+import { FilesTab } from "@/routes/service/files"
 import { NetworkingTab } from "@/routes/service/networking"
 import { OverviewTab } from "@/routes/service/overview"
 import { MetricsTab } from "@/routes/service/metrics"
@@ -77,6 +79,7 @@ const tabIcons: Record<Page, Icon> = {
   usage: ChartBarIcon,
   networking: GlobeIcon,
   variables: BracketsCurlyIcon,
+  files: FolderIcon,
   settings: GearSixIcon,
 }
 
@@ -159,7 +162,8 @@ function ServiceView({
         ...previous,
         tab: next === "overview" ? undefined : next,
         mode: undefined,
-        pod: next === "logs" || next === "deployments" ? previous.pod : undefined,
+        pod:
+          next === "logs" || next === "deployments" || next === "files" ? previous.pod : undefined,
       }),
       hash: "",
     })
@@ -423,6 +427,11 @@ function ServiceView({
                   refused={refusedAmong(unreadable, refusedPlaces.config)}
                 />
               </div>
+            ) : null}
+          </TabsContent>
+          <TabsContent value="files">
+            {tab === "files" ? (
+              <FilesTab project={project} service={service} pod={search.pod} onPodChange={setPod} />
             ) : null}
           </TabsContent>
           <TabsContent value="settings" keepMounted={kept("settings")}>

@@ -41,6 +41,12 @@
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs` | a log snapshot |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs/follow` | a log as Server-Sent Events |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/exec` | a terminal in a container, over a WebSocket (see the `pods::exec` module) |
+//! | `GET /api/v1/projects/{p}/pods/{pod}/files` | a container's mounts, and whether its files are read in it or through a debug container (see the `pods::files` module) |
+//! | `GET`, `DELETE /api/v1/projects/{p}/pods/{pod}/files/entries` | a folder's first 1,000 entries; deletes a file or folder |
+//! | `GET`, `PUT /api/v1/projects/{p}/pods/{pod}/files/content` | downloads or uploads a file, up to 100 MB; never a Secret's |
+//! | `GET /api/v1/projects/{p}/pods/{pod}/files/preview` | a file as text, up to 1 MB |
+//! | `POST /api/v1/projects/{p}/pods/{pod}/files/folders` | makes a folder |
+//! | `POST /api/v1/projects/{p}/pods/{pod}/files/moves` | renames a file or folder |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/debug` | its debug container for a container (the `debugContainer` change adds one) and why it does not start |
 //! | `GET /api/v1/projects/{p}/tools` | your tools pods (the `clusterTools` change starts one); deletes those that have stopped (see the `tools` module) |
 //! | `GET /api/v1/projects/{p}/tools/{name}/terminal` | a terminal with `kubectl` and `helm` acting as you, over a WebSocket |
@@ -159,7 +165,7 @@ promised a stable `/api/v1`.",
         (name = "cluster", description = "The cluster and what it has installed"),
         (name = "projects", description = "Projects (namespaces), their events, and changes: plan, then apply"),
         (name = "services", description = "A project's services (workloads): releases and usage history"),
-        (name = "pods", description = "A pod's containers: logs, and a terminal over a WebSocket"),
+        (name = "pods", description = "A pod's containers: logs, a terminal over a WebSocket, and their files"),
         (name = "resources", description = "A project's resources and objects of any kind, as YAML"),
         (name = "settings", description = "Zeabur's own settings"),
     ),
@@ -195,6 +201,12 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(pods::logs::follow_logs))
         .routes(routes!(pods::exec::exec))
         .routes(routes!(pods::debug::get))
+        .routes(routes!(pods::files::get))
+        .routes(routes!(pods::files::list, pods::files::delete))
+        .routes(routes!(pods::files::download, pods::files::upload))
+        .routes(routes!(pods::files::preview))
+        .routes(routes!(pods::files::make_folder))
+        .routes(routes!(pods::files::rename))
         .routes(routes!(tools::status))
         .routes(routes!(tools::delete))
         .routes(routes!(tools::terminal))

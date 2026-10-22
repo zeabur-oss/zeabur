@@ -24,11 +24,15 @@ wait_for() {
 
 # The write tests start from the manifest as applied: what an earlier run added (a variable, a
 # volume, a policy) goes with the namespace.
-wait_for kubectl delete namespace "$namespace" "$namespace-adopt" --ignore-not-found --wait --timeout=180s
+wait_for kubectl delete namespace "$namespace" "$namespace-adopt" "$namespace-files" \
+  --ignore-not-found --wait --timeout=180s
 kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \
-  -f "$root/web/e2e/manifests/second-project.yaml" >/dev/null
+  -f "$root/web/e2e/manifests/second-project.yaml" \
+  -f "$root/web/e2e/manifests/files.yaml" >/dev/null
 wait_for kubectl -n "$namespace" rollout status deployment/talker --timeout=180s
 wait_for kubectl -n "$namespace" rollout status deployment/editor --timeout=180s
+wait_for kubectl -n "$namespace-files" rollout status deployment/keeper --timeout=180s
+wait_for kubectl -n "$namespace-files" rollout status deployment/distroless --timeout=180s
 pod=$(kubectl -n "$namespace" get pods -l app=talker -o jsonpath='{.items[0].metadata.name}')
 # The crashing Deployment must have crashed a few times before the Overview test looks for it.
 # Between restarts the kubelet reports the container as `waiting: CrashLoopBackOff`,

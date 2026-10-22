@@ -8,6 +8,7 @@ export const serviceTabs = [
   "usage",
   "networking",
   "variables",
+  "files",
   "settings",
 ] as const
 export type ServiceTab = (typeof serviceTabs)[number]

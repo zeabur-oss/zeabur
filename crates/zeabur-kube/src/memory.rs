@@ -23,14 +23,18 @@ use serde_json::Value;
 use zeabur_core::json_patch::apply_patch;
 use zeabur_core::problem::{Denied, KubernetesStatus};
 
+mod files;
+
+pub use files::{MemoryFiles, MemoryNode};
+
 use crate::objects::{
     AccessRule, AccessRules, ResourceRef, ServedResource, hide_metadata, hide_secret_values,
 };
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
-    ExecSession, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects, ObjectTarget,
-    Preconditions, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody, WriteRequest,
-    Written,
+    ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects,
+    ObjectTarget, Preconditions, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody,
+    WriteRequest, Written,
 };
 
 /// What the in-memory cluster holds.
@@ -106,6 +110,11 @@ pub struct State {
     /// Pods, as `namespace/pod`, whose image has no shell, as a distroless image; their ephemeral
     /// containers have one.
     pub without_shell: BTreeSet<String>,
+    /// The files of each pod, by `namespace/pod`, which [`Cluster::stream`] reads and writes. A
+    /// pod of `without_shell` has no `tar` either, but in its ephemeral containers.
+    pub files: BTreeMap<String, MemoryFiles>,
+    /// Every command [`Cluster::stream`] ran, as `namespace/pod/container` and its arguments.
+    pub streams: Vec<(String, Vec<String>)>,
     /// Every terminal size a [`Cluster::exec`] session was given, in order.
     pub terminal_sizes: Vec<TerminalSize>,
     /// Every command [`Cluster::run`] ran, in order, with what it was given on standard input.
@@ -762,6 +771,86 @@ impl Cluster for MemoryCluster {
                     ExitStatus::CommandNotFound
                 },
             )
+        })
+    }
+
+    /// Runs one of [`crate::files`]' commands on the pod's [`State::files`] once standard input
+    /// has ended; refused as `exec` is, and not found in a container of a pod of
+    /// [`State::without_shell`] that is not an ephemeral container.
+    fn stream<'a>(
+        &'a self,
+        namespace: &'a str,
+        pod: &'a str,
+        container: &'a str,
+        command: &'a [String],
+    ) -> Answer<'a, ExecStream> {
+        Box::pin(async move {
+            use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+            let key = format!("{namespace}/{pod}");
+            let found = {
+                let mut state = self.allowed(Some(namespace))?;
+                if state.exec_refused.contains(&key) {
+                    return Err(forbidden(&format!("pods/exec {key}")));
+                }
+                let found = state.objects.get(namespace).and_then(|objects| {
+                    objects
+                        .pods
+                        .iter()
+                        .find(|p| p.metadata.name.as_deref() == Some(pod))
+                });
+                let Some(found) = found else {
+                    return Err(not_found(&key));
+                };
+                let ephemeral = found
+                    .spec
+                    .as_ref()
+                    .and_then(|s| s.ephemeral_containers.as_ref())
+                    .is_some_and(|list| list.iter().any(|c| c.name == container));
+                let has_tools = ephemeral || !state.without_shell.contains(&key);
+                state
+                    .streams
+                    .push((format!("{key}/{container}"), command.to_vec()));
+                drop(state);
+                has_tools
+            };
+            let (input, mut process_input) = tokio::io::duplex(64 * 1024);
+            let (mut process_output, output) = tokio::io::duplex(64 * 1024);
+            let (mut process_error, error) = tokio::io::duplex(64 * 1024);
+            let (exited, exit) = tokio::sync::oneshot::channel();
+            let state = Arc::clone(&self.state);
+            let command = command.to_vec();
+            tokio::spawn(async move {
+                let mut stdin = Vec::new();
+                let _read = process_input.read_to_end(&mut stdin).await;
+                let status = if found {
+                    let mut files = state.lock().map_or_else(
+                        |_| MemoryFiles::default(),
+                        |s| s.files.get(&key).cloned().unwrap_or_default(),
+                    );
+                    let (status, out, err) = files.run(&command, &stdin).await;
+                    if let Ok(mut state) = state.lock() {
+                        state.files.insert(key, files);
+                    }
+                    let _out = process_output.write_all(&out).await;
+                    let _err = process_error.write_all(&err).await;
+                    status
+                } else {
+                    ExitStatus::CommandNotFound
+                };
+                drop(process_output);
+                drop(process_error);
+                let _receiver_gone = exited.send(status);
+            });
+            Ok(ExecStream {
+                input: Box::pin(input),
+                output: Box::pin(output),
+                error: Box::pin(error),
+                exit: Box::pin(async move {
+                    exit.await.unwrap_or_else(|_closed| {
+                        ExitStatus::Failed("the in-memory process stopped".to_owned())
+                    })
+                }),
+            })
         })
     }
 

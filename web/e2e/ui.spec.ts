@@ -280,7 +280,7 @@ test("the services list filters, sorts, and leads from a pod to its logs", async
   await expect(logsPod(page)).toHaveAccessibleName(`Replica ${pod}`)
 })
 
-test("the service page has seven tabs and an actions menu, and Logs follows a pod", async ({
+test("the service page has eight tabs and an actions menu, and Logs follows a pod", async ({
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${healthy}`)
@@ -294,6 +294,7 @@ test("the service page has seven tabs and an actions menu, and Logs follows a po
     "Usage",
     "Networking",
     "Variables",
+    "Files",
     "Settings",
   ])
   const header = page.locator("main header").first()

@@ -87,6 +87,26 @@ impl std::fmt::Debug for ExecSession {
     }
 }
 
+/// A process started by [`Cluster::stream`]: standard input, output and error apart, without a
+/// terminal. Dropping it ends the stream to the container.
+pub struct ExecStream {
+    /// The process's standard input; dropping it closes it.
+    pub input: Pin<Box<dyn tokio::io::AsyncWrite + Send>>,
+    /// Its standard output.
+    pub output: Pin<Box<dyn tokio::io::AsyncRead + Send>>,
+    /// Its standard error. Read it alongside `output`: the stream carries both, and one left
+    /// unread can stall the other.
+    pub error: Pin<Box<dyn tokio::io::AsyncRead + Send>>,
+    /// Resolves when the process has ended.
+    pub exit: Pin<Box<dyn Future<Output = ExitStatus> + Send>>,
+}
+
+impl std::fmt::Debug for ExecStream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExecStream").finish_non_exhaustive()
+    }
+}
+
 /// Reads from one cluster as one person. Implemented by [`crate::UserClient`] (kube-apiserver)
 /// and `memory::MemoryCluster` (tests, behind the `memory` feature).
 ///
@@ -156,6 +176,19 @@ pub trait Cluster: Send + Sync {
         command: &'a [String],
         input: &'a [u8],
     ) -> Answer<'a, ExitStatus>;
+
+    /// Runs `command` in `container` without a terminal (`pods/exec` over a WebSocket), with
+    /// standard input, output and error each its own stream, as `kubectl cp` runs `tar`
+    /// [kubectl-cp]. The command is an argument vector run directly, never through a shell.
+    ///
+    /// [kubectl-cp]: https://kubernetes.io/docs/reference/kubectl/generated/kubectl_cp/
+    fn stream<'a>(
+        &'a self,
+        namespace: &'a str,
+        pod: &'a str,
+        container: &'a str,
+        command: &'a [String],
+    ) -> Answer<'a, ExecStream>;
 
     /// A Secret's values. Only on an explicit request from the person; never cached or logged.
     fn reveal_secret<'a>(

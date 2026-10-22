@@ -12,9 +12,13 @@
 //! terminal does not need a second container. Kubernetes never removes an ephemeral container: it
 //! stays in the pod's spec until the pod is replaced, which the plan says.
 //!
+//! It mounts the target's volumes where the target does, read-only where the target's are, so the
+//! file manager reads and writes them through it at the same paths. A mount of part of a volume
+//! (`subPath`, `subPathExpr`) is left out: the whole volume is not the target's to show.
+//!
 //! The container is Zeabur's when its name starts with [`DEBUG_PREFIX`] (an ephemeral container
-//! has no labels). One that still runs, or is still starting, for the same target is used again,
-//! and the plan then writes nothing.
+//! has no labels). One that still runs, or is still starting, for the same target and with all of
+//! those mounts is used again, and the plan then writes nothing.
 //!
 //! It runs as the target container's user where the pod or the container names one, so the
 //! target's files (`/proc/1/root`) and processes are reachable without `CAP_SYS_PTRACE`
@@ -118,6 +122,8 @@ pub struct DebugContainer {
     pub target: Option<String>,
     /// Its image.
     pub image: String,
+    /// Where it mounts volumes.
+    pub mounts: Vec<String>,
     /// Its state.
     pub state: ContainerState,
 }
@@ -200,6 +206,10 @@ pub fn debug_containers_with(pod: &Value, conventions: &Conventions) -> Vec<Debu
                         .and_then(Value::as_str)
                         .unwrap_or_default()
                         .to_owned(),
+                    mounts: items(container, "/volumeMounts")
+                        .filter_map(|m| m.get("mountPath")?.as_str())
+                        .map(str::to_owned)
+                        .collect(),
                     state: container_state(
                         items(pod, "/status/ephemeralContainerStatuses")
                             .find(|s| name_of(s) == Some(name)),
@@ -244,6 +254,64 @@ pub fn target_container(pod: &Value, asked: Option<&str>) -> Result<String, Plan
                 format!("Pod {pod_name} has no containers."),
             )
         })
+}
+
+/// The volume mounts of a debug container for `target` in `pod` (see the module documentation).
+fn debug_mounts(pod: &Value, target: &str) -> Vec<Value> {
+    items(pod, "/spec/containers")
+        .filter(|c| name_of(c) == Some(target))
+        .flat_map(|c| items(c, "/volumeMounts"))
+        .filter(|m| m.get("subPath").is_none() && m.get("subPathExpr").is_none())
+        .filter_map(|m| {
+            let mut mount = json!({"name": m.get("name")?, "mountPath": m.get("mountPath")?});
+            if m.get("readOnly").and_then(Value::as_bool) == Some(true)
+                && let Some(object) = mount.as_object_mut()
+            {
+                object.insert("readOnly".to_owned(), json!(true));
+            }
+            Some(mount)
+        })
+        .collect()
+}
+
+/// A debug container of Zeabur's in `pod` that runs or is starting for `target` with `mounts`.
+fn reusable(
+    pod: &Value,
+    target: &str,
+    mounts: &[Value],
+    conventions: &Conventions,
+) -> Option<DebugContainer> {
+    let mounted = |c: &DebugContainer| {
+        mounts.iter().all(|m| {
+            m.get("mountPath")
+                .and_then(Value::as_str)
+                .is_some_and(|path| c.mounts.iter().any(|p| p == path))
+        })
+    };
+    debug_containers_with(pod, conventions)
+        .into_iter()
+        .find(|c| c.usable() && c.target.as_deref() == Some(target) && mounted(c))
+}
+
+/// The ephemeral container `name` for `target` in `pod`.
+fn debug_spec(pod: &Value, name: &str, image: &str, target: &str, mounts: Vec<Value>) -> Value {
+    let mut container = json!({
+        "name": name,
+        "image": image,
+        "imagePullPolicy": "IfNotPresent",
+        "command": ["sh"],
+        "stdin": true,
+        "tty": true,
+        "targetContainerName": target,
+        "terminationMessagePolicy": "File",
+        "securityContext": debug_security_context(pod, target),
+    });
+    if !mounts.is_empty()
+        && let Some(object) = container.as_object_mut()
+    {
+        object.insert("volumeMounts".to_owned(), Value::Array(mounts));
+    }
+    container
 }
 
 /// The security context of a debug container for `target` in `pod` (see the module
@@ -324,10 +392,8 @@ pub fn debug_container_with(
             format!("Pod {pod_name} has stopped, so no container can start in it."),
         ));
     }
-    if let Some(reused) = debug_containers_with(pod, conventions)
-        .into_iter()
-        .find(|c| c.usable() && c.target.as_deref() == Some(target.as_str()))
-    {
+    let mounts = debug_mounts(pod, &target);
+    if let Some(reused) = reusable(pod, &target, &mounts, conventions) {
         return Ok(Plan {
             objects: Vec::new(),
             impact: Vec::new(),
@@ -345,17 +411,7 @@ pub fn debug_container_with(
     let digest = sha256(format!("{uid}\n{target}\n{made_at}").as_bytes());
     let prefix = &conventions.debug_prefix;
     let name = format!("{prefix}{}", hex(digest.get(..3).unwrap_or_default()));
-    let container = json!({
-        "name": name,
-        "image": image,
-        "imagePullPolicy": "IfNotPresent",
-        "command": ["sh"],
-        "stdin": true,
-        "tty": true,
-        "targetContainerName": target,
-        "terminationMessagePolicy": "File",
-        "securityContext": debug_security_context(pod, &target),
-    });
+    let container = debug_spec(pod, &name, image, &target, mounts);
     let existing = pod.pointer("/spec/ephemeralContainers").cloned();
     let mut operations = vec![json!({"op": "test", "path": "/metadata/uid", "value": uid})];
     match &existing {
@@ -641,7 +697,12 @@ mod tests {
                 "securityContext": {"runAsNonRoot": true},
                 "containers": [
                     {"name": "kube-state-metrics", "image": "ksm:2.15",
-                     "securityContext": {"runAsUser": 65534, "readOnlyRootFilesystem": true}},
+                     "securityContext": {"runAsUser": 65534, "readOnlyRootFilesystem": true},
+                     "volumeMounts": [
+                        {"name": "data", "mountPath": "/data"},
+                        {"name": "config", "mountPath": "/etc/ksm", "readOnly": true},
+                        {"name": "data", "mountPath": "/var/log/ksm", "subPath": "logs"}
+                     ]},
                     {"name": "sidecar", "image": "side:1"}
                 ]
             },
@@ -680,6 +741,26 @@ mod tests {
     }
 
     #[test]
+    fn a_debug_container_mounts_the_targets_whole_volumes_where_it_does() {
+        let plan = debug_container(&pod(), None, "b", "t").unwrap();
+        let Write::EphemeralContainers { operations } = &plan.objects[0].write else {
+            panic!()
+        };
+        assert_eq!(
+            operations[1]["value"][0]["volumeMounts"],
+            json!([
+                {"name": "data", "mountPath": "/data"},
+                {"name": "config", "mountPath": "/etc/ksm", "readOnly": true}
+            ])
+        );
+        let plan = debug_container(&pod(), Some("sidecar"), "b", "t").unwrap();
+        let Write::EphemeralContainers { operations } = &plan.objects[0].write else {
+            panic!()
+        };
+        assert_eq!(operations[1]["value"][0].get("volumeMounts"), None);
+    }
+
+    #[test]
     fn a_pod_that_must_not_run_as_root_and_names_no_user_gets_nobody() {
         let mut pod = pod();
         pod["spec"]["containers"][1]["name"] = json!("only");
@@ -706,9 +787,13 @@ mod tests {
     #[test]
     fn a_running_or_starting_debug_container_for_the_target_is_used_again() {
         let mut pod = pod();
+        let mounts = json!([{"name": "data", "mountPath": "/data"},
+                            {"name": "config", "mountPath": "/etc/ksm"}]);
         pod["spec"]["ephemeralContainers"] = json!([
             {"name": "zeabur-debug-aaaaaa", "image": "b", "targetContainerName": "sidecar"},
-            {"name": "zeabur-debug-bbbbbb", "image": "b", "targetContainerName": "kube-state-metrics"},
+            {"name": "zeabur-debug-cccccc", "image": "b", "targetContainerName": "kube-state-metrics"},
+            {"name": "zeabur-debug-bbbbbb", "image": "b", "targetContainerName": "kube-state-metrics",
+             "volumeMounts": mounts},
             {"name": "debugger-x", "image": "b", "targetContainerName": "kube-state-metrics"}
         ]);
         pod["status"]["ephemeralContainerStatuses"] = json!([
