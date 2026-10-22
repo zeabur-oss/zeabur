@@ -1463,17 +1463,17 @@ export const zhTW: Messages = {
   "install.who.zeabur": "由 Zeabur 安裝",
   "install.who.you": "自己執行",
   "install.here.what": (n: number) =>
-    `Zeabur 會在 kube-system 建立 ${n} 個 HelmChart 物件，k3s 的 Helm 控制器再依此安裝。建立前會先讓你檢查每個物件。`,
+    `Zeabur 會在 kube-system 建立 ${n} 個 HelmChart 物件，叢集的 Helm 控制器再依此安裝。建立前會先讓你檢查每個物件。`,
   "install.here.action": "檢查並安裝",
   "install.here.title": (name: string) => `安裝 ${name}`,
-  "install.here.after": "物件建立後，k3s 通常會在幾分鐘內裝好 chart。要移除時，刪除這些物件即可。",
+  "install.here.after":
+    "物件建立後，Helm 控制器通常會在幾分鐘內裝好 chart。要移除時，刪除這些物件即可。",
   "install.here.k3sPackaged":
     "這個元件不由 Zeabur 直接安裝：k3s 內建了一份，要先在每台 server 上停用。",
   "install.here.inputs": "這個元件不由 Zeabur 直接安裝：需要你填入一些值。",
   "install.here.manifests":
     "這個元件不由 Zeabur 直接安裝：其中有一部分是一般 manifest，不是 chart。",
-  "install.here.noHelmController":
-    "這個叢集沒有 Helm 控制器（不是 k3s），所以 Zeabur 不直接安裝元件。",
+  "install.here.noHelmController": "這個叢集沒有 Helm 控制器，所以 Zeabur 不直接安裝元件。",
   "reach.title": "連線規則",
   "reach.addPolicy": "新增規則",
   "reach.isolate": "隔離這個服務",
