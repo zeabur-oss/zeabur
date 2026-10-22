@@ -27,7 +27,11 @@ export async function authenticator(page: Page, passkeys: Passkey[] = []) {
   for (const credential of passkeys) {
     await cdp.send("WebAuthn.addCredential", { authenticatorId, credential })
   }
-  return { passkeys: () => stored(cdp, authenticatorId) }
+  return {
+    passkeys: () => stored(cdp, authenticatorId),
+    /** Takes the authenticator away, as if the device were put down. */
+    remove: () => cdp.send("WebAuthn.removeVirtualAuthenticator", { authenticatorId }),
+  }
 }
 
 /** Opens a setup link (`zeabur-identityctl setup-link`, an invitation) and adds a passkey. */
