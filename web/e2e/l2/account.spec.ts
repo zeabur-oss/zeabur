@@ -111,13 +111,13 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
   await test.step("the phone's page still lists two, but the last passkey is refused", async () => {
     const row = passkey(onPhone, "Phone")
     await confirmRemove(row)
-    await expect(onPhone.locator("#error")).toHaveText(
-      "You can’t remove your only passkey. Add another first.",
+    // The page lists the passkeys again and says why on the row.
+    await expect(row.locator("[data-error]")).toHaveText(
+      "Your other passkeys were removed in the meantime. Add another before removing this one.",
       { timeout: 30_000 },
     )
-
-    await onPhone.reload()
     await expect(passkeys(onPhone).getByRole("listitem")).toHaveCount(1)
+    await expect(row.locator("[data-confirm]")).toBeHidden()
     await expect(row).toContainText("This is your only passkey, so it can’t be removed.")
     await expect(row.getByRole("button", { name: "Remove" })).toHaveCount(0)
     // Zeabur renews its session with a grant the removed passkey made, so that grant is revoked:
