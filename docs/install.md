@@ -161,6 +161,15 @@ With `terminal.toolsNamespace`, tools pods go in a namespace of their own instea
 project's; give people those rights there, and nobody else `pods/exec` in it.
 `terminal.toolsDeadlineMinutes` and `terminal.toolsResources` bound each tools pod.
 
+### Use, disk and history
+
+Use history, node disk use and volume use are read from the metrics store
+(`metricsStore.service`, or the one chosen in Settings) as the person, so they need `get` on
+that Service's `services/proxy`. The store needs node-exporter for node disk and the kubelets'
+metrics for volume use; VictoriaMetrics' k8s-stack chart and kube-prometheus-stack collect both
+by default. Zeabur Catalog's single-node VictoriaMetrics profile turns node-exporter off, so
+there the cluster page says node disk use is not collected. Nobody needs `nodes/proxy`.
+
 ### An image of your own
 
 To run a build of your own instead, build the image on a Linux machine with Docker
