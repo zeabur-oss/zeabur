@@ -33,6 +33,7 @@ import {
   type YamlDocument,
 } from "@/model/create"
 import { deletionOf } from "@/model/risk"
+import { dropHandoff, handedOff } from "@/lib/adding"
 import { appended, offered, templateOf } from "@/model/templates"
 import { createCommand } from "@/model/terminal"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
@@ -92,7 +93,9 @@ export function CreatePage() {
   const t = useT()
   const navigate = useNavigate()
   const creatable = useQuery(creatableQuery(project))
-  const [initial] = useState(() => templateOf(deployment))
+  const [initial] = useState(() => handedOff(project) ?? templateOf(deployment))
+  // Dropped once shown: a reload after that starts from the template.
+  useEffect(() => dropHandoff(project), [project])
   const [text, setText] = useState(initial)
   const docs = useMemo(() => documentsOf(text), [text])
   const kinds = useMemo(() => {

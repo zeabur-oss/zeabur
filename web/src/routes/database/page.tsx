@@ -13,7 +13,7 @@ import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } fro
 import { databasesQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { CopyText } from "@/components/copy-text"
-import { DatabaseState, engineName } from "@/components/databases"
+import { DatabaseState } from "@/components/databases"
 import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { FormField } from "@/components/form-field"
 import { Freshness } from "@/components/freshness"
@@ -28,6 +28,7 @@ import {
   commands,
   connectionUri,
   enableBackups,
+  engineName,
   lastRun,
   newBackupTarget,
   presetOf,

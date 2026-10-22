@@ -7,11 +7,13 @@ import { useState, type ReactNode } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import CubeIcon from "~icons/ph/cube"
+import DatabaseIcon from "~icons/ph/database"
 import FileTextIcon from "~icons/ph/file-text"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GlobeIcon from "~icons/ph/globe"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import MoonIcon from "~icons/ph/moon"
+import PackageIcon from "~icons/ph/package"
 import PlusIcon from "~icons/ph/plus"
 import PuzzlePieceIcon from "~icons/ph/puzzle-piece"
 import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
@@ -21,15 +23,18 @@ import TranslateIcon from "~icons/ph/translate"
 
 import { logsReadable } from "@/api/logs-access"
 import { namespaceQuery, projectQuery, projectsQuery, toolsQuery } from "@/api/queries"
+import { useAddChoices } from "@/components/add/menu"
 import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot } from "@/components/status"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { addressOf, objectKey } from "@/lib/objects"
+import { openAdd } from "@/lib/adding"
 import { dock, openKubectl, openShell, toggleDock } from "@/lib/dock"
 import { serviceLink, usePlace } from "@/lib/place"
 import { palette, recent, remember } from "@/lib/stores"
 import { cn } from "@/lib/utils"
+import { engineName } from "@/model/databases"
 import { domainsOf, isTask, serviceId, statusOf, type Service } from "@/model/service"
 import { cycleTheme } from "@/theme"
 
@@ -81,6 +86,7 @@ export function PaletteBody() {
     logsReadable(namespaces.find((n) => n.data?.name === project)?.data)
   const recents = recent.useValue()
   const tools = useQuery({ ...toolsQuery(place.project ?? ""), enabled: !!place.project })
+  const adds = useAddChoices(place.project)
 
   const items: Item[] = []
   const g = {
@@ -160,6 +166,25 @@ export function PaletteBody() {
       icon: TerminalWindowIcon,
       run: () => openKubectl(project),
     })
+  if (project && adds?.image)
+    items.push({
+      id: "action:add-image",
+      keywords: "docker container deploy service new",
+      group: g.actions,
+      label: t("add.palette.image", project),
+      icon: PackageIcon,
+      run: () => openAdd(project, "image"),
+    })
+  for (const { engine } of adds?.databases.filter((d) => d.installed) ?? [])
+    if (project)
+      items.push({
+        id: `action:add-${engine}`,
+        keywords: "database new",
+        group: g.actions,
+        label: t("add.palette.database", engineName(engine), project),
+        icon: DatabaseIcon,
+        run: () => openAdd(project, engine),
+      })
   if (project)
     items.push({
       id: "action:create",

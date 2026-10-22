@@ -14,6 +14,7 @@ import { useT } from "@/i18n"
 import { databaseLink } from "@/lib/place"
 import {
   createDatabase,
+  engineName,
   engines,
   lastRun,
   memberChoices,
@@ -35,8 +36,6 @@ import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
 
 export const useDatabases = (project: string) => useQuery(databasesQuery(project))
-
-export const engineName = (engine: Engine) => (engine === "postgresql" ? "PostgreSQL" : "MongoDB")
 
 /** Engines whose operator is installed and readable. */
 export const installedEngines = (data: Schemas["ProjectDatabases"]) =>
@@ -148,14 +147,17 @@ export function NewDatabaseButton({
   )
 }
 
-function NewDatabaseDrawer({
+export function NewDatabaseDrawer({
   project,
   engines: available,
+  engine,
   taken,
   onClose,
 }: {
   project: string
   engines: Engine[]
+  /** The engine to start with, when offered. */
+  engine?: Engine
   taken: string[]
   onClose: () => void
 }) {
@@ -163,7 +165,10 @@ function NewDatabaseDrawer({
   const nodeList = useQuery(nodesQuery).data?.items ?? []
   const nodes = nodeList.length || 1
   const kernels = nodeList.map((n) => n.kernelVersion)
-  const first = engines.find((e) => available.includes(e)) ?? "postgresql"
+  const first =
+    engine && available.includes(engine)
+      ? engine
+      : (engines.find((e) => available.includes(e)) ?? "postgresql")
   const [form, setForm] = useState<NewDatabase>(() =>
     newDatabase(first, nodes, blockedVersions(first, kernels)),
   )

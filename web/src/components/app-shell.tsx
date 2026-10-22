@@ -12,6 +12,7 @@ import { AdminBadge } from "@/components/shell/admin-badge"
 import { ProjectSidebar } from "@/components/shell/project-sidebar"
 import { Sidebar } from "@/components/shell/sidebar"
 import { useT } from "@/i18n"
+import { adding } from "@/lib/adding"
 import { usePlace } from "@/lib/place"
 import { mobileNav, palette } from "@/lib/stores"
 import { useTheme } from "@/theme"
@@ -30,12 +31,15 @@ const Toaster = lazy(() =>
 const ElevationDialog = lazy(() =>
   import("@/components/elevation-dialog").then((m) => ({ default: m.ElevationDialog })),
 )
+// The "New" forms load when one opens.
+const AddHost = lazy(() => import("@/components/add/host").then((m) => ({ default: m.AddHost })))
 
 export function AppShell() {
   const t = useT()
   const place = usePlace()
   const mobileOpen = mobileNav.useValue()
   const elevating = elevation.useValue()
+  const add = adding.useValue()
   const theme = useTheme()
   const pathname = useLocation({ select: (location) => location.pathname })
   const content = usePageTransition<HTMLElement>(pathname)
@@ -88,6 +92,11 @@ export function AppShell() {
       </Dialog>
       <CommandPalette />
       <PlanFallback />
+      {add ? (
+        <Suspense fallback={null}>
+          <AddHost key={`${add.project}/${add.what}`} project={add.project} what={add.what} />
+        </Suspense>
+      ) : null}
       {elevating.phase === "idle" ? null : (
         <Suspense fallback={null}>
           <ElevationDialog state={elevating} />

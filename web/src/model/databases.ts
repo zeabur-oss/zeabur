@@ -20,6 +20,8 @@ type Manifest = Record<string, unknown>
 
 export const engines: Engine[] = ["postgresql", "mongodb"]
 
+export const engineName = (engine: Engine) => (engine === "postgresql" ? "PostgreSQL" : "MongoDB")
+
 /** Server versions the form offers, newest first; the first is the default. */
 export const versions: Record<Engine, { label: string; image: string }[]> = {
   postgresql: [

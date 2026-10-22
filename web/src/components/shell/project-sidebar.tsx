@@ -10,6 +10,7 @@ import SquaresFourIcon from "~icons/ph/squares-four"
 import StackIcon from "~icons/ph/stack"
 
 import { databasesQuery, projectQuery } from "@/api/queries"
+import { AddMenu } from "@/components/add/menu"
 import { RoleIcon, ServiceIcon } from "@/components/service-icon"
 import { DockToggle } from "@/components/shell/dock-slot"
 import { ContextMenu } from "@/components/shell/user-menu"
@@ -167,7 +168,7 @@ function ProjectNav({ project }: { project: string }) {
       <SearchRow />
       <SidebarContent>
         <SidebarGroup>{pages.map(pageRow)}</SidebarGroup>
-        <SidebarSection title={t("column.label")}>
+        <SidebarSection title={t("column.label")} action={<AddMenu project={project} compact />}>
           {data ? (
             <Services project={project} data={data} />
           ) : view.isPending ? (
