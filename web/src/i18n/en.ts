@@ -1007,7 +1007,21 @@ export const en = {
   "plan.col.service": "Service",
   "plan.col.replicas": "Replicas",
   "plan.col.effect": "Effect",
-  "plan.blockedReason": "Doesn't fit in the cluster",
+  "plan.short.title": "Not enough room",
+  "plan.short.nodes": (names: string, n: number) =>
+    n === 0
+      ? "The new pods wait as Pending until a node has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
+      : `The new pods wait as Pending until a node has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
+  "plan.short.quota": (names: string, n: number) =>
+    n === 0
+      ? "The quota refuses the new pods until it has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
+      : `The quota refuses the new pods until it has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
+  "plan.short.fix": (quota: boolean, nodes: boolean): string =>
+    quota && nodes
+      ? "To finish it, raise the quota and free up room on a node, or reserve less per replica."
+      : quota
+        ? "To finish it, raise the quota or reserve less per replica."
+        : "To finish it, free up room on a node or reserve less per replica.",
   "plan.fact.removed": (n: number) => `${n} removed`,
   "plan.fact.changed": (n: number) => `${n} changed`,
   "plan.fact.added": (n: number) => `${n} added`,
@@ -1429,6 +1443,7 @@ export const en = {
   "reach.more": (n: number) => `+${n} more`,
   "reach.filter": "Filter services",
   "reach.service": "Service",
+  "reach.via": "Rule",
   "reach.allow": "Allow",
   "reach.noMatch": "No service matches.",
   "backups.title": "Backups",
@@ -2050,7 +2065,6 @@ export const en = {
   "preview.cores": (n: string) => `${n} CPU`,
   "preview.fits": (pods: number, cpu: string, memory: string) =>
     `Fits: it adds ${plural(pods, "pod", "pods")}, ${cpu} and ${memory} at its peak.`,
-  "preview.blocked": "Why it does not fit",
   "preview.blockedQuota": (name: string, resource: string, need: string, left: string) =>
     resource === "pods"
       ? `Quota ${name} allows ${left} more pods; this needs ${need}.`

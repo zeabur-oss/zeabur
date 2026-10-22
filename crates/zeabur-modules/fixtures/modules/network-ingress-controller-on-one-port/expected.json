@@ -8,7 +8,10 @@
       "fromServices": [
         {
           "service": "projects/shop/services/deployment/api",
-          "access": "blocked"
+          "access": "blocked",
+          "via": [
+            "web-from-traefik"
+          ]
         }
       ]
     },

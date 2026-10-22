@@ -1,7 +1,16 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { filterPeers, FEW_PEERS, leadOf, namesShown, reachSummary } from "@/model/reach"
+import {
+  byRules,
+  filterPeers,
+  FEW_PEERS,
+  leadOf,
+  namesShown,
+  reachSummary,
+  sharedRules,
+  showsRules,
+} from "@/model/reach"
 
 type Reach = Schemas["NetworkPolicyService"]
 type Access = Schemas["NetworkPolicyAccess"]
@@ -18,6 +27,7 @@ const reach = (accesses: Access[], selectedBy = ["default-deny"]): Reach => ({
   fromServices: accesses.map((access, i) => ({
     service: `p/deployment/s${String(i).padStart(2, "0")}`,
     access,
+    via: access === "blocked" ? ["default-deny"] : [`allow-s${i}`],
   })),
 })
 const nameOf = (id: string) => id.split("/").pop() ?? id
@@ -72,10 +82,47 @@ test("leadOf counts each outcome", () => {
   })
 })
 
+describe("rules per peer", () => {
+  test("said only when the project has more than one", () => {
+    expect(showsRules([])).toBe(false)
+    expect(showsRules(["default-deny"])).toBe(false)
+    expect(showsRules(["default-deny", "allow-web"])).toBe(true)
+  })
+
+  test("each peer keeps the rules that decide it", () => {
+    const [blocked, allowed] = reachSummary(reach(["allowed", "blocked"]), nameOf).groups
+    expect(blocked!.peers).toEqual([{ id: "p/deployment/s01", name: "s01", via: ["default-deny"] }])
+    expect(allowed!.peers[0]!.via).toEqual(["allow-s0"])
+  })
+
+  test("peers decided by the same rules are said together, in name order", () => {
+    const peer = (name: string, via: string[]) => ({ id: name, name, via })
+    expect(
+      byRules([
+        peer("cron", ["allow-web", "deny-api"]),
+        peer("db", ["allow-db"]),
+        peer("worker", ["allow-web", "deny-api"]),
+      ]).map((part) => [part.via, part.peers.map((p) => p.name)]),
+    ).toEqual([
+      [
+        ["allow-web", "deny-api"],
+        ["cron", "worker"],
+      ],
+      [["allow-db"], ["db"]],
+    ])
+  })
+
+  test("rules shared by every peer are said once, else on each", () => {
+    const peer = (name: string, via: string[]) => ({ id: name, name, via })
+    expect(sharedRules([peer("a", ["deny-all"]), peer("b", ["deny-all"])])).toEqual(["deny-all"])
+    expect(sharedRules([peer("a", ["deny-all"]), peer("b", ["allow-b"])])).toBeUndefined()
+  })
+})
+
 test("filterPeers matches part of a name, ignoring case and spaces", () => {
   const peers = [
-    { id: "a", name: "Billing-Sync" },
-    { id: "b", name: "db" },
+    { id: "a", name: "Billing-Sync", via: [] },
+    { id: "b", name: "db", via: [] },
   ]
   expect(filterPeers(peers, " sync ")).toEqual([peers[0]!])
   expect(filterPeers(peers, "")).toEqual(peers)

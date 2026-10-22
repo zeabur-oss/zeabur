@@ -919,7 +919,21 @@ export const zhTW: Messages = {
   "plan.col.service": "服務",
   "plan.col.replicas": "副本",
   "plan.col.effect": "影響",
-  "plan.blockedReason": "叢集資源不足",
+  "plan.short.title": "空間不足",
+  "plan.short.nodes": (names, n) =>
+    n === 0
+      ? "新的 Pod 會停在 Pending，等節點有空間才啟動。舊的 Pod 會繼續執行，服務不中斷，但變更要到那時才完成。"
+      : `新的 Pod 會停在 Pending，等節點有空間才啟動。在那之前，${names}${latinEnd(names)}不會執行。`,
+  "plan.short.quota": (names, n) =>
+    n === 0
+      ? "配額會拒絕新的 Pod，直到配額有空間。舊的 Pod 會繼續執行，服務不中斷，但變更要到那時才完成。"
+      : `配額會拒絕新的 Pod，直到配額有空間。在那之前，${names}${latinEnd(names)}不會執行。`,
+  "plan.short.fix": (quota, nodes) =>
+    quota && nodes
+      ? "要完成變更，調高配額並騰出節點空間，或調低每個副本的保留量。"
+      : quota
+        ? "要完成變更，調高配額或調低每個副本的保留量。"
+        : "要完成變更，騰出節點空間或調低每個副本的保留量。",
   "plan.fact.removed": (n) => `移除 ${n} 項`,
   "plan.fact.changed": (n) => `變更 ${n} 項`,
   "plan.fact.added": (n) => `新增 ${n} 項`,
@@ -1302,6 +1316,7 @@ export const zhTW: Messages = {
   "reach.more": (n) => `還有 ${n} 個`,
   "reach.filter": "篩選服務",
   "reach.service": "服務",
+  "reach.via": "依據",
   "reach.allow": "允許",
   "reach.noMatch": "沒有符合的服務。",
   "backups.title": "備份",
@@ -1866,7 +1881,6 @@ export const zhTW: Messages = {
   "preview.cores": (n) => `${n} 核心 CPU`,
   "preview.fits": (pods, cpu, memory) =>
     `資源足夠：尖峰時會多出 ${pods} 個 Pod、${cpu} 和 ${memory}。`,
-  "preview.blocked": "資源不足的原因",
   "preview.blockedQuota": (name, resource, need, left) =>
     resource === "pods"
       ? `配額 ${name} 只容許再多 ${left} 個 Pod，這次需要 ${need} 個。`

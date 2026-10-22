@@ -2640,6 +2640,12 @@ export interface components {
       access: components["schemas"]["NetworkPolicyAccess"]
       /** @description The service's id. */
       service: string
+      /**
+       * @description The policies, by name, that decide it: those whose rules admit it, on its way out or on the
+       *     service's way in; when it is blocked, those that isolate the blocking side and admit
+       *     nothing from it. Empty when no policy isolates either side.
+       */
+      via: string[]
     }
     /** @description A ready-made policy for a service, to plan as a new object. */
     NetworkPolicyPreset: {

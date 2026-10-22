@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import type { Schemas } from "@/api/client"
+import { shortfall } from "@/components/plan/describe"
 import { RefusedKinds } from "@/components/refused"
 import { StatusDot } from "@/components/status"
 import { useT, type Translate } from "@/i18n"
@@ -48,18 +49,22 @@ const envEntry = /\.env\[name=[^\]]+\]/
 /** Whether a rollout says more than the sentences: a strategy other than one replica at a time. */
 const tellsMore = (r: Rollout) => r.strategy === "Recreate" || r.strategy === "OnDelete"
 
-/** Why the plan's new pods do not fit, one sentence per blocker; empty when they do. */
-export function useBlockers(fit: Schemas["Fit"]): string[] {
+/** Why the plan's new pods do not fit, what that costs and how to make room; undefined when
+ * they fit. */
+export function useShortfall(
+  preview?: Preview,
+): { cost: string; reasons: string[]; fix: string } | undefined {
   const t = useT()
   const { cores, memory } = useQuantityFormat()
+  const short = preview ? shortfall(t, preview) : undefined
+  if (!preview || !short) return undefined
   const amount = (resource: string, value: number) =>
     resource.endsWith("cpu")
       ? t("preview.cores", cores(value))
       : resource.endsWith("memory")
         ? memory(value)
         : String(value)
-  if (fit.status !== "blocked") return []
-  return (fit.blockers ?? []).map((b) =>
+  const reasons = (preview.fit.blockers ?? []).map((b) =>
     t(
       b.kind === "quota" ? "preview.blockedQuota" : "preview.blockedNodes",
       b.name ?? "",
@@ -68,6 +73,7 @@ export function useBlockers(fit: Schemas["Fit"]): string[] {
       amount(b.resource, b.available),
     ),
   )
+  return { ...short, reasons }
 }
 
 /** What the plan does to running pods beyond what its sentences or rows already say. */
