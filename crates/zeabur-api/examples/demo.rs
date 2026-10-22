@@ -414,7 +414,7 @@ fn shop() -> NamespaceObjects {
         zeabur_model::ConfigReload::AUTO.to_owned(),
         "true".to_owned(),
     )]));
-    let db = stateful_set(
+    let mut db = stateful_set(
         "db",
         "postgres:18",
         "20Gi",
@@ -422,6 +422,17 @@ fn shop() -> NamespaceObjects {
             {"name": "POSTGRES_PASSWORD", "valueFrom": secret("db-credentials", "password")}
         ]),
     );
+    if let Some(spec) = db.spec.as_mut().and_then(|s| s.template.spec.as_mut()) {
+        spec.containers.push(from(json!({
+            "name": "backup-agent",
+            "image": "ghcr.io/example/backup-agent:1.4.0",
+            "env": [
+                {"name": "BACKUP_SCHEDULE", "value": "0 3 * * *"},
+                {"name": "BACKUP_DATABASE_PASSWORD", "valueFrom": secret("db-credentials", "password")}
+            ],
+            "envFrom": [{"secretRef": {"name": "db-credentials"}}]
+        })));
+    }
     let redis = stateful_set("redis", "redis:8", "2Gi", &json!([]));
     let nightly: CronJob = from(json!({
         "metadata": {"name": "nightly-report", "namespace": "shop"},
