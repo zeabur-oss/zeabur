@@ -304,13 +304,10 @@ export const en = {
   "cluster.apiCheckFailed": "failed",
   "cluster.apiUnknown": "Unknown: the API server's readiness could not be read.",
   "cluster.apiCovers": (n: number) =>
-    `${plural(n, "readiness check", "readiness checks")} (/readyz) of the API server that answered. Each request reaches one API server, so other replicas are not checked here.`,
-  "cluster.apiEmbedded": (distribution: string) =>
-    `On ${distribution} the scheduler and controller manager run in the same process as the API server, so they are running when it answers.`,
+    `${plural(n, "readiness check", "readiness checks")} on the API server that answered. If the cluster has more than one API server, the others are not shown here.`,
   "cluster.apiLeases":
-    "The scheduler and controller manager are not part of these checks; their leader leases show whether each has a running leader.",
-  "cluster.apiNotCovered":
-    "The scheduler and controller manager are not part of these checks. On a managed cluster the provider runs them.",
+    "The scheduler and controller manager are checked separately: each is running if its lease was renewed recently.",
+  "cluster.apiNotCovered": "The scheduler and controller manager are not checked here.",
   "cluster.leaseRenewed": "Leader renewed",
   "cluster.leaseStale": "No leader: last renewed",
   "node.notReady": (n: number, node: string) =>
@@ -337,7 +334,7 @@ export const en = {
   "node.networkUnavailable": (n: number, node: string) =>
     n === 1 ? `${node} has no pod network` : `${n} nodes have no pod network`,
   "node.networkUnavailable.why": "Pods there cannot reach other pods or services.",
-  "node.networkUnavailable.fix": "Check the network plugin on the node (flannel on k3s).",
+  "node.networkUnavailable.fix": "Check the network plugin on the node.",
   "node.memoryFull": (n: number, node: string, share: string) =>
     n === 1
       ? `${node}: memory ${share} used`

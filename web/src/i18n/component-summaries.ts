@@ -70,10 +70,10 @@ export const summaries: Record<string, Summary> = {
     "zh-TW": "保存指標歷史並送出警示。",
     "zh-CN": "保存指标历史并发出告警。",
   },
-  "node-updates/system-upgrade-controller#1315d20c": {
-    en: "Upgrades k3s on the nodes, one node at a time.",
-    "zh-TW": "逐一升級各節點上的 k3s。",
-    "zh-CN": "逐个升级各节点上的 k3s。",
+  "node-updates/system-upgrade-controller#47de8b0b": {
+    en: "Upgrades Kubernetes on the nodes, one node at a time.",
+    "zh-TW": "逐一升級各節點上的 Kubernetes。",
+    "zh-CN": "逐个升级各节点上的 Kubernetes。",
   },
   "observability-operator/victoria-metrics-operator#c028706b": {
     en: "Runs the metrics and log stores.",

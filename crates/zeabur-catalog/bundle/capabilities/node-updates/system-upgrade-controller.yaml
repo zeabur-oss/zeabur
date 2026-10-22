@@ -3,7 +3,7 @@ homepage: https://github.com/rancher/system-upgrade-controller
 license: Apache-2.0
 maturity: independent
 rationale: >
-  Upgrades k3s and node packages one node at a time from declarative Plans,
+  Upgrades k3s or RKE2 and node packages one node at a time from declarative Plans,
   with cordon, drain and concurrency limits. The catalog installs it from
   upstream manifests because the Rancher chart lags behind releases.
 alternatives:
@@ -11,9 +11,9 @@ alternatives:
 defaults:
   single-node: recommended
   multi-node: recommended
-# Its Plans replace the k3s binary, and its manifest needs a control-plane
-# node label that other distributions (KubeSolo) do not set.
-distributions: [k3s]
+# Its Plans replace the k3s or RKE2 binary (rancher/k3s-upgrade, rancher/rke2-upgrade), and its
+# manifest needs a control-plane node label that other distributions (KubeSolo) do not set.
+distributions: [k3s, rke2]
 
 releases:
   - name: crds

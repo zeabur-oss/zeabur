@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import { isStatus, isUnreachable, toProblem, type Schemas } from "@/api/client"
-import { clusterHealthQuery, clusterQuery } from "@/api/queries"
+import { clusterHealthQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
@@ -102,8 +102,6 @@ function Readiness({ health }: { health: ClusterHealth }) {
 
 function Coverage({ health }: { health: ClusterHealth }) {
   const t = useT()
-  const cluster = useQuery(clusterQuery)
-  const embedded = cluster.data?.distribution === "k3s"
   return (
     <Collapsible>
       <CollapsibleTrigger variant="disclosure">
@@ -113,13 +111,7 @@ function Coverage({ health }: { health: ClusterHealth }) {
       <CollapsibleContent>
         <div className="flex flex-col gap-2 pt-2 type-meta text-muted-foreground">
           <p>{t("cluster.apiCovers", health.checks)}</p>
-          <p>
-            {embedded
-              ? t("cluster.apiEmbedded", "k3s")
-              : health.leaders.length > 0
-                ? t("cluster.apiLeases")
-                : t("cluster.apiNotCovered")}
-          </p>
+          <p>{health.leaders.length > 0 ? t("cluster.apiLeases") : t("cluster.apiNotCovered")}</p>
           {health.leaders.length > 0 ? (
             <dl className="grid grid-cols-pairs gap-x-4 gap-y-1">
               {health.leaders.map((lease) => (
