@@ -263,6 +263,7 @@ pub fn database(
             .creation_timestamp
             .as_ref()
             .map(|t| t.0.to_string()),
+        object: databases::written(cluster),
         name,
     }
 }
@@ -395,6 +396,8 @@ mod tests {
         let db = database("shop", &pg, &[store], &[], &[other, mine]);
         assert_eq!(db.state, State::Ready);
         assert_eq!(db.version.as_deref(), Some("18"));
+        assert!(db.object.get("status").is_none());
+        assert_eq!(db.object["spec"]["instances"], 2);
         assert_eq!(db.primary.as_deref(), Some("pg-1"));
         assert_eq!(db.claims, ["pg-1", "pg-2"]);
         assert_eq!(db.connection.host, "pg-rw.shop.svc");

@@ -1,4 +1,5 @@
-// The project's facts beside its services: domains, storage, backups and what happened lately.
+// The project's facts beside its services: domains, storage, databases, backups and what happened
+// lately.
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
@@ -28,6 +29,13 @@ import {
   shownCoverage,
   useBackups,
 } from "@/components/backups"
+import {
+  DatabaseRow,
+  installedEngines,
+  NewDatabaseButton,
+  OperatorNotes,
+  useDatabases,
+} from "@/components/databases"
 import { useSentence, useT, type Translate } from "@/i18n"
 import { podEventsLink, serviceLink } from "@/lib/place"
 import { useQuantityFormat } from "@/lib/quantity"
@@ -692,6 +700,51 @@ export function Storage({
   )
 }
 
+/** The project's databases, when there are some or an operator is installed to make one. */
+export function Databases({ project, bare = false }: { project: string; bare?: boolean }) {
+  const t = useT()
+  const data = useDatabases(project).data
+  if (!data) return null
+  if (data.items.length === 0 && installedEngines(data).length === 0) return null
+  const body = (
+    <>
+      {data.items.length === 0 ? (
+        <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
+          {t("db.empty")}
+        </p>
+      ) : (
+        <ul className="flex flex-col">
+          {data.items.map((database) => (
+            <DatabaseRow
+              key={`${database.engine}/${database.name}`}
+              project={project}
+              database={database}
+            />
+          ))}
+        </ul>
+      )}
+      <OperatorNotes data={data} />
+    </>
+  )
+  if (bare)
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex">
+          <NewDatabaseButton project={project} data={data} size="sm" />
+        </div>
+        {body}
+      </div>
+    )
+  return (
+    <section aria-labelledby="project-databases" className="flex flex-col gap-1">
+      <Heading id="project-databases" title={t("db.title")} count={data.items.length || undefined}>
+        <NewDatabaseButton project={project} data={data} />
+      </Heading>
+      {body}
+    </section>
+  )
+}
+
 /** Backed-up volumes out of all of them, or undefined before the answer or without volumes. */
 function useBackupCount(project: string) {
   const data = useBackups(project).data
@@ -775,11 +828,12 @@ export function SectionChips({
   unreadable: Schemas["UnreadableView"][]
 }) {
   const t = useT()
-  const [open, setOpen] = useState<"activity" | "domains" | "storage" | "backups">()
+  const [open, setOpen] = useState<"activity" | "domains" | "storage" | "databases" | "backups">()
   const { trouble } = useActivityCounts(project, events)
   const domains = summarise(data).domains.length
   const volumes = claimsOf(data).length
   const backups = useBackupCount(project)
+  const databases = useDatabases(project).data?.items.length ?? 0
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
   const chip = (key: NonNullable<typeof open>, label: string, count: ReactNode) => (
     <Button key={key} variant="outline" size="sm" onClick={() => setOpen(key)}>
@@ -791,6 +845,7 @@ export function SectionChips({
     activity: t("project.activity"),
     domains: t("common.domains"),
     storage: t("tab.storage"),
+    databases: t("db.title"),
     backups: t("backups.title"),
   }
   return (
@@ -798,6 +853,7 @@ export function SectionChips({
       {chip("activity", t("project.activity"), t("events.warningsCount", trouble))}
       {domains > 0 ? chip("domains", t("common.domains"), domains) : null}
       {volumes > 0 ? chip("storage", t("tab.storage"), volumes) : null}
+      {databases > 0 ? chip("databases", t("db.title"), databases) : null}
       {backups
         ? chip("backups", t("backups.title"), `${backups.scheduled}/${backups.total}`)
         : null}
@@ -821,6 +877,8 @@ export function SectionChips({
           <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} bare />
         ) : open === "storage" ? (
           <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} bare />
+        ) : open === "databases" ? (
+          <Databases project={project} bare />
         ) : open === "backups" ? (
           <Backups project={project} bare />
         ) : null}

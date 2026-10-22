@@ -44,7 +44,7 @@ import { needsAttention, statusOf, summarise, type Project, type Service } from 
 import { ProjectMap } from "@/routes/project/architecture"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import { ServicesTable } from "@/routes/project/services-table"
-import { Activity, Backups, Domains, SectionChips, Storage } from "@/routes/project/side"
+import { Activity, Backups, Databases, Domains, SectionChips, Storage } from "@/routes/project/side"
 import { validateProjectSearch, type ProjectView } from "@/routes/search"
 
 const route = getRouteApi("/projects/$project")
@@ -368,6 +368,7 @@ function ListView({
     <>
       <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} />
       <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} />
+      <Databases project={project} />
       <Backups project={project} />
     </>
   )
@@ -439,6 +440,7 @@ function NextStep({ project }: { project: string }) {
           </Link>
         </EmptyContent>
       </Empty>
+      <Databases project={project} />
     </PageColumn>
   )
 }

@@ -166,6 +166,25 @@ pub struct Database {
     /// When it was created, RFC 3339.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<String>,
+    /// The object as written, without `status` and `managedFields`: what an edit (turning
+    /// backups on) starts from, so the edit changes only what it adds.
+    #[schema(value_type = Object)]
+    pub object: serde_json::Value,
+}
+
+/// `object` without `status` and `managedFields`.
+pub(crate) fn written(object: &DynamicObject) -> serde_json::Value {
+    let mut value = serde_json::to_value(object).unwrap_or_default();
+    if let Some(map) = value.as_object_mut() {
+        map.remove("status");
+        if let Some(metadata) = map
+            .get_mut("metadata")
+            .and_then(serde_json::Value::as_object_mut)
+        {
+            metadata.remove("managedFields");
+        }
+    }
+    value
 }
 
 /// An integer field of an object, by JSON pointer.

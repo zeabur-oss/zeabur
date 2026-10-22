@@ -250,6 +250,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
             .creation_timestamp
             .as_ref()
             .map(|t| t.0.to_string()),
+        object: databases::written(cluster),
         name,
     }
 }

@@ -3301,6 +3301,7 @@ components:
       - claims
       - connection
       - backups
+      - object
       properties:
         apiVersion:
           type: string
@@ -3344,6 +3345,11 @@ components:
         name:
           type: string
           description: Its name.
+        object:
+          type: object
+          description: |-
+            The object as written, without `status` and `managedFields`: what an edit (turning
+            backups on) starts from, so the edit changes only what it adds.
         origin:
           $ref: "#/components/schemas/Origin"
           description: The object it is read from.

@@ -2,13 +2,14 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
 import CubeIcon from "~icons/ph/cube"
+import DatabaseIcon from "~icons/ph/database"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GearSixIcon from "~icons/ph/gear-six"
 import InfoIcon from "~icons/ph/info"
 import SquaresFourIcon from "~icons/ph/squares-four"
 import StackIcon from "~icons/ph/stack"
 
-import { projectQuery } from "@/api/queries"
+import { databasesQuery, projectQuery } from "@/api/queries"
 import { RoleIcon, ServiceIcon } from "@/components/service-icon"
 import { DockToggle } from "@/components/shell/dock-slot"
 import { ContextMenu } from "@/components/shell/user-menu"
@@ -19,9 +20,10 @@ import { StatusDot, StatusPill, useStatusWord } from "@/components/status"
 import { useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { addressOf, objectKey } from "@/lib/objects"
-import { serviceLink, usePlace, type ProjectEntry } from "@/lib/place"
+import { databaseLink, serviceLink, usePlace, type ProjectEntry } from "@/lib/place"
 import { useProjectSummary } from "@/lib/project-name"
 import { remembered } from "@/lib/stores"
+import { stateHealth } from "@/model/databases"
 import { projectTitle } from "@/model/project"
 import {
   groupServices,
@@ -176,6 +178,7 @@ function ProjectNav({ project }: { project: string }) {
             </div>
           ) : null}
         </SidebarSection>
+        <DatabaseSection project={project} />
         <SidebarSection
           title={t("column.advanced")}
           open={advancedOpen || advancedHolds}
@@ -304,6 +307,43 @@ function ServiceRow({
     >
       <span translate="no">{service.displayName ?? service.name}</span>
     </SidebarItem>
+  )
+}
+
+function DatabaseSection({ project }: { project: string }) {
+  const t = useT()
+  const place = usePlace()
+  const items = useQuery(databasesQuery(project)).data?.items ?? []
+  if (items.length === 0) return null
+  return (
+    <SidebarSection title={t("db.title")}>
+      {items.map((database) => {
+        const word = t(`db.state.${database.state}`)
+        return (
+          <SidebarItem
+            key={`${database.engine}/${database.name}`}
+            render={
+              <Link
+                {...databaseLink(project, database)}
+                activeOptions={{ exact: true, includeSearch: false }}
+              />
+            }
+            icon={<DatabaseIcon aria-hidden="true" />}
+            current={place.database === `${database.engine}/${database.name}`}
+            trailing={
+              <Tooltip content={word}>
+                <span className="flex size-4 items-center justify-center">
+                  <StatusDot health={stateHealth[database.state]} />
+                  <span className="sr-only">{word}</span>
+                </span>
+              </Tooltip>
+            }
+          >
+            <span translate="no">{database.name}</span>
+          </SidebarItem>
+        )
+      })}
+    </SidebarSection>
   )
 }
 
