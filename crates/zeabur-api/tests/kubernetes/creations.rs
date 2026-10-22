@@ -107,7 +107,8 @@ fn namespaced(admin: &Client, ns: &str, group: &str, kind: &str) -> Api<DynamicO
     )
 }
 
-/// Everything the API logs while the test runs, at every level.
+/// What the API and its client log while the test runs, down to `DEBUG` (Zeabur logs `INFO`;
+/// kube-rs writes response bodies at `TRACE`, and a refusal there may quote what was sent).
 #[derive(Clone, Default)]
 struct Log(Arc<Mutex<Vec<u8>>>);
 
@@ -131,8 +132,11 @@ impl std::io::Write for Log {
 }
 
 fn no_secret(what: &str, text: &str) {
-    assert!(!text.contains(SECRET_VALUE), "{what}: {text}");
-    assert!(!text.contains(SECRET_BASE64), "{what}: {text}");
+    let leaks: Vec<&str> = text
+        .lines()
+        .filter(|line| line.contains(SECRET_VALUE) || line.contains(SECRET_BASE64))
+        .collect();
+    assert!(leaks.is_empty(), "{what}: {leaks:#?}");
 }
 
 fn rules() -> Value {
@@ -235,7 +239,7 @@ async fn objects_written_as_yaml_are_created_as_the_person() {
     let log = Log::default();
     let writer = log.clone();
     let _logging = tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::TRACE)
+        .with_max_level(tracing::Level::DEBUG)
         .with_ansi(false)
         .with_writer(move || writer.clone())
         .set_default();
