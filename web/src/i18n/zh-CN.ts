@@ -1276,6 +1276,7 @@ export const zhCN: Messages = {
   "install.singleNode": "单节点",
   "install.multiNode": "多节点",
   "install.forCluster": "适合这个集群",
+  "install.notes": "备注",
   "install.needs": "需要先安装",
   "install.security": "权限",
   "install.clusterWide": "集群范围的 RBAC",

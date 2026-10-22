@@ -1279,6 +1279,7 @@ export const zhTW: Messages = {
   "install.singleNode": "單一節點",
   "install.multiNode": "多個節點",
   "install.forCluster": "適合這個叢集",
+  "install.notes": "備註",
   "install.needs": "需要先安裝",
   "install.security": "權限",
   "install.clusterWide": "叢集範圍的 RBAC",

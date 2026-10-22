@@ -30,7 +30,8 @@ import { StatusPill } from "@/components/status"
 import { buttonVariants } from "@zeabur/design-system/components/button"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
-import { useT } from "@/i18n"
+import { useI18n, useT } from "@/i18n"
+import { summaryOf } from "@/i18n/component-summaries"
 import type { Icon } from "@/lib/icon"
 import { cn } from "@/lib/utils"
 import { componentsRole, Forbidden } from "@/routes/cluster/forbidden"
@@ -80,7 +81,7 @@ const icons: Record<string, Icon> = {
 type Filter = "all" | "installed" | "recommended"
 
 export function ComponentsPage() {
-  const t = useT()
+  const { t, locale } = useI18n()
   const capLabel = useCapabilityLabel()
   const capabilities = useQuery(capabilitiesQuery)
   const search = route.useSearch()
@@ -108,7 +109,7 @@ export function ComponentsPage() {
       (filter === "installed" && c.existing) ||
       (filter === "recommended" && !c.existing && c.suggestion === "recommended")) &&
     (!query ||
-      `${c.name} ${capLabel(c.name)} ${c.components.map((x) => `${x.displayName} ${x.rationale}`).join(" ")}`
+      `${c.name} ${capLabel(c.name)} ${c.components.map((x) => `${x.displayName} ${summaryOf(c.name, x.id, x.rationale, locale) ?? x.rationale}`).join(" ")}`
         .toLowerCase()
         .includes(query.toLowerCase()))
   const known = new Set(categories.flatMap((c) => c.names))
@@ -123,10 +124,8 @@ export function ComponentsPage() {
     .filter((g) => g.items.length > 0)
 
   const open = search.component
-  const openName = open
-    ? list
-        .flatMap((c) => c.components.map((x) => [`${c.name}/${x.id}`, x.displayName] as const))
-        .find(([id]) => id === open)?.[1]
+  const opened = open
+    ? list.flatMap((c) => c.components).find((x) => `${x.capability}/${x.id}` === open)
     : undefined
 
   return (
@@ -135,7 +134,8 @@ export function ComponentsPage() {
         <Suspense fallback={null}>
           <InstallSheet
             component={open}
-            name={openName ?? open}
+            name={opened?.displayName ?? open}
+            notes={opened?.rationale}
             profile={search.profile}
             onProfile={(profile) =>
               void navigate({ search: (previous) => ({ ...previous, profile }), replace: true })
@@ -253,7 +253,7 @@ function ComponentCard({
   capability: Schemas["Capability"]
   component: Schemas["Component"]
 }) {
-  const t = useT()
+  const { t, locale } = useI18n()
   const capLabel = useCapabilityLabel()
   const CapIcon = icons[capability.name] ?? HardDrivesIcon
   const isDown = useDown()
@@ -283,7 +283,8 @@ function ComponentCard({
         <StateChip state={state} evidence={capability.evidence} />
       </div>
       <p className="line-clamp-3 type-body leading-normal text-muted-foreground">
-        {component.rationale}
+        {summaryOf(capability.name, component.id, component.rationale, locale) ??
+          component.rationale}
       </p>
       <div className="mt-auto flex items-center gap-2 pt-1">
         <span className="type-meta text-muted-foreground" translate="no">

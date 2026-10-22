@@ -34,6 +34,7 @@ const formatNames = {
 export function InstallSheet({
   component,
   name,
+  notes,
   profile,
   onProfile,
   onClose,
@@ -41,6 +42,8 @@ export function InstallSheet({
   /** `capability/id`. */
   component: string
   name: string
+  /** The catalogue's rationale: licence, sizing and packaging, in English. */
+  notes?: string
   profile?: Profile
   onProfile: (profile: Profile) => void
   onClose: () => void
@@ -100,6 +103,12 @@ export function InstallSheet({
                 />
               </div>
               <dl className="grid grid-cols-1 gap-x-4 gap-y-2 type-meta sm:grid-cols-pairs">
+                {notes ? (
+                  <>
+                    <dt className="text-muted-foreground">{t("install.notes")}</dt>
+                    <dd lang="en">{notes}</dd>
+                  </>
+                ) : null}
                 {data.dependsOn.length > 0 ? (
                   <>
                     <dt className="text-muted-foreground">{t("install.needs")}</dt>
