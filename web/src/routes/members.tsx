@@ -13,7 +13,12 @@ import XIcon from "~icons/ph/x"
 
 import { membersQuery, refreshMembers, removeMember, revokeInvitation } from "@/api/members"
 import { Ago } from "@/components/bits"
-import { AccessDialog, useAccessLines } from "@/components/members/access"
+import {
+  AccessDialog,
+  ProjectLabel,
+  useAccessLines,
+  useProjectTitle,
+} from "@/components/members/access"
 import { LinkedList, PasskeyList } from "@/components/members/credentials"
 import {
   ConfirmDialog,
@@ -333,6 +338,7 @@ function MemberPanel({
 }) {
   const t = useT()
   const accessLines = useAccessLines()
+  const title = useProjectTitle()
   const name = memberName(member)
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -376,8 +382,8 @@ function MemberPanel({
               <ul className="max-h-64 divide-y divide-main overflow-y-auto rounded-lg border border-main text-sm">
                 {member.projects.map((grant) => (
                   <li key={grant.project} className="flex items-center gap-3 px-3 py-2">
-                    <span className="min-w-0 flex-1 truncate font-mono" translate="no">
-                      {grant.project}
+                    <span className="flex min-w-0 flex-1">
+                      <ProjectLabel name={grant.project} title={title(grant.project)} />
                     </span>
                     <span className="text-muted-foreground">{t(`roles.${grant.role}`)}</span>
                   </li>

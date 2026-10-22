@@ -1628,7 +1628,8 @@ export const en = {
     "Everything a Viewer can, and changes services, opens terminals and reads secrets.",
   "account.means.viewer": "Sees services, replicas and logs.",
   "account.signIn": "Sign-in methods",
-  "account.signInWhere": "Your passkeys and linked accounts are managed where you sign in.",
+  "account.signInWhere":
+    "Zeabur Identity manages your passkeys, linked accounts and sessions: add or remove a passkey there, or sign out other devices.",
   "account.manageSignIn": "Manage sign-in methods",
   "passkey.unnamed": "Passkey",
   "passkey.added": (date: string) => `Added ${date}`,

@@ -19,6 +19,7 @@ import {
   type Member,
   type ProjectRole,
 } from "@/model/members"
+import { projectTitle } from "@/model/project"
 import { Button } from "@zeabur/design-system/components/button"
 import { Checkbox } from "@zeabur/design-system/components/checkbox"
 import { Input } from "@zeabur/design-system/components/input"
@@ -29,12 +30,43 @@ import { Skeleton } from "@zeabur/design-system/components/skeleton"
 
 export type Chosen = ReadonlyMap<string, ProjectRole>
 
+/** A project by its title, with its namespace after it when the two differ. */
+export function ProjectLabel({ name, title }: { name: string; title: string }) {
+  if (title === name)
+    return (
+      <span className="truncate font-mono" translate="no" title={name}>
+        {name}
+      </span>
+    )
+  return (
+    <span className="flex min-w-0 items-baseline gap-2" title={`${title} (${name})`}>
+      <span className="truncate" translate="no">
+        {title}
+      </span>
+      <span className="truncate font-mono type-meta text-muted-foreground" translate="no">
+        {name}
+      </span>
+    </span>
+  )
+}
+
+/** A project's name as the sidebar shows it; its namespace until the projects load. */
+export function useProjectTitle(): (project: string) => string {
+  const projects = useQuery(projectsQuery)
+  return (project) =>
+    projectTitle(
+      projects.data?.items.find((item) => item.name === project),
+      project,
+    )
+}
+
 /** A member's rights in a few words, a line per role: admin, each role with up to three projects
  * named, or none. */
 export function useAccessLines(): (member: Pick<Member, "role" | "projects">) => string[] {
   const t = useT()
+  const title = useProjectTitle()
   return (member) => {
-    const summary = accessSummary(member)
+    const summary = accessSummary(member, title)
     switch (summary.kind) {
       case "admin":
         return [t("members.role.admin")]
@@ -122,7 +154,12 @@ function ProjectPicker({
   if (projects.isPending) return <Skeleton variant="card" className="h-24" />
   if (projects.isError) return <Problem error={projects.error} />
   const names = grantableProjects(projects.data.items, held)
-  const shown = pickerProjects(names, chosen, query, first)
+  const title = (name: string) =>
+    projectTitle(
+      projects.data.items.find((item) => item.name === name),
+      name,
+    )
+  const shown = pickerProjects(names, chosen, query, first, title)
   const pick = (name: string, role: ProjectRole | undefined) => {
     const next = new Map(chosen)
     if (role) next.set(name, role)
@@ -169,9 +206,7 @@ function ProjectPicker({
                       onCheckedChange={(checked) => pick(name, checked ? "viewer" : undefined)}
                     />
                     <Label htmlFor={`${id}-${name}`} className="min-w-0 flex-1">
-                      <span className="truncate font-mono" translate="no" title={name}>
-                        {name}
-                      </span>
+                      <ProjectLabel name={name} title={title(name)} />
                     </Label>
                     {role ? (
                       <Select
@@ -179,7 +214,7 @@ function ProjectPicker({
                         items={roles}
                         value={role}
                         onValueChange={(next) => pick(name, next)}
-                        aria-label={t("roles.roleIn", name)}
+                        aria-label={t("roles.roleIn", title(name))}
                       />
                     ) : null}
                   </li>
@@ -211,11 +246,13 @@ export function AccessDialog({
   const [admin, setAdmin] = useState(member.role === "admin")
   const [chosen, setChosen] = useState<Chosen>(() => chosenOf(member))
   const held = (member.projects ?? []).map((p) => p.project)
+  const title = useProjectTitle()
   const lost = accessLosses(member, admin, chosen)
+  const titles = (names: string[]) => t("common.list", names.map(title))
   const consequences = [
     lost.admin ? t("roles.losesAdmin", name) : "",
-    lost.removed.length > 0 ? t("roles.losesProjects", name, t("common.list", lost.removed)) : "",
-    lost.lowered.length > 0 ? t("roles.losesChanges", name, t("common.list", lost.lowered)) : "",
+    lost.removed.length > 0 ? t("roles.losesProjects", name, titles(lost.removed)) : "",
+    lost.lowered.length > 0 ? t("roles.losesChanges", name, titles(lost.lowered)) : "",
   ].filter(Boolean)
   const save = useMutation({
     mutationFn: () =>

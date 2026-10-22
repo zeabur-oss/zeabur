@@ -182,6 +182,20 @@ describe("project roles", () => {
     })
   })
 
+  it("names projects by their display name, in that order, else by namespace", () => {
+    const titles: Record<string, string> = { "zeabur-e2e": "Shop", blog: "Another blog" }
+    const summary = accessSummary(
+      member("cy", {
+        projects: [grant("zeabur-e2e", "viewer"), grant("blog", "viewer"), grant("api", "viewer")],
+      }),
+      (project) => titles[project] ?? project,
+    )
+    expect(summary).toStrictEqual({
+      kind: "projects",
+      roles: [{ role: "viewer", named: ["Another blog", "Shop", "api"], count: 3 }],
+    })
+  })
+
   it("offers every project but Kubernetes' own, and keeps one already held", () => {
     const projects = [
       { name: "shop", system: false },
@@ -205,6 +219,10 @@ describe("project roles", () => {
       "a",
       "b",
     ])
+    const title = (project: string) => (project === "zeabur-e2e" ? "Shop" : project)
+    expect(
+      pickerProjects(["blog", "zeabur-e2e"], new Map(), "shop", new Set(), title),
+    ).toStrictEqual(["zeabur-e2e"])
     expect(pickerHasFilter(7)).toBe(false)
     expect(pickerHasFilter(8)).toBe(true)
   })

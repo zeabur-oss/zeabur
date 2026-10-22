@@ -103,7 +103,11 @@ export type AccessSummary =
       roles: { role: ProjectRole; named: string[]; count: number }[]
     }
 
-export function accessSummary(member: Pick<Member, "role" | "projects">): AccessSummary {
+/** `title` names a project as the sidebar does (its display name, else its namespace). */
+export function accessSummary(
+  member: Pick<Member, "role" | "projects">,
+  title: (project: string) => string = (project) => project,
+): AccessSummary {
   if (member.role === "admin") return { kind: "admin" }
   const projects = member.projects
   if (projects == null) return { kind: "unknown" }
@@ -111,7 +115,7 @@ export function accessSummary(member: Pick<Member, "role" | "projects">): Access
   const roles = (["developer", "viewer"] as const).flatMap((role) => {
     const names = projects
       .filter((p) => p.role === role)
-      .map((p) => p.project)
+      .map((p) => title(p.project))
       .toSorted()
     if (names.length === 0) return []
     return [{ role, named: names.length <= NAMED_UP_TO ? names : [], count: names.length }]
@@ -137,7 +141,7 @@ export function pickerHasFilter(count: number): boolean {
   return count >= PICKER_FILTER_FROM
 }
 
-/** Projects whose name holds `query`, and every chosen one, so a filter never hides a choice. Those
+/** Projects whose namespace or `title` holds `query`, and every chosen one, so a filter never hides a choice. Those
  * in `first` (the roles held when the picker opened) lead, so a held role is seen without
  * scrolling and a click never moves a row. */
 export function pickerProjects(
@@ -145,10 +149,11 @@ export function pickerProjects(
   chosen: ReadonlyMap<string, ProjectRole>,
   query: string,
   first: ReadonlySet<string> = new Set(),
+  title: (project: string) => string = (project) => project,
 ): string[] {
   const q = query.trim().toLowerCase()
   return names
-    .filter((name) => chosen.has(name) || name.includes(q))
+    .filter((name) => chosen.has(name) || name.includes(q) || title(name).toLowerCase().includes(q))
     .toSorted((a, b) => Number(first.has(b)) - Number(first.has(a)))
 }
 
