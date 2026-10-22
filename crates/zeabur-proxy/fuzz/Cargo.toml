@@ -1,0 +1,26 @@
+[package]
+name = "zeabur-proxy-fuzz"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+form_urlencoded = "1"
+http = "1"
+libfuzzer-sys = "0.4"
+zeabur-proxy = { path = ".." }
+
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+test = false
+doc = false
+bench = false
+
+# Its own workspace: the fuzz build takes libFuzzer and sanitizer flags the workspace's crates
+# never ship with.
+[workspace]

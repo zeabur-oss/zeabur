@@ -2337,9 +2337,13 @@ name = "zeabur"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "bytes",
  "clap",
  "form_urlencoded",
  "http-body-util",
+ "hyper-rustls",
+ "hyper-util",
+ "rustls",
  "secrecy",
  "serde_json",
  "tokio",
@@ -2571,6 +2575,34 @@ dependencies = [
  "zeabur-graph",
  "zeabur-kernel",
  "zeabur-model",
+]
+
+[[package]]
+name = "zeabur-proxy"
+version = "0.0.1"
+dependencies = [
+ "bytes",
+ "clap",
+ "form_urlencoded",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-rustls",
+ "hyper-util",
+ "k8s-openapi",
+ "kube",
+ "proptest",
+ "rustls",
+ "secrecy",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

@@ -100,6 +100,51 @@ terminal:
       cpu: "1"
       memory: 512Mi
 
+# Zeabur Proxy (crates/zeabur-proxy): lets members read their project's log history from the shared
+# VictoriaLogs Zeabur Catalog installs. Every query goes as the person, who must be allowed `get`
+# on `logs.proxy.zeabur.com` in the project's namespace (the ClusterRole zeabur-proxy-logs-reader,
+# aggregated into the project roles and into view, edit and admin), and reads that namespace only.
+# Off: the Logs tab shows what the kubelet still has.
+proxy:
+  enabled: false
+  image:
+    # Published next to Zeabur's image, from the same commit.
+    repository: ghcr.io/zeabur/proxy
+    # Defaults to the chart's appVersion. Ignored when digest is set.
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+  logs:
+    # VictoriaLogs' HTTP API, http://host:port.
+    url: http://vlsingle-victoria-logs.observability.svc:9428
+    # The pods behind that URL, for the proxy's NetworkPolicy; Zeabur Catalog's VLSingle by default.
+    namespace: observability
+    podLabels:
+      app.kubernetes.io/name: vlsingle
+      app.kubernetes.io/instance: victoria-logs
+    port: 9428
+    # The most lines one query returns, and the longest range it covers in hours.
+    maxLimit: 1000
+    maxHours: 168
+  # Zeabur reaches the proxy over TLS. Empty `existingSecret`: the chart makes a CA and a
+  # certificate for the proxy's Service (ten years), keeps them on upgrades, and gives Zeabur the
+  # CA; to replace them, delete the Secret, upgrade and restart both Deployments. Otherwise a
+  # Secret with tls.crt, tls.key and ca.crt, such as a cert-manager Certificate's for
+  # <release>-proxy.<namespace>.svc: the proxy picks up a renewed certificate by itself, and
+  # Zeabur reads the CA when it starts.
+  tls:
+    existingSecret: ""
+  # kube-apiserver's addresses for the proxy's egress (CIDRs). Empty: the endpoints of the
+  # Service default/kubernetes when installing, else TCP 443 and 6443 to anywhere.
+  apiServer: []
+  replicas: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      memory: 64Mi
+
 service:
   type: ClusterIP
   port: 80

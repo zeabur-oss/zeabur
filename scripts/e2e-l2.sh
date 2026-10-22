@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Zeabur in a cluster, end to end: a k3d cluster whose kube-apiserver trusts Zeabur Identity, Zeabur Identity and
-# Zeabur installed from their images (Zeabur with its Helm chart), both behind the cluster's
+# Zeabur installed from their images (Zeabur with its Helm chart, Zeabur Proxy enabled), both behind the cluster's
 # Traefik over HTTPS, and a browser (web/e2e/l2) that enrols a passkey, signs in, confirms a
 # terminal with the passkey again, runs a command, then reads and changes with admin rights; an
 # admin invites a Developer and a Viewer, who each see what their role allows. Then, from the
@@ -29,6 +29,7 @@ namespace=zeabur             # Zeabur's release
 project=zeabur-e2e           # the project the browser opens (web/e2e/manifests/talker.yaml)
 zeabur_identity_image=docker.io/library/zeabur-identity:e2e-l2
 zeabur_image=docker.io/library/zeabur:e2e-l2
+proxy_image=docker.io/library/zeabur-proxy:e2e-l2
 memory_budget=$((30 * 1024 * 1024))
 
 for tool in docker k3d kubectl helm openssl jq git bun curl nix; do
@@ -94,6 +95,7 @@ export BUILDX_NO_DEFAULT_ATTESTATIONS=1
   "./scripts/build-image.sh $zeabur_identity_image && cargo build --release --locked -p zeabur-identityctl")
 zeabur_identityctl="$zeabur_identity_build/target/release/zeabur-identityctl"
 "$root/scripts/build-image.sh" "$zeabur_image"
+"$root/scripts/build-image.sh" "$proxy_image" zeabur-proxy
 docker pull busybox:1.37
 printf 'FROM busybox:1.37\nLABEL com.zeabur.test=busybox\n' |
   DOCKER_BUILDKIT=0 docker build -t busybox:1.37 -
@@ -117,7 +119,7 @@ k3d cluster create "$cluster" --image "$k3s_image" --no-lb --wait --timeout 300s
 export KUBECONFIG="$out/kubeconfig"
 cluster_up=1
 k3d kubeconfig get "$cluster" >"$KUBECONFIG"
-for image in "$zeabur_identity_image" "$zeabur_image" busybox:1.37; do
+for image in "$zeabur_identity_image" "$zeabur_image" "$proxy_image" busybox:1.37; do
   k3d image import "$image" --cluster "$cluster"
   name="${image%:*}"
   # Read the whole list before matching: `grep -q` exits at the first match, and under pipefail
@@ -253,7 +255,9 @@ helm install zeabur "$root/deploy/chart/zeabur" --namespace "$namespace" --wait 
   --set issuer.clientSecret.existingSecret=zeabur-oidc \
   --set issuer.caBundle.configMap=zeabur-identity-ca \
   --set ingress.enabled=true --set ingress.className=traefik \
-  --set ingress.tls.secretName=zeabur-tls
+  --set ingress.tls.secretName=zeabur-tls \
+  --set proxy.enabled=true \
+  --set proxy.image.repository="${proxy_image%:*}" --set proxy.image.tag="${proxy_image##*:}"
 zeabur_up() {
   curl -sf --cacert "$tls/ca.crt" --resolve "$zeabur_host:443:127.0.0.1" "https://$zeabur_host/api/healthz"
 }
@@ -267,26 +271,28 @@ restarted=$(kubectl -n "$project" get deployment/talker \
   -o jsonpath='{.spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt}')
 [[ -n "$restarted" ]] || { echo "error: deployment/talker was not restarted" >&2; exit 1; }
 
-# --- Zeabur's own rights: none beyond what any service account has -----------------------------------
+# --- Zeabur's and Zeabur Proxy's own rights: none beyond what any service account has --------------
 # kubectl adds no groups to --as; these are the ones a service account's token carries. A name
 # no object has stands for a fresh service account, to which only the cluster's defaults apply.
 groups=(--as-group=system:serviceaccounts "--as-group=system:serviceaccounts:$namespace"
   --as-group=system:authenticated)
-as_zeabur=("--as=system:serviceaccount:$namespace:zeabur" "${groups[@]}")
 as_fresh=("--as=system:serviceaccount:$namespace:zeabur-e2e-fresh" "${groups[@]}")
-impersonate=$(kubectl auth can-i impersonate users "${as_zeabur[@]}" || true)
-if [[ "$impersonate" != no ]]; then
-  echo "error: Zeabur's service account may impersonate users ($impersonate)" >&2
-  exit 1
-fi
-for scope in "$namespace" default "$project" kube-system; do
-  if ! diff <(kubectl auth can-i --list -n "$scope" "${as_zeabur[@]}") \
-    <(kubectl auth can-i --list -n "$scope" "${as_fresh[@]}"); then
-    echo "error: Zeabur's service account has rights a fresh one lacks (namespace $scope)" >&2
+for account in zeabur zeabur-proxy; do
+  as_account=("--as=system:serviceaccount:$namespace:$account" "${groups[@]}")
+  impersonate=$(kubectl auth can-i impersonate users "${as_account[@]}" || true)
+  if [[ "$impersonate" != no ]]; then
+    echo "error: service account $account may impersonate users ($impersonate)" >&2
     exit 1
   fi
+  for scope in "$namespace" default "$project" kube-system; do
+    if ! diff <(kubectl auth can-i --list -n "$scope" "${as_account[@]}") \
+      <(kubectl auth can-i --list -n "$scope" "${as_fresh[@]}"); then
+      echo "error: service account $account has rights a fresh one lacks (namespace $scope)" >&2
+      exit 1
+    fi
+  done
+  echo "service account $account: no rights beyond the defaults"
 done
-echo "service account: no rights beyond the defaults"
 
 # --- Memory when idle -----------------------------------------------------------------------------
 # A fixed wait on purpose: the measure is the pod's working set after a minute of nothing, as

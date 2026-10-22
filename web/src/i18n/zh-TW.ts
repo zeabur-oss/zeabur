@@ -573,6 +573,16 @@ export const zhTW: Messages = {
   "logs.unavailableFix.removed":
     "稍候再重新整理。要在重新啟動後保留日誌，可以把日誌送到日誌儲存服務。",
   "logs.currentRun": "看這次執行",
+  "logs.history": "歷史紀錄",
+  "logs.historyHint": "所有副本寫過的日誌，包含已被取代的副本，來自日誌儲存服務。",
+  "logs.historyLatest": (n) => `最新 ${n} 行`,
+  "logs.historyNotInstalled": "尚未安裝日誌歷史紀錄",
+  "logs.historyNotInstalledBody":
+    "目前只能看執行中副本的日誌。叢集管理員可以用 Helm chart 的 proxy.enabled 開啟歷史紀錄。",
+  "logs.whatHistory": "讀取這個專案的日誌歷史紀錄",
+  "logs.historyRoles":
+    "專案的檢視者與開發者都有這個權限，命名空間內有 Kubernetes view 角色的人也有。",
+  "logs.historyUnavailable": "日誌儲存服務沒有回應。",
   "logs.count": (n) => `${n} 行`,
   "logs.of": (n) => `共 ${n} 行`,
   "dock.label": "終端機",

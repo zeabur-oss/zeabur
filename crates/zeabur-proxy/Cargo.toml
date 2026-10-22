@@ -1,0 +1,37 @@
+[package]
+name = "zeabur-proxy"
+description = "zeabur: reads a shared backend's data for one namespace, as far as the person's RBAC rights reach"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+bytes.workspace = true
+clap.workspace = true
+form_urlencoded.workspace = true
+http.workspace = true
+http-body.workspace = true
+http-body-util.workspace = true
+hyper = { workspace = true, features = ["client", "server", "http1"] }
+hyper-rustls.workspace = true
+hyper-util.workspace = true
+k8s-openapi.workspace = true
+kube.workspace = true
+rustls.workspace = true
+secrecy.workspace = true
+serde_json.workspace = true
+sha2 = { workspace = true, features = ["std"] }
+thiserror.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+tower.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true

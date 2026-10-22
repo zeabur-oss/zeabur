@@ -502,6 +502,28 @@ export const historyQuery = (
     refetchIntervalInBackground: false,
   })
 
+export const logHistoryQuery = (
+  project: string,
+  kind: string,
+  name: string,
+  range: Schemas["PrometheusRange"],
+  container: string | undefined,
+) =>
+  queryOptions({
+    queryKey: ["project", project, "log-history", kind, name, range, container],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/services/{kind}/{name}/logs/history", {
+          params: {
+            path: { project, kind: kind.toLowerCase(), name },
+            query: { range, container },
+          },
+          signal,
+        }),
+      ),
+    staleTime: 10_000,
+  })
+
 export const clusterNameQuery = queryOptions({
   queryKey: ["settings", "cluster-name"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/settings/cluster-name", { signal })),

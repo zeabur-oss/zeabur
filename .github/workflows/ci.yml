@@ -37,6 +37,7 @@ jobs:
           - name: cargo-deny
           - name: unsafe-report
           - name: levels
+          - name: fuzz
           - name: ui
           - name: no-ui
           - name: chart

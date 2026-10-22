@@ -15,7 +15,7 @@ set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-check_jobs=(format clippy docs test cargo-deny unsafe-report levels ui no-ui chart wording)
+check_jobs=(format clippy docs test cargo-deny unsafe-report levels fuzz ui no-ui chart wording)
 cluster_jobs=(kubernetes kubernetes-l2)
 
 if [[ "${1:-}" == --list ]]; then
@@ -128,6 +128,12 @@ case "$job" in
   cargo-deny) cargo deny --locked check ;;
   unsafe-report) ./scripts/unsafe-report.sh ;;
   levels) ./scripts/check-levels.sh ;;
+  # Zeabur Proxy's request parser for a minute (crates/zeabur-proxy/fuzz). Without a sanitizer the
+  # stable toolchain builds it; the target's own assertions are what it checks.
+  fuzz)
+    cd crates/zeabur-proxy/fuzz
+    cargo fuzz run parse --sanitizer none -- -max_total_time=60
+    ;;
   # The web interface: banned styles, generated sentences up to date (before the build regenerates
   # them), lint, unused code, build, unit tests, generated API types up to date, size budget, and a
   # release build that embeds it.
@@ -162,6 +168,7 @@ case "$job" in
       exit 1
     fi
     ./scripts/build-image.sh zeabur:ci
+    ./scripts/build-image.sh zeabur-proxy:ci zeabur-proxy
     ;;
   # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
   # passkey sign-in, elevation, terminal, rights, memory, removal.

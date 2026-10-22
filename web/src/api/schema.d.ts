@@ -761,6 +761,29 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/services/{kind}/{name}/logs/history": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What a service's pods logged over the last hour, 6 hours, day or week, also pods replaced
+     *     since, as you, from the cluster's VictoriaLogs through Zeabur Proxy. Always `200` once the
+     *     parameters are valid: `state` says when Zeabur Proxy is not installed, you may not read the
+     *     project's log history (`get` on `logs.proxy.zeabur.com` in its namespace), or it did not
+     *     answer.
+     */
+    get: operations["getServiceLogHistory"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/services/{kind}/{name}/releases": {
     parameters: {
       query?: never
@@ -2405,6 +2428,42 @@ export interface components {
       /** @description `GitHub` or `Google`. */
       provider: string
     }
+    /** @description A service's log lines over a range, every pod's, also those replaced since. */
+    LogHistory: {
+      /** @description `projects/{project}/services/{kind}/{name}/logs/history`. */
+      id: string
+      /**
+       * Format: int32
+       * @description The most lines returned.
+       */
+      limit: number
+      /** @description The lines, oldest first: the newest ones when there were more than `limit`. */
+      lines: components["schemas"]["LogHistoryLine"][]
+      /** @description Zeabur Proxy's or VictoriaLogs' words when it was not read. */
+      message?: string | null
+      /** @description The range. */
+      range: components["schemas"]["PrometheusRange"]
+      /** @description Whether it could be read. */
+      state: components["schemas"]["LogHistoryState"]
+      /** @description Whether there were more lines in the range than returned. */
+      truncated: boolean
+    }
+    /** @description One line. */
+    LogHistoryLine: {
+      /** @description Its container. */
+      container: string
+      /** @description The line. */
+      message: string
+      /** @description The pod that wrote it, which may be gone. */
+      pod: string
+      /** @description When it was written, RFC 3339. */
+      time: string
+    }
+    /**
+     * @description Whether the history could be read, as the person. An open set.
+     * @enum {string}
+     */
+    LogHistoryState: "available" | "not-installed" | "unreadable" | "unavailable"
     /** @description A snapshot of a container's log. */
     LogSnapshot: {
       /** @description The lines, oldest first. */
@@ -6023,6 +6082,46 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["ServiceHistory"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getServiceLogHistory: {
+    parameters: {
+      query?: {
+        /** @description `1h` (the default), `6h`, `24h` or `7d`. */
+        range?: string
+        /** @description Only this container's lines. */
+        container?: string
+        /** @description The most lines, 1,000 at most (the default). */
+        limit?: number
+      }
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+        /** @description `deployment`, `statefulset`, `daemonset`, `job` or `cronjob` (any case) */
+        kind: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["LogHistory"]
         }
       }
       400: {

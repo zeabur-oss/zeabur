@@ -1,0 +1,7 @@
+# Zeabur Proxy's image: one static binary; no shell, no package manager, no CA bundle (it trusts
+# kube-apiserver through the mounted cluster CA and reaches its backends inside the cluster).
+# Runs as a non-root user. Built by scripts/build-image.sh.
+FROM scratch
+COPY zeabur-proxy /zeabur-proxy
+USER 65532:65532
+ENTRYPOINT ["/zeabur-proxy"]

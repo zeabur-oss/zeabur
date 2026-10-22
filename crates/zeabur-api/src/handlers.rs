@@ -33,6 +33,8 @@ pub struct AppState {
     pub tools: Arc<crate::tools::Sessions>,
     /// Where the issuer lets people manage how they sign in (see [`crate::account`]).
     pub sign_in: Arc<dyn crate::account::SignInPage>,
+    /// Zeabur Proxy, for log history (see [`crate::services::logs`]); `None` without one.
+    pub log_proxy: Option<Arc<dyn crate::services::logs::LogProxy>>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -83,7 +85,7 @@ where
 }
 
 /// The person's token as the session holds it now, where Zeabur holds one (see
-/// [`ClusterAccess::handoff`]); only for a tools pod.
+/// [`ClusterAccess::handoff`]); only for a tools pod and Zeabur Proxy.
 pub(crate) struct Credential(pub(crate) Option<crate::access::Handoff>);
 
 impl<S> FromRequestParts<S> for Credential

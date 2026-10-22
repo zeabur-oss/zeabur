@@ -209,6 +209,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::usage::get))
         .routes(routes!(projects::usage::volumes))
         .routes(routes!(services::history::get))
+        .routes(routes!(services::logs::history))
         .routes(routes!(settings::store::get_setting, settings::store::set))
         .routes(routes!(
             settings::cluster_name::get_setting,
@@ -234,12 +235,14 @@ pub fn router(access: Arc<dyn ClusterAccess>) -> Router {
 /// [`router`] for the in-cluster server, with its `settings`.
 ///
 /// Plan tokens are sealed with `plan_key` instead of a key made at start, so that they outlive a
-/// restart, and `sign_in` finds the issuer's page where people manage how they sign in.
+/// restart, `sign_in` finds the issuer's page where people manage how they sign in, and
+/// `log_proxy` reaches Zeabur Proxy for log history, when it is installed.
 pub fn router_with_key(
     access: Arc<dyn ClusterAccess>,
     plan_key: PlanKey,
     settings: Settings,
     sign_in: Arc<dyn account::SignInPage>,
+    log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
 ) -> Router {
     build_with(
         access,
@@ -249,6 +252,25 @@ pub fn router_with_key(
         settings,
         Arc::new(resolve::System),
         sign_in,
+        log_proxy,
+    )
+}
+
+/// [`router_at`], reaching Zeabur Proxy through `log_proxy`; for tests.
+pub fn router_with_log_proxy(
+    access: Arc<dyn ClusterAccess>,
+    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
+    log_proxy: Arc<dyn services::logs::LogProxy>,
+) -> Router {
+    build_with(
+        access,
+        clock,
+        PlanKey::random().ok().map(Arc::new),
+        pods::exec::IDLE,
+        Settings::default(),
+        Arc::new(resolve::System),
+        Arc::new(account::Fixed(None)),
+        Some(log_proxy),
     )
 }
 
@@ -306,6 +328,7 @@ pub fn router_with_resolver(
         Settings::default(),
         resolver,
         Arc::new(account::Fixed(None)),
+        None,
     )
 }
 
@@ -324,9 +347,14 @@ fn build(
         settings,
         Arc::new(resolve::System),
         Arc::new(account::Fixed(None)),
+        None,
     )
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "every router above passes all of AppState's parts"
+)]
 fn build_with(
     access: Arc<dyn ClusterAccess>,
     clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
@@ -335,6 +363,7 @@ fn build_with(
     settings: Settings,
     resolver: Arc<dyn resolve::Resolve>,
     sign_in: Arc<dyn account::SignInPage>,
+    log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let state = AppState {
@@ -347,6 +376,7 @@ fn build_with(
         resolver,
         tools: Arc::new(tools::Sessions::default()),
         sign_in,
+        log_proxy,
     };
     let (router, api) = routes().split_for_parts();
     let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());

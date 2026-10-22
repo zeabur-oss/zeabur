@@ -102,8 +102,9 @@ pub trait ClusterAccess: Send + Sync + 'static {
     }
 
     /// The token of [`ClusterAccess::for_request`], to hand to a tools pod (see the `tools`
-    /// module); `None` where Zeabur holds no token of its own to hand over (local mode, where the
-    /// kubeconfig's credential may be anything, and tests).
+    /// module) or to Zeabur Proxy (see `services::logs`); `None` where Zeabur holds no token of
+    /// its own to hand over (local mode, where the kubeconfig's credential may be anything, and
+    /// tests).
     fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
         None
     }

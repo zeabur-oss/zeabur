@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Fails if a workspace crate depends on a workspace crate of the same or a higher level, if a
 # crate other than a composer depends on a module crate, or if a pure crate depends on a workspace
-# crate that is not pure. Levels are declared in Cargo.toml [workspace.metadata.levels], modules
-# and composers in [workspace.metadata.modules], pure crates in [workspace.metadata.pure]; normal
+# crate that is not pure, or if an isolated crate depends on a workspace crate not listed for it.
+# Levels are declared in Cargo.toml [workspace.metadata.levels], modules and composers in
+# [workspace.metadata.modules], pure crates in [workspace.metadata.pure], isolated crates in
+# [workspace.metadata.isolated]; normal
 # and build dependencies count, dev-dependencies do not (tests may use test helpers). See
 # docs/architecture.md.
 set -euo pipefail
@@ -11,6 +13,7 @@ errors=$(cargo metadata --format-version 1 --no-deps --locked | jq -r '
   (.metadata.levels // error("Cargo.toml has no [workspace.metadata.levels]")) as $levels
   | (.metadata.modules // error("Cargo.toml has no [workspace.metadata.modules]")) as $modules
   | (.metadata.pure // error("Cargo.toml has no [workspace.metadata.pure]")) as $pure
+  | (.metadata.isolated // {}) as $isolated
   | [.packages[].name] as $members
   | (($members - ($levels | keys)) | map("error: \(.) has no level")),
     (.packages[] as $p
@@ -29,10 +32,16 @@ errors=$(cargo metadata --format-version 1 --no-deps --locked | jq -r '
      | $p.dependencies[]
      | select(.kind != "dev" and (.name as $n | $members | index($n)))
      | select(.name as $n | ($pure.crates | index($n)) == null)
-     | "error: the pure crate \($p.name) depends on \(.name), which is not pure")
+     | "error: the pure crate \($p.name) depends on \(.name), which is not pure"),
+    (.packages[] as $p
+     | select($isolated[$p.name])
+     | $p.dependencies[]
+     | select(.kind != "dev" and (.name as $n | $members | index($n)))
+     | select(.name as $n | ($isolated[$p.name] | index($n)) == null)
+     | "error: the isolated crate \($p.name) depends on \(.name); it may depend only on \($isolated[$p.name] | join(", "))")
   | .[]?, strings' | sort -u)
 if [[ -n "$errors" ]]; then
   echo "$errors" >&2
   exit 1
 fi
-echo "crate levels, module boundaries and pure crates: ok"
+echo "crate levels, module boundaries, pure and isolated crates: ok"

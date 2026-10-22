@@ -98,6 +98,13 @@ pub(crate) struct Args {
     /// The tools container's limits, as `cpu=1,memory=512Mi`. Empty: these.
     #[arg(long, env = "ZEABUR_TOOLS_LIMITS", default_value = "")]
     pub(crate) tools_limits: String,
+    /// Zeabur Proxy, for log history, as `https://host[:port]`. Empty: there is no log history.
+    #[arg(long, env = "ZEABUR_PROXY_URL", default_value = "")]
+    pub(crate) proxy_url: String,
+    /// A PEM file of the certificate authorities that sign Zeabur Proxy's certificate; the only
+    /// ones trusted for it. Required with `--proxy-url`.
+    #[arg(long, env = "ZEABUR_PROXY_CA_FILE")]
+    pub(crate) proxy_ca_file: Option<PathBuf>,
 }
 
 /// The configuration, checked.
@@ -112,6 +119,7 @@ pub(crate) struct Config {
     pub(crate) elevation: bool,
     pub(crate) limits: Limits,
     pub(crate) settings: zeabur_api::Settings,
+    pub(crate) proxy: Option<crate::proxy::Proxy>,
 }
 
 impl Args {
@@ -186,6 +194,15 @@ impl Args {
             );
         }
         terminal(self, &mut settings.terminal)?;
+        let proxy = match (self.proxy_url.as_str(), &self.proxy_ca_file) {
+            ("", None) => None,
+            ("", Some(_)) => return Err("--proxy-ca-file needs --proxy-url".to_owned()),
+            (_, None) => return Err("--proxy-url needs --proxy-ca-file".to_owned()),
+            (url, Some(path)) => Some(
+                crate::proxy::Proxy::new(url, &read(path, "--proxy-ca-file")?)
+                    .map_err(|e| format!("--proxy-url, --proxy-ca-file: {e}"))?,
+            ),
+        };
         if self.session_idle_minutes == 0 || self.session_max_hours == 0 {
             return Err(
                 "--session-idle-minutes and --session-max-hours must be at least 1".to_owned(),
@@ -205,6 +222,7 @@ impl Args {
                 ..Limits::default()
             },
             settings,
+            proxy,
         })
     }
 }
@@ -525,6 +543,37 @@ qkDcEXA7cf4S+NsEneg=
         assert!(error.starts_with("--issuer-ca-file:"), "{error}");
         let error = args(&files, &["--issuer-ca-file", "/nonexistent/ca.crt"]).unwrap_err();
         assert!(error.starts_with("--issuer-ca-file:"), "{error}");
+    }
+
+    #[test]
+    fn zeabur_proxy_takes_an_https_origin_and_its_ca() {
+        let files = Files::new("proxy");
+        assert!(args(&files, &[]).unwrap().proxy.is_none());
+        let ca = files.write("ca.crt", CA.as_bytes());
+        let url = "https://zeabur-proxy.zeabur.svc";
+        assert!(
+            args(&files, &["--proxy-url", url, "--proxy-ca-file", &ca])
+                .unwrap()
+                .proxy
+                .is_some()
+        );
+        for (flags, starts) in [
+            (vec!["--proxy-url", url], "--proxy-url needs"),
+            (vec!["--proxy-ca-file", &ca], "--proxy-ca-file needs"),
+            (
+                vec!["--proxy-url", "http://zeabur-proxy", "--proxy-ca-file", &ca],
+                "--proxy-url, --proxy-ca-file:",
+            ),
+        ] {
+            let error = args(&files, &flags).unwrap_err();
+            assert!(error.starts_with(starts), "{error}");
+        }
+        let none = files.write("none.crt", b"not a certificate\n");
+        let error = args(&files, &["--proxy-url", url, "--proxy-ca-file", &none]).unwrap_err();
+        assert!(
+            error.starts_with("--proxy-url, --proxy-ca-file:"),
+            "{error}"
+        );
     }
 
     #[test]
