@@ -74,6 +74,21 @@ pub struct Connection {
     pub options: Option<String>,
 }
 
+/// A database user for applications, and the Secret key holding its password.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = DatabaseAppUser)]
+pub struct AppUser {
+    /// The user name.
+    pub username: String,
+    /// The database it may use, and authenticates against.
+    pub database: String,
+    /// The Secret holding its password, in the project.
+    pub secret: String,
+    /// The Secret's key holding the password.
+    pub password_key: String,
+}
+
 /// Where backups go: an S3-compatible bucket.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -164,6 +179,10 @@ pub struct Database {
     pub resources: Option<serde_json::Value>,
     /// Where and as whom to connect.
     pub connection: Connection,
+    /// The user a service connects as; absent when the database has none (a MongoDB without
+    /// `spec.users`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<AppUser>,
     /// Its backups.
     pub backups: Backups,
     /// When it was created, RFC 3339.

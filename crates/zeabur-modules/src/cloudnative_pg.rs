@@ -34,7 +34,7 @@
 use zeabur_kube::DynamicObject;
 
 use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, newest};
-use crate::databases::{self, Backups, Connection, Database, Engine, State, Store};
+use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
 use crate::{Module, Read, strings, text};
 
 /// The module.
@@ -219,8 +219,15 @@ pub fn database(
         text(cluster, "/spec/bootstrap/initdb/database").unwrap_or_else(|| "app".to_owned());
     let username =
         text(cluster, "/spec/bootstrap/initdb/owner").unwrap_or_else(|| database.clone());
-    let secret = text(cluster, "/spec/bootstrap/initdb/secret/name")
-        .unwrap_or_else(|| format!("{name}-app"));
+    let own_secret = text(cluster, "/spec/bootstrap/initdb/secret/name");
+    // Only the Secret CloudNativePG makes has `uri` and the other keys a service reads.
+    let app = own_secret.is_none().then(|| AppUser {
+        username: username.clone(),
+        database: database.clone(),
+        secret: format!("{name}-app"),
+        password_key: "password".to_owned(),
+    });
+    let secret = own_secret.unwrap_or_else(|| format!("{name}-app"));
     let service = text(cluster, "/status/writeService").unwrap_or_else(|| format!("{name}-rw"));
     let named = |wanted: &str| {
         stores
@@ -285,6 +292,7 @@ pub fn database(
             password_key: "password".to_owned(),
             options: None,
         },
+        app,
         backups: Backups {
             ready: state == State::Ready
                 && store.as_ref().is_some_and(|s| s.in_use)
@@ -443,6 +451,12 @@ mod tests {
         assert_eq!(db.connection.host, "pg-rw.shop.svc");
         assert_eq!(db.connection.secret, "pg-app");
         assert_eq!(db.connection.username.as_deref(), Some("app"));
+        assert_eq!(
+            db.app
+                .as_ref()
+                .map(|a| (a.secret.as_str(), a.database.as_str())),
+            Some(("pg-app", "app"))
+        );
         let store = db.backups.store.unwrap();
         assert!(store.in_use);
         assert_eq!(store.retention.as_deref(), Some("30d"));

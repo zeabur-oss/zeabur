@@ -4311,6 +4311,13 @@ components:
         apiVersion:
           type: string
           description: The object's `apiVersion`.
+        app:
+          oneOf:
+          - $ref: "#/components/schemas/DatabaseAppUser"
+            description: |-
+              The user a service connects as; absent when the database has none (a MongoDB without
+              `spec.users`).
+          - type: "null"
         backups:
           $ref: "#/components/schemas/DatabaseBackups"
           description: Its backups.
@@ -4396,6 +4403,27 @@ components:
           - string
           - "null"
           description: The server version, as reported, else from the image tag.
+    DatabaseAppUser:
+      type: object
+      description: A database user for applications, and the Secret key holding its password.
+      required:
+      - username
+      - database
+      - secret
+      - passwordKey
+      properties:
+        database:
+          type: string
+          description: The database it may use, and authenticates against.
+        passwordKey:
+          type: string
+          description: The Secret's key holding the password.
+        secret:
+          type: string
+          description: The Secret holding its password, in the project.
+        username:
+          type: string
+          description: The user name.
     DatabaseBackupStore:
       type: object
       description: "Where backups go: an S3-compatible bucket."
@@ -8641,6 +8669,7 @@ components:
         - canAdopt
         - canReadLogs
         - labelsGuarded
+        - workloadPatch
         properties:
           adopted:
             type: boolean
@@ -8672,6 +8701,13 @@ components:
           system:
             type: boolean
             description: Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted.
+          workloadPatch:
+            type: array
+            items:
+              $ref: "#/components/schemas/WorkloadPatch"
+            description: |-
+              Which Deployments, StatefulSets and DaemonSets the person may patch (change their
+              variables).
       description: A project's Namespace.
     ProjectRole:
       type: string
@@ -10460,6 +10496,25 @@ components:
       - Deployment
       - Job
       - StatefulSet
+    WorkloadPatch:
+      type: object
+      description: Whether the person may patch the workloads of one kind.
+      required:
+      - kind
+      - all
+      - names
+      properties:
+        all:
+          $ref: "#/components/schemas/Permission"
+          description: Every one of them.
+        kind:
+          type: string
+          description: "`Deployment`, `StatefulSet` or `DaemonSet`."
+        names:
+          type: array
+          items:
+            type: string
+          description: The ones a rule limited to names (`resourceNames`) allows.
     WorkloadRef:
       type: object
       description: |-

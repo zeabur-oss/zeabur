@@ -30,7 +30,7 @@ use serde_json::Value;
 use zeabur_kube::DynamicObject;
 
 use crate::backups::{Outcome, Run, Schedule, Target, TargetKind, newest};
-use crate::databases::{self, Backups, Connection, Database, Engine, State, Store};
+use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
 use crate::{Module, Read, text};
 
 /// The module.
@@ -204,6 +204,29 @@ fn backups_of(
     }
 }
 
+/// The first user of `spec.users`. Without `passwordSecretRef` the operator keeps its password in
+/// `<cluster>-custom-user-secret` under the user's name, letters and digits only
+/// (`pkg/controller/perconaservermongodb/custom_users.go`, `pkg/psmdb/secret/secret.go`, v1.23.1).
+fn app_user(cluster: &DynamicObject, name: &str) -> Option<AppUser> {
+    let user = cluster.data.pointer("/spec/users/0")?;
+    let username = user["name"].as_str()?.to_owned();
+    let database = user["db"].as_str().unwrap_or("admin").to_owned();
+    let reference = user.get("passwordSecretRef");
+    let secret = reference
+        .and_then(|r| r["name"].as_str())
+        .map_or_else(|| format!("{name}-custom-user-secret"), str::to_owned);
+    let password_key = match reference {
+        Some(r) => r["key"].as_str().unwrap_or("password").to_owned(),
+        None => username.clone(),
+    };
+    Some(AppUser {
+        username,
+        database,
+        secret,
+        password_key,
+    })
+}
+
 /// One `PerconaServerMongoDB` as a database, with its backups. Runs are the newest twenty.
 #[must_use]
 pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObject]) -> Database {
@@ -259,6 +282,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
             password_key: "MONGODB_DATABASE_ADMIN_PASSWORD".to_owned(),
             options: Some(format!("replicaSet={rs}")),
         },
+        app: app_user(cluster, &name),
         backups: backups_of(namespace, cluster, &name, backups),
         created: cluster
             .metadata
@@ -341,8 +365,43 @@ mod tests {
         }));
         let db = database("shop", &cluster, &[]);
         assert_eq!(db.state, State::Progressing);
+        assert_eq!(db.app, None);
         assert!(db.backups.schedules[0].paused);
         assert!(db.backups.store.is_none());
         assert!(!db.backups.ready);
+    }
+
+    #[test]
+    fn the_app_user_reads_its_password_from_the_custom_user_secret() {
+        let with = |users: Value| {
+            database(
+                "shop",
+                &object(serde_json::json!({
+                    "apiVersion": "psmdb.percona.com/v1", "kind": "PerconaServerMongoDB",
+                    "metadata": {"name": "mongo", "namespace": "shop"},
+                    "spec": {"replsets": [{"name": "rs0", "size": 1}], "users": users}
+                })),
+                &[],
+            )
+            .app
+        };
+        let app = with(serde_json::json!([{"name": "app", "db": "app",
+            "roles": [{"name": "readWrite", "db": "app"}]}]))
+        .unwrap();
+        assert_eq!(
+            (app.username.as_str(), app.database.as_str()),
+            ("app", "app")
+        );
+        assert_eq!(
+            (app.secret.as_str(), app.password_key.as_str()),
+            ("mongo-custom-user-secret", "app")
+        );
+        let own = with(serde_json::json!([{"name": "shop", "db": "shop",
+            "passwordSecretRef": {"name": "shop-login", "key": "pw"}}]))
+        .unwrap();
+        assert_eq!(
+            (own.secret.as_str(), own.password_key.as_str()),
+            ("shop-login", "pw")
+        );
     }
 }

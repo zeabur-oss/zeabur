@@ -215,6 +215,10 @@ mod tests {
         );
         // The rules hold no `pods/log`, as for a Viewer.
         assert_eq!(guarded["canReadLogs"], "denied");
+        assert_eq!(
+            guarded["workloadPatch"][0],
+            json!({"kind": "Deployment", "all": "denied", "names": []})
+        );
         let (_, open) = send(&app_with(&cluster, with_roles(false)), "GET", uri, None).await;
         assert_eq!(
             (
@@ -232,6 +236,23 @@ mod tests {
         });
         let (_, manager) = send(&app_with(&cluster, with_roles(true)), "GET", uri, None).await;
         assert_eq!(manager["canAdopt"], "allowed");
+
+        // A rule limited to names allows patching only those.
+        cluster.update(|s| {
+            let mut named = developer_rules();
+            named.rules.push(AccessRule {
+                verbs: vec!["patch".to_owned()],
+                groups: vec!["apps".to_owned()],
+                resources: vec!["deployments".to_owned()],
+                names: vec!["web".to_owned()],
+            });
+            s.access_rules.insert("shop".to_owned(), Some(named));
+        });
+        let (_, named) = send(&app_with(&cluster, with_roles(true)), "GET", uri, None).await;
+        assert_eq!(
+            named["workloadPatch"][0],
+            json!({"kind": "Deployment", "all": "denied", "names": ["web"]})
+        );
     }
 
     /// The chart's admission policy refuses a Developer's label change with `403`; the answer

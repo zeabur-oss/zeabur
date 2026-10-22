@@ -2200,6 +2200,7 @@ export interface components {
     Database: {
       /** @description The object's `apiVersion`. */
       apiVersion: string
+      app?: components["schemas"]["DatabaseAppUser"] | null
       /** @description Its backups. */
       backups: components["schemas"]["DatabaseBackups"]
       /** @description The members' PersistentVolumeClaims, as named by the operator's convention. */
@@ -2251,6 +2252,17 @@ export interface components {
       storage?: string | null
       /** @description The server version, as reported, else from the image tag. */
       version?: string | null
+    }
+    /** @description A database user for applications, and the Secret key holding its password. */
+    DatabaseAppUser: {
+      /** @description The database it may use, and authenticates against. */
+      database: string
+      /** @description The Secret's key holding the password. */
+      passwordKey: string
+      /** @description The Secret holding its password, in the project. */
+      secret: string
+      /** @description The user name. */
+      username: string
     }
     /** @description Where backups go: an S3-compatible bucket. */
     DatabaseBackupStore: {
@@ -4468,6 +4480,11 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
       system: boolean
+      /**
+       * @description Which Deployments, StatefulSets and DaemonSets the person may patch (change their
+       *     variables).
+       */
+      workloadPatch: components["schemas"]["WorkloadPatch"][]
     }
     /**
      * @description What a member may do in one project.
@@ -5440,6 +5457,15 @@ export interface components {
      * @enum {string}
      */
     WorkloadKind: "CronJob" | "DaemonSet" | "Deployment" | "Job" | "StatefulSet"
+    /** @description Whether the person may patch the workloads of one kind. */
+    WorkloadPatch: {
+      /** @description Every one of them. */
+      all: components["schemas"]["Permission"]
+      /** @description `Deployment`, `StatefulSet` or `DaemonSet`. */
+      kind: string
+      /** @description The ones a rule limited to names (`resourceNames`) allows. */
+      names: string[]
+    }
     /**
      * @description A workload, by kind and name.
      *

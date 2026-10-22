@@ -37,7 +37,7 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, MANAGE_VERB, is_system_namespace};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{Access, ResourceRef};
+use zeabur_kube::{Access, AccessRules, ResourceRef};
 use zeabur_model::{Origin, ProjectDetails};
 
 use crate::error::{ApiError, get_read, read_problem};
@@ -102,6 +102,55 @@ pub struct ProjectNamespace {
     /// The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
     /// changes only its details.
     pub labels_guarded: bool,
+    /// Which Deployments, StatefulSets and DaemonSets the person may patch (change their
+    /// variables).
+    pub workload_patch: Vec<WorkloadPatch>,
+}
+
+/// Whether the person may patch the workloads of one kind.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkloadPatch {
+    /// `Deployment`, `StatefulSet` or `DaemonSet`.
+    pub kind: String,
+    /// Every one of them.
+    pub all: Permission,
+    /// The ones a rule limited to names (`resourceNames`) allows.
+    pub names: Vec<String>,
+}
+
+fn workload_patch(rules: Option<&AccessRules>) -> Vec<WorkloadPatch> {
+    [
+        ("Deployment", "deployments"),
+        ("StatefulSet", "statefulsets"),
+        ("DaemonSet", "daemonsets"),
+    ]
+    .into_iter()
+    .map(|(kind, plural)| {
+        let resource = ResourceRef::new("apps", "v1", plural, kind);
+        let Some(rules) = rules else {
+            return WorkloadPatch {
+                kind: kind.to_owned(),
+                all: Permission::Unknown,
+                names: Vec::new(),
+            };
+        };
+        let has = |values: &[String], wanted: &str| values.iter().any(|v| v == "*" || v == wanted);
+        let names = rules
+            .rules
+            .iter()
+            .filter(|r| {
+                has(&r.verbs, "patch") && has(&r.groups, "apps") && has(&r.resources, plural)
+            })
+            .flat_map(|r| r.names.iter().cloned())
+            .collect();
+        WorkloadPatch {
+            kind: kind.to_owned(),
+            all: rules.allows("patch", &resource, "").into(),
+            names,
+        }
+    })
+    .collect()
 }
 
 /// A project's Namespace: adopted or not, its details, and whether you may change them.
@@ -134,6 +183,7 @@ pub(crate) async fn get(
     let metadata = namespace.metadata;
     let guarded = state.settings.identity.project_roles;
     let logs = ResourceRef::new("", "v1", "pods/log", "");
+    let workload_patch = workload_patch(rules.as_ref().ok());
     let (can_change, can_adopt, can_read_logs) = rules.map_or(
         (
             Permission::Unknown,
@@ -166,6 +216,7 @@ pub(crate) async fn get(
         can_adopt,
         can_read_logs,
         labels_guarded: guarded,
+        workload_patch,
         name: project,
     }))
 }
