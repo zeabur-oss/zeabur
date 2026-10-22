@@ -8,16 +8,18 @@ import BroadcastFillIcon from "~icons/ph/broadcast-fill"
 import CaretDownIcon from "~icons/ph/caret-down"
 import CheckIcon from "~icons/ph/check"
 import ClockIcon from "~icons/ph/clock"
+import ClockClockwiseIcon from "~icons/ph/clock-clockwise"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import DownloadSimpleIcon from "~icons/ph/download-simple"
 import FunnelIcon from "~icons/ph/funnel"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
-import { toProblem } from "@/api/client"
-import { followUrl, logsQuery, projectQuery, type LogOptions } from "@/api/queries"
+import { toProblem, type Schemas } from "@/api/client"
+import { followUrl, logHistoryQuery, logsQuery, projectQuery, type LogOptions } from "@/api/queries"
 import { Ago, Histogram } from "@/components/bits"
 import { Problem } from "@/components/problem"
+import { Refused } from "@/components/refused"
 import { StatusDot } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
@@ -29,6 +31,7 @@ import { parseAnsi } from "@/lib/ansi"
 import { openShell } from "@/lib/dock"
 import { cn } from "@/lib/utils"
 import { isTask, podHealth, podReason, worstPod, type Service } from "@/model/service"
+import { ranges } from "@/model/usage"
 import { useLogStream } from "@/routes/service/log-stream"
 import {
   Empty,
@@ -47,6 +50,7 @@ interface Line {
   text: string
   time?: number
   stamp?: string
+  source?: string
   severity: Severity
 }
 
@@ -54,7 +58,7 @@ interface Line {
 const ansi = /\u001b\[[0-?]*[ -/]*[@-~]/g
 const stampRe = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s/
 
-function parseLine(raw: string): Line {
+function parseLine(raw: string, source?: string): Line {
   const match = raw.match(stampRe)
   const body = match ? raw.slice(match[0].length) : raw
   const plain = body.replace(ansi, "")
@@ -70,6 +74,7 @@ function parseLine(raw: string): Line {
     text: plain,
     time: match?.[1] ? Date.parse(match[1]) : undefined,
     stamp: match?.[1],
+    source,
     severity,
   }
 }
@@ -101,6 +106,8 @@ export function LogsTab({
   const [container, setContainer] = useState<string>()
   const chosen = container && containerNames.includes(container) ? container : containerNames[0]
   const [previous, setPrevious] = useState(false)
+  const [history, setHistory] = useState(false)
+  const [range, setRange] = useState<Schemas["PrometheusRange"]>("1h")
   const [timestamps, setTimestamps] = useState(false)
   const [follow, setFollow] = useState(false)
   const [wrap, setWrap] = useState(false)
@@ -128,50 +135,52 @@ export function LogsTab({
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2">
-      <Popover open={podOpen} onOpenChange={setPodOpen}>
-        <PopoverTrigger
-          render={<Button variant="outline" size="sm" className="max-w-full justify-start" />}
-          aria-label={t("logs.podOf", pod.name)}
-        >
-          <StatusDot health={podHealth(pod)} />
-          <span className="truncate font-mono text-xs">{pod.name}</span>
-          <span className="text-muted-foreground tabular-nums">↻{pod.restarts}</span>
-          <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
-        </PopoverTrigger>
-        <PopoverContent className="w-80">
-          <ul className="flex flex-col">
-            {pods.map((p) => (
-              <li key={p.name}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onPodChange(p.name)
-                    setPodOpen(false)
-                  }}
-                  className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-xs hover:bg-muted"
-                >
-                  <StatusDot health={podHealth(p)} />
-                  <span className="truncate font-mono">{p.name}</span>
-                  <span
-                    className={cn(
-                      "rounded px-1 type-nano font-medium",
-                      p.ready ? "bg-ok/12 text-ok" : "bg-fail/10 text-fail",
-                    )}
+      {history ? null : (
+        <Popover open={podOpen} onOpenChange={setPodOpen}>
+          <PopoverTrigger
+            render={<Button variant="outline" size="sm" className="max-w-full justify-start" />}
+            aria-label={t("logs.podOf", pod.name)}
+          >
+            <StatusDot health={podHealth(pod)} />
+            <span className="truncate font-mono text-xs">{pod.name}</span>
+            <span className="text-muted-foreground tabular-nums">↻{pod.restarts}</span>
+            <CaretDownIcon aria-hidden="true" data-icon="inline-end" />
+          </PopoverTrigger>
+          <PopoverContent className="w-80">
+            <ul className="flex flex-col">
+              {pods.map((p) => (
+                <li key={p.name}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onPodChange(p.name)
+                      setPodOpen(false)
+                    }}
+                    className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-xs hover:bg-muted"
                   >
-                    {p.ready ? t("pod.ready") : (podReason(p) ?? t("pod.notReady"))}
-                  </span>
-                  <span className="ml-auto text-muted-foreground tabular-nums">
-                    {t("pod.restarts", p.restarts)}
-                  </span>
-                  {p.name === pod.name ? (
-                    <CheckIcon className="size-3.5" aria-hidden="true" />
-                  ) : null}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </PopoverContent>
-      </Popover>
+                    <StatusDot health={podHealth(p)} />
+                    <span className="truncate font-mono">{p.name}</span>
+                    <span
+                      className={cn(
+                        "rounded px-1 type-nano font-medium",
+                        p.ready ? "bg-ok/12 text-ok" : "bg-fail/10 text-fail",
+                      )}
+                    >
+                      {p.ready ? t("pod.ready") : (podReason(p) ?? t("pod.notReady"))}
+                    </span>
+                    <span className="ml-auto text-muted-foreground tabular-nums">
+                      {t("pod.restarts", p.restarts)}
+                    </span>
+                    {p.name === pod.name ? (
+                      <CheckIcon className="size-3.5" aria-hidden="true" />
+                    ) : null}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </PopoverContent>
+        </Popover>
+      )}
       {containerNames.length > 1 ? (
         <Select
           size="sm"
@@ -182,10 +191,31 @@ export function LogsTab({
           items={containerNames.map((name) => ({ value: name, label: name }))}
         />
       ) : null}
-      <Toggle variant="outline" size="sm" pressed={previous} onPressedChange={setPrevious}>
-        <ClockCounterClockwiseIcon aria-hidden="true" />
-        {t("logs.previous")}
+      {history ? null : (
+        <Toggle variant="outline" size="sm" pressed={previous} onPressedChange={setPrevious}>
+          <ClockCounterClockwiseIcon aria-hidden="true" />
+          {t("logs.previous")}
+        </Toggle>
+      )}
+      <Toggle
+        variant="outline"
+        size="sm"
+        pressed={history}
+        onPressedChange={setHistory}
+        title={t("logs.historyHint")}
+      >
+        <ClockClockwiseIcon aria-hidden="true" />
+        {t("logs.history")}
       </Toggle>
+      {history ? (
+        <Select
+          size="sm"
+          value={range}
+          onValueChange={setRange}
+          aria-label={t("usage.range")}
+          items={ranges.map((r) => ({ value: r, label: t(`usage.range.${r}`) }))}
+        />
+      ) : null}
       <label className="flex h-7 min-w-40 flex-1 items-center gap-1.5 rounded-lg border bg-background px-2 focus-within:border-ring">
         <FunnelIcon className="size-3.5 text-muted-foreground" aria-hidden="true" />
         <input
@@ -217,10 +247,16 @@ export function LogsTab({
         >
           <ClockIcon aria-hidden="true" />
         </Toggle>
-        <Toggle variant="outline" size="sm" pressed={follow} onPressedChange={setFollow}>
-          {follow ? <BroadcastFillIcon aria-hidden="true" /> : <BroadcastIcon aria-hidden="true" />}
-          {t("logs.follow")}
-        </Toggle>
+        {history ? null : (
+          <Toggle variant="outline" size="sm" pressed={follow} onPressedChange={setFollow}>
+            {follow ? (
+              <BroadcastFillIcon aria-hidden="true" />
+            ) : (
+              <BroadcastIcon aria-hidden="true" />
+            )}
+            {t("logs.follow")}
+          </Toggle>
+        )}
       </div>
       {isTask(service.kind) ? null : (
         <Button variant="outline" size="sm" onClick={() => openShell(project, service, pod.name)}>
@@ -243,12 +279,21 @@ export function LogsTab({
   return (
     <div className="flex min-h-105 flex-1 flex-col gap-3">
       {toolbar}
-      {replaced ? (
+      {replaced && !history ? (
         <p role="status" className="text-sm text-secondary">
           {t("logs.replaced", replaced, pod.name)}
         </p>
       ) : null}
-      {follow ? (
+      {history ? (
+        <History
+          project={project}
+          service={service}
+          range={range}
+          container={options.container}
+          {...viewProps}
+          fileName={`${service.name}${chosen ? `-${chosen}` : ""}-${range}.log`}
+        />
+      ) : follow ? (
         <Followed
           key={followUrl(project, pod.name, options)}
           url={followUrl(project, pod.name, options)}
@@ -336,6 +381,93 @@ function Snapshot({
   )
 }
 
+function History({
+  project,
+  service,
+  range,
+  container,
+  ...props
+}: {
+  project: string
+  service: Service
+  range: Schemas["PrometheusRange"]
+  container: string | undefined
+} & ViewProps) {
+  const t = useT()
+  const history = useQuery(logHistoryQuery(project, service.kind, service.name, range, container))
+  if (history.isPending) return <Skeleton variant="card" className="min-h-80 w-full flex-1" />
+  if (history.isError) return <Problem problem={toProblem(history.error)} />
+  const data = history.data
+  const refresh = (
+    <Button
+      variant="ghost"
+      size="xs"
+      onClick={() => void history.refetch()}
+      disabled={history.isFetching}
+    >
+      <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+      {t("logs.refresh")}
+    </Button>
+  )
+  switch (data.state) {
+    case "not-installed":
+      return (
+        <Empty variant="outline" data-log-history="not-installed">
+          <EmptyHeader>
+            <EmptyTitle>{t("logs.historyNotInstalled")}</EmptyTitle>
+            <EmptyDescription>{t("logs.historyNotInstalledBody")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )
+    case "unreadable":
+      return (
+        <div data-log-history="unreadable">
+          <Refused
+            refusal="unreadable"
+            what={t("logs.whatHistory")}
+            missing={["get logs.proxy.zeabur.com"]}
+          >
+            <p className="type-meta text-muted-foreground">{t("logs.historyRoles")}</p>
+          </Refused>
+        </div>
+      )
+    case "unavailable":
+      return (
+        <Empty variant="outline" data-log-history="unavailable">
+          <EmptyHeader>
+            <EmptyTitle>{t("logs.historyUnavailable")}</EmptyTitle>
+            {data.message ? (
+              <EmptyDescription>
+                <span className="font-mono" translate="no">
+                  {data.message}
+                </span>
+              </EmptyDescription>
+            ) : null}
+          </EmptyHeader>
+          {refresh}
+        </Empty>
+      )
+    case "available":
+      break
+  }
+  const prefix = `${service.name}-`
+  return (
+    <LogView
+      lines={data.lines.map((line) => `${line.time} ${line.message}`)}
+      sources={data.lines.map((line) =>
+        line.pod.startsWith(prefix) ? line.pod.slice(prefix.length) : line.pod,
+      )}
+      {...props}
+      status={
+        <output className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          {data.truncated ? t("logs.historyLatest", data.limit) : null}
+          {refresh}
+        </output>
+      }
+    />
+  )
+}
+
 /** The replica went away between the list and its log; the list is read again, which picks another. */
 function Gone({ project, pod }: { project: string; pod: string }) {
   const t = useT()
@@ -409,6 +541,7 @@ function Stream({
 
 function LogView({
   lines: rawLines,
+  sources,
   status,
   filter,
   severity,
@@ -416,13 +549,13 @@ function LogView({
   wrap,
   timestamps,
   fileName,
-}: { lines: string[]; status: ReactNode } & ViewProps) {
+}: { lines: string[]; sources?: string[]; status: ReactNode } & ViewProps) {
   "use no memo" // TanStack Virtual's instance is mutable; the React Compiler must not memoise it.
   const t = useT()
   const { locale } = useI18n()
   const scroller = useRef<HTMLDivElement>(null)
   const [stick, setStick] = useState(true)
-  const lines = rawLines.map(parseLine)
+  const lines = rawLines.map((raw, i) => parseLine(raw, sources?.[i]))
   const needle = filter.trim().toLowerCase()
   const exclude = needle.startsWith("-") ? needle.slice(1) : ""
   const matching = lines.filter((line) =>
@@ -589,6 +722,11 @@ function LogView({
                   {timestamps && line.stamp ? (
                     <span className="shrink-0 text-muted-foreground select-none">
                       {line.stamp.slice(11, 19)}
+                    </span>
+                  ) : null}
+                  {line.source ? (
+                    <span className="shrink-0 text-muted-foreground select-none" translate="no">
+                      {line.source}
                     </span>
                   ) : null}
                   <span className="min-w-0">

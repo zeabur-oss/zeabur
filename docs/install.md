@@ -176,6 +176,22 @@ metrics for volume use; VictoriaMetrics' k8s-stack chart and kube-prometheus-sta
 by default. Zeabur Catalog's single-node VictoriaMetrics profile turns node-exporter off, so
 there the cluster page says node disk use is not collected. Nobody needs `nodes/proxy`.
 
+### Log history
+
+With `proxy.enabled=true`, the Logs tab also shows lines from replicas that are gone, read from
+VictoriaLogs (Zeabur Catalog's logs capability; `proxy.logs`). VictoriaLogs holds every
+namespace's lines, so Zeabur never reads it. Zeabur Proxy does, as the person: it reads only
+the project's namespace, and only for people who may `get` `logs.proxy.zeabur.com` there.
+The chart's `zeabur-proxy-logs-reader` gives that to project Viewers and Developers and to
+Kubernetes' `view`, `edit` and `admin`.
+
+Zeabur reaches the proxy over TLS with a certificate the chart makes and keeps across upgrades.
+To use your own, for example a cert-manager Certificate, name its Secret in
+`proxy.tls.existingSecret`; it needs `ca.crt`. The proxy picks up a renewed certificate on its
+own; Zeabur reads the CA when it starts. The proxy's NetworkPolicy lets it reach DNS,
+VictoriaLogs and kube-apiserver only. Where kube-apiserver is not at the addresses of
+`default/kubernetes`, list its CIDRs in `proxy.apiServer`.
+
 ### An image of your own
 
 To run a build of your own instead, build the image on a Linux machine with Docker

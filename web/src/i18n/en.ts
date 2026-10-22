@@ -635,6 +635,17 @@ export const en = {
   "logs.unavailableFix.removed":
     "Wait a moment and refresh. To keep logs past restarts, send them to a log store.",
   "logs.currentRun": "Show current run",
+  "logs.history": "History",
+  "logs.historyHint":
+    "Lines every replica wrote, also replicas since replaced, from the log store.",
+  "logs.historyLatest": (n: number) => `Latest ${n} lines`,
+  "logs.historyNotInstalled": "Log history isn't installed",
+  "logs.historyNotInstalledBody":
+    "Logs come from running replicas only. A cluster administrator turns history on with the Helm chart's proxy.enabled.",
+  "logs.whatHistory": "Reading this project's log history",
+  "logs.historyRoles":
+    "Project viewers and developers have it, as does anyone with Kubernetes' view role in the namespace.",
+  "logs.historyUnavailable": "The log store did not respond.",
   "dock.label": "Terminal",
   "dock.show": "Show terminal",
   "dock.hide": "Hide terminal",

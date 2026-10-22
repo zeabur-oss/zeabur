@@ -571,6 +571,16 @@ export const zhCN: Messages = {
   "logs.unavailableFix.not-started": "等待容器启动；副本的事件会说明它在等什么。",
   "logs.unavailableFix.removed": "稍后再刷新。要在重启后保留日志，可以把日志发送到日志存储服务。",
   "logs.currentRun": "看本次运行",
+  "logs.history": "历史记录",
+  "logs.historyHint": "所有副本写过的日志，包括已被替换的副本，来自日志存储服务。",
+  "logs.historyLatest": (n) => `最新 ${n} 行`,
+  "logs.historyNotInstalled": "尚未安装日志历史记录",
+  "logs.historyNotInstalledBody":
+    "目前只能看运行中副本的日志。集群管理员可以用 Helm chart 的 proxy.enabled 开启历史记录。",
+  "logs.whatHistory": "读取这个项目的日志历史记录",
+  "logs.historyRoles":
+    "项目的查看者和开发者都有这个权限，命名空间内有 Kubernetes view 角色的人也有。",
+  "logs.historyUnavailable": "日志存储服务没有响应。",
   "logs.count": (n) => `${n} 行`,
   "logs.of": (n) => `共 ${n} 行`,
   "dock.label": "终端",
