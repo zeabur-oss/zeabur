@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   Fragment,
   lazy,
@@ -20,12 +20,14 @@ import KeyIcon from "~icons/ph/key"
 import ListBulletsIcon from "~icons/ph/list-bullets"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
+import PlugsConnectedIcon from "~icons/ph/plugs-connected"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
-import { configMapsQuery } from "@/api/queries"
+import { configMapsQuery, databasesQuery } from "@/api/queries"
 import { CopyButton, Hint, ManagedTip, Segmented } from "@/components/bits"
+import { ConnectDrawer, useTargets } from "@/components/connect"
 import { FilterField } from "@/components/filter-field"
 import { KubeDetails } from "@/components/kube-details"
 import { useDraft, useHold } from "@/components/plan/draft"
@@ -50,7 +52,10 @@ import { Textarea } from "@zeabur/design-system/components/textarea"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
+import { databaseLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
+import { databaseOfEnv } from "@/model/connect"
+import type { Database } from "@/model/databases"
 import type { Edge } from "@/model/connections"
 import {
   changesOf,
@@ -117,7 +122,15 @@ export function VariablesTab({
         named.set(key, [...(named.get(key) ?? []), evidence.service])
       }
 
+  const databases = useQuery(databasesQuery(project)).data?.items ?? []
+  const [connecting, setConnecting] = useState(false)
+  const targets = useTargets(project)
+  const mayConnect =
+    databases.some((d) => d.app) &&
+    targets.some((s) => s.kind === service.kind && s.name === service.name)
   const containers = service.containers
+  const databaseOf = (container: string, env: Schemas["EnvVar"]) =>
+    databaseOfEnv(env, containers.find((c) => c.name === container)?.env ?? [], databases)
   const literal = containers.flatMap((c) =>
     c.env.filter((e) => e.source.kind === "Literal").map((e) => ({ container: c.name, env: e })),
   )
@@ -372,6 +385,7 @@ export function VariablesTab({
   const sourceRow = ({ container, env }: { container: string; env: Schemas["EnvVar"] }) => {
     const value = valueOf(env)
     const secret = env.source.kind === "Secret" ? env.source.name : undefined
+    const from = databaseOf(container, env)
     return (
       <li
         key={`${container}/${env.name}`}
@@ -397,11 +411,15 @@ export function VariablesTab({
         </span>
         <span className="flex min-w-0 items-center gap-1 sm:max-w-72 sm:justify-end">
           {env.pendingRestart ? <PendingMark pending={env.pendingRestart} /> : null}
-          <SourceLink
-            source={env.source}
-            variable={env.name}
-            onOpen={(kind, name) => setEditor({ kind, name, key: env.source.key ?? undefined })}
-          />
+          {from ? (
+            <FromDatabase project={project} database={from} detail={sourceWords(t, env.source)} />
+          ) : (
+            <SourceLink
+              source={env.source}
+              variable={env.name}
+              onOpen={(kind, name) => setEditor({ kind, name, key: env.source.key ?? undefined })}
+            />
+          )}
         </span>
       </li>
     )
@@ -569,6 +587,12 @@ export function VariablesTab({
                 options={viewOptions}
               />
             ) : null}
+            {editing || !mayConnect || managed ? null : (
+              <Button variant="outline" size="sm" onClick={() => setConnecting(true)}>
+                <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
+                {t("connect.addToService")}
+              </Button>
+            )}
             {editing || !draft ? null : (
               <ManagedTip tool={managed}>
                 <Button
@@ -582,6 +606,13 @@ export function VariablesTab({
                 </Button>
               </ManagedTip>
             )}
+            {connecting ? (
+              <ConnectDrawer
+                project={project}
+                service={service}
+                onClose={() => setConnecting(false)}
+              />
+            ) : null}
           </>
         }
       />
@@ -806,6 +837,7 @@ export function VariablesTab({
                   <ul className="flex flex-col divide-y">
                     {byContainer(shownLiteral, ({ container, env }) => {
                       const targets = named.get(`${container}/${env.name}`) ?? []
+                      const from = databaseOf(container, env)
                       return (
                         <li
                           key={`${container}/${env.name}`}
@@ -826,6 +858,11 @@ export function VariablesTab({
                               {env.value}
                             </span>
                             <CopyButton value={env.value ?? ""} />
+                            {from ? (
+                              <span className="ml-auto shrink-0">
+                                <FromDatabase project={project} database={from} />
+                              </span>
+                            ) : null}
                             {targets.map((target) => (
                               <Tooltip key={target} content={t("vars.names", target)}>
                                 <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
@@ -1057,6 +1094,29 @@ function VarGroup({
       {children}
     </section>
   )
+}
+
+/** A variable a database gives: its name, linking to it; the Secret and key behind it on hover. */
+function FromDatabase({
+  project,
+  database,
+  detail,
+}: {
+  project: string
+  database: Database
+  detail?: string
+}) {
+  const t = useT()
+  const link = (
+    <Link
+      {...databaseLink(project, database)}
+      className="inline-flex min-w-0 items-center gap-1 truncate type-meta text-secondary hover:underline"
+    >
+      <PlugsConnectedIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <span className="truncate">{t("vars.fromDatabase", database.name)}</span>
+    </Link>
+  )
+  return detail ? <Tooltip content={detail}>{link}</Tooltip> : link
 }
 
 function Masked() {

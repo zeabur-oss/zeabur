@@ -7,11 +7,13 @@ import DatabaseIcon from "~icons/ph/database"
 import EyeIcon from "~icons/ph/eye"
 import EyeSlashIcon from "~icons/ph/eye-slash"
 import InfoIcon from "~icons/ph/info"
+import PlugsConnectedIcon from "~icons/ph/plugs-connected"
 import WarningIcon from "~icons/ph/warning"
 
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
-import { databasesQuery } from "@/api/queries"
+import { databasesQuery, projectQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
+import { ConnectDrawer, useTargets } from "@/components/connect"
 import { CopyText } from "@/components/copy-text"
 import { DatabaseState } from "@/components/databases"
 import { OpenInTerminal } from "@/components/dock/open-in-terminal"
@@ -38,6 +40,7 @@ import {
   type Database,
   type Frequency,
 } from "@/model/databases"
+import { connected } from "@/model/connect"
 import type { Health } from "@/model/service"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
@@ -344,6 +347,7 @@ function Connection({ project, database }: { project: string; database: Database
   )
   return (
     <Section id="db-connect" title={t("db.connect")}>
+      <ConnectServices project={project} database={database} />
       <p className="type-meta text-muted-foreground">{t("db.inCluster")}</p>
       <dl className="flex flex-col">
         <Row label={t("db.host")}>
@@ -388,6 +392,33 @@ function Connection({ project, database }: { project: string; database: Database
       </dl>
       {secret?.problem ? <Problem problem={secret.problem} what={c.secret} /> : null}
     </Section>
+  )
+}
+
+/** Which services read the database, and connecting another. */
+function ConnectServices({ project, database }: { project: string; database: Database }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const services = useQuery(projectQuery(project)).data?.services ?? []
+  const targets = useTargets(project)
+  const readers = services.filter((s) => connected(s, database)).map((s) => s.name)
+  if (!database.app)
+    return <p className="type-meta text-muted-foreground">{t("connect.noApp", database.name)}</p>
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <p className="min-w-0 flex-1 text-sm">
+        {readers.length > 0 ? t("connect.readBy", t("common.list", readers)) : t("connect.none")}
+      </p>
+      {targets.some((s) => !connected(s, database)) ? (
+        <Button variant="outline" size="xs" onClick={() => setOpen(true)}>
+          <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
+          {t("connect.action")}
+        </Button>
+      ) : null}
+      {open ? (
+        <ConnectDrawer project={project} database={database} onClose={() => setOpen(false)} />
+      ) : null}
+    </div>
   )
 }
 

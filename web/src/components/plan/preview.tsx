@@ -11,6 +11,8 @@ import type { Health } from "@/model/service"
 type Preview = Schemas["Preview"]
 type Rollout = Schemas["Rollout"]
 
+const starts = (rollout: Rollout) => rollout.actions.every((a) => a === "start")
+
 function rolloutText(t: Translate, rollout: Rollout): string {
   const name = rollout.workload.name
   const parts = rollout.actions.map((action) => {
@@ -24,7 +26,7 @@ function rolloutText(t: Translate, rollout: Rollout): string {
       case "scale":
         return t("preview.scale", name, rollout.fromReplicas ?? 0, rollout.replicas ?? 0)
       case "start":
-        return t("preview.start", name)
+        return t("preview.start", name, rollout.replicas ?? 1)
       case "stop":
         return t("preview.stop", name)
       case "pendingRestart":
@@ -112,24 +114,31 @@ export function PlanPreview({
   )
   return (
     <div className="flex flex-col gap-3 empty:hidden">
-      {rollouts.length > 0 ? (
-        <section aria-label={t("preview.restarts")} className="flex flex-col gap-1.5">
-          <h3 className="type-meta font-medium text-muted-foreground">{t("preview.restarts")}</h3>
-          <ul className="flex flex-col gap-1.5">
-            {rollouts.map((rollout) => (
-              <Line
-                key={`${rollout.workload.kind}/${rollout.workload.name}`}
-                health={rollout.downtime ? "warn" : "idle"}
-              >
-                {rolloutText(t, rollout)}
-                {rollout.downtime ? (
-                  <span className="text-warn-strong"> {t("preview.downtime")}</span>
-                ) : null}
-              </Line>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      {(
+        [
+          ["preview.starts", rollouts.filter(starts)],
+          ["preview.restarts", rollouts.filter((r) => !starts(r))],
+        ] as const
+      ).map(([heading, list]) =>
+        list.length > 0 ? (
+          <section key={heading} aria-label={t(heading)} className="flex flex-col gap-1.5">
+            <h3 className="type-meta font-medium text-muted-foreground">{t(heading)}</h3>
+            <ul className="flex flex-col gap-1.5">
+              {list.map((rollout) => (
+                <Line
+                  key={`${rollout.workload.kind}/${rollout.workload.name}`}
+                  health={rollout.downtime ? "warn" : "idle"}
+                >
+                  {rolloutText(t, rollout)}
+                  {rollout.downtime ? (
+                    <span className="text-warn-strong"> {t("preview.downtime")}</span>
+                  ) : null}
+                </Line>
+              ))}
+            </ul>
+          </section>
+        ) : null,
+      )}
       {fit.status === "fits" ? (
         <ul>
           <Line health="ok">

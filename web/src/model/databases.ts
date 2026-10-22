@@ -171,6 +171,9 @@ function databaseObject(form: NewDatabase): Manifest {
         },
       ],
       sharding: { enabled: false },
+      // The user services connect as; the operator keeps its password in
+      // `<name>-custom-user-secret`, key `app`.
+      users: [{ name: "app", db: "app", roles: [{ name: "readWrite", db: "app" }] }],
       backup: { enabled: false, image: PBM_IMAGE },
     },
   }

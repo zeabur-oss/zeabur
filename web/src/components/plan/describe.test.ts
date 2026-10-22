@@ -645,4 +645,16 @@ group("restartRuleApplies", () => {
     expect(restartRuleApplies(plan({ objects: [templated("api")] }))).toBe(false)
     expect(restartRuleApplies(plan())).toBe(false)
   })
+
+  test("a workload the plan creates starts replicas; it replaces none", () => {
+    const created = {
+      target: { apiVersion: "apps/v1", kind: "Deployment", plural: "deployments", name: "web" },
+      changes: [{ path: "spec.template.spec.containers", after: [] }],
+      owners: [],
+      after: {},
+      write: { type: "create", object: {} },
+    } as unknown as Schemas["PlannedObject"]
+    expect(replaced(plan({ objects: [created] }))).toStrictEqual([])
+    expect(restartRuleApplies(plan({ objects: [created] }))).toBe(false)
+  })
 })

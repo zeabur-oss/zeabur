@@ -120,6 +120,9 @@ describe("a new database", () => {
     const spec = one.object.spec as Record<string, unknown>
     expect(spec.unsafeFlags).toEqual({ replsetSize: true })
     expect(spec.sharding).toEqual({ enabled: false })
+    expect(spec.users).toEqual([
+      { name: "app", db: "app", roles: [{ name: "readWrite", db: "app" }] },
+    ])
     const three = createDatabase(newDatabase("mongodb", 3))[0] as never as {
       object: { spec: never }
     }

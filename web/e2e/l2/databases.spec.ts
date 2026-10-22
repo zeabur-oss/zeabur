@@ -13,6 +13,7 @@ import { invite, member, planAndApply, signInAsAdmin, toast } from "./members.ts
 //                             the keys below; set only when CloudNativePG runs in the cluster
 //   ZEABUR_L2_MONGODB         1 when the Percona Operator for MongoDB runs in the cluster too
 //   ZEABUR_L2_DB_KEEP         1 keeps the databases afterwards, to look at them
+//   ZEABUR_L2_SERVICE         the Deployment each database is connected to
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const keep = env("ZEABUR_L2_DB_KEEP") === "1"
 const adminLink = env("ZEABUR_L2_DB_ADMIN_LINK")
@@ -20,6 +21,7 @@ const project = env("ZEABUR_L2_NAMESPACE")
 const s3 = env("ZEABUR_L2_S3_ENDPOINT")
 const mongodb = env("ZEABUR_L2_MONGODB") === "1"
 const zeabur = env("ZEABUR_L2_URL")
+const service = env("ZEABUR_L2_SERVICE", "talker")
 const keys = {
   access: env("ZEABUR_L2_S3_ACCESS_KEY", "testkey"),
   secret: env("ZEABUR_L2_S3_SECRET_KEY", "testsecret123"),
@@ -38,6 +40,7 @@ const engines = [
     path: "postgresql",
     name: postgres,
     secret: `${postgres}-app`,
+    variables: ["DATABASE_URL"],
     resource: { group: "postgresql.cnpg.io", version: "v1", resource: "clusters" },
     backup: {
       apiVersion: "postgresql.cnpg.io/v1",
@@ -53,6 +56,7 @@ const engines = [
           path: "mongodb",
           name: mongo,
           secret: `${mongo}-secrets`,
+          variables: ["MONGOPASSWORD", "MONGO_URL"],
           resource: {
             group: "psmdb.percona.com",
             version: "v1",
@@ -118,6 +122,45 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       })
     })
 
+    await test.step(`the Developer connects ${db.name} to ${service}`, async () => {
+      const connect = developer.getByRole("region", { name: "Connect" })
+      await connect.getByRole("button", { name: "Connect to a service" }).click()
+      const drawer = developer.getByRole("dialog", { name: `Connect ${db.name} to services` })
+      await drawer.getByRole("checkbox", { name: service }).click()
+      await expect(drawer).toContainText(db.variables.join(", "))
+      await drawer.getByRole("button", { name: "Review", exact: true }).click()
+      const title = `Connect ${db.name} to ${service}`
+      // The plan is the drawer's second step; it names the restart and writes no password.
+      const plan = developer.getByRole("dialog", { name: title })
+      await expect(plan.getByRole("button", { name: "Back" })).toBeVisible()
+      await expect(plan).toContainText(service)
+      await apply(developer, title)
+      await expect(connect).toContainText(`Connected to ${service}`, { timeout: 30_000 })
+
+      await developer.goto(
+        `/projects/${encodeURIComponent(project)}/services/Deployment/${service}?tab=variables`,
+      )
+      await expect(developer.getByRole("main")).toContainText(`From database ${db.name}`)
+      // The new replicas start only once the Secret the variables read exists.
+      await expect
+        .poll(
+          async () => {
+            const answer = await developer.request.get(
+              `/api/v1/projects/${encodeURIComponent(project)}`,
+            )
+            const body = (await answer.json()) as {
+              services: { name: string; pods: { ready: boolean }[] }[]
+            }
+            const pods = body.services.find((s) => s.name === service)?.pods ?? []
+            // Old replicas leave once the new ones are ready; a new one stuck on the Secret stays.
+            return pods.length > 0 && pods.every((pod) => pod.ready)
+          },
+          { timeout: 180_000 },
+        )
+        .toBe(true)
+      await developer.goto(databasePage(db.path, db.name))
+    })
+
     await test.step(`the Developer backs ${db.name} up to S3 and backs it up now`, async () => {
       await developer.getByRole("tab", { name: "Backups" }).click()
       const setUp = developer.getByRole("region", { name: "Set up backups" })
@@ -165,8 +208,16 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
     await viewer.context().close()
   })
 
-  await test.step("the Developer deletes the databases", async () => {
+  await test.step("the Developer disconnects and deletes the databases", async () => {
     for (const db of keep ? [] : engines) {
+      const disconnected = await planAndApply(developer, project, [
+        {
+          op: "env",
+          workload: { kind: "Deployment", name: service },
+          changes: db.variables.map((name) => ({ op: "remove", name })),
+        },
+      ])
+      expect(disconnected.status, JSON.stringify(disconnected.body)).toBe(200)
       const deleted = await planAndApply(developer, project, [
         { op: "delete", resource: db.resource, name: db.name },
       ])

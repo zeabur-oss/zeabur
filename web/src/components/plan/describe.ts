@@ -24,11 +24,15 @@ type Plan = Pick<Schemas["PlanResponse"], "objects" | "impact" | "warnings"> & {
 
 const workloadKinds = new Set(["Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"])
 
+/** A workload the plan creates starts its replicas; it replaces none. */
+const created = (o: Plan["objects"][number]) => o.write.type === "create"
+
 export function replaced(plan: Plan): WorkloadRef[] {
   return plan.objects
     .filter(
       (o) =>
         workloadKinds.has(o.target.kind) &&
+        !created(o) &&
         o.changes.some((c) => c.path === "spec.template" || c.path.startsWith("spec.template.")),
     )
     .map((o) => ({ kind: o.target.kind as WorkloadRef["kind"], name: o.target.name }))
@@ -40,6 +44,7 @@ export function restartRuleApplies(plan: Plan): boolean {
   const own = plan.objects.some(
     (o) =>
       workloadKinds.has(o.target.kind) &&
+      !created(o) &&
       o.changes.some((c) => c.path.startsWith("spec.template.") && !c.path.endsWith("restartedAt")),
   )
   return (

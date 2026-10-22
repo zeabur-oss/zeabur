@@ -1122,6 +1122,7 @@ export const en = {
   "plan.apply": "Apply",
   "plan.applying": "Applying…",
   "plan.cancel": "Cancel",
+  "plan.back": "Back",
   "plan.replan": "Review again",
   "plan.details": "Technical details",
   "plan.expiresIn": (time: string) => `Expires in ${time}`,
@@ -1500,6 +1501,7 @@ export const en = {
   "vars.editThere": "Change it where it is kept",
   "vars.imported": "Every key of a config file or secret",
   "vars.inSecret": (secret: string, key: string) => `${key} in secret ${secret}`,
+  "vars.fromDatabase": (database: string) => `From database ${database}`,
   "vars.allOfSecret": (secret: string) => `Every key in secret ${secret}`,
   "vars.inConfig": (file: string, key: string) => `${key} in config file ${file}`,
   "vars.allOfConfig": (file: string) => `Every key in config file ${file}`,
@@ -1789,6 +1791,31 @@ export const en = {
   "db.fact.operator": "Operator says",
   "db.connect": "Connect",
   "db.inCluster": "Reachable from inside the cluster.",
+  "connect.action": "Connect to a service",
+  "connect.addToService": "Add a database connection",
+  "connect.title": (database: string) => `Connect ${database} to services`,
+  "connect.titleService": (service: string) => `Add a database connection to ${service}`,
+  "connect.planTitle": (database: string, services: string) => `Connect ${database} to ${services}`,
+  "connect.database": "Database",
+  "connect.services": "Services",
+  "connect.servicesHint": "Optional. Each gets the connection string as a variable.",
+  "connect.noTargets": "No service in this project that you may change.",
+  "connect.already": "Connected",
+  "connect.variable": "Variable name",
+  "connect.badName": "Letters, digits and _, not starting with a digit.",
+  "connect.extras": (names: string) => `Also add ${names}`,
+  "connect.adds": "Variables added",
+  "connect.note.postgresql": (secret: string) =>
+    `The values stay in Secret ${secret}; the service only points to them.`,
+  "connect.note.mongodb": (secret: string) =>
+    `The password stays in Secret ${secret}; MONGO_URL takes it from MONGOPASSWORD when the service starts.`,
+  "connect.noApp": (database: string) =>
+    `${database} has no app user with a generated password, so it cannot be connected here. Databases created in Zeabur have one.`,
+  "connect.noDatabases": "No database in this project can be connected.",
+  "connect.waitsReady": (services: string, database: string) =>
+    `${services} switch to the new version once ${database} is ready; the old version keeps running until then.`,
+  "connect.readBy": (services: string) => `Connected to ${services}.`,
+  "connect.none": "Not connected to a service yet.",
   "db.host": "Host",
   "db.port": "Port",
   "db.database": "Database",
@@ -2485,6 +2512,7 @@ export const en = {
   "sentence.rollout.stuck.replicaFailure": (p: P) =>
     `The rollout of ${p.name} is stuck: the cluster can't create a new replica.`,
   // ia:start
+  "preview.starts": "What starts",
   "preview.restarts": "What restarts",
   "preview.roll.rolling": (name: string) => `${name} replaces its replicas one at a time.`,
   "preview.roll.recreate": (name: string) => `${name} stops every replica, then starts new ones.`,
@@ -2492,7 +2520,8 @@ export const en = {
     `${name} uses its new settings only when you delete its old replicas.`,
   "preview.scale": (name: string, from: number, to: number) =>
     `${name} goes from ${from} to ${plural(to, "replica", "replicas")}.`,
-  "preview.start": (name: string) => `${name} starts.`,
+  "preview.start": (name: string, replicas: number) =>
+    `${name} starts ${plural(replicas, "replica", "replicas")}.`,
   "preview.stop": (name: string) => `${name} stops.`,
   "preview.pendingRestart": (name: string) => `${name} keeps the old value until it restarts.`,
   "preview.downtime": "Nothing serves for a moment.",

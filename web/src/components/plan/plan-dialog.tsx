@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
+import CaretLeftIcon from "~icons/ph/caret-left"
 import CaretRightIcon from "~icons/ph/caret-right"
 import WarningFillIcon from "~icons/ph/warning-fill"
 import XIcon from "~icons/ph/x"
@@ -51,23 +53,23 @@ interface Said {
   names?: string[]
 }
 
-export function PlanDialog({
-  project,
-  ask,
-  onClose,
-  onApplied,
-  reopen,
-  onRefused,
-  hooks,
-}: {
+interface PlanProps {
   project: string
   ask: PlanAsk
   onClose: () => void
+  /** After the apply starts; `onClose` when left out. */
+  onConfirmed?: () => void
   onApplied?: () => void
   reopen: (ask: PlanAsk) => void
   onRefused?: (problem: ProblemBody) => void
   hooks?: PlanHooks
-}) {
+}
+
+/** The plan of an ask: what it says, and its buttons. */
+function usePlan(
+  { project, ask, onClose, onConfirmed, onApplied, reopen, onRefused, hooks }: PlanProps,
+  bare = false,
+) {
   const t = useT()
   const { locale } = useI18n()
   const navigate = useNavigate()
@@ -125,7 +127,7 @@ export function PlanDialog({
       onApplied,
       onPartial: hooks?.onPartial,
     })
-    onClose()
+    ;(onConfirmed ?? onClose)()
   }
   const cancel = () => {
     if (plan.isError) onRefused?.(toProblem(plan.error))
@@ -135,12 +137,99 @@ export function PlanDialog({
   const where = refusedAt && hooks?.where ? hooks.where(refusedAt) : undefined
   const ready = !plan.isPending && !plan.isFetching && plan.data && description
 
+  const conclusion = ready ? (
+    <Conclusion
+      description={description}
+      short={short}
+      high={weight.risk === "high"}
+      grouped={grouped}
+      bare={bare}
+    />
+  ) : null
+  const content = (
+    <>
+      {plan.isPending || plan.isFetching ? (
+        <LoadingRows label={t("plan.planning")} rows={light ? 1 : 3} />
+      ) : plan.isError ? (
+        <div className="flex flex-col gap-3">
+          {where ? <p className="type-meta text-muted-foreground">{where}</p> : null}
+          <Problem error={plan.error} />
+          {where ? (
+            <div>
+              <Button variant="outline" size="xs" onClick={cancel}>
+                {t("create.showInYaml")}
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      ) : description ? (
+        <PlanBody
+          plan={plan.data}
+          skipped={ask.skipped}
+          notes={ask.notes}
+          description={description}
+          alerted={!grouped && !description.risk && weight.risk === "high"}
+        />
+      ) : null}
+      {plan.data && !plan.isFetching ? (
+        <Readers
+          project={project}
+          ask={ask}
+          plan={plan.data}
+          reopen={reopen}
+          go={(href) => {
+            onClose()
+            void navigate({ href })
+          }}
+        />
+      ) : null}
+      {named !== undefined && plan.data ? (
+        <div className="mt-4 flex flex-col gap-2">
+          <Label htmlFor="plan-typed-name">{t("plan.typeName", named)}</Label>
+          <Input
+            id="plan-typed-name"
+            value={typed}
+            onChange={(event) => setTyped(event.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            translate="no"
+          />
+        </div>
+      ) : null}
+    </>
+  )
+  const countdown =
+    plan.data && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
+      <span className="type-meta text-muted-foreground tabular-nums">
+        {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
+      </span>
+    ) : null
+  const action = expired ? (
+    <Button size="sm" onClick={() => void plan.refetch()}>
+      {t("plan.replan")}
+    </Button>
+  ) : (
+    <Button
+      size="sm"
+      variant={weight.risk === "high" ? "destructive" : "default"}
+      disabled={!plan.data || plan.isFetching || unconfirmed}
+      onClick={confirm}
+    >
+      {description?.action ?? actionOf(t, ask)}
+    </Button>
+  )
+  return { light, cancel, conclusion, content, countdown, action }
+}
+
+export function PlanDialog(props: PlanProps) {
+  const t = useT()
+  const { light, cancel, conclusion, content, countdown, action } = usePlan(props)
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : cancel())}>
       <DialogContent variant={light ? "compact" : "wide"}>
         <div className="flex items-center gap-2 border-b px-5 py-3">
           <div className="min-w-0 flex-1 truncate">
-            <DialogTitle>{ask.title}</DialogTitle>
+            <DialogTitle>{props.ask.title}</DialogTitle>
           </div>
           <DialogClose
             render={<Button variant="ghost" size="icon-sm" aria-label={t("common.close")} />}
@@ -148,91 +237,45 @@ export function PlanDialog({
             <XIcon aria-hidden="true" />
           </DialogClose>
         </div>
-        {ready ? (
-          <Conclusion
-            description={description}
-            short={short}
-            high={weight.risk === "high"}
-            grouped={grouped}
-          />
-        ) : null}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          {plan.isPending || plan.isFetching ? (
-            <LoadingRows label={t("plan.planning")} rows={light ? 1 : 3} />
-          ) : plan.isError ? (
-            <div className="flex flex-col gap-3">
-              {where ? <p className="type-meta text-muted-foreground">{where}</p> : null}
-              <Problem error={plan.error} />
-              {where ? (
-                <div>
-                  <Button variant="outline" size="xs" onClick={cancel}>
-                    {t("create.showInYaml")}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ) : description ? (
-            <PlanBody
-              plan={plan.data}
-              skipped={ask.skipped}
-              description={description}
-              alerted={!grouped && !description.risk && weight.risk === "high"}
-            />
-          ) : null}
-          {plan.data && !plan.isFetching ? (
-            <Readers
-              project={project}
-              ask={ask}
-              plan={plan.data}
-              reopen={reopen}
-              go={(href) => {
-                onClose()
-                void navigate({ href })
-              }}
-            />
-          ) : null}
-          {named !== undefined && plan.data ? (
-            <div className="mt-4 flex flex-col gap-2">
-              <Label htmlFor="plan-typed-name">{t("plan.typeName", named)}</Label>
-              <Input
-                id="plan-typed-name"
-                value={typed}
-                onChange={(event) => setTyped(event.target.value)}
-                autoComplete="off"
-                spellCheck={false}
-                translate="no"
-              />
-            </div>
-          ) : null}
-        </div>
+        {conclusion}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{content}</div>
         <div className="flex flex-wrap items-center gap-2 border-t px-5 py-3">
-          {plan.data && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
-            <span className="type-meta text-muted-foreground tabular-nums">
-              {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
-            </span>
-          ) : null}
+          {countdown}
           <span className="ml-auto flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={cancel}>
               {t("plan.cancel")}
             </Button>
-            {expired ? (
-              <Button size="sm" onClick={() => void plan.refetch()}>
-                {t("plan.replan")}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant={weight.risk === "high" ? "destructive" : "default"}
-                disabled={!plan.data || plan.isFetching || unconfirmed}
-                onClick={confirm}
-              >
-                {description?.action ?? actionOf(t, ask)}
-              </Button>
-            )}
+            {action}
           </span>
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** The plan as the second step of a drawer: its body here, its buttons in the drawer's footer.
+ * Back returns to the form. */
+export function PlanStep({ footer, ...props }: PlanProps & { footer: HTMLElement | null }) {
+  const t = useT()
+  const { cancel, conclusion, content, countdown, action } = usePlan(props, true)
+  return (
+    <div className="flex flex-col gap-4">
+      {conclusion}
+      {content}
+      {footer
+        ? createPortal(
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" onClick={cancel}>
+                <CaretLeftIcon aria-hidden="true" data-icon="inline-start" />
+                {t("plan.back")}
+              </Button>
+              {countdown}
+              <span className="ml-auto">{action}</span>
+            </div>,
+            footer,
+          )
+        : null}
+    </div>
   )
 }
 
@@ -256,17 +299,20 @@ function Conclusion({
   short,
   high,
   grouped,
+  bare,
 }: {
   description: Description
   short?: ReturnType<typeof useShortfall>
   high: boolean
   grouped: boolean
+  /** Inside a drawer's body, without the dialog's band. */
+  bare?: boolean
 }) {
   const t = useT()
   const risk = description.risk ?? (high && grouped ? description.consequence : undefined)
   if (!short && !risk && !grouped) return null
   return (
-    <div className="flex flex-col gap-3 border-b px-5 py-3">
+    <div className={cn("flex flex-col gap-3", !bare && "border-b px-5 py-3")}>
       {short ? (
         <Alert variant="warn" role="note">
           <WarningFillIcon aria-hidden="true" />
@@ -393,11 +439,13 @@ const sentenced = new Set<Schemas["PlanWarning"]["code"]>([
 function PlanBody({
   plan,
   skipped,
+  notes = [],
   description,
   alerted,
 }: {
   plan: Schemas["PlanResponse"]
   skipped?: Skipped[]
+  notes?: string[]
   description: Description
   /** The first line goes in a warning callout with the consequence. */
   alerted: boolean
@@ -433,6 +481,11 @@ function PlanBody({
           said={{ text: line, names: more[line] }}
           className="text-sm text-muted-foreground"
         />
+      ))}
+      {notes.map((note) => (
+        <p key={note} className="text-sm text-muted-foreground">
+          {note}
+        </p>
       ))}
       {!grouped && description.cost ? (
         <p className="text-sm text-muted-foreground">{description.cost}</p>

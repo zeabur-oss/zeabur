@@ -5,7 +5,8 @@ import CaretRightIcon from "~icons/ph/caret-right"
 
 import { clusterQuery, creatableQuery, projectQuery } from "@/api/queries"
 import { FormField, quantity } from "@/components/form-field"
-import { usePlanner } from "@/components/plan/planner"
+import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { usePlanStep } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { handOff } from "@/lib/adding"
 import { serviceLink } from "@/lib/place"
@@ -35,7 +36,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@zeabur/design-system/components/collapsible"
-import { Drawer } from "@zeabur/design-system/components/drawer"
 import { Input } from "@zeabur/design-system/components/input"
 import { Label } from "@zeabur/design-system/components/label"
 import { Select } from "@zeabur/design-system/components/select"
@@ -130,8 +130,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const blocked = Object.values(problems).some(Boolean)
   const shown = (problem: unknown, text: () => string) => (tried && problem ? [text()] : [])
 
-  const planner = usePlanner(project, () => {
-    onClose()
+  const planner = usePlanStep(project, onClose, () => {
     void navigate(serviceLink(project, { kind: "Deployment", name }))
   })
   const review = () => {
@@ -152,17 +151,20 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const moreOpen = tried && (problems.env || problems.mountPath || problems.volumeSize)
 
   return (
-    <Drawer
-      open
-      onOpenChange={(next) => {
-        if (!next) onClose()
-      }}
+    <PlanDrawer
+      step={planner}
+      onClose={onClose}
       title={t("add.imageTitle")}
       description={t("add.imageBody", project)}
-      closeLabel={t("common.close")}
       footer={
         <div className="flex w-full flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={editYaml} disabled={form.image.trim() === ""}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-3"
+            onClick={editYaml}
+            disabled={form.image.trim() === ""}
+          >
             {t("add.editYaml")}
           </Button>
           <div className="ml-auto flex gap-2">
@@ -436,8 +438,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
           </CollapsibleContent>
         </Collapsible>
       </form>
-      {planner.dialog}
-    </Drawer>
+    </PlanDrawer>
   )
 }
 

@@ -10,6 +10,9 @@ import type { Skipped } from "@/model/managed"
 const PlanDialog = lazy(() =>
   import("@/components/plan/plan-dialog").then((m) => ({ default: m.PlanDialog })),
 )
+const PlanStep = lazy(() =>
+  import("@/components/plan/plan-dialog").then((m) => ({ default: m.PlanStep })),
+)
 
 export interface PlanAsk {
   title: string
@@ -18,6 +21,8 @@ export interface PlanAsk {
   service?: Schemas["WorkloadRef"]
   /** Services the changes leave out because another tool manages them. */
   skipped?: Skipped[]
+  /** Sentences the changes cannot say themselves. */
+  notes?: string[]
   /** No toast once applied: what follows (a terminal opening) shows it. */
   quiet?: boolean
 }
@@ -74,3 +79,47 @@ export function usePlanner(
   ) : null
   return { plan, dialog, fields: refusal?.fields ?? [], refusal }
 }
+
+/** A plan shown as a drawer's second step (`PlanDrawer`), not a dialog over it. `onDone` closes
+ * the drawer once the apply starts. */
+export function usePlanStep(project: string, onDone: () => void, onApplied?: () => void) {
+  const [open, setOpen] = useState<Open | null>(null)
+  const [refusal, setRefusal] = useState<Problem | undefined>(undefined)
+  const [footer, setFooter] = useState<HTMLElement | null>(null)
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+  const plan = (ask: PlanAsk) => {
+    setRefusal(undefined)
+    setOpen(next(project, ask))
+  }
+  const reopen = (ask: PlanAsk) => (mounted.current ? plan(ask) : fallback.open(project, ask))
+  const view = open ? (
+    <Suspense fallback={null}>
+      <PlanStep
+        key={open.attempt}
+        project={project}
+        ask={open.ask}
+        footer={footer}
+        onClose={() => setOpen(null)}
+        onConfirmed={onDone}
+        onApplied={onApplied}
+        reopen={reopen}
+        onRefused={setRefusal}
+      />
+    </Suspense>
+  ) : null
+  return {
+    plan,
+    view,
+    asked: open?.ask,
+    footerRef: setFooter,
+    fields: refusal?.fields ?? [],
+  }
+}
+
+export type PlanStepState = ReturnType<typeof usePlanStep>

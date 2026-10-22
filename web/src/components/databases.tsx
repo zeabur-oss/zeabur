@@ -8,10 +8,13 @@ import type { Schemas } from "@/api/client"
 import { databasesQuery, nodesQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { FormField, quantity } from "@/components/form-field"
-import { usePlanner } from "@/components/plan/planner"
+import { ConnectFields, newChoice, pickedOf, useTargets, type Choice } from "@/components/connect"
+import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { usePlanStep } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
 import { databaseLink } from "@/lib/place"
+import { connectChanges, pendingDatabase, variableProblem } from "@/model/connect"
 import {
   createDatabase,
   engineName,
@@ -31,7 +34,6 @@ import {
 } from "@/model/databases"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
-import { Drawer } from "@zeabur/design-system/components/drawer"
 import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
 
@@ -174,28 +176,37 @@ export function NewDatabaseDrawer({
   )
   const blocked = blockedVersions(form.engine, kernels)
   const [tried, setTried] = useState(false)
-  const planner = usePlanner(project, onClose)
+  const step = usePlanStep(project, onClose)
+  const targets = useTargets(project)
+  const [choice, setChoice] = useState<Choice>(() => newChoice(form))
   const set = (patch: Partial<NewDatabase>) => setForm((f) => ({ ...f, ...patch }))
   const nameIssue = nameProblem(form.name, taken)
   const storageBad = !quantity.test(form.storage.trim())
   const resources = presetResources[form.engine][form.size]
+  const pending = pendingDatabase(form, project)
+  const picked = pickedOf(targets, choice)
   const review = () => {
     setTried(true)
-    if (nameIssue || storageBad) return
-    planner.plan({
+    if (nameIssue || storageBad || (picked.length > 0 && variableProblem(choice.name))) return
+    const names = t(
+      "common.list",
+      picked.map((s) => s.name),
+    )
+    step.plan({
       title: t("db.planCreate", form.name),
-      changes: createDatabase({ ...form, storage: form.storage.trim() }),
+      changes: [
+        ...createDatabase({ ...form, storage: form.storage.trim() }),
+        ...connectChanges(pending, picked, choice),
+      ],
+      notes: picked.length > 0 ? [t("connect.waitsReady", names, form.name)] : undefined,
     })
   }
   return (
-    <Drawer
-      open
-      onOpenChange={(next) => {
-        if (!next) onClose()
-      }}
+    <PlanDrawer
+      step={step}
+      onClose={onClose}
       title={t("db.new")}
       description={t("db.newBody")}
-      closeLabel={t("common.close")}
       footer={
         <div className="flex justify-end gap-2">
           <Button variant="ghost" size="sm" onClick={onClose}>
@@ -219,7 +230,7 @@ export function NewDatabaseDrawer({
             <Select
               size="sm"
               value={form.engine}
-              onValueChange={(engine) =>
+              onValueChange={(engine) => {
                 setForm({
                   ...newDatabase(
                     engine as Engine,
@@ -228,7 +239,8 @@ export function NewDatabaseDrawer({
                   ),
                   name: form.name,
                 })
-              }
+                setChoice((c) => newChoice({ engine: engine as Engine }, c.picked))
+              }}
               items={available.map((e) => ({ value: e, label: t(`db.engine.${e}`) }))}
             />
           </FormField>
@@ -323,8 +335,15 @@ export function NewDatabaseDrawer({
             <AlertDescription>{t("db.noRedundancy", false)}</AlertDescription>
           </Alert>
         ) : null}
+        <ConnectFields
+          database={pending}
+          targets={targets}
+          choice={choice}
+          onChange={setChoice}
+          optional
+          tried={tried}
+        />
       </form>
-      {planner.dialog}
-    </Drawer>
+    </PlanDrawer>
   )
 }
