@@ -1,10 +1,18 @@
 import { describe, expect, it } from "bun:test"
 
+import type { Problem } from "@/api/client"
 import {
+  accessLosses,
+  accessSummary,
+  canChangeAccess,
   canRemoveMember,
+  chosenOf,
   filterMembers,
+  grantableProjects,
+  grantsOf,
   inviteTarget,
   isUsername,
+  lacksProjectRole,
   linkState,
   losses,
   memberName,
@@ -12,9 +20,13 @@ import {
   needsBackup,
   passkeyKept,
   pendingInvitations,
+  pickerHasFilter,
+  pickerProjects,
   sortMembers,
   type Member,
   type Passkey,
+  type ProjectGrant,
+  type ProjectRole,
 } from "@/model/members"
 
 const origin = { apiVersion: "identity.zeabur.com/v1alpha1", kind: "Credential", name: "c" }
@@ -131,5 +143,122 @@ describe("members", () => {
     expect(
       pendingInvitations([at("2026-10-21T00:00:00Z"), at("2026-10-23T00:00:00Z")], now),
     ).toHaveLength(1)
+  })
+})
+
+describe("project roles", () => {
+  const grant = (project: string, role: ProjectRole): ProjectGrant => ({ project, role })
+
+  it("sums up an admin, no roles, unknown roles and roles per project", () => {
+    expect(accessSummary(member("ada", { role: "admin" }))).toStrictEqual({ kind: "admin" })
+    expect(accessSummary(member("bob"))).toStrictEqual({ kind: "unknown" })
+    expect(accessSummary(member("bob", { projects: [] }))).toStrictEqual({ kind: "none" })
+    expect(
+      accessSummary(
+        member("bob", { projects: [grant("shop", "viewer"), grant("blog", "developer")] }),
+      ),
+    ).toStrictEqual({
+      kind: "projects",
+      roles: [
+        { role: "developer", named: ["blog"], count: 1 },
+        { role: "viewer", named: ["shop"], count: 1 },
+      ],
+    })
+  })
+
+  it("names up to three projects in a role, and counts more", () => {
+    const names = ["a", "b", "c", "d"]
+    const few = accessSummary(
+      member("cy", { projects: names.slice(0, 3).map((n) => grant(n, "viewer")) }),
+    )
+    expect(few).toStrictEqual({
+      kind: "projects",
+      roles: [{ role: "viewer", named: ["a", "b", "c"], count: 3 }],
+    })
+    const many = accessSummary(member("cy", { projects: names.map((n) => grant(n, "viewer")) }))
+    expect(many).toStrictEqual({
+      kind: "projects",
+      roles: [{ role: "viewer", named: [], count: 4 }],
+    })
+  })
+
+  it("offers every project but Kubernetes' own, and keeps one already held", () => {
+    const projects = [
+      { name: "shop", system: false },
+      { name: "kube-system", system: true },
+      { name: "blog", system: false },
+    ]
+    expect(grantableProjects(projects)).toStrictEqual(["blog", "shop"])
+    expect(grantableProjects(projects, ["gone", "shop"])).toStrictEqual(["blog", "gone", "shop"])
+  })
+
+  it("filters the picker without hiding a chosen project", () => {
+    const chosen = new Map<string, ProjectRole>([["blog", "viewer"]])
+    expect(pickerProjects(["blog", "shop", "shop-api"], chosen, " Shop")).toStrictEqual([
+      "blog",
+      "shop",
+      "shop-api",
+    ])
+    expect(pickerProjects(["blog", "shop"], chosen, "api")).toStrictEqual(["blog"])
+    expect(pickerProjects(["a", "b", "c"], chosen, "", new Set(["c"]))).toStrictEqual([
+      "c",
+      "a",
+      "b",
+    ])
+    expect(pickerHasFilter(7)).toBe(false)
+    expect(pickerHasFilter(8)).toBe(true)
+  })
+
+  it("turns a choice into a request and a member's roles back into a choice", () => {
+    const chosen = chosenOf(
+      member("bob", { projects: [grant("shop", "developer"), grant("blog", "viewer")] }),
+    )
+    expect(grantsOf(chosen)).toStrictEqual([grant("blog", "viewer"), grant("shop", "developer")])
+    expect(chosenOf(member("bob")).size).toBe(0)
+  })
+
+  it("names what a change of access takes away", () => {
+    const bob = member("bob", { projects: [grant("shop", "developer"), grant("blog", "viewer")] })
+    expect(accessLosses(bob, false, new Map([["shop", "viewer"]]))).toStrictEqual({
+      admin: false,
+      removed: ["blog"],
+      lowered: ["shop"],
+    })
+    expect(accessLosses(bob, true, new Map())).toStrictEqual({
+      admin: false,
+      removed: [],
+      lowered: [],
+    })
+    expect(accessLosses(member("ada", { role: "admin" }), false, new Map()).admin).toBe(true)
+  })
+
+  it("changes access only when the member's roles are known, and never your own", () => {
+    expect(canChangeAccess(member("bob"), true)).toBe(false)
+    expect(canChangeAccess(member("bob"), false)).toBe(true)
+    expect(canChangeAccess(member("bob", { projects: [] }), true)).toBe(true)
+    expect(canChangeAccess(member("ada", { role: "admin" }), true)).toBe(true)
+    expect(canChangeAccess(member("ada", { role: "admin", you: true }), true)).toBe(false)
+  })
+
+  it("tells a member without a role apart from an admin or a kubeconfig refused", () => {
+    const refused = {
+      type: "/problems/forbidden",
+      title: "Forbidden",
+      status: 403,
+      detail: "",
+      fix: "",
+      kind: "forbidden",
+      kubernetes: { code: 403, reason: "Forbidden", message: "" },
+    } as Problem
+    const bob = { username: "zeabur:bob", groups: [] }
+    expect(lacksProjectRole(refused, bob)).toBe(true)
+    expect(lacksProjectRole(refused, { username: "zeabur:ada", groups: ["zeabur:admins"] })).toBe(
+      false,
+    )
+    expect(lacksProjectRole(refused, { username: "kubernetes-admin", groups: [] })).toBe(false)
+    expect(lacksProjectRole(refused, undefined)).toBe(false)
+    expect(lacksProjectRole({ ...refused, kind: "unavailable", kubernetes: undefined }, bob)).toBe(
+      false,
+    )
   })
 })

@@ -1,0 +1,16 @@
+{{- if .Values.memberRoles.enabled }}
+# The roles Zeabur gives members: zeabur-member to each one cluster-wide, a project role in each
+# project they are given. Zeabur binds them as the admin who invites or edits the member; the
+# chart binds nothing. Rules: files/member-roles.yaml.
+{{- range $name, $rules := .Files.Get "files/member-roles.yaml" | fromYaml }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "zeabur.labels" $ | nindent 4 }}
+rules:
+  {{- toYaml $rules | nindent 2 }}
+{{- end }}
+{{- end }}

@@ -180,6 +180,32 @@ fn people() -> Vec<DynamicObject> {
     ]
 }
 
+/// What Bob and Carol may do: Bob develops `shop` and views `blog`, Carol views five projects.
+fn member_roles() -> Vec<DynamicObject> {
+    use zeabur_api::members::access::{ProjectRole, baseline_binding, role_binding};
+    let roles = [
+        ("bob", "shop", ProjectRole::Developer),
+        ("bob", "blog", ProjectRole::Viewer),
+        ("carol", "shop", ProjectRole::Viewer),
+        ("carol", "blog", ProjectRole::Viewer),
+        ("carol", "billing", ProjectRole::Viewer),
+        ("carol", "payments", ProjectRole::Viewer),
+        ("carol", "analytics", ProjectRole::Viewer),
+    ];
+    roles
+        .into_iter()
+        .map(|(user, project, role)| from(role_binding(project, user, role)))
+        .chain(["alice", "bob", "carol", "dan"].map(|user| {
+            // The memory cluster keeps a cluster-scoped object in namespace "".
+            let mut binding = baseline_binding(user);
+            if let Some(metadata) = binding.get_mut("metadata").and_then(Value::as_object_mut) {
+                metadata.insert("namespace".to_owned(), "".into());
+            }
+            from(binding)
+        }))
+        .collect()
+}
+
 /// A Deployment in `shop` with one container, its selector `app=<name>`.
 fn deployment(name: &str, image: &str, replicas: i32, ready: i32, env: &Value) -> Deployment {
     deployment_in("shop", name, image, replicas, ready, env)
@@ -1146,6 +1172,20 @@ fn state() -> State {
                 true,
             ),
             ServedResource::readable("identity.zeabur.com", "v1alpha1", "grants", "Grant", true),
+            ServedResource::readable(
+                "rbac.authorization.k8s.io",
+                "v1",
+                "rolebindings",
+                "RoleBinding",
+                true,
+            ),
+            ServedResource::readable(
+                "rbac.authorization.k8s.io",
+                "v1",
+                "clusterrolebindings",
+                "ClusterRoleBinding",
+                false,
+            ),
         ],
         dynamic: [
             usage("vps-1", "1420m", "1730Mi"),
@@ -1161,6 +1201,7 @@ fn state() -> State {
         .into_iter()
         .chain(live)
         .chain(people())
+        .chain(member_roles())
         .collect(),
         // The metrics store where Zeabur's recommendation installs it.
         proxied: BTreeMap::from([(
@@ -1926,6 +1967,7 @@ async fn main() -> std::io::Result<()> {
         namespace: Some("zeabur".to_owned()),
         identity: zeabur_api::settings::IdentitySettings {
             issuer: Some("https://identity.example.com".to_owned()),
+            project_roles: true,
             ..zeabur_api::settings::IdentitySettings::default()
         },
         ..zeabur_api::Settings::default()

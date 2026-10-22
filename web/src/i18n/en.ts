@@ -449,6 +449,8 @@ export const en = {
   "projects.noMatch": (query: string) => `No projects match “${query}”.`,
 
   // Project
+  "project.noRole": (name: string) => `You don't have access to ${name}`,
+  "project.noRoleBody": "An admin can give you a role in it on the Members page.",
   "project.sections": "Project sections",
   "project.entry.overview": "Overview",
   "project.services": "Services",
@@ -1695,6 +1697,38 @@ export const en = {
   "invite.optional": "(optional)",
   "invite.admin": "Admin",
   "invite.create": "Create link",
+  "roles.legend": "Access",
+  "roles.projects": "Chosen projects",
+  "roles.projectsHint":
+    "Developer or Viewer in the projects picked below. Every member also sees node and project names.",
+  "roles.developer": "Developer",
+  "roles.viewer": "Viewer",
+  "roles.developerHint":
+    "Developers deploy, change variables, restart and open terminals, and can read Secret values.",
+  "roles.viewerHint":
+    "Viewers see status, logs and events. They can't change anything, open a terminal or read Secret values.",
+  "roles.filter": "Filter projects",
+  "roles.noProjects": "There are no projects yet.",
+  "roles.noMatch": "No projects match.",
+  "roles.noneChosen": "No project picked: they can sign in and see project names, nothing more.",
+  "roles.chosen": (n: number) => `${n} ${n === 1 ? "project" : "projects"} picked`,
+  "roles.roleIn": (project: string) => `Role in ${project}`,
+  "roles.none": "No projects",
+  "roles.in": (role: string, projects: string) => `${role} in ${projects}`,
+  "roles.inCount": (role: string, n: number) => `${role} in ${n} projects`,
+  "roles.projectsHeading": "Projects",
+  "roles.change": "Change access",
+  "roles.title": (name: string) => `Access for ${name}`,
+  "roles.save": "Save access",
+  "roles.saved": (name: string) => `Saved access for ${name}`,
+  "roles.losesAdmin": (name: string) => `${name} loses admin rights now.`,
+  "roles.losesProjects": (name: string, projects: string) =>
+    `${name} loses access to ${projects} now.`,
+  "roles.losesChanges": (name: string, projects: string) =>
+    `${name} can no longer change ${projects}.`,
+  "roles.openTerminals": "A terminal already open stays open until it ends.",
+  "roles.becomesAdmin": (name: string) =>
+    `${name} gets full control of the cluster: every project, the nodes and the members.`,
   "reset.title": (name: string) => `New setup link for ${name}`,
   "reset.keep": (name: string) =>
     `Adds a passkey to ${name}'s account; nothing is removed. The link works once, for 24 hours.`,
@@ -1712,7 +1746,7 @@ export const en = {
   "remove.consequence": (name: string) =>
     `${name} can no longer sign in: their passkeys, linked accounts, sessions and setup links are removed.`,
   "remove.stays": (user: string) =>
-    `Projects and everything in the cluster stay. Role bindings that name ${user} stay too.`,
+    `Projects and everything in the cluster stay. Role bindings Zeabur didn't make that name ${user} stay too.`,
   "remove.action": (name: string) => `Remove ${name}`,
   "remove.done": (name: string) => `Removed ${name}`,
   "sentence.account.lastPasskey": () => "This is your only passkey",
@@ -1724,6 +1758,11 @@ export const en = {
   "sentence.members.removeSelf.fix": () => "Ask another admin to remove you.",
   "sentence.members.noIssuer": () => "Zeabur doesn't know Zeabur Identity's address",
   "sentence.members.noIssuer.fix": () => "Start Zeabur with --issuer-url.",
+  "sentence.members.demoteSelf": () => "You can't take away your own admin rights",
+  "sentence.members.demoteSelf.fix": () => "Ask another admin to change your access.",
+  "sentence.members.noProjectRoles": () => "Zeabur was installed without the member roles",
+  "sentence.members.noProjectRoles.fix": () =>
+    "Install the chart with memberRoles.enabled=true, or make the member an admin.",
   "sentence.members.notInstalled": () => "Zeabur Identity isn't installed",
   "sentence.members.notInstalled.fix": () =>
     "Install Zeabur Identity, or start Zeabur with the namespace it runs in.",

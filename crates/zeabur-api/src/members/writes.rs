@@ -11,6 +11,7 @@ use zeabur_core::problem::{Kind, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, WriteBody, WriteRequest};
 
+use super::access::ProjectGrant;
 use super::directory::{Directory, IdentityKind, Object, UserSpec, request};
 use super::{
     ADMIN_GROUP, API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, LABEL_ANNOTATION,
@@ -39,6 +40,20 @@ pub struct InviteRequest {
     /// Whether a new member may take on admin rights (groups and elevated groups `admins`).
     #[serde(default)]
     pub admin: bool,
+    /// A new member's roles in projects, when they are not an admin.
+    #[serde(default)]
+    pub projects: Vec<ProjectGrant>,
+}
+
+/// What a member may do: admin rights, or roles in chosen projects.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct AccessRequest {
+    /// May take on admin rights, which cover every project.
+    pub admin: bool,
+    /// Roles in projects; empty for an admin. A project left out loses the member's role there.
+    #[serde(default)]
+    pub projects: Vec<ProjectGrant>,
 }
 
 /// A member's setup link.
@@ -217,6 +232,54 @@ pub(crate) fn new_user(namespace: &str, invite: &InviteRequest) -> Value {
                      "labels": {"app.kubernetes.io/managed-by": "zeabur"}},
         "spec": spec,
     })
+}
+
+/// `groups` with `admins` added or taken away, the rest kept in order.
+fn with_admin(groups: &[String], admin: bool) -> Vec<String> {
+    let mut groups: Vec<String> = groups
+        .iter()
+        .filter(|g| g.as_str() != ADMIN_GROUP)
+        .cloned()
+        .collect();
+    if admin {
+        groups.push(ADMIN_GROUP.to_owned());
+    }
+    groups
+}
+
+/// The JSON Patch that makes `user` an admin or takes that away, against the object as read;
+/// `None` when it already is what is asked.
+pub(crate) fn admin_patch(user: &Object<UserSpec>, admin: bool) -> Option<Value> {
+    let groups = with_admin(&user.spec.groups, admin);
+    let elevated = with_admin(&user.spec.elevated_groups, admin);
+    if groups == user.spec.groups && elevated == user.spec.elevated_groups {
+        return None;
+    }
+    Some(json!([
+        {"op": "test", "path": "/metadata/uid", "value": user.metadata.uid},
+        {"op": "test", "path": "/metadata/resourceVersion", "value": user.metadata.resource_version},
+        {"op": "add", "path": "/spec/groups", "value": groups},
+        {"op": "add", "path": "/spec/elevatedGroups", "value": elevated},
+    ]))
+}
+
+pub(crate) async fn set_admin(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    user: &Object<UserSpec>,
+    admin: bool,
+) -> Result<(), ApiError> {
+    let Some(patch) = admin_patch(user, admin) else {
+        return Ok(());
+    };
+    send(
+        cluster,
+        IdentityKind::User,
+        namespace,
+        user.name(),
+        WriteBody::JsonPatch(patch),
+    )
+    .await
 }
 
 /// A fresh token, `<name>.<secret>`.
@@ -486,6 +549,7 @@ mod tests {
             username: "cy".to_owned(),
             display_name: Some(" Cy ".to_owned()),
             admin,
+            projects: Vec::new(),
         };
         let admin = new_user("ns", &invite(true));
         assert_eq!(admin["spec"]["groups"], json!(["admins"]));
@@ -494,6 +558,28 @@ mod tests {
         let member = new_user("ns", &invite(false));
         assert_eq!(member["spec"]["groups"], json!([]));
         assert_eq!(member["spec"]["elevatedGroups"], json!([]));
+    }
+
+    #[test]
+    fn admin_rights_add_or_take_only_the_admins_group() {
+        let user: Object<UserSpec> = serde_json::from_value(json!({
+            "metadata": {"name": "bob", "uid": "u", "resourceVersion": "7"},
+            "spec": {"username": "bob", "groups": ["dev"], "elevatedGroups": []}
+        }))
+        .unwrap();
+        let patch = admin_patch(&user, true).unwrap();
+        assert_eq!(patch[1]["value"], "7");
+        assert_eq!(patch[2]["value"], json!(["dev", "admins"]));
+        assert_eq!(patch[3]["value"], json!(["admins"]));
+        assert_eq!(admin_patch(&user, false), None);
+        let admin: Object<UserSpec> = serde_json::from_value(json!({
+            "metadata": {"name": "ada", "uid": "u"},
+            "spec": {"username": "ada", "groups": ["admins", "dev"], "elevatedGroups": ["admins"]}
+        }))
+        .unwrap();
+        let patch = admin_patch(&admin, false).unwrap();
+        assert_eq!(patch[2]["value"], json!(["dev"]));
+        assert_eq!(patch[3]["value"], json!([]));
     }
 
     #[test]

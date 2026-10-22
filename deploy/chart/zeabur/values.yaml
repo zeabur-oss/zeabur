@@ -46,6 +46,13 @@ issuer:
 elevation:
   enabled: true
 
+# Members who are not admins: the ClusterRoles zeabur-member (node names and status, every
+# project's name), zeabur-project-developer and zeabur-project-viewer (files/member-roles.yaml).
+# Zeabur binds them per member when an admin invites or edits one. Off: no ClusterRoles, and
+# Members offers only admin or no rights.
+memberRoles:
+  enabled: true
+
 # The key that signs plan tokens. Empty `existingSecret`: the chart creates a Secret with a random
 # key on install and keeps it on upgrades. A new key only invalidates plans not yet applied.
 planKey:

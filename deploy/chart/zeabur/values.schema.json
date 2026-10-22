@@ -96,6 +96,11 @@
       "additionalProperties": false,
       "properties": { "enabled": { "type": "boolean" } }
     },
+    "memberRoles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } }
+    },
     "metricsStore": {
       "type": "object",
       "additionalProperties": false,

@@ -1,17 +1,18 @@
 import { useMutation } from "@tanstack/react-query"
-import { useId, useState, type ReactNode } from "react"
+import { useId, useState } from "react"
 import { toast } from "sonner"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
-import WarningFillIcon from "~icons/ph/warning-fill"
-import XIcon from "~icons/ph/x"
 
 import { createSetupLink, inviteMember, refreshMembers, type SetupLink } from "@/api/members"
+import { AccessFields, type Chosen } from "@/components/members/access"
+import { Consequence, Frame } from "@/components/members/frame"
 import type { Schemas } from "@/api/client"
 import { Problem } from "@/components/problem"
 import { RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { useI18n, useT } from "@/i18n"
 import { formatTime } from "@/lib/format"
 import {
+  grantsOf,
   inviteTarget,
   linkState,
   losses,
@@ -19,67 +20,11 @@ import {
   type Member,
   type SetupLinks,
 } from "@/model/members"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Checkbox } from "@zeabur/design-system/components/checkbox"
 import { CopyInput } from "@zeabur/design-system/components/copy-input"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogTitle,
-} from "@zeabur/design-system/components/dialog"
 import { Input } from "@zeabur/design-system/components/input"
 import { Label } from "@zeabur/design-system/components/label"
-
-/** The frame every dialog here shares with the plan's: title, body, then the buttons. */
-function Frame({
-  title,
-  wide,
-  onClose,
-  children,
-  footer,
-}: {
-  title: string
-  wide?: boolean
-  onClose: () => void
-  children: ReactNode
-  footer: ReactNode
-}) {
-  const t = useT()
-  return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent variant={wide ? "wide" : "compact"}>
-        <div className="flex items-center gap-2 border-b px-5 py-3">
-          <div className="min-w-0 flex-1 truncate">
-            <DialogTitle>{title}</DialogTitle>
-          </div>
-          <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t("common.close")} />}
-          >
-            <XIcon aria-hidden="true" />
-          </DialogClose>
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4 text-sm">
-          {children}
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t px-5 py-3">
-          {footer}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/** What will be lost, first, in the plan's warning callout. */
-function Consequence({ children }: { children: ReactNode }) {
-  return (
-    <Alert variant="warn" role="note">
-      <WarningFillIcon aria-hidden="true" />
-      <AlertDescription>{children}</AlertDescription>
-    </Alert>
-  )
-}
 
 /** A confirmation: the consequence first when there is one, the button naming the action. */
 export function ConfirmDialog({
@@ -192,18 +137,20 @@ export function OwnLinkDialog({ link, onClose }: { link: SetupLink; onClose: () 
 
 export function InviteDialog({
   members,
+  projectRoles,
   onClose,
 }: {
   members: readonly Member[]
+  projectRoles: boolean
   onClose: () => void
 }) {
   const t = useT()
   const nameId = useId()
   const displayId = useId()
-  const adminId = useId()
   const [username, setUsername] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [admin, setAdmin] = useState(false)
+  const [chosen, setChosen] = useState<Chosen>(new Map())
   const target = inviteTarget(members, username)
   const invite = useMutation({
     mutationFn: () =>
@@ -211,6 +158,7 @@ export function InviteDialog({
         username: username.trim(),
         displayName: displayName.trim() || null,
         admin,
+        projects: admin || !projectRoles ? [] : grantsOf(chosen),
       }),
     onSuccess: refreshMembers,
   })
@@ -224,6 +172,7 @@ export function InviteDialog({
   return (
     <Frame
       title={t("invite.title")}
+      wide={projectRoles}
       onClose={onClose}
       footer={
         <>
@@ -275,18 +224,13 @@ export function InviteDialog({
               onChange={(event) => setDisplayName(event.target.value)}
             />
           </div>
-          <div className="flex items-start gap-2.5">
-            <Checkbox
-              id={adminId}
-              checked={admin}
-              onCheckedChange={(checked) => setAdmin(checked)}
-              className="mt-0.5"
-            />
-            <div className="flex flex-col gap-0.5">
-              <Label htmlFor={adminId}>{t("invite.admin")}</Label>
-              <span className="type-meta text-muted-foreground">{t("members.adminHint")}</span>
-            </div>
-          </div>
+          <AccessFields
+            projectRoles={projectRoles}
+            admin={admin}
+            onAdmin={setAdmin}
+            chosen={chosen}
+            onChosen={setChosen}
+          />
         </>
       )}
       {invite.isError ? <Problem error={invite.error} /> : null}
