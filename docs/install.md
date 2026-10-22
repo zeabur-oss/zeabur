@@ -223,8 +223,11 @@ as kube-apiserver checks a stream when it starts.
 The member baseline, `get` and `list` on `nodes` and `namespaces`, is the ClusterRole
 `zeabur-member`. Zeabur binds it per member, with a ClusterRoleBinding `zeabur-member-<user>` made
 on invitation or on a change of access: Zeabur Identity puts no group on every member, and
-`system:authenticated` would grant it to every ServiceAccount too. A member made before this
-release gets it when an admin first changes their access.
+`system:authenticated` would grant it to every ServiceAccount too.
+
+Upgrading from a release without roles means inviting members again: Zeabur does not migrate the
+members made before roles. Remove each of them on the Members page and invite them anew; inviting
+someone who is still a member only gives them a setup link.
 
 `memberRoles.enabled=false` installs no ClusterRole; Zeabur then offers only Admin or nothing,
 and RBAC you write yourself decides the rest. The ClusterRole names are fixed: install one Zeabur
