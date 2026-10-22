@@ -231,7 +231,7 @@ function ServiceView({
         value={tab}
         onValueChange={(value) => setTab(value as Page)}
         variant="page"
-        className="flex min-h-0 flex-1 flex-col"
+        className={cn("flex flex-1 flex-col", wide && "min-h-0")}
       >
         <header className="shrink-0">
           <PageColumn width="content">
