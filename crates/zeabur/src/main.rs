@@ -12,6 +12,7 @@
 mod config;
 mod output;
 mod pages;
+mod proxy;
 mod server;
 
 use std::process::ExitCode;
@@ -132,11 +133,16 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
         elevation: config.elevation,
         clock,
     });
+    let log_proxy = config.proxy.map(|proxy| {
+        let proxy: Arc<dyn zeabur_api::services::logs::LogProxy> = Arc::new(proxy);
+        proxy
+    });
     let app = server::app(
         &auth,
         config.plan_key,
         config.settings,
         Arc::new(IssuerPage(passkeys)),
+        log_proxy,
     );
 
     tokio::spawn(async move {

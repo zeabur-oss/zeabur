@@ -22,8 +22,13 @@ zeabur-kube.workspace = true
 zeabur-plan.workspace = true
 zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
+bytes.workspace = true
 clap.workspace = true
 form_urlencoded.workspace = true
+http-body-util.workspace = true
+hyper-rustls.workspace = true
+hyper-util.workspace = true
+rustls.workspace = true
 secrecy.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

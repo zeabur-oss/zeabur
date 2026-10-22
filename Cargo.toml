@@ -25,6 +25,7 @@ zeabur-model = 1
 zeabur-adapters = 1
 zeabur-ui = 1
 zeabur-kube = 2
+zeabur-proxy = 1
 zeabur-auth = 2
 zeabur-graph = 2
 zeabur-modules = 3
@@ -43,6 +44,11 @@ zeabur-test-support = 6
 [workspace.metadata.modules]
 crates = ["zeabur-modules"]
 composers = ["zeabur-api", "zeabur-mcp", "zeabur", "zeaburctl"]
+
+# Crates that run as their own component with a small trusted base, also checked by
+# scripts/check-levels.sh: each may depend only on the workspace crates listed for it.
+[workspace.metadata.isolated]
+zeabur-proxy = ["zeabur-kernel"]
 
 # Crates with no I/O and no key, packageable on their own and built for WebAssembly, also checked
 # by scripts/check-levels.sh: a pure crate depends only on pure workspace crates.
@@ -85,6 +91,7 @@ clap = { version = "4", default-features = false, features = ["std", "derive", "
 form_urlencoded = "1"
 futures-util = { version = "0.3", default-features = false, features = ["std", "io", "async-await-macro"] }
 http = "1"
+http-body = "1"
 http-body-util = "0.1"
 # The HTTP client stack kube-rs already ships, used directly for the OAuth client (zeabur-auth).
 bytes = "1"
@@ -95,6 +102,8 @@ hyper-util = { version = "0.1", default-features = false, features = ["client-le
 hyper-timeout = "0.5"
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 rustls-platform-verifier = "0.7"
+# The TLS listener of zeabur-proxy; already under hyper-rustls.
+tokio-rustls = { version = "0.26", default-features = false, features = ["tls12", "aws_lc_rs"] }
 k8s-openapi = { version = "0.28", default-features = false, features = ["v1_34"] }
 kube = { version = "4.2", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs", "ws"] }
 proptest = { version = "1", default-features = false, features = ["std"] }

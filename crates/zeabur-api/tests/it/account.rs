@@ -133,6 +133,7 @@ mod tests {
                 PlanKey::from_bytes([7; 32]),
                 settings,
                 Arc::new(Fixed(url.map(str::to_owned))),
+                None,
             )
         };
         let configured = Settings {

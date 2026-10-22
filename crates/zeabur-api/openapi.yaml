@@ -1339,6 +1339,66 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/logs/history":
+    get:
+      tags:
+      - services
+      summary: |-
+        What a service's pods logged over the last hour, 6 hours, day or week, also pods replaced
+        since, as you, from the cluster's VictoriaLogs through Zeabur Proxy. Always `200` once the
+        parameters are valid: `state` says when Zeabur Proxy is not installed, you may not read the
+        project's log history (`get` on `logs.proxy.zeabur.com` in its namespace), or it did not
+        answer.
+      operationId: getServiceLogHistory
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: "`deployment`, `statefulset`, `daemonset`, `job` or `cronjob` (any case)"
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: range
+        in: query
+        description: "`1h` (the default), `6h`, `24h` or `7d`."
+        required: false
+        schema:
+          type: string
+      - name: container
+        in: query
+        description: Only this container's lines.
+        required: false
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: The most lines, 1,000 at most (the default).
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LogHistory"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/services/{kind}/{name}/releases":
     get:
       tags:
@@ -4395,6 +4455,73 @@ components:
         provider:
           type: string
           description: "`GitHub` or `Google`."
+    LogHistory:
+      type: object
+      description: A service's log lines over a range, every pod's, also those replaced since.
+      required:
+      - id
+      - state
+      - range
+      - lines
+      - limit
+      - truncated
+      properties:
+        id:
+          type: string
+          description: "`projects/{project}/services/{kind}/{name}/logs/history`."
+        limit:
+          type: integer
+          format: int32
+          description: The most lines returned.
+          minimum: 0
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/LogHistoryLine"
+          description: "The lines, oldest first: the newest ones when there were more than `limit`."
+        message:
+          type:
+          - string
+          - "null"
+          description: Zeabur Proxy's or VictoriaLogs' words when it was not read.
+        range:
+          $ref: "#/components/schemas/PrometheusRange"
+          description: The range.
+        state:
+          $ref: "#/components/schemas/LogHistoryState"
+          description: Whether it could be read.
+        truncated:
+          type: boolean
+          description: Whether there were more lines in the range than returned.
+    LogHistoryLine:
+      type: object
+      description: One line.
+      required:
+      - time
+      - pod
+      - container
+      - message
+      properties:
+        container:
+          type: string
+          description: Its container.
+        message:
+          type: string
+          description: The line.
+        pod:
+          type: string
+          description: The pod that wrote it, which may be gone.
+        time:
+          type: string
+          description: When it was written, RFC 3339.
+    LogHistoryState:
+      type: string
+      description: Whether the history could be read, as the person. An open set.
+      enum:
+      - available
+      - not-installed
+      - unreadable
+      - unavailable
     LogSnapshot:
       type: object
       description: A snapshot of a container's log.
