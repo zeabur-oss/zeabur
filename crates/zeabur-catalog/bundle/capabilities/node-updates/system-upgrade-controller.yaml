@@ -4,10 +4,10 @@ license: Apache-2.0
 maturity: independent
 rationale: >
   Upgrades k3s and node packages one node at a time from declarative Plans,
-  with cordon, drain and concurrency limits. Installed from upstream manifests;
-  the Rancher chart lags releases.
+  with cordon, drain and concurrency limits. The catalog installs it from
+  upstream manifests because the Rancher chart lags behind releases.
 alternatives:
-  kured: Left in charge of reboots when present.
+  kured: If installed, kured keeps handling reboots.
 defaults:
   single-node: recommended
   multi-node: recommended

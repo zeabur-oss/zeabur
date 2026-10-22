@@ -45,7 +45,15 @@ import { needsAttention, statusOf, summarise, type Project, type Service } from 
 import { ProjectMap } from "@/routes/project/architecture"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import { ServicesTable } from "@/routes/project/services-table"
-import { Activity, Alerts, Backups, Databases, Domains, SectionChips, Storage } from "@/routes/project/side"
+import {
+  Activity,
+  Alerts,
+  Backups,
+  Databases,
+  Domains,
+  SectionChips,
+  Storage,
+} from "@/routes/project/side"
 import { validateProjectSearch, type ProjectView } from "@/routes/search"
 
 const route = getRouteApi("/projects/$project")

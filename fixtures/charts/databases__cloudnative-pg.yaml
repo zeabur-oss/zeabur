@@ -1,0 +1,1603 @@
+---
+# Source: cloudnative-pg/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cnpg-cloudnative-pg
+  namespace: cnpg-system
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+
+---
+# Source: cloudnative-pg/templates/config.yaml
+#
+# Copyright © contributors to CloudNativePG, established as
+# CloudNativePG a Series of LF Projects, LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cnpg-controller-manager-config
+  namespace: cnpg-system
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+data:
+  {}
+
+---
+# Source: cloudnative-pg/templates/monitoring-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cnpg-default-monitoring
+  namespace: cnpg-system
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+    cnpg.io/reload: ""
+data:
+  queries:
+    |
+      backends:
+        query: |
+          SELECT sa.datname
+            , sa.usename
+            , sa.application_name
+            , states.state
+            , COALESCE(sa.count, 0) AS total
+            , COALESCE(sa.max_tx_secs, 0) AS max_tx_duration_seconds
+          FROM ( VALUES ('active')
+            , ('idle')
+            , ('idle in transaction')
+            , ('idle in transaction (aborted)')
+            , ('fastpath function call')
+            , ('disabled')
+            ) AS states(state)
+          LEFT JOIN (
+            SELECT datname
+              , state
+              , usename
+              , COALESCE(application_name, '') AS application_name
+              , pg_catalog.count(*)
+              , COALESCE(EXTRACT (EPOCH FROM (pg_catalog.max(pg_catalog.now() OPERATOR(pg_catalog.-) xact_start))), 0) AS max_tx_secs
+            FROM pg_catalog.pg_stat_activity
+            GROUP BY datname, state, usename, application_name
+          ) sa ON states.state OPERATOR(pg_catalog.=) sa.state
+          WHERE sa.usename IS NOT NULL
+        metrics:
+          - datname:
+              usage: "LABEL"
+              description: "Name of the database"
+          - usename:
+              usage: "LABEL"
+              description: "Name of the user"
+          - application_name:
+              usage: "LABEL"
+              description: "Name of the application"
+          - state:
+              usage: "LABEL"
+              description: "State of the backend"
+          - total:
+              usage: "GAUGE"
+              description: "Number of backends"
+          - max_tx_duration_seconds:
+              usage: "GAUGE"
+              description: "Maximum duration of a transaction in seconds"
+    
+      backends_waiting:
+        query: |
+          SELECT pg_catalog.count(*) AS total
+          FROM pg_catalog.pg_locks blocked_locks
+          JOIN pg_catalog.pg_locks blocking_locks
+            ON blocking_locks.locktype OPERATOR(pg_catalog.=) blocked_locks.locktype
+            AND blocking_locks.database IS NOT DISTINCT FROM blocked_locks.database
+            AND blocking_locks.relation IS NOT DISTINCT FROM blocked_locks.relation
+            AND blocking_locks.page IS NOT DISTINCT FROM blocked_locks.page
+            AND blocking_locks.tuple IS NOT DISTINCT FROM blocked_locks.tuple
+            AND blocking_locks.virtualxid IS NOT DISTINCT FROM blocked_locks.virtualxid
+            AND blocking_locks.transactionid IS NOT DISTINCT FROM blocked_locks.transactionid
+            AND blocking_locks.classid IS NOT DISTINCT FROM blocked_locks.classid
+            AND blocking_locks.objid IS NOT DISTINCT FROM blocked_locks.objid
+            AND blocking_locks.objsubid IS NOT DISTINCT FROM blocked_locks.objsubid
+            AND blocking_locks.pid OPERATOR(pg_catalog.<>) blocked_locks.pid
+          JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid OPERATOR(pg_catalog.=) blocking_locks.pid
+          WHERE NOT blocked_locks.granted
+        metrics:
+          - total:
+              usage: "GAUGE"
+              description: "Total number of backends that are currently waiting on other queries"
+    
+      pg_database:
+        query: |
+          SELECT datname
+            , pg_catalog.pg_database_size(datname) AS size_bytes
+            , pg_catalog.age(datfrozenxid) AS xid_age
+            , pg_catalog.mxid_age(datminmxid) AS mxid_age
+          FROM pg_catalog.pg_database
+          WHERE datallowconn
+        metrics:
+          - datname:
+              usage: "LABEL"
+              description: "Name of the database"
+          - size_bytes:
+              usage: "GAUGE"
+              description: "Disk space used by the database"
+          - xid_age:
+              usage: "GAUGE"
+              description: "Number of transactions from the frozen XID to the current one"
+          - mxid_age:
+              usage: "GAUGE"
+              description: "Number of multiple transactions (Multixact) from the frozen XID to the current one"
+    
+      pg_postmaster:
+        query: |
+          SELECT EXTRACT(EPOCH FROM pg_postmaster_start_time) AS start_time
+          FROM pg_catalog.pg_postmaster_start_time()
+        metrics:
+          - start_time:
+              usage: "GAUGE"
+              description: "Time at which postgres started (based on epoch)"
+    
+      pg_replication:
+        query: |
+          SELECT CASE WHEN (
+              NOT pg_catalog.pg_is_in_recovery()
+              OR pg_catalog.pg_last_wal_receive_lsn() OPERATOR(pg_catalog.=) pg_catalog.pg_last_wal_replay_lsn())
+            THEN 0
+            ELSE GREATEST (0,
+              EXTRACT(EPOCH FROM (pg_catalog.now() OPERATOR(pg_catalog.-) pg_catalog.pg_last_xact_replay_timestamp())))
+            END AS lag,
+            pg_catalog.pg_is_in_recovery() AS in_recovery,
+            EXISTS (TABLE pg_catalog.pg_stat_wal_receiver) AS is_wal_receiver_up,
+            (SELECT pg_catalog.count(*) FROM pg_catalog.pg_stat_replication) AS streaming_replicas
+        metrics:
+          - lag:
+              usage: "GAUGE"
+              description: "Replication lag behind primary in seconds"
+          - in_recovery:
+              usage: "GAUGE"
+              description: "Whether the instance is in recovery"
+          - is_wal_receiver_up:
+              usage: "GAUGE"
+              description: "Whether the instance wal_receiver is up"
+          - streaming_replicas:
+              usage: "GAUGE"
+              description: "Number of streaming replicas connected to the instance"
+    
+      pg_replication_slots:
+        query: |
+          SELECT slot_name,
+            slot_type,
+            database,
+            active,
+            (CASE pg_catalog.pg_is_in_recovery()
+              WHEN TRUE THEN pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_last_wal_receive_lsn(), restart_lsn)
+              ELSE pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), restart_lsn)
+            END) as pg_wal_lsn_diff
+          FROM pg_catalog.pg_replication_slots
+          WHERE NOT temporary
+        metrics:
+          - slot_name:
+              usage: "LABEL"
+              description: "Name of the replication slot"
+          - slot_type:
+              usage: "LABEL"
+              description: "Type of the replication slot"
+          - database:
+              usage: "LABEL"
+              description: "Name of the database"
+          - active:
+              usage: "GAUGE"
+              description: "Flag indicating whether the slot is active"
+          - pg_wal_lsn_diff:
+              usage: "GAUGE"
+              description: "Replication lag in bytes"
+    
+      pg_stat_archiver:
+        query: |
+          SELECT archived_count
+            , failed_count
+            , COALESCE(EXTRACT(EPOCH FROM (pg_catalog.now() OPERATOR(pg_catalog.-) last_archived_time)), -1) AS seconds_since_last_archival
+            , COALESCE(EXTRACT(EPOCH FROM (pg_catalog.now() OPERATOR(pg_catalog.-) last_failed_time)), -1) AS seconds_since_last_failure
+            , COALESCE(EXTRACT(EPOCH FROM last_archived_time), -1) AS last_archived_time
+            , COALESCE(EXTRACT(EPOCH FROM last_failed_time), -1) AS last_failed_time
+            , COALESCE(CAST(CAST('x' OPERATOR(pg_catalog.||) pg_catalog.right(pg_catalog.split_part(last_archived_wal, '.', 1), 16) AS pg_catalog.bit(64)) AS pg_catalog.int8), -1) AS last_archived_wal_start_lsn
+            , COALESCE(CAST(CAST('x' OPERATOR(pg_catalog.||) pg_catalog.right(pg_catalog.split_part(last_failed_wal, '.', 1), 16) AS pg_catalog.bit(64)) AS pg_catalog.int8), -1) AS last_failed_wal_start_lsn
+            , EXTRACT(EPOCH FROM stats_reset) AS stats_reset_time
+          FROM pg_catalog.pg_stat_archiver
+        predicate_query: |
+          SELECT NOT pg_catalog.pg_is_in_recovery()
+            OR pg_catalog.current_setting('archive_mode') OPERATOR(pg_catalog.=) 'always'
+        metrics:
+          - archived_count:
+              usage: "COUNTER"
+              description: "Number of WAL files that have been successfully archived"
+          - failed_count:
+              usage: "COUNTER"
+              description: "Number of failed attempts for archiving WAL files"
+          - seconds_since_last_archival:
+              usage: "GAUGE"
+              description: "Seconds since the last successful archival operation"
+          - seconds_since_last_failure:
+              usage: "GAUGE"
+              description: "Seconds since the last failed archival operation"
+          - last_archived_time:
+              usage: "GAUGE"
+              description: "Epoch of the last time WAL archiving succeeded"
+          - last_failed_time:
+              usage: "GAUGE"
+              description: "Epoch of the last time WAL archiving failed"
+          - last_archived_wal_start_lsn:
+              usage: "GAUGE"
+              description: "Archived WAL start LSN"
+          - last_failed_wal_start_lsn:
+              usage: "GAUGE"
+              description: "Last failed WAL LSN"
+          - stats_reset_time:
+              usage: "GAUGE"
+              description: "Time at which these statistics were last reset"
+    
+      pg_stat_bgwriter:
+        runonserver: "<17.0.0"
+        query: |
+          SELECT checkpoints_timed
+            , checkpoints_req
+            , checkpoint_write_time
+            , checkpoint_sync_time
+            , buffers_checkpoint
+            , buffers_clean
+            , maxwritten_clean
+            , buffers_backend
+            , buffers_backend_fsync
+            , buffers_alloc
+          FROM pg_catalog.pg_stat_bgwriter
+        metrics:
+          - checkpoints_timed:
+              usage: "COUNTER"
+              description: "Number of scheduled checkpoints that have been performed"
+          - checkpoints_req:
+              usage: "COUNTER"
+              description: "Number of requested checkpoints that have been performed"
+          - checkpoint_write_time:
+              usage: "COUNTER"
+              description: "Total amount of time that has been spent in the portion of checkpoint processing where files are written to disk, in milliseconds"
+          - checkpoint_sync_time:
+              usage: "COUNTER"
+              description: "Total amount of time that has been spent in the portion of checkpoint processing where files are synchronized to disk, in milliseconds"
+          - buffers_checkpoint:
+              usage: "COUNTER"
+              description: "Number of buffers written during checkpoints"
+          - buffers_clean:
+              usage: "COUNTER"
+              description: "Number of buffers written by the background writer"
+          - maxwritten_clean:
+              usage: "COUNTER"
+              description: "Number of times the background writer stopped a cleaning scan because it had written too many buffers"
+          - buffers_backend:
+              usage: "COUNTER"
+              description: "Number of buffers written directly by a backend"
+          - buffers_backend_fsync:
+              usage: "COUNTER"
+              description: "Number of times a backend had to execute its own fsync call (normally the background writer handles those even when the backend does its own write)"
+          - buffers_alloc:
+              usage: "COUNTER"
+              description: "Number of buffers allocated"
+    
+      pg_stat_bgwriter_17:
+        runonserver: ">=17.0.0"
+        name: pg_stat_bgwriter
+        query: |
+          SELECT buffers_clean
+            , maxwritten_clean
+            , buffers_alloc
+            , EXTRACT(EPOCH FROM stats_reset) AS stats_reset_time
+          FROM pg_catalog.pg_stat_bgwriter
+        metrics:
+          - buffers_clean:
+              usage: "COUNTER"
+              description: "Number of buffers written by the background writer"
+          - maxwritten_clean:
+              usage: "COUNTER"
+              description: "Number of times the background writer stopped a cleaning scan because it had written too many buffers"
+          - buffers_alloc:
+              usage: "COUNTER"
+              description: "Number of buffers allocated"
+          - stats_reset_time:
+              usage: "GAUGE"
+              description: "Time at which these statistics were last reset"
+    
+      pg_stat_checkpointer:
+        runonserver: ">=17.0.0"
+        query: |
+          SELECT num_timed AS checkpoints_timed
+            , num_requested AS checkpoints_req
+            , restartpoints_timed
+            , restartpoints_req
+            , restartpoints_done
+            , write_time
+            , sync_time
+            , buffers_written
+            , EXTRACT(EPOCH FROM stats_reset) AS stats_reset_time
+          FROM pg_catalog.pg_stat_checkpointer
+        metrics:
+          - checkpoints_timed:
+              usage: "COUNTER"
+              description: "Number of scheduled checkpoints that have been performed"
+          - checkpoints_req:
+              usage: "COUNTER"
+              description: "Number of requested checkpoints that have been performed"
+          - restartpoints_timed:
+              usage: "COUNTER"
+              description: "Number of scheduled restartpoints due to timeout or after a failed attempt to perform it"
+          - restartpoints_req:
+              usage: "COUNTER"
+              description: "Number of requested restartpoints that have been performed"
+          - restartpoints_done:
+              usage: "COUNTER"
+              description: "Number of restartpoints that have been performed"
+          - write_time:
+              usage: "COUNTER"
+              description: "Total amount of time that has been spent in the portion of processing checkpoints and restartpoints where files are written to disk, in milliseconds"
+          - sync_time:
+              usage: "COUNTER"
+              description: "Total amount of time that has been spent in the portion of processing checkpoints and restartpoints where files are synchronized to disk, in milliseconds"
+          - buffers_written:
+              usage: "COUNTER"
+              description: "Number of buffers written during checkpoints and restartpoints"
+          - stats_reset_time:
+              usage: "GAUGE"
+              description: "Time at which these statistics were last reset"
+    
+      pg_stat_database:
+        query: |
+          SELECT datname
+            , xact_commit
+            , xact_rollback
+            , blks_read
+            , blks_hit
+            , tup_returned
+            , tup_fetched
+            , tup_inserted
+            , tup_updated
+            , tup_deleted
+            , conflicts
+            , temp_files
+            , temp_bytes
+            , deadlocks
+            , blk_read_time
+            , blk_write_time
+          FROM pg_catalog.pg_stat_database
+        metrics:
+          - datname:
+              usage: "LABEL"
+              description: "Name of this database"
+          - xact_commit:
+              usage: "COUNTER"
+              description: "Number of transactions in this database that have been committed"
+          - xact_rollback:
+              usage: "COUNTER"
+              description: "Number of transactions in this database that have been rolled back"
+          - blks_read:
+              usage: "COUNTER"
+              description: "Number of disk blocks read in this database"
+          - blks_hit:
+              usage: "COUNTER"
+              description: "Number of times disk blocks were found already in the buffer cache, so that a read was not necessary (this only includes hits in the PostgreSQL buffer cache, not the operating system's file system cache)"
+          - tup_returned:
+              usage: "COUNTER"
+              description: "Number of rows returned by queries in this database"
+          - tup_fetched:
+              usage: "COUNTER"
+              description: "Number of rows fetched by queries in this database"
+          - tup_inserted:
+              usage: "COUNTER"
+              description: "Number of rows inserted by queries in this database"
+          - tup_updated:
+              usage: "COUNTER"
+              description: "Number of rows updated by queries in this database"
+          - tup_deleted:
+              usage: "COUNTER"
+              description: "Number of rows deleted by queries in this database"
+          - conflicts:
+              usage: "COUNTER"
+              description: "Number of queries canceled due to conflicts with recovery in this database"
+          - temp_files:
+              usage: "COUNTER"
+              description: "Number of temporary files created by queries in this database"
+          - temp_bytes:
+              usage: "COUNTER"
+              description: "Total amount of data written to temporary files by queries in this database"
+          - deadlocks:
+              usage: "COUNTER"
+              description: "Number of deadlocks detected in this database"
+          - blk_read_time:
+              usage: "COUNTER"
+              description: "Time spent reading data file blocks by backends in this database, in milliseconds"
+          - blk_write_time:
+              usage: "COUNTER"
+              description: "Time spent writing data file blocks by backends in this database, in milliseconds"
+    
+      pg_stat_replication:
+        primary: true
+        query: |
+          SELECT usename
+            , COALESCE(application_name, '') AS application_name
+            , COALESCE(client_addr::text, '') AS client_addr
+            , COALESCE(client_port::text, '') AS client_port
+            , EXTRACT(EPOCH FROM backend_start) AS backend_start
+            , COALESCE(pg_catalog.age(backend_xmin), 0) AS backend_xmin_age
+            , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), sent_lsn) AS sent_diff_bytes
+            , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), write_lsn) AS write_diff_bytes
+            , pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), flush_lsn) AS flush_diff_bytes
+            , COALESCE(pg_catalog.pg_wal_lsn_diff(pg_catalog.pg_current_wal_lsn(), replay_lsn),0) AS replay_diff_bytes
+            , COALESCE((EXTRACT(EPOCH FROM write_lag)),0)::float AS write_lag_seconds
+            , COALESCE((EXTRACT(EPOCH FROM flush_lag)),0)::float AS flush_lag_seconds
+            , COALESCE((EXTRACT(EPOCH FROM replay_lag)),0)::float AS replay_lag_seconds
+          FROM pg_catalog.pg_stat_replication
+        metrics:
+          - usename:
+              usage: "LABEL"
+              description: "Name of the replication user"
+          - application_name:
+              usage: "LABEL"
+              description: "Name of the application"
+          - client_addr:
+              usage: "LABEL"
+              description: "Client IP address"
+          - client_port:
+              usage: "LABEL"
+              description: "Client TCP port"
+          - backend_start:
+              usage: "COUNTER"
+              description: "Time when this process was started"
+          - backend_xmin_age:
+              usage: "COUNTER"
+              description: "The age of this standby's xmin horizon"
+          - sent_diff_bytes:
+              usage: "GAUGE"
+              description: "Difference in bytes from the last write-ahead log location sent on this connection"
+          - write_diff_bytes:
+              usage: "GAUGE"
+              description: "Difference in bytes from the last write-ahead log location written to disk by this standby server"
+          - flush_diff_bytes:
+              usage: "GAUGE"
+              description: "Difference in bytes from the last write-ahead log location flushed to disk by this standby server"
+          - replay_diff_bytes:
+              usage: "GAUGE"
+              description: "Difference in bytes from the last write-ahead log location replayed into the database on this standby server"
+          - write_lag_seconds:
+              usage: "GAUGE"
+              description: "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written it"
+          - flush_lag_seconds:
+              usage: "GAUGE"
+              description: "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written and flushed it"
+          - replay_lag_seconds:
+              usage: "GAUGE"
+              description: "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written, flushed and applied it"
+    
+      pg_settings:
+        query: |
+          SELECT name,
+          CASE setting WHEN 'on' THEN '1' WHEN 'off' THEN '0' ELSE setting END AS setting
+          FROM pg_catalog.pg_settings
+          WHERE vartype IN ('integer', 'real', 'bool')
+          ORDER BY 1
+        metrics:
+          - name:
+              usage: "LABEL"
+              description: "Name of the setting"
+          - setting:
+              usage: "GAUGE"
+              description: "Setting value"
+    
+      pg_extensions:
+        query: |
+          SELECT
+            pg_catalog.current_database() as datname,
+            name as extname,
+            default_version,
+            installed_version,
+            CASE
+              WHEN default_version OPERATOR(pg_catalog.=) installed_version THEN 0
+              ELSE 1
+          END AS update_available
+          FROM pg_catalog.pg_available_extensions
+          WHERE installed_version IS NOT NULL
+        metrics:
+          - datname:
+              usage: "LABEL"
+              description: "Name of the database"
+          - extname:
+              usage: "LABEL"
+              description: "Extension name"
+          - default_version:
+              usage: "LABEL"
+              description: "Default version"
+          - installed_version:
+              usage: "LABEL"
+              description: "Installed version"
+          - update_available:
+              usage: "GAUGE"
+              description: "An update is available"
+        target_databases:
+          - '*'
+
+---
+# Source: cloudnative-pg/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-cloudnative-pg
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - mutatingwebhookconfigurations
+  - validatingwebhookconfigurations
+  verbs:
+  - get
+  - patch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusterimagecatalogs
+  verbs:
+  - get
+  - list
+  - watch
+
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps/status
+  - secrets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  - pods
+  - pods/exec
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/status
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - serviceaccounts
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - podmonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups
+  - clusters
+  - databaseroles
+  - databases
+  - poolers
+  - publications
+  - scheduledbackups
+  - subscriptions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - failoverquorums
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups/status
+  - databases/status
+  - publications/status
+  - scheduledbackups/status
+  - subscriptions/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - imagecatalogs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusters/finalizers
+  - databaseroles/finalizers
+  - poolers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusters/status
+  - databaseroles/status
+  - poolers/status
+  - failoverquorums/status
+  verbs:
+  - get
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
+
+---
+# Source: cloudnative-pg/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-cloudnative-pg-view
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups
+  - clusters
+  - clusters/status
+  - databaseroles
+  - databases
+  - failoverquorums
+  - poolers
+  - publications
+  - scheduledbackups
+  - imagecatalogs
+  - clusterimagecatalogs
+  - subscriptions
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+# Source: cloudnative-pg/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-cloudnative-pg-edit
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+rules:
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups
+  - clusters
+  - clusters/status
+  - databaseroles
+  - databases
+  - failoverquorums
+  - poolers
+  - publications
+  - scheduledbackups
+  - imagecatalogs
+  - clusterimagecatalogs
+  - subscriptions
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - patch
+  - update
+
+---
+# Source: cloudnative-pg/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cnpg-cloudnative-pg
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cnpg-cloudnative-pg
+subjects:
+- kind: ServiceAccount
+  name: cnpg-cloudnative-pg
+  namespace: cnpg-system
+
+
+---
+# Source: cloudnative-pg/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: cnpg-webhook-service
+  namespace: cnpg-system
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+  - port: 443
+    targetPort: webhook-server
+    name: webhook-server
+  selector:
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+
+---
+# Source: cloudnative-pg/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cnpg-cloudnative-pg
+  namespace: cnpg-system
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+      app.kubernetes.io/instance: cnpg
+  template:
+    metadata:
+      annotations:
+        checksum/rbac: da9fa6d9f72cb77491623998262b6a5e05def7ebd5ab8d29c72d0e32b61721e6
+        checksum/config: 8fadd17362038f4209ee6ab7acbefab66e31935f337ef6dcaaf630ef4931cc48
+        checksum/monitoring-config: cbf85fe402a3dab88cead08d8af602489baee82063c2694296f4fc8166dbd9bf
+      labels:
+        app.kubernetes.io/name: cloudnative-pg
+        app.kubernetes.io/instance: cnpg
+    spec:
+      containers:
+      - args:
+        - controller
+        - --leader-elect
+        - --max-concurrent-reconciles=10
+        - --config-map-name=cnpg-controller-manager-config
+        - --webhook-port=9443
+        command:
+        - /manager
+        env:
+        - name: OPERATOR_IMAGE_NAME
+          value: "ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1"
+        - name: OPERATOR_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: MONITORING_QUERIES_CONFIGMAP
+          value: "cnpg-default-monitoring"
+        image: "ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1"
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          httpGet:
+            path: /readyz
+            port: webhook-server
+            scheme: HTTPS
+          initialDelaySeconds: 3
+        name: manager
+        ports:
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: webhook-server
+            scheme: HTTPS
+          initialDelaySeconds: 3
+        resources:
+          limits:
+            memory: 256Mi
+          requests:
+            cpu: 10m
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 10001
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        startupProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /readyz
+            port: webhook-server
+            scheme: HTTPS
+          periodSeconds: 5
+        volumeMounts:
+        - mountPath: /controller
+          name: scratch-data
+        - mountPath: /run/secrets/cnpg.io/webhook
+          name: webhook-certificates
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: cnpg-cloudnative-pg
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: scratch-data
+        emptyDir:
+          {}
+      - name: webhook-certificates
+        secret:
+          defaultMode: 420
+          optional: true
+          secretName: cnpg-webhook-cert
+
+---
+# Source: cloudnative-pg/templates/mutatingwebhookconfiguration.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: cnpg-mutating-webhook-configuration
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /mutate-postgresql-cnpg-io-v1-backup
+      port: 443
+  failurePolicy: Fail
+  name: mbackup.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - backups
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /mutate-postgresql-cnpg-io-v1-cluster
+      port: 443
+  failurePolicy: Fail
+  name: mcluster.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /mutate-postgresql-cnpg-io-v1-database
+      port: 443
+  failurePolicy: Fail
+  name: mdatabase.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - databases
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /mutate-postgresql-cnpg-io-v1-scheduledbackup
+      port: 443
+  failurePolicy: Fail
+  name: mscheduledbackup.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - scheduledbackups
+  sideEffects: None
+
+---
+# Source: cloudnative-pg/templates/validatingwebhookconfiguration.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: cnpg-validating-webhook-configuration
+  labels:
+    helm.sh/chart: cloudnative-pg-0.29.1
+    app.kubernetes.io/name: cloudnative-pg
+    app.kubernetes.io/instance: cnpg
+    app.kubernetes.io/version: "1.30.1"
+    app.kubernetes.io/managed-by: Helm
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /validate-postgresql-cnpg-io-v1-backup
+      port: 443
+  failurePolicy: Fail
+  name: vbackup.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - backups
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /validate-postgresql-cnpg-io-v1-cluster
+      port: 443
+  failurePolicy: Fail
+  name: vcluster.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - clusters
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /validate-postgresql-cnpg-io-v1-scheduledbackup
+      port: 443
+  failurePolicy: Fail
+  name: vscheduledbackup.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - scheduledbackups
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /validate-postgresql-cnpg-io-v1-database
+      port: 443
+  failurePolicy: Fail
+  name: vdatabase.cnpg.io
+  rules:
+  - apiGroups:
+    - postgresql.cnpg.io
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - databases
+  sideEffects: None
+- admissionReviewVersions:
+    - v1
+  clientConfig:
+    service:
+      name: cnpg-webhook-service
+      namespace: cnpg-system
+      path: /validate-postgresql-cnpg-io-v1-pooler
+      port: 443
+  failurePolicy: Fail
+  name: vpooler.cnpg.io
+  rules:
+    - apiGroups:
+        - postgresql.cnpg.io
+      apiVersions:
+        - v1
+      operations:
+        - CREATE
+        - UPDATE
+      resources:
+        - poolers
+  sideEffects: None
+
+---
+# Source: plugin-barman-cloud/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    helm.sh/chart: plugin-barman-cloud-0.8.1
+    app.kubernetes.io/name: plugin-barman-cloud
+    app.kubernetes.io/instance: plugin-barman-cloud
+    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/managed-by: Helm
+  name: plugin-barman-cloud
+  namespace: cnpg-system
+
+---
+# Source: plugin-barman-cloud/templates/configmap.yaml
+apiVersion: v1
+data:
+  SIDECAR_IMAGE: "ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar:v0.15.1"
+kind: ConfigMap
+metadata:
+  name: plugin-barman-cloud-config
+  namespace: cnpg-system
+
+---
+# Source: plugin-barman-cloud/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: plugin-barman-cloud
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch
+- apiGroups:
+  - barmancloud.cnpg.io
+  resources:
+  - objectstores
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - barmancloud.cnpg.io
+  resources:
+  - objectstores/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - barmancloud.cnpg.io
+  resources:
+  - objectstores/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - backups
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+
+---
+# Source: plugin-barman-cloud/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    helm.sh/chart: plugin-barman-cloud-0.8.1
+    app.kubernetes.io/name: plugin-barman-cloud
+    app.kubernetes.io/instance: plugin-barman-cloud
+    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/managed-by: Helm
+  name: plugin-barman-cloud-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: plugin-barman-cloud
+subjects:
+- kind: ServiceAccount
+  name: plugin-barman-cloud
+  namespace: cnpg-system
+
+---
+# Source: plugin-barman-cloud/templates/additional-rbac/leader_election.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    helm.sh/chart: plugin-barman-cloud-0.8.1
+    app.kubernetes.io/name: plugin-barman-cloud
+    app.kubernetes.io/instance: plugin-barman-cloud
+    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/managed-by: Helm
+  name: plugin-barman-cloud-leader-election-role
+  namespace: cnpg-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+
+---
+# Source: plugin-barman-cloud/templates/additional-rbac/leader_election.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    helm.sh/chart: plugin-barman-cloud-0.8.1
+    app.kubernetes.io/name: plugin-barman-cloud
+    app.kubernetes.io/instance: plugin-barman-cloud
+    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/managed-by: Helm
+  name: plugin-barman-cloud-leader-election-rolebinding
+  namespace: cnpg-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: plugin-barman-cloud-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: plugin-barman-cloud
+  namespace: cnpg-system
+
+---
+# Source: plugin-barman-cloud/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    helm.sh/chart: plugin-barman-cloud-0.8.1
+    app.kubernetes.io/name: plugin-barman-cloud
+    app.kubernetes.io/instance: plugin-barman-cloud
+    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/managed-by: Helm
+    cnpg.io/pluginName: barman-cloud.cloudnative-pg.io
+  annotations:
+    cnpg.io/pluginClientSecret: barman-cloud-client-tls
+    cnpg.io/pluginPort: "9090"
+    cnpg.io/pluginServerSecret: barman-cloud-server-tls
+  name: barman-cloud
+  namespace: cnpg-system
+spec:
+  ports:
+  - port: 9090
+    protocol: TCP
+    targetPort: 9090
+  selector:
+    app.kubernetes.io/name: plugin-barman-cloud
+    app.kubernetes.io/instance: plugin-barman-cloud
+
+---
+# Source: plugin-barman-cloud/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    helm.sh/chart: plugin-barman-cloud-0.8.1
+    app.kubernetes.io/name: plugin-barman-cloud
+    app.kubernetes.io/instance: plugin-barman-cloud
+    app.kubernetes.io/version: "v0.15.1"
+    app.kubernetes.io/managed-by: Helm
+  name: plugin-barman-cloud
+  namespace: cnpg-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: plugin-barman-cloud
+      app.kubernetes.io/instance: plugin-barman-cloud
+  # RollingUpdate strategy is not supported by the operator yet, so it can only use the Recreate strategy.
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: plugin-barman-cloud
+        app.kubernetes.io/instance: plugin-barman-cloud
+    spec:
+      containers:
+      - args:
+        - operator
+        - --server-cert=/server/tls.crt
+        - --server-key=/server/tls.key
+        - --client-cert=/client/tls.crt
+        - --server-address=:9090
+        - --leader-elect
+        - --log-level=info
+        env:
+        - name: SIDECAR_IMAGE
+          valueFrom:
+            configMapKeyRef:
+              key: SIDECAR_IMAGE
+              name: plugin-barman-cloud-config
+        image: "ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.15.1"
+        name: barman-cloud
+        ports:
+        - containerPort: 9090
+          protocol: TCP
+        readinessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          tcpSocket:
+            port: 8081
+        livenessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          tcpSocket:
+            port: 8081
+        resources:
+          limits:
+            memory: 128Mi
+          requests:
+            cpu: 10m
+            memory: 32Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 10001
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /server
+          name: server
+        - mountPath: /client
+          name: client
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: plugin-barman-cloud
+      volumes:
+      - name: server
+        secret:
+          secretName: barman-cloud-server-tls
+      - name: client
+        secret:
+          secretName: barman-cloud-client-tls
+
+---
+# Source: plugin-barman-cloud/templates/client-certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: barman-cloud-client
+  namespace: cnpg-system
+spec:
+  commonName: barman-cloud-client
+  duration: 2160h
+  isCA: false
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: plugin-barman-cloud-selfsigned-issuer
+  renewBefore: 360h
+  secretName: barman-cloud-client-tls
+  usages:
+    - client auth
+  privateKey:
+    rotationPolicy: Always
+
+---
+# Source: plugin-barman-cloud/templates/server-certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: barman-cloud-server
+  namespace: cnpg-system
+spec:
+  commonName: barman-cloud
+  dnsNames:
+  - barman-cloud
+  duration: 2160h
+  isCA: false
+  issuerRef:
+    group: cert-manager.io
+    kind: Issuer
+    name: plugin-barman-cloud-selfsigned-issuer
+  renewBefore: 360h
+  secretName: barman-cloud-server-tls
+  usages:
+    - server auth
+  privateKey:
+    rotationPolicy: Always
+
+---
+# Source: plugin-barman-cloud/templates/certificate-issuer.yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: plugin-barman-cloud-selfsigned-issuer
+  namespace: cnpg-system
+spec:
+  selfSigned: {}

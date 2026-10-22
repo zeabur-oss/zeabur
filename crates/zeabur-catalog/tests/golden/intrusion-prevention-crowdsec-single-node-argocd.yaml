@@ -1,6 +1,6 @@
 # Profile: single-node. Apply in the namespace Argo CD runs in (argocd).
 # Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
-# key: Key the Traefik bouncer uses for the CrowdSec local API.
+# key: The Traefik bouncer uses this key to call the CrowdSec local API.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -10,8 +10,8 @@ stringData:
   key: "<random: openssl rand -hex 64>"
 ---
 # Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
-# csLapiSecret: Shared secret LAPI signs agent sessions with.
-# registrationToken: Token agents register with.
+# csLapiSecret: The local API (LAPI) signs agent sessions with this shared secret.
+# registrationToken: Agents register with the local API using this token.
 apiVersion: v1
 kind: Secret
 metadata:

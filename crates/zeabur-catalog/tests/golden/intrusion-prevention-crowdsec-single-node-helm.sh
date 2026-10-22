@@ -1,12 +1,12 @@
 # Profile: single-node
 
 kubectl create namespace crowdsec --dry-run=client -o yaml | kubectl apply -f -
-# Key the Traefik bouncer uses for the CrowdSec local API.
+# The Traefik bouncer uses this key to call the CrowdSec local API.
 kubectl -n crowdsec create secret generic crowdsec-bouncer-key \
   --from-literal=key="$(openssl rand -hex 64)" \
   --dry-run=client -o yaml | kubectl apply -f -
-# Shared secret LAPI signs agent sessions with.
-# Token agents register with.
+# The local API (LAPI) signs agent sessions with this shared secret.
+# Agents register with the local API using this token.
 kubectl -n crowdsec create secret generic crowdsec-lapi \
   --from-literal=csLapiSecret="$(openssl rand -hex 64)" \
   --from-literal=registrationToken="$(openssl rand -hex 64)" \

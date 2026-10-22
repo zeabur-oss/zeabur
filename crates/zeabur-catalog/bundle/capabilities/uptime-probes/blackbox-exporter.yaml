@@ -3,8 +3,9 @@ homepage: https://github.com/prometheus/blackbox_exporter
 license: Apache-2.0
 maturity: cncf-graduated
 rationale: >
-  The Prometheus project's HTTP, TCP and DNS prober; uptime alerts are plain
-  rules. Needs VictoriaMetrics, so it follows its defaults.
+  Probes HTTP, TCP and DNS targets; it comes from the Prometheus project, and
+  uptime alerts are plain rules. It needs VictoriaMetrics, so it follows VictoriaMetrics'
+  defaults.
 defaults:
   single-node: optional
   multi-node: recommended
@@ -52,9 +53,9 @@ detection:
       labels: {app.kubernetes.io/name: prometheus-blackbox-exporter}
 
 security:
-  summary: No API access; only makes outbound probes.
+  summary: Has no API access and only makes outbound probes.
   tenants: admin-only
   tenantCRDs: [VMProbe]
   risks:
     - risk: Probe targets can reach cloud metadata or private services (SSRF).
-      mitigation: Admit only the namespace's own hostnames or public URLs via admission policy.
+      mitigation: Admit only the namespace's own hostnames or public URLs with an admission policy.

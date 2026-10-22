@@ -3,8 +3,9 @@ homepage: https://www.crowdsec.net
 license: MIT
 maturity: independent
 rationale: >
-  Blocks brute force and scanners seen in Traefik's access logs, for every app
-  behind the ingress. Fails open; the online API is off by default.
+  Blocks brute-force attempts and scanners that show up in Traefik's access
+  logs, for every app behind the ingress. It fails open, and the online API is
+  off by default.
 defaults:
   single-node: optional
   multi-node: optional
@@ -13,15 +14,15 @@ dependsOn: [ingress/traefik]
 
 inputs:
   - name: bouncer-key
-    description: Key the Traefik bouncer uses for the CrowdSec local API.
+    description: The Traefik bouncer uses this key to call the CrowdSec local API.
     secret: {name: crowdsec-bouncer-key, key: key, namespace: crowdsec}
     generate: random
   - name: lapi-secret
-    description: Shared secret LAPI signs agent sessions with.
+    description: The local API (LAPI) signs agent sessions with this shared secret.
     secret: {name: crowdsec-lapi, key: csLapiSecret, namespace: crowdsec}
     generate: random
   - name: registration-token
-    description: Token agents register with.
+    description: Agents register with the local API using this token.
     secret: {name: crowdsec-lapi, key: registrationToken, namespace: crowdsec}
     generate: random
 
@@ -145,12 +146,12 @@ detection:
       labels: {k8s-app: crowdsec, type: lapi}
 
 security:
-  summary: The agent reads node log files read-only; no API writes.
+  summary: The agent reads node log files read-only and makes no API writes.
   privileged: true
   egress: [hub-data.crowdsec.net, plugins.traefik.io, github.com]
   tenants: admin-only
   risks:
     - risk: A ban on a shared IP (NAT, CDN) blocks it for every tenant.
-      mitigation: Admins own decisions; configure trusted proxies before use behind a CDN.
+      mitigation: Only administrators manage decisions. Configure trusted proxies before running CrowdSec behind a CDN.
 
 leftovers: [persistentvolumeclaims]

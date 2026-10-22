@@ -3,10 +3,10 @@ homepage: https://k8up.io
 license: Apache-2.0
 maturity: cncf-sandbox
 rationale: >
-  Namespace-scoped restic backups to any S3-compatible store, so tenants can
-  safely manage their own backups.
+  Backs up each namespace with restic to any S3-compatible store, so tenants
+  can safely manage their own backups.
 alternatives:
-  velero: Cluster-wide backups, administrators only.
+  velero: Backs up the whole cluster; for administrators only.
 defaults:
   single-node: optional
   multi-node: optional

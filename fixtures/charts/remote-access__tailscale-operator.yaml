@@ -1,0 +1,264 @@
+---
+# Source: tailscale-operator/templates/operator-rbac.yaml
+# Copyright (c) Tailscale Inc & contributors
+# SPDX-License-Identifier: BSD-3-Clause
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: operator
+  namespace: tailscale
+
+---
+# Source: tailscale-operator/templates/proxy-rbac.yaml
+# Copyright (c) Tailscale Inc & contributors
+# SPDX-License-Identifier: BSD-3-Clause
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: proxies
+  namespace: tailscale
+
+---
+# Source: tailscale-operator/templates/operator-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: tailscale-operator
+rules:
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events", "services", "services/status"]
+  verbs: ["create","delete","deletecollection","get","list","patch","update","watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses", "ingresses/status"]
+  verbs: ["create","delete","deletecollection","get","list","patch","update","watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingressclasses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["tailscale.com"]
+  resources: ["connectors", "connectors/status", "proxyclasses", "proxyclasses/status", "proxygroups", "proxygroups/status"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["tailscale.com"]
+  resources: ["dnsconfigs", "dnsconfigs/status"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["tailscale.com"]
+  resources: ["tailnets", "tailnets/status"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["tailscale.com"]
+  resources: ["peerrelays", "peerrelays/status"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["tailscale.com"]
+  resources: ["proxygrouppolicies", "proxygrouppolicies/status"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["tailscale.com"]
+  resources: ["recorders", "recorders/status"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch"]
+  resourceNames: ["servicemonitors.monitoring.coreos.com"]
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["validatingadmissionpolicies", "validatingadmissionpolicybindings"]
+  verbs: ["list", "create", "delete", "update", "get", "watch"]
+
+---
+# Source: tailscale-operator/templates/operator-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: tailscale-operator
+subjects:
+- kind: ServiceAccount
+  name: operator
+  namespace: tailscale
+roleRef:
+  kind: ClusterRole
+  name: tailscale-operator
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: tailscale-operator/templates/operator-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: operator
+  namespace: tailscale
+rules:
+- apiGroups: [""]
+  resources: ["secrets", "serviceaccounts", "configmaps"]
+  verbs: ["create","delete","deletecollection","get","list","patch","update","watch"]
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  resourceNames: ["operator"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get","list","watch", "update"]
+- apiGroups: [""]
+  resources: ["pods/status"]
+  verbs: ["update"]
+- apiGroups: ["apps"]
+  resources: ["statefulsets", "deployments"]
+  verbs: ["create","delete","deletecollection","get","list","patch","update","watch"]
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get", "list", "watch", "create", "update", "deletecollection"]
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings"]
+  verbs: ["get", "create", "patch", "update", "list", "watch", "deletecollection"]
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors"]
+  verbs: ["get", "list", "update", "create", "delete"]
+
+---
+# Source: tailscale-operator/templates/proxy-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: proxies
+  namespace: tailscale
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create","delete","deletecollection","get","list","patch","update","watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch", "get"]
+
+---
+# Source: tailscale-operator/templates/operator-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: operator
+  namespace: tailscale
+subjects:
+- kind: ServiceAccount
+  name: operator
+  namespace: tailscale
+roleRef:
+  kind: Role
+  name: operator
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: tailscale-operator/templates/proxy-rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: proxies
+  namespace: tailscale
+subjects:
+- kind: ServiceAccount
+  name: proxies
+  namespace: tailscale
+roleRef:
+  kind: Role
+  name: proxies
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: tailscale-operator/templates/deployment.yaml
+# Copyright (c) Tailscale Inc & contributors
+# SPDX-License-Identifier: BSD-3-Clause
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: operator
+  namespace: tailscale
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: operator
+  template:
+    metadata:
+      labels:
+        app: operator
+    spec:
+      serviceAccountName: operator
+      volumes:
+        - name: oauth
+          secret:
+            secretName: operator-oauth
+      containers:
+        - name: operator
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
+          image: tailscale/k8s-operator:v1.104.1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: OPERATOR_INITIAL_TAGS
+              value: tag:k8s-operator
+            - name: OPERATOR_HOSTNAME
+              value: tailscale-operator
+            - name: OPERATOR_SECRET
+              value: operator
+            - name: OPERATOR_LOGGING
+              value: info
+            - name: OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: OPERATOR_SERVICE_ACCOUNT_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+            - name: OPERATOR_LOGIN_SERVER
+              value: 
+            - name: OPERATOR_INGRESS_CLASS_NAME
+              value: tailscale
+            - name: CLIENT_ID_FILE
+              value: /oauth/client_id
+            - name: CLIENT_SECRET_FILE
+              value: /oauth/client_secret
+            - name: PROXY_IMAGE
+              value: tailscale/tailscale:v1.104.1
+            - name: PROXY_TAGS
+              value: tag:k8s
+            - name: APISERVER_PROXY
+              value: "false"
+            - name: PROXY_FIREWALL_MODE
+              value: auto
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_UID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid
+            - name: OPERATOR_SHARED_ACME_ACCOUNT_KEY
+              value: "false"
+          volumeMounts:
+            - name: oauth
+              mountPath: /oauth
+              readOnly: true
+      nodeSelector:
+        kubernetes.io/os: linux
+
+---
+# Source: tailscale-operator/templates/ingressclass.yaml
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: tailscale
+  annotations: {} # we do not support default IngressClass annotation https://kubernetes.io/docs/concepts/services-networking/ingress/#default-ingress-class
+spec:
+  controller: tailscale.com/ts-ingress # controller name currently can not be changed
+  # parameters: {} # currently no parameters are supported
+

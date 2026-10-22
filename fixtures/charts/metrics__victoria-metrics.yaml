@@ -15,6 +15,22 @@ metadata:
   name: vm-kube-state-metrics
   namespace: observability
 ---
+# Source: victoria-metrics-k8s-stack/charts/prometheus-node-exporter/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vm-prometheus-node-exporter
+  namespace: observability
+  labels:
+    helm.sh/chart: prometheus-node-exporter-4.59.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: prometheus-node-exporter
+    app.kubernetes.io/name: prometheus-node-exporter
+    app.kubernetes.io/instance: vm
+    app.kubernetes.io/version: "1.12.1"
+automountServiceAccountToken: false
+---
 # Source: victoria-metrics-k8s-stack/templates/sync-job/rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -140,7 +156,7 @@ data:
           url: https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/manifests/kubeStateMetrics-prometheusRule.yaml
         - url: https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/manifests/kubePrometheus-prometheusRule.yaml
         - url: https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/manifests/kubernetesControlPlane-prometheusRule.yaml
-        - enabled: false
+        - enabled: true
           url: https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/manifests/nodeExporter-prometheusRule.yaml
         - enabled: false
           url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaLogs/master/deployment/docker/rules/alerts-vlogs.yml
@@ -431,6 +447,35 @@ spec:
     app.kubernetes.io/instance: vm
 
 ---
+# Source: victoria-metrics-k8s-stack/charts/prometheus-node-exporter/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: vm-prometheus-node-exporter
+  namespace: observability
+  labels:
+    helm.sh/chart: prometheus-node-exporter-4.59.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: prometheus-node-exporter
+    app.kubernetes.io/name: prometheus-node-exporter
+    app.kubernetes.io/instance: vm
+    app.kubernetes.io/version: "1.12.1"
+    jobLabel: node-exporter
+  annotations:
+    prometheus.io/scrape: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9100
+      targetPort: 9100
+      protocol: TCP
+      name: metrics
+  selector:
+    app.kubernetes.io/name: prometheus-node-exporter
+    app.kubernetes.io/instance: vm
+
+---
 # Source: victoria-metrics-k8s-stack/templates/servicemonitors.yaml
 apiVersion: v1
 kind: Service
@@ -454,6 +499,157 @@ spec:
   selector: 
     k8s-app: kube-dns
   type: ClusterIP
+
+---
+# Source: victoria-metrics-k8s-stack/charts/prometheus-node-exporter/templates/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vm-prometheus-node-exporter
+  namespace: observability
+  labels:
+    helm.sh/chart: prometheus-node-exporter-4.59.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: prometheus-node-exporter
+    app.kubernetes.io/name: prometheus-node-exporter
+    app.kubernetes.io/instance: vm
+    app.kubernetes.io/version: "1.12.1"
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-node-exporter
+      app.kubernetes.io/instance: vm
+  revisionHistoryLimit: 10
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+      labels:
+        app.kubernetes.io/component: metrics
+        app.kubernetes.io/instance: vm
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: prometheus-node-exporter
+        app.kubernetes.io/part-of: prometheus-node-exporter
+        app.kubernetes.io/version: 1.12.1
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        fsGroup: 65534
+        runAsGroup: 65534
+        runAsNonRoot: true
+        runAsUser: 65534
+      serviceAccountName: vm-prometheus-node-exporter
+      containers:
+        - name: node-exporter
+          image: quay.io/prometheus/node-exporter:v1.12.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --path.procfs=/host/proc
+            - --path.sysfs=/host/sys
+            - --path.rootfs=/host/root
+            - --path.udev.data=/host/root/run/udev/data
+            - --web.listen-address=[$(HOST_IP)]:9100
+            - --collector.disable-defaults
+            - --collector.filesystem
+            - --collector.cpu
+            - --collector.meminfo
+            - --collector.loadavg
+            - --collector.vmstat
+            - --collector.diskstats
+            - --collector.netdev
+            - --collector.netclass
+            - --collector.filefd
+            - --collector.conntrack
+            - --collector.timex
+            - --collector.mdadm
+            - --collector.bonding
+            - --collector.textfile
+            - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|run/k3s/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+            - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|erofs|sysfs|tracefs)$
+          securityContext:
+            readOnlyRootFilesystem: true
+          env:
+            - name: HOST_IP
+              value: 0.0.0.0
+          ports:
+            - name: metrics
+              containerPort: 9100
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              httpHeaders:
+              path: /
+              port: metrics
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              httpHeaders:
+              path: /
+              port: metrics
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              memory: 64Mi
+            requests:
+              cpu: 10m
+              memory: 16Mi
+          volumeMounts:
+            - name: proc
+              mountPath: /host/proc
+              readOnly:  true
+            - name: sys
+              mountPath: /host/sys
+              readOnly: true
+            - name: root
+              mountPath: /host/root
+              mountPropagation: HostToContainer
+              readOnly: true
+      hostNetwork: true
+      hostPID: true
+      hostIPC: false
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: eks.amazonaws.com/compute-type
+                operator: NotIn
+                values:
+                - fargate
+              - key: type
+                operator: NotIn
+                values:
+                - virtual-kubelet
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - effect: NoSchedule
+          operator: Exists
+      volumes:
+        - name: proc
+          hostPath:
+            path: /proc
+        - name: sys
+          hostPath:
+            path: /sys
+        - name: root
+          hostPath:
+            path: /
 
 ---
 # Source: victoria-metrics-k8s-stack/charts/kube-state-metrics/templates/deployment.yaml
@@ -870,6 +1066,33 @@ spec:
     matchLabels:
       app.kubernetes.io/instance: 'vm'
       app.kubernetes.io/name: 'kube-state-metrics'
+
+---
+# Source: victoria-metrics-k8s-stack/templates/servicemonitors.yaml
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: vm-victoria-metrics-k8s-stack-prometheus-node-exporter
+  namespace: observability
+  labels: 
+    app.kubernetes.io/instance: vm
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: victoria-metrics-k8s-stack
+    app.kubernetes.io/version: v1.153.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+spec: 
+  endpoints:
+  - metricRelabelConfigs:
+    - action: drop
+      regex: /var/lib/kubelet/pods.+
+      source_labels:
+      - mountpoint
+    port: metrics
+  jobLabel: jobLabel
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: vm
+      app.kubernetes.io/name: 'prometheus-node-exporter'
 
 ---
 # Source: victoria-metrics-k8s-stack/templates/victoria-metrics-operator/vmsingle/vmsingle.yml

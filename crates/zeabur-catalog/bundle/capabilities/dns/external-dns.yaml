@@ -12,20 +12,20 @@ dependsOn: [ingress]
 
 inputs:
   - name: provider
-    description: Provider name as external-dns spells it (cloudflare, route53, ...).
+    description: ExternalDNS writes records through this provider, spelled as ExternalDNS names it, such as cloudflare or route53.
     path: provider.name
     required: true
     testValue: inmemory
   - name: domain-filters
-    description: The only zones external-dns may change.
+    description: ExternalDNS changes records only in these zones.
     path: domainFilters
     required: true
     testValue: [example.test]
   - name: owner-id
-    description: Marks this cluster's records so clusters never fight over one.
+    description: ExternalDNS marks this cluster's records with this ID, so two clusters never fight over one record.
     path: txtOwnerId
     required: true
-    testValue: recs-ci
+    testValue: catalog-ci
 
 releases:
   - name: external-dns
@@ -64,7 +64,7 @@ security:
   summary: Reads Services, Ingresses and routes in all namespaces.
   clusterWide: true
   credentials: required
-  credentialsNote: A DNS provider token scoped to domainFilters.
+  credentialsNote: Needs a DNS provider token scoped to domainFilters.
   risks:
     - risk: A tenant route can publish a name in another tenant's domain.
       mitigation: Admit only verified hostnames; domainFilters limits the zones.

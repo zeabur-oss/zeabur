@@ -352,7 +352,7 @@ spec:
   accessMode: ReadWrite
   default: true
   objectStorage:
-    bucket: "recs-ci"
+    bucket: "catalog-ci"
   config:
     region: "us-east-1"
     s3ForcePathStyle: "true"

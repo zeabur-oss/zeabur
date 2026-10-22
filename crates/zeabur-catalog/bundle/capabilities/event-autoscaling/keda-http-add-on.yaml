@@ -5,7 +5,8 @@ maturity: cncf-graduated
 stability: beta
 rationale: >
   Scales HTTP services on request rate, including to zero; the interceptor
-  holds the first request while the workload wakes. Pre-1.0, so beta.
+  holds the first request while the workload wakes. It is pre-1.0, so it is
+  marked beta.
 defaults:
   single-node: optional
   multi-node: optional
@@ -61,4 +62,4 @@ leftovers: [customresourcedefinitions]
 
 upgradeNotes:
   - versions: "<1.0.0"
-    note: HTTPScaledObject fields change between minors; read release notes before bumping.
+    note: HTTPScaledObject fields change between minor versions; read the release notes before upgrading.

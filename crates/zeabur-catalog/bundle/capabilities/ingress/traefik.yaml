@@ -4,9 +4,9 @@ license: MIT
 maturity: independent
 rationale: >
   Serves Gateway API and Ingress, and hosts the CrowdSec bouncer. Ingress NGINX
-  is retired (2026-03).
+  was retired in March 2026.
 alternatives:
-  envoy-gateway: Envoy-based Gateway API; reused when already installed.
+  envoy-gateway: Serves Gateway API on Envoy; an existing installation is reused.
 defaults:
   single-node: recommended
   multi-node: recommended
@@ -129,7 +129,7 @@ security:
   tenantCRDs: [HTTPRoute, GRPCRoute]
   risks:
     - risk: A tenant HTTPRoute can claim another tenant's hostname on a shared listener.
-      mitigation: One listener per verified domain, allowedRoutes limited to its namespace.
+      mitigation: Use one listener per verified domain, with allowedRoutes limited to its namespace.
     - risk: Traefik CRDs can reference other namespaces.
       mitigation: allowCrossNamespace is false and tenants get no Traefik CRDs.
 

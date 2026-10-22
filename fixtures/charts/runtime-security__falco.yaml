@@ -1,4 +1,26 @@
 ---
+# Alerts carry command lines and file paths, so only namespace admins
+# (the built-in admin role, by aggregation) read their namespace's
+# report. Bind this role in a namespace to let others read it too.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: falco-alert-reader
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+rules:
+  - apiGroups: [wgpolicyk8s.io]
+    resources: [policyreports]
+    verbs: [get, list, watch]
+---
+# Source: falco/charts/falcosidekick/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: falco-falcosidekick
+  namespace: falco
+
+---
 # Source: falco/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -12,6 +34,522 @@ metadata:
     app.kubernetes.io/version: "0.45.0"
     app.kubernetes.io/managed-by: Helm
 
+---
+# Source: falco/charts/falcosidekick/templates/secrets.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: falco-falcosidekick
+  namespace: falco
+  labels:
+    helm.sh/chart: falcosidekick-0.14.0
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/version: "2.31.1"
+    app.kubernetes.io/part-of: falcosidekick
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: core
+  annotations:
+type: Opaque
+data:
+  # Slack Output
+  SLACK_WEBHOOKURL: ""
+  SLACK_CHANNEL: ""
+  SLACK_OUTPUTFORMAT: "YWxs"
+  SLACK_FOOTER: ""
+  SLACK_ICON: ""
+  SLACK_USERNAME: ""
+  SLACK_MINIMUMPRIORITY: ""
+  SLACK_MESSAGEFORMAT: ""
+
+  # RocketChat Output
+  ROCKETCHAT_WEBHOOKURL: ""
+  ROCKETCHAT_OUTPUTFORMAT: "YWxs"
+  ROCKETCHAT_ICON: ""
+  ROCKETCHAT_USERNAME: ""
+  ROCKETCHAT_MINIMUMPRIORITY: ""
+  ROCKETCHAT_MESSAGEFORMAT: ""
+  ROCKETCHAT_MUTUALTLS: "ZmFsc2U="
+  ROCKETCHAT_CHECKCERT: "dHJ1ZQ=="
+
+  # Mattermost Output
+  MATTERMOST_WEBHOOKURL: ""
+  MATTERMOST_OUTPUTFORMAT: "YWxs"
+  MATTERMOST_FOOTER: ""
+  MATTERMOST_ICON: ""
+  MATTERMOST_USERNAME: ""
+  MATTERMOST_MINIMUMPRIORITY: ""
+  MATTERMOST_MESSAGEFORMAT: ""
+  MATTERMOST_MUTUALTLS: "ZmFsc2U="
+  MATTERMOST_CHECKCERT: "dHJ1ZQ=="
+
+  # Teams Output
+  TEAMS_WEBHOOKURL: ""
+  TEAMS_OUTPUTFORMAT: "YWxs"
+  TEAMS_ACTIVITYIMAGE: ""
+  TEAMS_MINIMUMPRIORITY: ""
+
+  # Datadog (Events) Output
+  DATADOG_APIKEY: ""
+  DATADOG_HOST: ""
+  DATADOG_MINIMUMPRIORITY: ""
+
+  # Datadog Logs Output
+  DATADOGLOGS_APIKEY: ""
+  DATADOGLOGS_HOST: ""
+  DATADOGLOGS_SERVICE: ""
+  DATADOGLOGS_MINIMUMPRIORITY: ""
+
+  # AlertManager Output
+  ALERTMANAGER_HOSTPORT: ""
+  ALERTMANAGER_ENDPOINT: "L2FwaS92MS9hbGVydHM="
+  ALERTMANAGER_EXPIRESAFTER: ""
+  ALERTMANAGER_DROPEVENTDEFAULTPRIORITY: "Y3JpdGljYWw="
+  ALERTMANAGER_DROPEVENTTHRESHOLDS: "MTAwMDA6Y3JpdGljYWwsIDEwMDA6Y3JpdGljYWwsIDEwMDpjcml0aWNhbCwgMTA6d2FybmluZywgMTp3YXJuaW5n"
+  ALERTMANAGER_MINIMUMPRIORITY: ""
+  ALERTMANAGER_MUTUALTLS: "ZmFsc2U="
+  ALERTMANAGER_CHECKCERT: "dHJ1ZQ=="
+
+  # InfluxDB Output
+  INFLUXDB_USER: ""
+  INFLUXDB_PASSWORD: ""
+  INFLUXDB_TOKEN: ""
+  INFLUXDB_HOSTPORT: ""
+  INFLUXDB_ORGANIZATION: ""
+  INFLUXDB_PRECISION: "bnM="
+  INFLUXDB_MINIMUMPRIORITY: ""
+  INFLUXDB_DATABASE: "ZmFsY28="
+  INFLUXDB_MUTUALTLS: "ZmFsc2U="
+  INFLUXDB_CHECKCERT: "dHJ1ZQ=="
+
+  # AWS Output
+  AWS_ACCESSKEYID: ""
+  AWS_SECRETACCESSKEY: ""
+  AWS_REGION: ""
+  AWS_CHECKIDENTITY: "dHJ1ZQ=="
+  AWS_LAMBDA_FUNCTIONNAME: ""
+  AWS_LAMBDA_MINIMUMPRIORITY: ""
+  AWS_CLOUDWATCHLOGS_LOGGROUP: ""
+  AWS_CLOUDWATCHLOGS_LOGSTREAM: ""
+  AWS_CLOUDWATCHLOGS_MINIMUMPRIORITY: ""
+  AWS_SNS_TOPICARN: ""
+  AWS_SNS_RAWJSON: "ZmFsc2U="
+  AWS_SNS_MINIMUMPRIORITY: ""
+  AWS_SQS_URL: ""
+  AWS_SQS_MINIMUMPRIORITY: ""
+  AWS_S3_BUCKET: ""
+  AWS_S3_PREFIX: ""
+  AWS_S3_ENDPOINT: ""
+  AWS_S3_OBJECTCANNEDACL: "YnVja2V0LW93bmVyLWZ1bGwtY29udHJvbA=="
+  AWS_S3_MINIMUMPRIORITY: ""
+  AWS_KINESIS_STREAMNAME: ""
+  AWS_KINESIS_MINIMUMPRIORITY: ""
+  AWS_SECURITYLAKE_BUCKET: ""
+  AWS_SECURITYLAKE_REGION: ""
+  AWS_SECURITYLAKE_PREFIX: ""
+  AWS_SECURITYLAKE_ACCOUNTID: ""
+  AWS_SECURITYLAKE_INTERVAL: "NQ=="
+  AWS_SECURITYLAKE_BATCHSIZE: "MTAwMA=="
+  AWS_SECURITYLAKE_MINIMUMPRIORITY: ""
+
+  # SMTP Output
+  SMTP_USER: ""
+  SMTP_PASSWORD: ""
+  SMTP_AUTHMECHANISM: "cGxhaW4="
+  SMTP_TLS: "dHJ1ZQ=="
+  SMTP_HOSTPORT: ""
+  SMTP_FROM: ""
+  SMTP_TO: ""
+  SMTP_TOKEN: ""
+  SMTP_IDENTITY: ""
+  SMTP_TRACE: ""
+  SMTP_OUTPUTFORMAT: "aHRtbA=="
+  SMTP_MINIMUMPRIORITY: ""
+
+  # OpsGenie Output
+  OPSGENIE_APIKEY: ""
+  OPSGENIE_REGION: ""
+  OPSGENIE_MINIMUMPRIORITY: ""
+  OPSGENIE_MUTUALTLS: "ZmFsc2U="
+  OPSGENIE_CHECKCERT: "dHJ1ZQ=="
+
+  # Discord Output
+  DISCORD_WEBHOOKURL: ""
+  DISCORD_ICON: ""
+  DISCORD_MINIMUMPRIORITY: ""
+
+  # GCP Output
+  GCP_CREDENTIALS: ""
+  GCP_PUBSUB_PROJECTID: ""
+  GCP_PUBSUB_TOPIC: ""
+  GCP_PUBSUB_CUSTOMATTRIBUTES: ""
+  GCP_PUBSUB_MINIMUMPRIORITY: ""
+  GCP_STORAGE_BUCKET: ""
+  GCP_STORAGE_PREFIX: ""
+  GCP_STORAGE_MINIMUMPRIORITY: "ZGVidWc="
+  GCP_CLOUDFUNCTIONS_NAME: ""
+  GCP_CLOUDFUNCTIONS_MINIMUMPRIORITY: ""
+  GCP_CLOUDRUN_ENDPOINT: ""
+  GCP_CLOUDRUN_JWT: ""
+  GCP_CLOUDRUN_MINIMUMPRIORITY: ""
+
+  # GoogleChat Output
+  GOOGLECHAT_WEBHOOKURL: ""
+  GOOGLECHAT_OUTPUTFORMAT: "YWxs"
+  GOOGLECHAT_MINIMUMPRIORITY: ""
+  GOOGLECHAT_MESSAGEFORMAT: ""
+
+  # ElasticSearch Output
+  ELASTICSEARCH_HOSTPORT: ""
+  ELASTICSEARCH_INDEX: "ZmFsY28="
+  ELASTICSEARCH_TYPE: "X2RvYw=="
+  ELASTICSEARCH_PIPELINE: ""
+  ELASTICSEARCH_SUFFIX: "ZGFpbHk="
+  ELASTICSEARCH_APIKEY: ""
+  ELASTICSEARCH_USERNAME: ""
+  ELASTICSEARCH_PASSWORD: ""
+  ELASTICSEARCH_FLATTENFIELDS: "ZmFsc2U="
+  ELASTICSEARCH_CREATEINDEXTEMPLATE: "ZmFsc2U="
+  ELASTICSEARCH_ENABLECOMPRESSION: "ZmFsc2U="
+  ELASTICSEARCH_MAXCONCURRENTREQUESTS: "MQ=="
+  ELASTICSEARCH_BATCHING_ENABLED: "dHJ1ZQ=="
+  ELASTICSEARCH_BATCHING_BATCHSIZE: "NTI0Mjg4MA=="
+  ELASTICSEARCH_BATCHING_FLUSHINTERVAL: "MXM="
+  ELASTICSEARCH_NUMBEROFSHARDS: "Mw=="
+  ELASTICSEARCH_NUMBEROFREPLICAS: "Mw=="
+  ELASTICSEARCH_CUSTOMHEADERS: ""
+  ELASTICSEARCH_MUTUALTLS: "ZmFsc2U="
+  ELASTICSEARCH_CHECKCERT: "dHJ1ZQ=="
+  ELASTICSEARCH_MINIMUMPRIORITY: ""
+
+  # Loki Output
+  LOKI_HOSTPORT: ""
+  LOKI_ENDPOINT: "L2xva2kvYXBpL3YxL3B1c2g="
+  LOKI_USER: ""
+  LOKI_APIKEY: ""
+  LOKI_TENANT: ""
+  LOKI_FORMAT: "dGV4dA=="
+  LOKI_EXTRALABELS: ""
+  LOKI_CUSTOMHEADERS: ""
+  LOKI_MINIMUMPRIORITY: ""
+  LOKI_MUTUALTLS: "ZmFsc2U="
+  LOKI_CHECKCERT: "dHJ1ZQ=="
+
+  # Prometheus Output
+  PROMETHEUS_EXTRALABELS: ""
+
+  # Nats Output
+  NATS_HOSTPORT: ""
+  NATS_SUBJECTTEMPLATE: "ZmFsY28uPHByaW9yaXR5Pi48cnVsZT4="
+  NATS_MINIMUMPRIORITY: ""
+  NATS_MUTUALTLS: "ZmFsc2U="
+  NATS_CHECKCERT: "dHJ1ZQ=="
+
+  # Stan Output
+  STAN_HOSTPORT: ""
+  STAN_CLUSTERID: ""
+  STAN_CLIENTID: ""
+  STAN_SUBJECTTEMPLATE: "ZmFsY28uPHByaW9yaXR5Pi48cnVsZT4="
+  STAN_MINIMUMPRIORITY: ""
+  STAN_MUTUALTLS: "ZmFsc2U="
+  STAN_CHECKCERT: "dHJ1ZQ=="
+
+  # Statsd Output
+  STATSD_FORWARDER: ""
+  STATSD_NAMESPACE: "ZmFsY29zaWRla2ljay4="
+
+  # Dogstatsd Output
+  DOGSTATSD_FORWARDER: ""
+  DOGSTATSD_NAMESPACE: "ZmFsY29zaWRla2ljay4="
+  DOGSTATSD_TAGS: ""
+
+  # WebHook Output
+  WEBHOOK_ADDRESS: ""
+  WEBHOOK_METHOD: "UE9TVA=="
+  WEBHOOK_CUSTOMHEADERS: ""
+  WEBHOOK_MINIMUMPRIORITY: ""
+  WEBHOOK_MUTUALTLS: "ZmFsc2U="
+  WEBHOOK_CHECKCERT: "dHJ1ZQ=="
+
+  # Azure Output
+  AZURE_EVENTHUB_NAME: ""
+  AZURE_EVENTHUB_NAMESPACE: ""
+  AZURE_EVENTHUB_MINIMUMPRIORITY: ""
+
+  # Kafka Output
+  KAFKA_HOSTPORT: ""
+  KAFKA_TOPIC: ""
+  KAFKA_SASL: ""
+  KAFKA_TLS: "ZmFsc2U="
+  KAFKA_USERNAME: ""
+  KAFKA_PASSWORD: ""
+  KAFKA_ASYNC: "ZmFsc2U="
+  KAFKA_REQUIREDACKS: "Tk9ORQ=="
+  KAFKA_COMPRESSION: "Tk9ORQ=="
+  KAFKA_BALANCER: "cm91bmRfcm9iaW4="
+  KAFKA_TOPICCREATION: "ZmFsc2U="
+  KAFKA_CLIENTID: ""
+  KAFKA_MINIMUMPRIORITY: ""
+
+  # PagerDuty Output
+  PAGERDUTY_ROUTINGKEY: ""
+  PAGERDUTY_REGION: "dXM="
+  PAGERDUTY_MINIMUMPRIORITY: ""
+
+  # Kubeless Output
+  KUBELESS_FUNCTION: ""
+  KUBELESS_NAMESPACE: ""
+  KUBELESS_PORT: "ODA4MA=="
+  KUBELESS_MINIMUMPRIORITY: ""
+  KUBELESS_MUTUALTLS: "ZmFsc2U="
+  KUBELESS_CHECKCERT: "dHJ1ZQ=="
+
+  # OpenFaaS Output
+  OPENFAAS_GATEWAYNAMESPACE: "b3BlbmZhYXM="
+  OPENFAAS_GATEWAYSERVICE: "Z2F0ZXdheQ=="
+  OPENFAAS_FUNCTIONNAME: ""
+  OPENFAAS_FUNCTIONNAMESPACE: "b3BlbmZhYXMtZm4="
+  OPENFAAS_GATEWAYPORT: "ODA4MA=="
+  OPENFAAS_MINIMUMPRIORITY: ""
+  OPENFAAS_MUTUALTLS: "ZmFsc2U="
+  OPENFAAS_CHECKCERT: "dHJ1ZQ=="
+
+  # Cloud Events Output
+  CLOUDEVENTS_ADDRESS: ""
+  CLOUDEVENTS_EXTENSION: ""
+  CLOUDEVENTS_MINIMUMPRIORITY: ""
+
+  # RabbitMQ Output
+  RABBITMQ_URL: ""
+  RABBITMQ_QUEUE: ""
+  RABBITMQ_MINIMUMPRIORITY: "ZGVidWc="
+
+  # Wavefront Output
+  WAVEFRONT_ENDPOINTTYPE: ""
+  WAVEFRONT_ENDPOINTHOST: ""
+  WAVEFRONT_ENDPOINTTOKEN: ""
+  WAVEFRONT_ENDPOINTMETRICPORT: "Mjg3OA=="
+  WAVEFRONT_FLUSHINTERVALSECONDS: "MQ=="
+  WAVEFRONT_BATCHSIZE: "MTAwMDA="
+  WAVEFRONT_METRICNAME: "ZmFsY28uYWxlcnQ="
+  WAVEFRONT_MINIMUMPRIORITY: "ZGVidWc="
+
+  # Grafana Output
+  GRAFANA_HOSTPORT: ""
+  GRAFANA_APIKEY: ""
+  GRAFANA_DASHBOARDID: ""
+  GRAFANA_PANELID: ""
+  GRAFANA_ALLFIELDSASTAGS: "ZmFsc2U="
+  GRAFANA_CUSTOMHEADERS: ""
+  GRAFANA_MUTUALTLS: "ZmFsc2U="
+  GRAFANA_CHECKCERT: "dHJ1ZQ=="
+  GRAFANA_MINIMUMPRIORITY: ""
+
+  # Grafana On Call Output
+  GRAFANAONCALL_WEBHOOKURL: ""
+  GRAFANAONCALL_CUSTOMHEADERS: ""
+  GRAFANAONCALL_CHECKCERT: "dHJ1ZQ=="
+  GRAFANAONCALL_MUTUALTLS: "ZmFsc2U="
+  GRAFANAONCALL_MINIMUMPRIORITY: ""
+
+  # Fission Output
+  FISSION_FUNCTION: ""
+  FISSION_ROUTERNAMESPACE: "Zmlzc2lvbg=="
+  FISSION_ROUTERSERVICE: "cm91dGVy"
+  FISSION_ROUTERPORT: "ODA="
+  FISSION_MINIMUMPRIORITY: ""
+  FISSION_MUTUALTLS: "ZmFsc2U="
+  FISSION_CHECKCERT: "dHJ1ZQ=="
+
+  # Yandex Output
+  YANDEX_ACCESSKEYID:  ""
+  YANDEX_SECRETACCESSKEY: ""
+  YANDEX_REGION: ""
+  YANDEX_S3_ENDPOINT: ""
+  YANDEX_S3_BUCKET: ""
+  YANDEX_S3_PREFIX: ""
+  YANDEX_S3_MINIMUMPRIORITY: ""
+  YANDEX_DATASTREAMS_ENDPOINT: ""
+  YANDEX_DATASTREAMS_STREAMNAME: ""
+  YANDEX_DATASTREAMS_MINIMUMPRIORITY: ""
+
+  # KafkaRest Output
+  KAFKAREST_ADDRESS: ""
+  KAFKAREST_VERSION: "Mg=="
+  KAFKAREST_MINIMUMPRIORITY: ""
+  KAFKAREST_MUTUALTLS: "ZmFsc2U="
+  KAFKAREST_CHECKCERT: "dHJ1ZQ=="
+
+  # Syslog Output
+  SYSLOG_HOST: ""
+  SYSLOG_PORT: ""
+  SYSLOG_PROTOCOL: "dGNw"
+  SYSLOG_FORMAT: "anNvbg=="
+  SYSLOG_MINIMUMPRIORITY: ""
+
+  # Zoho Cliq Output
+  CLIQ_WEBHOOKURL: ""
+  CLIQ_ICON: ""
+  CLIQ_USEEMOJI: "dHJ1ZQ=="
+  CLIQ_OUTPUTFORMAT: "YWxs"
+  CLIQ_MESSAGEFORMAT: ""
+  CLIQ_MINIMUMPRIORITY: ""
+
+  # Policy Reporter Output
+  POLICYREPORT_ENABLED: "dHJ1ZQ=="
+  POLICYREPORT_KUBECONFIG: "fi8ua3ViZS9jb25maWc="
+  POLICYREPORT_MAXEVENTS: "MTAwMA=="
+  POLICYREPORT_PRUNEBYPRIORITY: "dHJ1ZQ=="
+  POLICYREPORT_MINIMUMPRIORITY: ""
+
+  # Node Red Output
+  NODERED_ADDRESS: ""
+  NODERED_USER: ""
+  NODERED_PASSWORD: ""
+  NODERED_CUSTOMHEADERS: ""
+  NODERED_CHECKCERT: "dHJ1ZQ=="
+  NODERED_MINIMUMPRIORITY: ""
+
+  # MQTT Output
+  MQTT_BROKER: ""
+  MQTT_TOPIC: "ZmFsY28vZXZlbnRz"
+  MQTT_QOS: "MA=="
+  MQTT_RETAINED: "ZmFsc2U="
+  MQTT_USER: ""
+  MQTT_PASSWORD: ""
+  MQTT_CHECKCERT: "dHJ1ZQ=="
+  MQTT_MINIMUMPRIORITY: ""
+
+  # Zincsearch Output
+  ZINCSEARCH_HOSTPORT: ""
+  ZINCSEARCH_INDEX: "ZmFsY28="
+  ZINCSEARCH_USERNAME: ""
+  ZINCSEARCH_PASSWORD: ""
+  ZINCSEARCH_CHECKCERT: "dHJ1ZQ=="
+  ZINCSEARCH_MINIMUMPRIORITY: ""
+
+  # Gotify Output
+  GOTIFY_HOSTPORT: ""
+  GOTIFY_TOKEN: ""
+  GOTIFY_FORMAT: "bWFya2Rvd24="
+  GOTIFY_CHECKCERT: "dHJ1ZQ=="
+  GOTIFY_MINIMUMPRIORITY: ""
+
+  # Tekton Output
+  TEKTON_EVENTLISTENER: ""
+  TEKTON_CHECKCERT: "dHJ1ZQ=="
+  TEKTON_MINIMUMPRIORITY: ""
+
+  # Spyderbat Output
+  SPYDERBAT_ORGUID: ""
+  SPYDERBAT_APIKEY: ""
+  SPYDERBAT_APIURL: "aHR0cHM6Ly9hcGkuc3B5ZGVyYmF0LmNvbQ=="
+  SPYDERBAT_SOURCE: "ZmFsY29zaWRla2ljaw=="
+  SPYDERBAT_SOURCEDESCRIPTION: ""
+  SPYDERBAT_MINIMUMPRIORITY: ""
+
+  # TimescaleDB Output
+  TIMESCALEDB_HOST: ""
+  TIMESCALEDB_PORT: "NTQzMg=="
+  TIMESCALEDB_USER: "cG9zdGdyZXM="
+  TIMESCALEDB_PASSWORD: "cG9zdGdyZXM="
+  TIMESCALEDB_DATABASE: ""
+  TIMESCALEDB_HYPERTABLENAME: "ZmFsY29fZXZlbnRz"
+  TIMESCALEDB_MINIMUMPRIORITY: ""
+
+  # Redis Output
+  REDIS_ADDRESS: ""
+  REDIS_PASSWORD: ""
+  REDIS_DATABASE: "MA=="
+  REDIS_KEY: "ZmFsY28="
+  REDIS_STORAGETYPE: "bGlzdA=="
+  REDIS_MINIMUMPRIORITY: ""
+
+  # TELEGRAM Output
+  TELEGRAM_TOKEN: ""
+  TELEGRAM_CHATID: ""
+  TELEGRAM_MESSAGE_THREAD_ID: ""
+  TELEGRAM_MINIMUMPRIORITY: ""
+  TELEGRAM_CHECKCERT: "dHJ1ZQ=="
+
+  # N8N Output
+  N8N_ADDRESS: ""
+  N8N_USER: ""
+  N8N_PASSWORD: ""
+  N8N_MINIMUMPRIORITY: ""
+  N8N_CHECKCERT: "dHJ1ZQ=="
+
+  # Open Observe Output
+  OPENOBSERVE_HOSTPORT: ""
+  OPENOBSERVE_USERNAME: ""
+  OPENOBSERVE_PASSWORD: ""
+  OPENOBSERVE_CHECKCERT: "dHJ1ZQ=="
+  OPENOBSERVE_MUTUALTLS: "ZmFsc2U="
+  OPENOBSERVE_CUSTOMHEADERS: ""
+  OPENOBSERVE_ORGANIZATIONNAME: "ZGVmYXVsdA=="
+  OPENOBSERVE_STREAMNAME: "ZmFsY28="
+  OPENOBSERVE_MINIMUMPRIORITY: ""
+
+  # Dynatrace Output
+  DYNATRACE_APITOKEN: ""
+  DYNATRACE_APIURL: ""
+  DYNATRACE_CHECKCERT: "dHJ1ZQ=="
+  DYNATRACE_MINIMUMPRIORITY: ""
+
+  # OTLP Traces Output
+  OTLP_TRACES_ENDPOINT: ""
+  OTLP_TRACES_PROTOCOL: ""
+  OTLP_TRACES_TIMEOUT: "MTAwMA=="
+  OTLP_TRACES_HEADERS: ""
+  OTLP_TRACES_SYNCED: "ZmFsc2U="
+  OTLP_TRACES_DURATION: "MTAwMA=="
+  OTLP_TRACES_CHECKCERT: "dHJ1ZQ=="
+  OTLP_TRACES_MINIMUMPRIORITY: ""
+  # OTLP Metrics Output
+  OTLP_METRICS_ENDPOINT: ""
+  OTLP_METRICS_PROTOCOL: "Z3JwYw=="
+  OTLP_METRICS_TIMEOUT: "MTAwMA=="
+  OTLP_METRICS_HEADERS: ""
+  OTLP_METRICS_EXTRAATTRIBUTES: ""
+  OTLP_METRICS_CHECKCERT: "dHJ1ZQ=="
+  OTLP_METRICS_MINIMUMPRIORITY: ""
+
+  # Sumologic Output
+  SUMOLOGIC_RECEIVERURL: ""
+  SUMOLOGIC_SOURCECATEGORY: ""
+  SUMOLOGIC_SOURCEHOST: ""
+  SUMOLOGIC_NAME: ""
+  SUMOLOGIC_CHECKCERT: "dHJ1ZQ=="
+  SUMOLOGIC_MINIMUMPRIORITY: ""
+
+  # Quickwit Output
+  QUICKWIT_HOSTPORT: ""
+  QUICKWIT_APIENDPOINT: "L2FwaS92MQ=="
+  QUICKWIT_INDEX: "ZmFsY28="
+  QUICKWIT_AUTOCREATEINDEX: "ZmFsc2U="
+  QUICKWIT_CUSTOMHEADERS: ""
+  QUICKWIT_VERSION: "MC43"
+  QUICKWIT_CHECKCERT: "dHJ1ZQ=="
+  QUICKWIT_MUTUALTLS: "ZmFsc2U="
+  QUICKWIT_MINIMUMPRIORITY: ""
+
+  # Webex Output
+  WEBEX_WEBHOOKURL: ""
+  WEBEX_MINIMUMPRIORITY: ""
+
+  # Talon Output
+  TALON_ADDRESS: ""
+  TALON_CHECKCERT: "dHJ1ZQ=="
+  TALON_MINIMUMPRIORITY: ""
+  
+  # WebUI Output
+
+  # Splunk Output
+  SPLUNK_HOST: ""
+  SPLUNK_TOKEN: ""
+  SPLUNK_CUSTOMHEADERS: ""
+  SPLUNK_CHECKCERT: "dHJ1ZQ=="
+  SPLUNK_MINIMUMPRIORITY: ""
 ---
 # Source: falco/templates/configmap.yaml
 apiVersion: v1
@@ -66,12 +604,12 @@ data:
       client_key: /etc/falco/certs/client/client.key
       compress_uploads: false
       echo: false
-      enabled: false
+      enabled: true
       insecure: false
       keep_alive: false
       max_consecutive_timeouts: 5
       mtls: false
-      url: ""
+      url: http://falco-falcosidekick:2801
       user_agent: falcosecurity/falco
     json_include_message_property: false
     json_include_output_fields_property: true
@@ -200,6 +738,135 @@ data:
       url: https://falcosecurity.github.io/falcoctl/index.yaml
 
 ---
+# Source: falco/charts/falcosidekick/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: falco-falcosidekick
+  labels:
+    helm.sh/chart: falcosidekick-0.14.0
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/version: "2.31.1"
+    app.kubernetes.io/part-of: falcosidekick
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: core
+rules:
+- apiGroups:
+    - "wgpolicyk8s.io"
+  resources:
+    - policyreports
+    - clusterpolicyreports
+  verbs:
+    - get
+    - create
+    - delete
+    - update
+
+---
+# Source: falco/charts/falcosidekick/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: falco-falcosidekick
+  labels:
+    helm.sh/chart: falcosidekick-0.14.0
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/version: "2.31.1"
+    app.kubernetes.io/part-of: falcosidekick
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: core
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: falco-falcosidekick
+subjects:
+- kind: ServiceAccount
+  namespace: falco
+  name: falco-falcosidekick
+
+---
+# Source: falco/charts/falcosidekick/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: falco-falcosidekick
+  namespace: falco
+  labels:
+    helm.sh/chart: falcosidekick-0.14.0
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/version: "2.31.1"
+    app.kubernetes.io/part-of: falcosidekick
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: core
+  annotations:
+rules:
+- apiGroups:
+    - ""
+  resources:
+    - endpoints
+  verbs:
+    - get
+
+---
+# Source: falco/charts/falcosidekick/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: falco-falcosidekick
+  namespace: falco
+  labels:
+    helm.sh/chart: falcosidekick-0.14.0
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/version: "2.31.1"
+    app.kubernetes.io/part-of: falcosidekick
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: core
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: falco-falcosidekick
+subjects:
+- kind: ServiceAccount
+  name: falco-falcosidekick
+
+---
+# Source: falco/charts/falcosidekick/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: falco-falcosidekick
+  namespace: falco
+  labels:
+    helm.sh/chart: falcosidekick-0.14.0
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/version: "2.31.1"
+    app.kubernetes.io/part-of: falcosidekick
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: core
+  annotations:
+    prometheus.io/scrape: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - port: 2801
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 2810
+      targetPort: http-notls
+      protocol: TCP
+      name: http-notls
+  selector:
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/component: core
+
+---
 # Source: falco/templates/daemonset.yaml
 apiVersion: apps/v1
 kind: DaemonSet
@@ -224,7 +891,7 @@ spec:
         app.kubernetes.io/name: falco
         app.kubernetes.io/instance: falco
       annotations:
-        checksum/config: aa366942369d414bc867ce03780871dc831bc47b221a2aee9480f9906d07eef4
+        checksum/config: 873082ea9823c1536396b5497ecc71dee4a364a18b358c876f7d5451a728db59
         checksum/rules: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
         checksum/certs: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
     spec:
@@ -400,3 +1067,118 @@ spec:
               path: falco.yaml
   updateStrategy:
     type: RollingUpdate
+
+---
+# Source: falco/charts/falcosidekick/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: falco-falcosidekick
+  namespace: falco
+  labels:
+    helm.sh/chart: falcosidekick-0.14.0
+    app.kubernetes.io/name: falcosidekick
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/version: "2.31.1"
+    app.kubernetes.io/part-of: falcosidekick
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: core
+  annotations:
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: falcosidekick
+      app.kubernetes.io/instance: falco
+      app.kubernetes.io/component: core
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: falcosidekick-0.14.0
+        app.kubernetes.io/name: falcosidekick
+        app.kubernetes.io/instance: falco
+        app.kubernetes.io/version: "2.31.1"
+        app.kubernetes.io/part-of: falcosidekick
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/component: core
+      annotations:
+        checksum/config: 731e0d5df54a12ecce367991eddbf717f4c8ecf294ab16e7c229b3248f150c83
+    spec:
+      serviceAccountName: falco-falcosidekick
+      securityContext:
+        fsGroup: 1234
+        runAsUser: 1234
+      containers:
+        - name: falcosidekick
+          image: "docker.io/falcosecurity/falcosidekick:2.35.0"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 2801
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          envFrom:
+            - secretRef:
+                name: falco-falcosidekick
+          env:
+            - name: DEBUG
+              value: "false"
+            - name: CUSTOMFIELDS
+              value: ""
+            - name: TEMPLATEDFIELDS
+              value: ""
+            - name: CUSTOMTAGS
+              value: ""
+            - name: OUTPUTFIELDFORMAT
+              value: ""
+            - name: BRACKETREPLACER
+              value: ""
+            - name: MUTUALTLSFILESPATH
+              value: "/etc/certs"
+            - name: MUTUALTLSCLIENT_CERTFILE
+              value: ""
+            - name: MUTUALTLSCLIENT_KEYFILE
+              value: ""
+            - name: MUTUALTLSCLIENT_CACERTFILE
+              value: ""
+            - name: TLSCLIENT_CACERTFILE
+              value: ""
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+---
+# Source: falco/charts/falcosidekick/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "falco-falcosidekick-test-connection"
+  namespace: falco
+  labels:
+    app.kubernetes.io/name: falcosidekick
+    helm.sh/chart: falcosidekick-0.14.0
+    app.kubernetes.io/instance: falco
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test-success
+spec:
+  containers:
+    - name: curl
+      image: curlimages/curl
+      command: ['curl']
+      args:  ["-X", "POST", 'falco-falcosidekick:2801/healthz']
+  restartPolicy: Never
+

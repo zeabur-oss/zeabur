@@ -140,7 +140,7 @@ spec:
             - --source=ingress
             - --policy=upsert-only
             - --registry=txt
-            - --txt-owner-id=recs-ci
+            - --txt-owner-id=catalog-ci
             - --domain-filter=example.test
             - --provider=inmemory
           ports:

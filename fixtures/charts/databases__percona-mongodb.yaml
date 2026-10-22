@@ -1,0 +1,294 @@
+---
+# Source: psmdb-operator/templates/role-binding.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: psmdb-operator
+  namespace: psmdb-operator
+
+---
+# Source: psmdb-operator/templates/role.yaml
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: psmdb-operator
+  labels:
+    app.kubernetes.io/name: psmdb-operator
+    helm.sh/chart: psmdb-operator-1.23.2
+    app.kubernetes.io/instance: psmdb-operator
+    app.kubernetes.io/version: "1.23.1"
+    app.kubernetes.io/managed-by: Helm
+rules:
+  - apiGroups:
+    - psmdb.percona.com
+    resources:
+    - perconaservermongodbs
+    - perconaservermongodbs/status
+    - perconaservermongodbs/finalizers
+    - perconaservermongodbbackups
+    - perconaservermongodbbackups/status
+    - perconaservermongodbbackups/finalizers
+    - perconaservermongodbclustersyncs
+    - perconaservermongodbclustersyncs/status
+    - perconaservermongodbclustersyncs/finalizers
+    - perconaservermongodbrestores
+    - perconaservermongodbrestores/status
+    - perconaservermongodbrestores/finalizers
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - admissionregistration.k8s.io
+    resources:
+    - validatingwebhookconfigurations
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - ""
+    resources:
+    - nodes
+    verbs:
+    - get
+    - list
+    - watch
+  - apiGroups:
+    - ""
+    resources:
+    - pods
+    - pods/exec
+    - services
+    - persistentvolumeclaims
+    - secrets
+    - configmaps
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - apps
+    resources:
+    - deployments
+    - replicasets
+    - statefulsets
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - batch
+    resources:
+    - cronjobs
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - policy
+    resources:
+    - poddisruptionbudgets
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+  - apiGroups:
+    - events.k8s.io
+    - ""
+    resources:
+    - events
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - patch
+  - apiGroups:
+    - metrics.k8s.io
+    resources:
+    - pods
+    verbs:
+    - get
+    - list
+  - apiGroups:
+    - certmanager.k8s.io
+    - cert-manager.io
+    resources:
+    - issuers
+    - certificates
+    - certificaterequests
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+    - deletecollection
+  - apiGroups:
+    - net.gke.io
+    - multicluster.x-k8s.io
+    resources:
+    - serviceexports
+    - serviceimports
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - update
+    - patch
+    - delete
+    - deletecollection
+  - apiGroups:
+    - snapshot.storage.k8s.io
+    resources:
+    - volumesnapshots
+    verbs:
+    - get
+    - list
+    - watch
+    - create
+    - delete
+
+---
+# Source: psmdb-operator/templates/role-binding.yaml
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: service-account-psmdb-operator
+  labels:
+    app.kubernetes.io/name: psmdb-operator
+    helm.sh/chart: psmdb-operator-1.23.2
+    app.kubernetes.io/instance: psmdb-operator
+    app.kubernetes.io/version: "1.23.1"
+    app.kubernetes.io/managed-by: Helm
+subjects:
+- kind: ServiceAccount
+  name: psmdb-operator
+  namespace: psmdb-operator
+roleRef:
+  kind: ClusterRole
+  name: psmdb-operator
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Source: psmdb-operator/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: psmdb-operator
+  namespace: psmdb-operator
+  labels:
+    app.kubernetes.io/name: psmdb-operator
+    helm.sh/chart: psmdb-operator-1.23.2
+    app.kubernetes.io/instance: psmdb-operator
+    app.kubernetes.io/version: "1.23.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: psmdb-operator
+      app.kubernetes.io/instance: psmdb-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: psmdb-operator
+        app.kubernetes.io/instance: psmdb-operator
+    spec:
+      serviceAccountName: psmdb-operator
+      securityContext:
+        {}
+      containers:
+        - name: psmdb-operator
+          securityContext:
+            {}
+          image: "percona/percona-server-mongodb-operator:1.23.1"
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8080
+            protocol: TCP
+            name: metrics
+          - containerPort: 8081
+            protocol: TCP
+            name: health
+          command:
+          - percona-server-mongodb-operator
+          env:
+            - name: LOG_STRUCTURED
+              value: "false"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: WATCH_NAMESPACE
+              value: ""
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: percona-server-mongodb-operator
+            - name: RESYNC_PERIOD
+              value: "5s"
+            - name: RECONCILE_INTERVAL
+              value: "5s"
+            - name: DISABLE_TELEMETRY
+              value: "true"
+            - name: MAX_CONCURRENT_RECONCILES
+              value: "1"
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: health
+              scheme: HTTP
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /readyz
+              port: health
+              scheme: HTTP
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi

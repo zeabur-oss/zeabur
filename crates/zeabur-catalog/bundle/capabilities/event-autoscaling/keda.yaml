@@ -3,8 +3,9 @@ homepage: https://keda.sh
 license: Apache-2.0
 maturity: cncf-graduated
 rationale: >
-  Event-driven autoscaling down to zero, configured per namespace. Optional on
-  a single node, where it costs more memory than scaling saves.
+  Scales workloads on events, down to zero, with scaling configured per
+  namespace. Optional on a single node: there it costs more memory than
+  scaling saves.
 defaults:
   single-node: optional
   multi-node: recommended
@@ -60,7 +61,7 @@ security:
   tenants: namespaced
   tenantCRDs: [ScaledObject, ScaledJob, TriggerAuthentication]
   risks:
-    - risk: A ScaledObject can use cluster-level credentials via ClusterTriggerAuthentication.
+    - risk: A ScaledObject can use cluster-level credentials through ClusterTriggerAuthentication.
       mitigation: Reject tenant references to ClusterTriggerAuthentication with an admission policy.
     - risk: URL-based triggers make the operator call any address (SSRF).
       mitigation: Reject private and link-local trigger addresses with the same policy.

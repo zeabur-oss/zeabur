@@ -6,7 +6,7 @@ rationale: >
   One operator runs both the metrics and the logs stack from CRDs, and accepts
   Prometheus operator objects so existing app manifests keep working.
 alternatives:
-  prometheus-operator: Reused if present; VictoriaMetrics converts its objects.
+  prometheus-operator: An existing installation is reused, and the VictoriaMetrics operator converts its objects.
 defaults:
   single-node: recommended
   multi-node: recommended

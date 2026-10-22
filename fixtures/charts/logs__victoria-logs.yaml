@@ -32,3 +32,27 @@ spec:
   resources:
     requests: {cpu: 20m, memory: 32Mi}
     limits: {memory: 256Mi}
+---
+# Only the collector, the metrics stack's vmagent (the operator's scrape of
+# /metrics) and Zeabur Proxy in the zeabur namespace reach the log store.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-logs
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: vlsingle, app.kubernetes.io/instance: victoria-logs}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 9428, protocol: TCP}]
+      from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: vlagent, app.kubernetes.io/instance: collector}
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: vmagent}
+        # Both selectors: anyone can label a pod in their own namespace.
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: zeabur}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: zeabur-proxy}

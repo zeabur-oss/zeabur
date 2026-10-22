@@ -4,7 +4,7 @@ license: Apache-2.0
 maturity: kubernetes-sig
 rationale: >
   Suggests CPU and memory requests from observed usage. Recommender only:
-  nothing changes pods unless the user applies a suggestion.
+  nothing changes pods unless you apply a suggestion.
 defaults:
   single-node: optional
   multi-node: optional

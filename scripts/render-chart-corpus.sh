@@ -40,7 +40,7 @@ fi
 # status also covers kubeconform, which is not this corpus's concern, so it is reported and
 # missing files are caught below instead.
 for run in 1 2; do
-  if ! (cd "$src" && nix develop -c go run ./tools/cmd/recs render -out "$work/render-$run") \
+  if ! (cd "$src" && nix develop -c go run ./tools/cmd/catalog render -out "$work/render-$run") \
     >"$work/render-$run.log" 2>&1; then
     echo "warning: recs render run $run exited non-zero; see the tail of its log:" >&2
     tail -n 20 "$work/render-$run.log" >&2
@@ -83,6 +83,9 @@ licence() {
   local gh=https://github.com recs="[Apache-2.0](https://github.com/zeabur/catalog/blob/main/LICENSE) (catalogue)"
   case $1 in
   certificates/cert-manager) echo "[Apache-2.0]($gh/cert-manager/cert-manager/blob/master/LICENSE)" ;;
+  config-reload/reloader) echo "[Apache-2.0]($gh/stakater/Reloader/blob/master/LICENSE)" ;;
+  databases/cloudnative-pg) echo "[Apache-2.0]($gh/cloudnative-pg/charts/blob/main/LICENSE)" ;;
+  databases/percona-mongodb) echo "[Apache-2.0]($gh/percona/percona-helm-charts/blob/main/LICENSE)" ;;
   dns/external-dns) echo "[Apache-2.0]($gh/kubernetes-sigs/external-dns/blob/master/LICENSE.md)" ;;
   event-autoscaling/keda | event-autoscaling/keda-http-add-on)
     echo "[Apache-2.0]($gh/kedacore/charts/blob/main/LICENSE)"
@@ -101,6 +104,7 @@ licence() {
   node-updates/system-upgrade-controller)
     echo "[Apache-2.0]($gh/rancher/system-upgrade-controller/blob/master/LICENSE)"
     ;;
+  remote-access/tailscale-operator) echo "[BSD-3-Clause]($gh/tailscale/tailscale/blob/main/LICENSE)" ;;
   resource-recommendations/vertical-pod-autoscaler)
     echo "[Apache-2.0]($gh/kubernetes/autoscaler/blob/master/LICENSE)"
     ;;

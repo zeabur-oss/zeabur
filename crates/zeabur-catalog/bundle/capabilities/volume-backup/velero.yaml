@@ -3,27 +3,27 @@ homepage: https://velero.io
 license: Apache-2.0
 maturity: cncf-sandbox
 rationale: >
-  Whole-cluster backup and disaster recovery to S3. It can touch any
+  Backs up the whole cluster to S3 for disaster recovery. It can touch any
   namespace, so it is for administrators only.
 alternatives:
-  k8up: Namespace-scoped backups for tenants.
+  k8up: Backs up each namespace on its own, so tenants can use it.
 defaults:
   single-node: optional
   multi-node: optional
 
 inputs:
   - name: bucket
-    description: S3 bucket for backups.
+    description: Velero stores backups in this S3 bucket.
     path: configuration.backupStorageLocation.0.bucket
     required: true
-    testValue: recs-ci
+    testValue: catalog-ci
   - name: s3-url
-    description: S3 endpoint URL (any S3-compatible service).
+    description: Velero connects to this S3 endpoint URL; any S3-compatible service works.
     path: configuration.backupStorageLocation.0.config.s3Url
     required: true
     testValue: http://minio.invalid:9000
   - name: credentials
-    description: AWS-style credentials file for the bucket.
+    description: Velero reads the bucket's credentials from this AWS-style credentials file.
     secret: {name: velero-credentials, key: cloud, namespace: velero}
     required: true
     testValue: "[default]\naws_access_key_id=ci\naws_secret_access_key=ci\n"
@@ -87,7 +87,7 @@ security:
   clusterWide: true
   privileged: true
   credentials: required
-  credentialsNote: Static S3 credentials; one Kopia key is shared by all backups.
+  credentialsNote: Needs static S3 credentials; all backups share one Kopia key.
   tenants: admin-only
   risks:
     - risk: Backups and Restores can include any namespace, including other tenants' Secrets.

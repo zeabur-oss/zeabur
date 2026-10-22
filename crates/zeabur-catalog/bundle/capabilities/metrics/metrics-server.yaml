@@ -3,8 +3,8 @@ homepage: https://github.com/kubernetes-sigs/metrics-server
 license: Apache-2.0
 maturity: kubernetes-sig
 rationale: >
-  Serves metrics.k8s.io for HPA and `kubectl top`. No history, so it is the
-  cheapest source of live CPU and memory.
+  Serves metrics.k8s.io for HPA and `kubectl top`. It keeps no history, so it
+  is the cheapest source of live CPU and memory.
 alternatives:
   victoria-metrics: Adds history and alerts at a few hundred MiB.
 defaults:
