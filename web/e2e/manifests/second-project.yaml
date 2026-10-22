@@ -1,0 +1,28 @@
+# A second project, for the roles test (web/e2e/l2/roles.spec.ts): its Developer has none here,
+# its Viewer only this one. Applied by scripts/e2e-l2.sh.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zeabur-e2e-second
+  labels:
+    zeabur.com/project: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: talker
+  namespace: zeabur-e2e-second
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: talker
+  template:
+    metadata:
+      labels:
+        app: talker
+    spec:
+      containers:
+        - name: talker
+          image: busybox:1.37
+          command: ["sh", "-c", "while true; do echo zeabur-e2e-second; sleep 5; done"]

@@ -2,8 +2,9 @@
 # Zeabur in a cluster, end to end: a k3d cluster whose kube-apiserver trusts Zeabur Identity, Zeabur Identity and
 # Zeabur installed from their images (Zeabur with its Helm chart), both behind the cluster's
 # Traefik over HTTPS, and a browser (web/e2e/l2) that enrols a passkey, signs in, confirms a
-# terminal with the passkey again, runs a command, then reads and changes with admin rights. Then,
-# from the outside: Zeabur's service account can do nothing a fresh one cannot, the idle pod
+# terminal with the passkey again, runs a command, then reads and changes with admin rights; an
+# admin invites a Developer and a Viewer, who each see what their role allows. Then, from the
+# outside: Zeabur's service account can do nothing a fresh one cannot, the idle pod
 # stays within its memory budget, and `helm uninstall` leaves the cluster as it was.
 #
 # Run inside `nix develop` on Linux with Docker; it uses this machine's port 443. It creates the
@@ -173,13 +174,12 @@ printf 'subjectAltName=DNS:%s,DNS:%s\nextendedKeyUsage=serverAuth\nbasicConstrai
   "$zeabur_identity_host" "$zeabur_host" >"$tls/ext.cnf"
 openssl x509 -req -in "$tls/tls.csr" -CA "$tls/ca.crt" -CAkey "$tls/ca.key" -days 2 \
   -set_serial "0x$(openssl rand -hex 16)" -extfile "$tls/ext.cnf" -out "$tls/tls.crt" 2>/dev/null
-spki=$(openssl x509 -in "$tls/tls.crt" -pubkey -noout | openssl pkey -pubin -outform der |
-  openssl dgst -sha256 -binary | base64)
 
 # --- Zeabur Identity, installed as its get-started guide does ----------------------------------------------
 export ZEABUR_IDENTITY_ISSUER="https://$zeabur_identity_host"
 "$zeabur_identityctl" crds | kubectl apply --server-side -f -
-"$zeabur_identityctl" manifests --image "$zeabur_identity_image" | kubectl apply --server-side -f -
+"$zeabur_identityctl" manifests --image "$zeabur_identity_image" --serve-arg=--invitations |
+  kubectl apply --server-side -f -
 kubectl -n zeabur-identity rollout status deployment/zeabur-identity --timeout=180s
 kubectl -n zeabur-identity create secret tls zeabur-identity-tls --cert="$tls/tls.crt" --key="$tls/tls.key"
 kubectl apply -f - <<EOF
@@ -220,11 +220,10 @@ retry 180 "kube-apiserver to load Zeabur Identity's configuration" reloaded
   --redirect-uri "https://$zeabur_host/auth/callback" --home-url "https://$zeabur_host/" 2>"$out/client.err" | kubectl apply -f -
 client_secret=$(tail -n 1 "$out/client.err")
 rm -f "$out/client.err"
-setup_link=$("$zeabur_identityctl" setup-link --username admin)
 
-# The project the browser opens.
-kubectl apply -f "$root/web/e2e/manifests/talker.yaml" >/dev/null
-kubectl -n "$project" rollout status deployment/talker --timeout=180s
+# The projects the browser opens, before the snapshot: their namespaces stay after the removal.
+kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \
+  -f "$root/web/e2e/manifests/second-project.yaml" >/dev/null
 
 # --- What the cluster looks like before zeabur ----------------------------------------------------
 # Every cluster-scoped object by kind and name, and every namespace's labels and annotations.
@@ -261,13 +260,8 @@ zeabur_up() {
 retry 120 "zeabur over HTTPS" zeabur_up
 
 # --- The browser ----------------------------------------------------------------------------------
-rm -rf "$out/results"
-# Chromium accepts the run's certificate by its key (ZEABUR_L2_SPKI); the test's own requests
-# (page.request) go through Node, which takes the run's CA from NODE_EXTRA_CA_CERTS.
-(cd "$root/web" && NODE_EXTRA_CA_CERTS="$tls/ca.crt" \
-  ZEABUR_L2_URL="https://$zeabur_host" ZEABUR_L2_SPKI="$spki" \
-  ZEABUR_L2_SETUP_LINK="$setup_link" ZEABUR_L2_NAMESPACE="$project" ZEABUR_L2_SERVICE=talker \
-  bunx playwright test -c playwright.l2.config.ts --reporter=line --output="$out/results")
+# The e2e users, made from scratch, and web/e2e/l2.
+"$root/scripts/e2e-l2-browser.sh"
 # The restart the browser confirmed reached the cluster.
 restarted=$(kubectl -n "$project" get deployment/talker \
   -o jsonpath='{.spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt}')
@@ -316,6 +310,7 @@ fi
 
 # --- Removal leaves the cluster as it was -----------------------------------------------------------
 helm uninstall zeabur --namespace "$namespace" --wait --timeout 3m
+kubectl delete rolebindings,clusterrolebindings -A -l zeabur.com/member --wait
 kubectl delete namespace "$namespace" --wait --timeout=180s
 snapshot >"$out/after.txt"
 if ! diff -u "$out/before.txt" "$out/after.txt"; then
