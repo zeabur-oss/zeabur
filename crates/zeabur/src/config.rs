@@ -47,6 +47,11 @@ pub(crate) struct Args {
     /// `true` or `false`.
     #[arg(long, env = "ZEABUR_ELEVATION")]
     pub(crate) elevation: bool,
+    /// The chart installed the member roles (`zeabur-member`, `zeabur-project-developer`,
+    /// `zeabur-project-viewer`), so members can be given rights in chosen projects. As an
+    /// environment variable, `true` or `false`.
+    #[arg(long, env = "ZEABUR_MEMBER_ROLES")]
+    pub(crate) member_roles: bool,
     /// Minutes a session may go unused before it ends.
     #[arg(long, env = "ZEABUR_SESSION_IDLE_MINUTES", default_value_t = 30)]
     pub(crate) session_idle_minutes: u32,
@@ -169,6 +174,7 @@ impl Args {
                 .to_owned(),
         );
         settings.identity.issuer = Some(issuer.to_string());
+        settings.identity.project_roles = self.member_roles;
         terminal(self, &mut settings.terminal)?;
         if self.session_idle_minutes == 0 || self.session_max_hours == 0 {
             return Err(
@@ -440,8 +446,9 @@ mod tests {
                 ..zeabur_api::Settings::default()
             }
         );
-        let config = args(&files, &["--cluster-name", " shop-prod "]).unwrap();
+        let config = args(&files, &["--cluster-name", " shop-prod ", "--member-roles"]).unwrap();
         assert_eq!(config.settings.cluster_name.as_deref(), Some("shop-prod"));
+        assert!(config.settings.identity.project_roles);
         let error = args(&files, &["--cluster-name", &"x".repeat(64)]).unwrap_err();
         assert!(error.starts_with("--cluster-name:"), "{error}");
         let config = args(&files, &["--public-url", "https://zeabur.localhost:8443"]).unwrap();

@@ -9,6 +9,7 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, DynamicObject, ResourceRef};
 use zeabur_model::Origin;
 
+use super::access::ProjectGrant;
 use super::{
     ADMIN_GROUP, API_VERSION, DEPLOYMENT, GROUP, LABEL_ANNOTATION, LAST_USED_ANNOTATION,
     USER_PREFIX, VERSION,
@@ -140,6 +141,8 @@ pub(crate) struct Directory {
     pub(crate) invitations: Vec<Object<InvitationSpec>>,
     pub(crate) grants: Vec<Object<GrantSpec>>,
     pub(crate) unreadable: Vec<UnreadableView>,
+    /// Each member's projects, by user name; `None` when the bindings were not read.
+    pub(crate) projects: Option<std::collections::BTreeMap<String, Vec<ProjectGrant>>>,
 }
 
 /// Objects that do not decode (made by hand, from another version) are left out: one bad object
@@ -229,6 +232,7 @@ impl Directory {
             invitations,
             grants,
             unreadable,
+            projects: None,
         }))
     }
 
@@ -244,12 +248,14 @@ impl Directory {
             .count()
     }
 
-    /// The member `user`, as `you` (the person's Kubernetes user name) sees them.
+    /// The member `user`, as `you` (the person's Kubernetes user name) sees them, with their
+    /// projects when the bindings could be read.
     pub(crate) fn member(
         &self,
         user: &Object<UserSpec>,
         namespace: &str,
         you: Option<&str>,
+        projects: Option<Vec<ProjectGrant>>,
     ) -> MemberView {
         let username = user.name().to_owned();
         let mine = |owner: &str| owner == username;
@@ -304,15 +310,17 @@ impl Directory {
             .max()
             .map(|t| t.to_string());
         let spec = &user.spec;
+        let admin = spec.elevated_groups.iter().any(|g| g == ADMIN_GROUP);
         MemberView {
             id: format!("members/{username}"),
             display_name: spec.display_name.clone().filter(|n| !n.trim().is_empty()),
             groups: spec.groups.clone(),
-            role: if spec.elevated_groups.iter().any(|g| g == ADMIN_GROUP) {
+            role: if admin {
                 MemberRole::Admin
             } else {
                 MemberRole::Member
             },
+            projects: projects.filter(|_| !admin),
             disabled: spec.disabled,
             passkeys,
             linked,
@@ -366,7 +374,13 @@ impl Directory {
         let mut items: Vec<MemberView> = self
             .users
             .iter()
-            .map(|user| self.member(user, namespace, you))
+            .map(|user| {
+                let projects = self
+                    .projects
+                    .as_ref()
+                    .map(|grants| grants.get(user.name()).cloned().unwrap_or_default());
+                self.member(user, namespace, you, projects)
+            })
             .collect();
         items.sort_by(|a, b| a.username.cmp(&b.username));
         let mut invitations: Vec<InvitationView> = self
@@ -383,6 +397,7 @@ impl Directory {
             invitations,
             setup_links,
             can_manage,
+            project_roles: false,
             unreadable: self.unreadable.clone(),
         }
     }
@@ -564,6 +579,10 @@ pub struct MemberView {
     pub groups: Vec<String>,
     /// Admin or member.
     pub role: MemberRole,
+    /// A member's roles in projects, by project; `None` when Zeabur could not read them. An
+    /// admin's are left out: their rights cover every project.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projects: Option<Vec<ProjectGrant>>,
     /// A disabled member cannot sign in.
     pub disabled: bool,
     /// Passkeys, oldest first.
@@ -621,7 +640,11 @@ pub struct MembersView {
     pub setup_links: SetupLinks,
     /// Whether the person may create invitations, as far as their rules tell.
     pub can_manage: Permission,
-    /// Kinds the person may not read (invitations, grants), whose parts are left out.
+    /// Whether members can be given Developer or Viewer in chosen projects (the chart's member
+    /// roles are installed).
+    pub project_roles: bool,
+    /// Kinds the person may not read (invitations, grants, role bindings), whose parts are left
+    /// out.
     pub unreadable: Vec<UnreadableView>,
 }
 
@@ -716,6 +739,7 @@ mod tests {
             grants: vec![object(json!({"metadata": {"name": "g-1"},
                 "spec": {"user": "ada", "authTime": 1_760_947_200, "expiresAt": 2_000_000_000}}))],
             unreadable: Vec::new(),
+            projects: None,
         }
     }
 

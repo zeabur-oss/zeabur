@@ -5,6 +5,7 @@ mod tests {
     use axum::http::StatusCode;
     use serde_json::{Value, json};
     use zeabur_api::Settings;
+    use zeabur_api::members::access::{ProjectRole, baseline_binding, role_binding};
     use zeabur_api::settings::IdentitySettings;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, Identity, ServedResource, WriteBody};
@@ -18,7 +19,7 @@ mod tests {
             "apiVersion": "identity.zeabur.com/v1alpha1",
             "kind": kind,
             "metadata": {"name": name, "namespace": NS, "uid": format!("uid-{name}"),
-                         "creationTimestamp": "2026-10-01T00:00:00Z"},
+                         "resourceVersion": "1", "creationTimestamp": "2026-10-01T00:00:00Z"},
         });
         value["metadata"]["labels"] = labels;
         value["spec"] = spec;
@@ -57,7 +58,30 @@ mod tests {
             let (plural, kind) = r.split_once(':').unwrap();
             ServedResource::readable("identity.zeabur.com", "v1alpha1", plural, kind, true)
         })
+        .chain([
+            ServedResource::readable(
+                "rbac.authorization.k8s.io",
+                "v1",
+                "rolebindings",
+                "RoleBinding",
+                true,
+            ),
+            ServedResource::readable(
+                "rbac.authorization.k8s.io",
+                "v1",
+                "clusterrolebindings",
+                "ClusterRoleBinding",
+                false,
+            ),
+        ])
         .collect();
+        let rbac = |mut value: Value| -> DynamicObject {
+            // The memory cluster keeps a cluster-scoped object in namespace "".
+            if value["metadata"].get("namespace").is_none() {
+                value["metadata"]["namespace"] = "".into();
+            }
+            serde_json::from_value(value).unwrap()
+        };
         MemoryCluster::new(State {
             identity: Identity {
                 username: username.to_owned(),
@@ -83,6 +107,9 @@ mod tests {
                            "authTime": 1_790_000_000, "expiresAt": 4_000_000_000_i64}),
                     json!({"identity.zeabur.com/user": "bob"}),
                 ),
+                rbac(role_binding("shop", "bob", ProjectRole::Viewer)),
+                rbac(role_binding("blog", "bob", ProjectRole::Developer)),
+                rbac(baseline_binding("bob")),
             ],
             ..State::default()
         })
@@ -92,6 +119,7 @@ mod tests {
         Settings {
             identity: IdentitySettings {
                 issuer: Some("https://id.example.com/".to_owned()),
+                project_roles: true,
                 ..IdentitySettings::default()
             },
             ..Settings::default()
@@ -188,6 +216,7 @@ mod tests {
             writes(&cluster),
             [
                 "create User/cy".to_owned(),
+                "create ClusterRoleBinding/zeabur-member-cy".to_owned(),
                 format!("create Invitation/{name}")
             ]
         );
@@ -364,8 +393,18 @@ mod tests {
         let cluster = signed_in("zeabur:ada");
         let (status, body) = call(&cluster, "DELETE", "/api/v1/members/bob", None).await;
         assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
-        assert_eq!(writes(&cluster).last().unwrap(), "delete User/bob");
-        assert_eq!(writes(&cluster).len(), 5);
+        let made = writes(&cluster);
+        assert_eq!(
+            made[..3],
+            [
+                "delete RoleBinding/zeabur-member-bob",
+                "delete RoleBinding/zeabur-member-bob",
+                "delete ClusterRoleBinding/zeabur-member-bob"
+            ]
+        );
+        assert_eq!(made.last().unwrap(), "delete User/bob");
+        assert_eq!(made.len(), 8);
+        assert_eq!(bindings(&cluster, "bob").len(), 0);
         let (status, body) = call(&cluster, "DELETE", "/api/v1/members/ada", None).await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
         let (status, _) = call(&cluster, "DELETE", "/api/v1/members/nobody", None).await;
@@ -407,6 +446,224 @@ mod tests {
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
         assert_eq!(body["summary"]["key"], "members.noIssuer");
         assert_eq!(body["fixKey"]["key"], "members.noIssuer.fix");
+        assert_eq!(writes(&cluster).len(), 0);
+    }
+
+    /// The bindings Zeabur holds for `username`, as `namespace/role`.
+    fn bindings(cluster: &MemoryCluster, username: &str) -> Vec<String> {
+        let mut found: Vec<String> = cluster
+            .inspect(|s| s.dynamic.clone())
+            .unwrap()
+            .iter()
+            .filter(|o| {
+                o.metadata
+                    .labels
+                    .as_ref()
+                    .and_then(|l| l.get("zeabur.com/member"))
+                    .is_some_and(|u| u == username)
+            })
+            .map(|o| {
+                format!(
+                    "{}/{}",
+                    o.metadata.namespace.as_deref().unwrap_or_default(),
+                    o.data["roleRef"]["name"].as_str().unwrap()
+                )
+            })
+            .collect();
+        found.sort();
+        found
+    }
+
+    #[tokio::test]
+    async fn members_show_their_projects_or_name_the_bindings_that_could_not_be_read() {
+        let cluster = signed_in("zeabur:ada");
+        let (_, body) = call(&cluster, "GET", "/api/v1/members", None).await;
+        assert_eq!(body["projectRoles"], true);
+        assert_eq!(body["items"][0].get("projects"), None);
+        assert_eq!(
+            body["items"][1]["projects"],
+            json!([{"project": "blog", "role": "developer"}, {"project": "shop", "role": "viewer"}])
+        );
+        cluster.update(|s| {
+            s.forbidden_resources
+                .insert("rolebindings.rbac.authorization.k8s.io".to_owned());
+        });
+        let (status, body) = call(&cluster, "GET", "/api/v1/members", None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["items"][1].get("projects"), None);
+        assert_eq!(
+            body["unreadable"][0]["resource"],
+            "rolebindings.rbac.authorization.k8s.io"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_new_member_gets_the_baseline_and_a_binding_per_project_before_the_link() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, body) = call(
+            &cluster,
+            "POST",
+            "/api/v1/members/invitations",
+            Some(&json!({"username": "cy", "projects": [
+                {"project": "shop", "role": "developer"},
+                {"project": "blog", "role": "viewer"}
+            ]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let made = writes(&cluster);
+        assert_eq!(
+            made[..4],
+            [
+                "create User/cy",
+                "create ClusterRoleBinding/zeabur-member-cy",
+                "create RoleBinding/zeabur-member-cy",
+                "create RoleBinding/zeabur-member-cy",
+            ]
+        );
+        assert!(made[4].starts_with("create Invitation/"));
+        assert_eq!(
+            bindings(&cluster, "cy"),
+            [
+                "/zeabur-member",
+                "blog/zeabur-project-viewer",
+                "shop/zeabur-project-developer"
+            ]
+        );
+        let shop = cluster
+            .inspect(|s| s.dynamic.clone())
+            .unwrap()
+            .into_iter()
+            .find(|o| {
+                o.metadata.namespace.as_deref() == Some("shop")
+                    && o.metadata.name.as_deref() == Some("zeabur-member-cy")
+            })
+            .unwrap();
+        assert_eq!(
+            shop.data["subjects"],
+            json!([{"kind": "User", "apiGroup": "rbac.authorization.k8s.io", "name": "zeabur:cy"}])
+        );
+    }
+
+    #[tokio::test]
+    async fn an_admin_with_projects_or_a_project_twice_is_refused() {
+        let cluster = signed_in("zeabur:ada");
+        for body in [
+            json!({"username": "cy", "admin": true,
+                   "projects": [{"project": "shop", "role": "viewer"}]}),
+            json!({"username": "cy", "projects": [
+                {"project": "shop", "role": "viewer"}, {"project": "shop", "role": "developer"}]}),
+            json!({"username": "cy", "projects": [{"project": "Shop", "role": "viewer"}]}),
+        ] {
+            let (status, answer) =
+                call(&cluster, "POST", "/api/v1/members/invitations", Some(&body)).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{answer}");
+        }
+        assert_eq!(writes(&cluster).len(), 0);
+    }
+
+    #[tokio::test]
+    async fn changing_a_role_replaces_its_binding_and_a_project_left_out_loses_it() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, body) = call(
+            &cluster,
+            "PUT",
+            "/api/v1/members/bob/access",
+            Some(&json!({"admin": false, "projects": [
+                {"project": "shop", "role": "developer"},
+                {"project": "billing", "role": "viewer"}
+            ]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+        assert_eq!(
+            bindings(&cluster, "bob"),
+            [
+                "/zeabur-member",
+                "billing/zeabur-project-viewer",
+                "shop/zeabur-project-developer"
+            ]
+        );
+        assert_eq!(
+            writes(&cluster),
+            [
+                "delete RoleBinding/zeabur-member-bob",
+                "delete RoleBinding/zeabur-member-bob",
+                "create RoleBinding/zeabur-member-bob",
+                "create RoleBinding/zeabur-member-bob",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn an_admin_loses_their_project_bindings_and_nobody_demotes_themselves() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, body) = call(
+            &cluster,
+            "PUT",
+            "/api/v1/members/bob/access",
+            Some(&json!({"admin": true})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+        assert_eq!(bindings(&cluster, "bob"), ["/zeabur-member"]);
+        assert_eq!(writes(&cluster).last().unwrap(), "patch User/bob");
+        let bob = cluster
+            .inspect(|s| s.dynamic.clone())
+            .unwrap()
+            .into_iter()
+            .find(|o| o.metadata.name.as_deref() == Some("bob"))
+            .unwrap();
+        assert_eq!(bob.data["spec"]["elevatedGroups"], json!(["admins"]));
+        let (status, body) = call(
+            &cluster,
+            "PUT",
+            "/api/v1/members/ada/access",
+            Some(&json!({"admin": false})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["summary"]["key"], "members.demoteSelf");
+    }
+
+    #[tokio::test]
+    async fn without_the_member_roles_projects_are_refused() {
+        let cluster = signed_in("zeabur:ada");
+        let off = Settings {
+            identity: IdentitySettings {
+                issuer: Some("https://id.example.com/".to_owned()),
+                ..IdentitySettings::default()
+            },
+            ..Settings::default()
+        };
+        let (status, body) = send(
+            &app_with(&cluster, off),
+            "PUT",
+            "/api/v1/members/bob/access",
+            Some(&json!({"admin": false, "projects": [{"project": "shop", "role": "viewer"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["summary"]["key"], "members.noProjectRoles");
+        assert_eq!(writes(&cluster).len(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_refused_binding_read_stops_the_change_before_any_write() {
+        let cluster = signed_in("zeabur:ada");
+        cluster.update(|s| {
+            s.forbidden_resources
+                .insert("rolebindings.rbac.authorization.k8s.io".to_owned());
+        });
+        let (status, body) = call(
+            &cluster,
+            "PUT",
+            "/api/v1/members/bob/access",
+            Some(&json!({"admin": false, "projects": []})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert_eq!(body["denied"]["resource"], "rolebindings");
         assert_eq!(writes(&cluster).len(), 0);
     }
 }

@@ -67,7 +67,7 @@ pub(crate) async fn get(
         |user| {
             answer(
                 AccountStatus::Identity,
-                Some(directory.member(user, namespace, Some(&you))),
+                Some(directory.member(user, namespace, Some(&you), None)),
             )
         },
     )))

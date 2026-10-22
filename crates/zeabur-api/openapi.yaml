@@ -455,8 +455,9 @@ paths:
       tags:
       - members
       summary: |-
-        Removes a member: their links, passkeys, linked accounts and sessions, then the member.
-        Projects and everything in the cluster stay; RBAC bindings that name them stay too.
+        Removes a member: the role bindings Zeabur made for them, their links, passkeys, linked
+        accounts and sessions, then the member. Projects and everything in them stay, and so do RBAC
+        bindings made outside Zeabur.
       operationId: removeMember
       parameters:
       - name: username
@@ -467,6 +468,49 @@ paths:
           type: string
       responses:
         "204": {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/members/{username}/access":
+    put:
+      tags:
+      - members
+      summary: |-
+        Changes what a member may do: admin rights, or roles in chosen projects (a project left out
+        loses theirs). Nobody takes their own admin rights away.
+      operationId: setMemberAccess
+      parameters:
+      - name: username
+        in: path
+        description: The member's user name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccessRequest"
+        required: true
+      responses:
+        "204": {}
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
         "403":
           content:
             application/problem+json:
@@ -1893,6 +1937,23 @@ components:
       - ReadWriteOncePod
       - ReadWriteMany
       - ReadOnlyMany
+    AccessRequest:
+      type: object
+      description: "What a member may do: admin rights, or roles in chosen projects."
+      required:
+      - admin
+      properties:
+        admin:
+          type: boolean
+          description: May take on admin rights, which cover every project.
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectGrant"
+          description: >-
+            Roles in projects; empty for an admin. A project left out loses the member's
+            role there.
+      additionalProperties: false
     AccountStatus:
       type: string
       description: Whether the person is a Zeabur Identity user Zeabur can show.
@@ -4334,6 +4395,11 @@ components:
           - string
           - "null"
           description: Name shown in the interface, for a new member.
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectGrant"
+          description: A new member's roles in projects, when they are not an admin.
         username:
           type: string
           description: |-
@@ -4525,6 +4591,15 @@ components:
           items:
             $ref: "#/components/schemas/PasskeyView"
           description: Passkeys, oldest first.
+        projects:
+          type:
+          - array
+          - "null"
+          items:
+            $ref: "#/components/schemas/ProjectGrant"
+          description: |-
+            A member's roles in projects, by project; `None` when Zeabur could not read them. An
+            admin's are left out: their rights cover every project.
         role:
           $ref: "#/components/schemas/MemberRole"
           description: Admin or member.
@@ -4548,6 +4623,7 @@ components:
       - invitations
       - setupLinks
       - canManage
+      - projectRoles
       - unreadable
       properties:
         canManage:
@@ -4569,6 +4645,11 @@ components:
           items:
             $ref: "#/components/schemas/MemberView"
           description: Members, by user name.
+        projectRoles:
+          type: boolean
+          description: |-
+            Whether members can be given Developer or Viewer in chosen projects (the chart's member
+            roles are installed).
         setupLinks:
           $ref: "#/components/schemas/SetupLinks"
           description: Whether setup links can be made and redeemed.
@@ -4576,7 +4657,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/UnreadableView"
-          description: Kinds the person may not read (invitations, grants), whose parts are left out.
+          description: |-
+            Kinds the person may not read (invitations, grants, role bindings), whose parts are left
+            out.
     Message:
       type: object
       description: |-
@@ -6656,6 +6739,20 @@ components:
               Who may reach each service, from the project's NetworkPolicy objects. Whether the
               cluster's network plugin enforces them is not known.
           - type: "null"
+    ProjectGrant:
+      type: object
+      description: A member's role in a project.
+      required:
+      - project
+      - role
+      properties:
+        project:
+          type: string
+          description: The project (its namespace).
+        role:
+          $ref: "#/components/schemas/ProjectRole"
+          description: The role there.
+      additionalProperties: false
     ProjectHealth:
       type: object
       description: |-
@@ -6749,6 +6846,12 @@ components:
             type: boolean
             description: Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted.
       description: A project's Namespace.
+    ProjectRole:
+      type: string
+      description: What a member may do in one project.
+      enum:
+      - developer
+      - viewer
     ProjectSummary:
       allOf:
       - $ref: "#/components/schemas/ProjectDetails"

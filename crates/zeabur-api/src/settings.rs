@@ -71,6 +71,9 @@ pub struct IdentitySettings {
     /// Its issuer URL (`https://identity.example.com`), which setup links start with; `None`
     /// where the server was not started with one, and the Identity Deployment's is read instead.
     pub issuer: Option<String>,
+    /// Whether the chart's member roles are installed, so members can be given Developer or
+    /// Viewer in chosen projects (see [`crate::members::access`]).
+    pub project_roles: bool,
 }
 
 impl Default for IdentitySettings {
@@ -78,6 +81,7 @@ impl Default for IdentitySettings {
         Self {
             namespace: crate::members::DEFAULT_NAMESPACE.to_owned(),
             issuer: None,
+            project_roles: false,
         }
     }
 }

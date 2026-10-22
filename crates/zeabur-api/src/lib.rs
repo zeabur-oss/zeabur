@@ -54,7 +54,8 @@
 //! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
 //! | `POST /api/v1/members/{username}/setup-links` | a new setup link for a member, optionally removing their passkeys first |
 //! | `DELETE /api/v1/members/{username}/credentials/{id}` | removes a member's passkey or linked account |
-//! | `DELETE /api/v1/members/{username}` | removes a member; projects stay |
+//! | `DELETE /api/v1/members/{username}` | removes a member and the role bindings Zeabur made for them; projects stay |
+//! | `PUT /api/v1/members/{username}/access` | makes a member an admin, or gives them Developer or Viewer in chosen projects |
 //! | `POST /api/v1/projects/{p}/plan` | the writes a change needs, what they do (pods replaced, fit, data and fields removed), and a token; writes nothing |
 //! | `POST /api/v1/projects/{p}/apply` | carries out a plan by its token |
 //!
@@ -227,6 +228,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(members::handlers::setup_link))
         .routes(routes!(members::handlers::remove_passkey))
         .routes(routes!(members::handlers::remove))
+        .routes(routes!(members::handlers::set_access))
 }
 
 /// The API, for `access`; mount it next to the web interface.

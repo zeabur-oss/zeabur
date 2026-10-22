@@ -9,7 +9,9 @@
 //! Like everything else, every read and write goes to kube-apiserver as the person, so RBAC
 //! decides: Zeabur Identity's install gives `zeabur:admins` the `view` role, which does not
 //! reach these custom resources, and `zeabur:elevated:admins` `cluster-admin`, so in practice an
-//! administrator manages members, and everyone else sees the refusal with the rule it needs. That
+//! administrator manages members, and everyone else sees the refusal with the rule it needs.
+//! A member who is not an admin has the rights of the [`access`] bindings: Developer or Viewer in
+//! chosen projects, and the names of nodes and projects. That
 //! includes one's own passkeys: RBAC cannot narrow a `list` to the objects labelled with one's
 //! name, so there is no right to read only one's own ([k8s-rbac-names]).
 //!
@@ -41,6 +43,7 @@
 //!
 //! [k8s-rbac-names]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
 
+pub mod access;
 pub(crate) mod account;
 mod directory;
 pub(crate) mod handlers;
@@ -50,7 +53,7 @@ pub use directory::{
     AccountStatus, AccountView, InvitationView, LinkedAccountView, MemberRole, MemberView,
     MembersView, PasskeyView, SetupLinks,
 };
-pub use writes::{InviteRequest, PasskeyLabel, SetupLinkRequest, SetupLinkView};
+pub use writes::{AccessRequest, InviteRequest, PasskeyLabel, SetupLinkRequest, SetupLinkView};
 
 /// Zeabur Identity's API group.
 pub const GROUP: &str = "identity.zeabur.com";
