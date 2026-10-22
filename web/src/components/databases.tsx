@@ -22,6 +22,7 @@ import {
   lastRun,
   memberChoices,
   nameProblem,
+  allowedVersion,
   blockedVersions,
   newDatabase,
   presetResources,
@@ -171,10 +172,12 @@ export function NewDatabaseDrawer({
     engine && available.includes(engine)
       ? engine
       : (engines.find((e) => available.includes(e)) ?? "postgresql")
-  const [form, setForm] = useState<NewDatabase>(() =>
+  const [entered, setForm] = useState<NewDatabase>(() =>
     newDatabase(first, nodes, blockedVersions(first, kernels)),
   )
-  const blocked = blockedVersions(form.engine, kernels)
+  // The nodes can load after the form opened, with a kernel that refuses its version.
+  const blocked = blockedVersions(entered.engine, kernels)
+  const form = { ...entered, version: allowedVersion(entered.engine, entered.version, blocked) }
   const [tried, setTried] = useState(false)
   const step = usePlanStep(project, onClose)
   const targets = useTargets(project)

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  allowedVersion,
   backUpNow,
   backupName,
   blockedVersions,
@@ -95,6 +96,12 @@ describe("a new database", () => {
     expect(blockedVersions("mongodb", ["7.0.0-38-generic"])).toEqual(["8.0"])
     expect(blockedVersions("postgresql", ["7.0.0-38-generic"])).toEqual([])
     expect(newDatabase("mongodb", 1, ["8.0"]).version).toBe("7.0")
+  })
+
+  test("a version the kernels refuse moves to one they allow, as nodes load after the form", () => {
+    expect(allowedVersion("mongodb", "8.0", ["8.0"])).toBe("7.0")
+    expect(allowedVersion("mongodb", "8.0", [])).toBe("8.0")
+    expect(allowedVersion("mongodb", "7.0", ["8.0"])).toBe("7.0")
   })
 
   test("PostgreSQL is a Cluster with the chosen image, size and resources", () => {

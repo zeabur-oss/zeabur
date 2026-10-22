@@ -85,6 +85,12 @@ export interface NewDatabase {
   size: SizePreset
 }
 
+/** `version`, or the newest version the kernels allow when they refuse it. */
+export function allowedVersion(engine: Engine, version: string, blocked: string[]): string {
+  if (!blocked.includes(version)) return version
+  return versions[engine].find((v) => !blocked.includes(v.label))?.label ?? version
+}
+
 /** Defaults for the form: one member on a single node, else three. */
 /** Versions that do not start on these kernels: MongoDB 8 refuses Linux 6.19 and newer
  * (https://jira.mongodb.org/browse/SERVER-121912). */
