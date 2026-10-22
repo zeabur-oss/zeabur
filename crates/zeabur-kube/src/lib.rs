@@ -177,9 +177,7 @@ impl UserClient {
     }
 
     fn from_kube_config(config: kube::Config, name: Option<String>) -> Result<Self, ConnectError> {
-        kube::Client::try_from(config)
-            .map(|client| Self { client, name })
-            .map_err(|e| ConnectError::Client(e.to_string()))
+        client(config, POOL_IDLE).map(|client| Self { client, name })
     }
 
     /// The underlying kube-rs client, bound to this person.
@@ -187,6 +185,41 @@ impl UserClient {
     pub const fn kube(&self) -> &kube::Client {
         &self.client
     }
+}
+
+/// How long a connection to kube-apiserver stays open unused.
+const POOL_IDLE: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// kube-rs's default stack (`kube::Client::try_from`) less its tracing and write timeout, with
+/// a pool that closes idle connections. The default pool has no timer, so it keeps every
+/// connection a burst of requests opened for as long as the client lives: in the cluster, a
+/// whole session.
+fn client(config: kube::Config, idle: std::time::Duration) -> Result<kube::Client, ConnectError> {
+    use kube::client::ConfigExt as _;
+    use kube::client::retry::RetryPolicy;
+    let refused = |e: kube::Error| ConnectError::Client(e.to_string());
+    let mut http = hyper_util::client::legacy::connect::HttpConnector::new();
+    http.enforce_http(false);
+    http.set_connect_timeout(config.connect_timeout);
+    let https = config
+        .rustls_https_connector_with_connector(http)
+        .map_err(refused)?;
+    let pool = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+        .pool_timer(hyper_util::rt::TokioTimer::new())
+        .pool_idle_timeout(idle)
+        .build(https);
+    let service = tower::ServiceBuilder::new()
+        .layer(config.base_uri_layer())
+        .option_layer(
+            config
+                .default_retry
+                .then(|| tower::retry::RetryLayer::new(RetryPolicy::server_retry())),
+        )
+        .option_layer(config.auth_layer().map_err(refused)?)
+        .layer(config.extra_headers_layer().map_err(refused)?)
+        .map_err(tower::BoxError::from)
+        .service(pool);
+    Ok(kube::Client::new(service, config.default_namespace))
 }
 
 /// The kubeconfig's name for the cluster `context` (the current context when `None`) uses, as
@@ -273,6 +306,48 @@ contexts:
         let endpoint = ClusterEndpoint::new(http::Uri::from_static("https://10.43.0.1:443"), None);
         let client = UserClient::with_token(&endpoint, &UserToken::new("t")).unwrap();
         assert_eq!(Cluster::kubeconfig_name(&client), None);
+    }
+
+    #[tokio::test]
+    async fn an_idle_connection_is_closed_and_the_token_is_sent() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0; 1024];
+            while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                let n = socket.read(&mut buffer).await.unwrap();
+                request.extend_from_slice(&buffer[..n]);
+            }
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
+                .await
+                .unwrap();
+            // Kept alive until the client's pool lets it go.
+            let closed = socket.read(&mut buffer).await.unwrap() == 0;
+            (String::from_utf8(request).unwrap(), closed)
+        });
+        let mut config = kube::Config::new(format!("http://127.0.0.1:{port}").parse().unwrap());
+        config.auth_info.token = Some(SecretString::from("alice-token"));
+        let client = client(config, std::time::Duration::from_millis(100)).unwrap();
+        let body = client
+            .request_text(http::Request::get("/version").body(Vec::new()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(body, "{}");
+        let (request, closed) = tokio::time::timeout(std::time::Duration::from_secs(5), server)
+            .await
+            .expect("the idle connection was not closed")
+            .unwrap();
+        assert!(closed);
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("authorization: bearer alice-token")
+        );
+        drop(client);
     }
 
     #[test]
