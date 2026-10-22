@@ -269,6 +269,8 @@ export interface Description {
   facts?: Fact[]
   edits?: EditGroup[]
   outcomes?: OutcomeGroup[]
+  /** The lines already say which fields go: a removal is what was asked. */
+  removalsSaid?: boolean
 }
 
 export interface Asked {
@@ -382,6 +384,7 @@ export function describe(
         : undefined,
     edits,
     outcomes,
+    removalsSaid: ask.changes.every((c) => c.op === "configReload") || undefined,
   }
 }
 

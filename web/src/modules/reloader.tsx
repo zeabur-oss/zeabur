@@ -60,7 +60,7 @@ function ConfigReloadSetting({ service, plan }: ServiceSettingsProps) {
           {t("reload.how")}
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="flex flex-col gap-1 pt-1 type-meta text-muted-foreground">
+          <div className="flex max-w-prose flex-col gap-1 pt-1 type-meta text-muted-foreground">
             <p>{t("reload.mechanism")}</p>
             {named.length > 0 ? <p>{t("reload.named", t("common.list", named))}</p> : null}
             {state === "unknown" ? <p>{t("reload.unknown")}</p> : null}

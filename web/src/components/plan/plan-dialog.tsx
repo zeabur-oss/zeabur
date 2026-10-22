@@ -419,7 +419,7 @@ function PlanBody({
         )}
         said={description.said}
         rollouts={!description.outcomes}
-        removals={!description.edits}
+        removals={!description.edits && !description.removalsSaid}
       />
       {warnings.length > 0 ? (
         <ul className="flex flex-col gap-1.5" aria-label={t("plan.warnings")}>
