@@ -78,6 +78,8 @@ pub struct Cluster {
     pub distribution: Option<String>,
     /// How a new service's public URL is made.
     pub domains: crate::settings::DomainSettings,
+    /// What you may change in the cluster itself.
+    pub can: crate::projects::rights::ClusterRights,
 }
 
 /// The API server's readiness, from the replica that answered (see `crate::cluster::health`).

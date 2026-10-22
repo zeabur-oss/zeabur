@@ -131,6 +131,7 @@ fn optional<T>(
 
 /// The cluster: its name and where that comes from, kube-apiserver's version and distribution.
 /// Readable by every signed-in person; the name may come from the nodes when they may list them.
+/// `can` is one `SelfSubjectRulesReview` in `kube-system`.
 #[utoipa::path(get, path = "/api/v1/cluster", tag = "cluster", operation_id = "getCluster",
     responses((status = 200, body = Cluster), (status = 401, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
@@ -138,10 +139,9 @@ pub(crate) async fn get(
     Person(cluster): Person,
     headers: HeaderMap,
 ) -> Result<Json<Cluster>, ApiError> {
-    let version = cluster
-        .version()
-        .await
-        .map_err(|e| ApiError::from(e.into_problem("the cluster's version")))?;
+    let (version, rules) =
+        futures_util::future::join(cluster.version(), cluster.access_rules("kube-system")).await;
+    let version = version.map_err(|e| ApiError::from(e.into_problem("the cluster's version")))?;
     let named = cluster_name::resolve(cluster.as_ref(), &state.settings, &headers).await;
     Ok(Json(Cluster {
         name: named.name,
@@ -150,6 +150,7 @@ pub(crate) async fn get(
         distribution: distribution(&version),
         kubernetes_version: version,
         domains: state.settings.domains.clone(),
+        can: crate::projects::rights::ClusterRights::of(rules.as_ref().ok()),
     }))
 }
 

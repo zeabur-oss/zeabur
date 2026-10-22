@@ -40,6 +40,8 @@ use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Access, AccessRules, ResourceRef};
 use zeabur_model::{Origin, ProjectDetails};
 
+use super::rights::ProjectRights;
+use crate::account::{AccountRole, role};
 use crate::error::{ApiError, get_read, read_problem};
 use crate::handlers::{AppState, Person};
 
@@ -96,9 +98,12 @@ pub struct ProjectNamespace {
     /// Whether the person may adopt it or let it go: patch it, and where the admission policy
     /// guards its labels, also `zeabur-manage` it.
     pub can_adopt: Permission,
-    /// Whether the person may read the logs of the project's pods (`get` on `pods/log`). A
-    /// project Viewer may not.
-    pub can_read_logs: Permission,
+    /// Your role in the project, from your rights there; absent when they could not be read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<AccountRole>,
+    /// What you may change in the project. A project Viewer may change nothing, nor read the
+    /// pods' logs.
+    pub can: ProjectRights,
     /// The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
     /// changes only its details.
     pub labels_guarded: bool,
@@ -182,28 +187,22 @@ pub(crate) async fn get(
         })?;
     let metadata = namespace.metadata;
     let guarded = state.settings.identity.project_roles;
-    let logs = ResourceRef::new("", "v1", "pods/log", "");
     let workload_patch = workload_patch(rules.as_ref().ok());
-    let (can_change, can_adopt, can_read_logs) = rules.map_or(
-        (
-            Permission::Unknown,
-            Permission::Unknown,
-            Permission::Unknown,
-        ),
-        |rules| {
+    let (can, role) = rules
+        .as_ref()
+        .map_or((ProjectRights::unknown(), None), |rules| {
+            (ProjectRights::of(rules), Some(role(rules)))
+        });
+    let (can_change, can_adopt) =
+        rules.map_or((Permission::Unknown, Permission::Unknown), |rules| {
             let patch = Permission::from(rules.allows("patch", &resource, &project));
             let manage = if guarded {
                 rules.allows(MANAGE_VERB, &resource, &project).into()
             } else {
                 Permission::Allowed
             };
-            (
-                patch,
-                patch.and(manage),
-                rules.allows("get", &logs, "").into(),
-            )
-        },
-    );
+            (patch, patch.and(manage))
+        });
     Ok(Json(ProjectNamespace {
         origin: Origin::complete("v1", "Namespace", None, &project),
         adopted: metadata
@@ -214,7 +213,8 @@ pub(crate) async fn get(
         details: ProjectDetails::from_annotations(metadata.annotations.as_ref()),
         can_change,
         can_adopt,
-        can_read_logs,
+        role,
+        can,
         labels_guarded: guarded,
         workload_patch,
         name: project,

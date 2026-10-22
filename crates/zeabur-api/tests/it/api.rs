@@ -1008,7 +1008,8 @@ mod tests {
         assert_eq!(
             about,
             json!({"name": "zeabur", "nameSource": "kubeconfig", "nameProvider": "k3d",
-                   "kubernetesVersion": "v1.36.5+k3s1", "distribution": "k3s", "domains": {}})
+                   "kubernetesVersion": "v1.36.5+k3s1", "distribution": "k3s", "domains": {},
+                   "can": {"installComponents": "allowed", "changeNodes": "allowed"}})
         );
 
         let capabilities = get(&cluster, "/api/v1/cluster/capabilities").await;

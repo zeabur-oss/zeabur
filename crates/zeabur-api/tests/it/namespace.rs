@@ -214,7 +214,7 @@ mod tests {
             (&json!("allowed"), &json!("denied"), &json!(true))
         );
         // The rules hold no `pods/log`, as for a Viewer.
-        assert_eq!(guarded["canReadLogs"], "denied");
+        assert_eq!(guarded["can"]["readLogs"], "denied");
         assert_eq!(
             guarded["workloadPatch"][0],
             json!({"kind": "Deployment", "all": "denied", "names": []})
@@ -252,6 +252,129 @@ mod tests {
         assert_eq!(
             named["workloadPatch"][0],
             json!({"kind": "Deployment", "all": "denied", "names": ["web"]})
+        );
+    }
+
+    fn rule(verbs: &[&str], group: &str, resources: &[&str]) -> AccessRule {
+        AccessRule {
+            verbs: verbs.iter().map(|&v| v.to_owned()).collect(),
+            groups: vec![group.to_owned()],
+            resources: resources.iter().map(|&r| r.to_owned()).collect(),
+            names: Vec::new(),
+        }
+    }
+
+    /// A Viewer's rules: read what runs, change nothing.
+    fn viewer_rules() -> AccessRules {
+        AccessRules {
+            rules: vec![
+                rule(
+                    &["get", "list", "watch"],
+                    "",
+                    &["pods", "services", "configmaps"],
+                ),
+                rule(&["get", "list", "watch"], "apps", &["deployments"]),
+            ],
+            incomplete: false,
+        }
+    }
+
+    /// The namespace says what the person may change there and their role, from the one review;
+    /// what an incomplete review does not allow, or a failed one, is unknown.
+    #[tokio::test]
+    async fn the_namespace_says_what_the_person_may_change_and_their_role() {
+        let cluster = cluster();
+        let uri = "/api/v1/projects/shop/namespace";
+        let app = app(&cluster);
+
+        cluster.update(|s| {
+            s.access_rules
+                .insert("shop".to_owned(), Some(viewer_rules()));
+        });
+        let (status, viewer) = send(&app, "GET", uri, None).await;
+        assert_eq!(status, StatusCode::OK, "{viewer}");
+        assert_eq!(viewer["role"], "viewer");
+        for (right, answer) in viewer["can"].as_object().unwrap() {
+            assert_eq!(answer, "denied", "{right}");
+        }
+
+        cluster.update(|s| {
+            let mut developer = viewer_rules();
+            developer.rules.extend([
+                rule(&["get"], "", &["pods/log", "secrets"]),
+                rule(&["create"], "", &["pods/exec"]),
+                rule(
+                    &["create", "update", "patch", "delete"],
+                    "apps",
+                    &["deployments"],
+                ),
+                rule(&["create", "update", "patch", "delete"], "", &["services"]),
+            ]);
+            s.access_rules.insert("shop".to_owned(), Some(developer));
+        });
+        let (_, developer) = send(&app, "GET", uri, None).await;
+        assert_eq!(developer["role"], "developer");
+        let can = &developer["can"];
+        assert_eq!(
+            (
+                &can["deploy"],
+                &can["changeServices"],
+                &can["deleteServices"]
+            ),
+            (&json!("allowed"), &json!("allowed"), &json!("allowed"))
+        );
+        assert_eq!(
+            (&can["readLogs"], &can["openTerminal"], &can["readSecrets"]),
+            (&json!("allowed"), &json!("allowed"), &json!("allowed"))
+        );
+        assert_eq!(
+            (&can["changeDomains"], &can["changeMembers"], &can["scale"]),
+            (&json!("denied"), &json!("denied"), &json!("denied"))
+        );
+
+        cluster.update(|s| {
+            let mut incomplete = viewer_rules();
+            incomplete.incomplete = true;
+            s.access_rules.insert("shop".to_owned(), Some(incomplete));
+        });
+        let (_, incomplete) = send(&app, "GET", uri, None).await;
+        assert_eq!(incomplete["can"]["deploy"], "unknown");
+        assert_eq!(incomplete["role"], "viewer");
+
+        cluster.update(|s| {
+            s.access_rules.insert("shop".to_owned(), None);
+        });
+        let (status, failed) = send(&app, "GET", uri, None).await;
+        assert_eq!(status, StatusCode::OK, "{failed}");
+        assert!(failed.get("role").is_none(), "{failed}");
+        assert_eq!(failed["can"]["changeMembers"], "unknown");
+    }
+
+    /// The cluster says whether the person may install components, from a review in
+    /// `kube-system`.
+    #[tokio::test]
+    async fn the_cluster_says_whether_the_person_may_install_components() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let (status, open) = send(&app, "GET", "/api/v1/cluster", None).await;
+        assert_eq!(status, StatusCode::OK, "{open}");
+        assert_eq!(
+            open["can"],
+            json!({"installComponents": "allowed", "changeNodes": "allowed"})
+        );
+        cluster.update(|s| {
+            s.access_rules.insert(
+                "kube-system".to_owned(),
+                Some(AccessRules {
+                    rules: vec![rule(&["get", "list"], "", &["nodes", "namespaces"])],
+                    incomplete: false,
+                }),
+            );
+        });
+        let (_, member) = send(&app, "GET", "/api/v1/cluster", None).await;
+        assert_eq!(
+            member["can"],
+            json!({"installComponents": "denied", "changeNodes": "denied"})
         );
     }
 

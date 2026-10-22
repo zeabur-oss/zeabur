@@ -263,7 +263,7 @@ pub(crate) async fn bindings_for(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use zeabur_core::names::{
         ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON, LABEL_PROJECT,
         MANAGE_VERB,
@@ -399,7 +399,7 @@ mod tests {
 
     /// The roles Zeabur binds, as `SelfSubjectRulesReview` would report them once Kubernetes has
     /// aggregated them.
-    fn roles() -> BTreeMap<String, AccessRules> {
+    pub(crate) fn roles() -> BTreeMap<String, AccessRules> {
         let mut sets = rule_sets();
         let gathered = gathered();
         for name in gathered.values().flatten() {

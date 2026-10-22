@@ -42,6 +42,7 @@ paths:
       summary: |-
         The cluster: its name and where that comes from, kube-apiserver's version and distribution.
         Readable by every signed-in person; the name may come from the nodes when they may list them.
+        `can` is one `SelfSubjectRulesReview` in `kube-system`.
       operationId: getCluster
       responses:
         "200":
@@ -3569,7 +3570,11 @@ components:
       - nameSource
       - kubernetesVersion
       - domains
+      - can
       properties:
+        can:
+          $ref: "#/components/schemas/ClusterRights"
+          description: What you may change in the cluster itself.
         distribution:
           type:
           - string
@@ -3717,6 +3722,19 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: The settings ConfigMap, when it could not be read.
+    ClusterRights:
+      type: object
+      description: What the person may change in the cluster itself.
+      required:
+      - installComponents
+      - changeNodes
+      properties:
+        changeNodes:
+          $ref: "#/components/schemas/Permission"
+          description: "Change nodes (labels, taints, cordon): `patch` on nodes."
+        installComponents:
+          $ref: "#/components/schemas/Permission"
+          description: "Install components with Zeabur: `create` on `helmcharts.helm.cattle.io` in `kube-system`."
     Component:
       type: object
       description: "One component of the catalogue: an upstream project that provides a capability."
@@ -8785,13 +8803,18 @@ components:
         - system
         - canChange
         - canAdopt
-        - canReadLogs
+        - can
         - labelsGuarded
         - workloadPatch
         properties:
           adopted:
             type: boolean
             description: It carries Zeabur's project label.
+          can:
+            $ref: "#/components/schemas/ProjectRights"
+            description: |-
+              What you may change in the project. A project Viewer may change nothing, nor read the
+              pods' logs.
           canAdopt:
             $ref: "#/components/schemas/Permission"
             description: |-
@@ -8800,11 +8823,6 @@ components:
           canChange:
             $ref: "#/components/schemas/Permission"
             description: "Whether the person may patch the Namespace: change its details."
-          canReadLogs:
-            $ref: "#/components/schemas/Permission"
-            description: |-
-              Whether the person may read the logs of the project's pods (`get` on `pods/log`). A
-              project Viewer may not.
           labelsGuarded:
             type: boolean
             description: |-
@@ -8816,6 +8834,13 @@ components:
           origin:
             $ref: "#/components/schemas/Origin"
             description: The Namespace.
+          role:
+            oneOf:
+            - $ref: "#/components/schemas/AccountRole"
+              description: >-
+                Your role in the project, from your rights there; absent when they could not be
+                read.
+            - type: "null"
           system:
             type: boolean
             description: Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted.
@@ -8827,6 +8852,75 @@ components:
               Which Deployments, StatefulSets and DaemonSets the person may patch (change their
               variables).
       description: A project's Namespace.
+    ProjectRights:
+      type: object
+      description: What the person may change in one project.
+      required:
+      - deploy
+      - changeServices
+      - deleteServices
+      - scale
+      - readSecrets
+      - changeSecrets
+      - changeConfig
+      - changeDomains
+      - changeStorage
+      - changeDatabases
+      - backUpDatabases
+      - openTerminal
+      - readLogs
+      - build
+      - changeNetworkPolicies
+      - changeMembers
+      properties:
+        backUpDatabases:
+          $ref: "#/components/schemas/Permission"
+          description: "Back up databases: `create` on either operator's backups."
+        build:
+          $ref: "#/components/schemas/Permission"
+          description: "Build again: `patch` on Zeabur Builder's builds."
+        changeConfig:
+          $ref: "#/components/schemas/Permission"
+          description: "Create and change ConfigMaps: `create` and `patch` on configmaps."
+        changeDatabases:
+          $ref: "#/components/schemas/Permission"
+          description: "Create, change and delete databases: CloudNativePG clusters or Percona MongoDB."
+        changeDomains:
+          $ref: "#/components/schemas/Permission"
+          description: "Add, change and remove domains: `create`, `patch` and `delete` on ingresses or HTTPRoutes."
+        changeMembers:
+          $ref: "#/components/schemas/Permission"
+          description: "Give people access to the project: `create` on rolebindings."
+        changeNetworkPolicies:
+          $ref: "#/components/schemas/Permission"
+          description: "Change network policies: `create` and `patch` on networkpolicies."
+        changeSecrets:
+          $ref: "#/components/schemas/Permission"
+          description: "Create and change Secrets: `create` and `patch` on secrets."
+        changeServices:
+          $ref: "#/components/schemas/Permission"
+          description: "Change, restart and redeploy services: `patch` on a workload kind."
+        changeStorage:
+          $ref: "#/components/schemas/Permission"
+          description: "Add and change volumes: `create` and `patch` on persistentvolumeclaims."
+        deleteServices:
+          $ref: "#/components/schemas/Permission"
+          description: "Delete services: `delete` on a workload kind."
+        deploy:
+          $ref: "#/components/schemas/Permission"
+          description: "Create services: `create` on deployments and services."
+        openTerminal:
+          $ref: "#/components/schemas/Permission"
+          description: "Open a terminal in a container: `create` on `pods/exec`."
+        readLogs:
+          $ref: "#/components/schemas/Permission"
+          description: "Read the pods' logs: `get` on `pods/log`."
+        readSecrets:
+          $ref: "#/components/schemas/Permission"
+          description: "Read Secret values: `get` on secrets."
+        scale:
+          $ref: "#/components/schemas/Permission"
+          description: "Change the number of replicas: `patch` on `deployments/scale` or `statefulsets/scale`."
     ProjectRole:
       type: string
       description: What a member may do in one project.

@@ -31,6 +31,7 @@ export interface paths {
     /**
      * The cluster: its name and where that comes from, kube-apiserver's version and distribution.
      *     Readable by every signed-in person; the name may come from the nodes when they may list them.
+     *     `can` is one `SelfSubjectRulesReview` in `kube-system`.
      */
     get: operations["getCluster"]
     put?: never
@@ -1812,6 +1813,8 @@ export interface components {
     }
     /** @description The cluster. */
     Cluster: {
+      /** @description What you may change in the cluster itself. */
+      can: components["schemas"]["ClusterRights"]
       /** @description The distribution, when the version names one: `k3s` or `rke2`. */
       distribution?: string | null
       /** @description How a new service's public URL is made. */
@@ -1883,6 +1886,13 @@ export interface components {
       storedIn?: components["schemas"]["Origin"] | null
       /** @description The settings ConfigMap, when it could not be read. */
       unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description What the person may change in the cluster itself. */
+    ClusterRights: {
+      /** @description Change nodes (labels, taints, cordon): `patch` on nodes. */
+      changeNodes: components["schemas"]["Permission"]
+      /** @description Install components with Zeabur: `create` on `helmcharts.helm.cattle.io` in `kube-system`. */
+      installComponents: components["schemas"]["Permission"]
     }
     /** @description One component of the catalogue: an upstream project that provides a capability. */
     Component: {
@@ -4509,17 +4519,17 @@ export interface components {
       /** @description It carries Zeabur's project label. */
       adopted: boolean
       /**
+       * @description What you may change in the project. A project Viewer may change nothing, nor read the
+       *     pods' logs.
+       */
+      can: components["schemas"]["ProjectRights"]
+      /**
        * @description Whether the person may adopt it or let it go: patch it, and where the admission policy
        *     guards its labels, also `zeabur-manage` it.
        */
       canAdopt: components["schemas"]["Permission"]
       /** @description Whether the person may patch the Namespace: change its details. */
       canChange: components["schemas"]["Permission"]
-      /**
-       * @description Whether the person may read the logs of the project's pods (`get` on `pods/log`). A
-       *     project Viewer may not.
-       */
-      canReadLogs: components["schemas"]["Permission"]
       /**
        * @description The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
        *     changes only its details.
@@ -4529,6 +4539,7 @@ export interface components {
       name: string
       /** @description The Namespace. */
       origin: components["schemas"]["Origin"]
+      role?: components["schemas"]["AccountRole"] | null
       /** @description Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
       system: boolean
       /**
@@ -4536,6 +4547,41 @@ export interface components {
        *     variables).
        */
       workloadPatch: components["schemas"]["WorkloadPatch"][]
+    }
+    /** @description What the person may change in one project. */
+    ProjectRights: {
+      /** @description Back up databases: `create` on either operator's backups. */
+      backUpDatabases: components["schemas"]["Permission"]
+      /** @description Build again: `patch` on Zeabur Builder's builds. */
+      build: components["schemas"]["Permission"]
+      /** @description Create and change ConfigMaps: `create` and `patch` on configmaps. */
+      changeConfig: components["schemas"]["Permission"]
+      /** @description Create, change and delete databases: CloudNativePG clusters or Percona MongoDB. */
+      changeDatabases: components["schemas"]["Permission"]
+      /** @description Add, change and remove domains: `create`, `patch` and `delete` on ingresses or HTTPRoutes. */
+      changeDomains: components["schemas"]["Permission"]
+      /** @description Give people access to the project: `create` on rolebindings. */
+      changeMembers: components["schemas"]["Permission"]
+      /** @description Change network policies: `create` and `patch` on networkpolicies. */
+      changeNetworkPolicies: components["schemas"]["Permission"]
+      /** @description Create and change Secrets: `create` and `patch` on secrets. */
+      changeSecrets: components["schemas"]["Permission"]
+      /** @description Change, restart and redeploy services: `patch` on a workload kind. */
+      changeServices: components["schemas"]["Permission"]
+      /** @description Add and change volumes: `create` and `patch` on persistentvolumeclaims. */
+      changeStorage: components["schemas"]["Permission"]
+      /** @description Delete services: `delete` on a workload kind. */
+      deleteServices: components["schemas"]["Permission"]
+      /** @description Create services: `create` on deployments and services. */
+      deploy: components["schemas"]["Permission"]
+      /** @description Open a terminal in a container: `create` on `pods/exec`. */
+      openTerminal: components["schemas"]["Permission"]
+      /** @description Read the pods' logs: `get` on `pods/log`. */
+      readLogs: components["schemas"]["Permission"]
+      /** @description Read Secret values: `get` on secrets. */
+      readSecrets: components["schemas"]["Permission"]
+      /** @description Change the number of replicas: `patch` on `deployments/scale` or `statefulsets/scale`. */
+      scale: components["schemas"]["Permission"]
     }
     /**
      * @description What a member may do in one project.
