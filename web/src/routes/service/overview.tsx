@@ -9,7 +9,8 @@ import GitBranchIcon from "~icons/ph/git-branch"
 import GlobeIcon from "~icons/ph/globe"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
-import { clusterQuery, rolloutQuery, traceQuery } from "@/api/queries"
+import { clusterQuery, projectAlertsQuery, rolloutQuery, traceQuery } from "@/api/queries"
+import { AlertList, RecentNote } from "@/components/alerts"
 import { Ago, CopyButton } from "@/components/bits"
 import { Diagnoses } from "@/components/diagnoses"
 import { EventList } from "@/components/events"
@@ -42,6 +43,7 @@ import { formatAgo, formatTime } from "@/lib/format"
 import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
+import { alertsFor, folded } from "@/model/alerts"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
@@ -134,10 +136,44 @@ export function OverviewTab({
               </div>
             </Container>
           ) : null}
+          <AlertsCard project={project} service={service} />
           <ConnectionsCard project={project} service={service} services={services} edges={edges} />
         </div>
       </div>
     </div>
+  )
+}
+
+const ALERTS_SHOWN = 3
+
+/** What Falco saw in this service's containers; the project page lists them all. */
+function AlertsCard({ project, service }: { project: string; service: Service }) {
+  const t = useT()
+  const data = useQuery(projectAlertsQuery(project)).data
+  const alerts = data?.state === "installed" ? alertsFor(data.items, service) : []
+  if (alerts.length === 0) return null
+  return (
+    <Container
+      title={t("alerts.title")}
+      titleAction={
+        folded(alerts).length > ALERTS_SHOWN ? (
+          <Link
+            to="/projects/$project"
+            params={{ project }}
+            className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary outline-none hover:text-main"
+          >
+            {t("common.all")}
+            <CaretRightIcon className="size-3.5" aria-hidden="true" />
+          </Link>
+        ) : undefined
+      }
+      variant="list"
+    >
+      <div className="flex flex-col gap-2 px-4 pb-3">
+        <AlertList alerts={alerts} limit={ALERTS_SHOWN} />
+        <RecentNote />
+      </div>
+    </Container>
   )
 }
 

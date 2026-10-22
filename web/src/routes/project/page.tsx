@@ -44,7 +44,7 @@ import { needsAttention, statusOf, summarise, type Project, type Service } from 
 import { ProjectMap } from "@/routes/project/architecture"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import { ServicesTable } from "@/routes/project/services-table"
-import { Activity, Backups, Domains, SectionChips, Storage } from "@/routes/project/side"
+import { Activity, Alerts, Backups, Domains, SectionChips, Storage } from "@/routes/project/side"
 import { validateProjectSearch, type ProjectView } from "@/routes/search"
 
 const route = getRouteApi("/projects/$project")
@@ -306,13 +306,16 @@ function MapView({
     void navigate({ search: (previous) => ({ ...previous, service: id }) })
   const broken = data.services.some((s) => needsAttention(statusOf(s)))
   const activity = (
-    <Activity
-      project={project}
-      services={data.services}
-      events={events}
-      unreadable={unreadable}
-      framed={!wide}
-    />
+    <div className="flex flex-col gap-7">
+      <Alerts project={project} services={data.services} />
+      <Activity
+        project={project}
+        services={data.services}
+        events={events}
+        unreadable={unreadable}
+        framed={!wide}
+      />
+    </div>
   )
   return (
     <>
@@ -366,6 +369,7 @@ function ListView({
   )
   const side = (
     <>
+      <Alerts project={project} services={data.services} />
       <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} />
       <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} />
       <Backups project={project} />

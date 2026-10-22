@@ -12,6 +12,7 @@
 //! | `GET /cluster/upgrades` | `/version`; nodes and Plans when allowed | nothing; nodes and Plans add skew and progress |
 //! | `GET /cluster/nodes` | nodes; pods, node metrics and the metrics store when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get` on the metrics store's `services/proxy` for disks |
 //! | `GET /cluster/events` | `events.k8s.io` events, all namespaces (`scope=cluster` keeps those about the cluster) | `list events.events.k8s.io` |
+//! | `GET /cluster/alerts` | Falco's `ClusterPolicyReport`s (`zeabur_modules::falco`) | `list clusterpolicyreports.wgpolicyk8s.io`; refused or not installed is a state, not an error |
 //! | `GET /cluster/capabilities` | CRDs, APIServices, classes, `HelmChart`s, Helm release Secrets' labels, workloads | all of them: in practice a cluster administrator |
 //!
 //! The page shows the cluster itself, not its projects: Home lists those from `GET /projects`

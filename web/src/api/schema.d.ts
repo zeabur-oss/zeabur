@@ -41,6 +41,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/alerts": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Falco's recent alerts that concern no namespace (a node's own processes), newest first, read
+     *     as the person.
+     */
+    get: operations["getClusterAlerts"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/capabilities": {
     parameters: {
       query?: never
@@ -356,6 +376,23 @@ export interface paths {
     }
     /** A project's services, the resources they use, and how they relate: the project document. */
     get: operations["get"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/alerts": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Falco's recent alerts about a project's pods, newest first, read as the person. */
+    get: operations["getProjectAlerts"]
     put?: never
     post?: never
     delete?: never
@@ -1992,6 +2029,34 @@ export interface components {
      * @enum {string}
      */
     ExitReason: "command-not-found" | "failed"
+    /** @description One alert. */
+    FalcoAlert: {
+      /** @description The command line that triggered it. */
+      command?: string | null
+      /** @description The container it concerns. */
+      container?: string | null
+      /** @description The report result it was read from. */
+      origin: components["schemas"]["Origin"]
+      /** @description Falco's own sentence, with every field it names. */
+      output: string
+      /** @description The pod it concerns. */
+      pod?: string | null
+      /** @description The rule that fired (`Terminal shell in container`). */
+      rule: string
+      /** @description How serious Falco's rule says it is. */
+      severity: components["schemas"]["FalcoSeverity"]
+      /** @description Falco's event source (`syscall`, `k8s_audit`). */
+      source: string
+      /** @description When it happened, RFC 3339. */
+      time?: string | null
+      /** @description The user it ran as. */
+      user?: string | null
+    }
+    /**
+     * @description Falco's priority as falcosidekick maps it to a report severity.
+     * @enum {string}
+     */
+    FalcoSeverity: "info" | "low" | "medium" | "high" | "critical"
     /** @description Where a failure's cause lies, and who can fix it. */
     Fault: {
       /**
@@ -3992,6 +4057,18 @@ export interface components {
     RouteTraceView: components["schemas"]["RouteTrace"] & {
       fix?: components["schemas"]["PlanRequest"] | null
     }
+    /** @description Falco's recent alerts in one place. */
+    RuntimeAlerts: {
+      /**
+       * @description Newest first. A report keeps its newest alerts only (1000 by default), so older ones may
+       *     be gone.
+       */
+      items: components["schemas"]["FalcoAlert"][]
+      /** @description Whether the reports could be read. */
+      state: components["schemas"]["ProviderState"]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /** @description One value of a revealed Secret. */
     SecretValue: {
       /** @description `utf-8` or `base64`. */
@@ -4696,6 +4773,33 @@ export interface operations {
       }
     }
   }
+  getClusterAlerts: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["RuntimeAlerts"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
   listCapabilities: {
     parameters: {
       query?: never
@@ -5276,6 +5380,36 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getProjectAlerts: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["RuntimeAlerts"]
+        }
+      }
+      401: {
         headers: {
           [name: string]: unknown
         }

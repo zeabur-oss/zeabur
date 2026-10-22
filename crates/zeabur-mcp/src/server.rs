@@ -27,8 +27,8 @@ use zeabur_modules::prometheus_api::PrometheusRange;
 
 use crate::Reader;
 use crate::reads::{
-    CAPABILITIES, CLUSTER, CLUSTER_GAPS, EVENTS, HISTORY, LOGS, OBJECT, PROJECT, PROJECTS, SERVICE,
-    UPGRADES, USAGE, path_and_query,
+    ALERTS, CAPABILITIES, CLUSTER, CLUSTER_GAPS, EVENTS, HISTORY, LOGS, OBJECT, PROJECT, PROJECTS,
+    SERVICE, UPGRADES, USAGE, path_and_query,
 };
 
 /// Log lines a `pod_logs` call returns unless it asks for others.
@@ -311,6 +311,19 @@ store cannot tell). state says when there is no store or it may not be read."
             )
             .await,
         ))
+    }
+
+    #[tool(
+        description = "Falco's recent runtime alerts about a project's pods, newest first: rule, \
+severity, time, pod, container, command and Falco's own output. Only the newest alerts are kept \
+(1000 per namespace by default). state says when Falco's reports are not installed or the user \
+may not read them; by default only the project's admins may."
+    )]
+    async fn project_alerts(
+        &self,
+        Parameters(args): Parameters<ProjectArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        Ok(answer(self.read(ALERTS, &[&args.project], &[]).await))
     }
 
     /// `GET`s `template` with `values` in place of its parameters.

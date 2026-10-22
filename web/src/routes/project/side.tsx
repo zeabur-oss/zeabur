@@ -8,7 +8,8 @@ import LockSimpleIcon from "~icons/ph/lock-simple"
 import LockSimpleOpenIcon from "~icons/ph/lock-simple-open"
 
 import type { Schemas } from "@/api/client"
-import { projectTimelineQuery } from "@/api/queries"
+import { projectAlertsQuery, projectTimelineQuery } from "@/api/queries"
+import { AlertList, AlertsRefused, RecentNote } from "@/components/alerts"
 import { Ago, Segmented } from "@/components/bits"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusDot, StatusPill } from "@/components/status"
@@ -46,6 +47,7 @@ import {
   type Project,
   type Service,
 } from "@/model/service"
+import { folded, serviceOf, type Alert } from "@/model/alerts"
 import { refusedPlaces } from "@/routes/project/data"
 import { FilterBox } from "@/routes/project/filter-box"
 import { MeterStack, meterPartTone } from "@zeabur/design-system/components/meter"
@@ -759,8 +761,88 @@ export function Backups({ project, bare = false }: { project: string; bare?: boo
   )
 }
 
+/** What Falco saw in the project's containers, when there is something to say. */
+function useProjectAlerts(project: string) {
+  const data = useQuery(projectAlertsQuery(project)).data
+  const said = data?.state === "refused" || (data?.state === "installed" && data.items.length > 0)
+  return said ? data : undefined
+}
+
+export function Alerts({
+  project,
+  services,
+  bare = false,
+}: {
+  project: string
+  services: Service[]
+  /** Every alert with a filter, without the heading: in a drawer. */
+  bare?: boolean
+}) {
+  const t = useT()
+  const data = useProjectAlerts(project)
+  if (!data) return null
+  const place = (alert: Alert) => {
+    const service = serviceOf(alert, services)
+    if (!service) return null
+    return (
+      <Link
+        {...serviceLink(project, service)}
+        className="truncate font-medium text-foreground hover:underline"
+        translate="no"
+      >
+        {service.name}
+      </Link>
+    )
+  }
+  const matching = (needle: string) =>
+    data.items.filter(
+      (a) =>
+        !needle ||
+        [a.rule, a.pod, a.container, a.command, serviceOf(a, services)?.name]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle),
+    )
+  const rows = folded(data.items).length
+  if (bare)
+    return (
+      <div className="flex flex-col gap-3">
+        <AlertsRefused data={data} />
+        <RecentNote />
+        <AlertList alerts={data.items} place={place} />
+      </div>
+    )
+  return (
+    <section aria-labelledby="project-alerts" className="flex flex-col gap-1">
+      <Heading
+        id="project-alerts"
+        title={t("alerts.title")}
+        count={data.state === "installed" ? rows : undefined}
+      />
+      <AlertsRefused data={data} />
+      {data.items.length > 0 ? (
+        <>
+          <AlertList alerts={data.items} place={place} limit={SIDE_ROWS} />
+          {rows > SIDE_ROWS ? (
+            <ShowAll count={rows} title={t("alerts.title")} filterLabel={t("alerts.filter")}>
+              {(needle) => (
+                <>
+                  <RecentNote />
+                  <AlertList alerts={matching(needle)} place={place} />
+                </>
+              )}
+            </ShowAll>
+          ) : (
+            <RecentNote />
+          )}
+        </>
+      ) : null}
+    </section>
+  )
+}
+
 /**
- * On a phone with many services: Activity, Domains, Storage and Backups as one row of buttons,
+ * On a phone with many services: Alerts, Activity, Domains, Storage and Backups as one row of buttons,
  * each opening its section in a drawer.
  */
 export function SectionChips({
@@ -775,11 +857,12 @@ export function SectionChips({
   unreadable: Schemas["UnreadableView"][]
 }) {
   const t = useT()
-  const [open, setOpen] = useState<"activity" | "domains" | "storage" | "backups">()
+  const [open, setOpen] = useState<"alerts" | "activity" | "domains" | "storage" | "backups">()
   const { trouble } = useActivityCounts(project, events)
   const domains = summarise(data).domains.length
   const volumes = claimsOf(data).length
   const backups = useBackupCount(project)
+  const alerts = useProjectAlerts(project)
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
   const chip = (key: NonNullable<typeof open>, label: string, count: ReactNode) => (
     <Button key={key} variant="outline" size="sm" onClick={() => setOpen(key)}>
@@ -788,6 +871,7 @@ export function SectionChips({
     </Button>
   )
   const titles = {
+    alerts: t("alerts.title"),
     activity: t("project.activity"),
     domains: t("common.domains"),
     storage: t("tab.storage"),
@@ -795,6 +879,13 @@ export function SectionChips({
   }
   return (
     <nav aria-label={t("project.sections")} className="flex flex-wrap gap-2">
+      {alerts
+        ? chip(
+            "alerts",
+            t("alerts.title"),
+            alerts.state === "refused" ? "—" : folded(alerts.items).length,
+          )
+        : null}
       {chip("activity", t("project.activity"), t("events.warningsCount", trouble))}
       {domains > 0 ? chip("domains", t("common.domains"), domains) : null}
       {volumes > 0 ? chip("storage", t("tab.storage"), volumes) : null}
@@ -809,7 +900,9 @@ export function SectionChips({
         title={open ? titles[open] : undefined}
         closeLabel={t("common.close")}
       >
-        {open === "activity" ? (
+        {open === "alerts" ? (
+          <Alerts project={project} services={data.services} bare />
+        ) : open === "activity" ? (
           <Activity
             project={project}
             services={data.services}

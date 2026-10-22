@@ -574,6 +574,66 @@ mod tests {
         assert_eq!(backups["unreadable"][0]["resource"], "schedules.velero.io");
     }
 
+    #[tokio::test]
+    async fn runtime_alerts_are_falcos_report_results_or_say_why_there_are_none() {
+        let cluster = cluster();
+        let alerts = get(&cluster, "/api/v1/projects/shop/alerts").await;
+        assert_eq!(alerts["state"], "not-installed");
+
+        cluster.update(|s| {
+            for (resource, kind) in [
+                ("policyreports", "PolicyReport"),
+                ("clusterpolicyreports", "ClusterPolicyReport"),
+            ] {
+                s.served.push(ServedResource::readable(
+                    "wgpolicyk8s.io",
+                    "v1alpha2",
+                    resource,
+                    kind,
+                    resource == "policyreports",
+                ));
+            }
+            s.dynamic.push(
+                serde_json::from_value(json!({
+                    "apiVersion": "wgpolicyk8s.io/v1alpha2", "kind": "PolicyReport",
+                    "metadata": {"name": "falco-policy-report", "namespace": "shop"},
+                    "results": [{
+                        "rule": "Terminal shell in container", "source": "Falco",
+                        "severity": "low", "policy": "syscall",
+                        "message": "Notice A shell was spawned in a container",
+                        "timestamp": {"seconds": 1_792_679_654_i64, "nanos": 0},
+                        "properties": {"k8s.pod.name": "web-7c9d8-abcde", "container.name": "web"}
+                    }]
+                }))
+                .unwrap(),
+            );
+        });
+        let alerts = get(&cluster, "/api/v1/projects/shop/alerts").await;
+        assert_eq!(alerts["state"], "installed");
+        assert_eq!(alerts["items"][0]["rule"], "Terminal shell in container");
+        assert_eq!(alerts["items"][0]["pod"], "web-7c9d8-abcde");
+        assert_eq!(alerts["items"][0]["origin"]["kind"], "PolicyReport");
+        let cluster_alerts = get(&cluster, "/api/v1/cluster/alerts").await;
+        assert_eq!(cluster_alerts["state"], "installed");
+        assert_eq!(cluster_alerts["items"], json!([]));
+
+        cluster.update(|s| {
+            s.forbidden_in_namespaces
+                .insert("policyreports.wgpolicyk8s.io".to_owned());
+            s.forbidden_resources
+                .insert("clusterpolicyreports.wgpolicyk8s.io".to_owned());
+        });
+        let alerts = get(&cluster, "/api/v1/projects/shop/alerts").await;
+        assert_eq!(alerts["state"], "refused");
+        assert_eq!(alerts["items"], json!([]));
+        assert_eq!(
+            alerts["unreadable"][0]["resource"],
+            "policyreports.wgpolicyk8s.io"
+        );
+        let cluster_alerts = get(&cluster, "/api/v1/cluster/alerts").await;
+        assert_eq!(cluster_alerts["state"], "refused");
+    }
+
     /// The test cluster with a custom resource besides the built-in kinds.
     fn cluster_with_a_certificate() -> MemoryCluster {
         let cluster = cluster();

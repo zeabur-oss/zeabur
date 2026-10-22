@@ -22,6 +22,7 @@ values are hidden in one place: the API.
 | `pod_logs` | `/projects/{p}/pods/{pod}/logs` with `tail_lines` (100 unless asked, at most 1000), `container` and `previous` |
 | `object_yaml` | `/projects/{p}/objects/{group}/{version}/{resource}/{name}`, Secret values hidden |
 | `project_usage` | `/projects/{p}/usage`: each pod's CPU and memory now, from metrics-server |
+| `project_alerts` | `/projects/{p}/alerts`: Falco's recent runtime alerts about the project's pods |
 | `service_history` | `/projects/{p}/services/{kind}/{name}/history?range=` (`1h` unless asked, `6h`, `24h`, `7d`), from the metrics store |
 
 An answer is its JSON as compact text and as `structuredContent`. A refusal or failure is a
