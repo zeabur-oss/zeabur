@@ -15,8 +15,10 @@ import BracketsCurlyIcon from "~icons/ph/brackets-curly"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import EyeIcon from "~icons/ph/eye"
 import EyeSlashIcon from "~icons/ph/eye-slash"
+import FileTextIcon from "~icons/ph/file-text"
 import KeyIcon from "~icons/ph/key"
 import ListBulletsIcon from "~icons/ph/list-bullets"
+import LockSimpleIcon from "~icons/ph/lock-simple"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
@@ -29,7 +31,7 @@ import { KubeDetails } from "@/components/kube-details"
 import { useDraft, useHold } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
-import { RefusedKinds } from "@/components/refused"
+import { isRefusal, Refused, RefusedKinds } from "@/components/refused"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import {
@@ -65,7 +67,7 @@ import {
   type RowProblem,
 } from "@/model/env-edit"
 import { isLongList } from "@/model/lists"
-import { configObjectsOf, type Service } from "@/model/service"
+import { envSecretsOf, type Service } from "@/model/service"
 
 const DataEditor = lazy(() =>
   import("@/components/data-editor").then((m) => ({ default: m.DataEditor })),
@@ -125,9 +127,7 @@ export function VariablesTab({
   const imported = containers.flatMap((c) =>
     c.importedEnv.map((i) => ({ container: c.name, imported: i })),
   )
-  const secretNames = configObjectsOf(service)
-    .filter((o) => o.kind === "Secret")
-    .map((o) => o.name)
+  const envSecrets = envSecretsOf(service)
   const multi = containers.length > 1
   const [editing, setEditing] = useState<{ rows: EnvRow[]; text?: string }>()
   const nextId = useRef(0)
@@ -150,7 +150,13 @@ export function VariablesTab({
           cache: "no-store",
         }),
       )
-      setSecrets((previous) => ({ ...previous, [name]: { values: answer.values } }))
+      // Being let in once means the earlier refusals no longer hold.
+      setSecrets((previous) => ({
+        ...Object.fromEntries(
+          Object.entries(previous).filter(([, s]) => !(s.problem && isRefusal(s.problem))),
+        ),
+        [name]: { values: answer.values },
+      }))
     } catch (error) {
       setSecrets((previous) => ({ ...previous, [name]: { problem: toProblem(error) } }))
     }
@@ -161,6 +167,14 @@ export function VariablesTab({
       delete next[name]
       return next
     })
+  const refusedReveal = Object.entries(secrets).find(([, s]) => s.problem && isRefusal(s.problem))
+  const listRefused = refused.some((u) => u.resource === "secrets")
+  // Without the right to read Secrets, nothing offers to show their values.
+  const locked = listRefused || refusedReveal !== undefined
+  const anyShown = envSecrets.some((name) => secrets[name]?.values)
+  const revealAll = () => {
+    for (const name of envSecrets) if (!secrets[name]?.values) void reveal(name)
+  }
 
   const valueOf = (env: Schemas["EnvVar"]): string | undefined => {
     const source = env.source
@@ -188,7 +202,9 @@ export function VariablesTab({
             )
       return entries.length
         ? entries.map(([k, v]) => `${i.prefix ?? ""}${k}=${quote(v)}`)
-        : [`# ${sourceWords(t, i.source, true)}: ${t("vars.keys", i.keyCount ?? 0)}`]
+        : [
+            `# ${sourceWords(t, i.source, true)}${typeof i.keyCount === "number" ? `: ${t("vars.keys", i.keyCount)}` : ""}`,
+          ]
     }),
   ].join("\n")
 
@@ -319,40 +335,43 @@ export function VariablesTab({
     setRows((rows) => pasteInto(rows, row.id, lines, newId))
   }
 
-  const revealButtons =
-    secretNames.length > 0 ? (
-      <span className="flex flex-wrap items-center gap-1.5">
-        {secretNames.map((name) => {
-          const state = secrets[name]
-          return state?.values ? (
-            <Button key={name} variant="outline" size="xs" onClick={() => hide(name)}>
-              <EyeSlashIcon aria-hidden="true" data-icon="inline-start" />
-              {t("vars.hide", name)}
-            </Button>
-          ) : (
-            <Button
-              key={name}
-              variant="outline"
-              size="xs"
-              onClick={() => void reveal(name)}
-              disabled={state?.pending}
-            >
-              {state?.pending ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <EyeIcon aria-hidden="true" data-icon="inline-start" />
-              )}
-              {t("vars.reveal", name)}
-            </Button>
-          )
-        })}
-        <Hint label={t("vars.secretsHint")}>{t("vars.revealHint")}</Hint>
-      </span>
-    ) : null
+  const secretToggle = (name: string) => {
+    const state = secrets[name]
+    if (state?.values)
+      return (
+        <Button
+          variant="muted"
+          size="icon-xs"
+          aria-label={t("vars.hide", name)}
+          title={t("vars.hide", name)}
+          onClick={() => hide(name)}
+        >
+          <EyeSlashIcon aria-hidden="true" />
+        </Button>
+      )
+    if (locked)
+      return (
+        <span className="inline-flex size-control-xs shrink-0 items-center justify-center text-muted-foreground">
+          <LockSimpleIcon className="size-3.5" aria-hidden="true" />
+        </span>
+      )
+    return (
+      <Button
+        variant="muted"
+        size="icon-xs"
+        aria-label={t("vars.reveal", name)}
+        title={t("vars.reveal", name)}
+        disabled={state?.pending}
+        onClick={() => void reveal(name)}
+      >
+        {state?.pending ? <Spinner /> : <EyeIcon aria-hidden="true" />}
+      </Button>
+    )
+  }
 
   const sourceRow = ({ container, env }: { container: string; env: Schemas["EnvVar"] }) => {
     const value = valueOf(env)
-    const secret = env.source.kind === "Secret"
+    const secret = env.source.kind === "Secret" ? env.source.name : undefined
     return (
       <li
         key={`${container}/${env.name}`}
@@ -370,24 +389,109 @@ export function VariablesTab({
               <CopyButton value={value} />
             </>
           ) : secret ? (
-            <span className="inline-flex items-center gap-1.5 font-mono text-xs tracking-widest text-muted-foreground">
-              <KeyIcon className="size-3.5" aria-hidden="true" />
-              ••••••••
-            </span>
+            <Masked />
           ) : (
             <span className="text-xs text-muted-foreground">{t("vars.atRuntime")}</span>
           )}
+          {secret ? secretToggle(secret) : null}
         </span>
-        <span className="flex items-center justify-end gap-1">
+        <span className="flex min-w-0 items-center gap-1 sm:justify-end">
           {env.pendingRestart ? <PendingMark pending={env.pendingRestart} /> : null}
           <SourceLink
             source={env.source}
+            variable={env.name}
             onOpen={(kind, name) => setEditor({ kind, name, key: env.source.key ?? undefined })}
           />
         </span>
       </li>
     )
   }
+
+  const importedRows = ({
+    container,
+    imported: i,
+  }: {
+    container: string
+    imported: Schemas["ImportedEnv"]
+  }) => {
+    const name = i.source.name ?? ""
+    const secret = i.source.kind === "Secret" && name ? name : undefined
+    const revealed = secret ? secrets[secret]?.values : undefined
+    const data = i.source.kind === "ConfigMap" ? configMaps.get(name) : undefined
+    const count = revealed
+      ? Object.keys(revealed).length
+      : data
+        ? Object.keys(data).length
+        : (i.keyCount ?? undefined)
+    const key = `${container}/${i.origin.fieldPath ?? name}`
+    return (
+      <Fragment key={key}>
+        <li className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions">
+          <span className="font-mono text-xs font-medium text-muted-foreground" translate="no">
+            {i.prefix ? `${i.prefix}*` : t("vars.allKeys")}
+          </span>
+          <span className="flex min-w-0 items-center gap-1">
+            {count !== undefined ? (
+              <span className="text-xs text-muted-foreground">{t("vars.keys", count)}</span>
+            ) : secret ? (
+              <Masked />
+            ) : null}
+            {secret ? secretToggle(secret) : null}
+          </span>
+          <span className="flex min-w-0 items-center gap-1 sm:justify-end">
+            {i.pendingRestart ? <PendingMark pending={i.pendingRestart} /> : null}
+            <SourceLink
+              source={i.source}
+              whole
+              onOpen={(kind, n) => setEditor({ kind, name: n })}
+            />
+          </span>
+        </li>
+        {Object.entries(revealed ?? {}).map(([k, v]) => (
+          <li
+            key={`${key}/${k}`}
+            className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
+          >
+            <span className="font-mono text-xs font-medium" translate="no">
+              {`${i.prefix ?? ""}${k}`}
+            </span>
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="truncate font-mono text-xs" translate="no">
+                {v.value}
+              </span>
+              <CopyButton value={v.value} />
+            </span>
+          </li>
+        ))}
+      </Fragment>
+    )
+  }
+
+  const containerHeading = (name: string) => (
+    <li
+      key={`container/${name}`}
+      className="pt-3 pb-1.5 font-mono type-meta text-muted-foreground"
+      translate="no"
+    >
+      {name}
+    </li>
+  )
+  /** Under a heading for each container when there are several. */
+  const byContainer = <T extends { container: string }>(
+    items: T[],
+    row: (item: T, at: number) => ReactNode,
+  ) =>
+    items.flatMap((item, at) =>
+      multi && items[at - 1]?.container !== item.container
+        ? [containerHeading(item.container), row(item, at)]
+        : [row(item, at)],
+    )
+  const objectRows = containers.flatMap((c) => [
+    ...shownObjects
+      .filter((o) => o.container === c.name)
+      .map((o) => ({ ...o, imported: undefined })),
+    ...shownImported.filter((o) => o.container === c.name).map((o) => ({ ...o, env: undefined })),
+  ])
 
   const kubeFacts: [ReactNode, ReactNode][] = [
     ...(literal.length > 0 ? [[t("vars.direct"), "env[].value"] as [ReactNode, ReactNode]] : []),
@@ -514,16 +618,25 @@ export function VariablesTab({
           </AlertDescription>
         </Alert>
       ) : null}
-      {secretNames.map((name) =>
-        secrets[name]?.problem ? (
+      {refusedReveal?.[1].problem && !listRefused ? (
+        <Refused
+          refusal={refusedReveal[1].problem}
+          what={t("refused.reveal")}
+          retry={() => void reveal(refusedReveal[0])}
+          line
+        />
+      ) : null}
+      {envSecrets.map((name) => {
+        const problem = secrets[name]?.problem
+        return problem && !isRefusal(problem) ? (
           <Problem
             key={name}
-            problem={secrets[name].problem}
+            problem={problem}
             retry={() => void reveal(name)}
-            what={t("refused.reveal", name)}
+            what={t("refused.reveal")}
           />
-        ) : null,
-      )}
+        ) : null
+      })}
 
       {editing && editing.text !== undefined ? (
         <div className="flex flex-col gap-2">
@@ -576,9 +689,32 @@ export function VariablesTab({
         </Empty>
       ) : raw && !editing ? (
         <>
-          {revealButtons}
           <div className="relative rounded-lg border bg-muted/30">
-            <CopyButton value={dotenv} className="absolute top-2 right-2" />
+            <span className="absolute top-2 right-2 flex items-center gap-1">
+              {envSecrets.length === 0 ? null : anyShown ? (
+                <Button
+                  variant="muted"
+                  size="icon-xs"
+                  aria-label={t("vars.hideAll")}
+                  title={t("vars.hideAll")}
+                  onClick={() => setSecrets({})}
+                >
+                  <EyeSlashIcon aria-hidden="true" />
+                </Button>
+              ) : locked ? null : (
+                <Button
+                  variant="muted"
+                  size="icon-xs"
+                  aria-label={t("vars.revealAll")}
+                  title={t("vars.revealAll")}
+                  disabled={envSecrets.some((name) => secrets[name]?.pending)}
+                  onClick={revealAll}
+                >
+                  <EyeIcon aria-hidden="true" />
+                </Button>
+              )}
+              <CopyButton value={dotenv} />
+            </span>
             <pre className="overflow-x-auto p-4 font-mono text-xs leading-6" translate="no">
               {dotenv || "# —"}
             </pre>
@@ -668,48 +804,38 @@ export function VariablesTab({
                     <p className="py-2 text-xs text-muted-foreground">{t("vars.noMatch")}</p>
                   ) : null}
                   <ul className="flex flex-col divide-y">
-                    {shownLiteral.map(({ container, env }, at) => {
+                    {byContainer(shownLiteral, ({ container, env }) => {
                       const targets = named.get(`${container}/${env.name}`) ?? []
-                      const first = multi && shownLiteral[at - 1]?.container !== container
                       return (
-                        <Fragment key={`${container}/${env.name}`}>
-                          {first ? (
-                            <li
-                              className="pt-3 pb-1.5 font-mono type-meta text-muted-foreground"
+                        <li
+                          key={`${container}/${env.name}`}
+                          className={cn(
+                            "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable",
+                            entrance(createdKey.env(workload, env.name)),
+                          )}
+                        >
+                          <span className="font-mono text-xs font-medium" translate="no">
+                            {env.name}
+                          </span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span
+                              className="truncate font-mono text-xs"
                               translate="no"
+                              title={env.value ?? ""}
                             >
-                              {container}
-                            </li>
-                          ) : null}
-                          <li
-                            className={cn(
-                              "grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable",
-                              entrance(createdKey.env(workload, env.name)),
-                            )}
-                          >
-                            <span className="font-mono text-xs font-medium" translate="no">
-                              {env.name}
+                              {env.value}
                             </span>
-                            <span className="flex min-w-0 items-center gap-2">
-                              <span
-                                className="truncate font-mono text-xs"
-                                translate="no"
-                                title={env.value ?? ""}
-                              >
-                                {env.value}
-                              </span>
-                              <CopyButton value={env.value ?? ""} />
-                              {targets.map((target) => (
-                                <Tooltip key={target} content={t("vars.names", target)}>
-                                  <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
-                                    <ArrowRightIcon className="size-3" aria-hidden="true" />
-                                    {target}
-                                  </span>
-                                </Tooltip>
-                              ))}
-                            </span>
-                          </li>
-                        </Fragment>
+                            <CopyButton value={env.value ?? ""} />
+                            {targets.map((target) => (
+                              <Tooltip key={target} content={t("vars.names", target)}>
+                                <span className="ml-auto inline-flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
+                                  <ArrowRightIcon className="size-3" aria-hidden="true" />
+                                  {target}
+                                </span>
+                              </Tooltip>
+                            ))}
+                          </span>
+                        </li>
                       )
                     })}
                   </ul>
@@ -718,40 +844,32 @@ export function VariablesTab({
             ) : null}
 
             {shownObjects.length + shownImported.length > 0 ? (
-              <VarGroup id="vars-objects" label={t("vars.fromObjects")} action={revealButtons}>
+              <VarGroup
+                id="vars-objects"
+                label={t("vars.fromObjects")}
+                hint={
+                  envSecrets.length > 0 ? (
+                    <Hint label={t("vars.secretsHint")}>
+                      {locked ? t("vars.lockedHint") : t("vars.revealHint")}
+                    </Hint>
+                  ) : undefined
+                }
+              >
                 <ul className="flex flex-col divide-y">
-                  {shownObjects.map(sourceRow)}
-                  {shownImported.map(({ container, imported: i }) => (
-                    <li
-                      key={`${container}/${i.origin.fieldPath ?? i.source.name}`}
-                      className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
-                    >
-                      <span
-                        className="font-mono text-xs font-medium text-muted-foreground"
-                        translate="no"
-                      >
-                        {i.prefix ? `${i.prefix}*` : t("vars.allKeys")}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {t("vars.keys", i.keyCount ?? 0)}
-                      </span>
-                      <span className="flex items-center justify-end gap-1">
-                        {i.pendingRestart ? <PendingMark pending={i.pendingRestart} /> : null}
-                        <SourceLink
-                          source={i.source}
-                          whole
-                          onOpen={(kind, name) => setEditor({ kind, name })}
-                        />
-                      </span>
-                    </li>
-                  ))}
+                  {byContainer(objectRows, ({ container, env, imported: i }) =>
+                    env
+                      ? sourceRow({ container, env })
+                      : i
+                        ? importedRows({ container, imported: i })
+                        : null,
+                  )}
                 </ul>
               </VarGroup>
             ) : null}
 
             {shownCluster.length > 0 ? (
               <VarGroup id="vars-cluster" label={t("vars.fromCluster")}>
-                <ul className="flex flex-col divide-y">{shownCluster.map(sourceRow)}</ul>
+                <ul className="flex flex-col divide-y">{byContainer(shownCluster, sourceRow)}</ul>
               </VarGroup>
             ) : null}
           </div>
@@ -913,12 +1031,14 @@ function VarGroup({
   id,
   label,
   count,
+  hint,
   action,
   children,
 }: {
   id?: string
   label: string
   count?: number
+  hint?: ReactNode
   action?: ReactNode
   children: ReactNode
 }) {
@@ -931,6 +1051,7 @@ function VarGroup({
             <span className="ml-1.5 text-muted-foreground">{count}</span>
           ) : null}
         </h3>
+        {hint}
         {action ? <span className="ml-auto">{action}</span> : null}
       </div>
       {children}
@@ -938,13 +1059,24 @@ function VarGroup({
   )
 }
 
-/** Where a value comes from, in words; for a config file or secret, a link to edit it there. */
+function Masked() {
+  return (
+    <span className="font-mono text-xs tracking-widest text-muted-foreground" translate="no">
+      ••••••••
+    </span>
+  )
+}
+
+/** Where a value comes from: for a config file or secret, its key and name, opening it to edit. */
 function SourceLink({
   source,
+  variable,
   whole = false,
   onOpen,
 }: {
   source: Source
+  /** The variable's own name; a key of the same name is not repeated. */
+  variable?: string
   whole?: boolean
   onOpen: (kind: "ConfigMap" | "Secret", name: string) => void
 }) {
@@ -954,10 +1086,33 @@ function SourceLink({
   const name = source.name
   if ((kind !== "ConfigMap" && kind !== "Secret") || !name)
     return <span className="truncate text-xs text-secondary">{words}</span>
+  const key = !whole && source.key && source.key !== variable ? source.key : undefined
+  const Icon = kind === "Secret" ? KeyIcon : FileTextIcon
   return (
-    <Tooltip content={t("vars.editThere")}>
-      <Button variant="link" size="xs" className="min-w-0" onClick={() => onOpen(kind, name)}>
-        <span className="truncate">{words}</span>
+    <Tooltip
+      content={
+        <span className="flex flex-col">
+          <span className="break-all">{words}</span>
+          <span className="text-muted-foreground">{t("vars.editThere")}</span>
+        </span>
+      }
+    >
+      <Button
+        variant="link"
+        size="xs"
+        className="max-w-full min-w-0 shrink"
+        aria-label={words}
+        onClick={() => onOpen(kind, name)}
+      >
+        <Icon className="text-muted-foreground" aria-hidden="true" />
+        {key ? (
+          <span className="truncate font-mono text-secondary" translate="no">
+            {key}
+          </span>
+        ) : null}
+        <span className="min-w-8 truncate text-muted-foreground" translate="no">
+          {name}
+        </span>
       </Button>
     </Tooltip>
   )

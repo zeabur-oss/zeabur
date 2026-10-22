@@ -195,7 +195,7 @@ export const en = {
   "refused.see": (what: string) => `Seeing ${what}`,
   "refused.some": "Some of this page",
   "refused.terminal": "Opening a terminal",
-  "refused.reveal": (name: string) => `Showing the values of ${name}`,
+  "refused.reveal": "Showing Secret values",
   "refused.listThese": "Listing these",
   "refused.adopt": (ns: string) => `Adopting ${ns}`,
   "refused.unadopt": (ns: string) => `Removing ${ns} from Zeabur`,
@@ -727,6 +727,9 @@ export const en = {
   "vars.secretsHint": "About Secret values",
   "vars.revealHint":
     "Zeabur fetches a value only when you reveal it, and keeps it on this page only.",
+  "vars.revealAll": "Show Secret values",
+  "vars.hideAll": "Hide Secret values",
+  "vars.lockedHint": "Your rights don't let you read Secrets, so their values stay hidden.",
   "vars.view": "View",
   "vars.list": "List",
   "vars.names": (service: string) => `Points to the service ${service}`,

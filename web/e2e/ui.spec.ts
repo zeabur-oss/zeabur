@@ -420,11 +420,20 @@ test("a Secret's values appear only when revealed; they and the log filter stay 
   await page.goto(`${project}/services/Deployment/${healthy}?tab=variables`)
   const panel = page.getByRole("tabpanel", { name: "Variables" })
   await expect(panel).not.toContainText(secretValue)
-  await panel.getByRole("button", { name: `Show values in ${secret}` }).click()
+  await panel
+    .getByRole("button", { name: `Show values in ${secret}` })
+    .first()
+    .click()
   await expect(panel).toContainText(secretValue)
-  await panel.getByRole("button", { name: `Hide values in ${secret}` }).click()
+  await panel
+    .getByRole("button", { name: `Hide values in ${secret}` })
+    .first()
+    .click()
   await expect(panel).not.toContainText(secretValue)
-  await panel.getByRole("button", { name: `Show values in ${secret}` }).click()
+  await panel
+    .getByRole("button", { name: `Show values in ${secret}` })
+    .first()
+    .click()
   await expect(panel).toContainText(secretValue)
   await column.getByRole("link", { name: new RegExp(`^${failing}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=variables`))

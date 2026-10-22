@@ -276,21 +276,13 @@ export function domainsOf(network: Network, service: Service): Domain[] {
 export const hostUrl = (domain: Pick<Domain, "host" | "https">) =>
   `${domain.https ? "https" : "http"}://${domain.host}`
 
-export function configObjectsOf(
-  service: Service,
-): { kind: "Secret" | "ConfigMap"; name: string }[] {
-  const seen = new Map<string, { kind: "Secret" | "ConfigMap"; name: string }>()
-  const add = (kind: string, name?: string | null) => {
-    if ((kind === "Secret" || kind === "ConfigMap") && name)
-      seen.set(`${kind}/${name}`, { kind, name })
-  }
-  for (const container of service.containers) {
-    for (const env of container.env) add(env.source.kind, env.source.name)
-    for (const imported of container.importedEnv) add(imported.source.kind, imported.source.name)
-    for (const mount of container.mounts)
-      if (mount.object) add(mount.object.kind, mount.object.name)
-  }
-  return [...seen.values()]
+/** The Secrets a service's variables read with `env` or `envFrom`; mounted ones are files. */
+export function envSecretsOf(service: Service): string[] {
+  const names = new Set<string>()
+  for (const container of service.containers)
+    for (const { source } of [...container.env, ...container.importedEnv])
+      if (source.kind === "Secret" && source.name) names.add(source.name)
+  return [...names]
 }
 
 export interface ServiceGroup {

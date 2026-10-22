@@ -1,7 +1,14 @@
 import { describe, test, expect } from "bun:test"
 
 import { layout } from "@/model/layout"
-import { canonicalKind, domainsOf, roleOf, type Network, type Service } from "@/model/service"
+import {
+  canonicalKind,
+  domainsOf,
+  envSecretsOf,
+  roleOf,
+  type Network,
+  type Service,
+} from "@/model/service"
 
 const service = (name: string, fields: Partial<Service> = {}) =>
   ({
@@ -75,5 +82,28 @@ describe("a service kind in an address", () => {
 
   test("stays as it is when no workload has that kind, so the page says not found", () => {
     expect(canonicalKind("Widget")).toBe("Widget")
+  })
+})
+
+describe("the Secrets a service's variables read", () => {
+  const source = (kind: string, name: string, key?: string) => ({ source: { kind, name, key } })
+  test("are those named by env and envFrom once each, not the mounted ones", () => {
+    const db = service("db", {
+      containers: [
+        {
+          name: "db",
+          env: [source("Secret", "users", "USER"), source("Secret", "users", "PASSWORD")],
+          importedEnv: [source("Secret", "users"), source("ConfigMap", "settings")],
+          mounts: [{ object: { kind: "Secret", name: "tls" } }],
+        },
+        {
+          name: "backup",
+          env: [source("Secret", "backup-s3", "KEY"), source("ConfigMap", "settings", "PORT")],
+          importedEnv: [],
+          mounts: [{ object: { kind: "Secret", name: "encryption-key" } }],
+        },
+      ],
+    } as unknown as Partial<Service>)
+    expect(envSecretsOf(db)).toStrictEqual(["users", "backup-s3"])
   })
 })
