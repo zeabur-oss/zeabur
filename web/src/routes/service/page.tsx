@@ -285,7 +285,7 @@ function ServiceView({
               <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:pl-13">
                 {restart ? (
                   <>
-                    <GateTip gate={gates("changeServices")}>
+                    <GateTip gate={gates("changeServices")} className="max-sm:hidden">
                       <Button
                         variant="outline"
                         size="sm"
@@ -296,7 +296,7 @@ function ServiceView({
                         {t("ops.restart")}
                       </Button>
                     </GateTip>
-                    <GateTip gate={gates("changeServices")}>
+                    <GateTip gate={gates("changeServices")} className="sm:hidden">
                       <Button
                         variant="outline"
                         size="icon-sm"
@@ -311,7 +311,7 @@ function ServiceView({
                 ) : null}
                 {isTask(service.kind) ? null : (
                   <>
-                    <GateTip gate={gates("openTerminal")}>
+                    <GateTip gate={gates("openTerminal")} className="max-sm:hidden">
                       <Button
                         variant="outline"
                         size="sm"
@@ -322,7 +322,7 @@ function ServiceView({
                         {t("tab.terminal")}
                       </Button>
                     </GateTip>
-                    <GateTip gate={gates("openTerminal")}>
+                    <GateTip gate={gates("openTerminal")} className="sm:hidden">
                       <Button
                         variant="outline"
                         size="icon-sm"

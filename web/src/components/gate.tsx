@@ -1,11 +1,14 @@
 import { useQuery } from "@tanstack/react-query"
 import { useParams } from "@tanstack/react-router"
+import { MenuItem } from "@zeabur/design-system/components/menu"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { cloneElement, type ReactElement, type ReactNode } from "react"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 
+import type { Schemas } from "@/api/client"
 import { clusterQuery, namespaceQuery, sessionQuery, whoamiQuery } from "@/api/queries"
 import { useT } from "@/i18n"
-import type { Schemas } from "@/api/client"
+import { cn } from "@/lib/utils"
 import {
   askerOf,
   gate,
@@ -16,8 +19,6 @@ import {
 } from "@/model/rights"
 
 type Permission = Schemas["Permission"]
-import { MenuItem } from "@zeabur/design-system/components/menu"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
 function useAsker() {
   const whoami = useQuery(whoamiQuery).data
@@ -69,7 +70,16 @@ export function useGateReason(): (gate: Gate) => string | undefined {
 }
 
 /** A control the person's role cannot use: disabled, with the role that can in a tooltip. */
-export function GateTip({ gate: g, children }: { gate: Gate; children: ReactElement }) {
+export function GateTip({
+  gate: g,
+  className,
+  children,
+}: {
+  gate: Gate
+  /** For the wrapper a closed control gets, such as the child's own responsive visibility. */
+  className?: string
+  children: ReactElement
+}) {
   const reason = useGateReason()(g)
   if (!reason) return children
   const disabled = cloneElement(children as ReactElement<{ disabled?: boolean }>, {
@@ -77,7 +87,7 @@ export function GateTip({ gate: g, children }: { gate: Gate; children: ReactElem
   })
   return (
     <Tooltip content={reason}>
-      <span className="inline-flex" tabIndex={0}>
+      <span className={cn("inline-flex", className)} tabIndex={0}>
         {disabled}
         <span className="sr-only">{reason}</span>
       </span>
