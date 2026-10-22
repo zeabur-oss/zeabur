@@ -91,6 +91,8 @@ bytes = "1"
 hyper = { version = "1", default-features = false }
 hyper-rustls = { version = "0.27", default-features = false, features = ["http1", "tls12", "aws-lc-rs"] }
 hyper-util = { version = "0.1", default-features = false, features = ["client-legacy", "http1", "tokio"] }
+# The read and write timeouts of kube-rs's default client (zeabur-kube).
+hyper-timeout = "0.5"
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 rustls-platform-verifier = "0.7"
 k8s-openapi = { version = "0.28", default-features = false, features = ["v1_34"] }
@@ -114,6 +116,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal
 # A WebSocket client for the terminal's tests; the server side comes with axum's `ws` feature.
 tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect"] }
 tower = { version = "0.5", default-features = false, features = ["util"] }
+# The request tracing of kube-rs's default client (zeabur-kube).
+tower-http = { version = "0.6", default-features = false, features = ["trace"] }
 tracing = "0.1"
 # OpenAPI from the code. Reviewed 2026-10-14 (zeabur-api README): no `yaml` feature (it pulls a
 # c2rust libyaml); the spec is written with serde-saphyr. Never enable `config`.

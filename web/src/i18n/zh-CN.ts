@@ -1473,7 +1473,7 @@ export const zhCN: Messages = {
   "account.unread": "无法读取你的权限",
   "account.unreadCount": (n) => `无法读取你在 ${n} 个项目的权限。重新加载以再试一次。`,
   "account.roleIn": (role, n) => `${n} 个项目的${role}`,
-  "account.summary": (parts) => `你是${listZh("zh-CN", parts)}。`,
+  "account.summary": (parts) => `你是 ${listZh("zh-CN", parts)}。`,
   "account.noRole": (names) => `你在${listZh("zh-CN", names)}没有角色。`,
   "account.noRoleCount": (n, all) =>
     all
@@ -1488,7 +1488,8 @@ export const zhCN: Messages = {
   "account.means.developer": "查看者能做的都能做，还能更改服务、打开终端和读取机密。",
   "account.means.viewer": "查看服务、副本和日志。",
   "account.signIn": "登录方式",
-  "account.signInWhere": "通行密钥和关联的账号，请到登录服务管理。",
+  "account.signInWhere":
+    "通行密钥、关联的账号和会话都由 Zeabur Identity 管理，可以在那里添加或移除通行密钥、退出其他设备的登录。",
   "account.manageSignIn": "管理登录方式",
   "passkey.unnamed": "通行密钥",
   "passkey.added": (date) => `${date} 添加`,

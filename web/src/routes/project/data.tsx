@@ -3,11 +3,12 @@ import { useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
 
 import { toProblem, type Schemas } from "@/api/client"
-import { eventsQuery, projectQuery, whoamiQuery } from "@/api/queries"
+import { eventsQuery, projectQuery, projectsQuery, whoamiQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
 import { lacksProjectRole } from "@/model/members"
+import { projectTitle } from "@/model/project"
 import type { Event, Project } from "@/model/service"
 import {
   Empty,
@@ -53,6 +54,7 @@ export function ProjectData({
 function Unread({ project, error }: { project: string; error: unknown }) {
   const t = useT()
   const whoami = useQuery(whoamiQuery).data
+  const summary = useQuery(projectsQuery).data?.items.find((p) => p.name === project)
   if (!lacksProjectRole(toProblem(error), whoami)) return <Problem error={error} />
   return (
     <Empty variant="outline">
@@ -60,7 +62,7 @@ function Unread({ project, error }: { project: string; error: unknown }) {
         <EmptyMedia>
           <Illustration kind="forbidden" />
         </EmptyMedia>
-        <EmptyTitle>{t("project.noRole", project)}</EmptyTitle>
+        <EmptyTitle>{t("project.noRole", projectTitle(summary, project))}</EmptyTitle>
         <EmptyDescription>{t("project.noRoleBody")}</EmptyDescription>
       </EmptyHeader>
     </Empty>

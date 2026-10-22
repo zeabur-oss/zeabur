@@ -24,6 +24,7 @@
 
 use std::fmt;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex, PoisonError};
 
 mod adapter;
 mod logs;
@@ -49,12 +50,22 @@ pub use port::{
 use secrecy::SecretString;
 
 /// Where kube-apiserver is and how to verify it. Holds no credential.
+///
+/// Its clones share one pool of connections, which every [`UserClient::with_token`] client of
+/// the endpoint sends through, so the connections open at once follow the requests in flight,
+/// not the number of signed-in people. A connection carries no identity: each request carries
+/// its person's bearer token, and kube-apiserver authenticates every request on its own
+/// [k8s-authn]. The pool's TLS has no client certificate, and its verifier re-reads the CA
+/// bundle, so a rotated bundle is still picked up.
+///
+/// [k8s-authn]: https://kubernetes.io/docs/reference/access-authn-authz/authentication/
 #[derive(Clone)]
 pub struct ClusterEndpoint {
     url: http::Uri,
     root_certs: Option<Vec<Vec<u8>>>,
     root_cert_file: Option<PathBuf>,
     tls_server_name: Option<String>,
+    pool: Arc<Mutex<Option<Pool>>>,
 }
 
 impl fmt::Debug for ClusterEndpoint {
@@ -69,12 +80,13 @@ impl fmt::Debug for ClusterEndpoint {
 impl ClusterEndpoint {
     /// An endpoint at `url`, trusting `root_certs` (DER), or the system roots when `None`.
     #[must_use]
-    pub const fn new(url: http::Uri, root_certs: Option<Vec<Vec<u8>>>) -> Self {
+    pub fn new(url: http::Uri, root_certs: Option<Vec<Vec<u8>>>) -> Self {
         Self {
             url,
             root_certs,
             root_cert_file: None,
             tls_server_name: None,
+            pool: Arc::default(),
         }
     }
 
@@ -98,6 +110,7 @@ impl ClusterEndpoint {
             root_certs: config.root_cert,
             root_cert_file: config.root_cert_file,
             tls_server_name: config.tls_server_name,
+            pool: Arc::default(),
         }
     }
 
@@ -113,6 +126,18 @@ impl ClusterEndpoint {
         config.root_cert_file.clone_from(&self.root_cert_file);
         config.tls_server_name.clone_from(&self.tls_server_name);
         config
+    }
+
+    /// The endpoint's pool, made on first use. It is made from [`Self::config`], which has no
+    /// credential, so its connections present no client certificate.
+    fn pool(&self) -> Result<Pool, ConnectError> {
+        let mut slot = self.pool.lock().unwrap_or_else(PoisonError::into_inner);
+        let pool = match slot.as_ref() {
+            Some(pool) => pool.clone(),
+            None => slot.insert(pool(&self.config(), POOL_IDLE)?).clone(),
+        };
+        drop(slot);
+        Ok(pool)
     }
 }
 
@@ -156,7 +181,10 @@ impl UserClient {
     pub fn with_token(endpoint: &ClusterEndpoint, token: &UserToken) -> Result<Self, ConnectError> {
         let mut config = endpoint.config();
         config.auth_info.token = Some(token.0.clone());
-        Self::from_kube_config(config, None)
+        Ok(Self {
+            client: client(config, endpoint.pool()?)?,
+            name: None,
+        })
     }
 
     /// Acts as the person at this machine, with a kubeconfig context (the current one when
@@ -176,10 +204,11 @@ impl UserClient {
         Self::from_kube_config(config, kubeconfig_cluster(context))
     }
 
+    /// A kubeconfig may name a client certificate, which binds a connection itself to the
+    /// person, so this client keeps a pool of its own.
     fn from_kube_config(config: kube::Config, name: Option<String>) -> Result<Self, ConnectError> {
-        kube::Client::try_from(config)
-            .map(|client| Self { client, name })
-            .map_err(|e| ConnectError::Client(e.to_string()))
+        let pool = pool(&config, POOL_IDLE)?;
+        client(config, pool).map(|client| Self { client, name })
     }
 
     /// The underlying kube-rs client, bound to this person.
@@ -187,6 +216,114 @@ impl UserClient {
     pub const fn kube(&self) -> &kube::Client {
         &self.client
     }
+}
+
+/// How long a connection to kube-apiserver stays open unused.
+const POOL_IDLE: std::time::Duration = std::time::Duration::from_secs(30);
+
+type Pool = hyper_util::client::legacy::Client<
+    hyper_timeout::TimeoutConnector<
+        hyper_rustls::HttpsConnector<hyper_util::client::legacy::connect::HttpConnector>,
+    >,
+    kube::client::Body,
+>;
+
+fn refused(error: &kube::Error) -> ConnectError {
+    ConnectError::Client(error.to_string())
+}
+
+/// The connections of kube-rs's default client (`kube::Client::try_from`): TLS as `config`
+/// says, its connect, read and write timeouts, in a pool that closes idle connections. The
+/// default pool has no timer, so it keeps every connection a burst of requests opened for as
+/// long as the pool lives.
+fn pool(config: &kube::Config, idle: std::time::Duration) -> Result<Pool, ConnectError> {
+    use kube::client::ConfigExt as _;
+    let mut http = hyper_util::client::legacy::connect::HttpConnector::new();
+    http.enforce_http(false);
+    let https = config
+        .rustls_https_connector_with_connector(http)
+        .map_err(|e| refused(&e))?;
+    let mut timed = hyper_timeout::TimeoutConnector::new(https);
+    timed.set_connect_timeout(config.connect_timeout);
+    timed.set_read_timeout(config.read_timeout);
+    timed.set_write_timeout(config.write_timeout);
+    Ok(
+        hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
+            .pool_timer(hyper_util::rt::TokioTimer::new())
+            .pool_idle_timeout(idle)
+            .build(timed),
+    )
+}
+
+/// The layers of kube-rs's default client (retry, auth, extra headers, tracing) over `pool`.
+fn client(config: kube::Config, pool: Pool) -> Result<kube::Client, ConnectError> {
+    use kube::client::ConfigExt as _;
+    use kube::client::retry::RetryPolicy;
+    use tower_http::classify::ServerErrorsFailureClass;
+    let service = tower::ServiceBuilder::new()
+        .layer(config.base_uri_layer())
+        .option_layer(
+            config
+                .default_retry
+                .then(|| tower::retry::RetryLayer::new(RetryPolicy::server_retry())),
+        )
+        .option_layer(config.auth_layer().map_err(|e| refused(&e))?)
+        .layer(config.extra_headers_layer().map_err(|e| refused(&e))?)
+        // kube-rs's request tracing, with its span and fields (OpenTelemetry's HTTP client
+        // conventions).
+        .layer(
+            tower_http::trace::TraceLayer::new_for_http()
+                .make_span_with(|request: &http::Request<kube::client::Body>| {
+                    tracing::debug_span!(
+                        "HTTP",
+                        http.method = %request.method(),
+                        http.url = %request.uri(),
+                        http.status_code = tracing::field::Empty,
+                        otel.name = request.extensions().get::<&'static str>().unwrap_or(&"HTTP"),
+                        otel.kind = "client",
+                        otel.status_code = tracing::field::Empty,
+                    )
+                })
+                .on_request(|_: &http::Request<kube::client::Body>, _: &tracing::Span| {
+                    tracing::debug!("requesting");
+                })
+                .on_response(
+                    |response: &http::Response<hyper::body::Incoming>,
+                     _: std::time::Duration,
+                     span: &tracing::Span| {
+                        let status = response.status();
+                        span.record("http.status_code", status.as_u16());
+                        if status.is_client_error() || status.is_server_error() {
+                            span.record("otel.status_code", "ERROR");
+                        }
+                    },
+                )
+                .on_body_chunk(())
+                .on_eos(
+                    |_: Option<&http::HeaderMap>, _: std::time::Duration, _: &tracing::Span| {
+                        tracing::debug!("stream closed");
+                    },
+                )
+                .on_failure(
+                    |class: ServerErrorsFailureClass,
+                     _: std::time::Duration,
+                     span: &tracing::Span| {
+                        span.record("otel.status_code", "ERROR");
+                        match class {
+                            ServerErrorsFailureClass::StatusCode(status) => {
+                                span.record("http.status_code", status.as_u16());
+                                tracing::error!("failed with status {status}");
+                            }
+                            ServerErrorsFailureClass::Error(error) => {
+                                tracing::error!("failed with error {error}");
+                            }
+                        }
+                    },
+                ),
+        )
+        .map_err(tower::BoxError::from)
+        .service(pool);
+    Ok(kube::Client::new(service, config.default_namespace))
 }
 
 /// The kubeconfig's name for the cluster `context` (the current context when `None`) uses, as
@@ -273,6 +410,129 @@ contexts:
         let endpoint = ClusterEndpoint::new(http::Uri::from_static("https://10.43.0.1:443"), None);
         let client = UserClient::with_token(&endpoint, &UserToken::new("t")).unwrap();
         assert_eq!(Cluster::kubeconfig_name(&client), None);
+    }
+
+    /// One request off `socket`, `None` once the client has closed it.
+    async fn request(socket: &mut tokio::net::TcpStream) -> Option<String> {
+        use tokio::io::AsyncReadExt as _;
+        let mut request = Vec::new();
+        let mut buffer = [0; 1024];
+        while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+            let n = socket.read(&mut buffer).await.unwrap();
+            if n == 0 {
+                return None;
+            }
+            request.extend_from_slice(&buffer[..n]);
+        }
+        Some(String::from_utf8(request).unwrap().to_ascii_lowercase())
+    }
+
+    async fn answer(socket: &mut tokio::net::TcpStream) {
+        use tokio::io::AsyncWriteExt as _;
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}")
+            .await
+            .unwrap();
+    }
+
+    async fn version(client: &UserClient) -> Result<String, kube::Error> {
+        client
+            .kube()
+            .request_text(http::Request::get("/version").body(Vec::new()).unwrap())
+            .await
+    }
+
+    async fn listen() -> (tokio::net::TcpListener, http::Uri) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        (listener, url.parse().unwrap())
+    }
+
+    fn own_pool(config: kube::Config, idle: std::time::Duration) -> UserClient {
+        let pool = pool(&config, idle).unwrap();
+        UserClient {
+            client: client(config, pool).unwrap(),
+            name: None,
+        }
+    }
+
+    const PATIENCE: std::time::Duration = std::time::Duration::from_secs(5);
+
+    #[tokio::test]
+    async fn people_share_the_endpoints_connections_and_each_sends_their_own_token() {
+        let (listener, url) = listen().await;
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut requests = Vec::new();
+            while requests.len() < 2
+                && let Some(request) = request(&mut socket).await
+            {
+                requests.push(request);
+                answer(&mut socket).await;
+            }
+            let another =
+                tokio::time::timeout(std::time::Duration::from_millis(200), listener.accept())
+                    .await
+                    .is_ok();
+            (requests, another)
+        });
+        let endpoint = ClusterEndpoint::new(url, None);
+        let alice = UserClient::with_token(&endpoint, &UserToken::new("alice-token")).unwrap();
+        let bob = UserClient::with_token(&endpoint.clone(), &UserToken::new("bob-token")).unwrap();
+        assert_eq!(version(&alice).await.unwrap(), "{}");
+        assert_eq!(version(&bob).await.unwrap(), "{}");
+        let (requests, another) = tokio::time::timeout(PATIENCE, server)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(!another, "Bob's request opened a connection of its own");
+        let [first, second] = requests.as_slice() else {
+            panic!("{requests:?}")
+        };
+        assert!(first.contains("authorization: bearer alice-token"));
+        assert!(second.contains("authorization: bearer bob-token"));
+        assert!(!second.contains("alice-token"));
+    }
+
+    #[tokio::test]
+    async fn an_idle_connection_is_closed() {
+        let (listener, url) = listen().await;
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            request(&mut socket).await.unwrap();
+            answer(&mut socket).await;
+            // Kept alive until the pool lets it go.
+            request(&mut socket).await.is_none()
+        });
+        let client = own_pool(
+            kube::Config::new(url),
+            std::time::Duration::from_millis(100),
+        );
+        assert_eq!(version(&client).await.unwrap(), "{}");
+        let closed = tokio::time::timeout(PATIENCE, server)
+            .await
+            .expect("the idle connection was not closed")
+            .unwrap();
+        assert!(closed);
+    }
+
+    #[tokio::test]
+    async fn an_api_server_that_stops_answering_times_out() {
+        let (listener, url) = listen().await;
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            request(&mut socket).await;
+            // Never answers.
+            std::future::pending::<()>().await;
+        });
+        let mut config = kube::Config::new(url);
+        config.read_timeout = Some(std::time::Duration::from_millis(100));
+        let client = own_pool(config, POOL_IDLE);
+        let answered = tokio::time::timeout(PATIENCE, version(&client))
+            .await
+            .expect("the request did not time out");
+        assert!(answered.is_err());
+        server.abort();
     }
 
     #[test]

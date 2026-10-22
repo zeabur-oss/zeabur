@@ -1475,7 +1475,7 @@ export const zhTW: Messages = {
   "account.unread": "無法讀取你的權限",
   "account.unreadCount": (n) => `無法讀取你在 ${n} 個專案的權限。重新載入以再試一次。`,
   "account.roleIn": (role, n) => `${n} 個專案的${role}`,
-  "account.summary": (parts) => `你是${listZh("zh-TW", parts)}。`,
+  "account.summary": (parts) => `你是 ${listZh("zh-TW", parts)}。`,
   "account.noRole": (names) => `你在${listZh("zh-TW", names)}沒有角色。`,
   "account.noRoleCount": (n, all) =>
     all
@@ -1490,7 +1490,8 @@ export const zhTW: Messages = {
   "account.means.developer": "檢視者能做的都能做，還能變更服務、開啟終端機和讀取機密。",
   "account.means.viewer": "檢視服務、副本和日誌。",
   "account.signIn": "登入方式",
-  "account.signInWhere": "通行密鑰和連結的帳號，請到登入服務管理。",
+  "account.signInWhere":
+    "通行密鑰、連結的帳號和工作階段都由 Zeabur Identity 管理，可以在那裡新增或移除通行密鑰、登出其他裝置。",
   "account.manageSignIn": "管理登入方式",
   "passkey.unnamed": "通行密鑰",
   "passkey.added": (date) => `${date} 新增`,

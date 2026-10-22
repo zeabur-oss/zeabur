@@ -206,12 +206,13 @@ function DetailsForm({
             <CardRow
               label={t("projectSettings.name")}
               description={t("projectSettings.nameHint", namespace.name)}
+              className="max-sm:items-stretch"
             >
               <FormField
                 label={t("projectSettings.name")}
                 hideLabel
                 errors={f.state.meta.errors}
-                className="w-full sm:w-70"
+                className="w-full sm:w-80"
               >
                 <Input
                   value={f.state.value}
@@ -230,6 +231,7 @@ function DetailsForm({
               label={t("projectSettings.description")}
               description={t("projectSettings.descriptionHint")}
               align="start"
+              className="max-sm:items-stretch"
             >
               <FormField
                 label={t("projectSettings.description")}

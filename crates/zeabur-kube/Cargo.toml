@@ -19,12 +19,21 @@ memory = []
 zeabur-core.workspace = true
 futures-util.workspace = true
 http.workspace = true
+# kube-rs's default client with a pool that closes idle connections (see `client` in lib.rs);
+# all already under kube.
+hyper.workspace = true
+hyper-rustls.workspace = true
+hyper-timeout.workspace = true
+hyper-util.workspace = true
 k8s-openapi.workspace = true
 kube.workspace = true
 secrecy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+tower = { workspace = true, features = ["retry"] }
+tower-http.workspace = true
+tracing.workspace = true
 # Already under kube's `ws` feature: the byte streams of `pods/exec`.
 tokio.workspace = true
 

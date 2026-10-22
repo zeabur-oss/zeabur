@@ -130,9 +130,9 @@ function Access({ account }: { account: Account }) {
         </Note>
       ) : null}
       {held.length > 0 ? (
-        <dl className="flex flex-col gap-1 border-t border-main pt-3 type-meta text-muted-foreground">
+        <dl className="grid grid-cols-pairs gap-x-3 gap-y-1 border-t border-main pt-3 type-meta text-muted-foreground">
           {held.map((role) => (
-            <div key={role} className="flex flex-wrap gap-x-2">
+            <div key={role} className="col-span-2 grid grid-cols-subgrid">
               <dt className="font-medium text-secondary">{t(`account.role.${role}`)}</dt>
               <dd>{t(`account.means.${role}`)}</dd>
             </div>
