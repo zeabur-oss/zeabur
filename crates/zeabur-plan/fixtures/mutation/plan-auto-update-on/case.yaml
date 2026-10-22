@@ -1,0 +1,6 @@
+description: "Turning automatic updates on asks Keel to force-update the Deployment and adds a keel target to the Build's notify list; the pods are not replaced."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: autoUpdate, workload: {kind: Deployment, name: web}, enabled: true, build: web, webhook: 'http://keel.keel.svc.cluster.local:9300/v1/webhooks/native'}

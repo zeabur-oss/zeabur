@@ -3,45 +3,41 @@
 # project they are given. Zeabur binds them as the admin who invites or edits the member; the
 # chart binds nothing. Rules: files/member-roles.yaml.
 #
-# A project role aggregates the ClusterRoles labelled `zeabur.com/aggregate-to-<role>`: its own
-# rules (`<role>-rules`) and those of components installed next to it, such as Zeabur Proxy's
-# zeabur-proxy-logs-reader. kube-controller-manager writes the aggregate's rules
+# A project role aggregates the ClusterRoles labelled `zeabur.com/aggregate-to-<role>`: the rule
+# sets files/member-role-sets.yaml names for it (its own rules are `<role>-rules`) and those of
+# components installed next to it, such as Zeabur Proxy's zeabur-proxy-logs-reader.
+# kube-controller-manager writes the aggregate's rules
 # (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
+{{- $sets := .Files.Get "files/member-role-sets.yaml" | fromYaml }}
 {{- range $name, $rules := .Files.Get "files/member-roles.yaml" | fromYaml }}
-{{- if eq $name "zeabur-member" }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ $name }}
+  name: {{ $name }}{{ if hasKey $sets $name }}-rules{{ end }}
   labels:
     {{- include "zeabur.labels" $ | nindent 4 }}
+    {{- range $role, $members := $sets }}
+    {{- if has $name $members }}
+    zeabur.com/aggregate-to-{{ $role }}: "true"
+    {{- end }}
+    {{- end }}
 rules:
   {{- toYaml $rules | nindent 2 }}
-{{- else }}
+{{- end }}
+{{- range $role, $members := $sets }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ $name }}
+  name: {{ $role }}
   labels:
     {{- include "zeabur.labels" $ | nindent 4 }}
 aggregationRule:
   clusterRoleSelectors:
     - matchLabels:
-        zeabur.com/aggregate-to-{{ $name }}: "true"
+        zeabur.com/aggregate-to-{{ $role }}: "true"
 rules: []
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: {{ $name }}-rules
-  labels:
-    {{- include "zeabur.labels" $ | nindent 4 }}
-    zeabur.com/aggregate-to-{{ $name }}: "true"
-rules:
-  {{- toYaml $rules | nindent 2 }}
-{{- end }}
 {{- end }}
 {{- end }}
 {{- if or .Values.memberRoles.enabled .Values.proxy.enabled }}

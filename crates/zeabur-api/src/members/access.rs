@@ -491,7 +491,7 @@ mod tests {
         );
     }
 
-    #[derive(Deserialize)]
+    #[derive(Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]
     struct Rule {
         api_groups: Vec<String>,
@@ -499,11 +499,36 @@ mod tests {
         verbs: Vec<String>,
     }
 
-    /// The chart's roles, as `SelfSubjectRulesReview` would report them.
-    fn roles() -> BTreeMap<String, AccessRules> {
+    /// The chart's rule sets, by name.
+    fn rule_sets() -> BTreeMap<String, Vec<Rule>> {
         let file = include_str!("../../../../deploy/chart/zeabur/files/member-roles.yaml");
-        let by_name: BTreeMap<String, Vec<Rule>> = serde_saphyr::from_str(file).unwrap();
-        by_name
+        serde_saphyr::from_str(file).unwrap()
+    }
+
+    /// The rule sets each aggregated role gathers.
+    fn gathered() -> BTreeMap<String, Vec<String>> {
+        let file = include_str!("../../../../deploy/chart/zeabur/files/member-role-sets.yaml");
+        serde_saphyr::from_str(file).unwrap()
+    }
+
+    /// The roles Zeabur binds, as `SelfSubjectRulesReview` would report them once Kubernetes has
+    /// aggregated them.
+    fn roles() -> BTreeMap<String, AccessRules> {
+        let mut sets = rule_sets();
+        let gathered = gathered();
+        for name in gathered.values().flatten() {
+            assert!(sets.contains_key(name), "{name} is not a rule set");
+        }
+        let mut bound: BTreeMap<String, Vec<Rule>> = gathered
+            .iter()
+            .map(|(role, names)| {
+                let rules = names.iter().flat_map(|n| sets[n].clone()).collect();
+                (role.clone(), rules)
+            })
+            .collect();
+        sets.retain(|name, _| !gathered.values().flatten().any(|n| n == name));
+        bound.extend(sets);
+        bound
             .into_iter()
             .map(|(name, listed)| {
                 let rules = listed
@@ -637,6 +662,24 @@ mod tests {
                 assert!(!allows(role, verb, restores), "{verb} {restores}");
             }
         }
+    }
+
+    #[test]
+    fn both_project_roles_see_builds_and_developers_build_again() {
+        let roles = roles();
+        let developer = &roles[ProjectRole::Developer.cluster_role()];
+        let viewer = &roles[ProjectRole::Viewer.cluster_role()];
+        for resource in ["builds.builder.zeabur.com", "buildruns.builder.zeabur.com"] {
+            assert!(allows(viewer, "list", resource), "viewer lists {resource}");
+            assert!(
+                allows(developer, "list", resource),
+                "developer lists {resource}"
+            );
+        }
+        assert!(allows(developer, "patch", "builds.builder.zeabur.com"));
+        assert!(!allows(viewer, "patch", "builds.builder.zeabur.com"));
+        assert!(!allows(developer, "create", "buildruns.builder.zeabur.com"));
+        assert!(!allows(developer, "delete", "builds.builder.zeabur.com"));
     }
 
     #[test]

@@ -84,12 +84,16 @@ licence() {
   case $1 in
   certificates/cert-manager) echo "[Apache-2.0]($gh/cert-manager/cert-manager/blob/master/LICENSE)" ;;
   config-reload/reloader) echo "[Apache-2.0]($gh/stakater/Reloader/blob/master/LICENSE)" ;;
+  container-registry/zot)
+    echo "tls: $recs; zot: [Apache-2.0]($gh/project-zot/helm-charts/blob/main/LICENSE)"
+    ;;
   databases/cloudnative-pg) echo "[Apache-2.0]($gh/cloudnative-pg/charts/blob/main/LICENSE)" ;;
   databases/percona-mongodb) echo "[Apache-2.0]($gh/percona/percona-helm-charts/blob/main/LICENSE)" ;;
   dns/external-dns) echo "[Apache-2.0]($gh/kubernetes-sigs/external-dns/blob/master/LICENSE.md)" ;;
   event-autoscaling/keda | event-autoscaling/keda-http-add-on)
     echo "[Apache-2.0]($gh/kedacore/charts/blob/main/LICENSE)"
     ;;
+  image-updates/keel) echo "[MPL-2.0]($gh/keel-hq/keel/blob/master/LICENSE)" ;;
   ingress/traefik)
     echo "gateway-api-crds: [Apache-2.0]($gh/kubernetes-sigs/gateway-api/blob/main/LICENSE); traefik: [Apache-2.0]($gh/traefik/traefik-helm-chart/blob/master/LICENSE)"
     ;;

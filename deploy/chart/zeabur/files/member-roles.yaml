@@ -1,5 +1,6 @@
 # The rules of the member roles (templates/member-roles.yaml); Zeabur binds them per member
-# (crates/zeabur-api/src/members/access.rs, which also tests these rules).
+# (crates/zeabur-api/src/members/access.rs, which also tests these rules). A project role gathers
+# the rule sets files/member-role-sets.yaml names for it.
 #
 # Every verb and resource is named: no `*`. Neither role has RBAC objects, namespace create or
 # delete, nodes/proxy, or the escalate, bind and impersonate verbs, so no member can widen their
@@ -162,3 +163,15 @@ zeabur-project-developer:
   - apiGroups: [""]
     resources: [namespaces]
     verbs: [get, patch]
+
+# Zeabur Builder: see a project's builds and their runs.
+zeabur-project-builds-read:
+  - apiGroups: [builder.zeabur.com]
+    resources: [builds, buildruns]
+    verbs: [get, list, watch]
+
+# Zeabur Builder: build again, and tell Keel of new images (both patch the Build).
+zeabur-project-builds-write:
+  - apiGroups: [builder.zeabur.com]
+    resources: [builds]
+    verbs: [patch]

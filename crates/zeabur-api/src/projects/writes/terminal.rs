@@ -79,6 +79,9 @@ pub(crate) async fn compute(
         | Change::EditMount { .. }
         | Change::RemoveVolume { .. }
         | Change::Probe { .. }
+        | Change::Image { .. }
+        | Change::Rebuild { .. }
+        | Change::AutoUpdate { .. }
         | Change::Scale { .. }
         | Change::ConfigReload { .. }
         | Change::Resources { .. }

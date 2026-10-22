@@ -223,8 +223,13 @@ namespace, and adopting is a label. The policy skips whoever may `zeabur-manage`
 (a custom verb that `cluster-admin`'s `*` covers) or patch every namespace, so admins and
 controllers work as before. It needs Kubernetes 1.30 or later.
 
-Developer and Viewer are the ClusterRoles `zeabur-project-developer` and `zeabur-project-viewer`
-(rules in `deploy/chart/zeabur/files/member-roles.yaml`). Giving a role makes a RoleBinding
+Developer and Viewer are the ClusterRoles `zeabur-project-developer` and `zeabur-project-viewer`.
+Each aggregates the rule sets `deploy/chart/zeabur/files/member-role-sets.yaml` names for it,
+whose rules are in `deploy/chart/zeabur/files/member-roles.yaml`: its own, and Zeabur Builder's.
+Both see a project's builds; Developers may also build again and turn on automatic updates
+(`patch` on `builds.builder.zeabur.com`). To leave that to admins, remove
+`zeabur-project-builds-write` from the developer's line. Deploying a build changes the
+workload's image, which Developers may do anyway. Giving a role makes a RoleBinding
 `zeabur-member-<user>` to user `zeabur:<user>` in the project's namespace, labelled
 `zeabur.com/member: <user>`, as the admin. Changing a role replaces it, and removing a member
 removes their bindings first. Each rule names its verbs and resources, without `*`. Neither role

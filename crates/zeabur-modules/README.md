@@ -54,6 +54,7 @@ reads) and `zeabur-adapters` (for label selectors). Only the crates that compose
 | `reloader` | config-reload | `apps/v1` deployments labelled `app.kubernetes.io/name: reloader`, cluster-wide |
 | `barman-cloud` | postgres | `barmancloud.cnpg.io/v1` objectstores |
 | `percona-server-mongodb` | mongodb | `psmdb.percona.com/v1` perconaservermongodbs, perconaservermongodbbackups |
+| `zeabur-builder` | builds | `builder.zeabur.com/v1alpha1` builds, buildruns |
 
 The databases capability (`databases`) has two providers, CloudNativePG and the Percona
 Operator for MongoDB; like backups, they share only what a person asks of any database: whether

@@ -1,0 +1,4 @@
+description: A Job controlled by a Zeabur Builder BuildRun is a build, not a workload, while a Job another API group's BuildRun owns is still listed.
+operation: graph.attribution
+params:
+  namespace: demo

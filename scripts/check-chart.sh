@@ -38,17 +38,18 @@ for values in "$chart"/ci/*-values.yaml; do
   # Zeabur has no rights of its own: no binding to a ServiceAccount, no ClusterRoleBinding, and no
   # token in the pod. The one Role the chart may render lets people read Zeabur's settings: `get`
   # on the ConfigMap zeabur-settings, nothing else. The ClusterRoles are the member roles, which
-  # Zeabur binds per member, the rules the project roles aggregate, and Zeabur Proxy's logs reader.
+  # Zeabur binds per member, the rule sets the project roles aggregate, and Zeabur Proxy's logs
+  # reader.
   expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "ClusterRole") | .metadata.name] | sort | join(",")' \
-    zeabur-member,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader
+    zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader
   # A project role is exactly what its own label selects: nothing else of the chart's widens it.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole" and .aggregationRule) | .metadata.name + "=" + (.aggregationRule.clusterRoleSelectors[].matchLabels | keys | join("+")) + (.rules | length | tostring)] | join(",")' \
     "zeabur-project-developer=zeabur.com/aggregate-to-zeabur-project-developer0,zeabur-project-viewer=zeabur.com/aggregate-to-zeabur-project-viewer0"
   expect "$name" "$out" \
     "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .metadata.labels | keys | .[] | select(test(\"aggregate-to\")) | \$n + \">\" + sub(\".*aggregate-to-\"; \"\")] | join(\",\")" \
-    "zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view"
+    "zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view"
   expect "$name" "$out" \
     'select(.kind == "ClusterRole" and .metadata.name == "zeabur-proxy-logs-reader") | .rules[] | [.apiGroups, .resources, .verbs] | map(join(",")) | join("|")' \
     'proxy.zeabur.com|logs|get'

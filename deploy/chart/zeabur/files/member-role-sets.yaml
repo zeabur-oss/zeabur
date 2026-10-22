@@ -1,0 +1,5 @@
+# The rule sets (files/member-roles.yaml) each project role gathers, by aggregation. Admins are
+# cluster-admin and need none. To leave building again to admins, drop
+# zeabur-project-builds-write from the developer.
+zeabur-project-viewer: [zeabur-project-viewer, zeabur-project-builds-read]
+zeabur-project-developer: [zeabur-project-developer, zeabur-project-builds-read, zeabur-project-builds-write]

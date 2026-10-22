@@ -455,6 +455,20 @@ export function followUrl(project: string, pod: string, options: LogOptions): st
   return `/api/v1/projects/${encodeURIComponent(project)}/pods/${encodeURIComponent(pod)}/logs/follow?${query}`
 }
 
+export const buildsQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "builds"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/builds", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+  })
+
 export const backupsQuery = (project: string) =>
   queryOptions({
     queryKey: ["project", project, "backups"],

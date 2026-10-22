@@ -1,0 +1,6 @@
+description: "Deploying an image to a Deployment Flux applies is refused: Flux would set the image back on its next sync."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: image, workload: {kind: Deployment, name: web}, image: 'example/web:2.0'}

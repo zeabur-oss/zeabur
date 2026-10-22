@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+  generation: 3
+spec:
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2
+---
+apiVersion: builder.zeabur.com/v1alpha1
+kind: Build
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "7"
+  generation: 2
+spec:
+  source: {git: {url: https://example.com/acme/web, ref: main}}
+  builderRef: dockerfile
+status:
+  latestImage: zot.zot.svc.cluster.local:5000/demo/web:main-1761059900-9f00aa1@sha256:1111111111111111111111111111111111111111111111111111111111111111

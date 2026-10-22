@@ -634,6 +634,62 @@ mod tests {
         assert_eq!(cluster_alerts["state"], "refused");
     }
 
+    #[tokio::test]
+    async fn builds_give_each_run_its_pod_or_say_the_builder_is_missing() {
+        let cluster = cluster();
+        let missing = get(&cluster, "/api/v1/projects/shop/builds").await;
+        assert_eq!(missing["state"], "not-installed");
+        cluster.update(|s| {
+            for (resource, kind) in [("builds", "Build"), ("buildruns", "BuildRun")] {
+                s.served.push(ServedResource::readable(
+                    "builder.zeabur.com",
+                    "v1alpha1",
+                    resource,
+                    kind,
+                    true,
+                ));
+            }
+            s.dynamic.push(
+                serde_json::from_value(json!({
+                    "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+                    "metadata": {"name": "web", "namespace": "shop"},
+                    "spec": {"builderRef": "dockerfile",
+                        "source": {"git": {"url": "https://example.com/acme/web", "ref": "main"}}},
+                    "status": {"latestImage": "zot:5000/shop/web:main-1-abc@sha256:00"}
+                }))
+                .unwrap(),
+            );
+            s.dynamic.push(
+                serde_json::from_value(json!({
+                    "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "BuildRun",
+                    "metadata": {"name": "web-x1", "namespace": "shop",
+                        "creationTimestamp": "2026-10-23T08:00:00Z"},
+                    "spec": {"buildRef": "web", "revision": "1ce75d01b6978863647da42557a707a479da3a51"},
+                    "status": {"phase": "Building"}
+                }))
+                .unwrap(),
+            );
+            if let Some(objects) = s.objects.get_mut("shop") {
+                objects.pods.push(
+                    serde_json::from_value(json!({
+                        "metadata": {"name": "web-x1-abcde", "namespace": "shop",
+                            "labels": {"builder.zeabur.com/buildrun": "web-x1"}},
+                        "spec": {"initContainers": [{"name": "fetch"}],
+                            "containers": [{"name": "build"}]}
+                    }))
+                    .unwrap(),
+                );
+            }
+        });
+        let builds = get(&cluster, "/api/v1/projects/shop/builds").await;
+        assert_eq!(builds["state"], "installed");
+        assert_eq!(builds["builds"][0]["repository"], "zot:5000/shop/web");
+        assert_eq!(builds["runs"][0]["name"], "web-x1");
+        assert_eq!(builds["runs"][0]["pod"], "web-x1-abcde");
+        assert_eq!(builds["runs"][0]["containers"], json!(["fetch", "build"]));
+        assert_eq!(builds["keel"], json!([]));
+    }
+
     /// The test cluster with a custom resource besides the built-in kinds.
     fn cluster_with_a_certificate() -> MemoryCluster {
         let cluster = cluster();

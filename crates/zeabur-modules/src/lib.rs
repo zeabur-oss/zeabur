@@ -15,6 +15,7 @@ pub mod prometheus_api;
 pub mod reloader;
 pub mod system_upgrade_controller;
 pub mod velero;
+pub mod zeabur_builder;
 
 /// One gap a module finds, with the object that closes it when Zeabur cannot write the fix
 /// itself.
@@ -120,6 +121,7 @@ pub fn modules() -> Vec<&'static Module> {
         &reloader::MODULE,
         &cloudnative_pg::BARMAN_CLOUD,
         &percona_mongodb::MODULE,
+        &zeabur_builder::MODULE,
     ]
 }
 

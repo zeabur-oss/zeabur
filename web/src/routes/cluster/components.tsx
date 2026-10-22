@@ -3,6 +3,7 @@ import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { lazy, Suspense, useState } from "react"
 import ArchiveIcon from "~icons/ph/archive"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
+import ArrowsClockwiseIcon from "~icons/ph/arrows-clockwise"
 import CertificateIcon from "~icons/ph/certificate"
 import ChartLineIcon from "~icons/ph/chart-line"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
@@ -14,6 +15,7 @@ import HardDrivesIcon from "~icons/ph/hard-drives"
 import HeartbeatIcon from "~icons/ph/heartbeat"
 import LightningIcon from "~icons/ph/lightning"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
+import PackageIcon from "~icons/ph/package"
 import PulseIcon from "~icons/ph/pulse"
 import ShieldCheckIcon from "~icons/ph/shield-check"
 import SignpostIcon from "~icons/ph/signpost"
@@ -56,7 +58,10 @@ const categories: {
     names: ["intrusion-prevention", "runtime-security", "vulnerability-scanning"],
   },
   { key: "data", names: ["postgres", "object-storage"] },
-  { key: "operations", names: ["node-updates", "volume-backup"] },
+  {
+    key: "operations",
+    names: ["node-updates", "volume-backup", "container-registry", "image-updates"],
+  },
 ]
 
 const icons: Record<string, Icon> = {
@@ -76,6 +81,8 @@ const icons: Record<string, Icon> = {
   "volume-backup": ClockCounterClockwiseIcon,
   postgres: DatabaseIcon,
   "object-storage": ArchiveIcon,
+  "container-registry": PackageIcon,
+  "image-updates": ArrowsClockwiseIcon,
 }
 
 type Filter = "all" | "installed" | "recommended"

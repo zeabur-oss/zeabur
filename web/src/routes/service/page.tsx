@@ -11,6 +11,7 @@ import FolderIcon from "~icons/ph/folder"
 import DotsThreeIcon from "~icons/ph/dots-three"
 import GearSixIcon from "~icons/ph/gear-six"
 import GlobeIcon from "~icons/ph/globe"
+import HammerIcon from "~icons/ph/hammer"
 import InfoIcon from "~icons/ph/info"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
@@ -63,6 +64,7 @@ import {
   type ServicePlace,
   type ServiceTab as Page,
 } from "@/routes/search"
+import { BuildsTab, useServiceBuilds } from "@/routes/service/builds"
 import { DeploymentsTab } from "@/routes/service/deployments"
 import { FilesTab } from "@/routes/service/files"
 import { NetworkingTab } from "@/routes/service/networking"
@@ -76,6 +78,7 @@ const tabIcons: Record<Page, Icon> = {
   overview: InfoIcon,
   logs: TextAlignLeftIcon,
   deployments: ClockCounterClockwiseIcon,
+  builds: HammerIcon,
   usage: ChartBarIcon,
   networking: GlobeIcon,
   variables: BracketsCurlyIcon,
@@ -207,6 +210,9 @@ function ServiceView({
         })
     : undefined
   const id = `${service.kind}/${service.name}`
+  // Builds shows only for a service a Zeabur Builder Build makes an image of.
+  const built = useServiceBuilds(project, service).built.length > 0
+  const shown = serviceTabs.filter((value) => value !== "builds" || built || tab === "builds")
   const wide = tab === "logs"
   const pendingIn = new Set(draft.parts.map((part) => tabOfPart[part]))
   const kept = (value: Page) => editing.includes(value) && opened.includes(value)
@@ -348,7 +354,7 @@ function ServiceView({
             <RefusedSome unreadable={refusedElsewhere(unreadable, inServiceTabs)} />
             <TabRow>
               <TabsList aria-label={t("service.tabs")} className="w-full">
-                {serviceTabs.map((value) => {
+                {shown.map((value) => {
                   const TabIcon = tabIcons[value]
                   return (
                     <TabsTrigger key={value} value={value} className="flex-1">
@@ -399,6 +405,9 @@ function ServiceView({
                 )}
               </div>
             ) : null}
+          </TabsContent>
+          <TabsContent value="builds">
+            {tab === "builds" ? <BuildsTab project={project} service={service} /> : null}
           </TabsContent>
           <TabsContent value="usage">
             {tab === "usage" ? <MetricsTab project={project} service={service} /> : null}

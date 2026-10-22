@@ -1,0 +1,110 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "after": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "example/web:1.0",
+                  "name": "app"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "afterYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: example/web:1.0\n        name: app\n",
+      "before": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "annotations": {
+            "keel.sh/policy": "force"
+          },
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "example/web:1.0",
+                  "name": "app"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\n  annotations:\n    keel.sh/policy: force\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: example/web:1.0\n        name: app\n",
+      "changes": [
+        {
+          "after": "{}",
+          "path": "metadata.annotations"
+        },
+        {
+          "before": "force",
+          "path": "metadata.annotations.keel.sh/policy"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/metadata/annotations/keel.sh~1policy",
+            "value": "force"
+          },
+          {
+            "op": "remove",
+            "path": "/metadata/annotations/keel.sh~1policy"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

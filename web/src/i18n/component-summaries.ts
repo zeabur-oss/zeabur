@@ -20,6 +20,11 @@ export const summaries: Record<string, Summary> = {
     "zh-TW": "服務使用的 ConfigMap 或 Secret 變更時，自動重新啟動服務。",
     "zh-CN": "服务使用的 ConfigMap 或 Secret 变更时，自动重启服务。",
   },
+  "container-registry/zot#6396ba2c": {
+    en: "Stores the images Zeabur Builder builds, inside the cluster.",
+    "zh-TW": "在叢集裡存放 Zeabur Builder 建置的映像檔。",
+    "zh-CN": "在集群里存放 Zeabur Builder 构建的镜像。",
+  },
   "databases/cloudnative-pg#e5be71dc": {
     en: "Runs PostgreSQL databases with failover and backups to S3.",
     "zh-TW": "執行 PostgreSQL 資料庫，支援故障切換和備份到 S3。",
@@ -44,6 +49,11 @@ export const summaries: Record<string, Summary> = {
     en: "Scales web services with their traffic, down to zero when idle.",
     "zh-TW": "依流量調整網頁服務的副本數，閒置時可降到零。",
     "zh-CN": "按流量调整 Web 服务的副本数，空闲时可缩到零。",
+  },
+  "image-updates/keel#9ece2498": {
+    en: "Deploys each new image to the services you turn auto-deploy on for.",
+    "zh-TW": "新的映像檔一建好，就部署到開了自動部署的服務。",
+    "zh-CN": "新的镜像一构建好，就部署到开了自动部署的服务。",
   },
   "ingress/traefik#da971ab9": {
     en: "Routes traffic from your domains to your services.",

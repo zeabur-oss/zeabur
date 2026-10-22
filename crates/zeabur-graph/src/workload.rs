@@ -113,7 +113,8 @@ impl<'a> Workload<'a> {
 /// The workloads of a snapshot, sorted by kind then name.
 ///
 /// A Job whose controller is a CronJob is one of its runs, not a workload of its own: listing it
-/// would show every scheduled task twice.
+/// would show every scheduled task twice. A Job a Zeabur Builder `BuildRun` controls is a build,
+/// shown with the service it builds for.
 #[must_use]
 pub fn workloads(snapshot: &Snapshot) -> Vec<Workload<'_>> {
     let mut out: Vec<Workload<'_>> = snapshot
@@ -126,7 +127,7 @@ pub fn workloads(snapshot: &Snapshot) -> Vec<Workload<'_>> {
             snapshot
                 .jobs
                 .iter()
-                .filter(|job| !controlled_by(&job.metadata, "CronJob"))
+                .filter(|job| !controlled_by(&job.metadata, "CronJob") && !built(&job.metadata))
                 .map(Workload::Job),
         )
         .chain(snapshot.stateful_sets.iter().map(Workload::StatefulSet))
@@ -138,6 +139,13 @@ pub fn workloads(snapshot: &Snapshot) -> Vec<Workload<'_>> {
 /// Whether the object's controller owner reference is of `kind`.
 fn controlled_by(meta: &ObjectMeta, kind: &str) -> bool {
     zeabur_adapters::controller_of(meta).is_some_and(|owner| owner.kind == kind)
+}
+
+/// Whether a Zeabur Builder `BuildRun` controls the object.
+fn built(meta: &ObjectMeta) -> bool {
+    zeabur_adapters::controller_of(meta).is_some_and(|owner| {
+        owner.kind == "BuildRun" && owner.api_version.starts_with("builder.zeabur.com/")
+    })
 }
 
 /// One container of a pod spec, whichever list it is in.

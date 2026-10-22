@@ -1,4 +1,5 @@
-//! What a plan reads before it edits an object as YAML, or deletes it: the object itself.
+//! What a plan reads before it edits an object as YAML, or deletes it: the object itself. The
+//! same for the Zeabur Builder `Build` it builds again or tells of Keel.
 
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _};
 use zeabur_plan::{Change, Fetched, PlanRequest};
@@ -16,9 +17,18 @@ pub(super) async fn edited_objects(
     project: &str,
     request: &PlanRequest,
 ) -> Result<Vec<Fetched>, ApiError> {
-    let mut out = Vec::new();
+    let mut out: Vec<Fetched> = Vec::new();
+    let builds = zeabur_plan::builds::builds();
     for change in &request.changes {
-        let (resource, name) = if let Change::Edit { resource, name, .. } = change
+        let (resource, name) = if let Change::Rebuild { build }
+        | Change::AutoUpdate {
+            build: Some(build),
+            enabled: true,
+            ..
+        } = change
+        {
+            (&builds, build)
+        } else if let Change::Edit { resource, name, .. } = change
             && zeabur_plan::checks::resource_allowed(resource).allowed
         {
             (resource, name)
@@ -29,6 +39,12 @@ pub(super) async fn edited_objects(
         } else {
             continue;
         };
+        if out
+            .iter()
+            .any(|f| f.resource == *resource && f.name == *name)
+        {
+            continue;
+        }
         let kind = if resource.group.is_empty() && resource.resource == "secrets" {
             "Secret"
         } else {

@@ -1,0 +1,110 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "after": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "zot.zot.svc.cluster.local:5000/demo/web:main-1761059900-9f00aa1@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+                  "name": "app"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "afterYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: >-\n          zot.zot.svc.cluster.local:5000/demo/web:main-1761059900-9f00aa1@sha256:1111111111111111111111111111111111111111111111111111111111111111\n        name: app\n",
+      "before": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2",
+                  "name": "app"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2\n        name: app\n",
+      "changes": [
+        {
+          "after": "zot.zot.svc.cluster.local:5000/demo/web:main-1761059900-9f00aa1@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+          "before": "zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2",
+          "path": "spec.template.spec.containers[name=app].image"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/generation",
+            "value": 3
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/image",
+            "value": "zot.zot.svc.cluster.local:5000/demo/web:main-1761058800-3e1a9c2"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/spec/containers/0/image",
+            "value": "zot.zot.svc.cluster.local:5000/demo/web:main-1761059900-9f00aa1@sha256:1111111111111111111111111111111111111111111111111111111111111111"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}
