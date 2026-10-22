@@ -170,6 +170,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/health": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The API server's readiness checks, of the replica that answered, with only the failing ones
+     *     named, and the scheduler's and controller manager's leader leases when the person may read
+     *     them (see [`mod@health`]). `403` when `/readyz` is refused.
+     */
+    get: operations["getClusterHealth"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/incidents": {
     parameters: {
       query?: never
@@ -1770,6 +1791,22 @@ export interface components {
       /** @description How many events matched, also those past `limit`. */
       totalSize: number
     }
+    /** @description The API server's readiness, from the replica that answered (see `crate::cluster::health`). */
+    ClusterHealth: {
+      /** @description How many checks ran. */
+      checks: number
+      /** @description The checks that failed, in the API server's order. */
+      failing: components["schemas"]["FailingCheck"][]
+      /** @description `cluster/health`. */
+      id: string
+      /**
+       * @description The leader leases of kube-scheduler and kube-controller-manager that exist and may be
+       *     read, in that order.
+       */
+      leaders: components["schemas"]["LeaderLease"][]
+      /** @description Every check passed. */
+      ready: boolean
+    }
     /** @description A kind that belongs to the whole cluster. */
     ClusterKind: {
       /** @description The API group; empty for the core group. */
@@ -2306,6 +2343,13 @@ export interface components {
      * @enum {string}
      */
     ExitReason: "command-not-found" | "failed"
+    /** @description A readiness check that failed. */
+    FailingCheck: {
+      /** @description The check's name (`etcd`, `poststarthook/crd-informer-synced`). */
+      name: string
+      /** @description What the API server gave as the reason; it withholds most (`reason withheld`). */
+      reason?: string | null
+    }
     /** @description One alert. */
     FalcoAlert: {
       /** @description The command line that triggered it. */
@@ -2873,6 +2917,24 @@ export interface components {
        *     (`details.retryAfterSeconds`).
        */
       retryAfterSeconds?: number | null
+    }
+    /** @description A component's leader lease in `kube-system`. */
+    LeaderLease: {
+      /** @description `kube-scheduler` or `kube-controller-manager`. */
+      component: string
+      /** @description Renewed within its duration: a replica is leading. */
+      current: boolean
+      /**
+       * Format: int32
+       * @description How long the lease holds without a renewal.
+       */
+      durationSeconds?: number | null
+      /** @description The leading replica, as it names itself. */
+      holder?: string | null
+      /** @description The Lease. */
+      origin: components["schemas"]["Origin"]
+      /** @description When the leader last renewed the lease. */
+      renewed?: string | null
     }
     /** @description A GitHub or Google account linked for everyday sign-in. */
     LinkedAccountView: {
@@ -5441,6 +5503,33 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["GapList"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getClusterHealth: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ClusterHealth"]
         }
       }
       403: {

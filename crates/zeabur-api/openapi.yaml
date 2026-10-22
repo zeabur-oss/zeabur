@@ -237,6 +237,26 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/health:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The API server's readiness checks, of the replica that answered, with only the failing ones
+        named, and the scheduler's and controller manager's leader leases when the person may read
+        them (see [`mod@health`]). `403` when `/readyz` is refused.
+      operationId: getClusterHealth
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterHealth"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/incidents:
     get:
       tags:
@@ -3507,6 +3527,40 @@ components:
           type: integer
           description: How many events matched, also those past `limit`.
           minimum: 0
+    ClusterHealth:
+      type: object
+      description: >-
+        The API server's readiness, from the replica that answered (see
+        `crate::cluster::health`).
+      required:
+      - id
+      - ready
+      - checks
+      - failing
+      - leaders
+      properties:
+        checks:
+          type: integer
+          description: How many checks ran.
+          minimum: 0
+        failing:
+          type: array
+          items:
+            $ref: "#/components/schemas/FailingCheck"
+          description: The checks that failed, in the API server's order.
+        id:
+          type: string
+          description: "`cluster/health`."
+        leaders:
+          type: array
+          items:
+            $ref: "#/components/schemas/LeaderLease"
+          description: |-
+            The leader leases of kube-scheduler and kube-controller-manager that exist and may be
+            read, in that order.
+        ready:
+          type: boolean
+          description: Every check passed.
     ClusterKind:
       type: object
       description: A kind that belongs to the whole cluster.
@@ -4508,6 +4562,20 @@ components:
       enum:
       - command-not-found
       - failed
+    FailingCheck:
+      type: object
+      description: A readiness check that failed.
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: The check's name (`etcd`, `poststarthook/crd-informer-synced`).
+        reason:
+          type:
+          - string
+          - "null"
+          description: What the API server gave as the reason; it withholds most (`reason withheld`).
     FalcoAlert:
       type: object
       description: One alert.
@@ -5525,6 +5593,39 @@ components:
             How long kube-apiserver asked clients to wait before retrying
             (`details.retryAfterSeconds`).
           minimum: 0
+    LeaderLease:
+      type: object
+      description: A component's leader lease in `kube-system`.
+      required:
+      - origin
+      - component
+      - current
+      properties:
+        component:
+          type: string
+          description: "`kube-scheduler` or `kube-controller-manager`."
+        current:
+          type: boolean
+          description: "Renewed within its duration: a replica is leading."
+        durationSeconds:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: How long the lease holds without a renewal.
+        holder:
+          type:
+          - string
+          - "null"
+          description: The leading replica, as it names itself.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The Lease.
+        renewed:
+          type:
+          - string
+          - "null"
+          description: When the leader last renewed the lease.
     LinkedAccountView:
       type: object
       description: A GitHub or Google account linked for everyday sign-in.
