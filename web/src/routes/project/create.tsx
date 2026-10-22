@@ -364,7 +364,7 @@ function Order({
               <button
                 type="button"
                 onClick={() => jump(d.line)}
-                className="flex w-full items-center gap-2 px-4 py-1.5 text-left outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
+                className="flex w-full items-center gap-2 px-4 py-1.5 text-left outline-none hover:bg-v2-surface-hover focus-visible:bg-v2-surface-hover"
               >
                 <span className="w-4 shrink-0 type-meta text-muted-foreground tabular-nums">
                   {i + 1}

@@ -1094,3 +1094,46 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
     page.getByRole("listitem").filter({ hasText: other }).getByRole("button", { name: "Adopt" }),
   ).toBeVisible({ timeout: 15_000 })
 })
+
+test("a Deployment and a Service are created from templates and drawn on the map", async ({
+  page,
+}) => {
+  await page.goto(`${project}/objects`)
+  await page.getByRole("link", { name: "Create", exact: true }).click()
+  await expect(page).toHaveURL(new RegExp(`${project}/create$`))
+  await expect(page.locator(".cm-content")).toContainText("kind: Deployment")
+  await page.getByRole("button", { name: "Add a template" }).click()
+  await page.getByRole("menuitem", { name: "Service", exact: true }).click()
+  await expect(page.getByText("2 documents")).toBeVisible()
+  await page.getByRole("button", { name: "Review", exact: true }).click()
+  await confirmPlan(page, `Create 2 objects in ${namespace}`, "Create 2 objects", "Service hello")
+  await expect(page).toHaveURL(new RegExp(`${project}/objects`))
+  await page.goto(`${project}?view=map`)
+  await expect(page.getByRole("button", { name: /^hello\b/ })).toBeVisible({ timeout: 15_000 })
+})
+
+test("a create the cluster refuses points at its document and line", async ({ page }) => {
+  await page.goto(`${project}/create`)
+  const editor = page.locator(".cm-content")
+  await expect(editor).toContainText("kind: Deployment")
+  await editor.click()
+  await page.keyboard.press("ControlOrMeta+a")
+  await page.keyboard.insertText(
+    "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: refused-config\n---\n" +
+      "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: refused\nspec:\n  replicas: -1\n" +
+      "  selector:\n    matchLabels: {app: refused}\n  template:\n    metadata:\n" +
+      "      labels: {app: refused}\n    spec:\n      containers:\n        - name: app\n" +
+      "          image: busybox:1.37\n",
+  )
+  await expect(page.getByText("2 documents")).toBeVisible()
+  await page.getByRole("button", { name: "Review", exact: true }).click()
+  const dialog = page.getByRole("dialog", { name: `Create 2 objects in ${namespace}` })
+  await expect(dialog).toContainText("Document 2, line 11")
+  await dialog.getByRole("button", { name: "Show in YAML" }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(page.locator(".cm-line.cm-mark-fail")).toContainText("replicas: -1")
+  const answer = await page.request.get(
+    `/api/v1/projects/${namespace}/objects/core/v1/configmaps/refused-config`,
+  )
+  expect(answer.status(), "nothing was created").toBe(404)
+})
