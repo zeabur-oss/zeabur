@@ -9,6 +9,7 @@ import type { Schemas } from "@/api/client"
 import { projectGapsQuery, projectIncidentsQuery, projectQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
 import { CopyText } from "@/components/copy-text"
+import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { Freshness } from "@/components/freshness"
 import { GapList } from "@/components/gaps"
 import { IncidentRow, isTakenDown, takenDown } from "@/components/incident"
@@ -233,7 +234,7 @@ function Suggestions({ project, data }: { project: string; data: Project }) {
         description={t("project.suggestionsBody")}
         closeLabel={t("common.close")}
       >
-        <GapList gaps={items} project={project} document={data} />
+        <GapList gaps={items} project={project} document={data} onTerminal={() => setOpen(false)} />
         {gaps.data && gaps.data.unreadable.length > 0 ? (
           <p className="type-meta text-muted-foreground">{t("gap.unreadable")}</p>
         ) : null}
@@ -413,8 +414,8 @@ function NextStep({ project }: { project: string }) {
         <EmptyContent className="w-full max-w-xl">
           <div className="flex w-full flex-col gap-1.5 text-left">
             <span className="type-meta text-muted-foreground">{t("project.next.command")}</span>
-            <div className="flex items-center gap-2 rounded-lg border bg-muted/40 py-1.5 pr-1.5 pl-3">
-              <code className="min-w-0 flex-1 type-mono break-words" translate="no">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-muted/40 py-1.5 pr-1.5 pl-3">
+              <code className="min-w-48 flex-1 type-mono break-words" translate="no">
                 {command.split(" ").map((word, i) => (
                   <Fragment key={i}>
                     {i > 0 ? " " : null}
@@ -422,7 +423,10 @@ function NextStep({ project }: { project: string }) {
                   </Fragment>
                 ))}
               </code>
-              <CopyText value={() => command} label={t("common.copy")} />
+              <div className="ml-auto flex items-center">
+                <CopyText value={() => command} label={t("common.copy")} />
+                <OpenInTerminal project={project} command={command} />
+              </div>
             </div>
             <span className="type-meta text-muted-foreground">{t("project.next.after")}</span>
           </div>

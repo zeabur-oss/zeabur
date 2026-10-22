@@ -2,8 +2,11 @@ import { describe, test, expect } from "bun:test"
 
 import type { Problem } from "@/api/client"
 import {
+  applyCommand,
   execRole,
+  isManifest,
   nearestExpiry,
+  typedCommand,
   nextState,
   parseFrame,
   reconnectsWithRights,
@@ -147,5 +150,30 @@ describe("the dock", () => {
     expect(toolsTerminalUrl({ protocol: "https:", host: "z.example" }, "shop", "tools-ada")).toBe(
       "wss://z.example/api/v1/projects/shop/tools/tools-ada/terminal",
     )
+  })
+})
+
+describe("a command typed into the kubectl terminal", () => {
+  test("ends without a line break, so it waits for Enter", () => {
+    expect(typedCommand("kubectl get pods\n")).toBe("kubectl get pods")
+    expect(typedCommand("kubectl get pods\r\n\r\n")).toBe("kubectl get pods")
+  })
+
+  test("applies YAML from a quoted here-document, line breaks kept and none after the end", () => {
+    const yaml = "apiVersion: v1\r\nkind: ConfigMap\r\ndata:\r\n  home: $HOME\r\n"
+    expect(applyCommand(yaml)).toBe(
+      "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: ConfigMap\ndata:\n  home: $HOME\nEOF",
+    )
+  })
+
+  test("ends the here-document with a marker no line of the YAML equals", () => {
+    const command = applyCommand("apiVersion: v1\nkind: ConfigMap\ndata:\n  a: |\nEOF\nEOF2\n")
+    expect(command.startsWith("kubectl apply -f - <<'EOF3'\n")).toBe(true)
+    expect(command.endsWith("\nEOF2\nEOF3")).toBe(true)
+  })
+
+  test("is offered for a whole object, not for a fragment to merge into one", () => {
+    expect(isManifest("# Replaces Ingress/shop\napiVersion: v1\nkind: Service\n")).toBe(true)
+    expect(isManifest("# Deployment/web\nspec:\n  template:\n    kind: x\n")).toBe(false)
   })
 })
