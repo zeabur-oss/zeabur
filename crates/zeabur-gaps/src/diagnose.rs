@@ -982,9 +982,14 @@ fn volume_missing(
 // ── Scheduling and quota ────────────────────────────────────────────────────────────────────────
 
 /// What the scheduler says is short, from its message ("0/3 nodes are available: 3 Insufficient
-/// cpu."): `cpu`, `memory`, `placement` (taints, affinity, selectors), or `other`.
+/// cpu."): `claimMissing` or `claimUnbound` (a volume claim the pod mounts), `cpu`, `memory`,
+/// `placement` (taints, affinity, selectors), or `other`.
 fn shortage(message: &str) -> &'static str {
-    if message.contains("Insufficient cpu") {
+    if missing_claim(message).is_some() {
+        "claimMissing"
+    } else if message.contains("unbound immediate PersistentVolumeClaims") {
+        "claimUnbound"
+    } else if message.contains("Insufficient cpu") {
         "cpu"
     } else if message.contains("Insufficient memory") {
         "memory"
@@ -996,6 +1001,13 @@ fn shortage(message: &str) -> &'static str {
     } else {
         "other"
     }
+}
+
+/// The claim a scheduler message says does not exist (`persistentvolumeclaim "data" not found`).
+fn missing_claim(message: &str) -> Option<&str> {
+    let (_, rest) = message.split_once("persistentvolumeclaim \"")?;
+    let (name, rest) = rest.split_once('"')?;
+    rest.trim_start().starts_with("not found").then_some(name)
 }
 
 /// The pods of `service` that wait for a node; `pods` are the snapshot's pods it lists.
@@ -1017,11 +1029,19 @@ fn unschedulable(found: &mut Found, service: &Service, pods: Vec<&Pod>) {
         };
         let message = condition.message.as_deref().unwrap_or_default();
         let variant = shortage(message);
-        let cause =
-            Message::new(&format!("diagnosis.unschedulable.cause.{variant}")).with("service", name);
-        let why = Message::new("diagnosis.unschedulable.why").with("message", message);
-        let fix =
-            Message::new(&format!("diagnosis.unschedulable.fix.{variant}")).with("service", name);
+        let claim = missing_claim(message).unwrap_or_default();
+        let cause = Message::new(&format!("diagnosis.unschedulable.cause.{variant}"))
+            .with("service", name)
+            .with("claim", claim);
+        let why = if variant.starts_with("claim") {
+            Message::new("diagnosis.unschedulable.whyClaim")
+        } else {
+            Message::new("diagnosis.unschedulable.why")
+        }
+        .with("message", message);
+        let fix = Message::new(&format!("diagnosis.unschedulable.fix.{variant}"))
+            .with("service", name)
+            .with("claim", claim);
         found.add(
             DiagnosisKind::Unschedulable,
             "",
@@ -1334,6 +1354,22 @@ mod tests {
             "placement"
         );
         assert_eq!(shortage("0/1 nodes are available."), "other");
+        assert_eq!(
+            shortage(
+                "0/1 nodes are available: persistentvolumeclaim \"editor-data\" not found. not found"
+            ),
+            "claimMissing"
+        );
+        assert_eq!(
+            missing_claim(
+                "0/1 nodes are available: persistentvolumeclaim \"editor-data\" not found."
+            ),
+            Some("editor-data")
+        );
+        assert_eq!(
+            shortage("0/1 nodes are available: pod has unbound immediate PersistentVolumeClaims."),
+            "claimUnbound"
+        );
         assert_eq!(
             quota_of("pods \"a\" is forbidden: exceeded quota: compute, requested: cpu=1"),
             Some("compute")

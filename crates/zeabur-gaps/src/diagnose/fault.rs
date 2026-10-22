@@ -60,7 +60,7 @@ pub(crate) fn fault(kind: DiagnosisKind, cause: &Message) -> Fault {
         },
         DiagnosisKind::QuotaBlocked => Fault::new(Cluster, ClusterAdmin),
         DiagnosisKind::Unschedulable => match variant {
-            "placement" => Fault::new(Configuration, You),
+            "placement" | "claimMissing" => Fault::new(Configuration, You),
             _ => Fault::new(Cluster, ClusterAdmin),
         },
         DiagnosisKind::Unexplained => Fault::new(Unknown, You),
