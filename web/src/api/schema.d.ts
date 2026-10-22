@@ -528,6 +528,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/databases": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The databases of a project, read as the person, from every database operator this build
+     *     knows (CloudNativePG, the Percona Operator for MongoDB).
+     */
+    get: operations["getProjectDatabases"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/events": {
     parameters: {
       query?: never
@@ -2120,6 +2140,136 @@ export interface components {
      * @enum {string}
      */
     DataStore: "postgres" | "mysql" | "redis" | "mongo" | "queue" | "search" | "other"
+    /** @description One database cluster. */
+    Database: {
+      /** @description The object's `apiVersion`. */
+      apiVersion: string
+      /** @description Its backups. */
+      backups: components["schemas"]["DatabaseBackups"]
+      /** @description The members' PersistentVolumeClaims, as named by the operator's convention. */
+      claims: string[]
+      /** @description Where and as whom to connect. */
+      connection: components["schemas"]["DatabaseConnection"]
+      /** @description When it was created, RFC 3339. */
+      created?: string | null
+      /** @description The engine. */
+      engine: components["schemas"]["DatabaseEngine"]
+      /** @description The server image. */
+      image?: string | null
+      /** @description The object's kind. */
+      kind: string
+      /**
+       * Format: int64
+       * @description Members asked for.
+       */
+      members: number
+      /** @description The operator's message, when it says why. */
+      message?: string | null
+      /** @description Its name. */
+      name: string
+      /**
+       * @description The object as written, without `status` and `managedFields`: what an edit (turning
+       *     backups on) starts from, so the edit changes only what it adds.
+       */
+      object: Record<string, never>
+      /** @description The object it is read from. */
+      origin: components["schemas"]["Origin"]
+      /** @description The operator's own words for it (`Cluster in healthy state`, `ready`). */
+      phase?: string | null
+      /** @description The member taking writes. */
+      primary?: string | null
+      /** @description The provider (module id). */
+      provider: string
+      /**
+       * Format: int64
+       * @description Members ready.
+       */
+      ready: number
+      /** @description The object's plural resource name. */
+      resource: string
+      /** @description CPU and memory each member asks for and may use, as written. */
+      resources?: Record<string, never> | null
+      /** @description How it is. */
+      state: components["schemas"]["DatabaseState"]
+      /** @description The size of each member's volume, as asked for. */
+      storage?: string | null
+      /** @description The server version, as reported, else from the image tag. */
+      version?: string | null
+    }
+    /** @description Where backups go: an S3-compatible bucket. */
+    DatabaseBackupStore: {
+      /** @description The bucket and path (`s3://bucket/path`). */
+      destination?: string | null
+      /** @description The endpoint URL, when not AWS S3's. */
+      endpoint?: string | null
+      /** @description The database uses this store for its backups (PostgreSQL: its WAL archive). */
+      inUse: boolean
+      /** @description The object naming the target: an `ObjectStore`, or a storage of the database object. */
+      name: string
+      /** @description How long backups are kept, as the provider writes it (`30d`, or a count). */
+      retention?: string | null
+      /** @description The Secret holding the access keys. */
+      secret?: string | null
+    }
+    /** @description A database's backups. */
+    DatabaseBackups: {
+      /**
+       * @description A backup can start now: the database runs with its store. False between setting up
+       *     backups and the operator restarting the members with them.
+       */
+      ready: boolean
+      /** @description Its backups, newest first. */
+      runs: components["schemas"]["BackupRun"][]
+      /** @description The schedules that back it up. */
+      schedules: components["schemas"]["BackupSchedule"][]
+      store?: components["schemas"]["DatabaseBackupStore"] | null
+    }
+    /** @description Where and as whom to connect, inside the cluster. */
+    DatabaseConnection: {
+      /** @description The database to connect to. */
+      database?: string | null
+      /** @description The Service's in-cluster DNS name. */
+      host: string
+      /** @description Extra connection-string options (`replicaSet=rs0`). */
+      options?: string | null
+      /** @description The Secret's key holding the password. */
+      passwordKey: string
+      /**
+       * Format: int32
+       * @description The port.
+       */
+      port: number
+      /** @description The Secret holding the credentials, in the project. */
+      secret: string
+      /** @description The user name, when the spec says it. */
+      username?: string | null
+      /** @description The Secret's key holding the user name. */
+      usernameKey?: string | null
+    }
+    /**
+     * @description A database engine.
+     * @enum {string}
+     */
+    DatabaseEngine: "postgresql" | "mongodb"
+    /** @description Whether an engine's operator, and its backup component, could be read. */
+    DatabaseOperator: {
+      /**
+       * @description Whether what backups need could be read: the Barman Cloud plugin's `ObjectStore`s for
+       *     PostgreSQL; the operator itself for MongoDB.
+       */
+      backups: components["schemas"]["ProviderState"]
+      /** @description The engine. */
+      engine: components["schemas"]["DatabaseEngine"]
+      /** @description The operator's module (`cloudnative-pg`). */
+      module: string
+      /** @description Whether its objects could be read. */
+      state: components["schemas"]["ProviderState"]
+    }
+    /**
+     * @description How a database is, from its operator's status.
+     * @enum {string}
+     */
+    DatabaseState: "ready" | "progressing" | "degraded" | "failed" | "paused" | "unknown"
     /** @description A debug container of Zeabur's. */
     DebugContainerStatus: {
       /** @description Its image. */
@@ -4094,6 +4244,15 @@ export interface components {
       unreadable: components["schemas"]["UnreadableView"][]
       /** @description Claims and databases no active schedule covers. */
       unscheduled: components["schemas"]["BackupTarget"][]
+    }
+    /** @description A project's databases. */
+    ProjectDatabases: {
+      /** @description The databases, by engine, then name. */
+      items: components["schemas"]["Database"][]
+      /** @description One per engine this build knows. */
+      operators: components["schemas"]["DatabaseOperator"][]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
     }
     /**
      * @description A project's details, as its namespace's annotations give them. Each is absent when its
@@ -6150,6 +6309,36 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["CreatableList"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getProjectDatabases: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ProjectDatabases"]
         }
       }
       403: {

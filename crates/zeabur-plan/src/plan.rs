@@ -312,12 +312,10 @@ pub fn plan_with(
         let Some(change) = request.changes.get(index) else {
             continue;
         };
-        planner
-            .change(change, index)
-            .map_err(|e| PlanError {
-                change: Some(index),
-                ..e
-            })?;
+        planner.change(change, index).map_err(|e| PlanError {
+            change: Some(index),
+            ..e
+        })?;
     }
     planner.finish()
 }

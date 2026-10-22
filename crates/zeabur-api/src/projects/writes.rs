@@ -528,7 +528,6 @@ mod tests {
     use serde_json::json;
     use zeabur_plan::{Plan, PlannedObject, Target, Write};
 
-
     fn object(kind: &str, write: Write) -> PlannedObject {
         PlannedObject {
             target: Target {
@@ -545,6 +544,7 @@ mod tests {
             owners: Vec::new(),
             resource_version: None,
             write,
+            change: None,
             raw_after: serde_json::Value::Null,
         }
     }

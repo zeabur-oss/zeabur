@@ -5,8 +5,8 @@ use zeabur_kube::{DynamicObject, ResourceRef};
 
 pub mod backups;
 pub mod cloudnative_pg;
-pub mod falco;
 pub mod databases;
+pub mod falco;
 pub mod k8up;
 pub mod metrics_server;
 pub mod network_policy;
