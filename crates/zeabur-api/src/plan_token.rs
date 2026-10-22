@@ -72,9 +72,33 @@ pub enum TokenError {
 ///
 /// When the system random number generator fails (each token has a fresh nonce).
 pub fn sign(key: &PlanKey, claims: &Claims) -> Result<String, RandomError> {
+    sign_as(key, PREFIX, claims)
+}
+
+/// Seals any claims under `prefix`, which is also the associated data: a token sealed under one
+/// prefix never opens under another.
+pub(crate) fn sign_as<T: serde::Serialize>(
+    key: &PlanKey,
+    prefix: &str,
+    claims: &T,
+) -> Result<String, RandomError> {
     let json = serde_json::to_vec(claims).unwrap_or_default();
-    let sealed = seal(&key.0, PREFIX.as_bytes(), &json)?;
-    Ok(format!("{PREFIX}{}", URL_SAFE_NO_PAD.encode(sealed)))
+    let sealed = seal(&key.0, prefix.as_bytes(), &json)?;
+    Ok(format!("{prefix}{}", URL_SAFE_NO_PAD.encode(sealed)))
+}
+
+/// The claims sealed under `prefix` by [`sign_as`]; the caller checks their expiry.
+pub(crate) fn open_as<T: serde::de::DeserializeOwned>(
+    key: &PlanKey,
+    prefix: &str,
+    token: &str,
+) -> Result<T, TokenError> {
+    let rest = token.strip_prefix(prefix).ok_or(TokenError::Malformed)?;
+    let sealed = URL_SAFE_NO_PAD
+        .decode(rest)
+        .map_err(|_e| TokenError::Malformed)?;
+    let json = open(&key.0, prefix.as_bytes(), &sealed).ok_or(TokenError::Altered)?;
+    serde_json::from_slice(&json).map_err(|_e| TokenError::Malformed)
 }
 
 /// The claims of `token`, if it opens under `key` and has not expired at `now` (seconds since
@@ -84,12 +108,7 @@ pub fn sign(key: &PlanKey, claims: &Claims) -> Result<String, RandomError> {
 ///
 /// [`TokenError`].
 pub fn verify(key: &PlanKey, token: &str, now: i64) -> Result<Claims, TokenError> {
-    let rest = token.strip_prefix(PREFIX).ok_or(TokenError::Malformed)?;
-    let sealed = URL_SAFE_NO_PAD
-        .decode(rest)
-        .map_err(|_e| TokenError::Malformed)?;
-    let json = open(&key.0, PREFIX.as_bytes(), &sealed).ok_or(TokenError::Altered)?;
-    let claims: Claims = serde_json::from_slice(&json).map_err(|_e| TokenError::Malformed)?;
+    let claims: Claims = open_as(key, PREFIX, token)?;
     if now >= claims.expires_at {
         return Err(TokenError::Expired);
     }

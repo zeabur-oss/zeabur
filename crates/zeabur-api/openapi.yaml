@@ -349,24 +349,26 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  /api/v1/members/invitations:
+  /api/v1/members/apply:
     post:
       tags:
       - members
-      summary: "Invites someone: a one-time link that adds a passkey to their account, made a member if new."
-      operationId: inviteMember
+      summary: |-
+        Carries out a member plan by its token: checks it, dry-runs every write, then writes, and
+        makes the invitation's link last.
+      operationId: applyMemberChange
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/InviteRequest"
+              $ref: "#/components/schemas/MemberApplyRequest"
         required: true
       responses:
-        "201":
+        "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SetupLinkView"
+                $ref: "#/components/schemas/MemberApplied"
         "400":
           content:
             application/problem+json:
@@ -378,6 +380,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
         "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
           content:
             application/problem+json:
               schema:
@@ -404,62 +411,26 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  "/api/v1/members/{username}":
-    delete:
+  /api/v1/members/plan:
+    post:
       tags:
       - members
-      summary: |-
-        Removes a member: the role bindings Zeabur made for them, their links, passkeys, linked
-        accounts and sessions, then the member. Projects and everything in them stay, and so do RBAC
-        bindings made outside Zeabur.
-      operationId: removeMember
-      parameters:
-      - name: username
-        in: path
-        description: The member's user name
-        required: true
-        schema:
-          type: string
-      responses:
-        "204": {}
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  "/api/v1/members/{username}/access":
-    put:
-      tags:
-      - members
-      summary: |-
-        Changes what a member may do: admin rights, or roles in chosen projects (a project left out
-        loses theirs). Nobody takes their own admin rights away.
-      operationId: setMemberAccess
-      parameters:
-      - name: username
-        in: path
-        description: The member's user name
-        required: true
-        schema:
-          type: string
+      summary: >-
+        Works out the objects a change to the members writes, and a token to apply it;
+        writes nothing.
+      operationId: planMemberChange
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AccessRequest"
+              $ref: "#/components/schemas/MemberChange"
         required: true
       responses:
-        "204": {}
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberPlan"
         "400":
           content:
             application/problem+json:
@@ -2573,23 +2544,6 @@ components:
       - ReadWriteOncePod
       - ReadWriteMany
       - ReadOnlyMany
-    AccessRequest:
-      type: object
-      description: "What a member may do: admin rights, or roles in chosen projects."
-      required:
-      - admin
-      properties:
-        admin:
-          type: boolean
-          description: May take on admin rights, which cover every project.
-        projects:
-          type: array
-          items:
-            $ref: "#/components/schemas/ProjectGrant"
-          description: >-
-            Roles in projects; empty for an admin. A project left out loses the member's
-            role there.
-      additionalProperties: false
     AccountRole:
       type: string
       description: A product role in a project, from the person's rights there.
@@ -5950,33 +5904,6 @@ components:
         username:
           type: string
           description: Who it enrols a passkey for.
-    InviteRequest:
-      type: object
-      description: Someone to invite.
-      required:
-      - username
-      properties:
-        admin:
-          type: boolean
-          description: >-
-            Whether a new member may take on admin rights (groups and elevated groups
-            `admins`).
-        displayName:
-          type:
-          - string
-          - "null"
-          description: Name shown in the interface, for a new member.
-        projects:
-          type: array
-          items:
-            $ref: "#/components/schemas/ProjectGrant"
-          description: A new member's roles in projects, when they are not an admin.
-        username:
-          type: string
-          description: |-
-            Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. An existing
-            member gets a link that adds a passkey; their name and role stay.
-      additionalProperties: false
     KeelPolicy:
       type: object
       description: A workload's Keel policy.
@@ -6219,6 +6146,123 @@ components:
       - autoscaler
       - controller
       - other
+    MemberApplied:
+      type: object
+      description: What an applied member plan made.
+      properties:
+        link:
+          oneOf:
+          - $ref: "#/components/schemas/SetupLinkView"
+            description: "For an invitation: the link, shown once."
+          - type: "null"
+    MemberApplyRequest:
+      type: object
+      description: The token of a member plan to apply.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token `plan` returned.
+    MemberChange:
+      oneOf:
+      - type: object
+        description: |-
+          Invite someone: a one-time link that adds a passkey to their account, the member made
+          first when new. An existing member keeps their name and access.
+        required:
+        - username
+        - op
+        properties:
+          admin:
+            type: boolean
+            description: Whether a new member may take on admin rights.
+          displayName:
+            type:
+            - string
+            - "null"
+            description: Name shown in the interface, for a new member.
+          op:
+            type: string
+            enum:
+            - invite
+          projects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: A new member's roles in projects, when they are not an admin.
+          username:
+            type: string
+            description: "Login name: lower-case letters, digits, `-` and `.`, at most 63 characters."
+      - type: object
+        description: |-
+          Change what a member may do: admin rights, or roles in chosen projects (a project left out
+          loses theirs). Nobody takes their own admin rights away.
+        required:
+        - username
+        - admin
+        - op
+        properties:
+          admin:
+            type: boolean
+            description: May take on admin rights, which cover every project.
+          op:
+            type: string
+            enum:
+            - access
+          projects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: Roles in projects; empty for an admin.
+          username:
+            type: string
+            description: The member.
+      - type: object
+        description: |-
+          Remove a member: the role bindings Zeabur made for them, their links, passkeys, linked
+          accounts and sessions, then the member. Nobody removes themselves.
+        required:
+        - username
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - remove
+          username:
+            type: string
+            description: The member.
+      description: A change to the members, as a person asks for it.
+    MemberPlan:
+      type: object
+      description: A member plan and the token that applies it.
+      required:
+      - token
+      - expiresAt
+      - writes
+      - newMember
+      properties:
+        expiresAt:
+          type: string
+          description: When the token stops working, RFC 3339.
+        linkSeconds:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "For an invitation: how long its link will work once made, in seconds."
+        newMember:
+          type: boolean
+          description: "For an invitation: whether it makes a new member."
+        token:
+          type: string
+          description: Send this to `apply` to carry out exactly this plan.
+        writes:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberWrite"
+          description: The writes, in order.
     MemberRole:
       type: string
       description: What a member may do in the cluster, as far as Zeabur Identity grants it.
@@ -6301,6 +6345,49 @@ components:
         you:
           type: boolean
           description: Whether this is the person asking.
+    MemberWrite:
+      type: object
+      description: One object a member plan writes.
+      required:
+      - apiVersion
+      - kind
+      - name
+      - action
+      properties:
+        action:
+          $ref: "#/components/schemas/MemberWriteAction"
+          description: The write.
+        afterYaml:
+          type:
+          - string
+          - "null"
+          description: The object as it will be, YAML; absent when it is deleted.
+        apiVersion:
+          type: string
+          description: "`apiVersion`."
+        beforeYaml:
+          type:
+          - string
+          - "null"
+          description: The object as it is, YAML; absent when it is created or not shown.
+        kind:
+          type: string
+          description: The kind.
+        name:
+          type: string
+          description: Its name; for the invitation, the prefix its random name starts with.
+        namespace:
+          type:
+          - string
+          - "null"
+          description: Its namespace; absent for a cluster-scoped object.
+    MemberWriteAction:
+      type: string
+      description: How a planned write changes its object.
+      enum:
+      - create
+      - patch
+      - delete
     MembersView:
       type: object
       description: Everyone who can sign in, and the links waiting to be used.

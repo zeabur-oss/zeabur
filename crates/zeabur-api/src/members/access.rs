@@ -22,11 +22,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
-use zeabur_core::problem::{Denied, Kind};
-use zeabur_kube::{
-    Cluster, ClusterError, DynamicObject, ObjectTarget, Preconditions, ResourceRef, WriteBody,
-    WriteRequest,
-};
+use zeabur_kube::{Cluster, ClusterError, DynamicObject, ObjectTarget, ResourceRef};
 
 use super::USER_PREFIX;
 use crate::error::{ApiError, list_read, read_problem};
@@ -35,7 +31,7 @@ use crate::error::{ApiError, list_read, read_problem};
 pub const MEMBER_LABEL: &str = "zeabur.com/member";
 /// The `ClusterRole` every member gets.
 pub const BASELINE_ROLE: &str = "zeabur-member";
-const RBAC_GROUP: &str = "rbac.authorization.k8s.io";
+pub(crate) const RBAC_GROUP: &str = "rbac.authorization.k8s.io";
 const RBAC_VERSION: &str = "rbac.authorization.k8s.io/v1";
 const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
 
@@ -237,95 +233,13 @@ pub(crate) fn check(projects: &[ProjectGrant]) -> Result<Vec<ProjectGrant>, Stri
         .collect())
 }
 
-fn target(kind: &str, namespace: &str, name: &str) -> ObjectTarget {
+pub(crate) fn target(kind: &str, namespace: &str, name: &str) -> ObjectTarget {
     ObjectTarget {
         api_version: RBAC_VERSION.to_owned(),
         kind: kind.to_owned(),
         plural: format!("{}s", kind.to_lowercase()),
         namespace: namespace.to_owned(),
         name: name.to_owned(),
-    }
-}
-
-async fn send(
-    cluster: &dyn Cluster,
-    target: ObjectTarget,
-    body: WriteBody,
-) -> Result<(), ApiError> {
-    let verb = match &body {
-        WriteBody::Create(_) => "create",
-        WriteBody::Delete(_) => "delete",
-        WriteBody::JsonPatch(_) | WriteBody::EphemeralContainers(_) => "patch",
-    };
-    let what = if target.namespace.is_empty() {
-        format!("{} {}", target.kind, target.name)
-    } else {
-        format!("{} {} in {}", target.kind, target.name, target.namespace)
-    };
-    let denied = Denied {
-        verb: verb.to_owned(),
-        group: RBAC_GROUP.to_owned(),
-        resource: target.plural.clone(),
-        name: (verb != "create").then(|| target.name.clone()),
-        namespace: (!target.namespace.is_empty()).then(|| target.namespace.clone()),
-    };
-    let write = WriteRequest {
-        target,
-        body,
-        dry_run: false,
-    };
-    match cluster.write(&write).await {
-        Ok(_) => Ok(()),
-        Err(error) => Err(read_problem(error, &what, denied)),
-    }
-}
-
-/// Carries out `steps` for `username`; a binding already gone is fine.
-pub(crate) async fn apply(
-    cluster: &dyn Cluster,
-    username: &str,
-    steps: Vec<Step>,
-) -> Result<(), ApiError> {
-    let name = binding_name(username);
-    for step in steps {
-        match step {
-            Step::Delete(binding) => {
-                let body = WriteBody::Delete(Preconditions {
-                    uid: binding.uid,
-                    resource_version: None,
-                });
-                match send(
-                    cluster,
-                    target("RoleBinding", &binding.project, &name),
-                    body,
-                )
-                .await
-                {
-                    Err(error) if error.0.kind == Kind::NotFound => {}
-                    other => other?,
-                }
-            }
-            Step::Create(grant) => {
-                let body = WriteBody::Create(role_binding(&grant.project, username, grant.role));
-                send(cluster, target("RoleBinding", &grant.project, &name), body).await?;
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Gives `username` the baseline; one already there is fine.
-pub(crate) async fn ensure_baseline(cluster: &dyn Cluster, username: &str) -> Result<(), ApiError> {
-    let body = WriteBody::Create(baseline_binding(username));
-    match send(
-        cluster,
-        target("ClusterRoleBinding", "", &binding_name(username)),
-        body,
-    )
-    .await
-    {
-        Err(error) if error.0.kind == Kind::Conflict => Ok(()),
-        other => other,
     }
 }
 
@@ -346,34 +260,6 @@ pub(crate) async fn bindings_for(
         .into_iter()
         .filter(|b| b.username == username)
         .collect())
-}
-
-/// Gives `username` exactly `wanted`: the baseline, and one binding per project.
-pub(crate) async fn set(
-    cluster: &dyn Cluster,
-    username: &str,
-    wanted: &[ProjectGrant],
-) -> Result<(), ApiError> {
-    let current = bindings_for(cluster, username).await?;
-    ensure_baseline(cluster, username).await?;
-    apply(cluster, username, steps(username, &current, wanted)).await
-}
-
-/// Takes every binding Zeabur made for `username` away: the projects', then the baseline.
-pub(crate) async fn remove_all(cluster: &dyn Cluster, username: &str) -> Result<(), ApiError> {
-    let current = bindings_for(cluster, username).await?;
-    apply(cluster, username, steps(username, &current, &[])).await?;
-    let body = WriteBody::Delete(Preconditions::default());
-    match send(
-        cluster,
-        target("ClusterRoleBinding", "", &binding_name(username)),
-        body,
-    )
-    .await
-    {
-        Err(error) if error.0.kind == Kind::NotFound => Ok(()),
-        other => other,
-    }
 }
 
 #[cfg(test)]

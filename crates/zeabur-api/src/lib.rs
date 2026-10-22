@@ -54,12 +54,11 @@
 //! | `DELETE /api/v1/projects/{p}/tools/{name}` | deletes your tools pod |
 //! | `GET /api/v1/account` | who you are, your role in each project, and where to manage how you sign in |
 //! | `GET /api/v1/members` | everyone Zeabur Identity signs in, and pending setup links |
-//! | `POST /api/v1/members/invitations` | invites someone: a one-time setup link, the member made if new |
+//! | `POST /api/v1/members/plan` | the objects inviting someone, changing a member's access or removing a member writes, and a token; writes nothing |
+//! | `POST /api/v1/members/apply` | carries out a member plan by its token; an invitation's link is made then, shown once |
 //! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
 //! | `POST /api/v1/members/{username}/setup-links` | a new setup link for a member, optionally removing their passkeys first |
 //! | `DELETE /api/v1/members/{username}/credentials/{id}` | removes a member's passkey or linked account |
-//! | `DELETE /api/v1/members/{username}` | removes a member and the role bindings Zeabur made for them; projects stay |
-//! | `PUT /api/v1/members/{username}/access` | makes a member an admin, or gives them Developer or Viewer in chosen projects |
 //! | `POST /api/v1/projects/{p}/plan` | the writes a change needs, what they do (pods replaced, fit, data and fields removed), and a token; writes nothing |
 //! | `POST /api/v1/projects/{p}/apply` | carries out a plan by its token |
 //!
@@ -238,12 +237,11 @@ fn routes() -> OpenApiRouter<AppState> {
         ))
         .routes(routes!(account::get))
         .routes(routes!(members::handlers::list))
-        .routes(routes!(members::handlers::invite))
+        .routes(routes!(members::plan::plan))
+        .routes(routes!(members::plan::apply))
         .routes(routes!(members::handlers::revoke_invitation))
         .routes(routes!(members::handlers::setup_link))
         .routes(routes!(members::handlers::remove_passkey))
-        .routes(routes!(members::handlers::remove))
-        .routes(routes!(members::handlers::set_access))
 }
 
 /// The API, for `access`; mount it next to the web interface.

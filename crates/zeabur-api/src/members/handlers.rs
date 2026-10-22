@@ -12,8 +12,7 @@ use super::directory::{
     setup_links,
 };
 use super::writes::{
-    AccessRequest, INVITE_SECONDS, InviteRequest, RESET_SECONDS, SetupLinkRequest, SetupLinkView,
-    bad, clear, create_user, delete, is_username, issue, refuse, remove_member, set_admin, target,
+    RESET_SECONDS, SetupLinkRequest, SetupLinkView, clear, delete, issue, refuse, target,
     user_object,
 };
 use super::{USER_PREFIX, access};
@@ -101,89 +100,6 @@ pub(crate) async fn list(
     let mut view = directory.view(namespace, Some(&you), (state.clock)(), links, can);
     view.project_roles = identity.project_roles;
     Ok(Json(view))
-}
-
-/// The roles asked for, checked against the request and what the chart installed.
-fn wanted_projects(
-    admin: bool,
-    projects: &[access::ProjectGrant],
-    offered: bool,
-) -> Result<Vec<access::ProjectGrant>, ApiError> {
-    let projects = access::check(projects).map_err(bad)?;
-    if admin && !projects.is_empty() {
-        return Err(bad(
-            "An admin's rights cover every project: leave the projects out.",
-        ));
-    }
-    if !offered && !projects.is_empty() {
-        return Err(refuse(
-            "Zeabur was installed without the member roles, so it cannot give roles in projects.",
-            "Install the chart with memberRoles.enabled=true, or make the member an admin.",
-            "members.noProjectRoles",
-        ));
-    }
-    Ok(projects)
-}
-
-/// Invites someone: a one-time link that adds a passkey to their account, made a member if new.
-#[utoipa::path(post, path = "/api/v1/members/invitations", tag = "members",
-    operation_id = "inviteMember", request_body = InviteRequest,
-    responses((status = 201, body = SetupLinkView),
-              (status = 400, body = Problem, content_type = PROBLEM),
-              (status = 403, body = Problem, content_type = PROBLEM),
-              (status = 409, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn invite(
-    State(state): State<AppState>,
-    Person(cluster): Person,
-    Json(invite): Json<InviteRequest>,
-) -> Result<(StatusCode, Json<SetupLinkView>), ApiError> {
-    let username = invite.username.trim().to_owned();
-    if !is_username(&username) {
-        return Err(bad(format!(
-            "{username:?} cannot be a user name: use lower-case letters, digits, - and ., at most \
-             63 characters."
-        )));
-    }
-    let identity = &state.settings.identity;
-    let projects = wanted_projects(invite.admin, &invite.projects, identity.project_roles)?;
-    let invite = InviteRequest {
-        username,
-        projects,
-        ..invite
-    };
-    let namespace = identity.namespace.as_str();
-    let issuer = issuer_of(&setup_links(cluster.as_ref(), identity).await)?;
-    let existing = user_object(cluster.as_ref(), namespace, &invite.username).await?;
-    let created_member = existing.is_none();
-    let user = if let Some(user) = existing {
-        user
-    } else {
-        let user = create_user(cluster.as_ref(), namespace, &invite).await?;
-        if identity.project_roles {
-            access::set(cluster.as_ref(), &invite.username, &invite.projects).await?;
-        }
-        user
-    };
-    let (url, name, expires_at) = issue(
-        cluster.as_ref(),
-        namespace,
-        &issuer,
-        &user,
-        (state.clock)(),
-        INVITE_SECONDS,
-    )
-    .await?;
-    Ok((
-        StatusCode::CREATED,
-        Json(SetupLinkView::new(
-            url,
-            invite.username,
-            expires_at,
-            name,
-            created_member,
-            false,
-        )),
-    ))
 }
 
 /// Revokes a setup link that has not been used. One already used or expired is gone already.
@@ -327,94 +243,6 @@ pub(crate) async fn remove_passkey(
     let found = credential(&directory, &username, &id)?;
     check_removal(&directory, found, &me)?;
     delete(cluster.as_ref(), IdentityKind::Credential, namespace, found).await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-/// Removes a member: the role bindings Zeabur made for them, their links, passkeys, linked
-/// accounts and sessions, then the member. Projects and everything in them stay, and so do RBAC
-/// bindings made outside Zeabur.
-#[utoipa::path(delete, path = "/api/v1/members/{username}", tag = "members",
-    operation_id = "removeMember",
-    params(("username" = String, Path, description = "The member's user name")),
-    responses((status = 204),
-              (status = 403, body = Problem, content_type = PROBLEM),
-              (status = 404, body = Problem, content_type = PROBLEM),
-              (status = 409, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn remove(
-    State(state): State<AppState>,
-    Person(cluster): Person,
-    Path(username): Path<String>,
-) -> Result<StatusCode, ApiError> {
-    let namespace = state.settings.identity.namespace.as_str();
-    let (directory, me) = futures_util::join!(
-        directory(cluster.as_ref(), namespace),
-        you(cluster.as_ref())
-    );
-    let directory = directory?;
-    if me == format!("{USER_PREFIX}{username}") {
-        return Err(refuse(
-            "You cannot remove yourself.",
-            "Ask another admin to remove you.",
-            "members.removeSelf",
-        ));
-    }
-    let Some(user) = directory.user(&username) else {
-        return Err(no_member(&username));
-    };
-    access::remove_all(cluster.as_ref(), &username).await?;
-    remove_member(cluster.as_ref(), namespace, &directory, user).await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-/// Changes what a member may do: admin rights, or roles in chosen projects (a project left out
-/// loses theirs). Nobody takes their own admin rights away.
-#[utoipa::path(put, path = "/api/v1/members/{username}/access", tag = "members",
-    operation_id = "setMemberAccess", request_body = AccessRequest,
-    params(("username" = String, Path, description = "The member's user name")),
-    responses((status = 204),
-              (status = 400, body = Problem, content_type = PROBLEM),
-              (status = 403, body = Problem, content_type = PROBLEM),
-              (status = 404, body = Problem, content_type = PROBLEM),
-              (status = 409, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn set_access(
-    State(state): State<AppState>,
-    Person(cluster): Person,
-    Path(username): Path<String>,
-    Json(request): Json<AccessRequest>,
-) -> Result<StatusCode, ApiError> {
-    let identity = &state.settings.identity;
-    let projects = wanted_projects(request.admin, &request.projects, identity.project_roles)?;
-    let namespace = identity.namespace.as_str();
-    let (directory, me) = futures_util::join!(
-        directory(cluster.as_ref(), namespace),
-        you(cluster.as_ref())
-    );
-    let directory = directory?;
-    let Some(user) = directory.user(&username) else {
-        return Err(no_member(&username));
-    };
-    let admin = user
-        .spec
-        .elevated_groups
-        .iter()
-        .any(|g| g == super::ADMIN_GROUP);
-    if admin && !request.admin && me == format!("{USER_PREFIX}{username}") {
-        return Err(refuse(
-            "You cannot take away your own admin rights.",
-            "Ask another admin to change your access.",
-            "members.demoteSelf",
-        ));
-    }
-    // What is taken away goes first, so a failure half-way never leaves more than was asked.
-    if !request.admin {
-        set_admin(cluster.as_ref(), namespace, user, false).await?;
-    }
-    if identity.project_roles {
-        access::set(cluster.as_ref(), &username, &projects).await?;
-    }
-    if request.admin {
-        set_admin(cluster.as_ref(), namespace, user, true).await?;
-    }
     Ok(StatusCode::NO_CONTENT)
 }
 

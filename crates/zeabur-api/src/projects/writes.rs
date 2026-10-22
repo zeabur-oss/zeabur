@@ -313,7 +313,7 @@ pub(crate) async fn plan(
 }
 
 /// The problem for a plan token that does not open.
-fn token_problem(error: TokenError) -> ApiError {
+pub(crate) fn token_problem(error: TokenError) -> ApiError {
     let kind = match error {
         TokenError::Expired => Kind::PlanExpired,
         TokenError::Altered | TokenError::Malformed => Kind::BadRequest,

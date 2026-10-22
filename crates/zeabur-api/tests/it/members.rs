@@ -135,6 +135,49 @@ mod tests {
         send(&app_with(cluster, settings()), method, uri, body).await
     }
 
+    /// Plans `change` and applies the plan on one server: the answer of the step that stopped,
+    /// and the plan.
+    async fn change_with(
+        cluster: &MemoryCluster,
+        settings: Settings,
+        change: Value,
+    ) -> (StatusCode, Value, Value) {
+        let app = app_with(cluster, settings);
+        let (status, plan) = send(&app, "POST", "/api/v1/members/plan", Some(&change)).await;
+        if status != StatusCode::OK {
+            return (status, plan, Value::Null);
+        }
+        let (status, applied) = send(
+            &app,
+            "POST",
+            "/api/v1/members/apply",
+            Some(&json!({"token": plan["token"]})),
+        )
+        .await;
+        (status, applied, plan)
+    }
+
+    async fn change(cluster: &MemoryCluster, change: Value) -> (StatusCode, Value, Value) {
+        change_with(cluster, settings(), change).await
+    }
+
+    /// A plan's writes, as `action Kind/name`.
+    fn planned(plan: &Value) -> Vec<String> {
+        plan["writes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| {
+                format!(
+                    "{} {}/{}",
+                    w["action"].as_str().unwrap(),
+                    w["kind"].as_str().unwrap(),
+                    w["name"].as_str().unwrap()
+                )
+            })
+            .collect()
+    }
+
     /// The writes made, as `verb Kind/name`.
     fn writes(cluster: &MemoryCluster) -> Vec<String> {
         cluster
@@ -192,70 +235,6 @@ mod tests {
         assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         assert_eq!(body["denied"]["resource"], "users");
         assert_eq!(body["denied"]["group"], "identity.zeabur.com");
-    }
-
-    #[tokio::test]
-    async fn inviting_a_new_name_makes_the_member_and_a_link_whose_token_is_not_stored() {
-        let cluster = signed_in("zeabur:ada");
-        let (status, body) = call(
-            &cluster,
-            "POST",
-            "/api/v1/members/invitations",
-            Some(&json!({"username": "cy", "displayName": "Cy", "admin": true})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::CREATED, "{body}");
-        assert_eq!(body["createdMember"], true);
-        let url = body["url"].as_str().unwrap();
-        let token = url
-            .strip_prefix("https://id.example.com/setup#token=")
-            .unwrap();
-        let name = body["name"].as_str().unwrap();
-        assert!(token.starts_with(&format!("{name}.")));
-        assert_eq!(
-            writes(&cluster),
-            [
-                "create User/cy".to_owned(),
-                "create ClusterRoleBinding/zeabur-member-cy".to_owned(),
-                format!("create Invitation/{name}")
-            ]
-        );
-        let dynamic = cluster.inspect(|s| s.dynamic.clone()).unwrap();
-        let invitation = dynamic
-            .iter()
-            .find(|o| o.metadata.name.as_deref() == Some(name))
-            .unwrap();
-        let stored = serde_json::to_string(invitation).unwrap();
-        assert!(!stored.contains(token.split_once('.').unwrap().1));
-        assert_eq!(invitation.data["spec"]["user"], "cy");
-        let cy = dynamic
-            .iter()
-            .find(|o| o.metadata.name.as_deref() == Some("cy"))
-            .unwrap();
-        assert_eq!(cy.data["spec"]["elevatedGroups"], json!(["admins"]));
-    }
-
-    #[tokio::test]
-    async fn inviting_an_existing_member_adds_a_link_and_a_bad_name_is_refused() {
-        let cluster = signed_in("zeabur:ada");
-        let (status, body) = call(
-            &cluster,
-            "POST",
-            "/api/v1/members/invitations",
-            Some(&json!({"username": "bob"})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::CREATED, "{body}");
-        assert_eq!(body["createdMember"], false);
-        assert_eq!(writes(&cluster).len(), 1);
-        let (status, _) = call(
-            &cluster,
-            "POST",
-            "/api/v1/members/invitations",
-            Some(&json!({"username": "Bob Smith"})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]
@@ -341,29 +320,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn removing_a_member_removes_everything_of_theirs_then_them_but_never_yourself() {
-        let cluster = signed_in("zeabur:ada");
-        let (status, body) = call(&cluster, "DELETE", "/api/v1/members/bob", None).await;
-        assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
-        let made = writes(&cluster);
-        assert_eq!(
-            made[..3],
-            [
-                "delete RoleBinding/zeabur-member-bob",
-                "delete RoleBinding/zeabur-member-bob",
-                "delete ClusterRoleBinding/zeabur-member-bob"
-            ]
-        );
-        assert_eq!(made.last().unwrap(), "delete User/bob");
-        assert_eq!(made.len(), 8);
-        assert_eq!(bindings(&cluster, "bob").len(), 0);
-        let (status, body) = call(&cluster, "DELETE", "/api/v1/members/ada", None).await;
-        assert_eq!(status, StatusCode::CONFLICT, "{body}");
-        let (status, _) = call(&cluster, "DELETE", "/api/v1/members/nobody", None).await;
-        assert_eq!(status, StatusCode::NOT_FOUND);
-    }
-
-    #[tokio::test]
     async fn revoking_a_link_deletes_it_and_one_already_gone_is_fine() {
         let cluster = signed_in("zeabur:ada");
         let (status, _) = call(
@@ -383,22 +339,6 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::NO_CONTENT);
         assert_eq!(writes(&cluster), ["delete Invitation/inv-bob"]);
-    }
-
-    #[tokio::test]
-    async fn without_an_issuer_no_link_is_made() {
-        let cluster = signed_in("zeabur:ada");
-        let (status, body) = send(
-            &app_with(&cluster, Settings::default()),
-            "POST",
-            "/api/v1/members/invitations",
-            Some(&json!({"username": "cy"})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::CONFLICT, "{body}");
-        assert_eq!(body["summary"]["key"], "members.noIssuer");
-        assert_eq!(body["fixKey"]["key"], "members.noIssuer.fix");
-        assert_eq!(writes(&cluster).len(), 0);
     }
 
     /// The bindings Zeabur holds for `username`, as `namespace/role`.
@@ -449,20 +389,171 @@ mod tests {
         );
     }
 
+    fn dynamic(cluster: &MemoryCluster, namespace: &str, name: &str) -> DynamicObject {
+        cluster
+            .inspect(|s| s.dynamic.clone())
+            .unwrap()
+            .into_iter()
+            .find(|o| {
+                o.metadata.namespace.as_deref() == Some(namespace)
+                    && o.metadata.name.as_deref() == Some(name)
+            })
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn an_invitation_is_planned_without_writing_and_its_link_is_made_only_at_apply() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, plan) = call(
+            &cluster,
+            "POST",
+            "/api/v1/members/plan",
+            Some(&json!({"op": "invite", "username": "cy", "displayName": "Cy", "admin": true})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert!(plan["token"].as_str().unwrap().starts_with("m1."));
+        assert_eq!(plan["newMember"], true);
+        assert_eq!(plan["linkSeconds"], 7 * 24 * 3600);
+        assert_eq!(
+            planned(&plan),
+            [
+                "create User/cy",
+                "create ClusterRoleBinding/zeabur-member-cy",
+                "create Invitation/inv-"
+            ]
+        );
+        assert!(
+            plan["writes"][0]["afterYaml"]
+                .as_str()
+                .unwrap()
+                .contains("- admins")
+        );
+        assert_eq!(writes(&cluster).len(), 0);
+
+        let (status, applied, _) = change(
+            &cluster,
+            json!({"op": "invite", "username": "cy", "displayName": "Cy", "admin": true}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let link = &applied["link"];
+        assert_eq!(link["createdMember"], true);
+        let url = link["url"].as_str().unwrap();
+        let token = url
+            .strip_prefix("https://id.example.com/setup#token=")
+            .unwrap();
+        let name = link["name"].as_str().unwrap();
+        assert!(token.starts_with(&format!("{name}.")));
+        assert_eq!(
+            writes(&cluster),
+            [
+                "create User/cy".to_owned(),
+                "create ClusterRoleBinding/zeabur-member-cy".to_owned(),
+                format!("create Invitation/{name}")
+            ]
+        );
+        let invitation = dynamic(&cluster, NS, name);
+        let stored = serde_json::to_string(&invitation).unwrap();
+        assert!(!stored.contains(token.split_once('.').unwrap().1));
+        assert_eq!(invitation.data["spec"]["user"], "cy");
+        assert_eq!(
+            dynamic(&cluster, NS, "cy").data["spec"]["elevatedGroups"],
+            json!(["admins"])
+        );
+    }
+
+    #[tokio::test]
+    async fn inviting_an_existing_member_adds_a_link_and_a_bad_name_is_refused() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, applied, plan) =
+            change(&cluster, json!({"op": "invite", "username": "bob"})).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(plan["newMember"], false);
+        assert_eq!(planned(&plan), ["create Invitation/inv-"]);
+        assert_eq!(applied["link"]["createdMember"], false);
+        assert_eq!(writes(&cluster).len(), 1);
+        let (status, ..) = change(&cluster, json!({"op": "invite", "username": "Bob Smith"})).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn removing_a_member_removes_everything_of_theirs_then_them_but_never_yourself() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, applied, plan) =
+            change(&cluster, json!({"op": "remove", "username": "bob"})).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(applied.get("link"), None);
+        let made = writes(&cluster);
+        assert_eq!(
+            made[..3],
+            [
+                "delete RoleBinding/zeabur-member-bob",
+                "delete RoleBinding/zeabur-member-bob",
+                "delete ClusterRoleBinding/zeabur-member-bob"
+            ]
+        );
+        assert_eq!(made.last().unwrap(), "delete User/bob");
+        assert_eq!(made.len(), 8);
+        assert_eq!(planned(&plan).len(), 8);
+        assert_eq!(plan["writes"][0]["namespace"], "blog");
+        assert_eq!(plan["writes"][2].get("namespace"), None);
+        let credential = plan["writes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|w| w["kind"] == "Credential")
+            .unwrap();
+        assert_eq!(
+            credential.get("beforeYaml"),
+            None,
+            "a passkey's record is not shown"
+        );
+        assert_eq!(bindings(&cluster, "bob").len(), 0);
+        let (status, body, _) = change(&cluster, json!({"op": "remove", "username": "ada"})).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["summary"]["key"], "members.removeSelf");
+        let (status, ..) = change(&cluster, json!({"op": "remove", "username": "nobody"})).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn without_an_issuer_no_link_is_planned() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, body, _) = change_with(
+            &cluster,
+            Settings::default(),
+            json!({"op": "invite", "username": "cy"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["summary"]["key"], "members.noIssuer");
+        assert_eq!(body["fixKey"]["key"], "members.noIssuer.fix");
+        assert_eq!(writes(&cluster).len(), 0);
+    }
+
     #[tokio::test]
     async fn a_new_member_gets_the_baseline_and_a_binding_per_project_before_the_link() {
         let cluster = signed_in("zeabur:ada");
-        let (status, body) = call(
+        let (status, body, plan) = change(
             &cluster,
-            "POST",
-            "/api/v1/members/invitations",
-            Some(&json!({"username": "cy", "projects": [
+            json!({"op": "invite", "username": "cy", "projects": [
                 {"project": "shop", "role": "developer"},
                 {"project": "blog", "role": "viewer"}
-            ]})),
+            ]}),
         )
         .await;
-        assert_eq!(status, StatusCode::CREATED, "{body}");
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(
+            planned(&plan),
+            [
+                "create User/cy",
+                "create ClusterRoleBinding/zeabur-member-cy",
+                "create RoleBinding/zeabur-member-cy",
+                "create RoleBinding/zeabur-member-cy",
+                "create Invitation/inv-",
+            ]
+        );
         let made = writes(&cluster);
         assert_eq!(
             made[..4],
@@ -482,17 +573,8 @@ mod tests {
                 "shop/zeabur-project-developer"
             ]
         );
-        let shop = cluster
-            .inspect(|s| s.dynamic.clone())
-            .unwrap()
-            .into_iter()
-            .find(|o| {
-                o.metadata.namespace.as_deref() == Some("shop")
-                    && o.metadata.name.as_deref() == Some("zeabur-member-cy")
-            })
-            .unwrap();
         assert_eq!(
-            shop.data["subjects"],
+            dynamic(&cluster, "shop", "zeabur-member-cy").data["subjects"],
             json!([{"kind": "User", "apiGroup": "rbac.authorization.k8s.io", "name": "zeabur:cy"}])
         );
     }
@@ -501,14 +583,14 @@ mod tests {
     async fn an_admin_with_projects_or_a_project_twice_is_refused() {
         let cluster = signed_in("zeabur:ada");
         for body in [
-            json!({"username": "cy", "admin": true,
+            json!({"op": "invite", "username": "cy", "admin": true,
                    "projects": [{"project": "shop", "role": "viewer"}]}),
-            json!({"username": "cy", "projects": [
+            json!({"op": "invite", "username": "cy", "projects": [
                 {"project": "shop", "role": "viewer"}, {"project": "shop", "role": "developer"}]}),
-            json!({"username": "cy", "projects": [{"project": "Shop", "role": "viewer"}]}),
+            json!({"op": "invite", "username": "cy",
+                   "projects": [{"project": "Shop", "role": "viewer"}]}),
         ] {
-            let (status, answer) =
-                call(&cluster, "POST", "/api/v1/members/invitations", Some(&body)).await;
+            let (status, answer, _) = change(&cluster, body).await;
             assert_eq!(status, StatusCode::BAD_REQUEST, "{answer}");
         }
         assert_eq!(writes(&cluster).len(), 0);
@@ -517,17 +599,15 @@ mod tests {
     #[tokio::test]
     async fn changing_a_role_replaces_its_binding_and_a_project_left_out_loses_it() {
         let cluster = signed_in("zeabur:ada");
-        let (status, body) = call(
+        let (status, body, plan) = change(
             &cluster,
-            "PUT",
-            "/api/v1/members/bob/access",
-            Some(&json!({"admin": false, "projects": [
+            json!({"op": "access", "username": "bob", "admin": false, "projects": [
                 {"project": "shop", "role": "developer"},
                 {"project": "billing", "role": "viewer"}
-            ]})),
+            ]}),
         )
         .await;
-        assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+        assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(
             bindings(&cluster, "bob"),
             [
@@ -536,42 +616,41 @@ mod tests {
                 "shop/zeabur-project-developer"
             ]
         );
-        assert_eq!(
-            writes(&cluster),
-            [
-                "delete RoleBinding/zeabur-member-bob",
-                "delete RoleBinding/zeabur-member-bob",
-                "create RoleBinding/zeabur-member-bob",
-                "create RoleBinding/zeabur-member-bob",
-            ]
+        let expected = [
+            "delete RoleBinding/zeabur-member-bob",
+            "delete RoleBinding/zeabur-member-bob",
+            "create RoleBinding/zeabur-member-bob",
+            "create RoleBinding/zeabur-member-bob",
+        ];
+        assert_eq!(writes(&cluster), expected);
+        assert_eq!(planned(&plan), expected);
+        assert!(
+            plan["writes"][0]["beforeYaml"]
+                .as_str()
+                .unwrap()
+                .contains("zeabur-project-developer")
         );
     }
 
     #[tokio::test]
     async fn an_admin_loses_their_project_bindings_and_nobody_demotes_themselves() {
         let cluster = signed_in("zeabur:ada");
-        let (status, body) = call(
+        let (status, body, plan) = change(
             &cluster,
-            "PUT",
-            "/api/v1/members/bob/access",
-            Some(&json!({"admin": true})),
+            json!({"op": "access", "username": "bob", "admin": true}),
         )
         .await;
-        assert_eq!(status, StatusCode::NO_CONTENT, "{body}");
+        assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(bindings(&cluster, "bob"), ["/zeabur-member"]);
         assert_eq!(writes(&cluster).last().unwrap(), "patch User/bob");
-        let bob = cluster
-            .inspect(|s| s.dynamic.clone())
-            .unwrap()
-            .into_iter()
-            .find(|o| o.metadata.name.as_deref() == Some("bob"))
-            .unwrap();
-        assert_eq!(bob.data["spec"]["elevatedGroups"], json!(["admins"]));
-        let (status, body) = call(
+        assert_eq!(planned(&plan).last().unwrap(), "patch User/bob");
+        assert_eq!(
+            dynamic(&cluster, NS, "bob").data["spec"]["elevatedGroups"],
+            json!(["admins"])
+        );
+        let (status, body, _) = change(
             &cluster,
-            "PUT",
-            "/api/v1/members/ada/access",
-            Some(&json!({"admin": false})),
+            json!({"op": "access", "username": "ada", "admin": false}),
         )
         .await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
@@ -588,11 +667,11 @@ mod tests {
             },
             ..Settings::default()
         };
-        let (status, body) = send(
-            &app_with(&cluster, off),
-            "PUT",
-            "/api/v1/members/bob/access",
-            Some(&json!({"admin": false, "projects": [{"project": "shop", "role": "viewer"}]})),
+        let (status, body, _) = change_with(
+            &cluster,
+            off,
+            json!({"op": "access", "username": "bob", "admin": false,
+                   "projects": [{"project": "shop", "role": "viewer"}]}),
         )
         .await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
@@ -601,21 +680,61 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_refused_binding_read_stops_the_change_before_any_write() {
+    async fn a_refused_binding_read_stops_the_plan() {
         let cluster = signed_in("zeabur:ada");
         cluster.update(|s| {
             s.forbidden_resources
                 .insert("rolebindings.rbac.authorization.k8s.io".to_owned());
         });
-        let (status, body) = call(
+        let (status, body, _) = change(
             &cluster,
-            "PUT",
-            "/api/v1/members/bob/access",
-            Some(&json!({"admin": false, "projects": []})),
+            json!({"op": "access", "username": "bob", "admin": false, "projects": []}),
         )
         .await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         assert_eq!(body["denied"]["resource"], "rolebindings");
         assert_eq!(writes(&cluster).len(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_plan_is_refused_once_the_member_changed_and_a_project_token_never_applies() {
+        let cluster = signed_in("zeabur:ada");
+        let app = app_with(&cluster, settings());
+        let (status, plan) = send(
+            &app,
+            "POST",
+            "/api/v1/members/plan",
+            Some(&json!({"op": "access", "username": "bob", "admin": true})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        cluster.update(|s| {
+            if let Some(bob) = s
+                .dynamic
+                .iter_mut()
+                .find(|o| o.metadata.name.as_deref() == Some("bob"))
+            {
+                bob.metadata.resource_version = Some("2".to_owned());
+            }
+        });
+        let (status, body) = send(
+            &app,
+            "POST",
+            "/api/v1/members/apply",
+            Some(&json!({"token": plan["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(writes(&cluster).len(), 0);
+        let sealed = plan["token"].as_str().unwrap().strip_prefix("m1.").unwrap();
+        let project_token = format!("v2.{sealed}");
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/v1/members/apply",
+            Some(&json!({"token": project_token})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 }

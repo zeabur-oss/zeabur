@@ -11,7 +11,6 @@ use zeabur_core::problem::{Kind, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, WriteBody, WriteRequest};
 
-use super::access::ProjectGrant;
 use super::directory::{Directory, IdentityKind, Object, UserSpec, request};
 use super::{ADMIN_GROUP, API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, USER_LABEL};
 use crate::error::{ApiError, read_problem};
@@ -21,35 +20,6 @@ pub(crate) const INVITE_SECONDS: i64 = 7 * 24 * 3600;
 /// How long a reset link lasts: long enough to reach someone, short enough to matter little if
 /// it leaks.
 pub(crate) const RESET_SECONDS: i64 = 24 * 3600;
-
-/// Someone to invite.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct InviteRequest {
-    /// Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. An existing
-    /// member gets a link that adds a passkey; their name and role stay.
-    pub username: String,
-    /// Name shown in the interface, for a new member.
-    #[serde(default)]
-    pub display_name: Option<String>,
-    /// Whether a new member may take on admin rights (groups and elevated groups `admins`).
-    #[serde(default)]
-    pub admin: bool,
-    /// A new member's roles in projects, when they are not an admin.
-    #[serde(default)]
-    pub projects: Vec<ProjectGrant>,
-}
-
-/// What a member may do: admin rights, or roles in chosen projects.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct AccessRequest {
-    /// May take on admin rights, which cover every project.
-    pub admin: bool,
-    /// Roles in projects; empty for an admin. A project left out loses the member's role there.
-    #[serde(default)]
-    pub projects: Vec<ProjectGrant>,
-}
 
 /// A member's setup link.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, ToSchema)]
@@ -188,22 +158,19 @@ pub(crate) async fn clear(
 }
 
 /// The `User` for a new member.
-pub(crate) fn new_user(namespace: &str, invite: &InviteRequest) -> Value {
-    let groups: Vec<&str> = if invite.admin {
-        vec![ADMIN_GROUP]
-    } else {
-        Vec::new()
-    };
+pub(crate) fn new_user(
+    namespace: &str,
+    username: &str,
+    display_name: Option<&str>,
+    admin: bool,
+) -> Value {
+    let groups: Vec<&str> = if admin { vec![ADMIN_GROUP] } else { Vec::new() };
     let mut spec = json!({
-        "username": invite.username,
+        "username": username,
         "groups": groups,
         "elevatedGroups": groups,
     });
-    if let Some(name) = invite
-        .display_name
-        .as_deref()
-        .map(str::trim)
-        .filter(|n| !n.is_empty())
+    if let Some(name) = display_name.map(str::trim).filter(|n| !n.is_empty())
         && let Some(spec) = spec.as_object_mut()
     {
         spec.insert(
@@ -214,7 +181,7 @@ pub(crate) fn new_user(namespace: &str, invite: &InviteRequest) -> Value {
     json!({
         "apiVersion": API_VERSION,
         "kind": "User",
-        "metadata": {"name": invite.username, "namespace": namespace,
+        "metadata": {"name": username, "namespace": namespace,
                      "labels": {"app.kubernetes.io/managed-by": "zeabur"}},
         "spec": spec,
     })
@@ -247,25 +214,6 @@ pub(crate) fn admin_patch(user: &Object<UserSpec>, admin: bool) -> Option<Value>
         {"op": "add", "path": "/spec/groups", "value": groups},
         {"op": "add", "path": "/spec/elevatedGroups", "value": elevated},
     ]))
-}
-
-pub(crate) async fn set_admin(
-    cluster: &dyn Cluster,
-    namespace: &str,
-    user: &Object<UserSpec>,
-    admin: bool,
-) -> Result<(), ApiError> {
-    let Some(patch) = admin_patch(user, admin) else {
-        return Ok(());
-    };
-    send(
-        cluster,
-        IdentityKind::User,
-        namespace,
-        user.name(),
-        WriteBody::JsonPatch(patch),
-    )
-    .await
 }
 
 /// A fresh token, `<name>.<secret>`.
@@ -390,36 +338,6 @@ pub(crate) async fn user_object(
     }
 }
 
-/// Creates the `User` for a new member and returns it as stored.
-pub(crate) async fn create_user(
-    cluster: &dyn Cluster,
-    namespace: &str,
-    invite: &InviteRequest,
-) -> Result<Value, ApiError> {
-    send(
-        cluster,
-        IdentityKind::User,
-        namespace,
-        &invite.username,
-        WriteBody::Create(new_user(namespace, invite)),
-    )
-    .await?;
-    user_object(cluster, namespace, &invite.username)
-        .await?
-        .ok_or_else(|| bad("The new member could not be read back."))
-}
-
-/// Deletes the member `user`: their invitations, credentials and grants, then the `User`.
-pub(crate) async fn remove_member(
-    cluster: &dyn Cluster,
-    namespace: &str,
-    directory: &Directory,
-    user: &Object<UserSpec>,
-) -> Result<(), ApiError> {
-    clear(cluster, namespace, directory, user.name()).await?;
-    delete(cluster, IdentityKind::User, namespace, user).await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -477,17 +395,11 @@ mod tests {
 
     #[test]
     fn a_new_admin_gets_the_admins_groups_and_a_member_none() {
-        let invite = |admin| InviteRequest {
-            username: "cy".to_owned(),
-            display_name: Some(" Cy ".to_owned()),
-            admin,
-            projects: Vec::new(),
-        };
-        let admin = new_user("ns", &invite(true));
+        let admin = new_user("ns", "cy", Some(" Cy "), true);
         assert_eq!(admin["spec"]["groups"], json!(["admins"]));
         assert_eq!(admin["spec"]["elevatedGroups"], json!(["admins"]));
         assert_eq!(admin["spec"]["displayName"], "Cy");
-        let member = new_user("ns", &invite(false));
+        let member = new_user("ns", "cy", None, false);
         assert_eq!(member["spec"]["groups"], json!([]));
         assert_eq!(member["spec"]["elevatedGroups"], json!([]));
     }

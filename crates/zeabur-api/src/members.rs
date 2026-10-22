@@ -48,12 +48,16 @@
 pub mod access;
 mod directory;
 pub(crate) mod handlers;
+pub(crate) mod plan;
 mod writes;
 
 pub use directory::{
     InvitationView, LinkedAccountView, MemberRole, MemberView, MembersView, PasskeyView, SetupLinks,
 };
-pub use writes::{AccessRequest, InviteRequest, SetupLinkRequest, SetupLinkView};
+pub use plan::{
+    MemberApplied, MemberApplyRequest, MemberChange, MemberPlan, MemberWrite, MemberWriteAction,
+};
+pub use writes::{SetupLinkRequest, SetupLinkView};
 
 /// Zeabur Identity's API group.
 pub const GROUP: &str = "identity.zeabur.com";
