@@ -12,6 +12,7 @@
 //! | `GET /cluster/upgrades` | `/version`; nodes and Plans when allowed | nothing; nodes and Plans add skew and progress |
 //! | `GET /cluster/nodes` | nodes; pods, node metrics and the metrics store when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get` on the metrics store's `services/proxy` for disks |
 //! | `GET /cluster/events` | `events.k8s.io` events, all namespaces (`scope=cluster` keeps those about the cluster) | `list events.events.k8s.io` |
+//! | `GET /cluster/config-reload` | Deployments' metadata, all namespaces; Reloader's Deployment | nothing: `unknown` when refused (see [`config_reload`]) |
 //! | `GET /cluster/capabilities` | CRDs, APIServices, classes, `HelmChart`s, Helm release Secrets' labels, workloads | all of them: in practice a cluster administrator |
 //!
 //! The page shows the cluster itself, not its projects: Home lists those from `GET /projects`
@@ -46,6 +47,7 @@
 //! one (see `zeabur_kube`'s cluster-wide reads).
 
 pub(crate) mod capacity;
+pub mod config_reload;
 pub(crate) mod disks;
 pub mod install;
 pub mod modules;

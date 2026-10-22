@@ -180,6 +180,16 @@ async fn compute(
     let objects = edited_objects(cluster, project, request).await?;
     let replica_sets = replica_sets_of_deleted(cluster, project, request).await?;
     let reclaim_policies = reclaim_policies(cluster, request, &snapshot).await?;
+    let changes_data = request.changes.iter().any(|c| {
+        matches!(c, Change::Data { .. })
+            || matches!(c, Change::Edit { resource, .. } if resource.group.is_empty()
+                && matches!(resource.resource.as_str(), "configmaps" | "secrets"))
+    });
+    let reloader = if changes_data {
+        crate::cluster::config_reload::read(cluster).await.0.runs()
+    } else {
+        None
+    };
     let mut plan = zeabur_plan::plan(
         Input {
             snapshot: &snapshot,
@@ -193,6 +203,7 @@ async fn compute(
             replica_sets: &replica_sets,
             reclaim_policies: &reclaim_policies,
             namespace: None,
+            reloader,
         },
         request,
     )

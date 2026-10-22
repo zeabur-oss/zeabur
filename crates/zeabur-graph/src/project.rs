@@ -244,6 +244,11 @@ fn service(
         endpoint_names: Index::names(&index.endpoints, &me),
         route_names: Index::names(&index.routes, &me),
         data_store: None,
+        config_reload: workload
+            .meta()
+            .annotations
+            .as_ref()
+            .and_then(zeabur_model::ConfigReload::from_annotations),
         diagnoses: Vec::new(),
     };
     service.data_store = data_store(&service);

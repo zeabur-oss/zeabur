@@ -99,6 +99,8 @@ pub struct Input<'a> {
     /// The project's Namespace, as read, with `managedFields`: needed to adopt it, let it go
     /// or change its details; `None` when the request does none of these.
     pub namespace: Option<&'a Value>,
+    /// Whether Stakater Reloader runs in the cluster; `None` when that could not be read.
+    pub reloader: Option<bool>,
 }
 
 impl<'a> Input<'a> {
@@ -122,6 +124,7 @@ impl<'a> Input<'a> {
             replica_sets: &[],
             reclaim_policies: &NO_RECLAIM_POLICIES,
             namespace: None,
+            reloader: None,
         }
     }
 }
@@ -261,13 +264,13 @@ pub fn plan_with(
         warnings: Vec::new(),
     };
     for change in &request.changes {
-        planner.change(change, request.restart_after)?;
+        planner.change(change)?;
     }
     planner.finish()
 }
 
 impl<'a> Planner<'a> {
-    fn change(&mut self, change: &Change, restart_after: bool) -> Result<(), PlanError> {
+    fn change(&mut self, change: &Change) -> Result<(), PlanError> {
         match change {
             Change::Env {
                 workload,
@@ -278,7 +281,7 @@ impl<'a> Planner<'a> {
                 kind,
                 name,
                 changes,
-            } => self.data(*kind, name, changes, restart_after),
+            } => self.data(*kind, name, changes),
             Change::AddDomain { workload, hostname } => self.add_domain(workload, hostname),
             Change::RenameDomain { route, from, to } => self.rename_domain(route, from, to),
             Change::RemoveDomain { route, hostname } => self.remove_domain(route, hostname),
@@ -332,6 +335,7 @@ impl<'a> Planner<'a> {
                 set,
             } => self.probe(workload, container.as_deref(), *probe, set.as_ref()),
             Change::Scale { workload, replicas } => self.scale(workload, *replicas),
+            Change::ConfigReload { workload, enabled } => self.config_reload(workload, *enabled),
             Change::Resources {
                 workload,
                 container,
@@ -342,7 +346,7 @@ impl<'a> Planner<'a> {
                 resource,
                 name,
                 yaml,
-            } => self.edit(resource, name, yaml, restart_after),
+            } => self.edit(resource, name, yaml),
             Change::Delete {
                 resource,
                 name,
@@ -627,7 +631,6 @@ impl<'a> Planner<'a> {
         kind: DataKind,
         name: &str,
         edits: &[DataEdit],
-        restart_after: bool,
     ) -> Result<(), PlanError> {
         if edits.is_empty() {
             return Err(error(
@@ -769,6 +772,7 @@ impl<'a> Planner<'a> {
             DataKind::Secret => SourceKind::Secret,
         };
         let mut env_readers = BTreeSet::new();
+        let mut reloaded = BTreeSet::new();
         for service in &self.project.services {
             let reference = WorkloadRef {
                 kind: service.workload.kind,
@@ -791,23 +795,35 @@ impl<'a> Planner<'a> {
             if reads_env || mounts {
                 self.impact.insert(reference.clone());
             }
-            if reads_env
-                && !matches!(
-                    service.workload.kind,
-                    WorkloadKind::Job | WorkloadKind::CronJob
-                )
-            {
+            if matches!(
+                service.workload.kind,
+                WorkloadKind::Job | WorkloadKind::CronJob
+            ) {
+                continue;
+            }
+            // Reloader replaces the pods of every workload that follows the object and refers to
+            // it, by environment or by volume; one Zeabur saw is not running restarts nothing.
+            let follows = self.input.reloader != Some(false)
+                && service
+                    .config_reload
+                    .as_ref()
+                    .is_some_and(|r| r.follows(kind == DataKind::Secret, name));
+            if follows && (reads_env || mounts) {
+                reloaded.insert(reference);
+            } else if reads_env {
                 env_readers.insert(reference);
             }
         }
+        if !reloaded.is_empty() {
+            self.warnings.push(Warning::ReloaderRestarts {
+                workloads: reloaded.into_iter().collect(),
+                confirmed: self.input.reloader == Some(true),
+            });
+        }
         if !env_readers.is_empty() {
-            let workloads: Vec<WorkloadRef> = env_readers.iter().cloned().collect();
-            if restart_after {
-                self.restarts.extend(env_readers);
-                self.warnings.push(Warning::RestartAdded { workloads });
-            } else {
-                self.warnings.push(Warning::RestartNeeded { workloads });
-            }
+            self.warnings.push(Warning::RestartNeeded {
+                workloads: env_readers.into_iter().collect(),
+            });
         }
         Ok(())
     }

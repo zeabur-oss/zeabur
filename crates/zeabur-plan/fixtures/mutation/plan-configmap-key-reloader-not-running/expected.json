@@ -1,0 +1,17 @@
+{
+  "warnings": [
+    {
+      "code": "restartNeeded",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "web"
+        },
+        {
+          "kind": "Deployment",
+          "name": "worker"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: example/web:1.0
+          env:
+            - name: MODE
+              valueFrom:
+                configMapKeyRef: {name: settings, key: MODE}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: demo
+  resourceVersion: "42"
+spec:
+  selector:
+    matchLabels: {app: worker}
+  template:
+    metadata:
+      labels: {app: worker}
+    spec:
+      containers:
+        - name: app
+          image: example/worker:1.0
+          envFrom:
+            - configMapRef: {name: settings}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy
+  namespace: demo
+  resourceVersion: "43"
+  annotations:
+    configmap.reloader.stakater.com/reload: "settings"
+spec:
+  selector:
+    matchLabels: {app: proxy}
+  template:
+    metadata:
+      labels: {app: proxy}
+    spec:
+      containers:
+        - name: app
+          image: example/proxy:1.0
+          volumeMounts:
+            - {name: settings, mountPath: /etc/proxy}
+      volumes:
+        - name: settings
+          configMap: {name: settings}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: settings
+  namespace: demo
+  resourceVersion: "7"
+data:
+  MODE: production

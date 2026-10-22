@@ -1,0 +1,35 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "ConfigMap",
+        "name": "settings"
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "reloaderRestarts",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "proxy"
+        },
+        {
+          "kind": "Deployment",
+          "name": "web"
+        }
+      ],
+      "confirmed": true
+    },
+    {
+      "code": "restartNeeded",
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "name": "worker"
+        }
+      ]
+    }
+  ]
+}

@@ -124,8 +124,7 @@ mod tests {
         assert_eq!(
             items[1]["revert"],
             json!({"changes": [{"op": "rollback",
-                "workload": {"kind": "Deployment", "name": "web"}, "revision": 1}],
-                "restartAfter": false})
+                "workload": {"kind": "Deployment", "name": "web"}, "revision": 1}]})
         );
         assert_eq!(items[2]["writer"]["tool"], "zeabur");
         assert_eq!(items[2]["fields"], json!(["spec.template"]));

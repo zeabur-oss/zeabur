@@ -1,0 +1,3 @@
+description: "Turning Reloader on for a workload that already has it is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "configReload", "workload": {"kind": "Deployment", "name": "web"}, "enabled": true}]}}

@@ -1,0 +1,3 @@
+description: "Turning Reloader on adds reloader.stakater.com/auto to the workload's own metadata, not its pod template, so nothing restarts now."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "configReload", "workload": {"kind": "Deployment", "name": "web"}, "enabled": true}]}}

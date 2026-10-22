@@ -120,6 +120,26 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/config-reload:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Whether Stakater Reloader runs in the cluster, so a workload's Reloader annotation takes
+        effect. Always answers: `unknown` when the person may not list Deployments in every
+        namespace.
+      operationId: getConfigReload
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigReloadView"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/events:
     get:
       tags:
@@ -2468,6 +2488,26 @@ components:
             $ref: "#/components/schemas/WorkloadRef"
             description: The workload.
       - type: object
+        description: |-
+          Have Stakater Reloader replace a workload's pods when a ConfigMap or Secret it reads
+          changes, or stop it: the workload's `reloader.stakater.com/auto` annotation (see the
+          `reload` module).
+        required:
+        - workload
+        - enabled
+        - op
+        properties:
+          enabled:
+            type: boolean
+            description: On or off.
+          op:
+            type: string
+            enum:
+            - configReload
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: "The workload: a Deployment, StatefulSet or DaemonSet."
+      - type: object
         description: Run this many pods of a Deployment or StatefulSet.
         required:
         - workload
@@ -2929,6 +2969,64 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The ConfigMap.
+    ConfigReload:
+      type: object
+      description: |-
+        What a workload's Reloader annotations ask for [reloader]: its pods are replaced when one of
+        these ConfigMaps or Secrets changes, whoever changed it, while Reloader runs in the cluster.
+        
+        Reloader also reads `reloader.stakater.com/search` with `reloader.stakater.com/match` on the
+        ConfigMap or Secret, and `reloader.stakater.com/ignore`; those live on the data objects and
+        are not part of this.
+        
+        [reloader]: https://github.com/stakater/Reloader#how-to-use-reloader
+      required:
+      - auto
+      - allConfigMaps
+      - allSecrets
+      - configMaps
+      - secrets
+      properties:
+        allConfigMaps:
+          type: boolean
+          description: "`configmap.reloader.stakater.com/auto: \"true\"`: every ConfigMap it reads."
+        allSecrets:
+          type: boolean
+          description: "`secret.reloader.stakater.com/auto: \"true\"`: every Secret it reads."
+        auto:
+          type: boolean
+          description: |-
+            `reloader.stakater.com/auto: "true"`: every ConfigMap and Secret it reads. This is what
+            Zeabur's setting writes.
+        configMaps:
+          type: array
+          items:
+            type: string
+          description: ConfigMaps named in `configmap.reloader.stakater.com/reload`.
+        secrets:
+          type: array
+          items:
+            type: string
+          description: Secrets named in `secret.reloader.stakater.com/reload`.
+    ConfigReloadView:
+      type: object
+      description: Whether the cluster restarts workloads when their configuration changes.
+      required:
+      - id
+      - reloader
+      - deployments
+      properties:
+        deployments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: Its Deployments, when found.
+        id:
+          type: string
+          description: "`cluster/config-reload`."
+        reloader:
+          $ref: "#/components/schemas/ReloaderState"
+          description: Whether Reloader runs.
     Connection:
       type: object
       description: |-
@@ -5490,11 +5588,6 @@ components:
           items:
             $ref: "#/components/schemas/Change"
           description: The changes, applied in order.
-        restartAfter:
-          type: boolean
-          description: |-
-            Also restart the workloads that read a changed ConfigMap or Secret into environment
-            variables, which a running container only reads when it starts.
     PlanResponse:
       allOf:
       - $ref: "#/components/schemas/Plan"
@@ -5558,15 +5651,23 @@ components:
               $ref: "#/components/schemas/WorkloadRef"
             description: The workloads.
       - type: object
-        description: These workloads are restarted by the plan, because `restartAfter` asked for it.
+        description: |-
+          These workloads read a changed ConfigMap or Secret and ask Stakater Reloader to replace
+          their pods when it changes, so Reloader restarts them after the apply.
         required:
         - workloads
+        - confirmed
         - code
         properties:
           code:
             type: string
             enum:
-            - restartAdded
+            - reloaderRestarts
+          confirmed:
+            type: boolean
+            description: |-
+              Whether Reloader was seen running in the cluster; `false` when that could not be
+              read with the person's rights.
           workloads:
             type: array
             items:
@@ -7068,6 +7169,14 @@ components:
           type: integer
           format: int64
           description: Its number.
+    ReloaderState:
+      type: string
+      description: Whether Reloader runs.
+      enum:
+      - running
+      - stopped
+      - notInstalled
+      - unknown
     Removal:
       type: object
       description: A field the plan removes.
@@ -7633,6 +7742,13 @@ components:
         - endpointNames
         - routeNames
         properties:
+          configReload:
+            oneOf:
+            - $ref: "#/components/schemas/ConfigReload"
+              description: |-
+                Which of its ConfigMaps and Secrets Stakater Reloader restarts it for, from its
+                annotations; absent when they ask for none. Whether Reloader runs is the cluster's.
+            - type: "null"
           containers:
             type: array
             items:

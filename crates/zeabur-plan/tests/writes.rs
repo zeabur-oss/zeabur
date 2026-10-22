@@ -676,10 +676,7 @@ mod tests {
                 objects: &fetched,
                 ..Input::new(&snapshot, NOW)
             },
-            &PlanRequest {
-                changes,
-                restart_after: false,
-            },
+            &PlanRequest { changes },
         )
     }
 

@@ -1,0 +1,3 @@
+description: "A CronJob's runs start with the configuration of their time; Reloader has nothing to restart, so the setting is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "configReload", "workload": {"kind": "CronJob", "name": "report"}, "enabled": true}]}}

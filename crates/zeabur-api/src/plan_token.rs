@@ -111,7 +111,6 @@ mod tests {
             project: "shop".to_owned(),
             request: PlanRequest {
                 changes: Vec::new(),
-                restart_after: false,
             },
             versions: BTreeMap::from([("Deployment/web".to_owned(), "41".to_owned())]),
             made_at: "2026-10-15T00:00:00Z".to_owned(),
@@ -173,7 +172,6 @@ mod tests {
                     value: Some(secret.to_owned()),
                 }],
             }],
-            restart_after: false,
         };
         let key = PlanKey::random().unwrap();
         let token = sign(&key, &with_secret).unwrap();

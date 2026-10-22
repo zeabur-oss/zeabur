@@ -1,0 +1,3 @@
+description: "When Reloader is not running, the annotations restart nothing: every reader of the environment needs a restart, and one that only mounts it is not warned about."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "data", "kind": "ConfigMap", "name": "settings", "changes": [{"op": "set", "key": "MODE", "value": "maintenance"}]}]}, "reloader": false}

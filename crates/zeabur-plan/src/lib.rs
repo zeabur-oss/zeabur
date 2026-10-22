@@ -9,6 +9,7 @@ pub mod json;
 mod plan;
 mod project;
 pub mod releases;
+mod reload;
 pub mod rules;
 mod settings;
 pub mod terminal;

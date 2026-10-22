@@ -1,0 +1,3 @@
+description: "Turning Reloader off removes the annotation, after testing its value; the other annotations stay."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "configReload", "workload": {"kind": "Deployment", "name": "web"}, "enabled": false}]}}

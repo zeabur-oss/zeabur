@@ -16,6 +16,7 @@ mod members;
 mod namespace;
 mod preview;
 mod releases;
+mod reloader;
 mod rollout;
 mod terminal;
 mod timeline;

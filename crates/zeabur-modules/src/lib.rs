@@ -9,6 +9,7 @@ pub mod k8up;
 pub mod metrics_server;
 pub mod network_policy;
 pub mod prometheus_api;
+pub mod reloader;
 pub mod system_upgrade_controller;
 pub mod velero;
 
@@ -112,6 +113,7 @@ pub fn modules() -> Vec<&'static Module> {
         &k8up::MODULE,
         &velero::MODULE,
         &cloudnative_pg::MODULE,
+        &reloader::MODULE,
     ]
 }
 
