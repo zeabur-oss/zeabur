@@ -168,13 +168,13 @@ function ProjectNav({ project }: { project: string }) {
         <SidebarSection title={t("column.label")}>
           {data ? (
             <Services project={project} data={data} />
-          ) : (
+          ) : view.isPending ? (
             <div className="flex flex-col gap-1.5">
               {Array.from({ length: 4 }, (_, i) => (
                 <Skeleton key={i} className="h-8 w-full" />
               ))}
             </div>
-          )}
+          ) : null}
         </SidebarSection>
         <SidebarSection
           title={t("column.advanced")}

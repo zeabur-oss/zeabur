@@ -2,12 +2,21 @@
 import { useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
 
-import type { Schemas } from "@/api/client"
-import { eventsQuery, projectQuery } from "@/api/queries"
+import { toProblem, type Schemas } from "@/api/client"
+import { eventsQuery, projectQuery, whoamiQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
+import { lacksProjectRole } from "@/model/members"
 import type { Event, Project } from "@/model/service"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@zeabur/design-system/components/empty"
+import { Illustration } from "@zeabur/design-system/components/illustration"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 const noEvents: Event[] = []
@@ -35,10 +44,27 @@ export function ProjectData({
   if (!view.data)
     return (
       <PageColumn className="my-6">
-        <Problem error={view.error} />
+        <Unread project={project} error={view.error} />
       </PageColumn>
     )
   return children(view.data, view.data.unreadable)
+}
+
+function Unread({ project, error }: { project: string; error: unknown }) {
+  const t = useT()
+  const whoami = useQuery(whoamiQuery).data
+  if (!lacksProjectRole(toProblem(error), whoami)) return <Problem error={error} />
+  return (
+    <Empty variant="outline">
+      <EmptyHeader>
+        <EmptyMedia>
+          <Illustration kind="forbidden" />
+        </EmptyMedia>
+        <EmptyTitle>{t("project.noRole", project)}</EmptyTitle>
+        <EmptyDescription>{t("project.noRoleBody")}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  )
 }
 
 /** Where the project's pages show a kind the person may not list: the section its objects feed. */

@@ -7,11 +7,13 @@ import LinkSimpleIcon from "~icons/ph/link-simple"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import ShieldWarningIcon from "~icons/ph/shield-warning"
 import TrashIcon from "~icons/ph/trash"
+import UserGearIcon from "~icons/ph/user-gear"
 import UserPlusIcon from "~icons/ph/user-plus"
 import XIcon from "~icons/ph/x"
 
 import { membersQuery, refreshMembers, removeMember, revokeInvitation } from "@/api/members"
 import { Ago } from "@/components/bits"
+import { AccessDialog, useAccessLines } from "@/components/members/access"
 import { LinkedList, PasskeyList } from "@/components/members/credentials"
 import {
   ConfirmDialog,
@@ -25,6 +27,7 @@ import { RefusedSome } from "@/components/refused"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo, formatTime } from "@/lib/format"
 import {
+  canChangeAccess,
   canRemoveMember,
   filterMembers,
   linkState,
@@ -63,6 +66,7 @@ type Open =
   | { kind: "details"; member: Member }
   | { kind: "link"; member: Member; reset: boolean }
   | { kind: "remove"; member: Member }
+  | { kind: "access"; member: Member }
 
 export function MembersPage() {
   const t = useT()
@@ -71,6 +75,7 @@ export function MembersPage() {
   const close = () => setOpen(undefined)
   const data = members.data
   const ready = data ? linkState(data.setupLinks) === "ready" : false
+  const projectRoles = data?.projectRoles ?? false
   const invite = (
     <Button size="sm" disabled={!ready} onClick={() => setOpen({ kind: "invite" })}>
       <UserPlusIcon aria-hidden="true" data-icon="inline-start" />
@@ -109,15 +114,22 @@ export function MembersPage() {
             what={t("members.inviting")}
             denied={t("members.denied")}
           />
-          <MemberList items={members.data.items} onOpen={setOpen} />
+          <MemberList items={members.data.items} projectRoles={projectRoles} onOpen={setOpen} />
           <RefusedSome unreadable={members.data.unreadable} />
           <Pending invitations={members.data.invitations} />
         </>
       )}
       {open?.kind === "invite" ? (
-        <InviteDialog members={data?.items ?? []} onClose={close} />
+        <InviteDialog members={data?.items ?? []} projectRoles={projectRoles} onClose={close} />
       ) : open?.kind === "details" ? (
-        <MemberPanel member={current(open.member)} onOpen={setOpen} onClose={close} />
+        <MemberPanel
+          member={current(open.member)}
+          projectRoles={projectRoles}
+          onOpen={setOpen}
+          onClose={close}
+        />
+      ) : open?.kind === "access" ? (
+        <AccessDialog member={current(open.member)} projectRoles={projectRoles} onClose={close} />
       ) : open?.kind === "link" ? (
         <SetupLinkDialog member={current(open.member)} reset={open.reset} onClose={close} />
       ) : open?.kind === "remove" ? (
@@ -128,7 +140,15 @@ export function MembersPage() {
 }
 
 /** Every member, one line each; a filter above the table once there are many. */
-function MemberList({ items, onOpen }: { items: Member[]; onOpen: (open: Open) => void }) {
+function MemberList({
+  items,
+  projectRoles,
+  onOpen,
+}: {
+  items: Member[]
+  projectRoles: boolean
+  onOpen: (open: Open) => void
+}) {
   const t = useT()
   const [query, setQuery] = useState("")
   const layout = membersLayout(items.length)
@@ -166,7 +186,12 @@ function MemberList({ items, onOpen }: { items: Member[]; onOpen: (open: Open) =
         ) : (
           <ul className="divide-y divide-main">
             {shown.map((member) => (
-              <MemberRow key={member.username} member={member} onOpen={onOpen} />
+              <MemberRow
+                key={member.username}
+                member={member}
+                projectRoles={projectRoles}
+                onOpen={onOpen}
+              />
             ))}
           </ul>
         )}
@@ -190,9 +215,19 @@ function PasskeyCount({ member }: { member: Member }) {
   )
 }
 
-function MemberRow({ member, onOpen }: { member: Member; onOpen: (open: Open) => void }) {
+function MemberRow({
+  member,
+  projectRoles,
+  onOpen,
+}: {
+  member: Member
+  projectRoles: boolean
+  onOpen: (open: Open) => void
+}) {
   const t = useT()
+  const accessLines = useAccessLines()
   const name = memberName(member)
+  const access = member.disabled ? [t("members.disabled")] : accessLines(member)
   return (
     <li className="grid grid-cols-member-phone items-center gap-3 px-4 py-2.5 md:grid-cols-member md:gap-4">
       <button
@@ -218,12 +253,12 @@ function MemberRow({ member, onOpen }: { member: Member; onOpen: (open: Open) =>
           </span>
         </span>
       </button>
-      <span className="text-muted-foreground max-md:hidden">
-        {member.disabled
-          ? t("members.disabled")
-          : member.role === "admin"
-            ? t("members.role.admin")
-            : t("members.role.member")}
+      <span className="flex min-w-0 flex-col text-muted-foreground max-md:hidden">
+        {access.map((line) => (
+          <span key={line} className="truncate" title={line}>
+            {line}
+          </span>
+        ))}
       </span>
       <span className="whitespace-nowrap">
         <PasskeyCount member={member} />
@@ -232,13 +267,21 @@ function MemberRow({ member, onOpen }: { member: Member; onOpen: (open: Open) =>
         {member.lastSignInAt ? <Ago iso={member.lastSignInAt} /> : <span>—</span>}
       </span>
       <span className="flex justify-end">
-        <MemberMenu member={member} onOpen={onOpen} />
+        <MemberMenu member={member} projectRoles={projectRoles} onOpen={onOpen} />
       </span>
     </li>
   )
 }
 
-function MemberMenu({ member, onOpen }: { member: Member; onOpen: (open: Open) => void }) {
+function MemberMenu({
+  member,
+  projectRoles,
+  onOpen,
+}: {
+  member: Member
+  projectRoles: boolean
+  onOpen: (open: Open) => void
+}) {
   const t = useT()
   const name = memberName(member)
   return (
@@ -249,6 +292,12 @@ function MemberMenu({ member, onOpen }: { member: Member; onOpen: (open: Open) =
         <DotsThreeIcon aria-hidden="true" />
       </MenuTrigger>
       <MenuContent align="end">
+        {canChangeAccess(member, projectRoles) ? (
+          <MenuItem onClick={() => onOpen({ kind: "access", member })}>
+            <UserGearIcon aria-hidden="true" />
+            {t("roles.change")}
+          </MenuItem>
+        ) : null}
         <MenuItem onClick={() => onOpen({ kind: "link", member, reset: false })}>
           <LinkSimpleIcon aria-hidden="true" />
           {t("members.newLink")}
@@ -273,14 +322,17 @@ function MemberMenu({ member, onOpen }: { member: Member; onOpen: (open: Open) =
 /** One member: their passkeys and linked accounts, and what can be done about them. */
 function MemberPanel({
   member,
+  projectRoles,
   onOpen,
   onClose,
 }: {
   member: Member
+  projectRoles: boolean
   onOpen: (open: Open) => void
   onClose: () => void
 }) {
   const t = useT()
+  const accessLines = useAccessLines()
   const name = memberName(member)
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -302,15 +354,37 @@ function MemberPanel({
         <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 py-4">
           <dl className="grid grid-cols-pairs gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">{t("account.role")}</dt>
-            <dd>
-              {member.role === "admin" ? t("members.role.admin") : t("members.role.member")}
-              {member.disabled ? `${t("common.sep")}${t("members.disabled")}` : null}
+            <dd className="flex min-w-0 flex-col">
+              {accessLines(member).map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+              {member.disabled ? <span>{t("members.disabled")}</span> : null}
             </dd>
             <dt className="text-muted-foreground">{t("members.column.lastSignIn")}</dt>
             <dd>{member.lastSignInAt ? <Ago iso={member.lastSignInAt} /> : "—"}</dd>
             <dt className="text-muted-foreground">{t("members.sessions")}</dt>
             <dd className="tabular-nums">{member.sessions}</dd>
           </dl>
+          {member.projects && member.projects.length > 0 ? (
+            <section className="flex flex-col gap-3">
+              <h3 className="text-sm font-medium">
+                {t("roles.projectsHeading")}{" "}
+                <span className="font-normal text-muted-foreground tabular-nums">
+                  {member.projects.length}
+                </span>
+              </h3>
+              <ul className="max-h-64 divide-y divide-main overflow-y-auto rounded-lg border border-main text-sm">
+                {member.projects.map((grant) => (
+                  <li key={grant.project} className="flex items-center gap-3 px-3 py-2">
+                    <span className="min-w-0 flex-1 truncate font-mono" translate="no">
+                      {grant.project}
+                    </span>
+                    <span className="text-muted-foreground">{t(`roles.${grant.role}`)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           <section className="flex flex-col gap-3">
             <h3 className="text-sm font-medium">{t("account.passkeys")}</h3>
             {needsBackup(member) && member.you ? (
@@ -324,6 +398,12 @@ function MemberPanel({
           </section>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t px-5 py-3">
+          {canChangeAccess(member, projectRoles) ? (
+            <Button size="sm" variant="outline" onClick={() => onOpen({ kind: "access", member })}>
+              <UserGearIcon aria-hidden="true" data-icon="inline-start" />
+              {t("roles.change")}
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="outline"

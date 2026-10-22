@@ -69,6 +69,13 @@ export async function removeCredential(username: string, id: string): Promise<vo
   )
 }
 
+export async function setMemberAccess(
+  username: string,
+  body: Schemas["AccessRequest"],
+): Promise<void> {
+  done(await api.PUT("/api/v1/members/{username}/access", { params: { path: { username } }, body }))
+}
+
 export async function removeMember(username: string): Promise<void> {
   done(await api.DELETE("/api/v1/members/{username}", { params: { path: { username } } }))
 }

@@ -307,10 +307,31 @@ export interface paths {
     put?: never
     post?: never
     /**
-     * Removes a member: their links, passkeys, linked accounts and sessions, then the member.
-     *     Projects and everything in the cluster stay; RBAC bindings that name them stay too.
+     * Removes a member: the role bindings Zeabur made for them, their links, passkeys, linked
+     *     accounts and sessions, then the member. Projects and everything in them stay, and so do RBAC
+     *     bindings made outside Zeabur.
      */
     delete: operations["removeMember"]
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/members/{username}/access": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    /**
+     * Changes what a member may do: admin rights, or roles in chosen projects (a project left out
+     *     loses theirs). Nobody takes their own admin rights away.
+     */
+    put: operations["setMemberAccess"]
+    post?: never
+    delete?: never
     options?: never
     head?: never
     patch?: never
@@ -1093,6 +1114,13 @@ export interface components {
      * @enum {string}
      */
     AccessMode: "ReadWriteOnce" | "ReadWriteOncePod" | "ReadWriteMany" | "ReadOnlyMany"
+    /** @description What a member may do: admin rights, or roles in chosen projects. */
+    AccessRequest: {
+      /** @description May take on admin rights, which cover every project. */
+      admin: boolean
+      /** @description Roles in projects; empty for an admin. A project left out loses the member's role there. */
+      projects?: components["schemas"]["ProjectGrant"][]
+    }
     /**
      * @description Whether the person is a Zeabur Identity user Zeabur can show.
      * @enum {string}
@@ -2354,6 +2382,8 @@ export interface components {
       admin?: boolean
       /** @description Name shown in the interface, for a new member. */
       displayName?: string | null
+      /** @description A new member's roles in projects, when they are not an admin. */
+      projects?: components["schemas"]["ProjectGrant"][]
       /**
        * @description Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. An existing
        *     member gets a link that adds a passkey; their name and role stay.
@@ -2471,6 +2501,11 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description Passkeys, oldest first. */
       passkeys: components["schemas"]["PasskeyView"][]
+      /**
+       * @description A member's roles in projects, by project; `None` when Zeabur could not read them. An
+       *     admin's are left out: their rights cover every project.
+       */
+      projects?: components["schemas"]["ProjectGrant"][] | null
       /** @description Admin or member. */
       role: components["schemas"]["MemberRole"]
       /** @description Signed-in sessions (grants) that can still renew. */
@@ -2492,9 +2527,17 @@ export interface components {
       invitations: components["schemas"]["InvitationView"][]
       /** @description Members, by user name. */
       items: components["schemas"]["MemberView"][]
+      /**
+       * @description Whether members can be given Developer or Viewer in chosen projects (the chart's member
+       *     roles are installed).
+       */
+      projectRoles: boolean
       /** @description Whether setup links can be made and redeemed. */
       setupLinks: components["schemas"]["SetupLinks"]
-      /** @description Kinds the person may not read (invitations, grants), whose parts are left out. */
+      /**
+       * @description Kinds the person may not read (invitations, grants, role bindings), whose parts are left
+       *     out.
+       */
       unreadable: components["schemas"]["UnreadableView"][]
     }
     /**
@@ -3514,6 +3557,13 @@ export interface components {
     ProjectExtensions: {
       networkPolicy?: components["schemas"]["NetworkPolicyReachability"] | null
     }
+    /** @description A member's role in a project. */
+    ProjectGrant: {
+      /** @description The project (its namespace). */
+      project: string
+      /** @description The role there. */
+      role: components["schemas"]["ProjectRole"]
+    }
     /**
      * @description How many of a project's services are in each state, for lists that show a project's health
      *     without its whole document.
@@ -3570,6 +3620,11 @@ export interface components {
       /** @description Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
       system: boolean
     }
+    /**
+     * @description What a member may do in one project.
+     * @enum {string}
+     */
+    ProjectRole: "developer" | "viewer"
     /** @description A project in the list. */
     ProjectSummary: components["schemas"]["ProjectDetails"] & {
       /**
@@ -5171,6 +5226,62 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  setMemberAccess: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The member's user name */
+        username: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AccessRequest"]
+      }
+    }
+    responses: {
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
       }
       403: {
         headers: {
