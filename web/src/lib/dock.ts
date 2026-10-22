@@ -16,6 +16,8 @@ export type DockTab =
       asked: number
       /** The tools pod the last ask named. */
       pod?: string
+      /** Typed into the shell once it opens, for the person to read and run with Enter. */
+      command?: string
     }
   | {
       id: string
@@ -90,10 +92,11 @@ export function openShell(project: string, service: ServiceRef, pod?: string) {
 }
 
 /** Opens the project's kubectl terminal, or shows it. An ask attaches to the tools pod named, or a
- * running one, or plans one; without, the tab lists the person's tools pods. */
+ * running one, or plans one; without, the tab lists the person's tools pods. A `command` is typed
+ * in once the shell opens, and not run. */
 export function openKubectl(
   project: string,
-  { ask = true, pod }: { ask?: boolean; pod?: string } = {},
+  { ask = true, pod, command }: { ask?: boolean; pod?: string; command?: string } = {},
 ) {
   const state = dock.get()
   const id = `kubectl:${project}`
@@ -101,11 +104,21 @@ export function openKubectl(
   const tabs = found
     ? state.tabs.map((tab) =>
         tab.id === id && tab.kind === "kubectl" && ask
-          ? { ...tab, asked: tab.asked + 1, pod }
+          ? { ...tab, asked: tab.asked + 1, pod, command: command ?? tab.command }
           : tab,
       )
-    : [...state.tabs, { id, kind: "kubectl" as const, project, asked: ask ? 1 : 0, pod }]
+    : [...state.tabs, { id, kind: "kubectl" as const, project, asked: ask ? 1 : 0, pod, command }]
   dock.set({ tabs, active: id, open: true, focus: state.focus + 1 })
+}
+
+/** Its command is in the shell now. */
+export function commandTyped(id: string) {
+  const state = dock.get()
+  update({
+    tabs: state.tabs.map((tab) =>
+      tab.id === id && tab.kind === "kubectl" ? { ...tab, command: undefined } : tab,
+    ),
+  })
 }
 
 export function updateShell(id: string, patch: { pod?: string; container?: string }) {

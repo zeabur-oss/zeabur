@@ -179,10 +179,6 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void
   label: string
 }) {
-  const index = Math.max(
-    0,
-    options.findIndex((option) => option.value === value),
-  )
   return (
     <ToggleGroup
       aria-label={label}
@@ -194,23 +190,10 @@ export function Segmented<T extends string>({
       }}
       variant="segmented"
       spacing={0}
-      className="relative grid shrink-0 auto-cols-fr grid-flow-col"
+      className="shrink-0"
     >
-      <span
-        aria-hidden="true"
-        className="slide absolute inset-y-0.5 left-0.5 w-(--thumb) translate-x-(--slide-x) rounded-md bg-card shadow-xs ring ring-foreground/8 dark:bg-foreground/12"
-        style={{
-          "--thumb": `calc((100% - 0.25rem) / ${options.length})`,
-          "--slide-x": `${index * 100}%`,
-        }}
-      />
       {options.map((option) => (
-        <ToggleGroupItem
-          key={option.value}
-          value={option.value}
-          size="sm"
-          className="relative h-6.5"
-        >
+        <ToggleGroupItem key={option.value} value={option.value} size="sm" className="h-6.5">
           {option.label}
         </ToggleGroupItem>
       ))}

@@ -234,6 +234,45 @@ test("the kubectl terminal opens through a review the first time and reuses its 
   await expect(page.getByRole("dialog")).toHaveCount(0)
 })
 
+test("a command on a page opens in the kubectl terminal, typed in and not run", async ({
+  page,
+}) => {
+  // crasher has no Service, so its Networking tab shows the command that adds one.
+  await page.goto(`${project}/services/Deployment/${failing}?tab=networking`)
+  const panel = page.getByRole("tabpanel", { name: "Networking" })
+  const command = `kubectl -n ${namespace} expose deployment ${failing}`
+  await expect(panel.getByText(command, { exact: true })).toBeVisible()
+  const open = panel.getByRole("button", { name: "Open in kubectl terminal" })
+  if (!(await toolsAvailable(page))) {
+    await expect(panel.getByRole("button", { name: "Copy" })).toBeVisible()
+    await expect(open).toHaveCount(0)
+    return
+  }
+
+  await open.click()
+  await expect(dock(page).getByRole("tab", { name: `kubectl ${namespace}` })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  )
+  const dialog = page.getByRole("dialog", { name: "Open kubectl terminal" })
+  const reused = await dialog
+    .waitFor({ timeout: 5_000 })
+    .then(() => false)
+    .catch(() => true)
+  if (!reused) await dialog.getByRole("button", { name: "Open kubectl terminal" }).click()
+  await expect(connected(page)).toBeVisible({ timeout: 60_000 })
+  await expect(screen(page)).toContainText(command, { timeout: 10_000 })
+  // Typed, not run: kubectl has said nothing.
+  await page.waitForTimeout(1_500)
+  await expect(screen(page)).not.toContainText(/exposed|couldn't find port|error:/i)
+
+  // The keyboard is in the terminal, after the command: Enter runs what was typed. A dry run, so
+  // the cluster keeps no Service.
+  await expect.poll(() => inTerminal(page)).toBe(true)
+  await page.keyboard.type(" --dry-run=client\n")
+  await expect(screen(page)).toContainText(/exposed \(dry run\)|couldn't find port/)
+})
+
 test("on a phone the dock is a sheet over the whole screen", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await openShell(page)

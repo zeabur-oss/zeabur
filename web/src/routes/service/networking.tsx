@@ -15,6 +15,7 @@ import TrashIcon from "~icons/ph/trash"
 import { ReviewWord, useDraft } from "@/components/plan/draft"
 import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
+import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { usePlanner } from "@/components/plan/planner"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { FilterField } from "@/components/filter-field"
@@ -145,7 +146,7 @@ export function NetworkingTab({
             <EmptyDescription>
               {scheduled ? t("net.scheduledBody") : t("net.noneBody")}
             </EmptyDescription>
-            {scheduled ? null : <ExposeHint command={expose} />}
+            {scheduled ? null : <ExposeHint project={project} command={expose} />}
           </EmptyHeader>
         </Empty>
       ) : (
@@ -431,7 +432,7 @@ export function NetworkingTab({
                   <EmptyHeader>
                     <EmptyTitle>{t("net.privateEmpty", service.name)}</EmptyTitle>
                     <EmptyDescription>{t("net.privateEmptyBody")}</EmptyDescription>
-                    <ExposeHint command={expose} />
+                    <ExposeHint project={project} command={expose} />
                   </EmptyHeader>
                 </Empty>
               )
@@ -529,18 +530,21 @@ function portNumber(endpoints: Endpoint[], route: PublicRoute): string {
   return named ? String(named.port) : port
 }
 
-function ExposeHint({ command }: { command?: string }) {
+function ExposeHint({ project, command }: { project: string; command?: string }) {
   const t = useT()
   if (!command) return null
   return (
     <div className="mt-2 flex w-full flex-col gap-1.5">
       <span className="type-meta text-muted-foreground">{t("net.exposeHint")}</span>
-      <span className="flex max-w-full min-w-0 items-center gap-1 self-start rounded-md bg-muted px-2 py-1">
-        <code className="min-w-0 font-mono text-xs break-all" translate="no">
-          {command}
-        </code>
-        <CopyButton value={command} />
-      </span>
+      <div className="flex max-w-full min-w-0 flex-wrap items-center gap-1 self-start">
+        <span className="flex max-w-full min-w-0 items-center gap-1 rounded-md bg-muted px-2 py-1">
+          <code className="min-w-0 font-mono text-xs break-all" translate="no">
+            {command}
+          </code>
+          <CopyButton value={command} />
+        </span>
+        <OpenInTerminal project={project} command={command} className="ml-auto" />
+      </div>
     </div>
   )
 }
