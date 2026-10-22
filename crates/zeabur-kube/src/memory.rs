@@ -123,6 +123,11 @@ pub struct State {
     /// here answers `503`, as kube-apiserver does when it cannot reach the kubelet. Refused with
     /// `403` when `forbidden_resources` holds `nodes/proxy`.
     pub kubelet_summaries: BTreeMap<String, Value>,
+    /// What a `SelfSubjectRulesReview` answers in a namespace, instead of rules that follow the
+    /// refusals above; `None`: the review fails with `500`.
+    pub access_rules: BTreeMap<String, Option<AccessRules>>,
+    /// Every cluster-wide `SelfSubjectAccessReview` (one without a namespace) answers no.
+    pub cluster_wide_denied: bool,
 }
 
 /// A command [`Cluster::run`] ran.
@@ -890,6 +895,15 @@ impl Cluster for MemoryCluster {
             // A Namespace whose writes are refused leaves the person reading everything in it.
             let (refused, read_only) = {
                 let state = self.lock()?;
+                if let Some(rules) = state.access_rules.get(namespace) {
+                    return rules.clone().ok_or_else(|| {
+                        ClusterError::Status(KubernetesStatus::new(
+                            500,
+                            "InternalError",
+                            "the review failed",
+                        ))
+                    });
+                }
                 (
                     state.forbid_everything || state.forbidden_namespaces.contains(namespace),
                     state
@@ -1094,9 +1108,9 @@ impl Cluster for MemoryCluster {
 
     // ── Reads for releases, storage and YAML edits ───────────────────────────────────────────
 
-    /// Allowed unless every call is refused, the namespace is, or the request names an object
-    /// whose writes are refused ([`State::forbidden_writes`]); admission refusals are allowed,
-    /// as on a cluster.
+    /// Allowed unless every call is refused, the namespace is, the request is cluster-wide and
+    /// [`State::cluster_wide_denied`], or it names an object whose writes are refused
+    /// ([`State::forbidden_writes`]); admission refusals are allowed, as on a cluster.
     fn review_access<'a>(&'a self, request: &'a Denied) -> Answer<'a, bool> {
         Box::pin(async move {
             let state = self.lock()?;
@@ -1108,6 +1122,7 @@ impl Cluster for MemoryCluster {
                 })
             });
             Ok(!(state.forbid_everything
+                || (namespace.is_none() && state.cluster_wide_denied)
                 || namespace.is_some_and(|n| state.forbidden_namespaces.contains(n))
                 || refused_object))
         })

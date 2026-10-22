@@ -131,6 +131,17 @@ impl BaseUrl {
     }
 }
 
+/// Checks `text` as the URL of a page people open: as [`BaseUrl::parse`], but a query or a
+/// fragment may follow the path. The text is kept as it is.
+///
+/// # Errors
+///
+/// When the part before the query or fragment is not a [`BaseUrl`].
+pub fn page_url(text: &str) -> Result<String, UrlError> {
+    let base = text.split(['?', '#']).next().unwrap_or_default();
+    BaseUrl::parse(base).map(|_| text.to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,5 +204,16 @@ mod tests {
             BaseUrl::parse_root("https://example.com/zeabur"),
             Err(UrlError::Path(_))
         ));
+    }
+
+    #[test]
+    fn a_page_url_may_have_a_query_and_is_kept_as_it_is() {
+        assert_eq!(
+            page_url("https://id.example.com/account/?tab=passkeys#list").unwrap(),
+            "https://id.example.com/account/?tab=passkeys#list"
+        );
+        assert!(page_url("http://id.example.com/account").is_err());
+        assert!(page_url("https://ada@id.example.com/account").is_err());
+        assert!(page_url("/account").is_err());
     }
 }
