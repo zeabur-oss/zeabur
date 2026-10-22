@@ -49,7 +49,16 @@ for values in "$chart"/ci/*-values.yaml; do
   expect "$name" "$out" "[$roles | select(.apiGroups[] == \"rbac.authorization.k8s.io\")] | length" 0
   expect "$name" "$out" "[$roles | select(.resources[] == \"nodes/proxy\")] | length" 0
   expect "$name" "$out" "[$roles | .verbs[] | select(. == \"escalate\" or . == \"bind\" or . == \"impersonate\")] | length" 0
-  expect "$name" "$out" "[$roles | select(.resources[] == \"namespaces\") | .verbs[] | select(. != \"get\" and . != \"list\")] | length" 0
+  # The one namespace write is the Developer's patch of their project's Namespace, which the
+  # admission policy keeps to its details.
+  expect "$name" "$out" \
+    "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .rules[] | select(.resources[] == \"namespaces\") | .verbs[] | select(. != \"get\" and . != \"list\") | \$n + \" \" + .] | join(\",\")" \
+    "zeabur-project-developer patch"
+  vap='select(.kind == "ValidatingAdmissionPolicy")'
+  expect "$name" "$out" "$vap | [.metadata.name, .spec.failurePolicy, (.spec.matchConstraints.resourceRules[] | .resources + .operations | join(\"/\"))] | join(\",\")" \
+    "zeabur-project-namespace,Fail,namespaces/UPDATE"
+  expect "$name" "$out" 'select(.kind == "ValidatingAdmissionPolicyBinding") | [.spec.policyName, (.spec.validationActions | join("/"))] | join(",")' \
+    "zeabur-project-namespace,Deny"
   # Secret values and shells in containers belong to developers only.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole") | select(.rules | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \
@@ -114,7 +123,7 @@ expect "everyoneReads=false" "$(render -f "$chart/ci/minimal-values.yaml" --set 
 
 # Without the member roles there is no ClusterRole, and Zeabur offers only admin or no rights.
 out=$(render -f "$chart/ci/minimal-values.yaml" --set memberRoles.enabled=false)
-expect "memberRoles=false" "$out" '[select(.kind == "ClusterRole")] | length' 0
+expect "memberRoles=false" "$out" '[select(.kind == "ClusterRole" or .kind == "ValidatingAdmissionPolicy" or .kind == "ValidatingAdmissionPolicyBinding")] | length' 0
 expect "memberRoles=false" "$out" \
   'select(.kind == "Deployment") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_MEMBER_ROLES") | .value' false
 

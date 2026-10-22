@@ -51,6 +51,30 @@ async function invite(page: Page, username: string, projects: Grant[]): Promise<
   return link.url
 }
 
+/** A plan's token, or a problem. */
+type Answer = { token?: string; kind?: string; why?: { params?: Record<string, string> } }
+
+/** Plans `changes` in `project` and applies the plan, with Zeabur's API from the page. */
+async function planAndApply(page: Page, project: string, changes: unknown[]) {
+  return page.evaluate(
+    async ({ project, changes }) => {
+      const post = async (path: string, body: unknown) => {
+        const response = await fetch(`/api/v1/projects/${encodeURIComponent(project)}/${path}`, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json", "zeabur-request": "1" },
+          body: JSON.stringify(body),
+        })
+        return { status: response.status, body: (await response.json()) as Answer }
+      }
+      const plan = await post("plan", { changes })
+      if (plan.status !== 200) return { stage: "plan", ...plan }
+      return { stage: "apply", ...(await post("apply", { token: plan.body.token })) }
+    },
+    { project, changes },
+  )
+}
+
 /** A browser of the member's own: enrols from `link`, signs in, and checks who they are. */
 async function member(browser: Browser, link: string, username: string) {
   const context = await browser.newContext({ baseURL: zeabur, locale: "en-US" })
@@ -77,6 +101,7 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
   const device = await authenticator(page)
   let developerLink = ""
   let viewerLink = ""
+  let developer: Page
 
   await test.step("the admin signs in and takes on admin rights", async () => {
     await enrol(page, adminLink)
@@ -105,7 +130,7 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
   })
 
   await test.step("the Developer sees both projects' names and restarts a service in theirs", async () => {
-    const developer = await member(browser, developerLink, "e2e-developer")
+    developer = await member(browser, developerLink, "e2e-developer")
     await developer.goto("/projects")
     const main = developer.getByRole("main")
     await expect(main.getByText(first, { exact: true }).first()).toBeVisible({ timeout: 30_000 })
@@ -131,6 +156,38 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
     await expect(
       developer.getByText("An admin can give you a role in it on the Members page."),
     ).toBeVisible()
+  })
+
+  await test.step("the Developer names their project, but cannot change its labels", async () => {
+    const name = `Shop ${Date.now()}`
+    await developer.goto(`/projects/${encodeURIComponent(first)}/settings`)
+    await developer.getByRole("textbox", { name: "Project name" }).fill(name)
+    await developer.getByRole("button", { name: "Save details" }).click()
+    const dialog = developer.getByRole("dialog", { name: `${first} details` })
+    await dialog.getByRole("button", { name: "Save details", exact: true }).click()
+    await expect(
+      developer
+        .getByRole("region", { name: /^Notifications/ })
+        .getByRole("listitem")
+        .filter({ hasText: "Applied" })
+        .first(),
+    ).toBeVisible({ timeout: 30_000 })
+    const namespace = (await (
+      await developer.request.get(`/api/v1/projects/${encodeURIComponent(first)}/namespace`)
+    ).json()) as { displayName?: string; canChange: string; canAdopt: string }
+    expect(namespace).toMatchObject({ displayName: name, canChange: "allowed", canAdopt: "denied" })
+
+    await developer.getByRole("button", { name: "Remove", exact: true }).click()
+    const help = developer.getByRole("dialog", { name: `You can't change ${first}` })
+    await expect(help).toContainText("zeabur-manage")
+    await help.getByRole("button", { name: "Close" }).click()
+
+    // Past the interface, the cluster's admission policy refuses the label change itself.
+    const refused = await planAndApply(developer, first, [{ op: "unadopt" }])
+    expect(refused.stage, JSON.stringify(refused.body)).toBe("apply")
+    expect(refused.status).toBe(403)
+    expect(refused.body.kind).toBe("policy-denied")
+    expect(refused.body.why?.params?.policy).toBe("zeabur-project-namespace")
     await developer.context().close()
   })
 

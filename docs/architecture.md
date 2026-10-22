@@ -11,7 +11,11 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
   Member roles are RBAC too: the chart installs three ClusterRoles (`zeabur-member`,
   `zeabur-project-developer`, `zeabur-project-viewer`), and an admin giving a member a role makes
   RoleBindings to them in that project's namespace, as the admin (`members/access.rs`;
-  [install.md](install.md#members-rights)).
+  [install.md](install.md#members-rights)). A Developer may patch their project's Namespace; the
+  chart's ValidatingAdmissionPolicy keeps that patch to the project's details, since labels decide
+  Pod Security admission and NetworkPolicy namespace selectors, and adopting is a label, left to
+  whoever may `zeabur-manage` the namespace. Every member can list namespaces and so read their
+  annotations: details hold no secrets.
 - **Kubernetes objects are the only state.** No database, no cache of Secret values, and no
   custom resources for layers L0 to L2. A project is a namespace; adopting one only adds a label.
   Removing Zeabur leaves the cluster as it was, but for the member bindings admins made, which

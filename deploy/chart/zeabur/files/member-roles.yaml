@@ -131,3 +131,8 @@ zeabur-project-developer:
   - apiGroups: [metrics.k8s.io]
     resources: [pods]
     verbs: [get, list]
+  # The project's own Namespace, through the RoleBinding. templates/namespace-policy.yaml lets
+  # this change only the project's details: name, description and icon.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, patch]

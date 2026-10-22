@@ -807,6 +807,10 @@ export const zhTW: Messages = {
   "access.title": (ns) => `無法變更 ${ns}`,
   "access.you": "<你的使用者名稱>",
   "access.ask": (ns) => `向叢集管理員申請 Namespace ${ns} 的 patch 權限。`,
+  "access.askManage": (ns) =>
+    `向叢集管理員申請 Namespace ${ns} 的 patch 與 zeabur-manage 權限。少了 zeabur-manage，patch 只能變更專案的名稱、描述和圖示，這是 Zeabur 准入政策的限制。`,
+  "access.detailsOnly":
+    "有了這個權限，可以變更專案的名稱、描述和圖示；Namespace 的標籤受 Zeabur 准入政策保護，不會變。",
   "access.alsoLabels":
     "這個權限也能變更 Namespace 的其他標籤，包括 Pod 安全等級（pod-security.kubernetes.io/*）。Kubernetes 無法只限定一個標籤。",
   "access.role": "用 resourceNames 限定在這個 Namespace 的 ClusterRole：",

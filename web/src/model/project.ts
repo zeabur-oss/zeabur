@@ -47,6 +47,12 @@ export function otherNamespaces(
 export const mayChange = (namespace: Pick<Schemas["ProjectNamespace"], "canChange">) =>
   namespace.canChange !== "denied"
 
+export const mayAdopt = (namespace: Pick<Schemas["ProjectNamespace"], "canAdopt">) =>
+  namespace.canAdopt !== "denied"
+
+/** zeabur-kernel `MANAGE_VERB`: what the chart's admission policy asks for before a label change. */
+export const MANAGE_VERB = "zeabur-manage"
+
 export const namespaceOps = new Set<Schemas["Change"]["op"]>(["adopt", "unadopt", "details"])
 
 export function kubectlLabel(namespace: string): { adopt: string; unadopt: string } {
@@ -57,8 +63,9 @@ export function kubectlLabel(namespace: string): { adopt: string; unadopt: strin
 }
 
 /** RBAC cannot narrow a patch to some labels, so this also covers the namespace's other labels
- * (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources). */
-export function patchRole(namespace: string, user: string): string {
+ * (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources), unless
+ * the chart's admission policy guards them; `manage` lets it past the policy. */
+export function patchRole(namespace: string, user: string, manage: boolean): string {
   return roleYaml({
     name: `zeabur-project-${namespace}`,
     rules: [
@@ -66,7 +73,7 @@ export function patchRole(namespace: string, user: string): string {
         apiGroup: "",
         resources: ["namespaces"],
         resourceNames: [namespace],
-        verbs: ["get", "patch"],
+        verbs: manage ? ["get", "patch", MANAGE_VERB] : ["get", "patch"],
       },
     ],
     username: user,

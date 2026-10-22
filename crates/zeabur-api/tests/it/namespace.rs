@@ -7,11 +7,14 @@ mod tests {
     use axum::Router;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
+    use zeabur_api::Settings;
+    use zeabur_api::settings::IdentitySettings;
+    use zeabur_core::problem::KubernetesStatus;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Identity, WriteBody};
+    use zeabur_kube::{AccessRule, AccessRules, Identity, WriteBody};
 
-    use crate::common::{app, plan_and_apply, send};
+    use crate::common::{app, app_with, plan_and_apply, send};
 
     fn namespace(name: &str, labels: &Value) -> Namespace {
         serde_json::from_value(json!({"apiVersion": "v1", "kind": "Namespace",
@@ -140,6 +143,100 @@ mod tests {
         assert_eq!(
             problem["denied"],
             json!({"verb": "patch", "group": "", "resource": "namespaces", "name": "shop"})
+        );
+        assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
+    }
+
+    /// What `zeabur-project-developer` holds on the Namespace through its RoleBinding.
+    fn developer_rules() -> AccessRules {
+        AccessRules {
+            rules: vec![AccessRule {
+                verbs: vec!["get".to_owned(), "patch".to_owned()],
+                groups: vec![String::new()],
+                resources: vec!["namespaces".to_owned()],
+                names: Vec::new(),
+            }],
+            incomplete: false,
+        }
+    }
+
+    fn with_roles(project_roles: bool) -> Settings {
+        Settings {
+            identity: IdentitySettings {
+                project_roles,
+                ..IdentitySettings::default()
+            },
+            ..Settings::default()
+        }
+    }
+
+    /// With the member roles, a Developer changes the details but adopting needs
+    /// `zeabur-manage`; without them nothing guards the labels, so `patch` is enough.
+    #[tokio::test]
+    async fn adopting_needs_the_manage_verb_only_where_the_policy_guards_the_labels() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.access_rules
+                .insert("shop".to_owned(), Some(developer_rules()));
+        });
+        let uri = "/api/v1/projects/shop/namespace";
+        let (status, guarded) = send(&app_with(&cluster, with_roles(true)), "GET", uri, None).await;
+        assert_eq!(status, StatusCode::OK, "{guarded}");
+        assert_eq!(
+            (
+                &guarded["canChange"],
+                &guarded["canAdopt"],
+                &guarded["labelsGuarded"]
+            ),
+            (&json!("allowed"), &json!("denied"), &json!(true))
+        );
+        let (_, open) = send(&app_with(&cluster, with_roles(false)), "GET", uri, None).await;
+        assert_eq!(
+            (
+                &open["canChange"],
+                &open["canAdopt"],
+                &open["labelsGuarded"]
+            ),
+            (&json!("allowed"), &json!("allowed"), &json!(false))
+        );
+
+        cluster.update(|s| {
+            let mut manager = developer_rules();
+            manager.rules[0].verbs.push("zeabur-manage".to_owned());
+            s.access_rules.insert("shop".to_owned(), Some(manager));
+        });
+        let (_, manager) = send(&app_with(&cluster, with_roles(true)), "GET", uri, None).await;
+        assert_eq!(manager["canAdopt"], "allowed");
+    }
+
+    /// The chart's admission policy refuses a Developer's label change with `403`; the answer
+    /// quotes it as `policy-denied`, not as missing rights.
+    #[tokio::test]
+    async fn the_policys_refusal_of_a_label_change_is_quoted() {
+        let cluster = cluster();
+        let words = "Only an admin can change the namespace's labels.";
+        cluster.update(|s| {
+            s.admission_refusals.insert(
+                "Namespace/shop".to_owned(),
+                KubernetesStatus::new(
+                    403,
+                    "Forbidden",
+                    format!(
+                        "namespaces \"shop\" is forbidden: ValidatingAdmissionPolicy \
+                         'zeabur-project-namespace' with binding 'zeabur-project-namespace' \
+                         denied request: {words}"
+                    ),
+                ),
+            );
+        });
+        let app = app_with(&cluster, with_roles(true));
+        let (status, problem) = plan_and_apply(&app, "shop", json!([{"op": "adopt"}])).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["kind"], "policy-denied");
+        assert_eq!(
+            problem["why"],
+            json!({"key": "problem.why.policy-denied",
+                   "params": {"policy": "zeabur-project-namespace", "message": words}})
         );
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
     }

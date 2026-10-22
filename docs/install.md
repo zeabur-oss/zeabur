@@ -7,7 +7,8 @@ ClusterRole and no token of its own. What someone can see and change in Zeabur i
 their Kubernetes RBAC allows. The chart's one Role lets everyone signed in read Zeabur's settings
 (`get` on the ConfigMap `zeabur-settings`); turn it off with `metricsStore.everyoneReads=false`.
 Its three ClusterRoles are the member roles, which admins give per project
-([Members' rights](#members-rights)); the chart binds them to nobody.
+([Members' rights](#members-rights)); the chart binds them to nobody. Its admission policy keeps
+a Developer's change of their project's Namespace to the project's details.
 
 This guide installs a release of Zeabur with its Helm chart (source in `deploy/chart/zeabur`).
 The examples use these names; replace them with yours:
@@ -20,6 +21,8 @@ The examples use these names; replace them with yours:
 
 ## What you need
 
+- Kubernetes 1.30 or later, for the member roles' admission policy (`ValidatingAdmissionPolicy`
+  is GA from 1.30). With `memberRoles.enabled=false` the chart installs none.
 - A cluster whose kube-apiserver trusts Zeabur Identity's tokens, with Zeabur Identity's sign-in page published
   over HTTPS: Zeabur Identity's [Get started](https://github.com/zeabur/identity/blob/main/docs/get-started.md)
   sets this up on k3s. Run `zeabur-identityctl` and `kubectl` below with the cluster admin's kubeconfig.
@@ -189,19 +192,28 @@ projects:
 | Role | Where | Can | Cannot |
 |---|---|---|---|
 | Admin | The cluster | What Zeabur Identity's `admins` group may do, with admin rights when asked for | — |
-| Developer | Chosen projects | Deploy, change variables, restart, read logs, open terminals, read Secret values | Other projects, nodes, members |
+| Developer | Chosen projects | Deploy, change variables, restart, read logs, open terminals, read Secret values, change the project's name, description and icon | Other projects, nodes, members, adopting or removing projects |
 | Viewer | Chosen projects | See status, logs and events | Change anything, open a terminal, read Secret values |
 
 Every member may also list nodes and namespaces, so the interface can show node names and every
-project's name; a project without a role says an admin can give one.
+project's name and details; a project without a role says an admin can give one. Listing
+namespaces returns their annotations too, so keep secrets out of a project's description.
+
+A Developer may `patch` their project's Namespace, and RBAC cannot narrow that to some fields.
+The chart's ValidatingAdmissionPolicy `zeabur-project-namespace` keeps such a patch to the three
+detail annotations (`zeabur.com/display-name`, `zeabur.com/description`, `zeabur.com/icon`):
+labels decide Pod Security admission and which NetworkPolicies of other projects select the
+namespace, and adopting is a label. The policy skips whoever may `zeabur-manage` the Namespace
+(a custom verb that `cluster-admin`'s `*` covers) or patch every namespace, so admins and
+controllers work as before. It needs Kubernetes 1.30 or later.
 
 Developer and Viewer are the ClusterRoles `zeabur-project-developer` and `zeabur-project-viewer`
 (rules in `deploy/chart/zeabur/files/member-roles.yaml`). Giving a role makes a RoleBinding
 `zeabur-member-<user>` to user `zeabur:<user>` in the project's namespace, labelled
 `zeabur.com/member: <user>`, as the admin. Changing a role replaces it, and removing a member
 removes their bindings first. Each rule names its verbs and resources, without `*`. Neither role
-has RBAC objects, namespace changes, `nodes/proxy`, or `escalate`, `bind` and `impersonate`, so
-no member can widen their own rights
+has RBAC objects, namespace creation or deletion, `nodes/proxy`, or `escalate`, `bind` and
+`impersonate`, so no member can widen their own rights
 ([RBAC good practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks)).
 
 Compared with Kubernetes' built-in roles, Viewer reads what `view` reads that Zeabur shows, and
@@ -229,8 +241,8 @@ Upgrading from a release without roles means inviting members again: Zeabur does
 members made before roles. Remove each of them on the Members page and invite them anew; inviting
 someone who is still a member only gives them a setup link.
 
-`memberRoles.enabled=false` installs no ClusterRole; Zeabur then offers only Admin or nothing,
-and RBAC you write yourself decides the rest. The ClusterRole names are fixed: install one Zeabur
+`memberRoles.enabled=false` installs no ClusterRole and no admission policy; Zeabur then offers
+only Admin or nothing, and RBAC you write yourself decides the rest. The ClusterRole names are fixed: install one Zeabur
 per cluster.
 
 ## Check what Zeabur may do

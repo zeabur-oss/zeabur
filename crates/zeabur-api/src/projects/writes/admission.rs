@@ -13,7 +13,9 @@
 //! - **`policy-denied`.** Any other admission refusal, with the policy's own words in `why`. A
 //!   webhook that denies without a status code of `400` or more is answered `400` with "admission
 //!   webhook "{name}" denied the request: …" [k8s-webhook-errors]; that is a policy's refusal too,
-//!   not a malformed request.
+//!   not a malformed request. A `ValidatingAdmissionPolicy` says "`ValidatingAdmissionPolicy`
+//!   '{name}' with binding '{binding}' denied request: …" [k8s-vap-errors], with the status its
+//!   validation's `reason` gives (the chart's own gives `Forbidden`).
 //!
 //! Neither kind is a refusal for missing rights, so neither is offered as `elevation-required`
 //! ([`crate::error`]).
@@ -22,6 +24,7 @@
 //! [k8s-limitrange]: https://kubernetes.io/docs/concepts/policy/limit-range/
 //! [k8s-quota-admission]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/resourcequota/controller.go
 //! [k8s-webhook-errors]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/errors/statuserror.go
+//! [k8s-vap-errors]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/policy/validating/dispatcher.go
 
 use zeabur_core::message::Message;
 use zeabur_core::origin::Origin;
@@ -34,6 +37,9 @@ const QUOTA_EXCEEDED: &str = "exceeded quota: ";
 
 /// What a webhook's denial starts with, before the webhook's name.
 const WEBHOOK_DENIED: &str = "admission webhook \"";
+
+/// What a `ValidatingAdmissionPolicy`'s denial starts with, before the policy's name.
+const POLICY_DENIED: &str = "ValidatingAdmissionPolicy '";
 
 /// `problem`, a refused write of `what` in `namespace`, as `quota-exceeded` or `policy-denied`
 /// when admission refused it; otherwise unchanged.
@@ -184,18 +190,27 @@ async fn quota_exceeded(
     refined
 }
 
-/// The policy's own words: a webhook's reason after its name, else the whole message.
+/// The policy's own words: a webhook's or a `ValidatingAdmissionPolicy`'s reason after its name,
+/// else the whole message.
 fn policy_words(message: &str) -> &str {
+    let after = if message.contains(POLICY_DENIED) {
+        "denied request: "
+    } else {
+        "denied the request: "
+    };
     message
-        .split_once("denied the request: ")
+        .split_once(after)
         .map_or(message, |(_, words)| words)
         .trim()
 }
 
-/// The webhook a denial names.
+/// The webhook or `ValidatingAdmissionPolicy` a denial names.
 fn webhook(message: &str) -> Option<&str> {
-    let (_, rest) = message.split_once(WEBHOOK_DENIED)?;
-    rest.split_once('"').map(|(name, _)| name)
+    if let Some((_, rest)) = message.split_once(WEBHOOK_DENIED) {
+        return rest.split_once('"').map(|(name, _)| name);
+    }
+    let (_, rest) = message.split_once(POLICY_DENIED)?;
+    rest.split_once('\'').map(|(name, _)| name)
 }
 
 fn policy_denied(problem: Problem, what: &str, message: &str) -> Problem {
@@ -245,5 +260,17 @@ mod tests {
             "pods \"web-1\" is forbidden: maximum cpu usage per Container is 1, but limit is 2";
         assert_eq!(webhook(limit), None);
         assert_eq!(policy_words(limit), limit);
+    }
+
+    #[test]
+    fn a_validating_admission_policys_denial_is_quoted_in_its_own_words() {
+        let message = "namespaces \"shop\" is forbidden: ValidatingAdmissionPolicy \
+                       'zeabur-project-namespace' with binding 'zeabur-project-namespace' denied \
+                       request: Only an admin can change the namespace's labels.";
+        assert_eq!(webhook(message), Some("zeabur-project-namespace"));
+        assert_eq!(
+            policy_words(message),
+            "Only an admin can change the namespace's labels."
+        );
     }
 }

@@ -13,15 +13,16 @@ import {
   DialogTitle,
 } from "@zeabur/design-system/components/dialog"
 import { useT } from "@/i18n"
-import { mayChange } from "@/model/project"
+import { MANAGE_VERB, mayAdopt } from "@/model/project"
 
-async function allowedToChange(namespace: string): Promise<boolean> {
+/** Whether the person may adopt it or let it go, and whether the policy guards its labels. */
+async function adoptHint(namespace: string): Promise<{ allowed: boolean; guarded: boolean }> {
   try {
     const ns = await queryClient.fetchQuery({ ...namespaceQuery(namespace), staleTime: 0 })
-    return mayChange(ns)
+    return { allowed: mayAdopt(ns), guarded: ns.labelsGuarded }
   } catch {
     // The hint could not be read; the plan and its dry run will say.
-    return true
+    return { allowed: true, guarded: false }
   }
 }
 
@@ -38,14 +39,14 @@ export function AdoptButton({
 }) {
   const t = useT()
   const planner = usePlanner(namespace)
-  const [help, setHelp] = useState(false)
+  const [help, setHelp] = useState<{ guarded: boolean }>()
   const [checking, setChecking] = useState(false)
   const start = async () => {
     setChecking(true)
-    const allowed = await allowedToChange(namespace)
+    const { allowed, guarded } = await adoptHint(namespace)
     setChecking(false)
     if (!allowed) {
-      setHelp(true)
+      setHelp({ guarded })
       return
     }
     planner.plan(
@@ -64,10 +65,12 @@ export function AdoptButton({
         <AccessDialog
           namespace={namespace}
           adopted={adopted}
-          onClose={() => setHelp(false)}
+          manage={help.guarded}
+          guarded={help.guarded}
+          onClose={() => setHelp(undefined)}
           what={adopted ? t("refused.unadopt", namespace) : t("refused.adopt", namespace)}
           retry={() => {
-            setHelp(false)
+            setHelp(undefined)
             void start()
           }}
         />
@@ -79,12 +82,16 @@ export function AdoptButton({
 export function AccessDialog({
   namespace,
   adopted,
+  manage,
+  guarded,
   onClose,
   what,
   retry,
 }: {
   namespace: string
   adopted: boolean
+  manage: boolean
+  guarded: boolean
   onClose: () => void
   what: string
   retry?: () => void
@@ -107,10 +114,19 @@ export function AccessDialog({
           <RefusedHint
             hint="denied"
             what={what}
-            missing={[permission("patch", "namespaces")]}
+            missing={
+              manage
+                ? [permission("patch", "namespaces"), permission(MANAGE_VERB, "namespaces")]
+                : [permission("patch", "namespaces")]
+            }
             retry={retry}
           />
-          <NamespaceAccess namespace={namespace} adopted={adopted} />
+          <NamespaceAccess
+            namespace={namespace}
+            adopted={adopted}
+            manage={manage}
+            guarded={guarded}
+          />
         </div>
       </DialogContent>
     </Dialog>

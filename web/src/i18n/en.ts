@@ -889,6 +889,10 @@ export const en = {
   "access.you": "<your user name>",
   "access.ask": (ns: string) =>
     `Ask a cluster administrator for permission to patch the namespace ${ns}.`,
+  "access.askManage": (ns: string) =>
+    `Ask a cluster administrator for permission to patch the namespace ${ns} and to zeabur-manage it. Without zeabur-manage, Zeabur's admission policy lets a patch change only the project's name, description and icon.`,
+  "access.detailsOnly":
+    "Zeabur's admission policy keeps this permission to the project's name, description and icon; the namespace's labels stay as they are.",
   "access.alsoLabels":
     "This permission also lets you change the namespace's other labels, including its Pod Security levels (pod-security.kubernetes.io/*). Kubernetes can't limit it to one label.",
   "access.role": "A ClusterRole limited to this namespace with resourceNames:",

@@ -134,6 +134,8 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
         <AccessDialog
           namespace={namespace.name}
           adopted={namespace.adopted}
+          manage={false}
+          guarded={namespace.labelsGuarded}
           onClose={() => setHelp(false)}
           what={t("projectSettings.changeDetails")}
         />

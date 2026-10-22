@@ -9,6 +9,7 @@ import {
   compareProjects,
   kubectlLabel,
   matchesProject,
+  mayAdopt,
   mayChange,
   otherNamespaces,
   patchRole,
@@ -107,6 +108,11 @@ describe("without the right to patch the namespace", () => {
     expect(mayChange({ canChange: "unknown" })).toBe(true)
   })
 
+  test("adopting follows its own answer, which can say no where the details say yes", () => {
+    expect(mayAdopt({ canAdopt: "denied" })).toBe(false)
+    expect(mayAdopt({ canAdopt: "unknown" })).toBe(true)
+  })
+
   test("the kubectl commands add and remove the one label", () => {
     expect(kubectlLabel("shop")).toStrictEqual({
       adopt: "kubectl label namespace shop zeabur.com/project=true",
@@ -115,7 +121,8 @@ describe("without the right to patch the namespace", () => {
   })
 
   test("the role to ask for patches this namespace only, and the help says what else it allows", () => {
-    const yaml = patchRole("shop", "system:serviceaccount:shop:alice")
+    expect(patchRole("shop", "alice", true)).toMatch(/verbs: \["get", "patch", "zeabur-manage"\]/)
+    const yaml = patchRole("shop", "system:serviceaccount:shop:alice", false)
     expect(yaml).toMatch(/kind: ClusterRole\n/)
     expect(yaml).toMatch(
       /resources: \["namespaces"\]\n\s+resourceNames: \["shop"\]\n\s+verbs: \["get", "patch"\]/,
