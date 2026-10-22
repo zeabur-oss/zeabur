@@ -4407,6 +4407,23 @@ components:
             Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. An existing
             member gets a link that adds a passkey; their name and role stay.
       additionalProperties: false
+    KeelPolicy:
+      type: object
+      description: A workload's Keel policy.
+      required:
+      - kind
+      - name
+      - policy
+      properties:
+        kind:
+          type: string
+          description: "`Deployment`, `StatefulSet` or `DaemonSet`."
+        name:
+          type: string
+          description: Its name.
+        policy:
+          type: string
+          description: "The `keel.sh/policy` annotation: `force`, `major`, `minor`, `patch`, `all`, `glob:…`."
     Kind:
       type: string
       description: |-
@@ -6717,6 +6734,7 @@ components:
       - state
       - builds
       - runs
+      - keel
       - unreadable
       properties:
         builds:
@@ -6724,6 +6742,11 @@ components:
           items:
             $ref: "#/components/schemas/ZeaburBuilderBuild"
           description: The `Build`s, by name.
+        keel:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeelPolicy"
+          description: The workloads Keel updates; read only when there is a `Build`.
         runs:
           type: array
           items:

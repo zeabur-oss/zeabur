@@ -627,6 +627,7 @@ mod tests {
         assert_eq!(builds["runs"][0]["name"], "web-x1");
         assert_eq!(builds["runs"][0]["pod"], "web-x1-abcde");
         assert_eq!(builds["runs"][0]["containers"], json!(["fetch", "build"]));
+        assert_eq!(builds["keel"], json!([]));
     }
 
     /// The test cluster with a custom resource besides the built-in kinds.

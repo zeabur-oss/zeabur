@@ -519,7 +519,7 @@ mod tests {
         for name in gathered.values().flatten() {
             assert!(sets.contains_key(name), "{name} is not a rule set");
         }
-        let mut roles: BTreeMap<String, Vec<Rule>> = gathered
+        let mut bound: BTreeMap<String, Vec<Rule>> = gathered
             .iter()
             .map(|(role, names)| {
                 let rules = names.iter().flat_map(|n| sets[n].clone()).collect();
@@ -527,8 +527,8 @@ mod tests {
             })
             .collect();
         sets.retain(|name, _| !gathered.values().flatten().any(|n| n == name));
-        roles.extend(sets);
-        roles
+        bound.extend(sets);
+        bound
             .into_iter()
             .map(|(name, listed)| {
                 let rules = listed
