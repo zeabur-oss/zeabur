@@ -1,0 +1,210 @@
+displayName: zot
+homepage: https://zotregistry.dev
+license: Apache-2.0
+maturity: cncf-sandbox
+rationale: >
+  An OCI registry inside the cluster for the images Zeabur Builder builds, so
+  builds need no external registry account. Optional: it serves only images
+  pushed to it, and nodes must trust its CA to pull.
+defaults:
+  single-node: optional
+  multi-node: optional
+persistsData: true
+dependsOn: [certificates]
+
+releases:
+  # Before the chart: the pod mounts zot-tls and starts once it exists.
+  - name: tls
+    namespace: zot
+    manifests: |
+      # Signs the CA below; nothing else uses it.
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
+      metadata:
+        name: zot-selfsigned
+        namespace: zot
+      spec:
+        selfSigned: {}
+      ---
+      # A CA of its own: no public CA signs *.svc names. Nodes and buildkitd
+      # trust ca.crt from the zot-tls Secret; to use a CA you already
+      # distribute, point zot-tls at your own issuer instead. Ten years,
+      # because every node holds a copy and rotating it means redistributing.
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      metadata:
+        name: zot-ca
+        namespace: zot
+      spec:
+        isCA: true
+        commonName: zot-ca
+        secretName: zot-ca
+        duration: 87600h
+        privateKey:
+          algorithm: ECDSA
+          size: 256
+        issuerRef:
+          kind: Issuer
+          name: zot-selfsigned
+      ---
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
+      metadata:
+        name: zot-ca
+        namespace: zot
+      spec:
+        ca:
+          secretName: zot-ca
+      ---
+      # The serving certificate. localhost and 127.0.0.1 let nodes pull
+      # through a loopback port-forward or mirror; no node addresses, which
+      # differ per cluster. zot reloads it when cert-manager renews it.
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      metadata:
+        name: zot-tls
+        namespace: zot
+      spec:
+        secretName: zot-tls
+        dnsNames:
+          - zot.zot.svc
+          - zot.zot.svc.cluster.local
+          - localhost
+        ipAddresses: [127.0.0.1]
+        privateKey:
+          algorithm: ECDSA
+          size: 256
+        issuerRef:
+          kind: Issuer
+          name: zot-ca
+
+  - name: zot
+    namespace: zot
+    repo: https://zotregistry.dev/helm-charts
+    chart: zot
+    version: 0.1.128
+    values: |
+      service:
+        # The registry is unauthenticated: never on node ports (the chart's
+        # default is NodePort).
+        type: ClusterIP
+        port: 5000
+      httpGet:
+        # The probes must speak TLS once zot does.
+        scheme: HTTPS
+      # StatefulSet with a volumeClaimTemplate; images survive restarts.
+      persistence: true
+      # zot-tls from the tls release; /etc/zot holds the config.
+      externalSecrets:
+        - secretName: zot-tls
+          mountPath: /tls
+      # Mount configFiles below as /etc/zot/config.json.
+      mountConfig: true
+      configFiles:
+        # No search or UI extensions: they keep an index in memory. No
+        # read/write timeouts: the chart's 60s cuts off large layer pushes.
+        # retention: every untagged manifest goes after the delay; per
+        # repository, the 20 most recently pushed tags stay. Builder pushes
+        # one tag per commit and re-pushes buildcache each build, so the
+        # cache always stays and 20 commits remain to roll back to.
+        config.json: |-
+          {
+            "distSpecVersion": "1.1.1",
+            "storage": {
+              "rootDirectory": "/var/lib/registry",
+              "dedupe": true,
+              "gc": true,
+              "gcDelay": "2h",
+              "gcInterval": "1h",
+              "retention": {
+                "delay": "2h",
+                "policies": [
+                  {
+                    "repositories": ["**"],
+                    "deleteReferrers": true,
+                    "deleteUntagged": true,
+                    "keepTags": [{"mostRecentlyPushedCount": 20}]
+                  }
+                ]
+              }
+            },
+            "http": {
+              "address": "0.0.0.0",
+              "port": "5000",
+              "tls": {"cert": "/tls/tls.crt", "key": "/tls/tls.key"}
+            },
+            "log": {"level": "info"}
+          }
+    profiles:
+      single-node: |
+        pvc:
+          # About 20 builds of a few apps; resize the claim as they grow.
+          storage: 20Gi
+        resources:
+          # Idles small without extensions; pushes stream to disk.
+          requests: {cpu: 20m, memory: 64Mi}
+          limits: {memory: 512Mi}
+      multi-node: |
+        # Still one replica: filesystem storage has a single writer, and the
+        # ReadWriteOnce volume binds it to one node anyway.
+        replicaCount: 1
+        pvc:
+          # More apps building into one registry.
+          storage: 50Gi
+        resources:
+          # More concurrent pushes and pulls.
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {memory: 1Gi}
+
+detection:
+  helmCharts: [zot]
+  workloads:
+    - kind: StatefulSet
+      labels: {app.kubernetes.io/name: zot}
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: zot}
+
+security:
+  summary: >
+    No RBAC: a ServiceAccount without roles. Serves the OCI registry API over
+    TLS on port 5000 inside the cluster.
+  risks:
+    - risk: Any pod in the cluster can push, overwrite and pull any image anonymously.
+      mitigation: >
+        Add an htpasswd file (an input stored in a Secret, mounted through
+        externalSecrets) and accessControl with one repository path per
+        namespace; give Builder the push credential and nodes a pull
+        credential. A NetworkPolicy can limit pushes to Builder's namespace.
+    - risk: Nodes refuse to pull until they trust its CA, and a node told to skip verification trusts anything at that address.
+      mitigation: >
+        Install ca.crt from the zot-tls Secret on every node, in
+        /etc/containerd/certs.d/<host>/ca.crt or k3s registries.yaml
+        (configs.<host>.tls.ca_file), and in buildkitd's registry config;
+        never set insecure_skip_verify.
+
+smoke:
+  - name: ready
+    wait:
+      - "-n zot certificate/zot-tls --for=condition=Ready"
+      - "-n zot statefulset/zot --for=jsonpath={.status.readyReplicas}=1"
+  # In zot's namespace: the CA it checks against is the zot-tls Secret there.
+  - name: tls-v2
+    manifest: |
+      apiVersion: batch/v1
+      kind: Job
+      metadata: {name: smoke, namespace: zot}
+      spec:
+        backoffLimit: 6
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: curl
+                image: curlimages/curl:8.11.1
+                args: [-sSf, --cacert, /tls/ca.crt, "https://zot.zot.svc:5000/v2/"]
+                volumeMounts: [{name: tls, mountPath: /tls}]
+            volumes: [{name: tls, secret: {secretName: zot-tls}}]
+    wait: ["-n zot job/smoke --for=condition=Complete"]
+
+# The volumeClaimTemplate's claims outlive the StatefulSet, with every image.
+leftovers: [persistentvolumeclaims]
