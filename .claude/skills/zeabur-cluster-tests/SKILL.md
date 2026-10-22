@@ -42,6 +42,9 @@ cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'   # every 
 - `e2e-l2.sh` builds Zeabur Identity at the commit in `ZEABUR_IDENTITY_PINNED` from `ZEABUR_IDENTITY_SRC` (default
   `../identity`, refused at another commit), creates the cluster `zeabur-l2`
   (`ZEABUR_L2_KEEP=1` keeps it), and runs `web/e2e/l2`. Its header lists every step.
+- `e2e-l2-browser.sh [playwright args]` reruns only `web/e2e/l2` on that cluster once kept. It
+  deletes the e2e users and their `zeabur.com/member` bindings and makes them again first, so
+  every user comes from today's code; never reuse a user from an earlier run.
 
 ## Writing one
 - Start from `zeabur_test_support::sandbox::Sandbox::new(prefix, rules)` (dev-dependency with the

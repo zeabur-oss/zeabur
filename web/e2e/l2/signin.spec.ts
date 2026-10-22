@@ -1,6 +1,5 @@
-import type { CDPSession, Page } from "@playwright/test"
-
 import { expect, test } from "../fixtures.ts"
+import { authenticator, enrol, signInAtZeaburIdentity } from "./identity.ts"
 
 // Zeabur in a cluster with Zeabur Identity, first sign-in to admin rights. scripts/e2e-l2.sh sets:
 //
@@ -8,9 +7,6 @@ import { expect, test } from "../fixtures.ts"
 //   ZEABUR_L2_SETUP_LINK   the one-time link `zeabur-identityctl setup-link` printed for user `admin`
 //   ZEABUR_L2_NAMESPACE    a project with a running Deployment whose image has a shell
 //   ZEABUR_L2_SERVICE      that Deployment (default talker)
-//
-// The passkey lives in Chromium's virtual authenticator, a user-verifying platform authenticator
-// (https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn/).
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const setupLink = env("ZEABUR_L2_SETUP_LINK")
 const namespace = env("ZEABUR_L2_NAMESPACE")
@@ -24,51 +20,6 @@ test.beforeAll(() => {
   if (!namespace) throw new Error("ZEABUR_L2_NAMESPACE is not set")
 })
 
-async function stored(cdp: CDPSession, authenticatorId: string) {
-  return (await cdp.send("WebAuthn.getCredentials", { authenticatorId })).credentials
-}
-type Passkey = Awaited<ReturnType<typeof stored>>[number]
-
-/** Each page (a popup too) has authenticators of its own, so a popup gets a copy of the passkeys. */
-async function authenticator(page: Page, passkeys: Passkey[] = []) {
-  const cdp = await page.context().newCDPSession(page)
-  await cdp.send("WebAuthn.enable", { enableUI: false })
-  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
-    options: {
-      protocol: "ctap2",
-      transport: "internal",
-      hasResidentKey: true,
-      hasUserVerification: true,
-      isUserVerified: true,
-      automaticPresenceSimulation: true,
-    },
-  })
-  for (const credential of passkeys) {
-    await cdp.send("WebAuthn.addCredential", { authenticatorId, credential })
-  }
-  return { passkeys: () => stored(cdp, authenticatorId) }
-}
-
-/** The virtual authenticator may answer the page's autofill (conditional mediation) before the
- * button is clicked; either way counts. */
-async function signInAtZeaburIdentity(page: Page) {
-  await expect(page).toHaveURL((url) => url.origin === identity)
-  const left = page
-    .waitForURL((url) => url.origin !== identity, { timeout: 30_000 })
-    // The elevation window may close itself as soon as it is back.
-    .catch((error: unknown) => {
-      if (!page.isClosed()) throw error
-    })
-  await Promise.race([
-    left,
-    page
-      .locator('#sign-in button[type="submit"]')
-      .click({ timeout: 30_000 })
-      .catch(() => left),
-  ])
-  await left
-}
-
 test("a first admin enrols a passkey, signs in, confirms a terminal with it and sees what was refused", async ({
   page,
 }) => {
@@ -76,25 +27,23 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
   const device = await authenticator(page)
 
   await test.step("enrol a passkey from the setup link", async () => {
-    await page.goto(setupLink)
-    await page.locator('#setup button[type="submit"]').click()
-    await expect(page.locator("#done")).toBeVisible()
+    await enrol(page, setupLink)
     expect(await device.passkeys()).toHaveLength(1)
   })
 
   await test.step("signing in to Zeabur goes through Zeabur Identity and shows who you are", async () => {
     await page.goto("/")
-    await signInAtZeaburIdentity(page)
+    await signInAtZeaburIdentity(page, identity)
     await expect(page).toHaveURL(
       (url) => url.origin === new URL(zeabur).origin && url.pathname === "/",
     )
     await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible()
     const whoami = await page.request.get("/api/v1/whoami")
     expect(whoami.status()).toBe(200)
-    const identity = (await whoami.json()) as { username: string; groups: string[] }
-    expect(identity.username).toBe("zeabur:admin")
-    expect(identity.groups).toContain("zeabur:admins")
-    expect(identity.groups).not.toContain("zeabur:elevated:admins")
+    const you = (await whoami.json()) as { username: string; groups: string[] }
+    expect(you.username).toBe("zeabur:admin")
+    expect(you.groups).toContain("zeabur:admins")
+    expect(you.groups).not.toContain("zeabur:elevated:admins")
     await expect(page.getByRole("button", { name: /, signed in as admin$/ })).toContainText("admin")
   })
 
@@ -133,7 +82,7 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     const popup = await opened
     await expect(page.getByRole("dialog", { name: "Admin rights" })).toBeVisible()
     await authenticator(popup, await device.passkeys())
-    await signInAtZeaburIdentity(popup)
+    await signInAtZeaburIdentity(popup, identity)
     await expect(page.getByRole("dialog", { name: "Admin rights" })).toBeHidden({
       timeout: 30_000,
     })
