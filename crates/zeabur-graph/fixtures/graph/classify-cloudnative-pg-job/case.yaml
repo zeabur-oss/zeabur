@@ -1,0 +1,2 @@
+description: A Job controlled by a CloudNativePG Cluster (its initdb or join Job) belongs to that database, in the databases group.
+operation: graph.classify

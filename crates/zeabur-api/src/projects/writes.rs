@@ -522,3 +522,77 @@ pub(crate) fn write_request(
         dry_run: false,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+    use zeabur_plan::{Plan, PlannedObject, Target, Write};
+
+
+    fn object(kind: &str, write: Write) -> PlannedObject {
+        PlannedObject {
+            target: Target {
+                api_version: "v1".to_owned(),
+                kind: kind.to_owned(),
+                plural: format!("{}s", kind.to_lowercase()),
+                name: "s3".to_owned(),
+            },
+            before: None,
+            after: None,
+            before_yaml: None,
+            after_yaml: None,
+            changes: Vec::new(),
+            owners: Vec::new(),
+            resource_version: None,
+            write,
+            raw_after: serde_json::Value::Null,
+        }
+    }
+
+    #[test]
+    fn a_plan_shows_no_secret_value_in_its_writes_and_everything_else_as_it_is() {
+        let body = |kind: &str| {
+            json!({"apiVersion": "v1", "kind": kind, "metadata": {"name": "s3"},
+                   "stringData": {"key": "hunter2"}, "data": {"id": "aWQ="}})
+        };
+        let patch = Write::Patch {
+            operations: vec![
+                json!({"op": "test", "path": "/metadata/resourceVersion", "value": "7"}),
+                json!({"op": "replace", "path": "/data/id", "value": "bmV3"}),
+                json!({"op": "add", "path": "/stringData", "value": {"key": "hunter3"}}),
+                json!({"op": "add", "path": "/dataSource", "value": "kept"}),
+            ],
+        };
+        let plan = Plan {
+            objects: vec![
+                object(
+                    "Secret",
+                    Write::Create {
+                        body: body("Secret"),
+                    },
+                ),
+                object("Secret", patch.clone()),
+                object(
+                    "ConfigMap",
+                    Write::Create {
+                        body: body("ConfigMap"),
+                    },
+                ),
+                object("ConfigMap", patch),
+            ],
+            impact: Vec::new(),
+            warnings: Vec::new(),
+        }
+        .without_secret_values();
+        let secret_values = ["hunter2", "hunter3", "aWQ=", "bmV3"];
+        let shown = serde_json::to_string(&plan.objects[..2]).unwrap();
+        for value in secret_values {
+            assert!(!shown.contains(value), "{value} in {shown}");
+        }
+        assert!(shown.contains("\"7\"") && shown.contains("kept"), "{shown}");
+        let kept = serde_json::to_string(&plan.objects[2..]).unwrap();
+        for value in secret_values {
+            assert!(kept.contains(value), "{value} in {kept}");
+        }
+    }
+}

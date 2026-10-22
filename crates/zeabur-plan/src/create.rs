@@ -294,13 +294,15 @@ impl Plan {
                 Write::Create { body } => *body = zeabur_graph::manifest::clean(body),
                 Write::Patch { operations } => {
                     for operation in operations {
-                        let secret =
-                            operation
-                                .get("path")
-                                .and_then(Value::as_str)
-                                .is_some_and(|p| {
-                                    p.starts_with("/data") || p.starts_with("/stringData")
-                                });
+                        let secret = operation
+                            .get("path")
+                            .and_then(Value::as_str)
+                            .is_some_and(|path| {
+                                ["/data", "/stringData"].iter().any(|field| {
+                                    path.strip_prefix(field)
+                                        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+                                })
+                            });
                         if let (true, Some(value)) = (secret, operation.get_mut("value")) {
                             hide(value);
                         }

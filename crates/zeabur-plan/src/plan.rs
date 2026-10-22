@@ -55,10 +55,38 @@ use crate::rules::{
 
 /// The kinds a plan may create, as `(apiVersion, kind, plural)`.
 ///
-/// Creation is kept to kinds a person asks for through Zeabur's own forms (ready-made
-/// NetworkPolicy objects); a kind joins the list with the form that needs it.
-pub const CREATABLE: &[(&str, &str, &str)] =
-    &[("networking.k8s.io/v1", "NetworkPolicy", "networkpolicies")];
+/// Creation is kept to kinds a person asks for through Zeabur's own forms; a kind joins the list
+/// with the form that needs it:
+///
+/// - ready-made NetworkPolicy objects;
+/// - a database and its backups: CloudNativePG's `Cluster`, `ScheduledBackup` and `Backup`, the
+///   Barman Cloud plugin's `ObjectStore`, the Percona Operator for MongoDB's `PerconaServerMongoDB`
+///   and `PerconaServerMongoDBBackup`, and the Secret holding the backup bucket's access keys.
+///
+/// The object is created as the person, so kube-apiserver's RBAC and admission decide, as for
+/// `kubectl create`; the plan only keeps it in the project's namespace.
+pub const CREATABLE: &[(&str, &str, &str)] = &[
+    ("networking.k8s.io/v1", "NetworkPolicy", "networkpolicies"),
+    ("v1", "Secret", "secrets"),
+    ("postgresql.cnpg.io/v1", "Cluster", "clusters"),
+    (
+        "postgresql.cnpg.io/v1",
+        "ScheduledBackup",
+        "scheduledbackups",
+    ),
+    ("postgresql.cnpg.io/v1", "Backup", "backups"),
+    ("barmancloud.cnpg.io/v1", "ObjectStore", "objectstores"),
+    (
+        "psmdb.percona.com/v1",
+        "PerconaServerMongoDB",
+        "perconaservermongodbs",
+    ),
+    (
+        "psmdb.percona.com/v1",
+        "PerconaServerMongoDBBackup",
+        "perconaservermongodbbackups",
+    ),
+];
 
 /// The plural of a kind [`CREATABLE`] lists.
 #[must_use]

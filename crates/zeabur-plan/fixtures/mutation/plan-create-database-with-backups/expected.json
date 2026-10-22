@@ -1,0 +1,24 @@
+{
+  "objects": [
+    {
+      "target": {"apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore", "plural": "objectstores", "name": "pg-backups"},
+      "resourceVersion": null,
+      "before": null,
+      "write": {"type": "create", "body": {"apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore", "metadata": {"name": "pg-backups", "namespace": "demo"}, "spec": {"retentionPolicy": "30d", "configuration": {"destinationPath": "s3://b/demo"}}}}
+    },
+    {
+      "target": {"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster", "plural": "clusters", "name": "pg"},
+      "resourceVersion": null,
+      "before": null,
+      "write": {"type": "create", "body": {"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster", "metadata": {"name": "pg", "namespace": "demo"}, "spec": {"instances": 1, "storage": {"size": "1Gi"}}}}
+    },
+    {
+      "target": {"apiVersion": "postgresql.cnpg.io/v1", "kind": "ScheduledBackup", "plural": "scheduledbackups", "name": "pg-daily"},
+      "resourceVersion": null,
+      "before": null,
+      "write": {"type": "create", "body": {"apiVersion": "postgresql.cnpg.io/v1", "kind": "ScheduledBackup", "metadata": {"name": "pg-daily", "namespace": "demo"}, "spec": {"schedule": "0 0 3 * * *", "cluster": {"name": "pg"}, "method": "plugin"}}}
+    }
+  ],
+  "impact": [],
+  "warnings": []
+}

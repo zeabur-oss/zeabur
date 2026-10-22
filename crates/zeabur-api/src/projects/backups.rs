@@ -64,7 +64,7 @@ pub struct ProjectBackups {
 }
 
 /// Reads `resources` of one module; the objects of each, or the state that stopped it.
-async fn read_all<const N: usize>(
+pub(crate) async fn read_all<const N: usize>(
     cluster: &dyn Cluster,
     reads: [&zeabur_modules::Read; N],
     namespace: Option<&str>,

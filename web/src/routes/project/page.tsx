@@ -9,6 +9,7 @@ import type { Schemas } from "@/api/client"
 import { projectGapsQuery, projectIncidentsQuery, projectQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
 import { CopyText } from "@/components/copy-text"
+import { NewDatabaseButton, useDatabases } from "@/components/databases"
 import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { Freshness } from "@/components/freshness"
 import { GapList } from "@/components/gaps"
@@ -44,7 +45,7 @@ import { needsAttention, statusOf, summarise, type Project, type Service } from 
 import { ProjectMap } from "@/routes/project/architecture"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import { ServicesTable } from "@/routes/project/services-table"
-import { Activity, Alerts, Backups, Domains, SectionChips, Storage } from "@/routes/project/side"
+import { Activity, Alerts, Backups, Databases, Domains, SectionChips, Storage } from "@/routes/project/side"
 import { validateProjectSearch, type ProjectView } from "@/routes/search"
 
 const route = getRouteApi("/projects/$project")
@@ -156,6 +157,7 @@ function Header({ project, data, view }: { project: string; data: Project; view?
                 failed={document.isRefetchError}
               />
               <Suggestions project={project} data={data} />
+              {view === "map" ? <MapNewDatabase project={project} /> : null}
               {view ? (
                 <Segmented
                   label={t("project.view")}
@@ -189,6 +191,11 @@ function Header({ project, data, view }: { project: string; data: Project; view?
       </PageColumn>
     </header>
   )
+}
+
+function MapNewDatabase({ project }: { project: string }) {
+  const data = useDatabases(project).data
+  return data ? <NewDatabaseButton project={project} data={data} size="sm" /> : null
 }
 
 function HealthPill({ data }: { data: Project }) {
@@ -372,6 +379,7 @@ function ListView({
       <Alerts project={project} services={data.services} />
       <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} />
       <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} />
+      <Databases project={project} />
       <Backups project={project} />
     </>
   )
@@ -443,6 +451,7 @@ function NextStep({ project }: { project: string }) {
           </Link>
         </EmptyContent>
       </Empty>
+      <Databases project={project} />
     </PageColumn>
   )
 }

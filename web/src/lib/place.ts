@@ -17,6 +17,8 @@ export interface Place {
   service?: string
   /** The tab, or the tab's view, that a link to another service keeps. */
   tab?: ServicePlace
+  /** `engine/name` of the database on its page. */
+  database?: string
 }
 
 const entries: Partial<Record<RouteId, ProjectEntry>> = {
@@ -37,6 +39,10 @@ export function usePlace(): Place {
         const { project, kind, name } = match.params
         const { tab, mode } = match.search
         return { route, project, service: `${kind}/${name}`, tab: mode ?? tab }
+      }
+      if (match.routeId === "/projects/$project/databases/$engine/$name") {
+        const { project, engine, name } = match.params
+        return { route, project, database: `${engine}/${name}` }
       }
       const entry = entries[route]
       if (!entry || !("project" in match.params)) return { route }
@@ -62,6 +68,18 @@ export function serviceLink(
     params: { project, kind: service.kind, name: service.name },
     search: { tab: place.tab, mode: place.mode, pod },
     hash: place.hash,
+  }
+}
+
+export function databaseLink(
+  project: string,
+  database: { engine: string; name: string },
+  tab?: "backups",
+) {
+  return {
+    to: "/projects/$project/databases/$engine/$name" as const,
+    params: { project, engine: database.engine, name: database.name },
+    search: { tab },
   }
 }
 

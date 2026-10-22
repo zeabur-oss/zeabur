@@ -223,6 +223,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::writes::apply))
         .routes(routes!(projects::backups::get))
         .routes(routes!(alerts::project))
+        .routes(routes!(projects::databases::get))
         .routes(routes!(projects::network_policy::presets))
         .routes(routes!(projects::usage::get))
         .routes(routes!(projects::usage::volumes))

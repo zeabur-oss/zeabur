@@ -1,4 +1,5 @@
-// The project's facts beside its services: domains, storage, backups and what happened lately.
+// The project's facts beside its services: domains, storage, databases, backups and what happened
+// lately.
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
@@ -29,8 +30,16 @@ import {
   shownCoverage,
   useBackups,
 } from "@/components/backups"
+import {
+  DatabaseRow,
+  installedEngines,
+  NewDatabaseButton,
+  OperatorNotes,
+  useDatabases,
+} from "@/components/databases"
+import type { Database } from "@/model/databases"
 import { useSentence, useT, type Translate } from "@/i18n"
-import { podEventsLink, serviceLink } from "@/lib/place"
+import { databaseLink, podEventsLink, serviceLink } from "@/lib/place"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
@@ -509,9 +518,14 @@ interface Sized {
   bytes?: number
   /** Its part of the meter. */
   part: number
+  /** The database whose members use it, when no workload does (CloudNativePG's pods). */
+  database?: Database
 }
 
-function useVolumes(data: Project) {
+const unusedVolume = (v: Sized) => v.claim.services.length === 0 && !v.database
+
+function useVolumes(project: string, data: Project) {
+  const databases = useDatabases(project).data?.items ?? []
   const claims = claimsOf(data)
   const largest = claims
     .filter((c) => c.sizeBytes)
@@ -524,12 +538,13 @@ function useVolumes(data: Project) {
         claim,
         bytes: claim.sizeBytes ?? undefined,
         part: rank < 0 ? -1 : Math.min(rank, METER_PARTS),
+        database: databases.find((d) => d.claims.includes(claim.name)),
       }
     })
     // Unused first, then the largest.
     .toSorted(
       (a, b) =>
-        Number(b.claim.services.length === 0) - Number(a.claim.services.length === 0) ||
+        Number(unusedVolume(b)) - Number(unusedVolume(a)) ||
         (b.bytes ?? 0) - (a.bytes ?? 0) ||
         a.claim.name.localeCompare(b.claim.name),
     )
@@ -541,7 +556,7 @@ function useVolumes(data: Project) {
     parts,
     total: sized.reduce((sum, c) => sum + (c.bytes ?? 0), 0),
     known: sized.some((c) => c.bytes !== undefined),
-    unused: sized.filter((s) => s.claim.services.length === 0).length,
+    unused: sized.filter(unusedVolume).length,
   }
 }
 
@@ -578,9 +593,19 @@ function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
               </span>
             ))}
           </span>
+        ) : volume.database ? (
+          <span className="truncate type-meta text-muted-foreground">
+            <Link
+              {...databaseLink(project, volume.database)}
+              className="hover:text-foreground hover:underline"
+              translate="no"
+            >
+              {volume.database.name}
+            </Link>
+          </span>
         ) : null}
       </div>
-      {claim.services.length === 0 ? (
+      {unusedVolume(volume) ? (
         <Tooltip content={t("storage.notMounted")}>
           <span className="flex shrink-0">
             <StatusPill health="warn" size="sm" dot={false}>
@@ -643,7 +668,7 @@ export function Storage({
   const t = useT()
   const { memoryParts } = useQuantityFormat()
   const [query, setQuery] = useState("")
-  const { sized, parts, total, known, unused } = useVolumes(data)
+  const { sized, parts, total, known, unused } = useVolumes(project, data)
   const [totalValue, totalUnit] = memoryParts(total)
   if (sized.length === 0 && refused.length === 0) return null
   const size = `${totalValue} ${totalUnit}`
@@ -690,6 +715,51 @@ export function Storage({
           ) : null}
         </>
       )}
+    </section>
+  )
+}
+
+/** The project's databases, when there are some or an operator is installed to make one. */
+export function Databases({ project, bare = false }: { project: string; bare?: boolean }) {
+  const t = useT()
+  const data = useDatabases(project).data
+  if (!data) return null
+  if (data.items.length === 0 && installedEngines(data).length === 0) return null
+  const body = (
+    <>
+      {data.items.length === 0 ? (
+        <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
+          {t("db.empty")}
+        </p>
+      ) : (
+        <ul className="flex flex-col">
+          {data.items.map((database) => (
+            <DatabaseRow
+              key={`${database.engine}/${database.name}`}
+              project={project}
+              database={database}
+            />
+          ))}
+        </ul>
+      )}
+      <OperatorNotes data={data} />
+    </>
+  )
+  if (bare)
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex">
+          <NewDatabaseButton project={project} data={data} size="sm" />
+        </div>
+        {body}
+      </div>
+    )
+  return (
+    <section aria-labelledby="project-databases" className="flex flex-col gap-1">
+      <Heading id="project-databases" title={t("db.title")} count={data.items.length || undefined}>
+        <NewDatabaseButton project={project} data={data} />
+      </Heading>
+      {body}
     </section>
   )
 }
@@ -857,12 +927,15 @@ export function SectionChips({
   unreadable: Schemas["UnreadableView"][]
 }) {
   const t = useT()
-  const [open, setOpen] = useState<"alerts" | "activity" | "domains" | "storage" | "backups">()
+  const [open, setOpen] = useState<
+    "alerts" | "activity" | "domains" | "storage" | "databases" | "backups"
+  >()
   const { trouble } = useActivityCounts(project, events)
   const domains = summarise(data).domains.length
   const volumes = claimsOf(data).length
   const backups = useBackupCount(project)
   const alerts = useProjectAlerts(project)
+  const databases = useDatabases(project).data?.items.length ?? 0
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
   const chip = (key: NonNullable<typeof open>, label: string, count: ReactNode) => (
     <Button key={key} variant="outline" size="sm" onClick={() => setOpen(key)}>
@@ -875,6 +948,7 @@ export function SectionChips({
     activity: t("project.activity"),
     domains: t("common.domains"),
     storage: t("tab.storage"),
+    databases: t("db.title"),
     backups: t("backups.title"),
   }
   return (
@@ -889,6 +963,7 @@ export function SectionChips({
       {chip("activity", t("project.activity"), t("events.warningsCount", trouble))}
       {domains > 0 ? chip("domains", t("common.domains"), domains) : null}
       {volumes > 0 ? chip("storage", t("tab.storage"), volumes) : null}
+      {databases > 0 ? chip("databases", t("db.title"), databases) : null}
       {backups
         ? chip("backups", t("backups.title"), `${backups.scheduled}/${backups.total}`)
         : null}
@@ -914,6 +989,8 @@ export function SectionChips({
           <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} bare />
         ) : open === "storage" ? (
           <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} bare />
+        ) : open === "databases" ? (
+          <Databases project={project} bare />
         ) : open === "backups" ? (
           <Backups project={project} bare />
         ) : null}

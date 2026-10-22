@@ -52,6 +52,12 @@ reads) and `zeabur-adapters` (for label selectors). Only the crates that compose
 | `cloudnative-pg` | postgres | `postgresql.cnpg.io/v1` clusters, scheduledbackups, backups |
 | `falco` | runtime-security | `wgpolicyk8s.io/v1alpha2` policyreports, clusterpolicyreports (written by falcosidekick) |
 | `reloader` | config-reload | `apps/v1` deployments labelled `app.kubernetes.io/name: reloader`, cluster-wide |
+| `barman-cloud` | postgres | `barmancloud.cnpg.io/v1` objectstores |
+| `percona-server-mongodb` | mongodb | `psmdb.percona.com/v1` perconaservermongodbs, perconaservermongodbbackups |
+
+The databases capability (`databases`) has two providers, CloudNativePG and the Percona
+Operator for MongoDB; like backups, they share only what a person asks of any database: whether
+it is up, its members, version, where to connect, and its backups.
 
 [inventory]: https://github.com/dtolnay/inventory
 [bevy-plugins]: https://docs.rs/bevy/latest/bevy/app/trait.Plugin.html

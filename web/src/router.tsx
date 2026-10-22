@@ -14,6 +14,7 @@ import {
   capabilitiesQuery,
   clusterQuery,
   clusterWarningsQuery,
+  databasesQuery,
   eventsQuery,
   namespaceQuery,
   nodesQuery,
@@ -66,6 +67,8 @@ import {
 //                                              terminal view opens Logs with the dock;
 //                                              Settings' parts as #anchors; a former ?tab=status…
 //                                              redirects to its place
+//   /projects/$project/databases/$engine/$name one database an operator runs: its state and how
+//                                              to connect, or ?tab=backups
 //   /settings                                  preferences, the signed-in person, About
 //   /account                                   your account: who you are, your role in each
 //                                              project, a link to manage how you sign in
@@ -271,6 +274,17 @@ const serviceRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/service/page"), "ServicePage"),
 })
 
+const databaseRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project/databases/$engine/$name",
+  validateSearch: (search: Record<string, unknown>): { tab?: "backups" } => ({
+    tab: search.tab === "backups" ? "backups" : undefined,
+  }),
+  loader: ({ params }) => load(ensure(databasesQuery(params.project))),
+  remountDeps: ({ params }) => `${params.project}/${params.engine}/${params.name}`,
+  component: lazyRouteComponent(() => import("@/routes/database/page"), "DatabasePage"),
+})
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -328,6 +342,7 @@ export const router = createRouter({
     projectSettingsRoute,
     toolsTerminalRoute,
     serviceRoute,
+    databaseRoute,
     settingsRoute,
     accountRoute,
     membersRoute,
