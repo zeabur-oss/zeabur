@@ -88,6 +88,10 @@
             "configMap": { "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }] },
             "key": { "$ref": "#/definitions/key" }
           }
+        },
+        "accountUrl": {
+          "description": "An https URL, or empty for the issuer's passkey-endpoints document.",
+          "anyOf": [{ "const": "" }, { "type": "string", "pattern": "^https://[^\\s]+$" }]
         }
       }
     },

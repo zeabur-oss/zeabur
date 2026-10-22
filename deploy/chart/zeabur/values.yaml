@@ -40,6 +40,9 @@ issuer:
   caBundle:
     configMap: ""
     key: ca.crt
+  # Where people manage their passkeys and linked accounts; the Account page links there. Empty:
+  # the `manage` URL the issuer publishes at /.well-known/passkey-endpoints, else no link.
+  accountUrl: ""
 
 # Anything the cluster refuses offers to ask for the passkey again (Zeabur Identity's `elevate` scope) and
 # retry with admin rights. Needs a client registered with `--allow-elevation`.

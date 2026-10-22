@@ -124,6 +124,7 @@ likely to set:
 | `clusterName` | What the interface calls the cluster; an administrator can rename it in Settings. Empty: a name read from the nodes where the person may list them (k3d, kind, minikube, EKS with eksctl, GKE, AKS, or the first control plane node), else the public URL's host. |
 | `issuer.url`, `issuer.clientId` | Zeabur Identity's issuer URL and the client registered in step 2. |
 | `issuer.clientSecret.existingSecret` | The Secret from step 2. The chart never takes the secret itself as a value, so it stays out of Helm's release records. |
+| `issuer.accountUrl` | Where people manage their passkeys and linked accounts; the Account page links there. Empty: the `manage` URL the issuer publishes at `/.well-known/passkey-endpoints`, else no link. |
 | `issuer.caBundle.configMap` | A ConfigMap with the CA that signed Zeabur Identity's certificate, when a private CA did (mkcert, an internal CA). |
 | `elevation.enabled` | Whether anything the cluster refuses to everyday rights (a change, a read, a terminal) offers "Retry as admin", which asks for the passkey again. While admin rights last, a few minutes, every request goes with them, as with `sudo`. |
 | `ingress.*`, `httpRoute.*` | An Ingress, or a Gateway API HTTPRoute (`httpRoute.parentRefs` names the Gateway), for the public URL's host name. |
