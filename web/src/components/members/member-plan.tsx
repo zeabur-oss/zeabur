@@ -14,8 +14,10 @@ import { LoadingRows } from "@/components/page"
 import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
 import { Problem } from "@/components/problem"
 import { YamlDiff } from "@/components/yaml"
+import { projectsQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { writeCounts, writtenName, type MemberWrite } from "@/model/members"
+import { projectMention } from "@/model/project"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Collapsible,
@@ -135,6 +137,19 @@ export function MemberPlan({
   )
 }
 
+/** A project as a plan's sentence names it: "Shop (shop)", or "blog" when it has no other name. */
+export function useProjectMention(): (project: string) => string {
+  const t = useT()
+  const projects = useQuery(projectsQuery)
+  return (project) => {
+    const { title, namespace } = projectMention(
+      projects.data?.items.find((item) => item.name === project),
+      project,
+    )
+    return namespace ? t("members.plan.project", title, namespace) : title
+  }
+}
+
 function Writes({ writes }: { writes: MemberWrite[] }) {
   const t = useT()
   const counts = writeCounts(writes)
@@ -166,6 +181,7 @@ function Writes({ writes }: { writes: MemberWrite[] }) {
 
 function Written({ write }: { write: MemberWrite }) {
   const t = useT()
+  const mention = useProjectMention()
   const name = `${write.kind}/${writtenName(write)}`
   const label =
     write.action === "create"
@@ -182,7 +198,7 @@ function Written({ write }: { write: MemberWrite }) {
         </span>
         {write.namespace ? (
           <span className="type-meta text-muted-foreground" translate="no">
-            {t("members.plan.in", write.namespace)}
+            {t("members.plan.in", mention(write.namespace))}
           </span>
         ) : null}
         <span className="type-meta text-muted-foreground">{label}</span>

@@ -34,6 +34,16 @@ export function projectTitle(
   return project?.displayName ?? name
 }
 
+/** A project named in a sentence: its title, and its namespace beside it when the two differ, so
+ * every project in one sentence is named the same way. */
+export function projectMention(
+  project: Pick<Schemas["ProjectSummary"], "name" | "displayName"> | undefined,
+  name: string,
+): { title: string; namespace?: string } {
+  const title = projectTitle(project, name)
+  return title === name ? { title } : { title, namespace: name }
+}
+
 export function otherNamespaces(
   items: readonly Schemas["ProjectSummary"][],
   showSystem: boolean,

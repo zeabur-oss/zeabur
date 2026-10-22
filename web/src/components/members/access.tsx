@@ -4,7 +4,7 @@ import { toast } from "sonner"
 
 import { projectsQuery } from "@/api/queries"
 import { Frame } from "@/components/members/frame"
-import { MemberPlan } from "@/components/members/member-plan"
+import { MemberPlan, useProjectMention } from "@/components/members/member-plan"
 import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
 import {
@@ -236,7 +236,7 @@ function ProjectPicker({
 /** Roles in projects in a few words: "Developer in shop and Viewer in blog". */
 export function useRoleLine(): (grants: readonly ProjectGrant[]) => string {
   const t = useT()
-  const title = useProjectTitle()
+  const title = useProjectMention()
   return (grants) =>
     t(
       "common.list",
@@ -260,7 +260,7 @@ export function AccessDialog({
   const [chosen, setChosen] = useState<Chosen>(() => chosenOf(member))
   const [reviewing, setReviewing] = useState(false)
   const held = (member.projects ?? []).map((p) => p.project)
-  const title = useProjectTitle()
+  const title = useProjectMention()
   const roleLine = useRoleLine()
   const titles = (names: string[]) => t("common.list", names.map(title))
   if (reviewing) {

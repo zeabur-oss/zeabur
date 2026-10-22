@@ -2136,6 +2136,7 @@ export const en = {
   "members.plan.adds": (name: string) => `Adds ${name} as a member.`,
   "members.plan.keeps": (name: string) =>
     `${name} is already a member and keeps their access. The link adds a passkey to their account.`,
+  "members.plan.project": (title: string, namespace: string) => `${title} (${namespace})`,
   "members.plan.gets": (name: string, roles: string) => `${name} gets ${roles}.`,
   "members.plan.raised": (name: string, projects: string) => `${name} can now change ${projects}.`,
   "members.plan.noProjects": (name: string) =>

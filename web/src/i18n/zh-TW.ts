@@ -1963,6 +1963,7 @@ export const zhTW: Messages = {
   "members.plan.adds": (name) => `把 ${name} 加為成員。`,
   "members.plan.keeps": (name) =>
     `${name} 已經是成員，權限不變。這個連結會在他的帳號新增一把通行密鑰。`,
+  "members.plan.project": (title, namespace) => `${title}（${namespace}）`,
   "members.plan.gets": (name, roles) => `${name} 會成為 ${roles}。`,
   "members.plan.raised": (name, projects) => `${name} 可以開始修改 ${projects}。`,
   "members.plan.noProjects": (name) => `${name} 可以登入並看到專案名稱，僅止於此。`,

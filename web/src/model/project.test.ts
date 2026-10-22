@@ -6,6 +6,7 @@ import { projectGlyphs } from "@/components/project-icon"
 import type { Translate } from "@/i18n"
 import { en } from "@/i18n/en"
 import {
+  projectMention,
   compareProjects,
   kubectlLabel,
   matchesProject,
@@ -189,5 +190,16 @@ describe("a new project's name", () => {
     expect(newProjectProblem("a".repeat(64), [])).toBe("long")
     expect(newProjectProblem("kube-tools", [])).toBe("system")
     expect(newProjectProblem("web", ["web"])).toBe("taken")
+  })
+})
+
+describe("a project named in a sentence", () => {
+  test("by its title, with the namespace beside it when they differ", () => {
+    expect(projectMention({ name: "shop", displayName: "Shop" }, "shop")).toStrictEqual({
+      title: "Shop",
+      namespace: "shop",
+    })
+    expect(projectMention({ name: "blog" }, "blog")).toStrictEqual({ title: "blog" })
+    expect(projectMention(undefined, "blog")).toStrictEqual({ title: "blog" })
   })
 })

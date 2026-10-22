@@ -1959,6 +1959,7 @@ export const zhCN: Messages = {
   "members.plan.adds": (name) => `将 ${name} 添加为成员。`,
   "members.plan.keeps": (name) =>
     `${name} 已经是成员，权限不变。这个链接会在他的账号添加一把通行密钥。`,
+  "members.plan.project": (title, namespace) => `${title}（${namespace}）`,
   "members.plan.gets": (name, roles) => `${name} 将成为 ${roles}。`,
   "members.plan.raised": (name, projects) => `${name} 可以开始修改 ${projects}。`,
   "members.plan.noProjects": (name) => `${name} 可以登录并看到项目名称，仅此而已。`,
