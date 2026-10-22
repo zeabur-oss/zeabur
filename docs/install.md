@@ -6,6 +6,8 @@ to kube-apiserver carries that person's token: Zeabur's service account has no R
 ClusterRole and no token of its own. What someone can see and change in Zeabur is exactly what
 their Kubernetes RBAC allows. The chart's one Role lets everyone signed in read Zeabur's settings
 (`get` on the ConfigMap `zeabur-settings`); turn it off with `metricsStore.everyoneReads=false`.
+Its three ClusterRoles are the member roles, which admins give per project
+([Members' rights](#members-rights)); the chart binds them to nobody.
 
 This guide installs a release of Zeabur with its Helm chart (source in `deploy/chart/zeabur`).
 The examples use these names; replace them with yours:
@@ -169,13 +171,68 @@ To run a build of your own instead, build the image on a Linux machine with Dock
 repository, `deploy/chart/zeabur`, with `--set image.repository=docker.io/library/zeabur
 --set image.tag=dev`.
 
+## Members' rights
+
+On the Members page an admin makes each member an Admin, or a Developer or Viewer in chosen
+projects:
+
+| Role | Where | Can | Cannot |
+|---|---|---|---|
+| Admin | The cluster | What Zeabur Identity's `admins` group may do, with admin rights when asked for | — |
+| Developer | Chosen projects | Deploy, change variables, restart, read logs, open terminals, read Secret values | Other projects, nodes, members |
+| Viewer | Chosen projects | See status, logs and events | Change anything, open a terminal, read Secret values |
+
+Every member may also list nodes and namespaces, so the interface can show node names and every
+project's name; a project without a role says an admin can give one.
+
+Developer and Viewer are the ClusterRoles `zeabur-project-developer` and `zeabur-project-viewer`
+(rules in `deploy/chart/zeabur/files/member-roles.yaml`). Giving a role makes a RoleBinding
+`zeabur-member-<user>` to user `zeabur:<user>` in the project's namespace, labelled
+`zeabur.com/member: <user>`, as the admin. Changing a role replaces it, and removing a member
+removes their bindings first. Each rule names its verbs and resources, without `*`. Neither role
+has RBAC objects, namespace changes, `nodes/proxy`, or `escalate`, `bind` and `impersonate`, so
+no member can widen their own rights
+([RBAC good practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks)).
+
+Compared with Kubernetes' built-in roles, Viewer reads what `view` reads that Zeabur shows, and
+like `view` no Secrets. Developer is narrower than `edit`: no ServiceAccount writes or
+impersonation, no service or pod proxy, no `deletecollection`. What the Developer's sensitive
+rights mean:
+
+| Right | Means |
+|---|---|
+| `secrets` | Reads every Secret value in the project, as a list returns them ([listing Secrets](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#listing-secrets)). |
+| `create` on `pods` | Runs a pod as any ServiceAccount of the project, with that account's rights ([workload creation](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation)). |
+| `pods/exec`, `pods/attach` | A shell in a container: whatever it can read, its mounted Secrets and token included. |
+| `pods/ephemeralcontainers` | A debug container next to the app's, the same reach as exec. |
+| `pods/portforward` | Connects to any port of a pod from their machine, through the kubelet rather than the pod network, so NetworkPolicies do not stop it. |
+
+Removing a role ends new requests at once. A terminal already open keeps running until it ends,
+as kube-apiserver checks a stream when it starts.
+
+The member baseline, `get` and `list` on `nodes` and `namespaces`, is the ClusterRole
+`zeabur-member`. Zeabur binds it per member, with a ClusterRoleBinding `zeabur-member-<user>` made
+on invitation or on a change of access: Zeabur Identity puts no group on every member, and
+`system:authenticated` would grant it to every ServiceAccount too. A member made before this
+release gets it when an admin first changes their access.
+
+`memberRoles.enabled=false` installs no ClusterRole; Zeabur then offers only Admin or nothing,
+and RBAC you write yourself decides the rest. The ClusterRole names are fixed: install one Zeabur
+per cluster.
+
 ## Check what Zeabur may do
 
 Zeabur's service account may do nothing a new service account cannot:
 
 ```sh
 kubectl auth can-i impersonate users --as=system:serviceaccount:zeabur:zeabur    # no
-kubectl get rolebindings,clusterrolebindings -A -o wide | grep -w zeabur         # nothing
+kubectl get rolebindings,clusterrolebindings -A -o wide | grep -w zeabur/zeabur  # nothing
+```
+
+To see what a member may do, ask as them:
+
+```sh
+kubectl auth can-i --list -n shop --as=zeabur:bob
 ```
 
 ## Uninstall
@@ -184,9 +241,11 @@ kubectl get rolebindings,clusterrolebindings -A -o wide | grep -w zeabur        
 helm uninstall zeabur --namespace zeabur
 kubectl delete namespace zeabur
 kubectl -n zeabur-identity delete oauthclient zeabur
+kubectl delete rolebindings,clusterrolebindings -A -l zeabur.com/member
 ```
 
-Zeabur keeps no state outside its namespace: no custom resources, nothing cluster-wide. After
-these commands the cluster is as it was before step 2. `scripts/e2e-l2.sh` checks this: it
+Zeabur keeps no state outside its namespace but the member bindings admins made: no custom
+resources, and only those bindings cluster-wide, which the last command removes. After these
+commands the cluster is as it was before step 2. `scripts/e2e-l2.sh` checks this: it
 records every cluster-scoped object and every namespace's labels and annotations before the
 install and compares them after the removal.

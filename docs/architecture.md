@@ -8,9 +8,14 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
 - **No power of its own.** Every read and write is made with the person's credential: a token
   issued by Zeabur Identity in the cluster, or their kubeconfig context on their machine. kube-apiserver
   decides. Zeabur does not impersonate, and its service account can do nothing a person cannot.
+  Member roles are RBAC too: the chart installs three ClusterRoles (`zeabur-member`,
+  `zeabur-project-developer`, `zeabur-project-viewer`), and an admin giving a member a role makes
+  RoleBindings to them in that project's namespace, as the admin (`members/access.rs`;
+  [install.md](install.md#members-rights)).
 - **Kubernetes objects are the only state.** No database, no cache of Secret values, and no
   custom resources for layers L0 to L2. A project is a namespace; adopting one only adds a label.
-  Removing Zeabur leaves the cluster as it was.
+  Removing Zeabur leaves the cluster as it was, but for the member bindings admins made, which
+  carry the label `zeabur.com/member`.
 - **Project, not own.** Services are inferred from owner references, selectors, env and volume
   references, backendRefs, operator conventions and the labels of Helm, Argo CD and Flux. For
   objects a GitOps tool or Helm manages, Zeabur exports a patch or warns, and never fights over
