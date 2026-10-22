@@ -162,13 +162,13 @@ export function CreatePage() {
   const secret = docs.some((d) => d.kind === "Secret" && !d.apiVersion?.includes("/"))
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-col">
       <header className="shrink-0 pt-6 pb-4 md:pt-8">
         <PageColumn>
           <PageHeader title={t("create.title", project)} />
         </PageColumn>
       </header>
-      <PageColumn gap="sm" className="mb-8 min-h-0 flex-1">
+      <PageColumn gap="sm" className="mb-20">
         <div className="flex flex-wrap items-center gap-2">
           <Templates
             creatable={creatable.data}
@@ -183,9 +183,9 @@ export function CreatePage() {
             {t("create.documents", docs.length)}
           </span>
         </div>
-        <div className="flex min-h-0 flex-1 gap-4">
+        <div className="flex gap-4">
           <div className="flex min-w-0 flex-1 flex-col gap-3">
-            <div className="flex min-h-80 flex-1 flex-col">
+            <div className="flex min-h-96 flex-col">
               <Suspense fallback={null}>
                 <YamlEditor
                   initial={initial}

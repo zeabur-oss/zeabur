@@ -107,8 +107,8 @@ fn namespaced(admin: &Client, ns: &str, group: &str, kind: &str) -> Api<DynamicO
     )
 }
 
-/// What the API and its client log while the test runs, down to `DEBUG` (Zeabur logs `INFO`;
-/// kube-rs writes response bodies at `TRACE`, and a refusal there may quote what was sent).
+/// What is logged while the test runs, at `INFO` as the server logs (crates/zeabur/src/main.rs).
+/// Below it kube-rs writes a refusal with kube-apiserver's message, which may quote a value.
 #[derive(Clone, Default)]
 struct Log(Arc<Mutex<Vec<u8>>>);
 
@@ -239,7 +239,7 @@ async fn objects_written_as_yaml_are_created_as_the_person() {
     let log = Log::default();
     let writer = log.clone();
     let _logging = tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::DEBUG)
+        .with_max_level(tracing::Level::INFO)
         .with_ansi(false)
         .with_writer(move || writer.clone())
         .set_default();
