@@ -17,8 +17,9 @@
 //! place), and `pods/exec` refuses every terminal. With `ZEABUR_DEMO_ELEVATION=1` the demo says
 //! admin rights are offered, so refusals show "View as admin" or "Retry as admin" (the demo has
 //! no `/auth/elevate` to grant them). `services/proxy` in `ZEABUR_DEMO_FORBID` refuses the
-//! sample metrics store, whose history is made up like the live usage. A system-upgrade-controller
-//! Plan resolves a newer patch, so the cluster page shows one; the demo makes no outbound request.
+//! sample metrics store, whose history and disk use are made up like the live usage. A
+//! system-upgrade-controller Plan resolves a newer patch, so the cluster page shows one; the demo
+//! makes no outbound request.
 //!
 //! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
 //! after it is added, as do tools pods. `ZEABUR_DEMO_TOOLS=1` hands the session a made-up token,
@@ -1458,6 +1459,27 @@ fn store(path: &str) -> Result<Value, zeabur_core::problem::KubernetesStatus> {
     let (start, end, step) = (number("start"), number("end"), number("step").max(1));
     let promql = params.get("query").map_or("", String::as_str);
     let namespace = label(promql, "namespace=\"");
+    if route == zeabur_modules::prometheus_api::QUERY {
+        let result: Vec<&Value> = DISKS
+            .get()
+            .into_iter()
+            .flatten()
+            .filter(|s| {
+                let name = s
+                    .pointer("/metric/__name__")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
+                (promql.contains("node_filesystem") && name.starts_with("node_filesystem"))
+                    || (promql.contains("kubelet_volume_stats")
+                        && name.starts_with("kubelet_volume_stats")
+                        && s.pointer("/metric/namespace").and_then(Value::as_str)
+                            == Some(namespace))
+            })
+            .collect();
+        return Ok(
+            json!({"status": "success", "data": {"resultType": "vector", "result": result}}),
+        );
+    }
     let service = pattern_name(label(promql, "pod=~\"")).replace("[.]", ".");
     let rollout = end - 30 * 3600;
     let mut runs = Vec::new();
@@ -1547,11 +1569,21 @@ fn store(path: &str) -> Result<Value, zeabur_core::problem::KubernetesStatus> {
 
 const GIB: u64 = 1 << 30;
 
-/// Each node's kubelet summary: its disk, its images, and the volume of each StatefulSet pod on it
-/// (which this also mounts in the pod, from its claim `data-<pod>`). The small control plane's
-/// disk and shop's database volume are nearly full.
-fn kubelet_summaries(objects: &mut BTreeMap<String, NamespaceObjects>) -> BTreeMap<String, Value> {
-    let mut volumes: BTreeMap<String, Vec<Value>> = BTreeMap::new();
+/// The sample store's disk series, as an instant query's results.
+static DISKS: std::sync::OnceLock<Vec<Value>> = std::sync::OnceLock::new();
+
+/// One series of an instant query's answer.
+fn sample(name: &str, labels: &Value, value: u64) -> Value {
+    let mut metric = labels.as_object().cloned().unwrap_or_default();
+    metric.insert("__name__".to_owned(), json!(name));
+    json!({"metric": metric, "value": [Timestamp::now().as_second(), value.to_string()]})
+}
+
+/// The disk series the sample store holds: each node's filesystem and the volume of each
+/// StatefulSet pod (which this also mounts in the pod, from its claim `data-<pod>`). The small
+/// control plane's disk and shop's database volume are nearly full.
+fn disks(objects: &mut BTreeMap<String, NamespaceObjects>) -> Vec<Value> {
+    let mut series = Vec::new();
     for (namespace, objects) in objects.iter_mut() {
         let sizes: BTreeMap<String, u64> = objects
             .stateful_sets
@@ -1602,35 +1634,29 @@ fn kubelet_summaries(objects: &mut BTreeMap<String, NamespaceObjects>) -> BTreeM
                 12 + claim.bytes().map(u64::from).sum::<u64>() % 40
             };
             let used = capacity / 100 * percent;
-            volumes
-                .entry(spec.node_name.clone().unwrap_or_default())
-                .or_default()
-                .push(
-                    json!({"podRef": {"name": name, "namespace": namespace}, "volume": [{
-                        "name": "data", "pvcRef": {"name": claim, "namespace": namespace},
-                        "capacityBytes": capacity, "usedBytes": used,
-                        "availableBytes": capacity - used
-                    }]}),
-                );
+            let labels = json!({"namespace": namespace, "persistentvolumeclaim": claim,
+                "node": spec.node_name.clone().unwrap_or_default()});
+            series.extend([
+                sample("kubelet_volume_stats_capacity_bytes", &labels, capacity),
+                sample("kubelet_volume_stats_used_bytes", &labels, used),
+                sample(
+                    "kubelet_volume_stats_available_bytes",
+                    &labels,
+                    capacity - used,
+                ),
+            ]);
         }
     }
-    [
-        ("vps-1", 40, 35, 9),
-        ("vps-2", 160, 61, 14),
-        ("vps-3", 160, 72, 18),
-    ]
-    .into_iter()
-    .map(|(node, size, used, images)| {
+    for (node, size, used) in [("vps-1", 40, 35), ("vps-2", 160, 61), ("vps-3", 160, 72)] {
         let (size, used) = (size * GIB, used * GIB);
-        let summary = json!({
-            "node": {"nodeName": node,
-                "fs": {"capacityBytes": size, "usedBytes": used, "availableBytes": size - used},
-                "runtime": {"imageFs": {"capacityBytes": size, "usedBytes": images * GIB}}},
-            "pods": volumes.remove(node).unwrap_or_default()
-        });
-        (node.to_owned(), summary)
-    })
-    .collect()
+        let labels = json!({"node": node, "mountpoint": "/", "fstype": "ext4"});
+        series.extend([
+            sample("node_filesystem_size_bytes", &labels, size),
+            sample("node_filesystem_free_bytes", &labels, size - used),
+            sample("node_filesystem_avail_bytes", &labels, size - used),
+        ]);
+    }
+    series
 }
 
 /// Three nodes: a small control plane, a cordoned worker and a worker one minor behind.
@@ -1887,7 +1913,7 @@ async fn main() -> std::io::Result<()> {
         }
         s.without_shell
             .extend(["shop/web-7c9d8-abcde", "shop/web-7c9d8-fghij"].map(str::to_owned));
-        s.kubelet_summaries = kubelet_summaries(&mut s.objects);
+        DISKS.get_or_init(|| disks(&mut s.objects));
     });
     kubelet(cluster.clone());
     let access = Demo {

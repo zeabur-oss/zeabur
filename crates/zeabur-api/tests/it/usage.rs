@@ -1,6 +1,6 @@
 //! Resource usage against an in-memory cluster: live usage from `PodMetrics`, history from a
-//! metrics store reached through the service proxy (canned answers), and the metrics store
-//! setting, kept in a ConfigMap written as the person.
+//! metrics store reached through the service proxy (canned answers), disk use from the same
+//! store, and the metrics store setting, kept in a ConfigMap written as the person.
 
 #[cfg(test)]
 mod tests {
@@ -386,67 +386,139 @@ mod tests {
         );
     }
 
+    /// The query of a proxied instant query.
+    fn instant_query(path: &str) -> String {
+        let (_, query) = path.split_once('?').unwrap();
+        form_urlencoded::parse(query.as_bytes())
+            .find(|(k, _)| k == "query")
+            .unwrap()
+            .1
+            .into_owned()
+    }
+
+    fn vector(result: &Value) -> Value {
+        json!({"status": "success", "data": {"resultType": "vector", "result": result}})
+    }
+
+    /// A store scraping node-exporter, whose node is at its address, and the kubelet: vps-1's
+    /// filesystem and shop's one volume, both nearly full.
+    #[expect(clippy::unnecessary_wraps, reason = "a `ProxyAnswer`, which may fail")]
+    fn disk_store(path: &str) -> Result<Value, KubernetesStatus> {
+        let query = instant_query(path);
+        let series = |name: &str, labels: Value, value: u64| {
+            let mut metric = labels;
+            metric["__name__"] = json!(name);
+            json!({"metric": metric, "value": [1_760_000_000, value.to_string()]})
+        };
+        Ok(vector(&if query.contains("node_filesystem") {
+            let fs = json!({"instance": "10.0.0.1:9100", "mountpoint": "/"});
+            json!([
+                series("node_filesystem_size_bytes", fs.clone(), 100),
+                series("node_filesystem_free_bytes", fs.clone(), 12),
+                series("node_filesystem_avail_bytes", fs, 12),
+            ])
+        } else if query.contains("namespace=\"shop\"") {
+            let claim = json!({"namespace": "shop", "persistentvolumeclaim": "data-db-0"});
+            json!([
+                series("kubelet_volume_stats_capacity_bytes", claim.clone(), 10),
+                series("kubelet_volume_stats_used_bytes", claim.clone(), 9),
+                series("kubelet_volume_stats_available_bytes", claim, 1),
+            ])
+        } else {
+            json!([])
+        }))
+    }
+
+    /// A store that scrapes neither.
+    #[expect(clippy::unnecessary_wraps, reason = "a `ProxyAnswer`, which may fail")]
+    fn bare_store(_: &str) -> Result<Value, KubernetesStatus> {
+        Ok(vector(&json!([])))
+    }
+
     #[tokio::test]
-    async fn volumes_and_node_disks_come_from_the_kubelets_or_say_why_not() {
+    async fn volumes_and_node_disks_come_from_the_store_or_say_why_not() {
         let cluster = cluster();
         cluster.update(|s| {
             s.nodes = vec![
                 serde_json::from_value(json!({"metadata": {"name": "vps-1"},
-                    "status": {"conditions": [{"type": "Ready", "status": "True"}]}}))
+                    "status": {"conditions": [{"type": "Ready", "status": "True"}],
+                        "addresses": [{"type": "InternalIP", "address": "10.0.0.1"}]}}))
                 .unwrap(),
             ];
-            s.objects.insert(
-                "shop".to_owned(),
-                zeabur_kube::NamespaceObjects {
-                    namespace: "shop".to_owned(),
-                    pods: vec![
-                        serde_json::from_value(json!({
-                            "metadata": {"name": "db-0", "namespace": "shop"},
-                            "spec": {"nodeName": "vps-1", "containers": [{"name": "db"}],
-                                "volumes": [{"name": "data",
-                                    "persistentVolumeClaim": {"claimName": "data-db-0"}}]}
-                        }))
-                        .unwrap(),
-                    ],
-                    ..zeabur_kube::NamespaceObjects::default()
-                },
-            );
         });
         let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
-        assert_eq!(volumes["state"], "unavailable");
+        assert_eq!(volumes["state"], "not-configured");
         assert_eq!(volumes["items"], json!([]));
+        let nodes = get(&cluster, "/api/v1/cluster/nodes").await;
+        assert_eq!(nodes["disk"], "not-configured");
+        assert!(nodes["items"][0].get("disk").is_none());
 
         cluster.update(|s| {
-            s.kubelet_summaries.insert(
-                "vps-1".to_owned(),
-                json!({
-                    "node": {"fs": {"capacityBytes": 100, "usedBytes": 88, "availableBytes": 12}},
-                    "pods": [{"podRef": {"name": "db-0", "namespace": "shop"}, "volume": [
-                        {"name": "data", "pvcRef": {"name": "data-db-0", "namespace": "shop"},
-                         "capacityBytes": 10, "usedBytes": 9, "availableBytes": 1}]}]
-                }),
-            );
+            s.proxied.insert(STORE.to_owned(), disk_store);
         });
         let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
         assert_eq!(volumes["state"], "available");
         assert_eq!(
             volumes["items"],
-            json!([{"claim": "data-db-0", "pod": "db-0", "node": "vps-1",
-                    "capacityBytes": 10, "usedBytes": 9, "availableBytes": 1}])
+            json!([{"claim": "data-db-0", "capacityBytes": 10, "usedBytes": 9,
+                    "availableBytes": 1}])
         );
         let nodes = get(&cluster, "/api/v1/cluster/nodes").await;
         assert_eq!(nodes["disk"], "available");
-        assert_eq!(nodes["items"][0]["disk"]["usedBytes"], 88);
+        assert_eq!(
+            nodes["items"][0]["disk"],
+            json!({"capacityBytes": 100, "usedBytes": 88, "availableBytes": 12})
+        );
         assert_eq!(nodes["totals"]["disk"]["capacityBytes"], 100);
+        let asked = cluster.inspect(|s| s.proxy_requests.clone()).unwrap();
+        let volume_query = instant_query(
+            asked
+                .iter()
+                .find(|r| r.contains("kubelet_volume_stats"))
+                .unwrap(),
+        );
+        assert!(
+            volume_query.contains("namespace=\"shop\""),
+            "{volume_query}"
+        );
+
+        // The store answers but scrapes neither: not zero, not collected.
+        cluster.update(|s| {
+            s.proxied.insert(STORE.to_owned(), bare_store);
+        });
+        let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
+        assert_eq!(volumes["state"], "not-collected");
+        let nodes = get(&cluster, "/api/v1/cluster/nodes").await;
+        assert_eq!(nodes["disk"], "not-collected");
+        assert!(nodes["totals"].get("disk").is_none());
 
         cluster.update(|s| {
-            s.forbidden_resources.insert("nodes/proxy".to_owned());
+            s.proxied.insert(STORE.to_owned(), refused);
         });
         let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
         assert_eq!(volumes["state"], "unreadable");
-        assert_eq!(volumes["unreadable"][0]["resource"], "nodes/proxy");
+        assert_eq!(
+            volumes["unreadable"][0]["resource"],
+            "services/proxy (observability/vmsingle-vm-victoria-metrics-k8s-stack)"
+        );
         let nodes = get(&cluster, "/api/v1/cluster/nodes").await;
         assert_eq!(nodes["disk"], "unreadable");
         assert!(nodes["items"][0].get("disk").is_none());
+
+        cluster.update(|s| {
+            s.proxied.insert(STORE.to_owned(), no_endpoints);
+        });
+        let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
+        assert_eq!(volumes["state"], "unavailable");
+
+        let (status, _) = call(
+            &cluster,
+            Settings::default(),
+            "GET",
+            "/api/v1/projects/Shop%22%7D/volumes",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 }

@@ -1,6 +1,7 @@
-//! A Prometheus-compatible metrics store: what a service used over time.
+//! A Prometheus-compatible metrics store: what a service used over time, and how full disks are.
 //!
-//! History comes from the Prometheus HTTP API's range queries [prom-api]. Prometheus and
+//! History comes from the Prometheus HTTP API's range queries [prom-api], disks from its instant
+//! queries ([`samples`]; the queries are `zeabur-api`'s). Prometheus and
 //! VictoriaMetrics serve the same API [vm-single]; Zeabur's recommendation installs
 //! VictoriaMetrics.
 //!
@@ -70,6 +71,9 @@ pub const PROMETHEUS_HTTP: HttpApi = HttpApi {
 
 /// The path of a range query.
 pub const QUERY_RANGE: &str = "/api/v1/query_range";
+
+/// The path of an instant query.
+pub const QUERY: &str = "/api/v1/query";
 
 // The API's `range` parameter and the `service_history` MCP tool's `range` argument, by their
 // serde names. The doc comments are the schemas' descriptions.
@@ -273,20 +277,7 @@ pub fn series(
     times: &[i64],
     scale: f64,
 ) -> Result<Vec<PrometheusSeries>, StoreError> {
-    if answer.get("status").and_then(Value::as_str) != Some("success") {
-        let message = answer
-            .get("error")
-            .and_then(Value::as_str)
-            .unwrap_or("the store answered without a status")
-            .to_owned();
-        return Err(StoreError { message });
-    }
-    let data = answer.get("data").unwrap_or(&Value::Null);
-    if data.get("resultType").and_then(Value::as_str) != Some("matrix") {
-        return Err(StoreError {
-            message: "the store's answer is not a range of values (resultType matrix)".to_owned(),
-        });
-    }
+    let data = data(answer, "matrix", "a range of values")?;
     let index: BTreeMap<i64, usize> = times.iter().enumerate().map(|(i, &t)| (t, i)).collect();
     let mut pods: BTreeMap<String, Vec<Option<f64>>> = BTreeMap::new();
     for result in data
@@ -324,6 +315,73 @@ pub fn series(
     Ok(pods
         .into_iter()
         .map(|(pod, values)| PrometheusSeries { pod, values })
+        .collect())
+}
+
+/// The `data` of a successful answer whose `resultType` is `kind`.
+fn data<'a>(answer: &'a Value, kind: &str, what: &str) -> Result<&'a Value, StoreError> {
+    if answer.get("status").and_then(Value::as_str) != Some("success") {
+        let message = answer
+            .get("error")
+            .and_then(Value::as_str)
+            .unwrap_or("the store answered without a status")
+            .to_owned();
+        return Err(StoreError { message });
+    }
+    let data = answer.get("data").unwrap_or(&Value::Null);
+    if data.get("resultType").and_then(Value::as_str) != Some(kind) {
+        return Err(StoreError {
+            message: format!("the store's answer is not {what} (resultType {kind})"),
+        });
+    }
+    Ok(data)
+}
+
+/// One series' value at an instant, with its labels (`__name__` included).
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrometheusSample {
+    /// The labels.
+    pub labels: BTreeMap<String, String>,
+    /// The value.
+    pub value: f64,
+}
+
+impl PrometheusSample {
+    /// The value of `label`; `""` when the series has none, as PromQL reads it.
+    #[must_use]
+    pub fn label(&self, label: &str) -> &str {
+        self.labels.get(label).map_or("", String::as_str)
+    }
+}
+
+/// Each series of an instant query's answer (`resultType: vector`). `NaN` and infinities are
+/// left out.
+///
+/// # Errors
+///
+/// When the store answered `status: error`, or with something else than a vector.
+pub fn samples(answer: &Value) -> Result<Vec<PrometheusSample>, StoreError> {
+    let data = data(answer, "vector", "a set of values")?;
+    Ok(data
+        .get("result")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|result| {
+            let labels = result
+                .get("metric")?
+                .as_object()?
+                .iter()
+                .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
+                .collect();
+            let value = result
+                .pointer("/value/1")?
+                .as_str()?
+                .parse::<f64>()
+                .ok()
+                .filter(|v| v.is_finite())?;
+            Some(PrometheusSample { labels, value })
+        })
         .collect())
 }
 
@@ -478,6 +536,21 @@ mod tests {
         );
         let vector = json!({"status": "success", "data": {"resultType": "vector", "result": []}});
         assert!(series(&vector, &[0], 1.0).is_err());
+    }
+
+    #[test]
+    fn a_vector_keeps_each_series_labels_and_leaves_out_what_is_not_a_number() {
+        let answer = json!({"status": "success", "data": {"resultType": "vector", "result": [
+            {"metric": {"__name__": "up", "instance": "10.0.0.1:9100"}, "value": [1, "1"]},
+            {"metric": {"__name__": "up"}, "value": [1, "NaN"]}
+        ]}});
+        let read = samples(&answer).unwrap();
+        assert_eq!(read.len(), 1);
+        assert_eq!(read[0].label("instance"), "10.0.0.1:9100");
+        assert_eq!(read[0].label("node"), "");
+        assert_eq!(read[0].value, 1.0);
+        let matrix = json!({"status": "success", "data": {"resultType": "matrix", "result": []}});
+        assert!(samples(&matrix).is_err());
     }
 
     #[test]

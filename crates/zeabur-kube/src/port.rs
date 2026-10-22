@@ -267,14 +267,6 @@ pub trait Cluster: Send + Sync {
         service: &'a ServicePort,
         path_and_query: &'a str,
     ) -> Answer<'a, serde_json::Value>;
-
-    /// `GET path` of the kubelet on `node` through kube-apiserver's node proxy
-    /// (`/api/v1/nodes/{node}/proxy/…`), as the person: the right it needs is `get` on
-    /// `nodes/proxy`. Zeabur asks it only for `/stats/summary` [kubelet-summary], what
-    /// metrics-server reads too; the answer must be JSON.
-    ///
-    /// [kubelet-summary]: https://kubernetes.io/docs/reference/instrumentation/node-metrics/
-    fn node_proxy_get<'a>(&'a self, node: &'a str, path: &'a str) -> Answer<'a, serde_json::Value>;
 }
 
 /// The typed reads built on [`Cluster`], for every implementation and for `dyn Cluster`.

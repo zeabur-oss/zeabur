@@ -332,9 +332,9 @@ paths:
         Requests and limits are summed per node from every unfinished pod, the way
         `kubectl describe node` sums them (see `capacity`); usage is added only when metrics-server
         is installed and readable, and is approximate ("meant only for autoscaling purposes"
-        [metrics-server]). Each node's disk comes from its kubelet's stats summary (see `stats`).
-        `403` when nodes cannot be listed; a refusal of pods, metrics or summaries leaves those parts
-        out and says so.
+        [metrics-server]). Each node's disk comes from the metrics store (see `disks`), and `disk`
+        says when it could not. `403` when nodes cannot be listed; a refusal of pods, metrics or the
+        store leaves those parts out and says so.
         
         [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
       operationId: listNodes
@@ -1708,10 +1708,12 @@ paths:
       tags:
       - projects
       summary: |-
-        How full each volume a running pod of the project mounts from a claim is, from the stats
-        summary of the kubelet on the pod's node (`get` on `nodes/proxy`). A claim no running pod
-        mounts has no measure. Always `200` once the pods can be listed: `state` says when the
-        kubelets may not be read (`unreadable` names the refusal) or did not answer.
+        How full each volume of the project is, by claim, from the kubelets' volume metrics in the
+        metrics store, as you. A kubelet measures a volume only while a pod on its node mounts it.
+        Always `200` for a project's name: `state` says when there is no store, you may not read it
+        (`get` on its `services/proxy`; `unreadable` names it), it did not answer, or it holds no
+        values for the project. Reading the store is reading every project's metrics: see the
+        description of `GET /api/v1/settings/metrics-store`.
       operationId: getVolumeUsage
       parameters:
       - name: project
@@ -1726,7 +1728,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/VolumeUsageList"
-        "403":
+        "400":
           content:
             application/problem+json:
               schema:
@@ -3452,9 +3454,18 @@ components:
       - unschedulable
       - configMissing
       - unexplained
+    DiskState:
+      type: string
+      description: Whether disk use could be read from the metrics store. An open set.
+      enum:
+      - available
+      - not-configured
+      - unreadable
+      - unavailable
+      - not-collected
     DiskUsage:
       type: object
-      description: A filesystem's size and use, as the kubelet measures it.
+      description: A filesystem's size and use.
       required:
       - capacityBytes
       - usedBytes
@@ -4949,7 +4960,7 @@ components:
       - unreadable
       properties:
         disk:
-          $ref: "#/components/schemas/StatsState"
+          $ref: "#/components/schemas/DiskState"
           description: Whether the nodes' disks could be read.
         items:
           type: array
@@ -5068,19 +5079,12 @@ components:
           oneOf:
           - $ref: "#/components/schemas/DiskUsage"
             description: |-
-              Its root filesystem (`nodefs`), where pods' logs, writable layers and `emptyDir` volumes
-              live, from the kubelet's stats summary; absent when that could not be read.
+              The kubelet's filesystem (`nodefs`), where pods' logs, writable layers and `emptyDir`
+              volumes live, from the metrics store; absent when the store has no value for this node.
           - type: "null"
         id:
           type: string
           description: "`cluster/nodes/<name>`."
-        imagesBytes:
-          type:
-          - integer
-          - "null"
-          format: int64
-          description: What the container runtime's images take on disk, from the same summary.
-          minimum: 0
         kernelVersion:
           type: string
           description: The kernel version.
@@ -7952,13 +7956,6 @@ components:
       - PodField
       - ResourceField
       - File
-    StatsState:
-      type: string
-      description: Whether the kubelet's stats summaries could be read. An open set.
-      enum:
-      - available
-      - unreadable
-      - unavailable
     StatusWord:
       type: string
       description: |-
@@ -8425,8 +8422,6 @@ components:
       description: How full one claim's volume is.
       required:
       - claim
-      - pod
-      - node
       - capacityBytes
       - usedBytes
       - availableBytes
@@ -8444,12 +8439,6 @@ components:
         claim:
           type: string
           description: The PersistentVolumeClaim.
-        node:
-          type: string
-          description: The node that pod runs on.
-        pod:
-          type: string
-          description: The pod it was measured in.
         usedBytes:
           type: integer
           format: int64
@@ -8471,15 +8460,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/VolumeUsage"
-          description: Every claim a running pod mounts, measured, by claim.
+          description: Every claim the store has values for, by claim.
         state:
-          $ref: "#/components/schemas/StatsState"
-          description: Whether the kubelets could be read.
+          $ref: "#/components/schemas/DiskState"
+          description: Whether the metrics store could be read.
         unreadable:
           type: array
           items:
             $ref: "#/components/schemas/UnreadableView"
-          description: What could not be read.
+          description: The settings ConfigMap or the store, when the person may not read it.
     WhoAmI:
       type: object
       description: Who the cluster says the person is.

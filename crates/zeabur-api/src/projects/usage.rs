@@ -7,24 +7,22 @@
 //! usage. A pod metrics-server has no sample for is not in the list (see
 //! `zeabur_modules::metrics_server`).
 //!
+//! How full its volumes are comes from the metrics store instead (see `crate::cluster::disks`).
+//!
 //! [ms-rbac]: https://github.com/kubernetes-sigs/metrics-server/blob/master/manifests/base/rbac.yaml
 
-use std::collections::BTreeSet;
-
 use axum::Json;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use serde::Serialize;
 use utoipa::ToSchema;
-use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::ClusterExt as _;
-use zeabur_kube::k8s_openapi::api::core::v1::Pod;
+use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_model::Origin;
 use zeabur_modules::Reading;
 
-use crate::cluster::{modules, stats};
+use crate::cluster::{disks, modules};
 use crate::error::ApiError;
-use crate::handlers::Person;
-use crate::views::{DiskUsage, MetricsState, StatsState, UnreadableView};
+use crate::handlers::{AppState, Person};
+use crate::views::{DiskState, MetricsState, UnreadableView};
 
 /// What one container uses.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -154,10 +152,6 @@ fn view(project: &str, pod: zeabur_modules::metrics_server::PodUsage) -> PodUsag
 pub struct VolumeUsage {
     /// The PersistentVolumeClaim.
     pub claim: String,
-    /// The pod it was measured in.
-    pub pod: String,
-    /// The node that pod runs on.
-    pub node: String,
     /// Its filesystem's size. It can differ a little from the claim's.
     pub capacity_bytes: u64,
     /// In use.
@@ -172,72 +166,56 @@ pub struct VolumeUsage {
 pub struct VolumeUsageList {
     /// `projects/{project}/volumes`.
     pub id: String,
-    /// Whether the kubelets could be read.
-    pub state: StatsState,
-    /// Every claim a running pod mounts, measured, by claim.
+    /// Whether the metrics store could be read.
+    pub state: DiskState,
+    /// Every claim the store has values for, by claim.
     pub items: Vec<VolumeUsage>,
-    /// What could not be read.
+    /// The settings ConfigMap or the store, when the person may not read it.
     pub unreadable: Vec<UnreadableView>,
 }
 
-/// How full each volume a running pod of the project mounts from a claim is, from the stats
-/// summary of the kubelet on the pod's node (`get` on `nodes/proxy`). A claim no running pod
-/// mounts has no measure. Always `200` once the pods can be listed: `state` says when the
-/// kubelets may not be read (`unreadable` names the refusal) or did not answer.
+/// How full each volume of the project is, by claim, from the kubelets' volume metrics in the
+/// metrics store, as you. A kubelet measures a volume only while a pod on its node mounts it.
+/// Always `200` for a project's name: `state` says when there is no store, you may not read it
+/// (`get` on its `services/proxy`; `unreadable` names it), it did not answer, or it holds no
+/// values for the project. Reading the store is reading every project's metrics: see the
+/// description of `GET /api/v1/settings/metrics-store`.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/volumes", tag = "projects",
     operation_id = "getVolumeUsage",
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = VolumeUsageList),
-              (status = 403, body = Problem, content_type = PROBLEM)))]
+              (status = 400, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn volumes(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<VolumeUsageList>, ApiError> {
-    let pods = cluster
-        .list::<Pod>(Some(&project))
-        .await
-        .map_err(|e| ApiError::from(e.into_problem("the project's pods")))?;
-    let nodes: BTreeSet<String> = pods
-        .iter()
-        .filter(|pod| {
-            pod.spec.as_ref().is_some_and(|spec| {
-                spec.volumes
-                    .iter()
-                    .flatten()
-                    .any(|v| v.persistent_volume_claim.is_some())
-            })
-        })
-        .filter_map(|pod| pod.spec.as_ref()?.node_name.clone())
-        .collect();
-    let mut unreadable = Vec::new();
-    let (summaries, state) =
-        stats::summaries(&cluster, nodes.into_iter().collect(), &mut unreadable).await;
-    let mut items: Vec<VolumeUsage> = Vec::new();
-    for (node, summary) in summaries {
-        for claim in summary.claims {
-            if claim.namespace != project || items.iter().any(|i| i.claim == claim.claim) {
-                continue;
-            }
-            let DiskUsage {
-                capacity_bytes,
-                used_bytes,
-                available_bytes,
-            } = claim.disk;
-            items.push(VolumeUsage {
-                claim: claim.claim,
-                pod: claim.pod,
-                node: node.clone(),
-                capacity_bytes,
-                used_bytes,
-                available_bytes,
-            });
-        }
+    if !zeabur_plan::checks::is_dns_label(&project) {
+        return Err(ApiError::from(Problem::new(
+            Kind::BadRequest,
+            format!("{project:?} is not a project's name."),
+        )));
     }
-    items.sort_by(|a, b| a.claim.cmp(&b.claim));
+    let asked = disks::ask(
+        cluster.as_ref(),
+        &state.settings,
+        &disks::volume_query(&project),
+    )
+    .await;
+    let read = asked.disks(disks::volume_disks);
     Ok(Json(VolumeUsageList {
         id: format!("projects/{project}/volumes"),
-        state,
-        items,
-        unreadable,
+        state: read.state,
+        items: read
+            .disks
+            .into_iter()
+            .map(|(claim, disk)| VolumeUsage {
+                claim,
+                capacity_bytes: disk.capacity_bytes,
+                used_bytes: disk.used_bytes,
+                available_bytes: disk.available_bytes,
+            })
+            .collect(),
+        unreadable: asked.unreadable,
     }))
 }

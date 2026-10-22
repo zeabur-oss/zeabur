@@ -16,7 +16,8 @@
 //!
 //! # The metrics store
 //!
-//! A Service port that serves the Prometheus HTTP API, as `namespace/name:port`, read through
+//! A Service port that serves the Prometheus HTTP API, as `namespace/name:port`, that usage
+//! history, node disk and volume use (`crate::cluster::disks`) are read from, through
 //! kube-apiserver's service proxy (see `zeabur_kube::Cluster::proxy_get`). The default is where
 //! Zeabur's recommendation installs VictoriaMetrics: the operator names a `VMSingle`'s Service
 //! `vmsingle-<name>`, and the k8s-stack chart names its `VMSingle` after the release
