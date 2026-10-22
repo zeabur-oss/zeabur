@@ -14,6 +14,7 @@ import {
 import { editCount, partOf } from "@/model/draft"
 import { problemText } from "@/model/problem"
 import { isolates, undoOf, type PodsOf, type Reason } from "@/model/risk"
+import { imageTag } from "@/model/service"
 
 type Change = Schemas["Change"]
 type WorkloadRef = Schemas["WorkloadRef"]
@@ -130,6 +131,15 @@ function sentenceOf(
     }
     case "probe":
       return probeSentence(t, change.probe, change.set ?? undefined)
+    case "image":
+      return t("confirm.image", change.workload.name, imageTag(change.image))
+    case "rebuild":
+      return t("confirm.rebuild", change.build)
+    case "autoUpdate":
+      return t(
+        change.enabled ? "confirm.autoUpdateOn" : "confirm.autoUpdateOff",
+        change.workload.name,
+      )
     case "scale": {
       if (change.replicas === 0) return t("confirm.scaleZero", change.workload.name)
       const from = podsOf(change.workload)?.desired
@@ -593,6 +603,12 @@ export function actionOf(t: Translate, ask: Asked, plan?: Plan): string {
       if (ask.changes.every((c) => c.op === "scale" && c.replicas === 0))
         return count > 1 ? t("action.pauseMany", count) : t("action.pause")
       return count > 1 ? t("action.scaleMany", count) : t("action.scale", change.replicas)
+    case "image":
+      return t("action.deploy")
+    case "rebuild":
+      return t("action.rebuild")
+    case "autoUpdate":
+      return t(change.enabled ? "action.autoUpdateOn" : "action.autoUpdateOff")
     case "resources":
       return t("action.saveResources")
     case "edit":

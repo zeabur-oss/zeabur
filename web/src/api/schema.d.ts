@@ -412,6 +412,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/builds": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The project's Zeabur Builder `Build`s and their runs, with the pod of each run, read as the
+     *     person. `state` is `not-installed` when the cluster does not serve `builder.zeabur.com`.
+     */
+    get: operations["getProjectBuilds"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/configmaps": {
     parameters: {
       query?: never
@@ -1372,6 +1392,34 @@ export interface components {
           probe: components["schemas"]["ProbeKind"]
           set?: components["schemas"]["ProbeRequest"] | null
           /** @description The workload. */
+          workload: components["schemas"]["WorkloadRef"]
+        }
+      | {
+          /** @description The container; may be left out when the workload has only one. */
+          container?: string | null
+          /** @description The image reference, such as a Zeabur Builder `Build`'s `status.latestImage`. */
+          image: string
+          /** @enum {string} */
+          op: "image"
+          /** @description The workload. */
+          workload: components["schemas"]["WorkloadRef"]
+        }
+      | {
+          /** @description The `Build`. */
+          build: string
+          /** @enum {string} */
+          op: "rebuild"
+        }
+      | {
+          /** @description The `Build` whose new images Keel is told of, when turning it on. */
+          build?: string | null
+          /** @description On or off. */
+          enabled: boolean
+          /** @enum {string} */
+          op: "autoUpdate"
+          /** @description Keel's native webhook, `…/v1/webhooks/native`. */
+          webhook?: string | null
+          /** @description The workload: a Deployment, StatefulSet or DaemonSet. */
           workload: components["schemas"]["WorkloadRef"]
         }
       | {
@@ -2350,6 +2398,15 @@ export interface components {
        *     member gets a link that adds a passkey; their name and role stay.
        */
       username: string
+    }
+    /** @description A workload's Keel policy. */
+    KeelPolicy: {
+      /** @description `Deployment`, `StatefulSet` or `DaemonSet`. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description The `keel.sh/policy` annotation: `force`, `major`, `minor`, `patch`, `all`, `glob:…`. */
+      policy: string
     }
     /**
      * @description What went wrong, in categories a person can act on. An open set: clients must expect new
@@ -3493,6 +3550,26 @@ export interface components {
       /** @description Claims and databases no active schedule covers. */
       unscheduled: components["schemas"]["BackupTarget"][]
     }
+    /** @description A run and the pod that ran it. */
+    ProjectBuildRun: components["schemas"]["ZeaburBuilderRun"] & {
+      /** @description The pod's containers, in the order they run (`fetch`, `plan`, `build`). */
+      containers: string[]
+      /** @description Its pod, while it is there. */
+      pod?: string | null
+    }
+    /** @description A project's builds. */
+    ProjectBuilds: {
+      /** @description The `Build`s, by name. */
+      builds: components["schemas"]["ZeaburBuilderBuild"][]
+      /** @description The workloads Keel updates; read only when there is a `Build`. */
+      keel: components["schemas"]["KeelPolicy"][]
+      /** @description Their runs, newest first. */
+      runs: components["schemas"]["ProjectBuildRun"][]
+      /** @description Whether Zeabur Builder could be read. */
+      state: components["schemas"]["ProviderState"]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /**
      * @description A project's details, as its namespace's annotations give them. Each is absent when its
      *     annotation is missing or blank (or, for the icon, names no built-in icon).
@@ -4633,6 +4710,67 @@ export interface components {
       /** @description The tool it is. */
       tool: components["schemas"]["ManagerTool"]
     }
+    /** @description A `Build`. */
+    ZeaburBuilderBuild: {
+      /** @description The `ClusterBuilder`. */
+      builder?: string | null
+      /** @description The branch or tag it follows. */
+      gitRef?: string | null
+      /** @description The Git repository. */
+      gitUrl?: string | null
+      /** @description The Keel webhooks it tells of new images. */
+      keelWebhooks: string[]
+      /** @description The newest successful image, `repository:tag@sha256:…`. */
+      latestImage?: string | null
+      /** @description The commit it was built from. */
+      latestRevision?: string | null
+      /** @description The message. */
+      message?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description The `Ready` condition: `True`, `False` or `Unknown`. */
+      ready?: string | null
+      /** @description Its reason and message, as the controller wrote them. */
+      reason?: string | null
+      /** @description The value of the rebuild annotation, when set. */
+      rebuildRequested?: string | null
+      /** @description The commit the ref points at. */
+      remoteRevision?: string | null
+      /**
+       * @description The repository it pushes to, without tag or digest; unknown until the first image when
+       *     the controller's default registry is used.
+       */
+      repository?: string | null
+      /** @description Whether builds are paused. */
+      suspended: boolean
+    }
+    /** @description A `BuildRun`. */
+    ZeaburBuilderRun: {
+      /** @description The `Build`. */
+      build: string
+      /** @description When it was created. */
+      created?: string | null
+      /** @description The pushed manifest's digest. */
+      digest?: string | null
+      /** @description When it finished. */
+      finished?: string | null
+      /** @description Details, at most 1 KiB of the Job's output. */
+      message?: string | null
+      /** @description Its name, also its Job's and its pod's label. */
+      name: string
+      /** @description `Pending`, `Planning`, `Building`, `Succeeded`, `Failed` or `Cancelled`. */
+      phase?: string | null
+      /** @description Why it waits or failed. */
+      reason?: string | null
+      /** @description The commit. */
+      revision?: string | null
+      /** @description When it started. */
+      started?: string | null
+      /** @description The tags pushed. */
+      tags: string[]
+      /** @description `webhook`, `poll`, `manual`, `baseImage` or `replan`. */
+      trigger?: string | null
+    }
   }
   responses: never
   parameters: never
@@ -5361,6 +5499,36 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["ProjectBackups"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getProjectBuilds: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ProjectBuilds"]
         }
       }
       403: {

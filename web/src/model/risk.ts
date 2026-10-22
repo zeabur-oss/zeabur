@@ -104,6 +104,8 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
       return isolates(change.object) ? { risk: "high", reason: "isolates" } : { risk: "normal" }
     case "delete":
       return { risk: "high", reason: "deletes" }
+    case "image":
+    case "autoUpdate":
     case "env":
     case "addDomain":
     case "renameDomain":
@@ -115,6 +117,7 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
       return { risk: "normal" }
     case "adopt":
     case "details":
+    case "rebuild":
       return { risk: "low" }
   }
 }

@@ -5,6 +5,7 @@ export const serviceTabs = [
   "overview",
   "logs",
   "deployments",
+  "builds",
   "usage",
   "networking",
   "variables",
