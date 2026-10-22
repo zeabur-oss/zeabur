@@ -1,4 +1,5 @@
-//! Adopting a namespace, letting it go and a project's details through the API, against an
+//! Creating a project, adopting a namespace, letting it go and a project's details through the
+//! API, against an
 //! in-memory cluster: the write is one patch of the Namespace, cluster-scoped; the list shows the
 //! result; a system namespace and a refused patch get typed problems.
 
@@ -304,5 +305,51 @@ mod tests {
         assert!(namespace.get("icon").is_none());
         let (status, _) = send(&app, "GET", "/api/v1/projects/nowhere/namespace", None).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn a_new_project_is_one_created_namespace_with_the_label_and_shows_in_the_list() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let (_, list) = send(&app, "GET", "/api/v1/projects", None).await;
+        assert_eq!(list["canCreate"], "allowed", "{list}");
+
+        let (status, applied) = plan_and_apply(
+            &app,
+            "my-app",
+            json!([{"op": "createProject", "displayName": "My app"}]),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        assert_eq!(writes.len(), 1);
+        assert_eq!(writes[0].target.namespace, "");
+        assert_eq!(writes[0].target.plural, "namespaces");
+        assert!(matches!(writes[0].body, WriteBody::Create(_)));
+        let created = summary(&app, "my-app").await;
+        assert_eq!(created["adopted"], true, "{created}");
+        assert_eq!(created["displayName"], "My app", "{created}");
+
+        let (status, taken) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({"changes": [{"op": "createProject"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{taken}");
+    }
+
+    #[tokio::test]
+    async fn without_the_right_to_create_namespaces_the_list_says_so_and_the_apply_is_refused() {
+        let cluster = cluster();
+        cluster.update(|s| s.cluster_wide_denied = true);
+        let app = app(&cluster);
+        let (_, list) = send(&app, "GET", "/api/v1/projects", None).await;
+        assert_eq!(list["canCreate"], "denied", "{list}");
+        let (status, refused) =
+            plan_and_apply(&app, "my-app", json!([{"op": "createProject"}])).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
+        assert!(cluster.inspect(|s| s.writes.is_empty()).unwrap());
     }
 }

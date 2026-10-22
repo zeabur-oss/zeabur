@@ -5,7 +5,7 @@ now, which workloads it affects, and what to know before applying. The requests 
 set a variable, change a ConfigMap or Secret key, add, rename or remove a hostname, restart a
 workload or roll it back to an earlier release, scale it, set a probe or its resources, add or
 grow a volume and move a mount, replace an object with edited YAML, create a ready-made object
-([`CREATABLE`]), delete one, adopt a namespace or let it go, and set a project's details.
+([`CREATABLE`]), delete one, create a project's namespace, adopt a namespace or let it go, and set a project's details.
 A plan token binds the request, the resource versions it was computed against and the person,
 so an apply carries out exactly what was confirmed, or nothing; this crate defines the claims,
 `zeabur-api` seals them.

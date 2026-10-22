@@ -21,6 +21,10 @@
 //! system-upgrade-controller Plan resolves a newer patch, so the cluster page shows one; the demo
 //! makes no outbound request.
 //!
+//! `namespaces` in `ZEABUR_DEMO_FORBID` refuses creating projects. New public URLs are suggested
+//! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
+//! `ZEABUR_DEMO_NO_DOMAINS=1` leaves both unset.
+//!
 //! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
 //! after it is added, as do tools pods. `ZEABUR_DEMO_TOOLS=1` hands the session a made-up token,
 //! so the kubectl terminal is offered.
@@ -1988,6 +1992,11 @@ async fn main() -> std::io::Result<()> {
             .extend(["shop/web-7c9d8-abcde", "shop/web-7c9d8-fghij"].map(str::to_owned));
         DISKS.get_or_init(|| disks(&mut s.objects));
     });
+    if std::env::var("ZEABUR_DEMO_FORBID")
+        .is_ok_and(|list| list.split(',').any(|r| r == "namespaces"))
+    {
+        cluster.update(|s| s.cluster_wide_denied = true);
+    }
     kubelet(cluster.clone());
     let access = Demo {
         cluster: Arc::new(cluster),
@@ -2001,6 +2010,14 @@ async fn main() -> std::io::Result<()> {
             issuer: Some("https://identity.example.com".to_owned()),
             project_roles: true,
             ..zeabur_api::settings::IdentitySettings::default()
+        },
+        domains: if std::env::var_os("ZEABUR_DEMO_NO_DOMAINS").is_some() {
+            zeabur_api::settings::DomainSettings::default()
+        } else {
+            zeabur_api::settings::DomainSettings {
+                suffix: Some("apps.example.com".to_owned()),
+                cluster_issuer: Some("letsencrypt".to_owned()),
+            }
         },
         ..zeabur_api::Settings::default()
     };

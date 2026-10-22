@@ -128,7 +128,24 @@ pub(crate) async fn list(Person(cluster): Person) -> Result<Json<ProjectList>, A
             item.services = Some(services);
         }
     }
-    Ok(Json(ProjectList { items }))
+    let can_create = can_create(cluster.as_ref()).await;
+    Ok(Json(ProjectList { items, can_create }))
+}
+
+/// Whether the person may create a Namespace, from one `SelfSubjectAccessReview`.
+async fn can_create(cluster: &dyn Cluster) -> namespace::Permission {
+    let request = zeabur_core::problem::Denied {
+        verb: "create".to_owned(),
+        group: String::new(),
+        resource: "namespaces".to_owned(),
+        name: None,
+        namespace: None,
+    };
+    match cluster.review_access(&request).await {
+        Ok(true) => namespace::Permission::Allowed,
+        Ok(false) => namespace::Permission::Denied,
+        Err(_) => namespace::Permission::Unknown,
+    }
 }
 
 /// A project's service health counts, and each service with its health.

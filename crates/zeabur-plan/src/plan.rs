@@ -298,6 +298,18 @@ pub fn plan_with(
              changes to the objects in it.",
         ));
     }
+    if request.changes.len() > 1
+        && request
+            .changes
+            .iter()
+            .any(|c| matches!(c, Change::CreateProject { .. }))
+    {
+        return Err(error(
+            ErrorKind::BadRequest,
+            "create_project_alone",
+            "A new project is planned on its own; add what goes in it once it exists.",
+        ));
+    }
     let mut planner = Planner {
         input,
         conventions,
@@ -399,6 +411,7 @@ impl<'a> Planner<'a> {
                 name,
                 resource_version,
             } => self.delete(resource, name, resource_version.as_deref()),
+            Change::CreateProject { display_name } => self.create_project(display_name.as_deref()),
             Change::Adopt => self.adopt(),
             Change::Unadopt => self.unadopt(),
             Change::Details {

@@ -88,6 +88,7 @@ pub(crate) async fn compute(
         | Change::Edit { .. }
         | Change::Create { .. }
         | Change::Delete { .. }
+        | Change::CreateProject { .. }
         | Change::Adopt
         | Change::Unadopt
         | Change::Details { .. } => Err(ApiError::from(Problem::new(

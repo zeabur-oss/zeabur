@@ -370,4 +370,91 @@ mod tests {
             "not_adopted"
         );
     }
+
+    fn create(
+        name: &str,
+        existing: Option<&Value>,
+        display_name: Option<&str>,
+    ) -> Result<Plan, PlanError> {
+        let snapshot = Snapshot {
+            namespace: name.to_owned(),
+            ..Snapshot::default()
+        };
+        plan(
+            Input {
+                namespace: existing,
+                ..Input::new(&snapshot, "2026-10-23T00:00:00Z")
+            },
+            &PlanRequest {
+                changes: vec![Change::CreateProject {
+                    display_name: display_name.map(str::to_owned),
+                }],
+            },
+        )
+    }
+
+    #[test]
+    fn a_new_project_is_a_namespace_with_the_project_label_and_nothing_else() {
+        let plan = create("my-app", None, Some("  My app ")).unwrap();
+        assert_eq!(plan.objects.len(), 1);
+        let object = &plan.objects[0];
+        assert_eq!(object.target.plural, "namespaces");
+        assert!(!object.target.namespaced());
+        let Write::Create { body } = &object.write else {
+            panic!("a new Namespace is created");
+        };
+        assert_eq!(
+            body,
+            &json!({"apiVersion": "v1", "kind": "Namespace", "metadata": {
+                "name": "my-app",
+                "labels": {LABEL: "true"},
+                "annotations": {"zeabur.com/display-name": "My app"}
+            }})
+        );
+        let unnamed = create("my-app", None, Some(" ")).unwrap();
+        let Write::Create { body } = &unnamed.objects[0].write else {
+            panic!("a new Namespace is created");
+        };
+        assert!(body["metadata"].get("annotations").is_none(), "{body}");
+    }
+
+    #[test]
+    fn a_new_project_is_refused_for_a_taken_kept_or_invalid_name() {
+        let taken = create("shop", Some(&shop(false)), None).unwrap_err();
+        assert_eq!(
+            (taken.kind, taken.code.as_str()),
+            (ErrorKind::Conflict, "namespace_exists")
+        );
+        let kept = create("kube-tools", None, None).unwrap_err();
+        assert_eq!(kept.kind, ErrorKind::SystemNamespace);
+        for name in ["My-App", "-app", "a_b", ""] {
+            let error = create(name, None, None).unwrap_err();
+            assert_eq!(error.code, "invalid_project_name", "{name}");
+        }
+        let long = "x".repeat(200);
+        assert_eq!(
+            create("app", None, Some(&long)).unwrap_err().code,
+            "display_name_too_long"
+        );
+        let snapshot = Snapshot {
+            namespace: "app".to_owned(),
+            ..Snapshot::default()
+        };
+        let mixed = plan(
+            Input::new(&snapshot, "2026-10-23T00:00:00Z"),
+            &PlanRequest {
+                changes: vec![Change::CreateProject { display_name: None }, Change::Adopt],
+            },
+        )
+        .unwrap_err();
+        assert_eq!(mixed.code, "create_project_alone");
+        let read: Change =
+            serde_json::from_value(json!({"op": "createProject", "displayName": "App"})).unwrap();
+        assert_eq!(
+            read,
+            Change::CreateProject {
+                display_name: Some("App".to_owned())
+            }
+        );
+    }
 }

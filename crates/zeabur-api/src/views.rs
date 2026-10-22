@@ -192,6 +192,8 @@ pub struct ServiceSummary {
 pub struct ProjectList {
     /// Adopted projects first, then the other namespaces, each sorted by name.
     pub items: Vec<ProjectSummary>,
+    /// Whether the person may create a project (`create` on `namespaces`, cluster-wide).
+    pub can_create: crate::projects::namespace::Permission,
 }
 
 /// A project: its services, the resources they use and how they relate, read as the person.

@@ -137,7 +137,8 @@ pub struct State {
     /// What a `SelfSubjectRulesReview` answers in a namespace, instead of rules that follow the
     /// refusals above; `None`: the review fails with `500`.
     pub access_rules: BTreeMap<String, Option<AccessRules>>,
-    /// Every cluster-wide `SelfSubjectAccessReview` (one without a namespace) answers no.
+    /// Every cluster-wide `SelfSubjectAccessReview` (one without a namespace) answers no, and
+    /// creating a Namespace is refused.
     pub cluster_wide_denied: bool,
 }
 
@@ -1130,6 +1131,9 @@ impl Cluster for MemoryCluster {
                 &target.namespace
             };
             let mut state = self.allowed(Some(namespace))?;
+            if state.cluster_wide_denied && creates_namespace(request) {
+                return Err(forbidden("namespaces"));
+            }
             let what = format!("{}/{}", target.kind, target.name);
             if state.forbidden_writes.contains(&what) {
                 return Err(forbidden(&what));
@@ -1351,6 +1355,11 @@ where
 }
 
 /// Puts `object` in `items` in place of the object called `name`, or after the others.
+/// A `POST` of a Namespace, which kube-apiserver authorises cluster-wide.
+fn creates_namespace(request: &WriteRequest) -> bool {
+    request.target.kind == "Namespace" && matches!(request.body, WriteBody::Create(_))
+}
+
 fn put<T>(items: &mut Vec<T>, name: &str, object: Value) -> Result<(), ClusterError>
 where
     T: Metadata<Ty = ObjectMeta> + DeserializeOwned,

@@ -253,6 +253,15 @@ pub enum Change {
     /// Stop showing the namespace as a project: remove that label, and nothing else. Nothing in
     /// the namespace is deleted.
     Unadopt,
+    /// Create the project's Namespace, with the project label and, when given, its display
+    /// name. Refused when a namespace of that name exists (adopt it instead), and for a name
+    /// Kubernetes keeps for itself (`kube-` prefix). Planned on its own.
+    #[serde(rename_all = "camelCase")]
+    CreateProject {
+        /// The name to show instead of the namespace's.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        display_name: Option<String>,
+    },
     /// Set the project's details, the Namespace's `zeabur.com/display-name`,
     /// `…/description` and `…/icon` annotations: each one left out (or blank) is removed.
     #[serde(rename_all = "camelCase")]
@@ -294,11 +303,14 @@ impl Change {
         matches!(self, Self::DebugContainer { .. } | Self::ClusterTools)
     }
 
-    /// Whether the change writes the project's Namespace (adopting it, letting it go, its
-    /// details) rather than objects in it.
+    /// Whether the change writes the project's Namespace (creating it, adopting it, letting it
+    /// go, its details) rather than objects in it.
     #[must_use]
     pub const fn is_namespace_change(&self) -> bool {
-        matches!(self, Self::Adopt | Self::Unadopt | Self::Details { .. })
+        matches!(
+            self,
+            Self::CreateProject { .. } | Self::Adopt | Self::Unadopt | Self::Details { .. }
+        )
     }
 }
 

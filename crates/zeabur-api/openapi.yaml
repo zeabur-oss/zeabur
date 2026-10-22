@@ -3472,6 +3472,23 @@ components:
             - unadopt
       - type: object
         description: |-
+          Create the project's Namespace, with the project label and, when given, its display
+          name. Refused when a namespace of that name exists (adopt it instead), and for a name
+          Kubernetes keeps for itself (`kube-` prefix). Planned on its own.
+        required:
+        - op
+        properties:
+          displayName:
+            type:
+            - string
+            - "null"
+            description: The name to show instead of the namespace's.
+          op:
+            type: string
+            enum:
+            - createProject
+      - type: object
+        description: |-
           Set the project's details, the Namespace's `zeabur.com/display-name`,
           `…/description` and `…/icon` annotations: each one left out (or blank) is removed.
         required:
@@ -8598,7 +8615,13 @@ components:
       description: The projects (namespaces) the person may list.
       required:
       - items
+      - canCreate
       properties:
+        canCreate:
+          $ref: "#/components/schemas/Permission"
+          description: >-
+            Whether the person may create a project (`create` on `namespaces`,
+            cluster-wide).
         items:
           type: array
           items:

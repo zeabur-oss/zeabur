@@ -1,5 +1,9 @@
-//! The planner for the project's Namespace: adopting it, letting it go, and its details.
+//! The planner for the project's Namespace: creating it, adopting it, letting it go, and its
+//! details.
 //!
+//! - **Creating** writes a new Namespace with the project label and, when given, the display name;
+//!   nothing else. kube-apiserver refuses it (`409 AlreadyExists`) if the name was taken since the
+//!   plan, which refuses a name that exists when it plans.
 //! - **Adopting** adds one label, `zeabur.com/project: "true"`; **letting go** removes it. Nothing
 //!   else on the Namespace changes, and nothing in it: a namespace that is no longer adopted keeps
 //!   every object, and is only no longer shown as a project.
@@ -22,9 +26,10 @@ use zeabur_kernel::names::is_system_namespace;
 use zeabur_model::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, ProjectIcon};
 
 use crate::change::Target;
+use crate::checks::is_dns_label;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
-use crate::plan::{ErrorKind, PlanError, Planner, error};
+use crate::plan::{ErrorKind, PlanError, Planner, Working, error};
 
 /// The value of the project label.
 const ADOPTED: &str = "true";
@@ -61,6 +66,63 @@ impl Planner<'_> {
                 &conventions.project_label,
             ]))
             .is_some()
+    }
+
+    pub(crate) fn create_project(&mut self, display_name: Option<&str>) -> Result<(), PlanError> {
+        let conventions = self.conventions;
+        let name = self.input.snapshot.namespace.clone();
+        if !is_dns_label(&name) {
+            return Err(error(
+                ErrorKind::Invalid,
+                "invalid_project_name",
+                format!(
+                    "{name:?} cannot name a project: use at most 63 lowercase letters, digits \
+                     and hyphens, starting and ending with a letter or digit."
+                ),
+            ));
+        }
+        if is_system_namespace(&name) {
+            return Err(error(
+                ErrorKind::SystemNamespace,
+                "system_namespace",
+                format!(
+                    "Names starting with kube- are kept for Kubernetes; {name} cannot be a project."
+                ),
+            ));
+        }
+        if self.input.namespace.is_some() {
+            return Err(error(
+                ErrorKind::Conflict,
+                "namespace_exists",
+                format!("A namespace named {name} already exists; adopt it instead."),
+            ));
+        }
+        let display_name = wanted(display_name);
+        validate(
+            display_name,
+            DISPLAY_NAME_MAX,
+            false,
+            "display_name",
+            "display name",
+        )?;
+        let annotations =
+            display_name.map(|d| json!({ conventions.display_name_annotation.clone(): d }));
+        let mut metadata = json!({
+            "name": name,
+            "labels": { conventions.project_label.clone(): ADOPTED },
+        });
+        if let (Some(annotations), Some(map)) = (annotations, metadata.as_object_mut()) {
+            map.insert("annotations".to_owned(), annotations);
+        }
+        self.objects.push(Working {
+            target: Target::namespace(&name),
+            original: None,
+            current: json!({"apiVersion": "v1", "kind": "Namespace", "metadata": metadata}),
+            operations: Vec::new(),
+            owners: Vec::new(),
+            deleted: false,
+        });
+        Ok(())
     }
 
     pub(crate) fn adopt(&mut self) -> Result<(), PlanError> {

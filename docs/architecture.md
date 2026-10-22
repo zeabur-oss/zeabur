@@ -17,9 +17,9 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
   whoever may `zeabur-manage` the namespace. Every member can list namespaces and so read their
   annotations: details hold no secrets.
 - **Kubernetes objects are the only state.** No database, no cache of Secret values, and no
-  custom resources for layers L0 to L2. A project is a namespace; adopting one only adds a label.
-  Removing Zeabur leaves the cluster as it was, but for the member bindings admins made, which
-  carry the label `zeabur.com/member`.
+  custom resources for layers L0 to L2. A project is a namespace; creating one is a plan like
+  any other change, and adopting one only adds a label. Removing Zeabur leaves the cluster as it
+  was, but for the member bindings admins made, which carry the label `zeabur.com/member`.
 - **Project, not own.** Services are inferred from owner references, selectors, env and volume
   references, backendRefs, operator conventions and the labels of Helm, Argo CD and Flux. For
   objects a GitOps tool or Helm manages, Zeabur exports a patch or warns, and never fights over
