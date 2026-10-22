@@ -35,10 +35,25 @@ for values in "$chart"/ci/*-values.yaml; do
   helm lint --strict --quiet "$chart" -f "$values" >/dev/null || fail "$name: helm lint failed"
   out=$(render -f "$values")
 
-  # Zeabur has no rights of its own: no ClusterRole, no binding to a ServiceAccount, and no token
-  # in the pod. The one Role the chart may render lets people read Zeabur's settings: `get` on
-  # the ConfigMap zeabur-settings, nothing else.
-  expect "$name" "$out" '[select(.kind == "ClusterRole" or .kind == "ClusterRoleBinding")] | length' 0
+  # Zeabur has no rights of its own: no binding to a ServiceAccount, no ClusterRoleBinding, and no
+  # token in the pod. The one Role the chart may render lets people read Zeabur's settings: `get`
+  # on the ConfigMap zeabur-settings, nothing else. The ClusterRoles are the member roles, which
+  # Zeabur binds per member.
+  expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
+  expect "$name" "$out" '[select(.kind == "ClusterRole") | .metadata.name] | sort | join(",")' \
+    zeabur-member,zeabur-project-developer,zeabur-project-viewer
+  roles='select(.kind == "ClusterRole") | .rules[]'
+  # Every rule names its groups, resources and verbs.
+  expect "$name" "$out" "[$roles | (.apiGroups + .resources + .verbs)[] | select(test(\"^[*]$\"))] | length" 0
+  # No RBAC objects, no kubelet, no widening of one's own rights, no namespace made or deleted.
+  expect "$name" "$out" "[$roles | select(.apiGroups[] == \"rbac.authorization.k8s.io\")] | length" 0
+  expect "$name" "$out" "[$roles | select(.resources[] == \"nodes/proxy\")] | length" 0
+  expect "$name" "$out" "[$roles | .verbs[] | select(. == \"escalate\" or . == \"bind\" or . == \"impersonate\")] | length" 0
+  expect "$name" "$out" "[$roles | select(.resources[] == \"namespaces\") | .verbs[] | select(. != \"get\" and . != \"list\")] | length" 0
+  # Secret values and shells in containers belong to developers only.
+  expect "$name" "$out" \
+    '[select(.kind == "ClusterRole") | select(.rules | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \
+    zeabur-project-developer
   expect "$name" "$out" '[select(.kind == "RoleBinding") | .subjects[] | select(.kind == "ServiceAccount")] | length' 0
   expect "$name" "$out" \
     'select(.kind == "Role") | .rules[] | [.apiGroups, .resources, .resourceNames, .verbs] | map(join(",")) | join("|")' \
@@ -70,6 +85,7 @@ for values in "$chart"/ci/*-values.yaml; do
   done
   # ZEABUR_ELEVATION is parsed as a bool: exactly true or false.
   expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_ELEVATION\") | .value | test(\"^(true|false)$\")" true
+  expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_MEMBER_ROLES\") | .value | test(\"^(true|false)$\")" true
 done
 
 # The plan key: generated when no Secret is named, else the named one is mounted.
@@ -95,6 +111,12 @@ expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
   'select(.kind == "RoleBinding") | .subjects[] | .kind + "/" + .name' Group/system:authenticated
 expect "everyoneReads=false" "$(render -f "$chart/ci/minimal-values.yaml" --set metricsStore.everyoneReads=false)" \
   '[select(.kind == "Role" or .kind == "RoleBinding")] | length' 0
+
+# Without the member roles there is no ClusterRole, and Zeabur offers only admin or no rights.
+out=$(render -f "$chart/ci/minimal-values.yaml" --set memberRoles.enabled=false)
+expect "memberRoles=false" "$out" '[select(.kind == "ClusterRole")] | length' 0
+expect "memberRoles=false" "$out" \
+  'select(.kind == "Deployment") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_MEMBER_ROLES") | .value' false
 
 # The terminal settings reach Zeabur as its flags; empty images stay Zeabur's pinned defaults.
 terminal_env='select(.kind == "Deployment") | .spec.template.spec.containers[0].env[] | select(.name | test("^ZEABUR_(DEBUG|TOOLS)_")) | .name + "=" + .value'

@@ -72,6 +72,8 @@ spec:
               value: /etc/zeabur/plan-key/{{ .Values.planKey.key }}
             - name: ZEABUR_ELEVATION
               value: {{ .Values.elevation.enabled | quote }}
+            - name: ZEABUR_MEMBER_ROLES
+              value: {{ .Values.memberRoles.enabled | quote }}
             # Where the settings people choose are kept: the ConfigMap zeabur-settings here.
             - name: ZEABUR_NAMESPACE
               valueFrom:

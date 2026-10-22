@@ -1,0 +1,133 @@
+# The rules of the member roles (templates/member-roles.yaml); Zeabur binds them per member
+# (crates/zeabur-api/src/members/access.rs, which also tests these rules).
+#
+# Every verb and resource is named: no `*`. Neither role has RBAC objects, namespace create or
+# delete, nodes/proxy, or the escalate, bind and impersonate verbs, so no member can widen their
+# own rights or reach a kubelet.
+# https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks
+
+# Everyone signed in: node names and status, and the names of every project.
+zeabur-member:
+  - apiGroups: [""]
+    resources: [nodes, namespaces]
+    verbs: [get, list]
+
+# Read what a project runs. Like the built-in `view`, without Secrets: a list returns their
+# values. https://kubernetes.io/docs/concepts/security/rbac-good-practices/#listing-secrets
+zeabur-project-viewer:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - configmaps
+      - persistentvolumeclaims
+      - events
+      - replicationcontrollers
+      - serviceaccounts
+      - resourcequotas
+      - limitranges
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets, controllerrevisions]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch]
+  - apiGroups: [policy]
+    resources: [poddisruptionbudgets]
+    verbs: [get, list, watch]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses, networkpolicies]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [get, list, watch]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [httproutes]
+    verbs: [get, list, watch]
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods]
+    verbs: [get, list]
+
+# Run and change a project: the viewer's reads, plus what deploying, variables, restarts and
+# terminals write. Narrower than the built-in `edit`: no ServiceAccount writes or impersonation,
+# no service or pod proxy, no deletecollection.
+zeabur-project-developer:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - configmaps
+      - persistentvolumeclaims
+      - events
+      - replicationcontrollers
+      - serviceaccounts
+      - resourcequotas
+      - limitranges
+    verbs: [get, list, watch]
+  # Reading a Secret reveals its values.
+  # https://kubernetes.io/docs/concepts/security/rbac-good-practices/#listing-secrets
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [services, configmaps, persistentvolumeclaims]
+    verbs: [create, update, patch, delete]
+  # Creating a pod runs it as any ServiceAccount of the project, with that account's rights.
+  # https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [create, delete]
+  # A shell in a container: everything the container can read, its mounted Secrets and token
+  # included. kube-apiserver checks `create` on WebSockets since 1.30, `get` before.
+  # https://kubernetes.io/docs/concepts/security/rbac-good-practices/#workload-creation
+  - apiGroups: [""]
+    resources: [pods/exec, pods/attach, pods/portforward]
+    verbs: [get, create]
+  # A debug container next to the app's, the same reach as exec.
+  - apiGroups: [""]
+    resources: [pods/ephemeralcontainers]
+    verbs: [patch]
+  - apiGroups: [apps]
+    resources: [deployments, replicasets, statefulsets, daemonsets, controllerrevisions]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets]
+    verbs: [create, update, patch, delete]
+  - apiGroups: [apps]
+    resources: [deployments/scale, statefulsets/scale]
+    verbs: [update, patch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [policy]
+    resources: [poddisruptionbudgets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses, networkpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [get, list, watch]
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [httproutes]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods]
+    verbs: [get, list]
