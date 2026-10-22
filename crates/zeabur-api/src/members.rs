@@ -1,4 +1,5 @@
-//! Members and your account, kept in Zeabur Identity's custom resources.
+//! Members, kept in Zeabur Identity's custom resources. One's own account is not read here (see
+//! [`crate::account`]).
 //!
 //! The people Zeabur Identity signs in, their passkeys and their one-time setup links are read
 //! and changed through `identity.zeabur.com/v1alpha1` (`User`, `Credential`, `Invitation`,
@@ -9,9 +10,9 @@
 //! Like everything else, every read and write goes to kube-apiserver as the person, so RBAC
 //! decides: Zeabur Identity's install gives `zeabur:admins` the `view` role, which does not
 //! reach these custom resources, and `zeabur:elevated:admins` `cluster-admin`, so in practice an
-//! administrator manages members, and everyone else sees the refusal with the rule it needs. That
-//! includes one's own passkeys: RBAC cannot narrow a `list` to the objects labelled with one's
-//! name, so there is no right to read only one's own ([k8s-rbac-names]).
+//! administrator manages members, and everyone else sees the refusal with the rule it needs. RBAC
+//! cannot narrow a `list` to the objects labelled with one's name ([k8s-rbac-names]), which is
+//! why one's own passkeys are managed at the issuer instead.
 //!
 //! # Setup links
 //!
@@ -33,24 +34,23 @@
 //!
 //! # Labels and last use
 //!
-//! A `Credential`'s `spec` is immutable, so a passkey renamed after enrolment keeps its new name
-//! in the annotation `identity.zeabur.com/label`, which wins over `spec.passkey.label`. When
+//! A `Credential`'s `spec` is immutable, so a passkey renamed after enrolment (at Zeabur
+//! Identity) keeps its new name in the annotation `identity.zeabur.com/label`, which wins over
+//! `spec.passkey.label`. When
 //! Zeabur Identity records a credential's last sign-in it is the annotation
 //! `identity.zeabur.com/last-used-at` (RFC 3339); a member's last sign-in is the latest of those
 //! and of their grants' `authTime`.
 //!
 //! [k8s-rbac-names]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
 
-pub(crate) mod account;
 mod directory;
 pub(crate) mod handlers;
 mod writes;
 
 pub use directory::{
-    AccountStatus, AccountView, InvitationView, LinkedAccountView, MemberRole, MemberView,
-    MembersView, PasskeyView, SetupLinks,
+    InvitationView, LinkedAccountView, MemberRole, MemberView, MembersView, PasskeyView, SetupLinks,
 };
-pub use writes::{InviteRequest, PasskeyLabel, SetupLinkRequest, SetupLinkView};
+pub use writes::{InviteRequest, SetupLinkRequest, SetupLinkView};
 
 /// Zeabur Identity's API group.
 pub const GROUP: &str = "identity.zeabur.com";
@@ -77,5 +77,3 @@ pub const ADMIN_GROUP: &str = "admins";
 pub const USER_PREFIX: &str = "zeabur:";
 /// The Identity Deployment, read for its issuer and whether it redeems invitations.
 pub const DEPLOYMENT: &str = "zeabur-identity";
-/// Longest passkey name, as Zeabur Identity limits `spec.passkey.label`.
-pub const MAX_LABEL: usize = 64;

@@ -489,6 +489,7 @@ mod tests {
             }),
             zeabur_api::plan_token::PlanKey::from_bytes([7; 32]),
             zeabur_api::Settings::default(),
+            Arc::new(zeabur_api::account::Fixed(None)),
         )
     }
 

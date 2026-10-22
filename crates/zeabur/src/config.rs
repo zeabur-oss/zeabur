@@ -28,6 +28,10 @@ pub(crate) struct Args {
     /// Zeabur Identity's issuer URL, such as `https://identity.example.com`.
     #[arg(long, env = "ZEABUR_ISSUER_URL")]
     pub(crate) issuer_url: String,
+    /// The issuer's page where people manage how they sign in, linked from their account page.
+    /// Empty: the `manage` URL of the issuer's `/.well-known/passkey-endpoints`, if it has one.
+    #[arg(long, env = "ZEABUR_ACCOUNT_URL", default_value = "")]
+    pub(crate) account_url: String,
     /// A PEM file of certificate authorities to trust for the issuer, besides the image's CA
     /// bundle: for an issuer whose certificate a private CA signed.
     #[arg(long, env = "ZEABUR_ISSUER_CA_FILE")]
@@ -169,6 +173,12 @@ impl Args {
                 .to_owned(),
         );
         settings.identity.issuer = Some(issuer.to_string());
+        if !self.account_url.is_empty() {
+            settings.account_url = Some(
+                zeabur_auth::url::page_url(&self.account_url)
+                    .map_err(|e| format!("--account-url: {e}"))?,
+            );
+        }
         terminal(self, &mut settings.terminal)?;
         if self.session_idle_minutes == 0 || self.session_max_hours == 0 {
             return Err(
@@ -372,6 +382,8 @@ mod tests {
         assert!(error.starts_with("--public-url:"), "{error}");
         let error = args(&files, &["--issuer-url", "zeabur-identity"]).unwrap_err();
         assert!(error.starts_with("--issuer-url:"), "{error}");
+        let error = args(&files, &["--account-url", "http://id.example.com/me"]).unwrap_err();
+        assert!(error.starts_with("--account-url:"), "{error}");
         let empty = files.write("empty", b"\n");
         let error = args(&files, &["--client-secret-file", &empty]).unwrap_err();
         assert!(error.starts_with("--client-secret-file:"), "{error}");
@@ -439,6 +451,15 @@ mod tests {
                 },
                 ..zeabur_api::Settings::default()
             }
+        );
+        let config = args(
+            &files,
+            &["--account-url", "https://id.example.com/me?tab=keys"],
+        )
+        .unwrap();
+        assert_eq!(
+            config.settings.account_url.as_deref(),
+            Some("https://id.example.com/me?tab=keys")
         );
         let config = args(&files, &["--cluster-name", " shop-prod "]).unwrap();
         assert_eq!(config.settings.cluster_name.as_deref(), Some("shop-prod"));

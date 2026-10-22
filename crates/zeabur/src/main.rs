@@ -22,11 +22,12 @@ use clap::Parser;
 use secrecy::{ExposeSecret as _, SecretString};
 use zeabur_auth::client::{ClientConfig, OAuthClient};
 use zeabur_auth::flow::FlowKey;
+use zeabur_auth::passkey::PasskeyEndpoints;
 use zeabur_auth::session::{Bind, Clock, Sessions};
 use zeabur_kube::{ClusterEndpoint, UserClient, UserToken};
 
 use crate::config::{Args, Config};
-use crate::server::{Auth, Connection};
+use crate::server::{Auth, Connection, IssuerPage};
 
 /// Worker threads of the async runtime.
 const WORKERS: usize = 2;
@@ -87,6 +88,8 @@ fn connect(endpoint: ClusterEndpoint) -> Bind<Connection> {
 
 async fn serve(args: &Args, config: Config) -> Result<(), String> {
     let endpoint = ClusterEndpoint::in_cluster().map_err(|e| e.to_string())?;
+    let passkeys = PasskeyEndpoints::new(&config.issuer, config.issuer_ca.clone())
+        .map_err(|e| e.to_string())?;
     let oauth = Arc::new(
         OAuthClient::new(ClientConfig {
             issuer: config.issuer.clone(),
@@ -129,7 +132,12 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
         elevation: config.elevation,
         clock,
     });
-    let app = server::app(&auth, config.plan_key, config.settings);
+    let app = server::app(
+        &auth,
+        config.plan_key,
+        config.settings,
+        Arc::new(IssuerPage(passkeys)),
+    );
 
     tokio::spawn(async move {
         let mut every = tokio::time::interval(SWEEP);

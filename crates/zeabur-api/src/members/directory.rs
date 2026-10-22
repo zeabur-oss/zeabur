@@ -388,13 +388,6 @@ impl Directory {
     }
 }
 
-/// The Zeabur Identity user name of a Kubernetes user name: `zeabur:alice` is `alice`.
-pub(crate) fn identity_username(kubernetes: &str) -> Option<&str> {
-    kubernetes
-        .strip_prefix(USER_PREFIX)
-        .filter(|rest| !rest.is_empty() && !rest.contains(':'))
-}
-
 /// Whether setup links can be made and redeemed here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -625,40 +618,6 @@ pub struct MembersView {
     pub unreadable: Vec<UnreadableView>,
 }
 
-/// Whether the person is a Zeabur Identity user Zeabur can show.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum AccountStatus {
-    /// Signed in through Zeabur Identity; `member` is their account.
-    Identity,
-    /// Signed in as a `zeabur:` user that has no `User` object.
-    Missing,
-    /// Signed in with another credential (a kubeconfig's), which Zeabur Identity does not hold.
-    Kubernetes,
-    /// Zeabur Identity is not installed in the cluster.
-    NotInstalled,
-}
-
-/// The person's own account.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct AccountView {
-    /// `account`.
-    pub id: String,
-    /// Who the cluster says the person is.
-    pub kubernetes_username: String,
-    /// Whether Zeabur Identity holds the account.
-    pub status: AccountStatus,
-    /// The account, when it does.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub member: Option<MemberView>,
-    /// Whether setup links can be made and redeemed.
-    pub setup_links: SetupLinks,
-    /// Whether the person may create invitations (and so add a passkey), as far as their rules
-    /// tell.
-    pub can_manage: Permission,
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -772,15 +731,6 @@ mod tests {
         assert_eq!(directory.passkeys_of("ada"), 2);
         assert_eq!(directory.passkeys_of("bob"), 0);
         assert_eq!(directory.passkeys_of("nobody"), 0);
-    }
-
-    #[test]
-    fn only_a_zeabur_user_name_is_an_identity_user() {
-        assert_eq!(identity_username("zeabur:ada"), Some("ada"));
-        assert_eq!(identity_username("zeabur:"), None);
-        assert_eq!(identity_username("zeabur:elevated:ada"), None);
-        assert_eq!(identity_username("kubernetes-admin"), None);
-        assert_eq!(identity_username("oidc:ada"), None);
     }
 
     #[test]

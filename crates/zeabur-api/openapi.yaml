@@ -21,10 +21,8 @@ paths:
   /api/v1/account:
     get:
       tags:
-      - members
-      summary: |-
-        Your account: who you are, your passkeys and linked accounts. Reading passkeys needs the
-        rights to read Zeabur Identity's credentials, which only admins have by default.
+      - identity
+      summary: Who you are, your role in each project, and where to manage how you sign in.
       operationId: getAccount
       responses:
         "200":
@@ -33,109 +31,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/AccountView"
         "401":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  "/api/v1/account/passkeys/{id}":
-    delete:
-      tags:
-      - members
-      summary: |-
-        Removes one of your passkeys or linked accounts. Your last passkey is refused: admin rights
-        need one, and without it you could not sign in again.
-      operationId: removePasskey
-      parameters:
-      - name: id
-        in: path
-        description: The `Credential` object's name
-        required: true
-        schema:
-          type: string
-      responses:
-        "204": {}
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-    patch:
-      tags:
-      - members
-      summary: >-
-        Renames one of your passkeys; an empty name goes back to the one given when it
-        was added.
-      operationId: renamePasskey
-      parameters:
-      - name: id
-        in: path
-        description: The `Credential` object's name
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PasskeyLabel"
-        required: true
-      responses:
-        "204": {}
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  /api/v1/account/setup-links:
-    post:
-      tags:
-      - members
-      summary: |-
-        A one-time link that adds a passkey to your account, valid for an hour. Open it on the device
-        or in the password manager that should hold the passkey.
-      operationId: createOwnSetupLink
-      responses:
-        "201":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SetupLinkView"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "409":
           content:
             application/problem+json:
               schema:
@@ -1893,46 +1788,43 @@ components:
       - ReadWriteOncePod
       - ReadWriteMany
       - ReadOnlyMany
-    AccountStatus:
-      type: string
-      description: Whether the person is a Zeabur Identity user Zeabur can show.
-      enum:
-      - identity
-      - missing
-      - kubernetes
-      - not-installed
     AccountView:
       type: object
-      description: The person's own account.
+      description: Who you are, what you may do, and where to manage how you sign in.
       required:
       - id
-      - kubernetesUsername
-      - status
-      - setupLinks
-      - canManage
+      - username
+      - groups
+      - clusterAdmin
       properties:
-        canManage:
-          $ref: "#/components/schemas/Permission"
-          description: |-
-            Whether the person may create invitations (and so add a passkey), as far as their rules
-            tell.
+        clusterAdmin:
+          type: boolean
+          description: "Whether you may do anything anywhere: Admin in every project."
+        groups:
+          type: array
+          items:
+            type: string
+          description: Your groups, as kube-apiserver authenticated you.
         id:
           type: string
           description: "`account`."
-        kubernetesUsername:
+        manageSignInUrl:
+          type:
+          - string
+          - "null"
+          description: The issuer's page for your sign-in methods, when it names one.
+        projects:
+          type:
+          - array
+          - "null"
+          items:
+            $ref: "#/components/schemas/ProjectAccess"
+          description: >-
+            Your role in each adopted project, by name; absent when the projects could not
+            be listed.
+        username:
           type: string
-          description: Who the cluster says the person is.
-        member:
-          oneOf:
-          - $ref: "#/components/schemas/MemberView"
-            description: The account, when it does.
-          - type: "null"
-        setupLinks:
-          $ref: "#/components/schemas/SetupLinks"
-          description: Whether setup links can be made and redeemed.
-        status:
-          $ref: "#/components/schemas/AccountStatus"
-          description: Whether Zeabur Identity holds the account.
+          description: Your user name, as kube-apiserver authenticated you.
     AddressKind:
       type: string
       description: What kind of address a trace follows.
@@ -5351,16 +5243,6 @@ components:
       - owned
       - shared
       - orphan
-    PasskeyLabel:
-      type: object
-      description: A passkey's new name.
-      properties:
-        label:
-          type:
-          - string
-          - "null"
-          description: At most 64 characters; empty or `null` goes back to the name given at enrolment.
-      additionalProperties: false
     PasskeyView:
       type: object
       description: "A passkey: a way to sign in that lives on a device or in a password manager."
@@ -6555,6 +6437,25 @@ components:
           items:
             $ref: "#/components/schemas/Service"
           description: One service per workload, sorted by kind then name.
+    ProjectAccess:
+      type: object
+      description: Your role in one adopted project.
+      required:
+      - name
+      properties:
+        displayName:
+          type:
+          - string
+          - "null"
+          description: The name shown instead, when one was given.
+        name:
+          type: string
+          description: The Namespace's name.
+        role:
+          oneOf:
+          - $ref: "#/components/schemas/ProjectRole"
+            description: Your role; absent when your rights there could not be read.
+          - type: "null"
     ProjectBackups:
       type: object
       description: A project's backups across providers.
@@ -6749,6 +6650,14 @@ components:
             type: boolean
             description: Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted.
       description: A project's Namespace.
+    ProjectRole:
+      type: string
+      description: A product role in a project, from the person's rights there.
+      enum:
+      - none
+      - viewer
+      - developer
+      - admin
     ProjectSummary:
       allOf:
       - $ref: "#/components/schemas/ProjectDetails"
@@ -8668,9 +8577,9 @@ components:
           description: The tool it is.
 tags:
 - name: identity
-  description: Who you are
+  description: Who you are and what you may do
 - name: members
-  description: "Your account and everyone Zeabur Identity signs in: passkeys, setup links, removals"
+  description: "Everyone Zeabur Identity signs in: passkeys, setup links, removals"
 - name: cluster
   description: The cluster and what it has installed
 - name: projects
