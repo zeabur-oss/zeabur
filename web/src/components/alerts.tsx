@@ -50,7 +50,7 @@ export function AlertList({
               {place?.(alert)}
               {alert.pod || alert.container ? (
                 <span className="min-w-0 truncate font-mono" translate="no">
-                  {[alert.pod, alert.container].filter(Boolean).join(" · ")}
+                  {[alert.pod, alert.container].filter(Boolean).join(t("common.sep"))}
                 </span>
               ) : null}
             </div>
