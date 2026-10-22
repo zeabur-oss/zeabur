@@ -116,7 +116,7 @@ function usePlan(
       ask,
       t,
       locale,
-      view: destinationOf(project, ask.changes, plan.data, ask.service),
+      view: ask.view ?? destinationOf(project, ask.changes, plan.data, ask.service),
       undo: (applied) => {
         const changes = undoOf(ask.changes, podsOf, applied)
         return changes ? { changes, title: undoTitle(t, changes, ask.changes) } : undefined

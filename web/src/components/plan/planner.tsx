@@ -25,6 +25,8 @@ export interface PlanAsk {
   notes?: string[]
   /** No toast once applied: what follows (a terminal opening) shows it. */
   quiet?: boolean
+  /** Where the toast's View goes, when the changes do not say. */
+  view?: string
 }
 
 /** For a plan of objects written as YAML. */

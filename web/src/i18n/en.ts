@@ -1599,6 +1599,22 @@ export const en = {
     "That deletes the Traefik CRDs and any IngressRoute or Middleware objects; Ingress traffic stops until this one runs.",
   "install.k3sPackagedMetrics": "The metrics API is unavailable until this one runs.",
   "install.k3sPackagedOther": "Its workloads stop until this one runs.",
+  "install.who": "Who installs it",
+  "install.who.zeabur": "Install with Zeabur",
+  "install.who.you": "Run it yourself",
+  "install.here.what": (n: number) =>
+    `Zeabur creates ${n === 1 ? "a HelmChart object" : `${n} HelmChart objects`} in kube-system, and k3s's Helm controller installs from ${n === 1 ? "it" : "them"}. You check each object before anything is created.`,
+  "install.here.action": "Review and install",
+  "install.here.title": (name: string) => `Install ${name}`,
+  "install.here.after":
+    "k3s installs the charts once the objects exist, usually within a few minutes. To remove it, delete these objects.",
+  "install.here.k3sPackaged":
+    "Zeabur doesn't install this one itself: k3s ships its own copy, which has to be disabled on the servers first.",
+  "install.here.inputs": "Zeabur doesn't install this one itself: it needs values you fill in.",
+  "install.here.manifests":
+    "Zeabur doesn't install this one itself: part of it is plain manifests, not a chart.",
+  "install.here.noHelmController":
+    "This cluster has no Helm controller (it isn't k3s), so Zeabur doesn't install components itself.",
   "reach.title": "Connection rules",
   "reach.addPolicy": "Add rule",
   "reach.isolate": "Isolate this service",

@@ -1455,6 +1455,21 @@ export const zhCN: Messages = {
     "这会删除 Traefik 的 CRD 以及所有 IngressRoute、Middleware 对象；这个组件开始运行前，Ingress 流量会中断。",
   "install.k3sPackagedMetrics": "这个组件开始运行前，metrics API 不可用。",
   "install.k3sPackagedOther": "这个组件开始运行前，内置版本的工作负载会停止。",
+  "install.who": "由谁安装",
+  "install.who.zeabur": "由 Zeabur 安装",
+  "install.who.you": "自己运行",
+  "install.here.what": (n: number) =>
+    `Zeabur 会在 kube-system 创建 ${n} 个 HelmChart 对象，k3s 的 Helm 控制器再据此安装。创建前会先让你检查每个对象。`,
+  "install.here.action": "检查并安装",
+  "install.here.title": (name: string) => `安装 ${name}`,
+  "install.here.after": "对象创建后，k3s 通常会在几分钟内装好 chart。要移除时，删除这些对象即可。",
+  "install.here.k3sPackaged":
+    "这个组件不由 Zeabur 直接安装：k3s 内置了一份，要先在每台 server 上禁用。",
+  "install.here.inputs": "这个组件不由 Zeabur 直接安装：需要你填入一些值。",
+  "install.here.manifests":
+    "这个组件不由 Zeabur 直接安装：其中有一部分是普通 manifest，不是 chart。",
+  "install.here.noHelmController":
+    "这个集群没有 Helm 控制器（不是 k3s），所以 Zeabur 不直接安装组件。",
   "reach.title": "连接规则",
   "reach.addPolicy": "添加规则",
   "reach.isolate": "隔离这个服务",

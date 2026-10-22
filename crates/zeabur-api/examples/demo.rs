@@ -1175,8 +1175,15 @@ fn state() -> State {
         ]),
         nodes: nodes(),
         // metrics-server and system-upgrade-controller, read through their modules; and
-        // NetworkPolicy, so a ready-made policy shows among the objects and can be deleted.
+        // NetworkPolicy, so a ready-made policy shows among the objects and can be deleted; k3s's
+        // HelmChart, so a component installs from the catalogue.
         served: vec![
+            ServedResource {
+                verbs: ["create", "delete", "get", "list"]
+                    .map(str::to_owned)
+                    .to_vec(),
+                ..ServedResource::readable("helm.cattle.io", "v1", "helmcharts", "HelmChart", true)
+            },
             ServedResource::readable("metrics.k8s.io", "v1beta1", "nodes", "NodeMetrics", false),
             ServedResource::readable("metrics.k8s.io", "v1beta1", "pods", "PodMetrics", true),
             ServedResource::readable(

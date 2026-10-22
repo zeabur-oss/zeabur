@@ -6,6 +6,7 @@ import XIcon from "~icons/ph/x"
 import { installQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
+import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Badge } from "@zeabur/design-system/components/badge"
@@ -52,7 +53,19 @@ export function InstallSheet({
   const [capability = "", id = ""] = component.split("/")
   const guide = useQuery({ ...installQuery(capability, id, profile), placeholderData: keep })
   const [format, setFormat] = useState<string>("helm")
+  const [who, setWho] = useState<"zeabur" | "you">("zeabur")
+  const planner = usePlanner("kube-system", onClose, true)
   const data = guide.data
+  const objects = data && !data.here.blocked ? data.here.objects : []
+  const mine = objects.length === 0 || who === "you"
+  const blocked = data?.here.blocked
+  const install = () =>
+    planner.plan({
+      title: t("install.here.title", name),
+      changes: objects.map((yaml) => ({ op: "create", yaml })),
+      notes: [t("install.here.after")],
+      view: "/cluster/components",
+    })
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
@@ -76,7 +89,6 @@ export function InstallSheet({
             <Problem error={guide.error} />
           ) : data ? (
             <>
-              <p className="type-meta text-muted-foreground">{t("install.note")}</p>
               {k3sPackagedNotes(data.replacesK3sPackaged, t).map((note) => (
                 <Alert key={note} variant="warn" role="note">
                   <WarningFillIcon aria-hidden="true" />
@@ -194,23 +206,54 @@ export function InstallSheet({
                   </>
                 ) : null}
               </dl>
-              <Tabs value={format} onValueChange={(value) => setFormat(String(value))}>
-                <TabsList>
-                  {data.formats.map((f) => (
-                    <TabsTrigger key={f.format} value={f.format}>
-                      {formatNames[f.format]}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                {data.formats.map((f) => (
-                  <TabsContent key={f.format} value={f.format}>
-                    <YamlBlock yaml={f.text} label={`${name} ${formatNames[f.format]}`} />
-                  </TabsContent>
-                ))}
-              </Tabs>
+              <section className="flex flex-col gap-3 border-t pt-5">
+                {objects.length > 0 ? (
+                  <Segmented
+                    label={t("install.who")}
+                    value={who}
+                    onChange={setWho}
+                    options={[
+                      { value: "zeabur", label: t("install.who.zeabur") },
+                      { value: "you", label: t("install.who.you") },
+                    ]}
+                  />
+                ) : null}
+                {mine ? (
+                  <>
+                    <p className="type-meta text-muted-foreground">
+                      {blocked ? `${t(`install.here.${blocked}`)} ` : ""}
+                      {t("install.note")}
+                    </p>
+                    <Tabs value={format} onValueChange={(value) => setFormat(String(value))}>
+                      <TabsList>
+                        {data.formats.map((f) => (
+                          <TabsTrigger key={f.format} value={f.format}>
+                            {formatNames[f.format]}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                      {data.formats.map((f) => (
+                        <TabsContent key={f.format} value={f.format}>
+                          <YamlBlock yaml={f.text} label={`${name} ${formatNames[f.format]}`} />
+                        </TabsContent>
+                      ))}
+                    </Tabs>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-pretty">{t("install.here.what", objects.length)}</p>
+                    <div>
+                      <Button size="sm" onClick={install}>
+                        {t("install.here.action")}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </section>
             </>
           ) : null}
         </div>
+        {planner.dialog}
       </DialogContent>
     </Dialog>
   )
