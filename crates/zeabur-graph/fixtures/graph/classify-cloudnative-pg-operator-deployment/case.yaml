@@ -1,0 +1,2 @@
+description: The CloudNativePG operator Deployment, named by its chart, is placed in the operators group.
+operation: graph.classify

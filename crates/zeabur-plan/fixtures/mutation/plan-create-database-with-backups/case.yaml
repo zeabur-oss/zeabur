@@ -1,0 +1,8 @@
+description: "A CloudNativePG Cluster, the ObjectStore its backups go to and the ScheduledBackup that takes them are created in one plan, each with a POST in the project's namespace, in the order asked."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {"op": "create", "object": {"apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore", "metadata": {"name": "pg-backups"}, "spec": {"retentionPolicy": "30d", "configuration": {"destinationPath": "s3://b/demo"}}}}
+      - {"op": "create", "object": {"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster", "metadata": {"name": "pg"}, "spec": {"instances": 1, "storage": {"size": "1Gi"}}}}
+      - {"op": "create", "object": {"apiVersion": "postgresql.cnpg.io/v1", "kind": "ScheduledBackup", "metadata": {"name": "pg-daily"}, "spec": {"schedule": "0 0 3 * * *", "cluster": {"name": "pg"}, "method": "plugin"}}}

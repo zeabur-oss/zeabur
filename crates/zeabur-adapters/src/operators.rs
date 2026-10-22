@@ -47,7 +47,15 @@ struct DatabaseOwner {
 /// The Crunchy Data label on each StatefulSet holding a PostgreSQL instance's data.
 const CRUNCHY_DATA_LABEL: &str = "postgres-operator.crunchydata.com/data";
 
-const DATABASE_OWNERS: [DatabaseOwner; 5] = [
+const DATABASE_OWNERS: [DatabaseOwner; 6] = [
+    // CloudNativePG's pods and Jobs belong to the `Cluster` itself, with no StatefulSet between.
+    DatabaseOwner {
+        group: "postgresql.cnpg.io",
+        kind: "Cluster",
+        shown_kind: "Cluster",
+        engine: Engine::PostgreSql,
+        data_label: None,
+    },
     DatabaseOwner {
         group: "upstream.pgv2.percona.com",
         kind: "PostgresCluster",
@@ -93,7 +101,10 @@ const OPERATOR_LABELS: [&str; 2] = [
 ];
 
 /// `app.kubernetes.io/name` values of known database operators.
-const OPERATOR_NAMES: [&str; 5] = [
+const OPERATOR_NAMES: [&str; 8] = [
+    "cloudnative-pg",
+    "plugin-barman-cloud",
+    "psmdb-operator",
     "mongodb-kubernetes-operator",
     "percona-server-mongodb-operator",
     "percona-xtradb-cluster-operator",

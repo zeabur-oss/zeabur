@@ -644,6 +644,32 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/databases":
+    get:
+      tags:
+      - projects
+      summary: |-
+        The databases of a project, read as the person, from every database operator this build
+        knows (CloudNativePG, the Percona Operator for MongoDB).
+      operationId: getProjectDatabases
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectDatabases"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/events":
     get:
       tags:
@@ -3258,6 +3284,244 @@ components:
       - queue
       - search
       - other
+    Database:
+      type: object
+      description: One database cluster.
+      required:
+      - origin
+      - engine
+      - provider
+      - apiVersion
+      - kind
+      - resource
+      - name
+      - state
+      - members
+      - ready
+      - claims
+      - connection
+      - backups
+      properties:
+        apiVersion:
+          type: string
+          description: The object's `apiVersion`.
+        backups:
+          $ref: "#/components/schemas/DatabaseBackups"
+          description: Its backups.
+        claims:
+          type: array
+          items:
+            type: string
+          description: The members' PersistentVolumeClaims, as named by the operator's convention.
+        connection:
+          $ref: "#/components/schemas/DatabaseConnection"
+          description: Where and as whom to connect.
+        created:
+          type:
+          - string
+          - "null"
+          description: When it was created, RFC 3339.
+        engine:
+          $ref: "#/components/schemas/DatabaseEngine"
+          description: The engine.
+        image:
+          type:
+          - string
+          - "null"
+          description: The server image.
+        kind:
+          type: string
+          description: The object's kind.
+        members:
+          type: integer
+          format: int64
+          description: Members asked for.
+        message:
+          type:
+          - string
+          - "null"
+          description: The operator's message, when it says why.
+        name:
+          type: string
+          description: Its name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The object it is read from.
+        phase:
+          type:
+          - string
+          - "null"
+          description: The operator's own words for it (`Cluster in healthy state`, `ready`).
+        primary:
+          type:
+          - string
+          - "null"
+          description: The member taking writes.
+        provider:
+          type: string
+          description: The provider (module id).
+        ready:
+          type: integer
+          format: int64
+          description: Members ready.
+        resource:
+          type: string
+          description: The object's plural resource name.
+        resources:
+          type:
+          - object
+          - "null"
+          description: CPU and memory each member asks for and may use, as written.
+        state:
+          $ref: "#/components/schemas/DatabaseState"
+          description: How it is.
+        storage:
+          type:
+          - string
+          - "null"
+          description: The size of each member's volume, as asked for.
+        version:
+          type:
+          - string
+          - "null"
+          description: The server version, as reported, else from the image tag.
+    DatabaseBackupStore:
+      type: object
+      description: "Where backups go: an S3-compatible bucket."
+      required:
+      - name
+      - inUse
+      properties:
+        destination:
+          type:
+          - string
+          - "null"
+          description: The bucket and path (`s3://bucket/path`).
+        endpoint:
+          type:
+          - string
+          - "null"
+          description: The endpoint URL, when not AWS S3's.
+        inUse:
+          type: boolean
+          description: "The database uses this store for its backups (PostgreSQL: its WAL archive)."
+        name:
+          type: string
+          description: "The object naming the target: an `ObjectStore`, or a storage of the database object."
+        retention:
+          type:
+          - string
+          - "null"
+          description: How long backups are kept, as the provider writes it (`30d`, or a count).
+        secret:
+          type:
+          - string
+          - "null"
+          description: The Secret holding the access keys.
+    DatabaseBackups:
+      type: object
+      description: A database's backups.
+      required:
+      - schedules
+      - runs
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupRun"
+          description: Its backups, newest first.
+        schedules:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupSchedule"
+          description: The schedules that back it up.
+        store:
+          oneOf:
+          - $ref: "#/components/schemas/DatabaseBackupStore"
+            description: Where they go, when set up.
+          - type: "null"
+    DatabaseConnection:
+      type: object
+      description: Where and as whom to connect, inside the cluster.
+      required:
+      - host
+      - port
+      - secret
+      - passwordKey
+      properties:
+        database:
+          type:
+          - string
+          - "null"
+          description: The database to connect to.
+        host:
+          type: string
+          description: The Service's in-cluster DNS name.
+        options:
+          type:
+          - string
+          - "null"
+          description: Extra connection-string options (`replicaSet=rs0`).
+        passwordKey:
+          type: string
+          description: The Secret's key holding the password.
+        port:
+          type: integer
+          format: int32
+          description: The port.
+          minimum: 0
+        secret:
+          type: string
+          description: The Secret holding the credentials, in the project.
+        username:
+          type:
+          - string
+          - "null"
+          description: The user name, when the spec says it.
+        usernameKey:
+          type:
+          - string
+          - "null"
+          description: The Secret's key holding the user name.
+    DatabaseEngine:
+      type: string
+      description: A database engine.
+      enum:
+      - postgresql
+      - mongodb
+    DatabaseOperator:
+      type: object
+      description: Whether an engine's operator, and its backup component, could be read.
+      required:
+      - engine
+      - module
+      - state
+      - backups
+      properties:
+        backups:
+          $ref: "#/components/schemas/ProviderState"
+          description: |-
+            Whether what backups need could be read: the Barman Cloud plugin's `ObjectStore`s for
+            PostgreSQL; the operator itself for MongoDB.
+        engine:
+          $ref: "#/components/schemas/DatabaseEngine"
+          description: The engine.
+        module:
+          type: string
+          description: The operator's module (`cloudnative-pg`).
+        state:
+          $ref: "#/components/schemas/ProviderState"
+          description: Whether its objects could be read.
+    DatabaseState:
+      type: string
+      description: How a database is, from its operator's status.
+      enum:
+      - ready
+      - progressing
+      - degraded
+      - failed
+      - paused
+      - unknown
     DebugContainerStatus:
       type: object
       description: A debug container of Zeabur's.
@@ -6601,6 +6865,29 @@ components:
           items:
             $ref: "#/components/schemas/BackupTarget"
           description: Claims and databases no active schedule covers.
+    ProjectDatabases:
+      type: object
+      description: A project's databases.
+      required:
+      - operators
+      - items
+      - unreadable
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Database"
+          description: The databases, by engine, then name.
+        operators:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseOperator"
+          description: One per engine this build knows.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
     ProjectDetails:
       type: object
       description: |-

@@ -56,6 +56,17 @@ zeabur-project-viewer:
   - apiGroups: [metrics.k8s.io]
     resources: [pods]
     verbs: [get, list]
+  # Databases: CloudNativePG, its Barman Cloud plugin, and the Percona Operator for MongoDB.
+  # Granted whether or not they are installed; RBAC rules may name resources not yet served.
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters, backups, scheduledbackups]
+    verbs: [get, list, watch]
+  - apiGroups: [barmancloud.cnpg.io]
+    resources: [objectstores]
+    verbs: [get, list, watch]
+  - apiGroups: [psmdb.percona.com]
+    resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
+    verbs: [get, list, watch]
 
 # Run and change a project: the viewer's reads, plus what deploying, variables, restarts and
 # terminals write. Narrower than the built-in `edit`: no ServiceAccount writes or impersonation,
@@ -131,6 +142,21 @@ zeabur-project-developer:
   - apiGroups: [metrics.k8s.io]
     resources: [pods]
     verbs: [get, list]
+  # Databases and their backups. A database's pods run the operator's image as the operator
+  # configures them, under the namespace's Pod Security level like any pod the role may create.
+  # Restores are read only for now: a restore overwrites a running database.
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters, backups, scheduledbackups]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [barmancloud.cnpg.io]
+    resources: [objectstores]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [psmdb.percona.com]
+    resources: [perconaservermongodbs, perconaservermongodbbackups]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [psmdb.percona.com]
+    resources: [perconaservermongodbrestores]
+    verbs: [get, list, watch]
   # The project's own Namespace, through the RoleBinding. templates/namespace-policy.yaml lets
   # this change only the project's details: name, description and icon.
   - apiGroups: [""]

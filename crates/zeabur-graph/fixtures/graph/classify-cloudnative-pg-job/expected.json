@@ -1,0 +1,9 @@
+{
+  "group": "databases",
+  "displayName": null,
+  "managedBy": {
+    "kind": "Cluster",
+    "name": "pg",
+    "engine": "PostgreSQL"
+  }
+}

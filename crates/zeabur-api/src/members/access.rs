@@ -601,6 +601,45 @@ mod tests {
     }
 
     #[test]
+    fn developers_create_and_back_up_databases_and_viewers_only_see_them_and_nobody_restores() {
+        let roles = roles();
+        let developer = &roles[ProjectRole::Developer.cluster_role()];
+        let viewer = &roles[ProjectRole::Viewer.cluster_role()];
+        let changed = [
+            "clusters.postgresql.cnpg.io",
+            "backups.postgresql.cnpg.io",
+            "scheduledbackups.postgresql.cnpg.io",
+            "objectstores.barmancloud.cnpg.io",
+            "perconaservermongodbs.psmdb.percona.com",
+            "perconaservermongodbbackups.psmdb.percona.com",
+        ];
+        let restores = "perconaservermongodbrestores.psmdb.percona.com";
+        for resource in changed.iter().chain([&restores]) {
+            for verb in ["get", "list", "watch"] {
+                assert!(allows(viewer, verb, resource), "viewer {verb} {resource}");
+                assert!(
+                    allows(developer, verb, resource),
+                    "developer {verb} {resource}"
+                );
+            }
+        }
+        for resource in changed {
+            for verb in ["create", "update", "patch", "delete"] {
+                assert!(
+                    allows(developer, verb, resource),
+                    "developer {verb} {resource}"
+                );
+                assert!(!allows(viewer, verb, resource), "viewer {verb} {resource}");
+            }
+        }
+        for verb in ["create", "update", "patch", "delete"] {
+            for role in [developer, viewer] {
+                assert!(!allows(role, verb, restores), "{verb} {restores}");
+            }
+        }
+    }
+
+    #[test]
     fn secrets_shells_and_patching_the_namespace_are_developers_and_nobody_gets_rbac_or_kubelets() {
         let roles = roles();
         let sensitive = [

@@ -1,0 +1,14 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pg-1-initdb
+  namespace: demo
+  labels:
+    cnpg.io/cluster: pg
+    cnpg.io/jobRole: initdb
+  ownerReferences:
+    - apiVersion: postgresql.cnpg.io/v1
+      kind: Cluster
+      name: pg
+      uid: 0c6f3a6e-5e1b-4f5d-9c4e-0b1e7f2a9d11
+      controller: true
