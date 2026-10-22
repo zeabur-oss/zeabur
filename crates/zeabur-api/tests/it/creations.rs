@@ -418,4 +418,49 @@ stringData:
                 .contains(&json!({"group": "", "kind": "Namespace"}))
         );
     }
+
+    /// A component that is only charts is installed as k3s `HelmChart`s in `kube-system`,
+    /// planned there like any other object; without a Helm controller the answer says so.
+    #[tokio::test]
+    async fn a_component_is_installed_as_helm_charts_in_kube_system() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let path = "/api/v1/cluster/components/databases/cloudnative-pg/install";
+        let (status, guide) = send(&app, "GET", path, None).await;
+        assert_eq!(status, StatusCode::OK, "{guide}");
+        assert_eq!(guide["here"]["blocked"], "noHelmController");
+        assert_eq!(guide["here"]["objects"], json!([]));
+
+        cluster.update(|s| {
+            s.served.push(ServedResource {
+                verbs: ["create", "get", "list"].map(str::to_owned).to_vec(),
+                ..ServedResource::readable("helm.cattle.io", "v1", "helmcharts", "HelmChart", true)
+            });
+            s.namespaces.push(
+                serde_json::from_value(json!({"metadata": {"name": "kube-system"}})).unwrap(),
+            );
+        });
+        let (_, guide) = send(&app, "GET", path, None).await;
+        assert_eq!(guide["here"].get("blocked"), None, "{guide}");
+        let objects = guide["here"]["objects"].as_array().unwrap();
+        assert_eq!(objects.len(), 2);
+        let request = json!({"changes": objects.iter().map(|y| json!({"op": "create", "yaml": y})).collect::<Vec<_>>()});
+        let (status, planned) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/kube-system/plan",
+            Some(&request),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let (status, applied) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/kube-system/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(cluster.inspect(|s| s.writes.len()), Some(objects.len()));
+    }
 }

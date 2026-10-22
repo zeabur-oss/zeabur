@@ -1,19 +1,24 @@
-//! How to install a catalogue component yourself ([`zeabur_catalog::install`]).
+//! How to install a catalogue component ([`zeabur_catalog::install`]).
 //!
-//! Zeabur recommends and never installs: the answer is texts to copy (Helm commands, a k3s
-//! `HelmChart`, Flux objects, an Argo CD `Application`), rendered from the catalogue embedded in
-//! the binary. The only cluster read is the node count, which picks the default profile: more
-//! than one node means `multi-node`. Someone who may not list nodes gets `single-node` and can
-//! choose the other.
+//! The answer is texts to copy (Helm commands, a k3s `HelmChart`, Flux objects, an Argo CD
+//! `Application`), rendered from the catalogue embedded in the binary, and, for a component that
+//! is only charts and asks for nothing, the k3s `HelmChart` objects Zeabur can create itself in
+//! `kube-system` through a plan (a `create` change for each in project `kube-system`); k3s's Helm
+//! controller then installs them. The cluster reads are the node count, which picks the default
+//! profile (more than one node means `multi-node`; someone who may not list nodes gets
+//! `single-node` and can choose the other), and the served resources, for whether there is a Helm
+//! controller at all.
 
 use axum::Json;
 use axum::extract::{Path, RawQuery};
 use serde::Serialize;
 use utoipa::ToSchema;
-use zeabur_catalog::install::{InstallError, InstallGuide, PROFILES, guide};
+use zeabur_catalog::install::{
+    HereBlocked, InstallError, InstallGuide, InstallHere, PROFILES, guide,
+};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::ClusterExt as _;
 use zeabur_kube::k8s_openapi::api::core::v1::Node;
+use zeabur_kube::{Cluster, ClusterExt as _};
 
 use crate::error::ApiError;
 use crate::handlers::Person;
@@ -64,8 +69,24 @@ pub(crate) async fn guide_for(
             InstallError::Catalogue(..) => Problem::new(Kind::Internal, e.to_string()),
         })
     })?;
+    let mut guide = guide;
+    if guide.here.blocked.is_none() && !serves_helm_charts(cluster.as_ref()).await {
+        guide.here = InstallHere {
+            objects: Vec::new(),
+            blocked: Some(HereBlocked::NoHelmController),
+        };
+    }
     Ok(Json(InstallAnswer {
         guide,
         default_profile: default_profile.to_owned(),
     }))
+}
+
+/// Whether the cluster serves k3s's `HelmChart`; true when discovery fails, so the plan says why.
+async fn serves_helm_charts(cluster: &dyn Cluster) -> bool {
+    cluster.served_resources().await.map_or(true, |served| {
+        served
+            .iter()
+            .any(|r| r.group == "helm.cattle.io" && r.resource == "helmcharts")
+    })
 }

@@ -5512,6 +5512,14 @@ components:
       - progress
       - ok
       - idle
+    HereBlocked:
+      type: string
+      description: Why a component is not installed by Zeabur itself.
+      enum:
+      - k3sPackaged
+      - inputs
+      - manifests
+      - noHelmController
     HistorySource:
       type: object
       description: The store a history came from.
@@ -5743,6 +5751,7 @@ components:
       - contributesTo
       - replacesK3sPackaged
       - formats
+      - here
       properties:
         component:
           type: string
@@ -5764,6 +5773,9 @@ components:
           items:
             $ref: "#/components/schemas/InstallText"
           description: The texts, one per form.
+        here:
+          $ref: "#/components/schemas/InstallHere"
+          description: Whether Zeabur can install it itself, and how.
         inputs:
           type: array
           items:
@@ -5787,6 +5799,24 @@ components:
         security:
           $ref: "#/components/schemas/Security"
           description: Its RBAC and network access.
+    InstallHere:
+      type: object
+      description: |-
+        Whether Zeabur can install a component here itself, as k3s `HelmChart` objects in
+        `kube-system` that k3s's Helm controller installs, and those objects.
+      required:
+      - objects
+      properties:
+        blocked:
+          oneOf:
+          - $ref: "#/components/schemas/HereBlocked"
+            description: Why Zeabur cannot install it itself; the texts still work.
+          - type: "null"
+        objects:
+          type: array
+          items:
+            type: string
+          description: One `HelmChart` per chart release, YAML, in install order; empty when blocked.
     InstallInput:
       type: object
       description: A value the install needs from the person, or generates.

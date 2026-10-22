@@ -74,6 +74,32 @@ pub struct InstallText {
     pub text: String,
 }
 
+/// Whether Zeabur can install a component here itself, as k3s `HelmChart` objects in
+/// `kube-system` that k3s's Helm controller installs, and those objects.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallHere {
+    /// One `HelmChart` per chart release, YAML, in install order; empty when blocked.
+    pub objects: Vec<String>,
+    /// Why Zeabur cannot install it itself; the texts still work.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked: Option<HereBlocked>,
+}
+
+/// Why a component is not installed by Zeabur itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum HereBlocked {
+    /// It replaces a component k3s packages, which is disabled on the servers first.
+    K3sPackaged,
+    /// It asks for values (a token, a domain) or generates secrets.
+    Inputs,
+    /// Some of it is plain manifests, or applies only when CRDs are missing.
+    Manifests,
+    /// The cluster has no Helm controller (`helmcharts.helm.cattle.io`): it is not k3s.
+    NoHelmController,
+}
+
 /// What a component's RBAC and network access amount to, from the catalogue.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -151,6 +177,8 @@ pub struct InstallGuide {
     pub replaces_k3s_packaged: Vec<String>,
     /// The texts, one per form.
     pub formats: Vec<InstallText>,
+    /// Whether Zeabur can install it itself, and how.
+    pub here: InstallHere,
 }
 
 /// Why a guide could not be rendered.
@@ -353,6 +381,7 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
                 text: rendered.argo_cd(),
             },
         ],
+        here: rendered.here(),
     })
 }
 
@@ -676,39 +705,74 @@ impl<'a> Rendered<'a> {
                 out.push_str(&text);
                 continue;
             }
-            let (chart, repo, version) = match release.source() {
-                Some(Source::Oci { url, version }) => (url, None, version),
-                Some(Source::Repo {
-                    repo,
-                    chart,
-                    version,
-                }) => (chart, Some(repo), version),
-                _ => continue,
-            };
-            push(
-                &mut out,
-                format!(
-                    "apiVersion: helm.cattle.io/v1\nkind: HelmChart\nmetadata:\n  name: {}\n  namespace: kube-system\nspec:\n  chart: {chart}\n",
-                    release.release_name()
-                ),
-            );
-            if let Some(repo) = repo {
-                push(&mut out, format!("  repo: {repo}\n"));
+            if let Some(object) = Self::helm_chart_object(release, merged) {
+                out.push_str(&object);
+                out.push_str("---\n");
             }
-            push(
-                &mut out,
-                format!(
-                    "  version: {version}\n  targetNamespace: {}\n  createNamespace: true\n",
-                    release.namespace
-                ),
-            );
-            if !merged.is_empty() {
-                out.push_str("  valuesContent: |-\n");
-                out.push_str(&indent_block(merged, 4));
-            }
-            out.push_str("---\n");
         }
         trim_separator(out)
+    }
+
+    /// One chart release as a k3s `HelmChart` in `kube-system`; `None` for manifests.
+    fn helm_chart_object(release: &Release, merged: &str) -> Option<String> {
+        let (chart, repo, version) = match release.source()? {
+            Source::Oci { url, version } => (url, None, version),
+            Source::Repo {
+                repo,
+                chart,
+                version,
+            } => (chart, Some(repo), version),
+            Source::Urls(_) | Source::Manifests(_) => return None,
+        };
+        let mut out = format!(
+            "apiVersion: helm.cattle.io/v1\nkind: HelmChart\nmetadata:\n  name: {}\n  namespace: kube-system\nspec:\n  chart: {chart}\n",
+            release.release_name()
+        );
+        if let Some(repo) = repo {
+            push(&mut out, format!("  repo: {repo}\n"));
+        }
+        push(
+            &mut out,
+            format!(
+                "  version: {version}\n  targetNamespace: {}\n  createNamespace: true\n",
+                release.namespace
+            ),
+        );
+        if !merged.is_empty() {
+            out.push_str("  valuesContent: |-\n");
+            out.push_str(&indent_block(merged, 4));
+        }
+        Some(out)
+    }
+
+    /// The `HelmChart`s Zeabur would create, or why it does not: a component that replaces one
+    /// k3s packages, asks for values, or is not only charts is left to the texts.
+    fn here(&self) -> InstallHere {
+        let blocked = if !self.file.detection.k3s_addons.is_empty() {
+            Some(HereBlocked::K3sPackaged)
+        } else if !self.file.inputs.is_empty() {
+            Some(HereBlocked::Inputs)
+        } else if self
+            .file
+            .releases
+            .iter()
+            .any(|r| !r.is_chart() || !r.skip_if_present.is_empty())
+        {
+            Some(HereBlocked::Manifests)
+        } else {
+            None
+        };
+        let objects = if blocked.is_some() {
+            Vec::new()
+        } else {
+            self.file
+                .releases
+                .iter()
+                .zip(&self.merged)
+                .filter_map(|(release, merged)| Self::helm_chart_object(release, merged))
+                .collect()
+        };
+        InstallHere { objects, blocked }
     }
 
     /// Flux sources and `HelmRelease`s.
@@ -993,6 +1057,37 @@ mod tests {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn zeabur_installs_only_components_that_are_charts_without_inputs() {
+        let here = |component: &str| guide(component, "single-node").unwrap().here;
+        let pg = here("databases/cloudnative-pg");
+        assert_eq!(pg.blocked, None);
+        assert_eq!(pg.objects.len(), 2);
+        for object in &pg.objects {
+            let parsed: Value = serde_saphyr::from_str(object).unwrap();
+            assert_eq!(parsed["kind"], "HelmChart");
+            assert_eq!(parsed["metadata"]["namespace"], "kube-system");
+            assert!(parsed["spec"]["version"].is_string());
+        }
+        assert_eq!(here("dns/external-dns").blocked, Some(HereBlocked::Inputs));
+        assert_eq!(
+            here("metrics/metrics-server").blocked,
+            Some(HereBlocked::K3sPackaged)
+        );
+        assert_eq!(
+            here("certificates/cert-manager").blocked,
+            Some(HereBlocked::Manifests)
+        );
+        assert_eq!(here("dns/external-dns").objects, Vec::<String>::new());
+        for (capability, id, _) in bundle::FILES {
+            let guide = guide(&format!("{capability}/{id}"), "multi-node").unwrap();
+            let k3s = &guide.formats[1].text;
+            for object in &guide.here.objects {
+                assert!(k3s.contains(object.as_str()), "{capability}/{id}");
             }
         }
     }

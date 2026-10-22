@@ -2865,6 +2865,11 @@ export interface components {
      * @enum {string}
      */
     Health: "fail" | "warn" | "progress" | "ok" | "idle"
+    /**
+     * @description Why a component is not installed by Zeabur itself.
+     * @enum {string}
+     */
+    HereBlocked: "k3sPackaged" | "inputs" | "manifests" | "noHelmController"
     /** @description The store a history came from. */
     HistorySource: {
       /** @description Its Service port, `namespace/name:port`. */
@@ -2996,6 +3001,8 @@ export interface components {
       dependsOn: string[]
       /** @description The texts, one per form. */
       formats: components["schemas"]["InstallText"][]
+      /** @description Whether Zeabur can install it itself, and how. */
+      here: components["schemas"]["InstallHere"]
       /** @description Values asked for or generated. */
       inputs: components["schemas"]["InstallInput"][]
       /** @description The profile the texts are for. */
@@ -3009,6 +3016,15 @@ export interface components {
       replacesK3sPackaged: string[]
       /** @description Its RBAC and network access. */
       security: components["schemas"]["Security"]
+    }
+    /**
+     * @description Whether Zeabur can install a component here itself, as k3s `HelmChart` objects in
+     *     `kube-system` that k3s's Helm controller installs, and those objects.
+     */
+    InstallHere: {
+      blocked?: components["schemas"]["HereBlocked"] | null
+      /** @description One `HelmChart` per chart release, YAML, in install order; empty when blocked. */
+      objects: string[]
     }
     /** @description A value the install needs from the person, or generates. */
     InstallInput: {
