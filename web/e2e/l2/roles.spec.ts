@@ -117,7 +117,7 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
     await developer.context().close()
   })
 
-  await test.step("the Viewer sees their project's service but no logs and cannot open a terminal", async () => {
+  await test.step("the Viewer sees their project's service, with what only a Developer may do closed", async () => {
     const viewer = await member(browser, viewerLink, "e2e-viewer", zeabur)
     await viewer.goto(servicePage(second))
     await expect(viewer.getByRole("heading", { level: 1, name: service })).toBeVisible({
@@ -125,18 +125,41 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
     })
     await expect(viewer.getByRole("tab", { name: "Overview" })).toBeVisible()
     await expect(viewer.getByRole("tab", { name: "Logs" })).toHaveCount(0)
-    await viewer
-      .locator("main header")
-      .first()
-      .getByRole("button", { name: "Terminal", exact: true })
-      .click()
-    const dock = viewer.getByRole("region", { name: "Terminal" })
-    const panel = dock.getByRole("tabpanel", { name: service })
-    // Admin rights are offered to everyone signed in here, so the sentence may name either.
-    await expect(panel.getByText(/^Opening a terminal needs (admin|more) rights\./)).toBeVisible({
-      timeout: 30_000,
+
+    const namespace = (await (
+      await viewer.request.get(`/api/v1/projects/${encodeURIComponent(second)}/namespace`)
+    ).json()) as { role?: string; can: Record<string, string> }
+    expect(namespace.role).toBe("viewer")
+    expect(namespace.can).toMatchObject({
+      deploy: "denied",
+      changeServices: "denied",
+      openTerminal: "denied",
+      readSecrets: "denied",
+      changeMembers: "denied",
     })
-    await expect(dock.getByRole("status").filter({ hasText: "Connected" })).toBeHidden()
+
+    // Closed rather than missing, each with the role that opens it.
+    const header = viewer.locator("main header").first()
+    for (const name of ["Restart", "Terminal"]) {
+      const action = header.getByRole("button", { name, exact: true })
+      await expect(action).toBeDisabled({ timeout: 30_000 })
+      const closed = header.locator("span[tabindex='0']").filter({ has: action })
+      await expect(closed).toContainText("Needs Developer access")
+      await closed.focus()
+      await expect(viewer.getByRole("tooltip")).toHaveText("Needs Developer access")
+      await closed.blur()
+    }
+    await expect(viewer.getByRole("region", { name: "Terminal" })).toHaveCount(0)
+
+    await header.getByRole("button", { name: "More" }).click()
+    const remove = viewer.getByRole("menuitem", { name: /^Delete/ })
+    await expect(remove).toHaveAttribute("aria-disabled", "true")
+    await expect(remove).toContainText("Needs Developer access")
+    await viewer.keyboard.press("Escape")
+
+    await viewer.goto(`/projects/${encodeURIComponent(second)}`)
+    const add = viewer.getByRole("main").getByRole("button", { name: "New", exact: true })
+    await expect(add).toBeDisabled({ timeout: 30_000 })
 
     // Zeabur Proxy reads log history as the person; a Viewer may read it in no project.
     const logHistory = async (project: string) =>
