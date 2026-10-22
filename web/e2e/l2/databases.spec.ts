@@ -75,9 +75,11 @@ const engines = [
 const databasePage = (path: string, name: string) =>
   `/projects/${encodeURIComponent(project)}/databases/${path}/${name}`
 
-/** Confirms the plan dialog titled `title` with its last button, which names the change. */
+/** Confirms the plan dialog titled `title` with its last button, which names the change. A
+ * drawer's plan step loads first with only Close, so its Back (a dialog's Cancel) comes first. */
 async function apply(page: Page, title: string) {
   const dialog = page.getByRole("dialog", { name: title })
+  await expect(dialog.getByRole("button", { name: /^(Back|Cancel)$/ })).toBeVisible()
   await dialog.getByRole("button").last().click()
   await expect(dialog).toHaveCount(0)
   await expect(toast(page, "Applied")).toBeVisible({ timeout: 30_000 })
@@ -101,13 +103,9 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
   for (const db of engines) {
     await test.step(`the Developer creates ${db.engine} database ${db.name}`, async () => {
       await developer.goto(`/projects/${encodeURIComponent(project)}`)
-      await developer.getByRole("button", { name: "New database" }).first().click()
+      await developer.getByRole("button", { name: "New", exact: true }).click()
+      await developer.getByRole("menuitem", { name: db.engine, exact: true }).click()
       const drawer = developer.getByRole("dialog", { name: "New database" })
-      const engine = drawer.getByRole("combobox", { name: "Engine" })
-      if (await engine.isVisible()) {
-        await engine.click()
-        await developer.getByRole("option", { name: db.engine, exact: true }).click()
-      }
       await drawer.getByRole("textbox", { name: "Name" }).fill(db.name)
       await drawer.getByRole("textbox", { name: "Storage per member" }).fill("1Gi")
       await expect(drawer.getByRole("alert")).toContainText("nothing takes over")
