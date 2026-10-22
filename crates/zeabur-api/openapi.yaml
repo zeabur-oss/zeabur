@@ -3597,12 +3597,16 @@ components:
       - name
       - nameSource
       - kubernetesVersion
+      - domains
       properties:
         distribution:
           type:
           - string
           - "null"
           description: "The distribution, when the version names one: `k3s` or `rke2`."
+        domains:
+          $ref: "#/components/schemas/DomainSettings"
+          description: How a new service's public URL is made.
         kubernetesVersion:
           type: string
           description: kube-apiserver's version (`gitVersion`, such as `v1.36.5+k3s1`).
@@ -4709,6 +4713,26 @@ components:
           format: int64
           description: In use.
           minimum: 0
+    DomainSettings:
+      type: object
+      description: |-
+        How a new service's public URL is made, as an administrator installed Zeabur (the chart's
+        `domains`).
+      properties:
+        clusterIssuer:
+          type:
+          - string
+          - "null"
+          description: |-
+            The cert-manager `ClusterIssuer` a new URL's certificate comes from. `None`: a new URL
+            is HTTP only.
+        suffix:
+          type:
+          - string
+          - "null"
+          description: |-
+            The domain a new URL is suggested under, as `<service>-<project>.<suffix>`; a wildcard
+            DNS record sends it to the cluster's ingress. `None`: people type the whole host.
     ElevationState:
       type: string
       description: Whether administrator rights are offered and in use.

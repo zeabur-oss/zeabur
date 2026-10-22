@@ -62,6 +62,14 @@ spec:
             - name: ZEABUR_CLUSTER_NAME
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.domains.suffix }}
+            - name: ZEABUR_DOMAIN_SUFFIX
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.domains.clusterIssuer }}
+            - name: ZEABUR_CLUSTER_ISSUER
+              value: {{ . | quote }}
+            {{- end }}
             - name: ZEABUR_ISSUER_URL
               value: {{ required "issuer.url is required" $issuer.url | quote }}
             - name: ZEABUR_CLIENT_ID

@@ -71,6 +71,15 @@ pub(crate) struct Args {
     /// `shop-prod`. Empty: a name read from the nodes, else the public URL's host.
     #[arg(long, env = "ZEABUR_CLUSTER_NAME", default_value = "")]
     pub(crate) cluster_name: String,
+    /// The domain a new service's public URL is suggested under, as
+    /// `<service>-<project>.<suffix>`, such as `apps.example.com`; it needs a wildcard DNS record.
+    /// Empty: people type the whole host.
+    #[arg(long, env = "ZEABUR_DOMAIN_SUFFIX", default_value = "")]
+    pub(crate) domain_suffix: String,
+    /// The cert-manager `ClusterIssuer` that signs a new public URL's certificate. Empty: a new
+    /// URL is HTTP only.
+    #[arg(long, env = "ZEABUR_CLUSTER_ISSUER", default_value = "")]
+    pub(crate) cluster_issuer: String,
     /// The namespace Zeabur runs in, where the ConfigMap `zeabur-settings` keeps the settings
     /// people choose. Empty: settings cannot be changed.
     #[arg(long, env = "ZEABUR_NAMESPACE", default_value = "")]
@@ -174,6 +183,7 @@ impl Args {
                     .map_err(|e| format!("--cluster-name: {e}"))?,
             );
         }
+        settings.domains = domains(self)?;
         let authority = public_url.authority();
         settings.public_host = Some(
             authority
@@ -225,6 +235,36 @@ impl Args {
             proxy,
         })
     }
+}
+
+/// How new public URLs are made, from `args`.
+fn domains(args: &Args) -> Result<zeabur_api::settings::DomainSettings, String> {
+    let mut domains = zeabur_api::settings::DomainSettings::default();
+    let suffix = args
+        .domain_suffix
+        .trim()
+        .trim_start_matches("*.")
+        .trim_end_matches('.');
+    if !suffix.is_empty() {
+        if !zeabur_plan::checks::is_dns_subdomain(suffix) {
+            return Err(format!(
+                "--domain-suffix: {:?} is not a domain name",
+                args.domain_suffix
+            ));
+        }
+        domains.suffix = Some(suffix.to_owned());
+    }
+    let issuer = args.cluster_issuer.trim();
+    if !issuer.is_empty() {
+        if !zeabur_plan::checks::is_dns_subdomain(issuer) {
+            return Err(format!(
+                "--cluster-issuer: {:?} is not a ClusterIssuer's name",
+                args.cluster_issuer
+            ));
+        }
+        domains.cluster_issuer = Some(issuer.to_owned());
+    }
+    Ok(domains)
 }
 
 /// The terminal's settings from `args`.
@@ -490,6 +530,27 @@ mod tests {
         assert!(config.settings.identity.project_roles);
         let error = args(&files, &["--cluster-name", &"x".repeat(64)]).unwrap_err();
         assert!(error.starts_with("--cluster-name:"), "{error}");
+        let config = args(
+            &files,
+            &[
+                "--domain-suffix",
+                "*.apps.example.com",
+                "--cluster-issuer",
+                "letsencrypt",
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            config.settings.domains,
+            zeabur_api::settings::DomainSettings {
+                suffix: Some("apps.example.com".to_owned()),
+                cluster_issuer: Some("letsencrypt".to_owned()),
+            }
+        );
+        let error = args(&files, &["--domain-suffix", "Apps_example"]).unwrap_err();
+        assert!(error.starts_with("--domain-suffix:"), "{error}");
+        let error = args(&files, &["--cluster-issuer", "Let's Encrypt"]).unwrap_err();
+        assert!(error.starts_with("--cluster-issuer:"), "{error}");
         let config = args(&files, &["--public-url", "https://zeabur.localhost:8443"]).unwrap();
         assert_eq!(
             config.settings.public_host.as_deref(),

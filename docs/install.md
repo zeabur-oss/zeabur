@@ -133,6 +133,7 @@ likely to set:
 | `issuer.caBundle.configMap` | A ConfigMap with the CA that signed Zeabur Identity's certificate, when a private CA did (mkcert, an internal CA). |
 | `elevation.enabled` | Whether anything the cluster refuses to everyday rights (a change, a read, a terminal) offers "Retry as admin", which asks for the passkey again. While admin rights last, a few minutes, every request goes with them, as with `sudo`. |
 | `ingress.*`, `httpRoute.*` | An Ingress, or a Gateway API HTTPRoute (`httpRoute.parentRefs` names the Gateway), for the public URL's host name. |
+| `domains.suffix`, `domains.clusterIssuer` | How a new service's public URL is made; see [Public URLs for services](#public-urls-for-services). |
 
 ### The plan key
 
@@ -148,6 +149,28 @@ kubectl -n zeabur create secret generic zeabur-plan-key --from-literal=plan-key=
 ```
 
 A new key only means plans not yet applied have to be reviewed again.
+
+### Public URLs for services
+
+When someone deploys an image with a public URL, Zeabur plans an Ingress for it, with the
+cluster's default IngressClass, made with their own rights like every other change.
+
+- **`domains.suffix`**: the domain new URLs are suggested under, such as `apps.example.com`. A
+  service `web` in project `shop` is offered `web-shop.apps.example.com`. Point a wildcard DNS
+  record, `*.apps.example.com`, at the ingress controller's address. Empty (the default): people
+  type the whole host and set up its DNS themselves.
+- **`domains.clusterIssuer`**: the cert-manager ClusterIssuer that signs new URLs' certificates,
+  such as `letsencrypt`. The Ingress then carries the annotation
+  `cert-manager.io/cluster-issuer: <issuer>` and a `tls` block for the host, with the Secret
+  `<service>-tls`; both are in the plan before anyone confirms it. cert-manager's ingress-shim
+  then requests the certificate ([cert-manager: securing Ingress resources][cm-ingress]). Empty
+  (the default): new URLs are HTTP only, and the form says so.
+
+Zeabur does not look for a ClusterIssuer itself: project members usually may not list
+ClusterIssuers, which are cluster-scoped, and Zeabur's service account reads nothing on their
+behalf. Name the one to use here, after installing cert-manager and creating it.
+
+[cm-ingress]: https://cert-manager.io/docs/usage/ingress/
 
 ### One replica
 

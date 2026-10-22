@@ -13,6 +13,9 @@ issuer:
   caBundle:
     configMap: zeabur-identity-ca
   accountUrl: https://identity.example.test:8443/account
+domains:
+  suffix: apps.example.test
+  clusterIssuer: letsencrypt
 elevation:
   enabled: false
 terminal:

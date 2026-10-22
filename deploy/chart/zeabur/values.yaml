@@ -44,6 +44,15 @@ issuer:
   # the `manage` URL the issuer publishes at /.well-known/passkey-endpoints, else no link.
   accountUrl: ""
 
+# New public URLs. suffix: the domain a new service's URL is suggested under, as
+# <service>-<project>.<suffix>, such as apps.example.com; point a wildcard DNS record
+# (*.apps.example.com) at the cluster's ingress. Empty: people type the whole host.
+# clusterIssuer: the cert-manager ClusterIssuer that signs a new URL's certificate; Zeabur adds its
+# annotation and a tls block to the Ingress, shown in the plan. Empty: new URLs are HTTP only.
+domains:
+  suffix: ""
+  clusterIssuer: ""
+
 # Anything the cluster refuses offers to ask for the passkey again (Zeabur Identity's `elevate` scope) and
 # retry with admin rights. Needs a client registered with `--allow-elevation`.
 elevation:

@@ -65,6 +65,23 @@ pub struct Settings {
     /// The issuer's page where people manage how they sign in, as the server was started with it
     /// (`--account-url`); `None`: the issuer's passkey endpoints say (see [`crate::account`]).
     pub account_url: Option<String>,
+    /// How a new service's public URL is made.
+    pub domains: DomainSettings,
+}
+
+/// How a new service's public URL is made, as an administrator installed Zeabur (the chart's
+/// `domains`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainSettings {
+    /// The domain a new URL is suggested under, as `<service>-<project>.<suffix>`; a wildcard
+    /// DNS record sends it to the cluster's ingress. `None`: people type the whole host.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suffix: Option<String>,
+    /// The cert-manager `ClusterIssuer` a new URL's certificate comes from. `None`: a new URL
+    /// is HTTP only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cluster_issuer: Option<String>,
 }
 
 /// Where Zeabur Identity keeps its people, and the address its setup links open.
@@ -100,6 +117,7 @@ impl Default for Settings {
             public_host: None,
             identity: IdentitySettings::default(),
             account_url: None,
+            domains: DomainSettings::default(),
         }
     }
 }

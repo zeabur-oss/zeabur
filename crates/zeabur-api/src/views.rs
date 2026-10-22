@@ -76,6 +76,8 @@ pub struct Cluster {
     /// The distribution, when the version names one: `k3s` or `rke2`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub distribution: Option<String>,
+    /// How a new service's public URL is made.
+    pub domains: crate::settings::DomainSettings,
 }
 
 /// The API server's readiness, from the replica that answered (see `crate::cluster::health`).

@@ -149,6 +149,7 @@ pub(crate) async fn get(
         name_provider: named.provider,
         distribution: distribution(&version),
         kubernetes_version: version,
+        domains: state.settings.domains.clone(),
     }))
 }
 

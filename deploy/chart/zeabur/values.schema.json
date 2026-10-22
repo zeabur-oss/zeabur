@@ -95,6 +95,22 @@
         }
       }
     },
+    "domains": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "suffix": {
+          "description": "A domain name new URLs are suggested under, or empty.",
+          "type": "string",
+          "pattern": "^([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*)?$",
+          "maxLength": 253
+        },
+        "clusterIssuer": {
+          "description": "The cert-manager ClusterIssuer for new URLs, or empty for HTTP only.",
+          "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }]
+        }
+      }
+    },
     "elevation": {
       "type": "object",
       "additionalProperties": false,
