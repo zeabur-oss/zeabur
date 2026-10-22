@@ -198,6 +198,7 @@ export const en = {
   "refused.reveal": "Showing Secret values",
   "refused.listThese": "Listing these",
   "refused.adopt": (ns: string) => `Adopting ${ns}`,
+  "refused.createProject": (name: string) => `Creating project ${name}`,
   "refused.unadopt": (ns: string) => `Removing ${ns} from Zeabur`,
 
   // Status words
@@ -451,7 +452,22 @@ export const en = {
   "projects.filterOther": "Filter namespaces",
   "projects.noOtherMatch": (query: string) => `No namespaces match “${query}”.`,
   "projects.noneBody":
-    "A project is a Kubernetes namespace shown in Zeabur. Adopt one from the namespaces below.",
+    "A project is a Kubernetes namespace shown in Zeabur. Create one, or adopt a namespace below.",
+  "projects.new": "New project",
+  "projects.newBody":
+    "A project is a namespace with the Zeabur project label. You review it before it is created.",
+  "projects.newName": "Name",
+  "projects.newNameHint": "It becomes the namespace's name, which can't change later.",
+  "projects.newDisplayName": "Display name",
+  "projects.newDisplayNameHint": "Optional. Shown in place of the name.",
+  "projects.problem.empty": "Give it a name.",
+  "projects.problem.invalid":
+    "Lowercase letters, digits and hyphens, starting and ending with a letter or digit.",
+  "projects.problem.long": "At most 63 characters.",
+  "projects.problem.system": "Names starting with kube- belong to Kubernetes.",
+  "projects.problem.taken": "A namespace of this name exists. Adopt it instead.",
+  "projects.planNew": (name: string) => `Create project ${name}`,
+  "projects.rowMenu": (name: string) => `More for ${name}`,
   "projects.showSystem": "Show system namespaces",
   "projects.forbiddenTitle": "You cannot list projects",
   "projects.view": "View",
@@ -939,6 +955,7 @@ export const en = {
   "title.details": (ns: string) => `${ns} details`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
   "title.restartAll": (ns: string) => `Restart every service in ${ns}`,
+  "confirm.createProject": "Creates the namespace with the project label. Nothing else changes.",
   "confirm.adopt": "Adds the project label to the namespace. Nothing in it changes.",
   "confirm.unadopt": "The namespace stops showing as a project. Nothing in it is deleted.",
   "confirm.debugContainer": (pod: string) =>

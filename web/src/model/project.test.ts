@@ -10,6 +10,7 @@ import {
   kubectlLabel,
   matchesProject,
   mayAdopt,
+  newProjectProblem,
   mayChange,
   otherNamespaces,
   patchRole,
@@ -175,5 +176,18 @@ describe("the projects list", () => {
     const service = (restarts: number) => ({ restarts }) as Schemas["ServiceSummary"]
     expect(restartsIn(summary("shop", 0, { services: [service(2), service(3)] }))).toBe(5)
     expect(restartsIn(summary("shop", 0))).toBeUndefined()
+  })
+})
+
+describe("a new project's name", () => {
+  test("is a DNS label, not Kubernetes' own, and not a namespace already there", () => {
+    expect(newProjectProblem("shop", ["web"])).toBeUndefined()
+    expect(newProjectProblem("2024-archive", [])).toBeUndefined()
+    expect(newProjectProblem("", [])).toBe("empty")
+    expect(newProjectProblem("Shop", [])).toBe("invalid")
+    expect(newProjectProblem("shop-", [])).toBe("invalid")
+    expect(newProjectProblem("a".repeat(64), [])).toBe("long")
+    expect(newProjectProblem("kube-tools", [])).toBe("system")
+    expect(newProjectProblem("web", ["web"])).toBe("taken")
   })
 })

@@ -10,6 +10,7 @@ const cluster = (part: Partial<Schemas["Cluster"]>): Schemas["Cluster"] => ({
   name: "zeabur-l2",
   nameSource: "nodes",
   kubernetesVersion: "v1.36.5+k3s1",
+  domains: {},
   ...part,
 })
 

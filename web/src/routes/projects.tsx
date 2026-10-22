@@ -6,7 +6,8 @@ import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 
 import { isStatus, toProblem } from "@/api/client"
 import { projectsQuery } from "@/api/queries"
-import { AdoptButton } from "@/components/adopt"
+import { AdoptMenu } from "@/components/adopt"
+import { NewProjectButton } from "@/components/new-project"
 import { Problem } from "@/components/problem"
 import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { ProjectIcon } from "@/components/project-icon"
@@ -92,7 +93,7 @@ export function OtherNamespaces({
                   {p.name}
                 </span>
               </Link>
-              {p.adoptable ? <AdoptButton namespace={p.name} adopted={false} /> : null}
+              {p.adoptable ? <AdoptMenu namespace={p.name} /> : null}
             </li>
           ))}
         </ul>
@@ -127,7 +128,20 @@ export function ProjectsPage() {
 
   return (
     <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
-      <PageHeader title={t("projects.title")} actions={<ProjectViewSwitch />} />
+      <PageHeader
+        title={t("projects.title")}
+        actions={
+          <span className="flex items-center gap-2">
+            <ProjectViewSwitch />
+            {projects.data ? (
+              <NewProjectButton
+                canCreate={projects.data.canCreate}
+                taken={items.map((p) => p.name)}
+              />
+            ) : null}
+          </span>
+        }
+      />
       {projects.isPending ? (
         list ? (
           <Skeleton variant="card" className="h-50" />

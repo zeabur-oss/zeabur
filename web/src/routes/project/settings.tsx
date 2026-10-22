@@ -16,7 +16,7 @@ import { Problem } from "@/components/problem"
 import { projectGlyphs } from "@/components/project-icon"
 import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { useT } from "@/i18n"
-import { mayChange, projectIcons, type ProjectIconName } from "@/model/project"
+import { DISPLAY_NAME_MAX, mayChange, projectIcons, type ProjectIconName } from "@/model/project"
 import type { Service } from "@/model/service"
 import { Button } from "@zeabur/design-system/components/button"
 import { Card, CardFooter, CardRow, SectionLabel } from "@zeabur/design-system/components/card"
@@ -29,8 +29,7 @@ import { PageColumn } from "@zeabur/design-system/components/page-column"
 
 const route = getRouteApi("/projects/$project/settings")
 
-/** zeabur-model `DISPLAY_NAME_MAX`, `DESCRIPTION_MAX`. */
-export const DISPLAY_NAME_MAX = 64
+/** zeabur-model `DESCRIPTION_MAX`. */
 export const DESCRIPTION_MAX = 500
 
 export function ProjectSettingsPage() {

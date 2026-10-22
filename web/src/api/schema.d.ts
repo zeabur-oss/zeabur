@@ -1779,6 +1779,12 @@ export interface components {
           op: "unadopt"
         }
       | {
+          /** @description The name to show instead of the namespace's. */
+          displayName?: string | null
+          /** @enum {string} */
+          op: "createProject"
+        }
+      | {
           /** @description What the project is. */
           description?: string | null
           /** @description The name to show instead of the namespace's. */
@@ -1836,6 +1842,8 @@ export interface components {
     Cluster: {
       /** @description The distribution, when the version names one: `k3s` or `rke2`. */
       distribution?: string | null
+      /** @description How a new service's public URL is made. */
+      domains: components["schemas"]["DomainSettings"]
       /** @description kube-apiserver's version (`gitVersion`, such as `v1.36.5+k3s1`). */
       kubernetesVersion: string
       /**
@@ -2431,6 +2439,22 @@ export interface components {
        * @description In use.
        */
       usedBytes: number
+    }
+    /**
+     * @description How a new service's public URL is made, as an administrator installed Zeabur (the chart's
+     *     `domains`).
+     */
+    DomainSettings: {
+      /**
+       * @description The cert-manager `ClusterIssuer` a new URL's certificate comes from. `None`: a new URL
+       *     is HTTP only.
+       */
+      clusterIssuer?: string | null
+      /**
+       * @description The domain a new URL is suggested under, as `<service>-<project>.<suffix>`; a wildcard
+       *     DNS record sends it to the cluster's ingress. `None`: people type the whole host.
+       */
+      suffix?: string | null
     }
     /**
      * @description Whether administrator rights are offered and in use.
@@ -4412,6 +4436,8 @@ export interface components {
       | "briefcase"
     /** @description The projects (namespaces) the person may list. */
     ProjectList: {
+      /** @description Whether the person may create a project (`create` on `namespaces`, cluster-wide). */
+      canCreate: components["schemas"]["Permission"]
       /** @description Adopted projects first, then the other namespaces, each sorted by name. */
       items: components["schemas"]["ProjectSummary"][]
     }

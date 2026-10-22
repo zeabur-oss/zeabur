@@ -1,4 +1,5 @@
 import { useState } from "react"
+import DotsThreeIcon from "~icons/ph/dots-three"
 import XIcon from "~icons/ph/x"
 
 import { namespaceQuery, queryClient } from "@/api/queries"
@@ -12,6 +13,7 @@ import {
   DialogContent,
   DialogTitle,
 } from "@zeabur/design-system/components/dialog"
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 import { useT } from "@/i18n"
 import { MANAGE_VERB, mayAdopt } from "@/model/project"
 
@@ -26,17 +28,8 @@ async function adoptHint(namespace: string): Promise<{ allowed: boolean; guarded
   }
 }
 
-export function AdoptButton({
-  namespace,
-  adopted,
-  variant = "outline",
-  label,
-}: {
-  namespace: string
-  adopted: boolean
-  variant?: "outline" | "destructive"
-  label?: string
-}) {
+/** Adopting or letting go: the plan, or what rights it needs when the person lacks them. */
+function useAdopt(namespace: string, adopted: boolean) {
   const t = useT()
   const planner = usePlanner(namespace)
   const [help, setHelp] = useState<{ guarded: boolean }>()
@@ -55,11 +48,8 @@ export function AdoptButton({
         : { title: t("title.adopt", namespace), changes: [{ op: "adopt" }] },
     )
   }
-  return (
+  const dialogs = (
     <>
-      <Button size="sm" variant={variant} disabled={checking} onClick={() => void start()}>
-        {label ?? (adopted ? t("action.unadopt") : t("action.adopt"))}
-      </Button>
       {planner.dialog}
       {help ? (
         <AccessDialog
@@ -75,6 +65,58 @@ export function AdoptButton({
           }}
         />
       ) : null}
+    </>
+  )
+  return { start: () => void start(), checking, dialogs }
+}
+
+export function AdoptButton({
+  namespace,
+  adopted,
+  variant = "outline",
+  label,
+}: {
+  namespace: string
+  adopted: boolean
+  variant?: "outline" | "destructive"
+  label?: string
+}) {
+  const t = useT()
+  const adopt = useAdopt(namespace, adopted)
+  return (
+    <>
+      <Button size="sm" variant={variant} disabled={adopt.checking} onClick={adopt.start}>
+        {label ?? (adopted ? t("action.unadopt") : t("action.adopt"))}
+      </Button>
+      {adopt.dialogs}
+    </>
+  )
+}
+
+/** A namespace row's other actions: adopting it is not the page's main path. */
+export function AdoptMenu({ namespace }: { namespace: string }) {
+  const t = useT()
+  const adopt = useAdopt(namespace, false)
+  return (
+    <>
+      <Menu>
+        <MenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              disabled={adopt.checking}
+              aria-label={t("projects.rowMenu", namespace)}
+            />
+          }
+        >
+          <DotsThreeIcon aria-hidden="true" />
+        </MenuTrigger>
+        <MenuContent align="end">
+          <MenuItem onClick={adopt.start}>{t("action.adopt")}</MenuItem>
+        </MenuContent>
+      </Menu>
+      {adopt.dialogs}
     </>
   )
 }

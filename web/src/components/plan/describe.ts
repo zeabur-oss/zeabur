@@ -183,6 +183,8 @@ function sentenceOf(
       return t("confirm.delete", change.name)
     case "adopt":
       return t("confirm.adopt")
+    case "createProject":
+      return t("confirm.createProject")
     case "unadopt":
       return t("confirm.unadopt")
     case "details":
@@ -682,6 +684,8 @@ export function actionOf(t: Translate, ask: Asked): string {
       return t("action.delete")
     case "adopt":
       return t("action.adopt")
+    case "createProject":
+      return t("action.create")
     case "unadopt":
       return t("action.unadopt")
     case "details":

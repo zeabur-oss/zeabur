@@ -117,6 +117,7 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "clusterTools":
       return { risk: "normal" }
     case "adopt":
+    case "createProject":
     case "details":
     case "rebuild":
       return { risk: "low" }
@@ -282,6 +283,7 @@ export function destinationOf(
       // The object is gone; a policy's effect shows on the service it was asked from.
       return change.resource.resource === "networkpolicies" ? tab(service, "networking") : undefined
     case "adopt":
+    case "createProject":
       return `/projects/${encodeURIComponent(project)}`
     case "unadopt":
       return "/projects"

@@ -53,7 +53,29 @@ export const mayAdopt = (namespace: Pick<Schemas["ProjectNamespace"], "canAdopt"
 /** zeabur-kernel `MANAGE_VERB`: what the chart's admission policy asks for before a label change. */
 export const MANAGE_VERB = "zeabur-manage"
 
-export const namespaceOps = new Set<Schemas["Change"]["op"]>(["adopt", "unadopt", "details"])
+export const namespaceOps = new Set<Schemas["Change"]["op"]>([
+  "adopt",
+  "unadopt",
+  "details",
+  "createProject",
+])
+
+/** zeabur-model `DISPLAY_NAME_MAX`. */
+export const DISPLAY_NAME_MAX = 64
+const NAMESPACE_MAX = 63
+const DNS_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
+
+/** Why a new project's name won't do, as zeabur-plan's `createProject` would refuse it. */
+export function newProjectProblem(
+  name: string,
+  taken: readonly string[],
+): "empty" | "long" | "invalid" | "system" | "taken" | undefined {
+  if (name === "") return "empty"
+  if (name.length > NAMESPACE_MAX) return "long"
+  if (!DNS_LABEL.test(name)) return "invalid"
+  if (name.startsWith("kube-")) return "system"
+  return taken.includes(name) ? "taken" : undefined
+}
 
 export function kubectlLabel(namespace: string): { adopt: string; unadopt: string } {
   return {
