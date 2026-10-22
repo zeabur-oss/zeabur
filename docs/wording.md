@@ -174,6 +174,7 @@ why. Add a row before introducing a new concept.
 | configuration | 設定 | 配置 | |
 | logs | 日誌 | 日志 | |
 | event | 事件 | 事件 | |
+| conditions (an object's `status.conditions`) | 狀況 | 状况 | As the Kubernetes docs translate it |
 | warning | 警告 | 警告 | |
 | metrics | 指標 | 指标 | |
 | reserved (a request) | 保留量 | 预留量 | |

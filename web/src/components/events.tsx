@@ -18,6 +18,7 @@ export function EventList({
   plain,
   empty,
   objectLink,
+  oneObject,
 }: {
   events: Event[]
   limit?: number
@@ -28,6 +29,8 @@ export function EventList({
   empty?: string
   /** A link for the object an event is about (`pod/worker-…`), when the page knows where to go. */
   objectLink?: (event: Event, label: string) => ReactNode
+  /** Every event is about the same object, so its name is left out. */
+  oneObject?: boolean
 }) {
   const t = useT()
   const sorted = events.toSorted(newestFirst)
@@ -38,13 +41,14 @@ export function EventList({
     const warning = isWarning(event)
     const word = plain ? eventWord(event.reason) : undefined
     const regarding = event.regarding
-    const object = !regarding
-      ? undefined
-      : !plain
-        ? `${regarding.kind.toLowerCase()}/${regarding.name}`
-        : regarding.kind === "Pod"
-          ? t("pod.named", regarding.name)
-          : regarding.name
+    const object =
+      !regarding || oneObject
+        ? undefined
+        : !plain
+          ? `${regarding.kind.toLowerCase()}/${regarding.name}`
+          : regarding.kind === "Pod"
+            ? t("pod.named", regarding.name)
+            : regarding.name
     return (
       <li
         key={event.id}

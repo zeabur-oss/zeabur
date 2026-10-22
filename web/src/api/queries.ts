@@ -312,7 +312,11 @@ export interface ObjectAddress {
   name: string
 }
 
-export const objectQuery = (project: string, address: ObjectAddress) =>
+export const objectQuery = (
+  project: string,
+  address: ObjectAddress,
+  { poll = false }: PollOptions = {},
+) =>
   queryOptions({
     queryKey: ["project", project, "object", address],
     queryFn: async ({ signal }) =>
@@ -331,6 +335,23 @@ export const objectQuery = (project: string, address: ObjectAddress) =>
         }),
       ),
     staleTime: 0,
+    refetchInterval: poll ? POLL : false,
+    refetchIntervalInBackground: false,
+  })
+
+/** `kind` is the object's kind (`Deployment`), as events name what they are about. */
+export const objectEventsQuery = (project: string, kind: string, name: string) =>
+  queryOptions({
+    queryKey: ["project", project, "events", kind, name],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/events", {
+          params: { path: { project }, query: { regarding: `${kind}/${name}` } },
+          signal,
+        }),
+      ),
+    refetchInterval: POLL,
+    refetchIntervalInBackground: false,
   })
 
 /** Under the project's key, so an applied plan (a rollback) refreshes them. */

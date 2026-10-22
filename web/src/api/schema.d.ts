@@ -3579,6 +3579,11 @@ export interface components {
       provenance: components["schemas"]["Provenance"]
       /** @description The plural resource name. */
       resource: string
+      /**
+       * @description The object's `status` as the cluster reports it; absent when it has none, and never for a
+       *     Secret.
+       */
+      status?: Record<string, never> | null
       /** @description The object as YAML, without the server's bookkeeping; a Secret's values hidden. */
       yaml: string
     }
