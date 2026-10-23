@@ -363,11 +363,14 @@ mod tests {
                         "state": {"running": {"startedAt": "2026-10-23T08:00:00Z"}}}]}
             }))
             .unwrap();
-            let mut conditions = vec![json!({"type": "Ready", "status": "True", "reason": "Built"})];
+            let mut conditions =
+                vec![json!({"type": "Ready", "status": "True", "reason": "Built"})];
             if let Some((reason, since)) = problem {
-                conditions.push(json!({"type": "SourceReady", "status": "False", "reason": reason,
+                conditions.push(
+                    json!({"type": "SourceReady", "status": "False", "reason": reason,
                     "message": "github.com refused the key for `git`",
-                    "lastTransitionTime": since}));
+                    "lastTransitionTime": since}),
+                );
             }
             cluster.update(|s| {
                 let objects = s.objects.get_mut("shop").unwrap();
@@ -403,7 +406,10 @@ mod tests {
         cluster.update(|s| {
             s.secret_values.insert(
                 "shop/site-git".to_owned(),
-                BTreeMap::from([("ssh-privatekey".to_owned(), key.private.clone().into_bytes())]),
+                BTreeMap::from([(
+                    "ssh-privatekey".to_owned(),
+                    key.private.clone().into_bytes(),
+                )]),
             );
             s.secret_values.insert(
                 "shop/site-token".to_owned(),
@@ -419,7 +425,10 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{answer}");
-        assert!(key.public.starts_with(answer["publicKey"].as_str().unwrap()));
+        assert!(
+            key.public
+                .starts_with(answer["publicKey"].as_str().unwrap())
+        );
         assert!(!answer.to_string().contains("PRIVATE"));
         let (status, _) = send(
             &app,

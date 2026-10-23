@@ -49,6 +49,7 @@
 //! `partial: true`), so a very large cluster gives a partial answer quickly rather than a slow
 //! one (see `zeabur_kube`'s cluster-wide reads).
 
+pub mod backups;
 pub(crate) mod capacity;
 pub mod config_reload;
 pub(crate) mod disks;

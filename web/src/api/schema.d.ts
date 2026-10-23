@@ -62,6 +62,65 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/backups": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The cluster's backups through Velero: its locations with whether Velero reaches them, its
+     *     schedules, and the newest hundred backups with how each went. Read as the person; Velero not
+     *     installed is `state: not-installed`, and a refused read is named in `unreadable`.
+     */
+    get: operations["getClusterBackups"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/backups/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Carries out a backups plan by its token: checks it, dry-runs every write, then writes. */
+    post: operations["applyClusterBackups"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/backups/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out what setting the backup location or Zeabur's schedule, pausing or resuming it, or
+     *     backing up now writes, and a token to apply it; writes nothing. The keys of a location never
+     *     appear in the answer.
+     */
+    post: operations["planClusterBackups"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/capabilities": {
     parameters: {
       query?: never
@@ -1862,6 +1921,90 @@ export interface components {
      * @enum {string}
      */
     BackupTargetKind: "volume" | "database" | "namespace"
+    /** @description One object a plan writes. */
+    BackupWrite: {
+      /** @description What it does. */
+      action: components["schemas"]["BackupWriteAction"]
+      /** @description The object as it will be, YAML; a Secret's keys are not in it. */
+      afterYaml?: string | null
+      /** @description The object as it is, YAML; absent for a creation. */
+      beforeYaml?: string | null
+      /** @description The object's kind. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace. */
+      namespace: string
+    }
+    /**
+     * @description What a write does.
+     * @enum {string}
+     */
+    BackupWriteAction: "create" | "patch"
+    /** @description What an apply wrote. */
+    BackupsApplied: {
+      /** @description The backup a `backupNow` plan created. */
+      backup?: string | null
+      /** @description The objects written, `Kind/name`. */
+      written: string[]
+    }
+    /** @description The token of a plan to apply. */
+    BackupsApply: {
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description A plan, and the token that applies it. */
+    BackupsPlan: {
+      /** @description The backup a `backupNow` plan creates. */
+      backup?: string | null
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /** @description The writes, in order; empty when nothing changes. */
+      writes: components["schemas"]["BackupWrite"][]
+    }
+    /** @description What to plan. */
+    BackupsPlanRequest:
+      | {
+          /** @description The access key ID; empty with the secret to keep the keys the location has. */
+          accessKeyId?: string
+          /** @description The bucket. */
+          bucket: string
+          /** @description The S3-compatible endpoint, `https://…`; empty for AWS S3. */
+          endpoint?: string
+          /** @enum {string} */
+          op: "location"
+          /** @description A folder in the bucket. */
+          prefix?: string
+          /** @description The region; `us-east-1` when empty. */
+          region?: string
+          /** @description The secret access key. */
+          secretAccessKey?: string
+        }
+      | {
+          /** @description Five cron fields, in the Velero server's clock. */
+          cron: string
+          /**
+           * Format: int32
+           * @description How many days each backup is kept.
+           */
+          keepDays: number
+          /** @description The namespaces to back up; empty for every namespace. */
+          namespaces?: string[]
+          /** @enum {string} */
+          op: "schedule"
+        }
+      | {
+          /** @enum {string} */
+          op: "pause"
+          /** @description Paused after the change. */
+          paused: boolean
+        }
+      | {
+          /** @enum {string} */
+          op: "backupNow"
+        }
     /** @description A baseline policy and the node addresses it does not let in. */
     BaselinePolicy: {
       /** @description Whether its blocks are exactly the nodes' addresses. */
@@ -2289,6 +2432,25 @@ export interface components {
       /** @description Where `name` comes from. */
       nameSource: components["schemas"]["NameSource"]
     }
+    /** @description The cluster's backups as Velero keeps them. */
+    ClusterBackups: {
+      /** @description The newest backups, newest first, a hundred at most. */
+      backups: components["schemas"]["VeleroBackup"][]
+      /** @description Whether the person may create schedules in Velero's namespace. */
+      canChange: components["schemas"]["Permission"]
+      /** @description Where backups go. */
+      locations: components["schemas"]["VeleroLocation"][]
+      /** @description Velero's namespace. */
+      namespace: string
+      /** @description When they run. */
+      schedules: components["schemas"]["VeleroSchedule"][]
+      /** @description Whether Velero is installed and its objects could be read. */
+      state: components["schemas"]["ProviderState"]
+      /** @description How many backups there are. */
+      totalBackups: number
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /** @description Events of the whole cluster, the newest `limit` of them. */
     ClusterEventList: {
       /** @description Newest first (by `lastSeen`, events without one last), then by namespace and name. */
@@ -2348,6 +2510,11 @@ export interface components {
     }
     /** @description What the person may change in the cluster itself. */
     ClusterRights: {
+      /**
+       * @description Set up Velero backups: `create` on `schedules.velero.io`. The backups page asks again in
+       *     Velero's own namespace.
+       */
+      changeBackups: components["schemas"]["Permission"]
       /** @description Change nodes (labels, taints, cordon): `patch` on nodes. */
       changeNodes: components["schemas"]["Permission"]
       /** @description Install components with Zeabur: `create` on `helmcharts.helm.cattle.io` in `kube-system`. */
@@ -6572,6 +6739,120 @@ export interface components {
       /** @description The reference is marked optional: the container starts without it. */
       optional?: boolean
     }
+    /** @description One backup. */
+    VeleroBackup: {
+      /**
+       * Format: int64
+       * @description Bytes its file-system backups copied.
+       */
+      bytes?: number | null
+      /**
+       * Format: int64
+       * @description Errors Velero counted.
+       */
+      errors: number
+      /** @description When Velero deletes it, RFC 3339. */
+      expires?: string | null
+      failure?: components["schemas"]["VeleroFailure"] | null
+      /** @description When it finished, RFC 3339. */
+      finished?: string | null
+      /**
+       * Format: int64
+       * @description Objects copied.
+       */
+      items?: number | null
+      /** @description Its name. */
+      name: string
+      /** @description The namespaces it covers; empty for every namespace. */
+      namespaces: string[]
+      /** @description How it went. */
+      outcome: components["schemas"]["BackupOutcome"]
+      /** @description Velero's phase. */
+      phase?: string | null
+      /** @description Velero's own words for it (`failureReason`, `validationErrors`). */
+      reason?: string | null
+      /** @description The schedule that made it. */
+      schedule?: string | null
+      /** @description When it started, RFC 3339. */
+      started?: string | null
+      /**
+       * Format: int64
+       * @description Objects it set out to copy.
+       */
+      totalItems?: number | null
+      /**
+       * Format: int64
+       * @description Warnings Velero counted.
+       */
+      warnings: number
+    }
+    /**
+     * @description Why a backup did not finish well, in the words the interface explains.
+     * @enum {string}
+     */
+    VeleroFailure: "locationUnavailable" | "invalid" | "itemsFailed" | "interrupted" | "other"
+    /** @description Where backups go. */
+    VeleroLocation: {
+      /** @description The bucket. */
+      bucket: string
+      /** @description The Secret holding its keys; absent when it uses Velero's own. */
+      credential?: string | null
+      /** @description Backups that name no location go here. */
+      default: boolean
+      /** @description The S3-compatible endpoint (`s3Url`); absent for AWS itself. */
+      endpoint?: string | null
+      /** @description When Velero last checked, RFC 3339. */
+      lastValidated?: string | null
+      /** @description Velero's message about the last check. */
+      message?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description Velero's namespace. */
+      namespace: string
+      /** @description Whether Velero can reach it. */
+      phase: components["schemas"]["VeleroLocationPhase"]
+      /** @description The folder in the bucket. */
+      prefix?: string | null
+      /** @description The object store plugin (`aws`). */
+      provider: string
+      /** @description The region. */
+      region?: string | null
+    }
+    /**
+     * @description Whether Velero can reach a location.
+     * @enum {string}
+     */
+    VeleroLocationPhase: "available" | "unavailable" | "unknown"
+    /** @description When backups run and what they take. */
+    VeleroSchedule: {
+      /** @description The cron expression, in the Velero server's clock (UTC unless set otherwise). */
+      cron: string
+      /** @description The namespaces it leaves out. */
+      excluded: string[]
+      /** @description It copies the files on every volume (file-system backup). */
+      fsBackup: boolean
+      /**
+       * Format: int32
+       * @description The same in whole days, when it is.
+       */
+      keepDays?: number | null
+      /** @description When it last made a backup, RFC 3339. */
+      lastBackup?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description Velero's namespace. */
+      namespace: string
+      /** @description The namespaces it covers; empty for every namespace. */
+      namespaces: string[]
+      /** @description No backups run while paused. */
+      paused: boolean
+      /** @description How long each backup is kept, as Velero writes it (`168h0m0s`). */
+      ttl?: string | null
+      /** @description Why Velero refused it (`status.validationErrors`). */
+      validationErrors: string[]
+      /** @description It is the schedule Zeabur sets up ([`SCHEDULE`]). */
+      zeabur: boolean
+    }
     /** @description A new volume for a workload: a PersistentVolumeClaim and where it is mounted. */
     VolumeRequest: {
       accessMode?: components["schemas"]["AccessMode"] | null
@@ -6896,6 +7177,135 @@ export interface operations {
         }
       }
       401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getClusterBackups: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ClusterBackups"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyClusterBackups: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BackupsApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["BackupsApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planClusterBackups: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["BackupsPlanRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["BackupsPlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
         headers: {
           [name: string]: unknown
         }

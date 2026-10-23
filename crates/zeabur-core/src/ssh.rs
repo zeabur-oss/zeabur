@@ -189,6 +189,9 @@ mod tests {
         let public = public_key(&key.private).unwrap();
         assert_eq!(format!("{public} zeabur shop"), key.public);
         assert_eq!(public_key("not a key"), None);
-        assert_eq!(public_key(&key.private.replace("b3BlbnNzaC1rZXktdjE", "AAAA")), None);
+        assert_eq!(
+            public_key(&key.private.replace("b3BlbnNzaC1rZXktdjE", "AAAA")),
+            None
+        );
     }
 }

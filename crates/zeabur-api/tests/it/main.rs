@@ -4,6 +4,7 @@
 
 mod account;
 mod api;
+mod backups;
 mod cluster_name;
 mod cluster_tools;
 #[cfg(test)]

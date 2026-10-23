@@ -12,6 +12,7 @@ import {
 
 import {
   capabilitiesQuery,
+  clusterBackupsQuery,
   clusterQuery,
   clusterWarningsQuery,
   databasesQuery,
@@ -51,6 +52,8 @@ import {
 //   /                                          Home: what needs you, grouped by where it comes
 //                                              from, then the projects
 //   /cluster                                   the cluster: version, attention, nodes, warnings
+//   /cluster/backups                           Velero's backups: where they go, the schedule, each
+//                                              run
 //   /cluster/components                        installed components and the catalogue
 //   /projects                                  every project and namespace
 //   /projects/$project                         the project: its problems, then its services as a
@@ -305,6 +308,13 @@ const membersRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/members"), "MembersPage"),
 })
 
+const clusterBackupsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cluster/backups",
+  loader: () => load(ensure(clusterQuery), ensure(upgradesQuery), ensure(clusterBackupsQuery)),
+  component: lazyRouteComponent(() => import("@/routes/cluster/backups"), "BackupsPage"),
+})
+
 const componentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/cluster/components",
@@ -346,6 +356,7 @@ export const router = createRouter({
     settingsRoute,
     accountRoute,
     membersRoute,
+    clusterBackupsRoute,
     componentsRoute,
     problemRoute,
     movedComponentsRoute,

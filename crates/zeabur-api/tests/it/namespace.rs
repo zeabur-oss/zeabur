@@ -360,7 +360,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{open}");
         assert_eq!(
             open["can"],
-            json!({"installComponents": "allowed", "changeNodes": "allowed"})
+            json!({"installComponents": "allowed", "changeNodes": "allowed", "changeBackups": "allowed"})
         );
         cluster.update(|s| {
             s.access_rules.insert(
@@ -374,7 +374,7 @@ mod tests {
         let (_, member) = send(&app, "GET", "/api/v1/cluster", None).await;
         assert_eq!(
             member["can"],
-            json!({"installComponents": "denied", "changeNodes": "denied"})
+            json!({"installComponents": "denied", "changeNodes": "denied", "changeBackups": "denied"})
         );
     }
 
