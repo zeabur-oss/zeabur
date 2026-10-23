@@ -48,7 +48,7 @@
     "diagnosis.podSecurity.cause.refused": "${service} can't start replicas: the project's Pod Security level ${level} refuses them.",
     "diagnosis.podSecurity.why.runAsNonRoot": "Strict security tells the cluster never to start a container as root. It checks the user the image runs as, and refuses root or a user it can't check.",
     "diagnosis.podSecurity.why.refused": "The cluster refuses replicas that break the project's ${level} level: ${breaks}.",
-    "diagnosis.podSecurity.fix.compatible": "Use an image built to run without root, such as nginxinc/nginx-unprivileged for nginx, or choose Compatible security in the service's settings.",
+    "diagnosis.podSecurity.fix.compatible": "Use an image that runs without root: nginxinc/nginx-unprivileged instead of nginx, or, for a service built from your Dockerfile, a numeric user such as USER 1000 in it. Otherwise, choose Compatible security in the service's settings.",
     "diagnosis.podSecurity.fix.numericUser": "Give the image a numeric user (USER 101, not USER nginx), or choose Compatible security in the service's settings.",
     "diagnosis.podSecurity.fix.privileged": "The project's level ${level} doesn't allow what the service asks for; remove that setting, or ask an admin to allow it.",
     "diagnosis.unreachable.cause.noService": "Nothing in the cluster can reach ${service} yet: it has no private address (Service).",
