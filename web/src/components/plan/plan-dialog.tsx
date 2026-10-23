@@ -107,9 +107,9 @@ function usePlan(
   const grouped = !!description?.facts
   const light = weight.risk === "low" && !grouped
   const short = useShortfall(plan.data?.preview)
-  const named = typedName(ask.changes)
+  const named = typedName(ask.changes, project)
   const [typed, setTyped] = useState("")
-  const unconfirmed = awaitsName(ask.changes, typed)
+  const unconfirmed = awaitsName(ask.changes, project, typed)
 
   const confirm = () => {
     if (!plan.data) return

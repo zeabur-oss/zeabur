@@ -5,6 +5,7 @@ import {
   awaitsName,
   destinationOf,
   isolates,
+  revokesJoinToken,
   typedName,
   undoOf,
   weigh,
@@ -208,13 +209,37 @@ describe("undoOf", () => {
 
 describe("typed confirmation", () => {
   test("a deletion waits for the object's name; other plans do not", () => {
-    expect(typedName([remove])).toBe("zeabur-isolate-api")
-    expect(awaitsName([remove], "")).toBe(true)
-    expect(awaitsName([remove], "zeabur-isolate")).toBe(true)
-    expect(awaitsName([remove], "ZEABUR-ISOLATE-API")).toBe(true)
-    expect(awaitsName([remove], " zeabur-isolate-api ")).toBe(false)
-    expect(awaitsName([{ op: "restart", workload: api }], "")).toBe(false)
-    expect(typedName([{ op: "restart", workload: api }])).toBe(undefined)
+    expect(typedName([remove], "shop")).toBe("zeabur-isolate-api")
+    expect(awaitsName([remove], "shop", "")).toBe(true)
+    expect(awaitsName([remove], "shop", "zeabur-isolate")).toBe(true)
+    expect(awaitsName([remove], "shop", "ZEABUR-ISOLATE-API")).toBe(true)
+    expect(awaitsName([remove], "shop", " zeabur-isolate-api ")).toBe(false)
+    expect(awaitsName([{ op: "restart", workload: api }], "shop", "")).toBe(false)
+    expect(typedName([{ op: "restart", workload: api }], "shop")).toBe(undefined)
+  })
+
+  test("revoking a join token is not typed; other Secrets in kube-system are", () => {
+    const secret = (name: string): Change => ({
+      op: "delete",
+      resource: { group: "", version: "v1", resource: "secrets" },
+      name,
+    })
+    const revoke = secret("bootstrap-token-abc123")
+    expect(revokesJoinToken("kube-system", revoke)).toBe(true)
+    expect(typedName([revoke], "kube-system")).toBe(undefined)
+    expect(awaitsName([revoke], "kube-system", "")).toBe(false)
+    expect(typedName([revoke], "shop")).toBe("bootstrap-token-abc123")
+    expect(typedName([secret("rke2-serving")], "kube-system")).toBe("rke2-serving")
+    expect(typedName([secret("bootstrap-token-ABC123")], "kube-system")).toBe(
+      "bootstrap-token-ABC123",
+    )
+    const configMap: Change = {
+      op: "delete",
+      resource: { group: "", version: "v1", resource: "configmaps" },
+      name: "bootstrap-token-abc123",
+    }
+    expect(typedName([configMap], "kube-system")).toBe("bootstrap-token-abc123")
+    expect(typedName([revoke, configMap], "kube-system")).toBe("bootstrap-token-abc123")
   })
 })
 
