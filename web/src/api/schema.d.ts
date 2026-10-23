@@ -929,6 +929,22 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/compose": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post: operations["convertCompose"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/configmaps": {
     parameters: {
       query?: never
@@ -2973,6 +2989,66 @@ export interface components {
       | "behind-major"
       | "ahead"
       | "unknown"
+    /** @description A Compose file to convert. */
+    ComposeRequest: {
+      /**
+       * @description The files `env_file` names, and `.env` for interpolation, by path as the Compose file
+       *     writes it.
+       */
+      envFiles?: {
+        [key: string]: string
+      }
+      /** @description The Compose file, YAML. */
+      yaml: string
+    }
+    /** @description One Compose service. */
+    ComposeService: {
+      /** @description The container's arguments (`command`). */
+      args?: string[]
+      /** @description The container's command (`entrypoint`). */
+      command?: string[]
+      /** @description Its name in the Compose file. */
+      composeName: string
+      counterpart?: components["schemas"]["Counterpart"] | null
+      /** @description The services it starts after, by Kubernetes name. */
+      dependsOn: string[]
+      /** @description What is left out, and why. */
+      findings: components["schemas"]["Finding"][]
+      /** @description The image; absent when the service only has `build:`, which is then not made. */
+      image?: string | null
+      /** @description Its Kubernetes name, a DNS label. */
+      name: string
+      /** @description The TCP ports it listens on (`ports` targets, then `expose`), without repeats. */
+      ports: number[]
+      /** @description Compose publishes one of its ports on the host: the service may want a public domain. */
+      published: boolean
+      /**
+       * Format: int32
+       * @description How many replicas (`deploy.replicas` or `scale`), from 1 to 20.
+       */
+      replicas: number
+      /** @description Its variables, `env_file` first and `environment` over them. */
+      variables: components["schemas"]["ComposeVariable"][]
+      /** @description Its volumes. */
+      volumes: components["schemas"]["ComposeVolume"][]
+    }
+    /** @description A variable of a service. */
+    ComposeVariable: {
+      /** @description Its name. */
+      name: string
+      refers?: components["schemas"]["Refers"] | null
+      /** @description Its value, interpolated. */
+      value: string
+    }
+    /** @description A volume of a service. */
+    ComposeVolume: {
+      /** @description Where it is mounted. */
+      mountPath: string
+      /** @description Its name, a DNS label; the claim is `<service>-<name>`. */
+      name: string
+      /** @description Mounted read-only. */
+      readOnly: boolean
+    }
     /** @description The ConfigMaps of a project. */
     ConfigMapList: {
       /** @description Sorted by name. */
@@ -3164,6 +3240,22 @@ export interface components {
       /** @description `CrashLoopBackOff`, `ImagePullBackOff`, `ErrImagePull`, `CreateContainerConfigError`, … */
       reason?: string | null
     }
+    /** @description What a Compose file becomes. */
+    Conversion: {
+      /** @description Files `env_file` names that the request does not hold. */
+      missingEnvFiles: string[]
+      /** @description The services, by Compose name. */
+      services: components["schemas"]["ComposeService"][]
+      /** @description Variables the file interpolates that nothing sets; they are empty. */
+      unset: string[]
+      /** @description The image of the init containers that wait for a dependency (`depends_on`). */
+      waitImage: string
+    }
+    /**
+     * @description The operator-managed counterpart of a database or object-storage image.
+     * @enum {string}
+     */
+    Counterpart: "postgresql" | "mysql" | "mariadb" | "mongodb" | "dragonfly" | "objectStorage"
     /** @description A kind that can be created in a project. */
     CreatableKind: {
       /** @description Whether the person may create it, as the review hints. */
@@ -4001,6 +4093,73 @@ export interface components {
       /** @description How the files are reached. */
       reader: components["schemas"]["FileReader"]
     }
+    /** @description A field of a service that is left out, or a difference to know of. */
+    Finding:
+      | {
+          /** @enum {string} */
+          code: "privileged"
+        }
+      | {
+          /** @enum {string} */
+          code: "hostNetwork"
+        }
+      | {
+          /** @enum {string} */
+          code: "hostPid"
+        }
+      | {
+          /** @description The capabilities. */
+          capabilities: string[]
+          /** @enum {string} */
+          code: "capAdd"
+        }
+      | {
+          /** @enum {string} */
+          code: "devices"
+        }
+      | {
+          /** @enum {string} */
+          code: "dockerSocket"
+          /** @description The path on the host. */
+          source: string
+        }
+      | {
+          /** @enum {string} */
+          code: "hostPath"
+          /** @description The path on the host. */
+          source: string
+          /** @description Where it was mounted. */
+          target: string
+        }
+      | {
+          /** @enum {string} */
+          code: "build"
+          /** @description The build context. */
+          context: string
+        }
+      | {
+          /** @enum {string} */
+          code: "healthcheck"
+        }
+      | {
+          /** @enum {string} */
+          code: "udpPort"
+          /**
+           * Format: int32
+           * @description The port.
+           */
+          port: number
+        }
+      | {
+          /** @enum {string} */
+          code: "sharedVolume"
+          /** @description The volume's name in the Compose file. */
+          volume: string
+        }
+      | {
+          /** @enum {string} */
+          code: "renamed"
+        }
     /** @description Whether the plan's new pods fit, and what blocks them. */
     Fit: {
       /** @description What blocks them, quotas first. */
@@ -5375,6 +5534,11 @@ export interface components {
      * @enum {string}
      */
     Ownership: "owned" | "shared" | "orphan"
+    /**
+     * @description What a variable that points at a database holds.
+     * @enum {string}
+     */
+    Part: "url" | "host" | "password" | "user" | "database" | "mention"
     /** @description A passkey: a way to sign in that lives on a device or in a password manager. */
     PasskeyView: {
       /** @description The authenticator model (AAGUID), when it reported one. */
@@ -6468,6 +6632,13 @@ export interface components {
        *     them to it again.
        */
       workload: components["schemas"]["WorkloadRef"]
+    }
+    /** @description How a variable points at a database service. */
+    Refers: {
+      /** @description What the value is. */
+      part: components["schemas"]["Part"]
+      /** @description The database service, by Kubernetes name. */
+      service: string
     }
     /** @description Credentials for the image's registry. */
     RegistryLogin: {
@@ -9536,6 +9707,40 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  convertCompose: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ComposeRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Conversion"]
+        }
+      }
+      400: {
         headers: {
           [name: string]: unknown
         }

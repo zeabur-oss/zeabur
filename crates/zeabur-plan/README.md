@@ -10,6 +10,9 @@ A plan token binds the request, the resource versions it was computed against an
 so an apply carries out exactly what was confirmed, or nothing; this crate defines the claims,
 `zeabur-api` seals them.
 
+The `compose` module reads a Docker Compose file as the services, volumes and variables it
+makes, and lists the fields it leaves out.
+
 ## Hides
 
 How an edit maps to fields and to a write. Zeabur writes as the field manager `zeabur`, sends

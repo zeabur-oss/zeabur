@@ -4,6 +4,7 @@ pub mod access;
 pub mod builds;
 mod change;
 pub mod checks;
+pub mod compose;
 mod create;
 mod delete;
 pub mod edit;

@@ -1382,6 +1382,35 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/compose":
+    post:
+      tags:
+      - projects
+      operationId: convertCompose
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComposeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversion"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/configmaps":
     get:
       tags:
@@ -5637,6 +5666,134 @@ components:
       - behind-major
       - ahead
       - unknown
+    ComposeRequest:
+      type: object
+      description: A Compose file to convert.
+      required:
+      - yaml
+      properties:
+        envFiles:
+          type: object
+          description: |-
+            The files `env_file` names, and `.env` for interpolation, by path as the Compose file
+            writes it.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        yaml:
+          type: string
+          description: The Compose file, YAML.
+    ComposeService:
+      type: object
+      description: One Compose service.
+      required:
+      - name
+      - composeName
+      - ports
+      - published
+      - variables
+      - volumes
+      - dependsOn
+      - replicas
+      - findings
+      properties:
+        args:
+          type: array
+          items:
+            type: string
+          description: The container's arguments (`command`).
+        command:
+          type: array
+          items:
+            type: string
+          description: The container's command (`entrypoint`).
+        composeName:
+          type: string
+          description: Its name in the Compose file.
+        counterpart:
+          oneOf:
+          - $ref: "#/components/schemas/Counterpart"
+            description: The operator-managed counterpart of its image, when it has one.
+          - type: "null"
+        dependsOn:
+          type: array
+          items:
+            type: string
+          description: The services it starts after, by Kubernetes name.
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/Finding"
+          description: What is left out, and why.
+        image:
+          type:
+          - string
+          - "null"
+          description: The image; absent when the service only has `build:`, which is then not made.
+        name:
+          type: string
+          description: Its Kubernetes name, a DNS label.
+        ports:
+          type: array
+          items:
+            type: integer
+            format: int32
+            minimum: 0
+          description: The TCP ports it listens on (`ports` targets, then `expose`), without repeats.
+        published:
+          type: boolean
+          description: "Compose publishes one of its ports on the host: the service may want a public domain."
+        replicas:
+          type: integer
+          format: int32
+          description: How many replicas (`deploy.replicas` or `scale`), from 1 to 20.
+          minimum: 0
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComposeVariable"
+          description: Its variables, `env_file` first and `environment` over them.
+        volumes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComposeVolume"
+          description: Its volumes.
+    ComposeVariable:
+      type: object
+      description: A variable of a service.
+      required:
+      - name
+      - value
+      properties:
+        name:
+          type: string
+          description: Its name.
+        refers:
+          oneOf:
+          - $ref: "#/components/schemas/Refers"
+            description: The database service it points at, when it does.
+          - type: "null"
+        value:
+          type: string
+          description: Its value, interpolated.
+    ComposeVolume:
+      type: object
+      description: A volume of a service.
+      required:
+      - name
+      - mountPath
+      - readOnly
+      properties:
+        mountPath:
+          type: string
+          description: Where it is mounted.
+        name:
+          type: string
+          description: Its name, a DNS label; the claim is `<service>-<name>`.
+        readOnly:
+          type: boolean
+          description: Mounted read-only.
     ConfigMapList:
       type: object
       description: The ConfigMaps of a project.
@@ -5991,6 +6148,43 @@ components:
           - string
           - "null"
           description: "`CrashLoopBackOff`, `ImagePullBackOff`, `ErrImagePull`, `CreateContainerConfigError`, …"
+    Conversion:
+      type: object
+      description: What a Compose file becomes.
+      required:
+      - services
+      - missingEnvFiles
+      - unset
+      - waitImage
+      properties:
+        missingEnvFiles:
+          type: array
+          items:
+            type: string
+          description: Files `env_file` names that the request does not hold.
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComposeService"
+          description: The services, by Compose name.
+        unset:
+          type: array
+          items:
+            type: string
+          description: Variables the file interpolates that nothing sets; they are empty.
+        waitImage:
+          type: string
+          description: The image of the init containers that wait for a dependency (`depends_on`).
+    Counterpart:
+      type: string
+      description: The operator-managed counterpart of a database or object-storage image.
+      enum:
+      - postgresql
+      - mysql
+      - mariadb
+      - mongodb
+      - dragonfly
+      - objectStorage
     CreatableKind:
       type: object
       description: A kind that can be created in a project.
@@ -7565,6 +7759,149 @@ components:
         reader:
           $ref: "#/components/schemas/FileReader"
           description: How the files are reached.
+    Finding:
+      oneOf:
+      - type: object
+        description: "`privileged: true`."
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - privileged
+      - type: object
+        description: "`network_mode: host`."
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - hostNetwork
+      - type: object
+        description: "`pid: host`."
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - hostPid
+      - type: object
+        description: "`cap_add`."
+        required:
+        - capabilities
+        - code
+        properties:
+          capabilities:
+            type: array
+            items:
+              type: string
+            description: The capabilities.
+          code:
+            type: string
+            enum:
+            - capAdd
+      - type: object
+        description: "`devices`."
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - devices
+      - type: object
+        description: A mount of the Docker socket.
+        required:
+        - source
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - dockerSocket
+          source:
+            type: string
+            description: The path on the host.
+      - type: object
+        description: A mount of another host path; nothing is mounted there.
+        required:
+        - source
+        - target
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - hostPath
+          source:
+            type: string
+            description: The path on the host.
+          target:
+            type: string
+            description: Where it was mounted.
+      - type: object
+        description: "`build:`. With an image the image is run; without one the service is not made."
+        required:
+        - context
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - build
+          context:
+            type: string
+            description: The build context.
+      - type: object
+        description: "`healthcheck`; Zeabur checks the first port instead."
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - healthcheck
+      - type: object
+        description: A UDP port, which a Kubernetes Service from this form does not carry.
+        required:
+        - port
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - udpPort
+          port:
+            type: integer
+            format: int32
+            description: The port.
+            minimum: 0
+      - type: object
+        description: A volume other services mount too; each gets a volume of its own.
+        required:
+        - volume
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - sharedVolume
+          volume:
+            type: string
+            description: The volume's name in the Compose file.
+      - type: object
+        description: The Compose name is not a DNS label; other services reach it by the new name.
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - renamed
+      description: A field of a service that is left out, or a difference to know of.
     Fit:
       type: object
       description: Whether the plan's new pods fit, and what blocks them.
@@ -10230,6 +10567,16 @@ components:
       - owned
       - shared
       - orphan
+    Part:
+      type: string
+      description: What a variable that points at a database holds.
+      enum:
+      - url
+      - host
+      - password
+      - user
+      - database
+      - mention
     PasskeyView:
       type: object
       description: "A passkey: a way to sign in that lives on a device or in a password manager."
@@ -12480,6 +12827,19 @@ components:
           description: |-
             The workload the route sends requests to. An `HTTPRoute` that stops redirecting sends
             them to it again.
+    Refers:
+      type: object
+      description: How a variable points at a database service.
+      required:
+      - service
+      - part
+      properties:
+        part:
+          $ref: "#/components/schemas/Part"
+          description: What the value is.
+        service:
+          type: string
+          description: The database service, by Kubernetes name.
     RegistryLogin:
       type: object
       description: Credentials for the image's registry.
