@@ -7,6 +7,8 @@ import {
   joined,
   joinScript,
   liveTokens,
+  policiesState,
+  serverHost,
   newToken,
   randomText,
   serverProblem,
@@ -112,8 +114,8 @@ describe("the commands on the new VM", () => {
         "    provider: hetzner",
         "    region: fsn1",
         "EOF",
-        "zeabur-installer plan",
-        "zeabur-installer apply",
+        "zeabur-installer plan     # what it installs, network checks and warnings; changes nothing",
+        "zeabur-installer apply    # installs RKE2 as an agent and waits for the node to be Ready",
         "",
       ].join("\n"),
     )
@@ -166,5 +168,38 @@ describe("when a node can be added and when it has joined", () => {
     expect(
       joined(before, [node("vm-2", "Unknown"), node("vm-3", "True"), node("server-1", "True")]),
     ).toEqual({ name: "vm-3", ready: true })
+  })
+})
+
+describe("network policies after a node joins", () => {
+  const policies = {
+    addresses: ["10.0.0.5", "10.0.0.9"],
+    policies: [{ namespace: "zeabur", missing: ["10.0.0.9"], current: false }],
+    behind: [{ name: "vps-4", addresses: ["10.0.0.9"] }],
+    canUpdate: "allowed",
+    unreadable: [],
+  } satisfies Schemas["NodePolicies"]
+
+  test("behind while a node's address is missing, current once none is", () => {
+    expect(policiesState(policies)).toBe("behind")
+    expect(policiesState({ ...policies, behind: [] })).toBe("current")
+    expect(policiesState({ ...policies, policies: [], behind: [] })).toBe("none")
+    expect(
+      policiesState({
+        ...policies,
+        unreadable: [
+          {
+            resource: "networkpolicies.networking.k8s.io",
+            kubernetes: { code: 403, reason: "Forbidden", message: "" },
+          },
+        ],
+      }),
+    ).toBe("unreadable")
+  })
+
+  test("the server's host, for the plan's messages", () => {
+    expect(serverHost("https://10.0.0.5:9345")).toBe("10.0.0.5")
+    expect(serverHost(" https://[fd00::5]:9345 ")).toBe("fd00::5")
+    expect(serverHost("https://server.internal:9345")).toBe("server.internal")
   })
 })

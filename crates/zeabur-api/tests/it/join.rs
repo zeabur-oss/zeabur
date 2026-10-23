@@ -264,4 +264,134 @@ mod tests {
         .await;
         assert_eq!(ids(&join(&cluster).await), ["abc123"]);
     }
+
+    fn baseline(namespace: &str, cidrs: &[&str]) -> zeabur_kube::DynamicObject {
+        let mut from = vec![
+            json!({"podSelector": {}}),
+            json!({"namespaceSelector": {"matchLabels":
+                {"app.kubernetes.io/managed-by": "zeabur-installer"}}}),
+        ];
+        from.extend(cidrs.iter().map(|c| json!({"ipBlock": {"cidr": c}})));
+        serde_json::from_value(json!({
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {"name": "zeabur-installer-baseline", "namespace": namespace,
+                         "resourceVersion": "3",
+                         "labels": {"app.kubernetes.io/managed-by": "zeabur-installer"}},
+            "spec": {"podSelector": {}, "policyTypes": ["Ingress"], "ingress": [{"from": from}]}
+        }))
+        .unwrap()
+    }
+
+    /// Two nodes, and policies that know only the first, as after `worker-1` joined.
+    fn with_policies() -> MemoryCluster {
+        let cluster = cluster("v1.34.1+rke2r1");
+        cluster.update(|s| {
+            s.served.push(zeabur_kube::ServedResource::readable(
+                "networking.k8s.io",
+                "v1",
+                "networkpolicies",
+                "NetworkPolicy",
+                true,
+            ));
+            s.dynamic = vec![
+                baseline("zeabur", &["10.0.0.5/32"]),
+                baseline("observability", &["10.0.0.5/32"]),
+            ];
+        });
+        cluster
+    }
+
+    #[tokio::test]
+    async fn the_baseline_policies_are_behind_a_new_node_until_a_plan_rewrites_them() {
+        let cluster = with_policies();
+        let app = app(&cluster);
+        let (status, body) = send(&app, "GET", "/api/v1/cluster/node-policies", None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(
+            body["behind"],
+            json!([{"name": "worker-1", "addresses": ["10.0.0.6"]}])
+        );
+        assert_eq!(body["canUpdate"], "allowed");
+
+        let (status, planned) =
+            send(&app, "POST", "/api/v1/cluster/node-policies/plan", None).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let namespaces: Vec<&str> = planned["writes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| w["namespace"].as_str().unwrap())
+            .collect();
+        assert_eq!(namespaces, ["observability", "zeabur"]);
+        assert!(
+            planned["writes"][0]["afterYaml"]
+                .as_str()
+                .unwrap()
+                .contains("10.0.0.6/32")
+        );
+        let (status, applied) = send(
+            &app,
+            "POST",
+            "/api/v1/cluster/node-policies/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let (_, body) = send(&app, "GET", "/api/v1/cluster/node-policies", None).await;
+        assert_eq!(body["behind"], json!([]));
+        let (_, again) = send(&app, "POST", "/api/v1/cluster/node-policies/plan", None).await;
+        assert_eq!(again["writes"], json!([]));
+    }
+
+    #[tokio::test]
+    async fn a_plan_made_before_another_node_joined_is_refused() {
+        let cluster = with_policies();
+        let app = app(&cluster);
+        let (_, planned) = send(&app, "POST", "/api/v1/cluster/node-policies/plan", None).await;
+        cluster.update(|s| {
+            s.nodes
+                .push(node("worker-2", &json!({}), "10.0.0.7", "True"));
+        });
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/v1/cluster/node-policies/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+    }
+
+    #[tokio::test]
+    async fn policies_the_person_may_not_read_or_patch_are_said_so() {
+        let cluster = with_policies();
+        cluster.update(|s| {
+            s.forbidden_writes
+                .insert("NetworkPolicy/zeabur-installer-baseline".to_owned());
+        });
+        let app = app(&cluster);
+        let (_, body) = send(&app, "GET", "/api/v1/cluster/node-policies", None).await;
+        assert_eq!(body["canUpdate"], "denied");
+        let (_, planned) = send(&app, "POST", "/api/v1/cluster/node-policies/plan", None).await;
+        let (status, refused) = send(
+            &app,
+            "POST",
+            "/api/v1/cluster/node-policies/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
+
+        cluster.update(|s| {
+            s.forbidden_resources
+                .insert("networkpolicies.networking.k8s.io".to_owned());
+        });
+        let (_, body) = send(&app, "GET", "/api/v1/cluster/node-policies", None).await;
+        assert_eq!(
+            body["unreadable"][0]["resource"],
+            "networkpolicies.networking.k8s.io"
+        );
+        assert_eq!(body["policies"], json!([]));
+    }
 }

@@ -32,6 +32,7 @@ import type { Health } from "@/model/service"
 import { useIssueText } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { AddNodeButton, JoinTokens } from "@/routes/cluster/add-node"
+import { PoliciesBehind } from "@/routes/cluster/node-policies"
 import { Section } from "@/routes/cluster/section"
 import { Meter } from "@zeabur/design-system/components/meter"
 
@@ -205,6 +206,7 @@ export function NodesSection() {
             <Worst nodes={data.items} />
           </div>
           <Notes data={data} />
+          <PoliciesBehind />
           <NodeList nodes={data.items} skew={skew} metrics={data.metrics} />
           <JoinTokens />
         </div>

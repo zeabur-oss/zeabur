@@ -234,6 +234,63 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/node-policies": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Whether the installer's baseline network policies let every node's traffic in. Read as the
+     *     person; a read they may not make is listed in `unreadable`.
+     */
+    get: operations["getNodePolicies"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/node-policies/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Carries out a plan by its token: checks it, dry-runs every write, then writes. */
+    post: operations["applyNodePolicies"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/node-policies/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out how the baseline network policies change to let every node in, and a token to apply
+     *     it; writes nothing.
+     */
+    post: operations["planNodePolicies"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/nodes": {
     parameters: {
       query?: never
@@ -1518,6 +1575,15 @@ export interface components {
      * @enum {string}
      */
     BackupTargetKind: "volume" | "database" | "namespace"
+    /** @description A baseline policy and the node addresses it does not let in. */
+    BaselinePolicy: {
+      /** @description Whether its blocks are exactly the nodes' addresses. */
+      current: boolean
+      /** @description Node addresses it has no block for, sorted. */
+      missing: string[]
+      /** @description Its namespace. */
+      namespace: string
+    }
     /** @description One limit the new pods exceed. */
     Blocker: {
       /**
@@ -3729,6 +3795,13 @@ export interface components {
       /** @description Addresses outside the cluster's pods. */
       toOutside: components["schemas"]["NetworkPolicyAccess"]
     }
+    /** @description A node some baseline policy drops traffic from. */
+    NodeBehind: {
+      /** @description Its addresses a policy does not let in. */
+      addresses: string[]
+      /** @description The node. */
+      name: string
+    }
     /**
      * @description A node condition that is not as it should be: `Ready` not `True`, or a pressure that is
      *     `True`.
@@ -3761,6 +3834,40 @@ export interface components {
       unreadable: components["schemas"]["UnreadableView"][]
       /** @description Pods not yet placed on a node. */
       unscheduledPods: number
+    }
+    /** @description The baseline policies against the nodes, as far as the person may read them. */
+    NodePolicies: {
+      /** @description The addresses every baseline policy should let in, sorted. */
+      addresses: string[]
+      /** @description Nodes whose traffic a policy drops, by name. */
+      behind: components["schemas"]["NodeBehind"][]
+      /** @description Whether the person may patch the policies that are not current. */
+      canUpdate: components["schemas"]["Permission"]
+      /** @description The baseline policies, by namespace; empty on a cluster the installer did not set up. */
+      policies: components["schemas"]["BaselinePolicy"][]
+      /** @description The reads that were refused (`nodes`, `networkpolicies.networking.k8s.io`). */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description What an apply wrote. */
+    NodePoliciesApplied: {
+      /** @description The namespaces whose policy was rewritten. */
+      namespaces: string[]
+    }
+    /** @description The token of a plan to apply. */
+    NodePoliciesApply: {
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description A plan that brings the baseline policies up to date, and the token that applies it. */
+    NodePoliciesPlan: {
+      /** @description The addresses the policies will let in. */
+      addresses: string[]
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /** @description The policies it rewrites; empty when all are current. */
+      writes: components["schemas"]["PolicyWrite"][]
     }
     /** @description A node whose kubelet minor differs from kube-apiserver's. */
     NodeSkew: {
@@ -4373,6 +4480,17 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description The pod. */
       pod: string
+    }
+    /** @description One policy a plan rewrites. */
+    PolicyWrite: {
+      /** @description The policy as it will be, YAML. */
+      afterYaml?: string | null
+      /** @description The policy as it is, YAML. */
+      beforeYaml?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace. */
+      namespace: string
     }
     /** @description One port of a Kubernetes Service. */
     Port: components["schemas"]["ProtocolInference"] & {
@@ -6234,6 +6352,115 @@ export interface operations {
         }
       }
       401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getNodePolicies: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NodePolicies"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyNodePolicies: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NodePoliciesApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NodePoliciesApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planNodePolicies: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NodePoliciesPlan"]
+        }
+      }
+      403: {
         headers: {
           [name: string]: unknown
         }

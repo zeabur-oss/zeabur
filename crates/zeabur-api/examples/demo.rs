@@ -28,7 +28,9 @@
 //! `ZEABUR_DEMO_RKE2=1` makes the cluster an RKE2 one installed by Zeabur Installer, so Cluster →
 //! Nodes offers Add node: the nodes have addresses and a location, `kube-system` has the CA and
 //! one installer-made join token, and a node `vps-4` joins a few seconds after a join token is
-//! created, Ready a few seconds later.
+//! created, Ready a few seconds later. Three namespaces have the installer's baseline network
+//! policy, which lets in the first nodes only, so it is behind once `vps-4` joins;
+//! `networkpolicies/patch` in `ZEABUR_DEMO_FORBID` refuses rewriting it.
 //!
 //! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
 //! after it is added, as do tools pods. `ZEABUR_DEMO_TOOLS=1` hands the session a made-up token,
@@ -2373,6 +2375,8 @@ fn rke2(s: &mut State) {
         status.addresses = Some(vec![from(
             json!({"type": "InternalIP", "address": format!("10.0.0.{}", i + 5)}),
         )]);
+        node.spec.get_or_insert_with(Default::default).pod_cidrs =
+            Some(vec![format!("10.42.{i}.0/24")]);
         let labels = node.metadata.labels.get_or_insert_with(Default::default);
         labels.insert(
             "installer.zeabur.com/provider".to_owned(),
@@ -2386,6 +2390,19 @@ fn rke2(s: &mut State) {
             "topology.kubernetes.io/zone".to_owned(),
             "fsn1-dc14".to_owned(),
         );
+    }
+    let mut blocks: Vec<String> = (0..s.nodes.len())
+        .flat_map(|i| [format!("10.0.0.{}", i + 5), format!("10.42.{i}.0")])
+        .collect();
+    blocks.sort();
+    for namespace in ["observability", "zeabur", "zeabur-identity"] {
+        s.dynamic.push(from(baseline_policy(namespace, &blocks)));
+    }
+    if std::env::var("ZEABUR_DEMO_FORBID")
+        .is_ok_and(|list| list.split(',').any(|r| r == "networkpolicies/patch"))
+    {
+        s.forbidden_writes
+            .insert("NetworkPolicy/zeabur-installer-baseline".to_owned());
     }
     let system = s
         .objects
@@ -2429,6 +2446,28 @@ fn rke2(s: &mut State) {
     );
 }
 
+/// The policy `zeabur-installer apply` puts in a namespace it manages, letting in `addresses`.
+fn baseline_policy(namespace: &str, addresses: &[String]) -> Value {
+    let mut from = vec![
+        json!({"podSelector": {}}),
+        json!({"namespaceSelector": {"matchLabels":
+            {"app.kubernetes.io/managed-by": "zeabur-installer"}}}),
+    ];
+    from.extend(
+        addresses
+            .iter()
+            .map(|a| json!({"ipBlock": {"cidr": format!("{a}/32")}})),
+    );
+    json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {"name": "zeabur-installer-baseline", "namespace": namespace,
+                     "resourceVersion": "1",
+                     "labels": {"app.kubernetes.io/managed-by": "zeabur-installer"}},
+        "spec": {"podSelector": {}, "policyTypes": ["Ingress"], "ingress": [{"from": from}]},
+    })
+}
+
 /// A VM that joins as `vps-4` once a join token has been created: listed after a few seconds,
 /// Ready a few seconds later.
 fn joining(cluster: MemoryCluster) {
@@ -2464,6 +2503,8 @@ fn joining(cluster: MemoryCluster) {
                     status.addresses = Some(vec![from(
                         json!({"type": "InternalIP", "address": "10.0.0.9"}),
                     )]);
+                    node.spec.get_or_insert_with(Default::default).pod_cidrs =
+                        Some(vec!["10.42.9.0/24".to_owned()]);
                     for condition in status.conditions.iter_mut().flatten() {
                         if condition.type_ == "Ready" {
                             if ticks == 6 { "False" } else { "True" }

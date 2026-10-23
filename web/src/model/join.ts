@@ -4,6 +4,7 @@ import type { Schemas } from "@/api/client"
 
 type JoinInfo = Schemas["JoinInfo"]
 type NodeView = Schemas["NodeView"]
+type NodePolicies = Schemas["NodePolicies"]
 
 /** Minutes a token works for: long enough to join a VM, short enough not to linger. */
 export const LIFETIMES = [30, 60] as const
@@ -114,8 +115,8 @@ export function joinScript({
     "(umask 077; cat > /etc/zeabur-installer/config.yaml) <<'EOF'",
     ...config,
     "EOF",
-    "zeabur-installer plan",
-    "zeabur-installer apply",
+    "zeabur-installer plan     # what it installs, network checks and warnings; changes nothing",
+    "zeabur-installer apply    # installs RKE2 as an agent and waits for the node to be Ready",
     "",
   ].join("\n")
 }
@@ -153,3 +154,25 @@ export const liveTokens = (tokens: readonly Schemas["JoinToken"][], now: number)
     const left = timeLeft(t.expires, now)
     return left === undefined || left > 0
   })
+
+/** What a person runs on a server when Zeabur cannot update the network policies itself. */
+export const SYNC_COMMAND = "zeabur-installer node sync"
+
+/** Whether the installer's network policies let every node in: `none` on a cluster without them. */
+export function policiesState(
+  policies: NodePolicies,
+): "unreadable" | "none" | "behind" | "current" {
+  if (policies.unreadable.length > 0) return "unreadable"
+  if (policies.policies.length === 0) return "none"
+  return policies.behind.length > 0 ? "behind" : "current"
+}
+
+/** The ports plan checks on the server for a worker, besides 9345. */
+export const WORKER_PORTS = ["6443", "10250"] as const
+
+/** The host of `https://<host>:<port>`, without IPv6 brackets. */
+export function serverHost(server: string): string {
+  const text = server.trim().replace(/^https:\/\//, "")
+  const host = text.slice(0, text.lastIndexOf(":"))
+  return host.replace(/^\[(.*)\]$/, "$1") || text
+}

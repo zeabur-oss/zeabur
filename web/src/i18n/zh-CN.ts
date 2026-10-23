@@ -411,19 +411,10 @@ export const zhCN: Messages = {
   "join.unavailable.noCaHash":
     "Zeabur 读不到集群的 CA 证书（kube-system 中的 ConfigMap kube-root-ca.crt），加入令牌需要它。",
   "join.before": "开始之前",
-  "join.warn.sameRegion":
-    "所有节点都放在同一家云服务商的同一个区域。同一区域内的不同可用区没有问题。跨服务商或跨区域时，延迟会拖慢 etcd、Kubernetes API 和存储，也可能让集群不稳定。",
-  "join.warn.ports":
-    "节点之间要放行：到服务器的 TCP 9345 和 6443；所有节点之间的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；服务器之间的 TCP 2379 到 2381。UDP 8472 不要对互联网开放。",
-  "join.warn.storageLocal":
-    "默认 local-path 存储类的卷会留在创建它的节点上：使用它的 Pod 只能在那个节点上运行，数据也跟着那个节点。",
-  "join.warn.udp": "这里无法检查 UDP 8472。如果它被拦截，不同节点上的 Pod 会互相连不上。",
   "join.role": "角色",
   "join.worker": "工作节点",
   "join.workerHint": "运行你的服务。控制平面留在现有的服务器上。",
   "join.serverNote": (command) => `要添加服务器（控制平面），请在现有的服务器上运行 ${command}。`,
-  "join.serversHa":
-    "控制平面要有三台以上的服务器，才能在少一台时继续运行：etcd 需要过半数。只有两台时，任何一台故障都会让集群停止，所以要加第三台。",
   "join.lifetime": "令牌有效时间",
   "join.hours": (n) => `${n} 小时`,
   "join.minutes": (n) => `${n} 分钟`,
@@ -461,6 +452,32 @@ export const zhCN: Messages = {
   "join.revokeTitle": (id) => `撤销加入令牌 ${id}`,
   "join.revokeNote":
     "已加入的节点会保留，重启后也会用自己的证书连回集群。之后不能再用这个令牌加入新机器；节点从集群删除后，要用新的令牌才能再加入。",
+  "join.next": "节点就绪后：",
+  "join.revokeStep": "撤销加入令牌。",
+  "join.planSays": "plan 停止或出现警告时",
+  "policies.step": "让网络策略放行它的流量。",
+  "policies.current": "网络策略已放行所有节点的流量。",
+  "policies.behind": (names) => `网络策略还没放行 ${listZh("zh-CN", names)}。`,
+  "policies.unreadable": (command) => `Zeabur 读不到网络策略。请在服务器上运行 ${command}。`,
+  "policies.cannotUpdate": (command) => `你无法在这里更新网络策略。请在服务器上运行 ${command}。`,
+  "policies.planTitle": "更新网络策略",
+  "policies.planLine": (namespaces) =>
+    `让所有节点的流量进入 ${listZh("zh-CN", namespaces)}。每条策略只改节点地址，其他设置不变。`,
+  "warning.join.sameRegion":
+    "所有节点都要在同一家云服务商的同一个区域。同一区域内的不同可用区没有问题；跨服务商或跨区域时，延迟会拖慢 etcd、Kubernetes API 和存储，甚至让集群不稳定。",
+  "warning.join.ports":
+    "节点之间需要放行：到服务器的 TCP 9345 和 6443；所有节点之间的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；服务器之间的 TCP 2379 到 2381。UDP 8472 不要对公网开放。",
+  "warning.join.storage.local":
+    "默认 local-path 存储类创建的卷只在创建它的节点上：使用它的 Pod 只能在那个节点运行，节点没了，数据也跟着没了。",
+  "warning.join.udp": "无法从这里检查 UDP 8472。如果它被拦截，不同节点上的 Pod 会互相连不上。",
+  "warning.join.servers.ha":
+    "控制平面要有三台以上的服务器，少一台时才能继续运行：etcd 需要过半数。只有两台时，任一台宕机整个集群就会停摆，请再加一台。",
+  "warning.join.server.unreachable": (server) =>
+    `连不上 ${server}。请检查地址，以及这台 VM 能否连到 TCP 9345。`,
+  "warning.join.port.closed": (ports, host) =>
+    `这台 VM 连不上 ${host} 的 TCP ${ports}，请检查防火墙或安全组。`,
+  "warning.join.token.unpinned":
+    "这个令牌没有 CA 哈希（K10<hash>::…），所以这台 VM 会信任在那个地址响应的任何服务器。请原样使用这里显示的令牌。",
 
   "projects.title": "项目",
   "projects.adopted": "项目",

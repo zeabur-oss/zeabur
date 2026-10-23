@@ -411,19 +411,10 @@ export const zhTW: Messages = {
   "join.unavailable.noCaHash":
     "Zeabur 讀不到叢集的 CA 憑證（kube-system 裡的 ConfigMap kube-root-ca.crt），加入權杖需要它。",
   "join.before": "開始之前",
-  "join.warn.sameRegion":
-    "所有節點都放在同一家主機供應商的同一個區域。同一區域裡的不同可用區沒問題。跨供應商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存空間，也可能讓叢集不穩定。",
-  "join.warn.ports":
-    "節點之間要開放：通往伺服器的 TCP 9345 和 6443；所有節點之間的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；伺服器之間的 TCP 2379 到 2381。UDP 8472 不要對網際網路開放。",
-  "join.warn.storageLocal":
-    "預設的 local-path 儲存只把資料存在一個節點上。用到這些資料的 Pod 只能在那個節點執行；那個節點不在了，資料也就不在了。",
-  "join.warn.udp": "這裡無法檢查 UDP 8472。如果它被擋住，不同節點上的 Pod 會連不到彼此。",
   "join.role": "角色",
   "join.worker": "工作節點",
   "join.workerHint": "執行你的服務。控制平面留在現有的伺服器上。",
   "join.serverNote": (command) => `要新增伺服器（控制平面），請在現有的伺服器上執行 ${command}。`,
-  "join.serversHa":
-    "控制平面要有三台以上的伺服器，才能在少一台時繼續運作：etcd 需要過半數。只有兩台時，任何一台故障都會讓叢集停擺，所以要加第三台。",
   "join.lifetime": "權杖有效時間",
   "join.hours": (n) => `${n} 小時`,
   "join.minutes": (n) => `${n} 分鐘`,
@@ -461,6 +452,32 @@ export const zhTW: Messages = {
   "join.revokeTitle": (id) => `撤銷加入權杖 ${id}`,
   "join.revokeNote":
     "已加入的節點會留著，重新開機後也會用自己的憑證連回叢集。之後不能再用這個權杖加入新機器；節點從叢集刪除後，要用新的權杖才能再加入。",
+  "join.next": "節點就緒後：",
+  "join.revokeStep": "撤銷加入權杖。",
+  "join.planSays": "plan 停下或出現警告時",
+  "policies.step": "讓網路政策放行它的流量。",
+  "policies.current": "網路政策已放行所有節點的流量。",
+  "policies.behind": (names) => `網路政策還沒放行 ${listZh("zh-TW", names)}。`,
+  "policies.unreadable": (command) => `Zeabur 讀不到網路政策。請在伺服器上執行 ${command}。`,
+  "policies.cannotUpdate": (command) => `你無法在這裡更新網路政策。請在伺服器上執行 ${command}。`,
+  "policies.planTitle": "更新網路政策",
+  "policies.planLine": (namespaces) =>
+    `讓所有節點的流量進入 ${listZh("zh-TW", namespaces)}。每條政策只改節點位址，其他設定不變。`,
+  "warning.join.sameRegion":
+    "所有節點都要在同一家主機服務商的同一個區域。同一區域內的不同可用區域沒有問題；跨服務商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存，甚至讓叢集不穩定。",
+  "warning.join.ports":
+    "節點之間要開放：連到伺服器的 TCP 9345 和 6443；所有節點之間的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；伺服器之間的 TCP 2379 到 2381。UDP 8472 不要對網際網路開放。",
+  "warning.join.storage.local":
+    "預設的 local-path 儲存只把資料存在一個節點上。用到這些資料的 Pod 只能在那個節點執行；那個節點不在了，資料也就不在了。",
+  "warning.join.udp": "從這裡無法檢查 UDP 8472。如果它被擋住，不同節點上的 Pod 會連不到彼此。",
+  "warning.join.servers.ha":
+    "控制平面要有三台以上的伺服器，少一台時才能繼續運作：etcd 需要過半數。只有兩台時，任一台停機整個叢集就會停擺，請再加一台。",
+  "warning.join.server.unreachable": (server) =>
+    `連不到 ${server}。請檢查位址，以及這台 VM 能不能連到 TCP 9345。`,
+  "warning.join.port.closed": (ports, host) =>
+    `這台 VM 連不到 ${host} 的 TCP ${ports}，請檢查防火牆或安全群組。`,
+  "warning.join.token.unpinned":
+    "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照這裡顯示的權杖原樣使用。",
 
   "projects.title": "專案",
   "projects.adopted": "專案",
