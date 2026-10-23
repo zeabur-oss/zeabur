@@ -18,7 +18,9 @@ import { EventList } from "@/components/events"
 import { replicaCounts } from "@/components/pods"
 import { RouteLine } from "@/components/route-trace"
 import { ServiceIcon } from "@/components/service-icon"
-import { plainReason, StatusDot, useStatusFacts, useStatusWord } from "@/components/status"
+import { useBrowserChecks } from "@/components/browser-check"
+import { plainReason, StatusDot, useStatusFacts } from "@/components/status"
+import { ReachLine, useHeadline } from "@/components/verdict"
 import { Button } from "@zeabur/design-system/components/button"
 import { Container } from "@zeabur/design-system/components/container"
 import { Meter } from "@zeabur/design-system/components/meter"
@@ -49,6 +51,7 @@ import { alertsFor, folded } from "@/model/alerts"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
+import { verdictOf, type Verdict } from "@/model/verdict"
 import {
   imageTag,
   isHealthy,
@@ -97,11 +100,23 @@ export function OverviewTab({
     events,
   )
   const diagnosed = said.causes.length > 0
+  const browser = useBrowserChecks()
+  const routes = trace.data?.routes ?? []
+  const verdict = verdictOf({
+    status: statusOf(service),
+    said,
+    routes,
+    checks: (address) => {
+      const route = routes.find((r) => r.kind === "domain" && r.address === address)
+      return browser(address, route?.hops.some((h) => h.step === "certificate") ?? false)
+    },
+  })
   return (
     <div className="flex flex-col gap-5">
       <Summary
         project={project}
         service={service}
+        verdict={verdict}
         explained={diagnosed || said.rollout.as === "card"}
         onTab={onTab}
       />
@@ -348,18 +363,20 @@ function More({ onClick, children }: { onClick: () => void; children: string }) 
 function Summary({
   project,
   service,
+  verdict,
   explained,
   onTab,
 }: {
   project: string
   service: Service
+  verdict: Verdict
   /** A diagnosis or a rollout below already says what is missing. */
   explained: boolean
   onTab: OnTab
 }) {
   const t = useT()
   const { locale } = useI18n()
-  const word = useStatusWord()
+  const headline = useHeadline()
   const cluster = useQuery(clusterQuery).data?.name
   const status = statusOf(service)
   const facts = useStatusFacts()(undefined, status.pod)
@@ -373,14 +390,15 @@ function Summary({
   return (
     <SummaryCard aria-label={t("common.status")}>
       <SummaryCardMain>
-        <SummaryCardStatus tone={status.health}>
+        <SummaryCardStatus tone={verdict.tone}>
           <SummaryCardWord>
-            <SwapText>{word(status)}</SwapText>
+            <SwapText>{headline(verdict.headline, status)}</SwapText>
           </SummaryCardWord>
           {status.desired !== undefined ? (
             <Replicas project={project} service={service} onTab={onTab} />
           ) : null}
         </SummaryCardStatus>
+        {verdict.reach ? <ReachLine reach={verdict.reach} /> : null}
         {since ? (
           <SummaryCardSince>
             <Tooltip content={formatTime(since, locale)}>

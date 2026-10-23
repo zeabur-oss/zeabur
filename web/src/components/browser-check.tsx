@@ -18,6 +18,15 @@ function start(url: string) {
   void check(url, (u, init) => fetch(u, init), Date.now).then((result) => put(url, result))
 }
 
+/** The last result for a domain, as the lines on screen checked it. */
+export function useBrowserChecks(): (address: string, tls: boolean) => BrowserCheck | undefined {
+  const results = checks.useValue()
+  return (address, tls) => {
+    const url = checkUrl(address, tls)
+    return url ? results.get(url) : undefined
+  }
+}
+
 /** Whether the person's browser reaches a domain the cluster could not check: once it is on
  * screen and the tab is visible, again at most once a minute or when asked. */
 export function BrowserCheckLine({ address, tls }: { address: string; tls: boolean }) {
