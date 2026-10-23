@@ -1,0 +1,6 @@
+description: "A restore makes a new MariaDB bootstrapped from the original's scheduled Backup at the backup's time, with its own app password Secret."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {"op":"create","object":{"apiVersion":"k8s.mariadb.com/v1alpha1","kind":"MariaDB","metadata":{"name":"shop-restored-1023","annotations":{"zeabur.com/restored-from":"shop","zeabur.com/restored-backup":"shop-20261022-030000","zeabur.com/restored-time":"2026-10-22T03:01:00Z"}},"spec":{"image":"mariadb:12.3.3","replicas":1,"rootPasswordSecretKeyRef":{"name":"mariadb-root","key":"password","generate":false},"database":"app","username":"app","passwordSecretKeyRef":{"name":"shop-restored-1023-app","key":"password","generate":false},"storage":{"size":"10Gi","storageClassName":"local-path"},"resources":{"requests":{"cpu":"100m","memory":"256Mi"},"limits":{"memory":"512Mi"}},"podSecurityContext":{"runAsNonRoot":true,"runAsUser":999,"runAsGroup":999,"fsGroup":999,"fsGroupChangePolicy":"OnRootMismatch","seccompProfile":{"type":"RuntimeDefault"}},"securityContext":{"allowPrivilegeEscalation":false,"capabilities":{"drop":["ALL"]}},"bootstrapFrom":{"backupRef":{"name":"shop-scheduled"},"targetRecoveryTime":"2026-10-22T03:01:00Z"}}}}

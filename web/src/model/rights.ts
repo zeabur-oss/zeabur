@@ -134,6 +134,9 @@ export function rightOfResource(
     networkpolicies: "changeNetworkPolicies",
     clusters: "changeDatabases",
     perconaservermongodbs: "changeDatabases",
+    mysqlclusters: "changeDatabases",
+    mariadbs: "changeDatabases",
+    dragonflies: "changeDatabases",
   }
   return rights[resource]
 }

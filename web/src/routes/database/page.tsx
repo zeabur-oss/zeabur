@@ -9,6 +9,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import CopyIcon from "~icons/ph/copy"
 import DatabaseIcon from "~icons/ph/database"
 import DotsThreeIcon from "~icons/ph/dots-three"
+import DownloadSimpleIcon from "~icons/ph/download-simple"
 import EyeIcon from "~icons/ph/eye"
 import EyeSlashIcon from "~icons/ph/eye-slash"
 import GearSixIcon from "~icons/ph/gear-six"
@@ -27,6 +28,7 @@ import { Ago } from "@/components/bits"
 import { ConnectDrawer, useTargets } from "@/components/connect"
 import { CopyText } from "@/components/copy-text"
 import { DatabaseState } from "@/components/databases"
+import { Diagnoses } from "@/components/diagnoses"
 import { EventList } from "@/components/events"
 import { FormField } from "@/components/form-field"
 import { Freshness } from "@/components/freshness"
@@ -41,14 +43,20 @@ import { openDatabaseShell } from "@/lib/dock"
 import type { Icon } from "@/lib/icon"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
+import { partsOf } from "@/model/database-parts"
 import {
   backUpNow,
   backupsOn,
+  canBackUpNow,
   connectionUri,
   deleteDatabase,
   enableBackups,
   engineName,
   eventsOf,
+  exportTool,
+  exportUrl,
+  fixedFolder,
+  keepsEverything,
   lastRun,
   newBackupTarget,
   presetOf,
@@ -62,6 +70,7 @@ import {
 import { connected } from "@/model/connect"
 import { isWarning, type Event, type Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
+import { Restore, Restored } from "@/routes/database/restore"
 import { DatabaseSettings } from "@/routes/database/settings"
 import { databaseTabs, type DatabaseTab, type ServiceMode } from "@/routes/search"
 import { TabRow } from "@/routes/service/tab-row"
@@ -208,6 +217,10 @@ function Body({
       () => undefined,
     )
   const terminalGate = gates("openTerminal")
+  const tool = exportTool[database.engine]
+  // MOCO's dump reads moco-writable's password from its Secret.
+  const exportGate =
+    terminalGate.open && database.engine === "mysql" ? gates("readSecrets") : terminalGate
 
   return (
     <Tabs
@@ -243,7 +256,9 @@ function Body({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:pl-13">
-              {backupsOn(database) ? <BackUpNow project={project} database={database} /> : null}
+              {backupsOn(database) && canBackUpNow(database.engine) ? (
+                <BackUpNow project={project} database={database} />
+              ) : null}
               <GateTip gate={terminalGate} className="max-sm:hidden">
                 <Button
                   variant="outline"
@@ -274,11 +289,25 @@ function Body({
                 >
                   <DotsThreeIcon aria-hidden="true" />
                 </MenuTrigger>
-                <MenuContent>
+                <MenuContent align="end" className="w-72">
                   <MenuItem onClick={() => void copyName()}>
                     <CopyIcon aria-hidden="true" />
                     {t("service.copyName")}
                   </MenuItem>
+                  {tool ? (
+                    <GatedMenuItem
+                      gate={exportGate}
+                      render={<a href={exportUrl(project, database)} download />}
+                    >
+                      <DownloadSimpleIcon aria-hidden="true" />
+                      <span className="flex min-w-0 flex-col">
+                        {t("db.export")}
+                        <span className="type-meta text-muted-foreground">
+                          {t("db.exportHint", tool)}
+                        </span>
+                      </span>
+                    </GatedMenuItem>
+                  ) : null}
                   <MenuSeparator />
                   <GatedMenuItem
                     gate={gates("changeDatabases")}
@@ -463,8 +492,11 @@ function Overview({
   const t = useT()
   const preset = presetOf(database.engine, database.resources)
   const run = lastRun(database)
+  const services = useQuery(projectQuery(project)).data?.services ?? []
+  const troubled = partsOf(database, services).find((s) => (s.diagnoses?.length ?? 0) > 0)
   return (
     <div className="flex flex-col gap-7">
+      <Restored project={project} database={database} />
       <SummaryCard>
         <SummaryCardMain>
           <SummaryCardStatus tone={stateHealth[database.state]}>
@@ -529,13 +561,20 @@ function Overview({
           </AlertDescription>
         </Alert>
       ) : null}
+      {troubled ? (
+        <Diagnoses diagnoses={troubled.diagnoses} service={troubled} project={project} />
+      ) : null}
+      {database.engine === "dragonfly" && !database.app ? (
+        <Alert variant="warn">
+          <WarningIcon aria-hidden="true" />
+          <AlertDescription>{t("db.noAuth", engineName(database.engine))}</AlertDescription>
+        </Alert>
+      ) : null}
       <KubeDetails
         facts={[
           [
             t("db.fact.members"),
-            `${database.kind}/${database.name} ${
-              database.engine === "postgresql" ? "spec.instances" : "spec.replsets[].size"
-            }`,
+            `${database.kind}/${database.name} ${membersField[database.engine]}`,
           ],
         ]}
       />
@@ -543,6 +582,15 @@ function Overview({
       <Connection project={project} database={database} />
     </div>
   )
+}
+
+/** Where each operator's object counts its members. */
+const membersField: Record<Database["engine"], string> = {
+  postgresql: "spec.instances",
+  mongodb: "spec.replsets[].size",
+  mysql: "spec.replicas",
+  mariadb: "spec.replicas",
+  dragonfly: "spec.replicas",
 }
 
 /** Rows in a card, labels and values at the summary card's facts' x. */
@@ -600,6 +648,9 @@ function Connection({ project, database }: { project: string; database: Database
     <Section id="db-connect" title={t("db.connect")}>
       <ConnectServices project={project} database={database} />
       <p className="type-meta text-muted-foreground">{t("db.inCluster")}</p>
+      {database.engine === "mysql" ? (
+        <p className="type-meta text-muted-foreground">{t("db.noDatabase")}</p>
+      ) : null}
       <Rows>
         <Row label={t("db.host")}>
           {mono(c.host)}
@@ -607,13 +658,15 @@ function Connection({ project, database }: { project: string; database: Database
         </Row>
         <Row label={t("db.port")}>{mono(String(c.port))}</Row>
         {c.database ? <Row label={t("db.database")}>{mono(c.database)}</Row> : null}
-        <Row label={t("db.username")}>
-          {username ? (
-            mono(username)
-          ) : (
-            <span className="type-meta text-muted-foreground">{t("db.inSecret", c.secret)}</span>
-          )}
-        </Row>
+        {c.username || c.usernameKey ? (
+          <Row label={t("db.username")}>
+            {username ? (
+              mono(username)
+            ) : (
+              <span className="type-meta text-muted-foreground">{t("db.inSecret", c.secret)}</span>
+            )}
+          </Row>
+        ) : null}
         <Row label={t("db.password")}>
           {shown ? mono(password) : mono("••••••••")}
           {shown ? (
@@ -716,8 +769,10 @@ function Backups({
           <SetUp project={project} database={database} />
         </>
       )}
-      <Runs database={database} />
-      <p className="type-meta text-muted-foreground">{t("db.backup.restoreNext")}</p>
+      {database.engine === "dragonfly" ? null : <Runs database={database} />}
+      <Section id="db-restore" title={t("db.restore.action")}>
+        <Restore project={project} database={database} />
+      </Section>
     </div>
   )
 }
@@ -727,13 +782,18 @@ function Target({ database }: { database: Database }) {
   const store = database.backups.store
   if (!store) return null
   const days = store.retention?.match(/^(\d+)d$/)?.[1]
+  const hours = Number(store.retention?.match(/^(\d+)h$/)?.[1] ?? Number.NaN)
   const retention = !store.retention
-    ? "—"
+    ? keepsEverything(database.engine)
+      ? t("db.backup.keepsEverything")
+      : "—"
     : database.engine === "mongodb"
       ? t("db.backup.retentionCount", store.retention)
       : days
         ? t("db.backup.retentionDays", Number(days))
-        : store.retention
+        : hours % 24 === 0
+          ? t("db.backup.retentionDays", hours / 24)
+          : store.retention
   return (
     <Section id="db-target" title={t("db.backup.destination")}>
       <Rows>
@@ -769,6 +829,9 @@ function Target({ database }: { database: Database }) {
       </Rows>
       {database.engine === "postgresql" ? (
         <p className="type-meta text-muted-foreground">{t("db.backup.walNote")}</p>
+      ) : null}
+      {database.engine === "dragonfly" ? (
+        <p className="type-meta text-muted-foreground">{t("db.backup.snapshots")}</p>
       ) : null}
     </Section>
   )
@@ -826,6 +889,10 @@ function SetUp({ project, database }: { project: string; database: Database }) {
     planner.plan({
       title: t("db.backup.plan", database.name),
       changes: enableBackups(database, target),
+      notes:
+        database.engine === "dragonfly" && database.members === 1
+          ? [t("db.backup.startsEmpty")]
+          : undefined,
     })
   }
   return (
@@ -860,17 +927,19 @@ function SetUp({ project, database }: { project: string; database: Database }) {
               onChange={(event) => set({ bucket: event.target.value })}
             />
           </FormField>
-          <FormField label={t("db.backup.path")} hint={t("db.backup.pathHint")}>
-            <Input
-              size="sm"
-              mono
-              placeholder={database.name}
-              value={target.path}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => set({ path: event.target.value })}
-            />
-          </FormField>
+          {fixedFolder(database.engine) ? null : (
+            <FormField label={t("db.backup.path")} hint={t("db.backup.pathHint")}>
+              <Input
+                size="sm"
+                mono
+                placeholder={database.name}
+                value={target.path}
+                autoComplete="off"
+                spellCheck={false}
+                onChange={(event) => set({ path: event.target.value })}
+              />
+            </FormField>
+          )}
           <FormField label={t("db.backup.accessKey")} errors={error("keys")}>
             <Input
               size="sm"
@@ -912,17 +981,33 @@ function SetUp({ project, database }: { project: string; database: Database }) {
               ]}
             />
           </FormField>
-          <FormField label={t("db.backup.keep")} errors={error("keep")}>
-            <Input
-              size="sm"
-              type="number"
-              min={1}
-              max={365}
-              value={String(target.keepDays)}
-              onChange={(event) => set({ keepDays: Number(event.target.value) })}
-            />
-          </FormField>
+          {keepsEverything(database.engine) ? null : (
+            <FormField label={t("db.backup.keep")} errors={error("keep")}>
+              <Input
+                size="sm"
+                type="number"
+                min={1}
+                max={365}
+                value={String(target.keepDays)}
+                onChange={(event) => set({ keepDays: Number(event.target.value) })}
+              />
+            </FormField>
+          )}
         </div>
+        {fixedFolder(database.engine) ? (
+          <p className="type-meta text-muted-foreground">
+            {t("db.backup.fixedFolder", `moco/${project}/${database.name}`)}
+          </p>
+        ) : null}
+        {keepsEverything(database.engine) ? (
+          <p className="type-meta text-muted-foreground">{t("db.backup.keepsEverything")}</p>
+        ) : null}
+        {database.engine === "dragonfly" && database.members === 1 ? (
+          <Alert variant="warn">
+            <WarningIcon aria-hidden="true" />
+            <AlertDescription>{t("db.backup.startsEmpty")}</AlertDescription>
+          </Alert>
+        ) : null}
         <div className="flex justify-end">
           <GateTip gate={setUpGate}>
             <Button size="sm" type="submit">

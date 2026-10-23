@@ -1,0 +1,78 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "dragonflydb.io/v1alpha1",
+        "kind": "Dragonfly",
+        "plural": "dragonflies",
+        "name": "dragonfly"
+      },
+      "resourceVersion": null,
+      "before": null,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "dragonflydb.io/v1alpha1",
+          "kind": "Dragonfly",
+          "metadata": {
+            "name": "dragonfly",
+            "namespace": "demo"
+          },
+          "spec": {
+            "image": "docker.dragonflydb.io/dragonflydb/dragonfly:v1.34.1",
+            "replicas": 1,
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "256Mi"
+              },
+              "limits": {
+                "memory": "512Mi"
+              }
+            },
+            "authentication": {
+              "passwordFromSecret": {
+                "name": "dragonfly-auth",
+                "key": "password"
+              }
+            },
+            "snapshot": {
+              "cron": "0 * * * *",
+              "persistentVolumeClaimSpec": {
+                "accessModes": [
+                  "ReadWriteOnce"
+                ],
+                "storageClassName": "local-path",
+                "resources": {
+                  "requests": {
+                    "storage": "2Gi"
+                  }
+                }
+              }
+            },
+            "podSecurityContext": {
+              "runAsNonRoot": true,
+              "runAsUser": 999,
+              "runAsGroup": 999,
+              "fsGroup": 999,
+              "fsGroupChangePolicy": "OnRootMismatch",
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "containerSecurityContext": {
+              "allowPrivilegeEscalation": false,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "impact": [],
+  "warnings": []
+}

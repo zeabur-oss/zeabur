@@ -264,3 +264,38 @@ describe("connecting a database to a service", () => {
     expect(variablesFor(mg, web())).toEqual(variablesFor(mongo, web()))
   })
 })
+
+describe("connecting MySQL, MariaDB and Dragonfly", () => {
+  test("each reads its password, then builds its URL from it", () => {
+    const mysql = pendingDatabase({ ...newDatabase("mysql", 1), name: "orders" }, "shop")
+    expect(variablesFor(mysql, web())).toEqual([
+      {
+        op: "set",
+        name: "MYSQLPASSWORD",
+        valueFrom: { secretName: "moco-orders", key: "WRITABLE_PASSWORD" },
+      },
+      {
+        op: "set",
+        name: "DATABASE_URL",
+        value: "mysql://moco-writable:$(MYSQLPASSWORD)@moco-orders-primary.shop.svc:3306/",
+      },
+    ])
+    const maria = pendingDatabase({ ...newDatabase("mariadb", 1), members: 2 }, "shop")
+    expect(variablesFor(maria, web()).at(-1)?.value).toBe(
+      "mysql://app:$(MYSQLPASSWORD)@mariadb-primary.shop.svc:3306/app",
+    )
+    const cache = pendingDatabase(newDatabase("dragonfly", 1), "shop")
+    expect(variablesFor(cache, web(), { name: "CACHE_REDIS_URL" })).toEqual([
+      {
+        op: "set",
+        name: "CACHE_REDIS_PASSWORD",
+        valueFrom: { secretName: "dragonfly-auth", key: "password" },
+      },
+      {
+        op: "set",
+        name: "CACHE_REDIS_URL",
+        value: "redis://:$(CACHE_REDIS_PASSWORD)@dragonfly.shop.svc:6379",
+      },
+    ])
+  })
+})

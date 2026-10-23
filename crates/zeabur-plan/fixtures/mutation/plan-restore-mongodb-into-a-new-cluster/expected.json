@@ -1,0 +1,129 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "psmdb.percona.com/v1",
+        "kind": "PerconaServerMongoDB",
+        "plural": "perconaservermongodbs",
+        "name": "shop-restored-1023"
+      },
+      "resourceVersion": null,
+      "before": null,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "psmdb.percona.com/v1",
+          "kind": "PerconaServerMongoDB",
+          "metadata": {
+            "name": "shop-restored-1023",
+            "annotations": {
+              "zeabur.com/restored-from": "shop",
+              "zeabur.com/restored-backup": "shop-20261022-030000",
+              "zeabur.com/restored-time": "2026-10-22T03:01:00Z"
+            },
+            "namespace": "demo"
+          },
+          "spec": {
+            "image": "percona/percona-server-mongodb:8.0.32-14",
+            "replsets": [
+              {
+                "name": "rs0",
+                "size": 3,
+                "resources": {
+                  "requests": {
+                    "cpu": "100m",
+                    "memory": "512Mi"
+                  },
+                  "limits": {
+                    "memory": "1Gi"
+                  }
+                },
+                "volumeSpec": {
+                  "persistentVolumeClaim": {
+                    "resources": {
+                      "requests": {
+                        "storage": "10Gi"
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            "sharding": {
+              "enabled": false
+            },
+            "users": [
+              {
+                "name": "app",
+                "db": "app",
+                "roles": [
+                  {
+                    "name": "readWrite",
+                    "db": "app"
+                  }
+                ]
+              }
+            ],
+            "backup": {
+              "enabled": true,
+              "image": "percona/percona-backup-mongodb:2.15.0",
+              "storages": {
+                "backups": {
+                  "type": "s3",
+                  "s3": {
+                    "bucket": "b",
+                    "prefix": "shop",
+                    "endpointUrl": "https://s3.example.com",
+                    "region": "us-east-1",
+                    "credentialsSecret": "shop-backups-s3"
+                  }
+                }
+              },
+              "tasks": []
+            },
+            "secrets": {
+              "users": "shop-secrets"
+            }
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "apiVersion": "psmdb.percona.com/v1",
+        "kind": "PerconaServerMongoDBRestore",
+        "plural": "perconaservermongodbrestores",
+        "name": "shop-restored-1023-restore"
+      },
+      "resourceVersion": null,
+      "before": null,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "psmdb.percona.com/v1",
+          "kind": "PerconaServerMongoDBRestore",
+          "metadata": {
+            "name": "shop-restored-1023-restore",
+            "namespace": "demo"
+          },
+          "spec": {
+            "clusterName": "shop-restored-1023",
+            "backupSource": {
+              "type": "logical",
+              "destination": "s3://b/shop/2026-10-22T03:00:21Z",
+              "s3": {
+                "bucket": "b",
+                "prefix": "shop",
+                "endpointUrl": "https://s3.example.com",
+                "region": "us-east-1",
+                "credentialsSecret": "shop-backups-s3"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "impact": [],
+  "warnings": []
+}

@@ -22,6 +22,7 @@ import { connectChanges, pendingDatabase } from "@/model/connect"
 import { chosenClass } from "@/model/storage"
 import {
   createDatabase,
+  engineLicence,
   engineName,
   engines,
   lastRun,
@@ -366,6 +367,11 @@ export function NewDatabaseDrawer({
           engine={engineName(form.engine)}
           onChange={(name) => set({ storageClass: chosenClass(storage, name) })}
         />
+        {engineLicence[form.engine] ? (
+          <p className="type-meta text-muted-foreground">
+            {t("db.licence", engineName(form.engine), engineLicence[form.engine] ?? "")}
+          </p>
+        ) : null}
         {form.members === 1 ? (
           <Alert variant="warn">
             <WarningIcon aria-hidden="true" />

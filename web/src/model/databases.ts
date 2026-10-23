@@ -10,6 +10,17 @@
 // for MongoDB, configured in `spec.backup` (a storage and scheduled tasks), and an on-demand backup
 // is a `PerconaServerMongoDBBackup`.
 // https://docs.percona.com/percona-operator-for-mongodb/backups.html
+//
+// MySQL is a MOCO `MySQLCluster`; its backups are a `BackupPolicy` the cluster names, which MOCO
+// runs as a CronJob into `s3://<bucket>/moco/<namespace>/<name>`.
+// https://cybozu-go.github.io/moco/backup.html
+//
+// MariaDB is a mariadb-operator `MariaDB`; its backups are `Backup` objects, scheduled or not.
+// https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/logical_backup.md
+//
+// Dragonfly is a Dragonfly Operator `Dragonfly`; it snapshots to a volume, or to a bucket when
+// `spec.snapshot.dir` is `s3://…`.
+// https://www.dragonflydb.io/docs/managing-dragonfly/backups
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
 import type { Event, Health } from "@/model/service"
@@ -19,9 +30,22 @@ export type Engine = Schemas["DatabaseEngine"]
 type Change = Schemas["Change"]
 type Manifest = Record<string, unknown>
 
-export const engines: Engine[] = ["postgresql", "mongodb"]
+export const engines: Engine[] = ["postgresql", "mongodb", "mysql", "mariadb", "dragonfly"]
 
-export const engineName = (engine: Engine) => (engine === "postgresql" ? "PostgreSQL" : "MongoDB")
+const ENGINE_NAMES: Record<Engine, string> = {
+  postgresql: "PostgreSQL",
+  mongodb: "MongoDB",
+  mysql: "MySQL",
+  mariadb: "MariaDB",
+  dragonfly: "Dragonfly",
+}
+
+export const engineName = (engine: Engine) => ENGINE_NAMES[engine]
+
+/** The server's licence, when it is not an open-source one. */
+export const engineLicence: Partial<Record<Engine, string>> = {
+  dragonfly: "Apache-2.0 AND BUSL-1.1",
+}
 
 /** Server versions the form offers, newest first; the first is the default. */
 export const versions: Record<Engine, { label: string; image: string }[]> = {
@@ -34,6 +58,12 @@ export const versions: Record<Engine, { label: string; image: string }[]> = {
     { label: "8.0", image: "percona/percona-server-mongodb:8.0.32-14" },
     { label: "7.0", image: "percona/percona-server-mongodb:7.0.43-23" },
   ],
+  mysql: [{ label: "8.4", image: "ghcr.io/cybozu-go/moco/mysql:8.4.10" }],
+  mariadb: [
+    { label: "12.3", image: "mariadb:12.3.3" },
+    { label: "11.8", image: "mariadb:11.8.3" },
+  ],
+  dragonfly: [{ label: "1.34", image: "docker.dragonflydb.io/dragonflydb/dragonfly:v1.34.1" }],
 }
 
 /** The Percona Backup for MongoDB agent the operator's 1.23 chart ships. */
@@ -59,6 +89,21 @@ export const presetResources: Record<Engine, Record<SizePreset, Resources>> = {
     small: { requests: { cpu: "100m", memory: "512Mi" }, limits: { memory: "1Gi" } },
     medium: { requests: { cpu: "500m", memory: "1Gi" }, limits: { memory: "2Gi" } },
     large: { requests: { cpu: "1", memory: "2Gi" }, limits: { memory: "4Gi" } },
+  },
+  mysql: {
+    small: { requests: { cpu: "100m", memory: "512Mi" }, limits: { memory: "1Gi" } },
+    medium: { requests: { cpu: "500m", memory: "1Gi" }, limits: { memory: "2Gi" } },
+    large: { requests: { cpu: "1", memory: "2Gi" }, limits: { memory: "4Gi" } },
+  },
+  mariadb: {
+    small: { requests: { cpu: "100m", memory: "256Mi" }, limits: { memory: "512Mi" } },
+    medium: { requests: { cpu: "500m", memory: "1Gi" }, limits: { memory: "1Gi" } },
+    large: { requests: { cpu: "1", memory: "2Gi" }, limits: { memory: "2Gi" } },
+  },
+  dragonfly: {
+    small: { requests: { cpu: "100m", memory: "256Mi" }, limits: { memory: "512Mi" } },
+    medium: { requests: { cpu: "500m", memory: "1Gi" }, limits: { memory: "1Gi" } },
+    large: { requests: { cpu: "1", memory: "2Gi" }, limits: { memory: "2Gi" } },
   },
 }
 
@@ -106,25 +151,39 @@ export function blockedVersions(engine: Engine, kernels: string[]): string[] {
   return tooNew ? versions.mongodb.filter((v) => v.label.startsWith("8.")).map((v) => v.label) : []
 }
 
+const defaults: Record<Engine, { name: string; storage: string; quorum: boolean }> = {
+  postgresql: { name: "postgres", storage: "5Gi", quorum: false },
+  mongodb: { name: "mongodb", storage: "10Gi", quorum: true },
+  mysql: { name: "mysql", storage: "10Gi", quorum: true },
+  mariadb: { name: "mariadb", storage: "10Gi", quorum: false },
+  dragonfly: { name: "dragonfly", storage: "2Gi", quorum: false },
+}
+
 export function newDatabase(engine: Engine, nodes: number, blocked: string[] = []): NewDatabase {
+  const d = defaults[engine]
   return {
     engine,
-    name: engine === "postgresql" ? "postgres" : "mongodb",
+    name: d.name,
     version: versions[engine].find((v) => !blocked.includes(v.label))?.label ?? "",
-    members: engine === "postgresql" || nodes <= 1 ? 1 : 3,
-    storage: engine === "postgresql" ? "5Gi" : "10Gi",
+    members: d.quorum && nodes > 1 ? 3 : 1,
+    storage: d.storage,
     size: "small",
   }
 }
 
-/** Member counts the form offers: PostgreSQL 1 to 5; a MongoDB replica set has an odd count. */
+/** Member counts the form offers. A MongoDB replica set and a MOCO cluster vote, so their counts
+ * are odd. */
 export const memberChoices: Record<Engine, number[]> = {
   postgresql: [1, 2, 3, 4, 5],
   mongodb: [1, 3, 5],
+  mysql: [1, 3, 5],
+  mariadb: [1, 2, 3],
+  dragonfly: [1, 2, 3],
 }
 
 const DNS_LABEL = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
-/** Short enough for every name the operators derive from it (`<name>-rs0-0`, `<name>-backups`). */
+/** Short enough for every name the operators derive from it (`<name>-rs0-0`, `<name>-backups`,
+ * `moco-backup-<name>`). */
 const NAME_MAX = 30
 
 export type NameProblem = "empty" | "invalid" | "long" | "taken"
@@ -145,58 +204,182 @@ const create = (object: Manifest): Change => ({
 const imageOf = (engine: Engine, label: string) =>
   versions[engine].find((v) => v.label === label)?.image ?? versions[engine][0]?.image ?? ""
 
+const restricted = {
+  allowPrivilegeEscalation: false,
+  capabilities: { drop: ["ALL"] },
+}
+
+/** A pod that passes the restricted Pod Security Standard, as `uid`. */
+const restrictedPod = (uid: number) => ({
+  runAsNonRoot: true,
+  runAsUser: uid,
+  runAsGroup: uid,
+  fsGroup: uid,
+  fsGroupChangePolicy: "OnRootMismatch",
+  seccompProfile: { type: "RuntimeDefault" },
+})
+
+const claimSpec = (storage: string, storageClass?: string) => ({
+  accessModes: ["ReadWriteOnce"],
+  ...(storageClass ? { storageClassName: storageClass } : {}),
+  resources: { requests: { storage } },
+})
+
+const ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+/** 24 letters and digits, safe in a URL without escaping. */
+export function newPassword(): string {
+  let out = ""
+  while (out.length < 24)
+    for (const byte of crypto.getRandomValues(new Uint8Array(32)))
+      if (byte < 248 && out.length < 24) out += ALPHABET[byte % ALPHABET.length]
+  return out
+}
+
+const secret = (name: string, data: Record<string, string>) =>
+  create({ apiVersion: "v1", kind: "Secret", metadata: { name }, type: "Opaque", stringData: data })
+
+/** MOCO's containers besides `mysqld`, which run as the pod's user. */
+const MOCO_CONTAINERS = ["agent", "moco-init", "slow-log"]
+
 /** The object the form creates. */
 function databaseObject(form: NewDatabase): Manifest {
   const resources = presetResources[form.engine][form.size]
-  if (form.engine === "postgresql")
-    return {
-      apiVersion: "postgresql.cnpg.io/v1",
-      kind: "Cluster",
-      metadata: { name: form.name },
-      spec: {
-        instances: form.members,
-        imageName: imageOf("postgresql", form.version),
-        storage: {
-          size: form.storage,
-          ...(form.storageClass ? { storageClass: form.storageClass } : {}),
-        },
-        resources,
-      },
-    }
-  return {
-    apiVersion: "psmdb.percona.com/v1",
-    kind: "PerconaServerMongoDB",
-    // The operator deletes the data claims with the cluster, as CloudNativePG does.
-    // https://docs.percona.com/percona-operator-for-mongodb/operator.html#metadata
-    metadata: { name: form.name, finalizers: ["percona.com/delete-psmdb-pvc"] },
-    spec: {
-      image: imageOf("mongodb", form.version),
-      // Fewer than three members is allowed only when asked for by name: it has no redundancy.
-      // https://docs.percona.com/percona-operator-for-mongodb/operator.html#unsafeflagsreplsetsize
-      ...(form.members < 3 ? { unsafeFlags: { replsetSize: true } } : {}),
-      replsets: [
-        {
-          name: "rs0",
-          size: form.members,
+  const image = imageOf(form.engine, form.version)
+  switch (form.engine) {
+    case "postgresql":
+      return {
+        apiVersion: "postgresql.cnpg.io/v1",
+        kind: "Cluster",
+        metadata: { name: form.name },
+        spec: {
+          instances: form.members,
+          imageName: image,
+          storage: {
+            size: form.storage,
+            ...(form.storageClass ? { storageClass: form.storageClass } : {}),
+          },
           resources,
-          volumeSpec: {
-            persistentVolumeClaim: {
-              ...(form.storageClass ? { storageClassName: form.storageClass } : {}),
-              resources: { requests: { storage: form.storage } },
+        },
+      }
+    case "mongodb":
+      return {
+        apiVersion: "psmdb.percona.com/v1",
+        kind: "PerconaServerMongoDB",
+        // The operator deletes the data claims with the cluster, as CloudNativePG does.
+        // https://docs.percona.com/percona-operator-for-mongodb/operator.html#metadata
+        metadata: { name: form.name, finalizers: ["percona.com/delete-psmdb-pvc"] },
+        spec: {
+          image,
+          // Fewer than three members is allowed only when asked for by name: it has no redundancy.
+          // https://docs.percona.com/percona-operator-for-mongodb/operator.html#unsafeflagsreplsetsize
+          ...(form.members < 3 ? { unsafeFlags: { replsetSize: true } } : {}),
+          replsets: [
+            {
+              name: "rs0",
+              size: form.members,
+              resources,
+              volumeSpec: {
+                persistentVolumeClaim: {
+                  ...(form.storageClass ? { storageClassName: form.storageClass } : {}),
+                  resources: { requests: { storage: form.storage } },
+                },
+              },
+            },
+          ],
+          sharding: { enabled: false },
+          // The user services connect as; the operator keeps its password in
+          // `<name>-custom-user-secret`, key `app`.
+          users: [{ name: "app", db: "app", roles: [{ name: "readWrite", db: "app" }] }],
+          backup: { enabled: false, image: PBM_IMAGE },
+        },
+      }
+    case "mysql":
+      // MOCO's images run as 10000; services connect as `moco-writable`, whose password MOCO
+      // keeps in `moco-<name>`.
+      return {
+        apiVersion: "moco.cybozu.com/v1beta2",
+        kind: "MySQLCluster",
+        metadata: { name: form.name },
+        spec: {
+          replicas: form.members,
+          podTemplate: {
+            spec: {
+              securityContext: restrictedPod(10000),
+              containers: [{ name: "mysqld", image, resources, securityContext: restricted }],
             },
           },
+          volumeClaimTemplates: [
+            {
+              metadata: { name: "mysql-data" },
+              spec: claimSpec(form.storage, form.storageClass),
+            },
+          ],
+          overwriteContainers: MOCO_CONTAINERS.map((name) => ({
+            name,
+            securityContext: restricted,
+          })),
         },
-      ],
-      sharding: { enabled: false },
-      // The user services connect as; the operator keeps its password in
-      // `<name>-custom-user-secret`, key `app`.
-      users: [{ name: "app", db: "app", roles: [{ name: "readWrite", db: "app" }] }],
-      backup: { enabled: false, image: PBM_IMAGE },
-    },
+      }
+    case "mariadb":
+      return {
+        apiVersion: "k8s.mariadb.com/v1alpha1",
+        kind: "MariaDB",
+        metadata: { name: form.name },
+        spec: {
+          image,
+          replicas: form.members,
+          ...(form.members > 1 ? { replication: { enabled: true } } : {}),
+          rootPasswordSecretKeyRef: { name: `${form.name}-root`, key: "password", generate: false },
+          database: "app",
+          username: "app",
+          passwordSecretKeyRef: { name: `${form.name}-app`, key: "password", generate: false },
+          storage: {
+            size: form.storage,
+            ...(form.storageClass ? { storageClassName: form.storageClass } : {}),
+          },
+          resources,
+          podSecurityContext: restrictedPod(999),
+          securityContext: restricted,
+        },
+      }
+    case "dragonfly":
+      return {
+        apiVersion: "dragonflydb.io/v1alpha1",
+        kind: "Dragonfly",
+        metadata: { name: form.name },
+        spec: {
+          image,
+          replicas: form.members,
+          resources,
+          authentication: { passwordFromSecret: { name: `${form.name}-auth`, key: "password" } },
+          // Snapshots on a volume each hour; Dragonfly also saves one when it stops.
+          snapshot: {
+            cron: "0 * * * *",
+            persistentVolumeClaimSpec: claimSpec(form.storage, form.storageClass),
+          },
+          podSecurityContext: restrictedPod(999),
+          containerSecurityContext: restricted,
+        },
+      }
   }
 }
 
-export const createDatabase = (form: NewDatabase): Change[] => [create(databaseObject(form))]
+/** The Secrets Zeabur makes for a database: MariaDB's root and app passwords, Dragonfly's. */
+function passwordSecrets(form: NewDatabase, password: () => string): Change[] {
+  if (form.engine === "mariadb")
+    return [
+      secret(`${form.name}-root`, { password: password() }),
+      secret(`${form.name}-app`, { password: password() }),
+    ]
+  if (form.engine === "dragonfly") return [secret(`${form.name}-auth`, { password: password() })]
+  return []
+}
+
+export const createDatabase = (form: NewDatabase, password = newPassword): Change[] => [
+  ...passwordSecrets(form, password),
+  create(databaseObject(form)),
+]
 
 export type Frequency = "daily" | "weekly"
 
@@ -253,6 +436,73 @@ const cron = (frequency: Frequency, seconds: boolean) =>
 
 const PLUGIN = "barman-cloud.cloudnative-pg.io"
 
+/** The bucket and folder of `s3://bucket/folder`. */
+export function splitDestination(destination: string | null | undefined) {
+  const [bucket = "", ...rest] = (destination ?? "").replace(/^s3:\/\//, "").split("/")
+  return { bucket, folder: rest.join("/") }
+}
+
+/** MOCO's backup and restore Jobs: the bucket, the keys from `secretName` as AWS variables, and a
+ * scratch volume as big as the data. They run as the namespace's `default` ServiceAccount, as
+ * MOCO's Jobs call no Kubernetes API.
+ * https://cybozu-go.github.io/moco/backup.html */
+function mocoJobConfig(
+  database: Pick<Database, "storage" | "storageClass">,
+  bucket: string,
+  endpoint: string | null | undefined,
+  secretName: string,
+) {
+  return {
+    serviceAccountName: "default",
+    bucketConfig: {
+      bucketName: bucket,
+      ...(endpoint ? { endpointURL: endpoint } : {}),
+      usePathStyle: true,
+    },
+    envFrom: [{ secretRef: { name: secretName } }],
+    workVolume: {
+      ephemeral: {
+        volumeClaimTemplate: {
+          spec: claimSpec(database.storage ?? "10Gi", database.storageClass ?? undefined),
+        },
+      },
+    },
+  }
+}
+
+/** mariadb-operator's S3 storage: the endpoint without its scheme, TLS from it. */
+function mariaStorage(
+  bucket: string,
+  prefix: string,
+  endpoint: string,
+  region: string,
+  secretName: string,
+) {
+  return {
+    s3: {
+      bucket,
+      prefix,
+      endpoint: endpoint.replace(/^https?:\/\//, "").replace(/\/+$/, ""),
+      region: region || "us-east-1",
+      accessKeyIdSecretKeyRef: { name: secretName, key: "AWS_ACCESS_KEY_ID" },
+      secretAccessKeySecretKeyRef: { name: secretName, key: "AWS_SECRET_ACCESS_KEY" },
+      tls: { enabled: endpoint.startsWith("https://") },
+    },
+  }
+}
+
+const awsKeys = (target: BackupTarget, region: string) => ({
+  AWS_ACCESS_KEY_ID: target.accessKey.trim(),
+  AWS_SECRET_ACCESS_KEY: target.secretKey.trim(),
+  AWS_REGION: region || "us-east-1",
+})
+
+/** Engines whose backups have no retention: the person sets a lifecycle rule on the bucket. */
+export const keepsEverything = (engine: Engine) => engine === "mysql" || engine === "dragonfly"
+
+/** MOCO writes to a fixed folder, `moco/<namespace>/<name>`. */
+export const fixedFolder = (engine: Engine) => engine === "mysql"
+
 /**
  * The writes that back a database up: the keys as a Secret, where backups go, the schedule, and
  * the database edited to use them (`object` is the database as written, `Database.object`).
@@ -265,107 +515,168 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
   const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
   const spec = (object.spec ??= {})
   const { group, version, resource } = databaseAddress(database)
-  const edit: Change = {
+  const edit = (): Change => ({
     op: "edit",
     resource: { group, version, resource },
     name: database.name,
-    yaml: "",
-  }
-  if (database.engine === "postgresql") {
-    const secret = create({
-      apiVersion: "v1",
-      kind: "Secret",
-      metadata: { name: names.secret },
-      type: "Opaque",
-      stringData: {
+    yaml: JSON.stringify(object),
+  })
+  switch (database.engine) {
+    case "postgresql": {
+      const keys = secret(names.secret, {
         ACCESS_KEY_ID: target.accessKey.trim(),
         ACCESS_SECRET_KEY: target.secretKey.trim(),
         ...(region ? { REGION: region } : {}),
-      },
-    })
-    const store = create({
-      apiVersion: "barmancloud.cnpg.io/v1",
-      kind: "ObjectStore",
-      metadata: { name: names.store },
-      spec: {
-        retentionPolicy: `${target.keepDays}d`,
-        configuration: {
-          destinationPath: `s3://${bucket}/${folder(target, database.name)}`,
-          endpointURL: endpoint,
-          s3Credentials: {
-            accessKeyId: { name: names.secret, key: "ACCESS_KEY_ID" },
-            secretAccessKey: { name: names.secret, key: "ACCESS_SECRET_KEY" },
-            ...(region ? { region: { name: names.secret, key: "REGION" } } : {}),
+      })
+      const store = create({
+        apiVersion: "barmancloud.cnpg.io/v1",
+        kind: "ObjectStore",
+        metadata: { name: names.store },
+        spec: {
+          retentionPolicy: `${target.keepDays}d`,
+          configuration: {
+            destinationPath: `s3://${bucket}/${folder(target, database.name)}`,
+            endpointURL: endpoint,
+            s3Credentials: {
+              accessKeyId: { name: names.secret, key: "ACCESS_KEY_ID" },
+              secretAccessKey: { name: names.secret, key: "ACCESS_SECRET_KEY" },
+              ...(region ? { region: { name: names.secret, key: "REGION" } } : {}),
+            },
+            wal: { compression: "gzip" },
+            data: { compression: "gzip" },
           },
-          wal: { compression: "gzip" },
-          data: { compression: "gzip" },
         },
-      },
-    })
-    const plugins = ((spec.plugins as Manifest[] | undefined) ?? []).filter(
-      (p) => p.name !== PLUGIN,
-    )
-    spec.plugins = [
-      ...plugins,
-      { name: PLUGIN, isWALArchiver: true, parameters: { barmanObjectName: names.store } },
-    ]
-    const schedule = create({
-      apiVersion: "postgresql.cnpg.io/v1",
-      kind: "ScheduledBackup",
-      metadata: { name: names.schedule },
-      spec: {
-        schedule: cron(target.frequency, true),
-        backupOwnerReference: "self",
-        cluster: { name: database.name },
-        method: "plugin",
-        pluginConfiguration: { name: PLUGIN },
-      },
-    })
-    return [secret, store, { ...edit, yaml: JSON.stringify(object) }, schedule]
-  }
-  const secret = create({
-    apiVersion: "v1",
-    kind: "Secret",
-    metadata: { name: names.secret },
-    type: "Opaque",
-    stringData: {
-      AWS_ACCESS_KEY_ID: target.accessKey.trim(),
-      AWS_SECRET_ACCESS_KEY: target.secretKey.trim(),
-    },
-  })
-  const backup = (spec.backup as Manifest | undefined) ?? {}
-  const runs = target.frequency === "weekly" ? Math.ceil(target.keepDays / 7) : target.keepDays
-  spec.backup = {
-    ...backup,
-    enabled: true,
-    image: (backup.image as string | undefined) ?? PBM_IMAGE,
-    storages: {
-      ...(backup.storages as Manifest | undefined),
-      backups: {
-        type: "s3",
-        s3: {
-          bucket,
-          prefix: folder(target, database.name),
-          endpointUrl: endpoint,
-          region: region || "us-east-1",
-          credentialsSecret: names.secret,
-          forcePathStyle: true,
+      })
+      const plugins = ((spec.plugins as Manifest[] | undefined) ?? []).filter(
+        (p) => p.name !== PLUGIN,
+      )
+      spec.plugins = [
+        ...plugins,
+        { name: PLUGIN, isWALArchiver: true, parameters: { barmanObjectName: names.store } },
+      ]
+      const schedule = create({
+        apiVersion: "postgresql.cnpg.io/v1",
+        kind: "ScheduledBackup",
+        metadata: { name: names.schedule },
+        spec: {
+          schedule: cron(target.frequency, true),
+          backupOwnerReference: "self",
+          cluster: { name: database.name },
+          method: "plugin",
+          pluginConfiguration: { name: PLUGIN },
         },
-      },
-    },
-    tasks: [
-      ...((backup.tasks as Manifest[] | undefined) ?? []).filter((t) => t.name !== "scheduled"),
-      {
-        name: "scheduled",
+      })
+      return [keys, store, edit(), schedule]
+    }
+    case "mongodb": {
+      const keys = secret(names.secret, {
+        AWS_ACCESS_KEY_ID: target.accessKey.trim(),
+        AWS_SECRET_ACCESS_KEY: target.secretKey.trim(),
+      })
+      const backup = (spec.backup as Manifest | undefined) ?? {}
+      const runs = target.frequency === "weekly" ? Math.ceil(target.keepDays / 7) : target.keepDays
+      spec.backup = {
+        ...backup,
         enabled: true,
-        schedule: cron(target.frequency, false),
-        storageName: "backups",
-        type: "logical",
-        retention: { type: "count", count: runs, deleteFromStorage: true },
-      },
-    ],
+        image: (backup.image as string | undefined) ?? PBM_IMAGE,
+        storages: {
+          ...(backup.storages as Manifest | undefined),
+          backups: {
+            type: "s3",
+            s3: {
+              bucket,
+              prefix: folder(target, database.name),
+              endpointUrl: endpoint,
+              region: region || "us-east-1",
+              credentialsSecret: names.secret,
+              forcePathStyle: true,
+            },
+          },
+        },
+        tasks: [
+          ...((backup.tasks as Manifest[] | undefined) ?? []).filter((t) => t.name !== "scheduled"),
+          {
+            name: "scheduled",
+            enabled: true,
+            schedule: cron(target.frequency, false),
+            storageName: "backups",
+            type: "logical",
+            retention: { type: "count", count: runs, deleteFromStorage: true },
+          },
+        ],
+      }
+      return [keys, edit()]
+    }
+    case "mysql": {
+      const keys = secret(names.secret, awsKeys(target, region))
+      const policy = create({
+        apiVersion: "moco.cybozu.com/v1beta2",
+        kind: "BackupPolicy",
+        metadata: { name: names.store },
+        spec: {
+          schedule: cron(target.frequency, false),
+          concurrencyPolicy: "Forbid",
+          jobConfig: mocoJobConfig(database, bucket, endpoint, names.secret),
+        },
+      })
+      spec.backupPolicyName = names.store
+      return [keys, policy, edit()]
+    }
+    case "mariadb": {
+      const keys = secret(names.secret, awsKeys(target, region))
+      const backup = create({
+        apiVersion: "k8s.mariadb.com/v1alpha1",
+        kind: "Backup",
+        metadata: { name: names.schedule },
+        spec: {
+          mariaDbRef: { name: database.name },
+          schedule: { cron: cron(target.frequency, false) },
+          maxRetention: `${target.keepDays * 24}h`,
+          compression: "gzip",
+          storage: mariaStorage(
+            bucket,
+            folder(target, database.name),
+            endpoint,
+            region,
+            names.secret,
+          ),
+          podSecurityContext: restrictedPod(999),
+          securityContext: restricted,
+        },
+      })
+      return [keys, backup]
+    }
+    case "dragonfly": {
+      const keys = secret(names.secret, awsKeys(target, region))
+      const https = !endpoint.startsWith("http://")
+      const host = endpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "")
+      const own = (arg: string) =>
+        arg.startsWith("--s3_endpoint=") || arg.startsWith("--s3_use_https=")
+      spec.args = [
+        ...((spec.args as string[] | undefined) ?? []).filter((arg) => !own(arg)),
+        `--s3_endpoint=${host}`,
+        `--s3_use_https=${https}`,
+      ]
+      const key = (name: string) => ({
+        name,
+        valueFrom: { secretKeyRef: { name: names.secret, key: name } },
+      })
+      spec.env = [
+        ...((spec.env as Manifest[] | undefined) ?? []).filter(
+          (e) => !String(e.name).startsWith("AWS_"),
+        ),
+        key("AWS_ACCESS_KEY_ID"),
+        key("AWS_SECRET_ACCESS_KEY"),
+        key("AWS_REGION"),
+      ]
+      spec.snapshot = {
+        ...(spec.snapshot as Manifest | undefined),
+        dir: `s3://${bucket}/${folder(target, database.name)}`,
+        cron: cron(target.frequency, false),
+      }
+      return [keys, edit()]
+    }
   }
-  return [secret, { ...edit, yaml: JSON.stringify(object) }]
 }
 
 /** A name for an on-demand backup: the database's, and the time to the second. */
@@ -379,9 +690,14 @@ export function backupName(database: string, now: Date) {
   return `${database}-${stamp}`
 }
 
+/** Engines that take a backup on demand: MOCO and Dragonfly only back up on their schedule. */
+export const canBackUpNow = (engine: Engine) =>
+  engine === "postgresql" || engine === "mongodb" || engine === "mariadb"
+
 /** One backup, now, to where the database's backups go. */
 export function backUpNow(database: Database, now: Date): Change[] {
   const name = backupName(database.name, now)
+  const store = database.backups.store
   if (database.engine === "postgresql")
     return [
       create({
@@ -395,6 +711,29 @@ export function backUpNow(database: Database, now: Date): Change[] {
         },
       }),
     ]
+  if (database.engine === "mariadb") {
+    const { bucket, folder: prefix } = splitDestination(store?.destination)
+    return [
+      create({
+        apiVersion: "k8s.mariadb.com/v1alpha1",
+        kind: "Backup",
+        metadata: { name },
+        spec: {
+          mariaDbRef: { name: database.name },
+          compression: "gzip",
+          storage: mariaStorage(
+            bucket,
+            prefix,
+            store?.endpoint ?? "",
+            store?.region ?? "",
+            store?.secret ?? backupNames(database.name).secret,
+          ),
+          podSecurityContext: restrictedPod(999),
+          securityContext: restricted,
+        },
+      }),
+    ]
+  }
   return [
     create({
       apiVersion: "psmdb.percona.com/v1",
@@ -402,7 +741,7 @@ export function backUpNow(database: Database, now: Date): Change[] {
       metadata: { name },
       spec: {
         clusterName: database.name,
-        storageName: database.backups.store?.name ?? "backups",
+        storageName: store?.name ?? "backups",
         type: "logical",
       },
     }),
@@ -424,12 +763,22 @@ export const backupsOn = (database: Database) => database.backups.store?.inUse =
 /** The newest run, if any. */
 export const lastRun = (database: Database) => database.backups.runs[0]
 
+const SCHEMES: Record<Engine, string> = {
+  postgresql: "postgresql",
+  mongodb: "mongodb",
+  mysql: "mysql",
+  mariadb: "mysql",
+  dragonfly: "redis",
+}
+
 /** The connection string, with a placeholder where the password goes. */
 export function connectionUri(database: Database, password = "PASSWORD") {
   const c = database.connection
+  const scheme = SCHEMES[database.engine]
+  if (database.engine === "dragonfly")
+    return `${scheme}://:${encodeURIComponent(password)}@${c.host}:${c.port}`
   const user = c.username ? encodeURIComponent(c.username) : "USER"
   const options = c.options ? `?${c.options}` : ""
-  const scheme = database.engine === "postgresql" ? "postgresql" : "mongodb"
   return `${scheme}://${user}:${encodeURIComponent(password)}@${c.host}:${c.port}/${c.database ?? ""}${options}`
 }
 
@@ -439,23 +788,61 @@ export function databaseAddress(database: Database): ObjectAddress {
   return { group, version, resource: database.resource, name: database.name }
 }
 
-/** The container the server runs in, in each member. */
-export const serverContainer: Record<Engine, string> = { postgresql: "postgres", mongodb: "mongod" }
+/** The tool an export runs in the primary; Dragonfly has none. */
+export const exportTool: Partial<Record<Engine, string>> = {
+  postgresql: "pg_dump",
+  mongodb: "mongodump",
+  mysql: "mysqldump",
+  mariadb: "mariadb-dump",
+}
 
-/** The member a shell opens in: PostgreSQL's primary; MongoDB's first member. */
-export const shellPod = (database: Database) =>
-  database.engine === "postgresql"
-    ? (database.primary ?? `${database.name}-1`)
-    : `${database.name}-rs0-0`
+/** Where the dump downloads from: the server runs the tool through the person's `pods/exec`. */
+export const exportUrl = (project: string, database: Pick<Database, "engine" | "name">) =>
+  `/api/v1/projects/${encodeURIComponent(project)}/databases/${database.engine}/${encodeURIComponent(database.name)}/export`
+
+/** The container the server runs in, in each member. */
+export const serverContainer: Record<Engine, string> = {
+  postgresql: "postgres",
+  mongodb: "mongod",
+  mysql: "mysqld",
+  mariadb: "mariadb",
+  dragonfly: "dragonfly",
+}
+
+/** The member a shell opens in: the primary when known, else the first member. */
+export function shellPod(database: Database): string {
+  switch (database.engine) {
+    case "postgresql":
+      return database.primary ?? `${database.name}-1`
+    case "mongodb":
+      return `${database.name}-rs0-0`
+    case "mysql":
+      return database.primary ?? `moco-${database.name}-0`
+    case "mariadb":
+    case "dragonfly":
+      return database.primary ?? `${database.name}-0`
+  }
+}
 
 // The operator mounts its users' Secret into each member at /etc/users-secret.
 const mongoLogin =
   'mongosh -u "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_USER)" -p "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_PASSWORD)" --authenticationDatabase admin'
 
-/** What a terminal runs in the server's container: the engine's own shell, signed in. */
+/** What a terminal runs in the server's container: the engine's own shell, signed in where the
+ * container holds a password. MOCO's does not, so `mysql` asks for `moco-writable`'s. */
 export function shellCommand(database: Database): string[] {
-  if (database.engine === "postgresql") return ["psql", database.connection.database ?? "app"]
-  return ["bash", "-c", mongoLogin]
+  switch (database.engine) {
+    case "postgresql":
+      return ["psql", database.connection.database ?? "app"]
+    case "mongodb":
+      return ["bash", "-c", mongoLogin]
+    case "mysql":
+      return ["mysql", "-h", "127.0.0.1", "-u", "moco-writable", "-p"]
+    case "mariadb":
+      return ["bash", "-c", 'MYSQL_PWD="$MARIADB_ROOT_PASSWORD" exec mariadb -u root']
+    case "dragonfly":
+      return ["sh", "-c", 'REDISCLI_AUTH="$DFLY_requirepass" exec redis-cli']
+  }
 }
 
 /** Events about the database's object, its members and their volumes. */
@@ -480,10 +867,7 @@ export function commands(project: string, database: Database) {
   const describe = `kubectl get ${resource} ${name} -n ${ns} -o wide`
   const pod = q(shellPod(database))
   const container = serverContainer[database.engine]
-  const command =
-    database.engine === "postgresql"
-      ? shellCommand(database).map(q).join(" ")
-      : `bash -c '${mongoLogin}'`
+  const command = shellCommand(database).map(q).join(" ")
   return { describe, shell: `kubectl exec -it -n ${ns} ${pod} -c ${container} -- ${command}` }
 }
 
@@ -511,9 +895,21 @@ export function storageProblem(current: string | null | undefined, next: string)
   return now !== undefined && bytes < now ? ("shrink" as const) : undefined
 }
 
+/** Engines whose volumes do not grow from the database's object: the Dragonfly Operator keeps
+ * a StatefulSet's claim template, which Kubernetes does not change. */
+export const storageFixed = (engine: Engine) => engine === "dragonfly"
+
+/** Patch `container` in `containers` by name, adding it when absent. */
+function withContainer(containers: Manifest[] | undefined, name: string, patch: Manifest) {
+  const list = containers ?? []
+  return list.some((c) => c.name === name)
+    ? list.map((c) => (c.name === name ? { ...c, ...patch } : c))
+    : [...list, { name, ...patch }]
+}
+
 /** The edit that gives the database `shape`: instances, the size of each, and its storage. A
  * MongoDB volume grows only with `enableVolumeExpansion`, and fewer than three members needs
- * `unsafeFlags.replsetSize`.
+ * `unsafeFlags.replsetSize`; a MariaDB of more than one member replicates.
  * https://docs.percona.com/percona-operator-for-mongodb/scaling.html */
 export function reshapeDatabase(database: Database, shape: DatabaseShape): Change[] {
   const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
@@ -522,39 +918,66 @@ export function reshapeDatabase(database: Database, shape: DatabaseShape): Chang
     ? structuredClone(presetResources[database.engine][shape.size])
     : undefined
   const storage = shape.storage.trim()
-  if (database.engine === "postgresql") {
-    spec.instances = shape.members
-    if (resources) spec.resources = resources
-    spec.storage = { ...(spec.storage as Manifest | undefined), size: storage }
-  } else {
-    const [first = {}, ...rest] = (spec.replsets as Manifest[] | undefined) ?? []
-    const volume = (first.volumeSpec as Manifest | undefined) ?? {}
-    const claim = (volume.persistentVolumeClaim as Manifest | undefined) ?? {}
-    const asked = (claim.resources as Manifest | undefined) ?? {}
-    spec.replsets = [
-      {
-        ...first,
-        size: shape.members,
-        ...(resources ? { resources } : {}),
-        volumeSpec: {
-          ...volume,
-          persistentVolumeClaim: {
-            ...claim,
-            resources: {
-              ...asked,
-              requests: { ...(asked.requests as Manifest | undefined), storage },
-            },
-          },
+  switch (database.engine) {
+    case "postgresql":
+      spec.instances = shape.members
+      if (resources) spec.resources = resources
+      spec.storage = { ...(spec.storage as Manifest | undefined), size: storage }
+      break
+    case "mongodb": {
+      const [first = {}, ...rest] = (spec.replsets as Manifest[] | undefined) ?? []
+      const volume = (first.volumeSpec as Manifest | undefined) ?? {}
+      const claim = (volume.persistentVolumeClaim as Manifest | undefined) ?? {}
+      spec.replsets = [
+        {
+          ...first,
+          size: shape.members,
+          ...(resources ? { resources } : {}),
+          volumeSpec: { ...volume, persistentVolumeClaim: withStorage(claim, storage) },
         },
-      },
-      ...rest,
-    ]
-    if (storage !== database.storage) spec.enableVolumeExpansion = true
-    const flags = { ...(spec.unsafeFlags as Manifest | undefined) }
-    if (shape.members < 3) flags.replsetSize = true
-    else delete flags.replsetSize
-    if (Object.keys(flags).length > 0) spec.unsafeFlags = flags
-    else delete spec.unsafeFlags
+        ...rest,
+      ]
+      if (storage !== database.storage) spec.enableVolumeExpansion = true
+      const flags = { ...(spec.unsafeFlags as Manifest | undefined) }
+      if (shape.members < 3) flags.replsetSize = true
+      else delete flags.replsetSize
+      if (Object.keys(flags).length > 0) spec.unsafeFlags = flags
+      else delete spec.unsafeFlags
+      break
+    }
+    case "mysql": {
+      spec.replicas = shape.members
+      const template = (spec.podTemplate as Manifest | undefined) ?? {}
+      const pod = (template.spec as Manifest | undefined) ?? {}
+      if (resources)
+        spec.podTemplate = {
+          ...template,
+          spec: {
+            ...pod,
+            containers: withContainer(pod.containers as Manifest[] | undefined, "mysqld", {
+              resources,
+            }),
+          },
+        }
+      spec.volumeClaimTemplates = ((spec.volumeClaimTemplates as Manifest[] | undefined) ?? []).map(
+        (t) =>
+          (t.metadata as Manifest | undefined)?.name === "mysql-data"
+            ? { ...t, spec: withStorage((t.spec as Manifest | undefined) ?? {}, storage) }
+            : t,
+      )
+      break
+    }
+    case "mariadb":
+      spec.replicas = shape.members
+      if (shape.members > 1)
+        spec.replication = { ...(spec.replication as Manifest | undefined), enabled: true }
+      if (resources) spec.resources = resources
+      spec.storage = { ...(spec.storage as Manifest | undefined), size: storage }
+      break
+    case "dragonfly":
+      spec.replicas = shape.members
+      if (resources) spec.resources = resources
+      break
   }
   const { group, version, resource } = databaseAddress(database)
   return [
@@ -565,6 +988,15 @@ export function reshapeDatabase(database: Database, shape: DatabaseShape): Chang
       yaml: JSON.stringify(object),
     },
   ]
+}
+
+/** A claim spec asking for `storage`. */
+function withStorage(claim: Manifest, storage: string): Manifest {
+  const asked = (claim.resources as Manifest | undefined) ?? {}
+  return {
+    ...claim,
+    resources: { ...asked, requests: { ...(asked.requests as Manifest | undefined), storage } },
+  }
 }
 
 /** Deleting the database: its object, which the operator deletes its members and volumes with. */

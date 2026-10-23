@@ -1,5 +1,5 @@
 import type { Schemas } from "@/api/client"
-import type { Database, NewDatabase } from "@/model/databases"
+import type { Database, Engine, NewDatabase } from "@/model/databases"
 import type { Service } from "@/model/service"
 
 type Change = Schemas["Change"]
@@ -11,8 +11,24 @@ export type Target = Pick<Service, "kind" | "name" | "containers">
 export type Connectable = Pick<Database, "engine" | "name" | "connection" | "app">
 
 /** The variable a service reads the database from, as Railway names it. */
-const mainVariable = (database: Pick<Database, "engine">) =>
-  database.engine === "postgresql" ? "DATABASE_URL" : "MONGO_URL"
+const MAIN: Record<Engine, string> = {
+  postgresql: "DATABASE_URL",
+  mongodb: "MONGO_URL",
+  mysql: "DATABASE_URL",
+  mariadb: "DATABASE_URL",
+  dragonfly: "REDIS_URL",
+}
+
+/** The variable the password goes in, where the URL is a literal that reads it. */
+const PASSWORD: Record<Engine, string | undefined> = {
+  postgresql: undefined,
+  mongodb: "MONGOPASSWORD",
+  mysql: "MYSQLPASSWORD",
+  mariadb: "MYSQLPASSWORD",
+  dragonfly: "REDIS_PASSWORD",
+}
+
+const mainVariable = (database: Pick<Database, "engine">) => MAIN[database.engine]
 
 const PG_EXTRAS = [
   ["PGHOST", "host"],
@@ -52,12 +68,13 @@ function stemOf(database: Pick<Database, "engine">, name: string) {
   return stem ? `${stem}_` : ""
 }
 
-/** Every variable a connection under `name` sets: the main one, MongoDB's password, PG*. */
+/** Every variable a connection under `name` sets: the main one, the password, PG*. */
 export function namesOf(database: Pick<Database, "engine">, name: string, extras = false) {
   const stem = stemOf(database, name)
+  const password = PASSWORD[database.engine]
   return {
     main: name,
-    password: database.engine === "mongodb" ? `${stem}MONGOPASSWORD` : undefined,
+    password: password ? `${stem}${password}` : undefined,
     extras: database.engine === "postgresql" && extras ? pgExtras.map((e) => `${stem}${e}`) : [],
   }
 }
@@ -110,7 +127,26 @@ export function nameProblem(
   return taken ? { kind: "taken", ...taken } : undefined
 }
 
-/** The variables one service gets: MongoDB's password before the URL that reads it. */
+/** The URL a service reads, with `$(password)` where the password goes. */
+function urlOf(database: Connectable, app: NonNullable<Connectable["app"]>, password: string) {
+  const { host, port, options } = database.connection
+  switch (database.engine) {
+    case "mongodb": {
+      const query = [options, `authSource=${app.database}`].filter(Boolean).join("&")
+      return `mongodb://${app.username}:$(${password})@${host}:${port}/${app.database}?${query}`
+    }
+    case "dragonfly":
+      return `redis://:$(${password})@${host}:${port}`
+    case "postgresql":
+      return `postgresql://${app.username}:$(${password})@${host}:${port}/${app.database ?? ""}`
+    case "mysql":
+    case "mariadb":
+      return `mysql://${app.username}:$(${password})@${host}:${port}/${app.database ?? ""}`
+  }
+}
+
+/** The variables one service gets: PostgreSQL's from its Secret; for the others, the password
+ * before the URL that reads it. */
 export function variablesFor(
   database: Connectable,
   target: Target,
@@ -129,16 +165,10 @@ export function variablesFor(
       secret(names.main, "uri"),
       ...(extras ? PG_EXTRAS.map(([, key], i) => secret(names.extras[i] ?? "", key)) : []),
     ]
-  const password = names.password ?? "MONGOPASSWORD"
-  const { host, port, options } = database.connection
-  const query = [options, `authSource=${app.database}`].filter(Boolean).join("&")
+  const password = names.password ?? PASSWORD[database.engine] ?? "PASSWORD"
   return [
     secret(password, app.passwordKey),
-    {
-      op: "set",
-      name: names.main,
-      value: `mongodb://${app.username}:$(${password})@${host}:${port}/${app.database}?${query}`,
-    },
+    { op: "set", name: names.main, value: urlOf(database, app, password) },
   ]
 }
 
@@ -236,30 +266,77 @@ export function disconnectChange(target: Target, container: string, names: strin
 
 /** What a database the drawer is about to create will be, for connecting services to it. */
 export function pendingDatabase(form: NewDatabase, project: string): Connectable {
-  const app = { username: "app", database: "app" }
-  if (form.engine === "postgresql")
-    return {
-      engine: form.engine,
-      name: form.name,
-      connection: {
-        host: `${form.name}-rw.${project}.svc`,
-        port: 5432,
-        secret: `${form.name}-app`,
-        passwordKey: "password",
-      },
-      app: { ...app, secret: `${form.name}-app`, passwordKey: "password" },
+  const { engine, name } = form
+  const at = (host: string) => `${host}.${project}.svc`
+  switch (engine) {
+    case "postgresql":
+      return {
+        engine,
+        name,
+        connection: {
+          host: at(`${name}-rw`),
+          port: 5432,
+          secret: `${name}-app`,
+          passwordKey: "password",
+        },
+        app: { username: "app", database: "app", secret: `${name}-app`, passwordKey: "password" },
+      }
+    case "mongodb":
+      return {
+        engine,
+        name,
+        connection: {
+          host: at(`${name}-rs0`),
+          port: 27017,
+          secret: `${name}-secrets`,
+          passwordKey: "MONGODB_DATABASE_ADMIN_PASSWORD",
+          options: "replicaSet=rs0",
+        },
+        app: {
+          username: "app",
+          database: "app",
+          secret: `${name}-custom-user-secret`,
+          passwordKey: "app",
+        },
+      }
+    case "mysql": {
+      const user = { secret: `moco-${name}`, passwordKey: "WRITABLE_PASSWORD" }
+      return {
+        engine,
+        name,
+        connection: {
+          host: at(`moco-${name}-primary`),
+          port: 3306,
+          username: "moco-writable",
+          ...user,
+        },
+        app: { username: "moco-writable", ...user },
+      }
     }
-  return {
-    engine: form.engine,
-    name: form.name,
-    connection: {
-      host: `${form.name}-rs0.${project}.svc`,
-      port: 27017,
-      secret: `${form.name}-secrets`,
-      passwordKey: "MONGODB_DATABASE_ADMIN_PASSWORD",
-      options: "replicaSet=rs0",
-    },
-    app: { ...app, secret: `${form.name}-custom-user-secret`, passwordKey: "app" },
+    case "mariadb": {
+      const user = { secret: `${name}-app`, passwordKey: "password" }
+      return {
+        engine,
+        name,
+        connection: {
+          host: at(form.members > 1 ? `${name}-primary` : name),
+          port: 3306,
+          username: "app",
+          database: "app",
+          ...user,
+        },
+        app: { username: "app", database: "app", ...user },
+      }
+    }
+    case "dragonfly": {
+      const user = { secret: `${name}-auth`, passwordKey: "password" }
+      return {
+        engine,
+        name,
+        connection: { host: at(name), port: 6379, ...user },
+        app: { username: "default", ...user },
+      }
+    }
   }
 }
 

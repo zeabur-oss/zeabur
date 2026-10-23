@@ -18,7 +18,9 @@ import {
   memberChoices,
   presetOf,
   presetResources,
+  engineName,
   reshapeDatabase,
+  storageFixed,
   sizePresets,
   storageProblem,
   type Database,
@@ -108,7 +110,8 @@ function Shape({ project, database }: { project: string; database: Database }) {
   const disabled = !gate.open
   const storageClass = classNamed(useStorage(project), database.storageClass)
   const growable = useStorage(project)?.classes.some((c) => c.allowExpansion) ?? false
-  const fixed = storageClass?.allowExpansion === false
+  const operatorFixed = storageFixed(database.engine)
+  const fixed = operatorFixed || storageClass?.allowExpansion === false
   const review = () => {
     setTried(true)
     if (problem) return
@@ -180,11 +183,13 @@ function Shape({ project, database }: { project: string; database: Database }) {
         id="storage"
         title={t("part.storage")}
         description={
-          storageClass === undefined
-            ? t("storage.growUnknown")
-            : fixed
-              ? t("storage.fixed", storageClass.name, growable)
-              : t("storage.grows")
+          operatorFixed
+            ? t("db.storage.operatorFixed", engineName(database.engine))
+            : storageClass === undefined
+              ? t("storage.growUnknown")
+              : fixed
+                ? t("storage.fixed", storageClass.name, growable)
+                : t("storage.grows")
         }
       >
         <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">

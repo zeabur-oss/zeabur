@@ -4,6 +4,7 @@ import {
   allowedVersion,
   backUpNow,
   backupName,
+  canBackUpNow,
   blockedVersions,
   commands,
   connectionUri,
@@ -15,6 +16,7 @@ import {
   nameProblem,
   newBackupTarget,
   newDatabase,
+  newPassword,
   presetOf,
   presetResources,
   reshapeDatabase,
@@ -412,5 +414,160 @@ describe("reshaping", () => {
         name: "mongo",
       },
     ])
+  })
+})
+
+const password = () => "pw"
+const objects = (changes: ReturnType<typeof createDatabase>) =>
+  changes.map((c) => (c.op === "create" ? (c.object as Record<string, any>) : {}))
+
+describe("MySQL, MariaDB and Dragonfly", () => {
+  test("MySQL is a MOCO cluster whose every container passes the restricted standard", () => {
+    const form = { ...newDatabase("mysql", 3), storageClass: "fast" }
+    expect(form.members).toBe(3)
+    const [cluster] = objects(createDatabase(form, password))
+    expect(cluster?.kind).toBe("MySQLCluster")
+    const pod = cluster?.spec.podTemplate.spec
+    expect(pod.securityContext).toMatchObject({ runAsNonRoot: true, runAsUser: 10000 })
+    expect(pod.containers[0]).toMatchObject({
+      name: "mysqld",
+      securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } },
+    })
+    expect(cluster?.spec.overwriteContainers.map((c: { name: string }) => c.name)).toEqual([
+      "agent",
+      "moco-init",
+      "slow-log",
+    ])
+    expect(cluster?.spec.volumeClaimTemplates[0].spec.storageClassName).toBe("fast")
+  })
+
+  test("MariaDB and Dragonfly get their passwords in Secrets Zeabur makes first", () => {
+    const maria = objects(createDatabase({ ...newDatabase("mariadb", 3), members: 2 }, password))
+    expect(maria.map((o) => `${o.kind}/${o.metadata.name}`)).toEqual([
+      "Secret/mariadb-root",
+      "Secret/mariadb-app",
+      "MariaDB/mariadb",
+    ])
+    expect(maria[2]?.spec).toMatchObject({
+      replication: { enabled: true },
+      passwordSecretKeyRef: { name: "mariadb-app", key: "password", generate: false },
+      podSecurityContext: { runAsNonRoot: true },
+    })
+    const cache = objects(createDatabase(newDatabase("dragonfly", 1), password))
+    expect(cache[0]?.stringData).toEqual({ password: "pw" })
+    expect(cache[1]?.spec.authentication.passwordFromSecret.name).toBe("dragonfly-auth")
+    expect(cache[1]?.spec.snapshot.persistentVolumeClaimSpec.resources.requests.storage).toBe("2Gi")
+  })
+
+  test("a generated password is 24 letters and digits", () => {
+    expect(newPassword()).toMatch(/^[A-Za-z0-9]{24}$/)
+  })
+
+  const as = (engine: Database["engine"], kind: string, resource: string, spec = {}) =>
+    ({
+      ...postgres,
+      engine,
+      kind,
+      resource,
+      name: "db",
+      storage: "5Gi",
+      storageClass: "fast",
+      object: { kind, metadata: { name: "db" }, spec },
+    }) as unknown as Database
+
+  test("MySQL backs up through a BackupPolicy the cluster names, with its keys as AWS variables", () => {
+    const changes = enableBackups(as("mysql", "MySQLCluster", "mysqlclusters"), target)
+    const [keys, policy, edit] = changes
+    expect(keys?.op === "create" && keys.object?.stringData).toMatchObject({
+      AWS_ACCESS_KEY_ID: "id",
+      AWS_REGION: "us-east-1",
+    })
+    expect(policy?.op === "create" && policy.object?.spec).toMatchObject({
+      schedule: "0 3 * * *",
+      jobConfig: {
+        serviceAccountName: "default",
+        bucketConfig: { bucketName: "backups", endpointURL: "http://s3.test:8333" },
+        envFrom: [{ secretRef: { name: "db-backups-s3" } }],
+      },
+    })
+    expect(edit?.op === "edit" && JSON.parse(edit.yaml).spec.backupPolicyName).toBe("db-backups")
+    expect(canBackUpNow("mysql")).toBe(false)
+  })
+
+  test("MariaDB backs up through a scheduled Backup, and on demand to the same bucket", () => {
+    const maria = as("mariadb", "MariaDB", "mariadbs")
+    const [, backup] = enableBackups(maria, { ...target, keepDays: 3 })
+    expect(backup?.op === "create" && backup.object?.spec).toMatchObject({
+      schedule: { cron: "0 3 * * *" },
+      maxRetention: "72h",
+      storage: {
+        s3: { bucket: "backups", prefix: "db", endpoint: "s3.test:8333", tls: { enabled: false } },
+      },
+    })
+    const now = backUpNow(
+      {
+        ...maria,
+        backups: {
+          ...maria.backups,
+          store: {
+            name: "db-scheduled",
+            destination: "s3://backups/db",
+            endpoint: "https://s3.test",
+            region: "eu",
+            secret: "db-backups-s3",
+            inUse: true,
+          },
+        },
+      },
+      new Date("2026-10-23T01:02:03Z"),
+    )
+    expect(now[0]?.op === "create" && now[0].object?.spec).toMatchObject({
+      mariaDbRef: { name: "db" },
+      storage: { s3: { bucket: "backups", prefix: "db", region: "eu", tls: { enabled: true } } },
+    })
+  })
+
+  test("Dragonfly snapshots to the bucket with the endpoint as its flags", () => {
+    const cache = as("dragonfly", "Dragonfly", "dragonflies", {
+      args: ["--s3_endpoint=old", "--maxmemory=1gb"],
+      env: [{ name: "AWS_REGION", value: "x" }],
+      snapshot: { cron: "0 * * * *", persistentVolumeClaimSpec: {} },
+    })
+    const [, edit] = enableBackups(cache, target)
+    const spec = edit?.op === "edit" ? JSON.parse(edit.yaml).spec : {}
+    expect(spec.args).toEqual([
+      "--maxmemory=1gb",
+      "--s3_endpoint=s3.test:8333",
+      "--s3_use_https=false",
+    ])
+    expect(spec.env.map((e: { name: string }) => e.name)).toEqual([
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+      "AWS_REGION",
+    ])
+    expect(spec.snapshot).toMatchObject({ dir: "s3://backups/db", persistentVolumeClaimSpec: {} })
+  })
+
+  test("reshaping MySQL changes mysqld's resources and the data claim template", () => {
+    const mysql = as("mysql", "MySQLCluster", "mysqlclusters", {
+      replicas: 1,
+      podTemplate: { spec: { containers: [{ name: "mysqld", image: "m" }] } },
+      volumeClaimTemplates: [{ metadata: { name: "mysql-data" }, spec: { resources: {} } }],
+    })
+    const [edit] = reshapeDatabase(mysql, { members: 3, size: "medium", storage: "8Gi" })
+    const spec = edit?.op === "edit" ? JSON.parse(edit.yaml).spec : {}
+    expect(spec.replicas).toBe(3)
+    expect(spec.podTemplate.spec.containers[0]).toMatchObject({
+      image: "m",
+      resources: presetResources.mysql.medium,
+    })
+    expect(spec.volumeClaimTemplates[0].spec.resources.requests.storage).toBe("8Gi")
+  })
+
+  test("Dragonfly's terminal signs in with the password the operator gives the server", () => {
+    const cache = as("dragonfly", "Dragonfly", "dragonflies")
+    expect(commands("shop", { ...cache, primary: "db-1" }).shell).toBe(
+      `kubectl exec -it -n shop db-1 -c dragonfly -- sh -c 'REDISCLI_AUTH="$DFLY_requirepass" exec redis-cli'`,
+    )
   })
 })

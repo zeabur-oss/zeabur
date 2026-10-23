@@ -1,0 +1,6 @@
+description: "A restore makes a new CloudNativePG Cluster that recovers the backup's ID through the Barman Cloud plugin; the original is not written."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {"op":"create","object":{"apiVersion":"postgresql.cnpg.io/v1","kind":"Cluster","metadata":{"name":"shop-restored-1023","annotations":{"zeabur.com/restored-from":"shop","zeabur.com/restored-backup":"shop-20261022-030000","zeabur.com/restored-time":"2026-10-22T03:01:00Z"}},"spec":{"instances":1,"imageName":"ghcr.io/cloudnative-pg/postgresql:18-standard-trixie","storage":{"size":"5Gi"},"resources":{"requests":{"cpu":"100m","memory":"256Mi"},"limits":{"memory":"512Mi"}},"bootstrap":{"recovery":{"source":"shop","database":"app","owner":"app","recoveryTarget":{"backupID":"20261022T030000","targetImmediate":true}}},"externalClusters":[{"name":"shop","plugin":{"name":"barman-cloud.cloudnative-pg.io","parameters":{"barmanObjectName":"shop-backups","serverName":"shop"}}}]}}}

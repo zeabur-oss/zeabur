@@ -2,6 +2,7 @@ import { installedEngines, NewDatabaseDrawer, useDatabases } from "@/components/
 import { GitDrawer } from "@/components/add/git-drawer"
 import { ImageDrawer } from "@/components/add/image-drawer"
 import { adding, type AddWhat } from "@/lib/adding"
+import type { Engine } from "@/model/databases"
 
 /** The form "New" opened, wherever it was opened from. */
 export function AddHost({ project, what }: { project: string; what: AddWhat }) {
@@ -17,7 +18,7 @@ function DatabaseForm({
   onClose,
 }: {
   project: string
-  engine: "postgresql" | "mongodb"
+  engine: Engine
   onClose: () => void
 }) {
   const data = useDatabases(project).data

@@ -211,7 +211,7 @@ export function ConnectFields({
             <p className="type-meta text-muted-foreground">
               {database.engine === "postgresql"
                 ? t("connect.note.postgresql", database.app?.secret ?? "")
-                : t("connect.note.mongodb", database.app?.secret ?? "", name, names.password ?? "")}
+                : t("connect.note.url", database.app?.secret ?? "", name, names.password ?? "")}
             </p>
           </div>
         </>

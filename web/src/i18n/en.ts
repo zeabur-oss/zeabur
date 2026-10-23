@@ -2398,6 +2398,9 @@ export const en = {
   "add.card.image": "Run a container image from any registry.",
   "add.card.postgresql": "A PostgreSQL cluster run by its operator.",
   "add.card.mongodb": "A MongoDB replica set run by its operator.",
+  "add.card.mysql": "A MySQL cluster run by its operator.",
+  "add.card.mariadb": "A MariaDB server run by its operator.",
+  "add.card.dragonfly": "A Redis-compatible Dragonfly store run by its operator.",
   "add.orYaml": "You can also create from YAML.",
   "add.kubectl": "Use kubectl",
   "add.palette.image": (project: string) => `Deploy an image in ${project}`,
@@ -2461,6 +2464,11 @@ export const en = {
     "Zeabur creates the operator's own object in this project, as you; the operator runs the database.",
   "db.engine.postgresql": "PostgreSQL",
   "db.engine.mongodb": "MongoDB",
+  "db.engine.mysql": "MySQL",
+  "db.engine.mariadb": "MariaDB",
+  "db.engine.dragonfly": "Dragonfly",
+  "db.licence": (engine: string, licence: string) =>
+    `${engine} is under ${licence}. The Business Source License does not allow offering it to others as a hosted database service.`,
   "db.field.engine": "Engine",
   "db.field.name": "Name",
   "db.field.version": "Version",
@@ -2502,6 +2510,8 @@ export const en = {
   "db.customSize": "Set by hand in the object; picking a size replaces it.",
   "db.storage.invalid": "A size such as 10Gi.",
   "db.storage.shrink": (current: string) => `It can grow, not go below ${current}.`,
+  "db.storage.operatorFixed": (engine: string) =>
+    `The ${engine} operator does not grow its snapshot volume. Set the size when you create it.`,
   "db.reshape": (name: string) => `Change ${name}`,
   "db.tabs": "Database sections",
   "db.fact.engine": "Engine",
@@ -2515,6 +2525,13 @@ export const en = {
   "db.fact.operator": "Operator says",
   "db.connect": "Connect",
   "db.inCluster": "Reachable from inside the cluster.",
+  "db.noDatabase":
+    "MOCO creates no database. Create the ones your app uses as moco-writable, and add the name to the connection string.",
+  "db.noAuth": (engine: string) =>
+    `This ${engine} has no password: anything in the cluster can connect to it.`,
+  "db.export": "Export",
+  "db.exportHint": (tool: string) =>
+    `Downloads a dump that ${tool} makes in the primary, run through your terminal right.`,
   "connect.action": "Connect to a service",
   "connect.addToService": "Add a database connection",
   "connect.title": (database: string) => `Connect ${database} to services`,
@@ -2531,7 +2548,7 @@ export const en = {
   "connect.adds": "Variables added",
   "connect.note.postgresql": (secret: string) =>
     `The values stay in Secret ${secret}; the service only points to them.`,
-  "connect.note.mongodb": (secret: string, url: string, password: string) =>
+  "connect.note.url": (secret: string, url: string, password: string) =>
     `The password stays in Secret ${secret}; ${url} takes it from ${password} when the service starts.`,
   "connect.taken": (name: string, service: string) => `${service} already has ${name}.`,
   "connect.disconnect": "Disconnect",
@@ -2598,9 +2615,40 @@ export const en = {
     `${store} exists, but this database does not send its backups there yet.`,
   "db.backup.pluginMissing":
     "Backing up PostgreSQL needs the Barman Cloud plugin for CloudNativePG.",
-  "db.backup.restoreNext":
-    "Restoring is not in Zeabur yet: a restore creates a new database from a backup, with the operator's own recovery settings.",
   "db.backup.walNote": "PostgreSQL also archives its write-ahead log there continuously.",
+  "db.backup.keepsEverything":
+    "Every backup is kept. Set a lifecycle rule on the bucket to delete old ones.",
+  "db.backup.fixedFolder": (folder: string) => `MOCO writes to ${folder} in the bucket.`,
+  "db.backup.startsEmpty":
+    "With one instance, Dragonfly restarts from the bucket, which is empty: the data so far stays in the snapshot on its volume.",
+  "db.backup.retentionHours": (hours: string) => `${hours} of backups`,
+  "db.backup.snapshots":
+    "Dragonfly writes a snapshot there on its schedule and when it stops. Zeabur cannot list them.",
+  "db.restore.action": "Restore into a new database",
+  "db.restore.title": (name: string) => `Restore ${name} into a new database`,
+  "db.restore.body":
+    "Zeabur creates a new database with the same settings, starting from the backup. The original is not changed.",
+  "db.restore.point": "Backup",
+  "db.restore.latest": "Newest snapshot",
+  "db.restore.name": "New database name",
+  "db.restore.none": "No finished backup to restore from yet.",
+  "db.restore.plan": (from: string, name: string) => `Restore ${from} into ${name}`,
+  "db.restore.unchanged": (from: string) =>
+    `${from} is not changed, and services keep reading it until you point them to the new database.`,
+  "db.restore.asOf":
+    "The new database holds the data as of the backup, not what was written after it.",
+  "db.restore.sharedSecret": (secret: string) =>
+    `The new database uses the original's Secret ${secret}, as the backup holds the same users and passwords.`,
+  "db.restored.from": (name: string, time: string) => `Restored from ${name}'s backup of ${time}`,
+  "db.restored.copy": (name: string, time: string) =>
+    `${name} was restored from this database's backup of ${time}`,
+  "db.restored.point": "Point services here",
+  "db.restored.pointTitle": (name: string) => `Point services to ${name}`,
+  "db.restored.keep": (name: string) =>
+    `${name} keeps running. Delete it from its page when you no longer need it.`,
+  "db.restored.readers": (name: string, services: string) => `Reading ${name}: ${services}.`,
+  "db.restored.noReaders": (name: string) => `No service reads ${name}.`,
+  "db.restored.waiting": (name: string) => `Services can move once ${name} is ready.`,
 
   // Usage and history
   "usage.title": "Current usage",
@@ -3437,6 +3485,9 @@ export const en = {
   "sentence.files.configMapReadOnly.fix": () => "Change them in the ConfigMap's editor.",
   "sentence.files.secretReadOnly": (p: P) => `These files come from Secret ${p.object}.`,
   "sentence.files.secretReadOnly.fix": () => "Change them in the Secret's editor.",
+  "sentence.databases.exportFailed": (p: P) => `The dump did not start: ${p.detail}`,
+  "sentence.databases.exportFailed.fix": () =>
+    "Check that the database is running, then try again.",
   "sentence.files.readOnly": (p: P) => `${p.path} is mounted read-only.`,
   "sentence.files.readOnly.fix": () => "Change the mount in Settings to write here.",
   "sentence.files.mountPoint": (p: P) => `${p.path} is or holds a mount point.`,

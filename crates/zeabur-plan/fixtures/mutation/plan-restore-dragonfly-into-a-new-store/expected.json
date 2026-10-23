@@ -1,0 +1,140 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "dragonflydb.io/v1alpha1",
+        "kind": "Dragonfly",
+        "plural": "dragonflies",
+        "name": "shop-restored-1023"
+      },
+      "resourceVersion": null,
+      "before": null,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "dragonflydb.io/v1alpha1",
+          "kind": "Dragonfly",
+          "metadata": {
+            "name": "shop-restored-1023",
+            "annotations": {
+              "zeabur.com/restored-from": "shop",
+              "zeabur.com/restored-backup": "latest"
+            },
+            "namespace": "demo"
+          },
+          "spec": {
+            "image": "docker.dragonflydb.io/dragonflydb/dragonfly:v1.34.1",
+            "replicas": 1,
+            "resources": {
+              "requests": {
+                "cpu": "100m",
+                "memory": "256Mi"
+              },
+              "limits": {
+                "memory": "512Mi"
+              }
+            },
+            "authentication": {
+              "passwordFromSecret": {
+                "name": "shop-restored-1023-auth",
+                "key": "password"
+              }
+            },
+            "snapshot": {
+              "cron": "0 * * * *",
+              "persistentVolumeClaimSpec": {
+                "accessModes": [
+                  "ReadWriteOnce"
+                ],
+                "storageClassName": "local-path",
+                "resources": {
+                  "requests": {
+                    "storage": "2Gi"
+                  }
+                }
+              },
+              "dir": "s3://b/shop-restored-1023"
+            },
+            "podSecurityContext": {
+              "runAsNonRoot": true,
+              "runAsUser": 999,
+              "runAsGroup": 999,
+              "fsGroup": 999,
+              "fsGroupChangePolicy": "OnRootMismatch",
+              "seccompProfile": {
+                "type": "RuntimeDefault"
+              }
+            },
+            "containerSecurityContext": {
+              "allowPrivilegeEscalation": false,
+              "capabilities": {
+                "drop": [
+                  "ALL"
+                ]
+              }
+            },
+            "env": [
+              {
+                "name": "AWS_ACCESS_KEY_ID",
+                "valueFrom": {
+                  "secretKeyRef": {
+                    "name": "shop-backups-s3",
+                    "key": "AWS_ACCESS_KEY_ID"
+                  }
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "name": "zeabur-restore",
+                "image": "amazon/aws-cli:2.27.0",
+                "command": [
+                  "sh",
+                  "-c",
+                  "set -eu\nendpoint=${ENDPOINT:+--endpoint-url=$ENDPOINT}\nif [ -n \"$(aws s3 ls $endpoint \"$TO/\")\" ]; then exit 0; fi\nlatest=$(aws s3 ls $endpoint \"$FROM/\" | awk '{print $4}' | grep -- '-summary.dfs$' | sort | tail -n 1)\nif [ -z \"$latest\" ]; then exit 0; fi\naws s3 cp $endpoint --recursive --exclude '*' --include \"${latest%-summary.dfs}-*\" \"$FROM/\" \"$TO/\""
+                ],
+                "env": [
+                  {
+                    "name": "FROM",
+                    "value": "s3://b/shop"
+                  },
+                  {
+                    "name": "TO",
+                    "value": "s3://b/shop-restored-1023"
+                  },
+                  {
+                    "name": "ENDPOINT",
+                    "value": "https://s3.example.com"
+                  },
+                  {
+                    "name": "HOME",
+                    "value": "/tmp"
+                  },
+                  {
+                    "name": "AWS_ACCESS_KEY_ID",
+                    "valueFrom": {
+                      "secretKeyRef": {
+                        "name": "shop-backups-s3",
+                        "key": "AWS_ACCESS_KEY_ID"
+                      }
+                    }
+                  }
+                ],
+                "securityContext": {
+                  "allowPrivilegeEscalation": false,
+                  "capabilities": {
+                    "drop": [
+                      "ALL"
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "impact": [],
+  "warnings": []
+}

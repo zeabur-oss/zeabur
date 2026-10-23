@@ -30,6 +30,9 @@ export function foldDatabases(project: Project): Project {
 const ENGINE_OF: Record<string, Database["engine"]> = {
   PostgreSQL: "postgresql",
   MongoDB: "mongodb",
+  MySQL: "mysql",
+  MariaDB: "mariadb",
+  Dragonfly: "dragonfly",
 }
 
 /** The database a part belongs to, among `databases`. */
@@ -37,6 +40,14 @@ const databaseOfPart = (service: Service, databases: Database[]) =>
   databases.find(
     (d) =>
       d.name === service.managedBy?.name && d.engine === ENGINE_OF[service.managedBy.engine ?? ""],
+  )
+
+/** The workloads the database's operator runs for it. */
+export const partsOf = (database: Database, services: Service[]) =>
+  services.filter(
+    (s) =>
+      s.managedBy?.name === database.name &&
+      ENGINE_OF[s.managedBy.engine ?? ""] === database.engine,
   )
 
 /** A database on the project map. */
@@ -105,10 +116,10 @@ export function databaseEdges(project: Project, databases: Database[]): Edge[] {
   return [...edges.values()]
 }
 
-/** The version as the create form offers it: PostgreSQL's major, MongoDB's major.minor. */
+/** The version as the create form offers it: PostgreSQL's major, the others' major.minor. */
 export function versionLabel(engine: Database["engine"], version?: string | null): string {
   if (!version) return ""
-  const match = engine === "mongodb" ? /^(\d+\.\d+)/.exec(version) : /^(\d+)/.exec(version)
+  const match = engine === "postgresql" ? /^(\d+)/.exec(version) : /^(\d+\.\d+)/.exec(version)
   return match?.[1] ?? version
 }
 
