@@ -10,6 +10,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import { isStatus, isUnreachable } from "@/api/client"
 import { capabilitiesQuery, nodesQuery, upgradesQuery } from "@/api/queries"
 import { StatusDot } from "@/components/status"
+import { buttonVariants } from "@zeabur/design-system/components/button"
 import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { groupIssues, isProblem, nodeIssues, type IssueGroup } from "@/model/node-health"
@@ -136,7 +137,11 @@ export function useAttention(): Attention {
       problem: false,
     })
   const nodesLink = (
-    <Link to="/cluster" hash="cluster-nodes" className="hover:text-foreground hover:underline">
+    <Link
+      to="/cluster"
+      hash="cluster-nodes"
+      className={buttonVariants({ variant: "outline", size: "sm" })}
+    >
       {t("cluster.nodes")}
     </Link>
   )
@@ -186,7 +191,10 @@ export function useAttention(): Attention {
             }))
           : undefined,
       link: (
-        <Link to="/cluster/components" className="hover:text-foreground hover:underline">
+        <Link
+          to="/cluster/components"
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
           {t("settings.components")}
         </Link>
       ),
@@ -226,12 +234,7 @@ export function AttentionRow({ item, inset = false }: { item: ClusterItem; inset
         <StatusDot health={item.health} className="mt-1.5 shrink-0" />
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-          <span className="min-w-0 font-medium break-words">{item.text}</span>
-          {item.link ? (
-            <span className="shrink-0 type-meta text-muted-foreground">{item.link}</span>
-          ) : null}
-        </div>
+        <span className="min-w-0 font-medium break-words">{item.text}</span>
         {item.detail ? (
           <span className="type-meta text-muted-foreground">{item.detail}</span>
         ) : null}
@@ -258,6 +261,7 @@ export function AttentionRow({ item, inset = false }: { item: ClusterItem; inset
           </Collapsible>
         ) : null}
       </div>
+      {item.link ? <span className="flex shrink-0 self-center">{item.link}</span> : null}
     </li>
   )
 }

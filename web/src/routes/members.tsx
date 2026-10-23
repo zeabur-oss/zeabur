@@ -539,7 +539,7 @@ function Pending({ invitations }: { invitations: Invitation[] }) {
             </span>
             <Button
               size="xs"
-              variant="ghost"
+              variant="outline"
               className="justify-self-end max-md:row-span-2 max-md:col-start-2 max-md:row-start-1"
               loading={revoke.isPending && revoke.variables === invitation.name}
               onClick={() => revoke.mutate(invitation.name)}
