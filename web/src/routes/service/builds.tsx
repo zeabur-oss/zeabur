@@ -19,6 +19,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@zeabur/design-system/components/collapsible"
+import { Empty, EmptyDescription, EmptyHeader } from "@zeabur/design-system/components/empty"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import {
@@ -74,6 +75,14 @@ export function BuildsTab({ project, service }: { project: string; service: Serv
   const planner = usePlanner(project)
   if (builds.isPending) return <LoadingRows label={t("common.loading")} rows={4} />
   if (builds.isError) return <Problem error={builds.error} />
+  if (built.length === 0)
+    return (
+      <Empty size="sm">
+        <EmptyHeader>
+          <EmptyDescription>{t("builds.notBuilt")}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
   return (
     <div className="flex flex-col gap-8">
       {built.map((b) => (

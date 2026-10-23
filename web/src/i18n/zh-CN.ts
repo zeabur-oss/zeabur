@@ -553,6 +553,7 @@ export const zhCN: Messages = {
     commit ? `最近一次构建于${ago}开始，来自 ${commit}` : `最近一次构建于${ago}开始`,
   "builds.current": (service) => `${service} 已在使用最新的镜像。`,
   "builds.behind": (service, tag) => `已有更新的镜像 ${tag}，${service} 还没部署。`,
+  "builds.notBuilt": "这个服务的镜像不是由 Zeabur Builder 构建的。",
   "builds.noImage": "还没有构建出镜像。",
   "builds.suspended": "这个 Build 的构建已暂停。",
   "builds.image": "最新",

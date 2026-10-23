@@ -613,6 +613,7 @@ export const en = {
   "builds.current": (service: string) => `${service} runs the newest image.`,
   "builds.behind": (service: string, tag: string) =>
     `A newer image is ready: ${tag}. ${service} runs an older one.`,
+  "builds.notBuilt": "No Zeabur Builder build makes this service's image.",
   "builds.noImage": "No image has been built yet.",
   "builds.suspended": "Builds are paused on this Build.",
   "builds.image": "Newest",

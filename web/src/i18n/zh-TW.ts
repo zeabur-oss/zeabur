@@ -554,6 +554,7 @@ export const zhTW: Messages = {
     commit ? `最近一次建置在${ago}開始，來自 ${commit}` : `最近一次建置在${ago}開始`,
   "builds.current": (service) => `${service} 已在使用最新的映像檔。`,
   "builds.behind": (service, tag) => `已有較新的映像檔 ${tag}，${service} 還沒部署。`,
+  "builds.notBuilt": "這個服務的映像檔不是由 Zeabur Builder 建置的。",
   "builds.noImage": "還沒有建置出映像檔。",
   "builds.suspended": "這個 Build 的建置已暫停。",
   "builds.image": "最新",
