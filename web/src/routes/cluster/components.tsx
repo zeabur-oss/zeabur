@@ -203,7 +203,7 @@ export function ComponentsPage() {
           <Problem error={capabilities.error} />
         ) : (
           groups.map((group) => (
-            <section key={group.key} className="flex flex-col gap-3">
+            <section key={group.key} className="mt-2 flex flex-col gap-3">
               <h2 className="type-meta font-medium text-muted-foreground">
                 {t(`category.${group.key as "traffic"}`)}
               </h2>
@@ -293,7 +293,7 @@ function ComponentCard({
         {summaryOf(capability.name, component.id, component.rationale, locale) ??
           component.rationale}
       </p>
-      <div className="mt-auto flex items-center gap-2 pt-1">
+      <div className="mt-auto flex min-h-8 items-center gap-2 pt-1">
         <span className="type-meta text-muted-foreground" translate="no">
           {component.license}
         </span>
