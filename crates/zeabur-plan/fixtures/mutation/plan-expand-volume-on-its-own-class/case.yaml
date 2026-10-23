@@ -1,0 +1,3 @@
+description: "A claim grows by its own StorageClass, not the default: a Longhorn claim grows while the default local-path cannot."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "expandVolume", "claim": "data-postgresql-0", "size": "20Gi"}]}, "storageClasses": [{"name": "local-path", "allowVolumeExpansion": false, "default": true}, {"name": "longhorn", "allowVolumeExpansion": true}]}

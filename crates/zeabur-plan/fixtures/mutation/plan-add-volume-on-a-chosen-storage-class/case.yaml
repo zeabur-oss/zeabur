@@ -1,0 +1,3 @@
+description: "A new volume on a StorageClass other than the default names it in the claim."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "uploads", "size": "5Gi", "mountPath": "/srv/uploads", "storageClass": "longhorn"}}]}, "storageClasses": [{"name": "local-path", "allowVolumeExpansion": false, "default": true}, {"name": "longhorn", "allowVolumeExpansion": true}]}
