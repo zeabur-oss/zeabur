@@ -1264,6 +1264,8 @@ export const zhTW: Messages = {
   "confirm.create": (kind, name) => `建立 ${kind} ${name}。`,
   "confirm.isolates": (name) => `${name} 之後只收發這條和其他政策允許的流量，其餘流量叢集會擋下。`,
   "confirm.delete": (name: string) => `刪除 ${name}。刪除後無法復原。`,
+  "confirm.deleteDatabase": (name: string) =>
+    `刪除 ${name} 和其中的資料，無法復原。物件儲存中的備份會保留。`,
   "action.restart": "重新啟動",
   "action.deploy": "部署",
   "action.rebuild": "重新建置",

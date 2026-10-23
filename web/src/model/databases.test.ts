@@ -136,6 +136,16 @@ describe("a new database", () => {
     expect((three.object.spec as Record<string, unknown>).unsafeFlags).toBeUndefined()
   })
 
+  test("a MongoDB takes its data volumes with it when deleted", () => {
+    const [change] = createDatabase({ ...newDatabase("mongodb", 3), name: "mongo" }) as never as [
+      { object: { metadata: unknown } },
+    ]
+    expect(change.object.metadata).toEqual({
+      name: "mongo",
+      finalizers: ["percona.com/delete-psmdb-pvc"],
+    })
+  })
+
   test("names are DNS labels short enough for what the operators derive", () => {
     expect(nameProblem("", [])).toBe("empty")
     expect(nameProblem("Pg", [])).toBe("invalid")

@@ -912,6 +912,146 @@ mod tests {
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
     }
 
+    fn with_mongodb(cluster: &MemoryCluster, finalizers: &Value) {
+        cluster.update(|s| {
+            s.served.push(zeabur_kube::ServedResource::readable(
+                "psmdb.percona.com",
+                "v1",
+                "perconaservermongodbs",
+                "PerconaServerMongoDB",
+                true,
+            ));
+            s.dynamic.push(
+                serde_json::from_value(json!({
+                    "apiVersion": "psmdb.percona.com/v1", "kind": "PerconaServerMongoDB",
+                    "metadata": {"name": "mongo", "namespace": "shop", "uid": "u-mongo",
+                        "resourceVersion": "9", "finalizers": finalizers},
+                    "spec": {"replsets": [{"name": "rs0", "size": 2}],
+                        "sharding": {"enabled": false}}
+                }))
+                .unwrap(),
+            );
+            let objects = s.objects.get_mut("shop").unwrap();
+            for (i, name) in [
+                "mongod-data-mongo-rs0-0",
+                "mongod-data-mongo-rs0-1",
+                "mongod-data-mongo-rs0-extra-0",
+                "mongod-data-mongo2-rs0-0",
+                "data",
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                objects.persistent_volume_claims.push(
+                    serde_json::from_value(json!({
+                        "apiVersion": "v1", "kind": "PersistentVolumeClaim",
+                        "metadata": {"name": name, "namespace": "shop",
+                            "uid": format!("u-{name}"), "resourceVersion": format!("{}", 20 + i)},
+                        "spec": {"accessModes": ["ReadWriteOnce"],
+                            "resources": {"requests": {"storage": "1Gi"}}}
+                    }))
+                    .unwrap(),
+                );
+            }
+        });
+    }
+
+    fn mongodbs() -> Value {
+        json!({"group": "psmdb.percona.com", "version": "v1", "resource": "perconaservermongodbs"})
+    }
+
+    fn claims_left(cluster: &MemoryCluster) -> Vec<String> {
+        cluster
+            .inspect(|s| {
+                s.objects["shop"]
+                    .persistent_volume_claims
+                    .iter()
+                    .filter_map(|c| c.metadata.name.clone())
+                    .collect()
+            })
+            .unwrap()
+    }
+
+    /// Given a MongoDB made before Zeabur set Percona's `percona.com/delete-psmdb-pvc`
+    /// finalizer, when it is deleted, then the plan deletes its data claims after it, and the
+    /// apply leaves no `mongod-data-mongo-*` claim and every other claim as it was.
+    #[tokio::test]
+    async fn a_mongodb_without_the_claims_finalizer_is_deleted_with_its_data_claims() {
+        let cluster = cluster();
+        with_mongodb(&cluster, &json!([]));
+        let app = app(&cluster);
+        let planned = plan(&app, &delete(&mongodbs(), "mongo", None)).await;
+        let deleted: Vec<(&str, &str)> = planned["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| {
+                assert_eq!(o["write"]["type"], "delete", "{o}");
+                (
+                    o["target"]["kind"].as_str().unwrap(),
+                    o["target"]["name"].as_str().unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            deleted,
+            [
+                ("PerconaServerMongoDB", "mongo"),
+                ("PersistentVolumeClaim", "mongod-data-mongo-rs0-0"),
+                ("PersistentVolumeClaim", "mongod-data-mongo-rs0-1"),
+            ]
+        );
+        let lost: Vec<&Value> = planned["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|w| w["code"] == "claimDataMayBeLost")
+            .map(|w| &w["claim"])
+            .collect();
+        assert_eq!(
+            lost,
+            [
+                &json!("mongod-data-mongo-rs0-0"),
+                &json!("mongod-data-mongo-rs0-1")
+            ]
+        );
+
+        let (status, applied) = post(
+            app,
+            "/api/v1/projects/shop/apply",
+            &json!({"token": planned["token"]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(
+            claims_left(&cluster),
+            [
+                "mongod-data-mongo-rs0-extra-0",
+                "mongod-data-mongo2-rs0-0",
+                "data"
+            ]
+        );
+    }
+
+    /// Given a MongoDB with the finalizer, when it is deleted, then the plan deletes only the
+    /// MongoDB and says its data claims go with it: the operator deletes them.
+    #[tokio::test]
+    async fn a_mongodb_with_the_claims_finalizer_takes_its_data_claims_with_it() {
+        let cluster = cluster();
+        with_mongodb(&cluster, &json!(["percona.com/delete-psmdb-pvc"]));
+        let app = app(&cluster);
+        let planned = plan(&app, &delete(&mongodbs(), "mongo", None)).await;
+        assert_eq!(planned["objects"].as_array().unwrap().len(), 1, "{planned}");
+        assert_eq!(
+            planned["warnings"],
+            json!([{"code": "deletesDependents",
+                "target": {"kind": "PerconaServerMongoDB", "name": "mongo"},
+                "dependents": [
+                    {"kind": "PersistentVolumeClaim", "name": "mongod-data-mongo-rs0-0"},
+                    {"kind": "PersistentVolumeClaim", "name": "mongod-data-mongo-rs0-1"}]}])
+        );
+    }
+
     #[tokio::test]
     async fn a_deletion_of_a_helm_object_is_refused_naming_helm() {
         let cluster = cluster();

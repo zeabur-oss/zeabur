@@ -1403,6 +1403,8 @@ export const en = {
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
   "confirm.delete": (name: string) => `Delete ${name}. This can't be undone.`,
+  "confirm.deleteDatabase": (name: string) =>
+    `Delete ${name} and its data for good. Backups in object storage are kept.`,
   "action.restart": "Restart",
   "action.deploy": "Deploy",
   "action.rebuild": "Build again",

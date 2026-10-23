@@ -91,6 +91,11 @@ function sorted<E extends { op: string }>(
   return [removed, set.filter(added), set.filter((n) => !added(n))]
 }
 
+const databases = new Set([
+  "clusters.postgresql.cnpg.io",
+  "perconaservermongodbs.psmdb.percona.com",
+])
+
 function sentenceOf(
   t: Translate,
   change: Change,
@@ -185,7 +190,9 @@ function sentenceOf(
       return t("confirm.create", kind, name)
     }
     case "delete":
-      return t("confirm.delete", change.name)
+      return databases.has(`${change.resource.resource}.${change.resource.group}`)
+        ? t("confirm.deleteDatabase", change.name)
+        : t("confirm.delete", change.name)
     case "adopt":
       return t("confirm.adopt")
     case "createProject":
