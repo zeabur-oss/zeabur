@@ -480,7 +480,7 @@ function PlanBody({
         <p className="text-sm text-muted-foreground">{description.cost}</p>
       ) : null}
       {restartRuleApplies(plan) ? (
-        <p className="type-meta text-muted-foreground">{t("restart.rule")}</p>
+        <p className="text-sm text-muted-foreground">{t("restart.rule")}</p>
       ) : null}
       <PlanPreview
         preview={plan.preview}
