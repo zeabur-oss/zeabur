@@ -2050,6 +2050,12 @@ export interface components {
           name: string
           /** @enum {string} */
           op: "delete"
+          /**
+           * @description For a workload: also delete what the service made and nothing else uses, its
+           *     Kubernetes Services, routes, ConfigMaps, Secrets and claims (see the `owned` module).
+           *     What it uses that stays is named in a warning with the reason.
+           */
+          owned?: boolean
           /** @description The object's resource. */
           resource: components["schemas"]["ResourceRef"]
           /**
@@ -3581,6 +3587,11 @@ export interface components {
       policy: string
     }
     /**
+     * @description Why an object a deleted service uses or made stays.
+     * @enum {string}
+     */
+    KeptReason: "shared" | "routesElsewhere" | "controlled" | "managed" | "notMade"
+    /**
      * @description What went wrong, in categories a person can act on. An open set: clients must expect new
      *     values and treat an unknown one by its HTTP status.
      * @enum {string}
@@ -4677,6 +4688,26 @@ export interface components {
           reclaimPolicy?: string | null
           /** @description Its PersistentVolume; absent while the claim is not bound. */
           volume?: string | null
+        }
+      | {
+          /** @enum {string} */
+          code: "deletesOwned"
+          /** @description The objects, in the order they are deleted. */
+          objects: components["schemas"]["ObjectName"][]
+          /** @description The deleted workload. */
+          target: components["schemas"]["ObjectName"]
+        }
+      | {
+          /** @enum {string} */
+          code: "stays"
+          /** @description The object. */
+          object: components["schemas"]["ObjectName"]
+          owner?: components["schemas"]["ObjectName"] | null
+          /** @description Why. */
+          reason: components["schemas"]["KeptReason"]
+          tool?: components["schemas"]["Tool"] | null
+          /** @description The other workloads that use it, for `shared`. */
+          workloads?: components["schemas"]["WorkloadRef"][]
         }
       | {
           /** @enum {string} */

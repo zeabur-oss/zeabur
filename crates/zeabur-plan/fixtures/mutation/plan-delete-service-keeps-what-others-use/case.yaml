@@ -1,0 +1,9 @@
+description: "Deleting a StatefulSet with `owned` deletes the claim its template made, whose data goes. A Service it labelled that also selects another workload's pods stays, and so does the route it made to that Service; a Secret Helm manages stays; a Secret both workloads read stays."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: apps, version: v1, resource: statefulsets}
+        name: db
+        owned: true

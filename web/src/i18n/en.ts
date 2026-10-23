@@ -1530,6 +1530,15 @@ export const en = {
     `${workload} runs several replicas: a ReadWriteOncePod volume serves one replica at a time`,
   "warn.deletesDependents": (owner: string, names: string) =>
     `Also deletes what ${owner} owns: ${names}`,
+  "warn.deletesOwned": (owner: string, names: string) =>
+    `Also deletes what ${owner} made and nothing else uses: ${names}`,
+  "warn.staysShared": (object: string, names: string) => `${object} stays: ${names} also use it`,
+  "warn.staysRoute": (object: string) => `${object} stays: it also leads to a Service that stays`,
+  "warn.staysControlled": (object: string, owner: string) =>
+    `${object} stays: it belongs to ${owner}`,
+  "warn.staysManaged": (object: string, tool: string) => `${object} stays: ${tool} manages it`,
+  "warn.staysNotMade": (object: string) =>
+    `${object} stays: the service uses it but was not created with it`,
   "warn.podReplaced": (pod: string, owner: string) =>
     `${owner} starts a new replica in place of ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>

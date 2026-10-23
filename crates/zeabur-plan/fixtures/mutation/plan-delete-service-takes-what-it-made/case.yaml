@@ -1,0 +1,10 @@
+description: "Deleting a service with `owned` deletes, after its Deployment, what it made and nothing else uses: its routes (one from Add domain, by name), its Kubernetes Service, its `-env` and `-registry` Secrets, a route's certificate Secret and its claim, whose data goes. A Secret it labelled that another service reads, a ConfigMap both read, a database's Secret and a ConfigMap it did not make stay, each with the reason. Its Build's Git credentials are left to the Build's own change, and the certificate cert-manager owns goes with its Ingress."
+operation: mutation.plan
+params:
+  reclaimPolicies: {pv-web-data: Delete}
+  request:
+    changes:
+      - op: delete
+        resource: {group: apps, version: v1, resource: deployments}
+        name: web
+        owned: true

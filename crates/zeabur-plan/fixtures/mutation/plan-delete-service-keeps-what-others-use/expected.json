@@ -1,0 +1,15 @@
+{
+  "impact": [{"kind": "StatefulSet", "name": "db"}],
+  "objects": [
+    {"target": {"kind": "StatefulSet", "name": "db"}, "write": {"type": "delete", "uid": "ss-db", "resourceVersion": "7"}},
+    {"target": {"kind": "PersistentVolumeClaim", "name": "data-db-0"}, "write": {"type": "delete", "uid": "pvc-data-db-0", "resourceVersion": "13"}}
+  ],
+  "warnings": [
+    {"code": "deletesOwned", "target": {"kind": "StatefulSet", "name": "db"}, "objects": [{"kind": "PersistentVolumeClaim", "name": "data-db-0"}]},
+    {"code": "claimDataMayBeLost", "claim": "data-db-0"},
+    {"code": "stays", "object": {"kind": "Service", "name": "backend"}, "reason": "shared", "workloads": [{"kind": "Deployment", "name": "cache"}]},
+    {"code": "stays", "object": {"kind": "Ingress", "name": "db-db-example-test"}, "reason": "shared", "workloads": [{"kind": "Deployment", "name": "cache"}]},
+    {"code": "stays", "object": {"kind": "Secret", "name": "common"}, "reason": "shared", "workloads": [{"kind": "Deployment", "name": "cache"}]},
+    {"code": "stays", "object": {"kind": "Secret", "name": "db-chart"}, "reason": "managed", "tool": "Helm"}
+  ]
+}
