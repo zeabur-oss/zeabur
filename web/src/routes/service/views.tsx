@@ -5,10 +5,12 @@ import { Segmented } from "@/components/bits"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { useT } from "@/i18n"
-import type { Event, Service } from "@/model/service"
+import { openShell } from "@/lib/dock"
+import { isTask, type Event, type Service } from "@/model/service"
 import { refusedPlaces } from "@/routes/project/data"
 import { serviceModes, type ServiceMode, type ServiceTab } from "@/routes/search"
 import { EventsTab } from "@/routes/service/events"
+import type { LogSource } from "@/routes/service/logs"
 
 const LogsTab = lazy(() => import("@/routes/service/logs").then((m) => ({ default: m.LogsTab })))
 
@@ -74,7 +76,20 @@ export function Logs({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {frame(<LogsTab project={project} service={service} pod={pod} onPodChange={onPodChange} />)}
+      {frame(
+        <LogsTab
+          project={project}
+          source={{
+            name: service.name,
+            pods: service.pods,
+            containers: service.containers.map((c) => c.name),
+            history: service,
+            shell: isTask(service.kind) ? undefined : (name) => openShell(project, service, name),
+          }}
+          pod={pod}
+          onPodChange={onPodChange}
+        />,
+      )}
     </div>
   )
 }
@@ -94,6 +109,25 @@ export function Events({
     <div className="flex flex-col gap-4">
       <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.events)} />
       <EventsTab events={events} pod={pod} onClearPod={() => onPod(undefined)} />
+    </div>
+  )
+}
+
+/** A database's members' logs: no log store history, and its own terminal. */
+export function MemberLogs({
+  project,
+  source,
+  pod,
+  onPodChange,
+}: {
+  project: string
+  source: LogSource
+  pod?: string
+  onPodChange: (pod?: string) => void
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {frame(<LogsTab project={project} source={source} pod={pod} onPodChange={onPodChange} />)}
     </div>
   )
 }

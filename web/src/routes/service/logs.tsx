@@ -28,9 +28,8 @@ import { Spinner } from "@zeabur/design-system/components/spinner"
 import { Toggle } from "@zeabur/design-system/components/toggle"
 import { useI18n, useT } from "@/i18n"
 import { parseAnsi } from "@/lib/ansi"
-import { openShell } from "@/lib/dock"
 import { cn } from "@/lib/utils"
-import { isTask, podHealth, podReason, worstPod, type Service } from "@/model/service"
+import { podHealth, podReason, worstPod, type Pod, type Service } from "@/model/service"
 import { logTone } from "@/model/severity"
 import { ranges } from "@/model/usage"
 import { useLogStream } from "@/routes/service/log-stream"
@@ -87,23 +86,34 @@ const severityBar = (severity: Severity) => {
   return tone ? toneBg[tone] : "bg-transparent"
 }
 
+/** Whose logs: a service's replicas, or a database's members. */
+export interface LogSource {
+  name: string
+  pods: Pod[]
+  /** The containers a pod runs, when the pod does not list them. */
+  containers: string[]
+  /** The workload whose earlier logs the log store keeps, when it does. */
+  history?: Pick<Service, "kind" | "name">
+  /** Opens a terminal in the pod, where one can be. */
+  shell?: (pod: string) => void
+}
+
 export function LogsTab({
   project,
-  service,
+  source,
   pod: selectedPod,
   onPodChange,
 }: {
   project: string
-  service: Service
+  source: LogSource
   pod?: string
   onPodChange: (pod: string) => void
 }) {
   const t = useT()
-  const pods = service.pods
-  const pod = pods.find((p) => p.name === selectedPod) ?? worstPod(service)
+  const pods = source.pods
+  const pod = pods.find((p) => p.name === selectedPod) ?? worstPod(source)
   const replaced = selectedPod && pod && pod.name !== selectedPod ? selectedPod : undefined
-  const containerNames =
-    pod && pod.containers.length > 0 ? pod.containers : service.containers.map((c) => c.name)
+  const containerNames = pod && pod.containers.length > 0 ? pod.containers : source.containers
   const [container, setContainer] = useState<string>()
   const chosen = container && containerNames.includes(container) ? container : containerNames[0]
   const [previous, setPrevious] = useState(false)
@@ -198,16 +208,18 @@ export function LogsTab({
           {t("logs.previous")}
         </Toggle>
       )}
-      <Toggle
-        variant="outline"
-        size="sm"
-        pressed={history}
-        onPressedChange={setHistory}
-        title={t("logs.historyHint")}
-      >
-        <ClockClockwiseIcon aria-hidden="true" />
-        {t("logs.history")}
-      </Toggle>
+      {source.history ? (
+        <Toggle
+          variant="outline"
+          size="sm"
+          pressed={history}
+          onPressedChange={setHistory}
+          title={t("logs.historyHint")}
+        >
+          <ClockClockwiseIcon aria-hidden="true" />
+          {t("logs.history")}
+        </Toggle>
+      ) : null}
       {history ? (
         <Select
           size="sm"
@@ -259,12 +271,12 @@ export function LogsTab({
           </Toggle>
         )}
       </div>
-      {isTask(service.kind) ? null : (
-        <Button variant="outline" size="sm" onClick={() => openShell(project, service, pod.name)}>
+      {source.shell ? (
+        <Button variant="outline" size="sm" onClick={() => source.shell?.(pod.name)}>
           <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
           {t("tab.terminal")}
         </Button>
-      )}
+      ) : null}
     </div>
   )
 
@@ -285,14 +297,14 @@ export function LogsTab({
           {t("logs.replaced", replaced, pod.name)}
         </p>
       ) : null}
-      {history ? (
+      {history && source.history ? (
         <History
           project={project}
-          service={service}
+          service={source.history}
           range={range}
           container={options.container}
           {...viewProps}
-          fileName={`${service.name}${chosen ? `-${chosen}` : ""}-${range}.log`}
+          fileName={`${source.name}${chosen ? `-${chosen}` : ""}-${range}.log`}
         />
       ) : follow ? (
         <Followed
@@ -390,7 +402,7 @@ function History({
   ...props
 }: {
   project: string
-  service: Service
+  service: Pick<Service, "kind" | "name">
   range: Schemas["PrometheusRange"]
   container: string | undefined
 } & ViewProps) {
