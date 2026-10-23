@@ -148,6 +148,7 @@ async fn compute(
     project: &str,
     request: &PlanRequest,
     now: &str,
+    cluster_issuer: Option<&str>,
 ) -> Result<Plan, ApiError> {
     if request.changes.iter().any(Change::is_namespace_change) {
         return compute_namespace(cluster, project, request, now).await;
@@ -215,6 +216,7 @@ async fn compute(
             namespace: None,
             reloader,
             kinds: &kinds,
+            cluster_issuer,
         },
         request,
     )
@@ -237,11 +239,12 @@ async fn compute_any(
     project: &str,
     request: &PlanRequest,
     now: &str,
+    cluster_issuer: Option<&str>,
 ) -> Result<Plan, ApiError> {
     if request.changes.iter().any(Change::is_terminal_change) {
         terminal::compute(planner, cluster, project, request, now).await
     } else {
-        compute(cluster, project, request, now).await
+        compute(cluster, project, request, now, cluster_issuer).await
     }
 }
 
@@ -274,7 +277,15 @@ pub(crate) async fn plan(
         person: &identity.username,
         handoff: handoff.as_ref(),
     };
-    let plan = compute_any(&planner, cluster.as_ref(), &project, &request, &made_at).await?;
+    let plan = compute_any(
+        &planner,
+        cluster.as_ref(),
+        &project,
+        &request,
+        &made_at,
+        state.settings.domains.cluster_issuer.as_deref(),
+    )
+    .await?;
     let from_yaml = creations::from_yaml(&request);
     if from_yaml {
         creations::dry_run(cluster.as_ref(), &project, &plan).await?;
@@ -399,6 +410,7 @@ pub(crate) async fn apply(
         &project,
         &claims.request,
         &claims.made_at,
+        state.settings.domains.cluster_issuer.as_deref(),
     )
     .await?;
     let namespace = terminal::namespace(&state.settings.terminal, &claims.request, &project);

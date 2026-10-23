@@ -1,0 +1,9 @@
+description: "With a ClusterIssuer named in the chart, a new hostname on an Ingress without HTTPS also gets cert-manager's annotation and a tls entry whose Secret is named after the Ingress, as a new service's Ingress does."
+operation: mutation.plan
+params:
+  clusterIssuer: letsencrypt
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: www.example.test

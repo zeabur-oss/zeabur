@@ -1,0 +1,8 @@
+description: "On an Ingress cert-manager already issues for, a new hostname gets a tls entry of its own, so a host whose DNS is not ready yet cannot hold up the others' renewals; the Ingress's own issuer is kept even when the chart names none."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: www.example.test

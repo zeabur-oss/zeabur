@@ -185,6 +185,7 @@ mod tests {
             namespace: None,
             reloader: params.get("reloader").and_then(Value::as_bool),
             kinds: &kinds,
+            cluster_issuer: params.get("clusterIssuer").and_then(Value::as_str),
         };
         match plan(input, &request) {
             Ok(plan) => to_value(plan).unwrap(),

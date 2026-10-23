@@ -41,8 +41,8 @@ use zeabur_kernel::names::{Conventions, GatewayRef};
 use zeabur_model::{HttpRoute, Project, SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{
-    Change, DataEdit, DataKind, FieldOwners, Plan, PlanRequest, PlannedObject, RouteKind, RouteRef,
-    Target, Warning, Write,
+    Change, DataEdit, DataKind, FieldOwners, HttpOnlyReason, Plan, PlanRequest, PlannedObject,
+    RouteKind, RouteRef, Target, Warning, Write,
 };
 use crate::checks::ResourceRef;
 use crate::create::ServedKind;
@@ -138,6 +138,9 @@ pub struct Input<'a> {
     /// The kinds the cluster serves, from discovery: what a `create` may make. Empty: only the
     /// kinds [`CREATABLE`] lists.
     pub kinds: &'a [ServedKind],
+    /// The `ClusterIssuer` the chart names for new hostnames (`domains.clusterIssuer`); `None`:
+    /// a new hostname gets HTTPS only where its Ingress already asks cert-manager for it.
+    pub cluster_issuer: Option<&'a str>,
 }
 
 impl<'a> Input<'a> {
@@ -163,6 +166,7 @@ impl<'a> Input<'a> {
             namespace: None,
             reloader: None,
             kinds: &[],
+            cluster_issuer: None,
         }
     }
 }
@@ -1020,7 +1024,9 @@ impl<'a> Planner<'a> {
             } else {
                 add("/spec/rules", json!([rule]))
             };
-            return self.patch(index, vec![operation]);
+            let mut operations = vec![operation];
+            operations.extend(self.https(index, &name, &hostname)?);
+            return self.patch(index, operations);
         }
         // An HTTPRoute that already routes to the workload.
         let route = self
@@ -1105,6 +1111,7 @@ impl<'a> Planner<'a> {
                 }),
             )
         };
+        let is_ingress = target.kind == "Ingress";
         self.objects.push(Working {
             target,
             original: None,
@@ -1113,7 +1120,102 @@ impl<'a> Planner<'a> {
             owners: Vec::new(),
             deleted: false,
         });
+        if is_ingress {
+            let index = self.objects.len() - 1;
+            let operations = self.https(index, &name, &hostname)?;
+            if let Some(working) = self.objects.get_mut(index) {
+                working.current = apply_patch(&working.current, &operations).map_err(|e| {
+                    error(ErrorKind::Invalid, "patch_does_not_apply", e.to_string())
+                })?;
+            }
+        }
         Ok(())
+    }
+
+    /// The operations that list `hostname` for HTTPS on Ingress `index` (named `ingress`), where
+    /// cert-manager can issue its certificate: through the issuer the Ingress names, else the
+    /// chart's `ClusterIssuer` when the Ingress lists no certificates of its own. The hostname
+    /// gets its own `tls` entry, so a host whose DNS is not ready does not hold up the others'
+    /// renewals; the Secret is `<ingress>-tls` while that is free, as a new service's is.
+    fn https(
+        &mut self,
+        index: usize,
+        ingress: &str,
+        hostname: &str,
+    ) -> Result<Vec<Value>, PlanError> {
+        const CLUSTER_ISSUER: &str = "cert-manager.io/cluster-issuer";
+        const ISSUER: &str = "cert-manager.io/issuer";
+        let current = self.current(index);
+        let annotations = current
+            .pointer("/metadata/annotations")
+            .and_then(Value::as_object);
+        let named = annotations
+            .and_then(|a| a.get(CLUSTER_ISSUER).or_else(|| a.get(ISSUER)))
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let tls = array(&current, "/spec/tls");
+        let mut operations = Vec::new();
+        let issuer = match (named, self.input.cluster_issuer) {
+            (Some(issuer), _) => issuer,
+            (None, _) if !tls.is_empty() => {
+                self.warnings.push(Warning::HttpOnly {
+                    hostname: hostname.to_owned(),
+                    reason: HttpOnlyReason::CertificatesElsewhere,
+                    route: Some(ingress.to_owned()),
+                });
+                return Ok(operations);
+            }
+            (None, Some(issuer)) => {
+                self.claim(
+                    index,
+                    &[
+                        Step::field("metadata"),
+                        Step::field("annotations"),
+                        Step::field(CLUSTER_ISSUER),
+                    ],
+                    "annotations",
+                )?;
+                operations.push(if annotations.is_some() {
+                    add(
+                        &pointer(&["metadata", "annotations", CLUSTER_ISSUER]),
+                        json!(issuer),
+                    )
+                } else {
+                    add("/metadata/annotations", json!({ CLUSTER_ISSUER: issuer }))
+                });
+                issuer.to_owned()
+            }
+            (None, None) => {
+                self.warnings.push(Warning::HttpOnly {
+                    hostname: hostname.to_owned(),
+                    reason: HttpOnlyReason::NoIssuer,
+                    route: None,
+                });
+                return Ok(operations);
+            }
+        };
+        let taken = |secret: &str| {
+            tls.iter()
+                .any(|t| t.get("secretName").and_then(Value::as_str) == Some(secret))
+        };
+        let mut secret = format!("{ingress}-tls");
+        if taken(&secret) {
+            secret = route_name(ingress, hostname);
+            secret.truncate(249);
+            secret.push_str("-tls");
+        }
+        self.claim(index, &[Step::field("spec"), Step::field("tls")], "tls")?;
+        let entry = json!({"hosts": [hostname], "secretName": secret});
+        operations.push(if current.pointer("/spec/tls").is_some() {
+            add("/spec/tls/-", entry)
+        } else {
+            add("/spec/tls", json!([entry]))
+        });
+        self.warnings.push(Warning::HttpsCertificate {
+            hostname: hostname.to_owned(),
+            issuer,
+        });
+        Ok(operations)
     }
 
     /// The route object `route`, its metadata and the Services it routes to.

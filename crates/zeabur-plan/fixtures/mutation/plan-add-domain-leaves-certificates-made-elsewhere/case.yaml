@@ -1,0 +1,9 @@
+description: "An Ingress whose certificates cert-manager does not issue keeps its tls as it is: the new hostname is HTTP only, and the plan says where its certificate has to come from."
+operation: mutation.plan
+params:
+  clusterIssuer: letsencrypt
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: www.example.test

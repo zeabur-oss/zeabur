@@ -9,13 +9,15 @@ mod tests {
     use axum::Router;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
+    use zeabur_api::settings::{DomainSettings, Settings};
     use zeabur_core::problem::KubernetesStatus;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
-    use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
+    use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Service};
+    use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
 
-    use crate::common::{app, send};
+    use crate::common::{app, app_with, send};
 
     const DEPLOYMENT: &str = "apiVersion: apps/v1
 kind: Deployment
@@ -201,6 +203,61 @@ stringData:
         );
         assert_eq!(ingress["spec"]["tls"][0]["secretName"], "site-tls");
         assert_eq!(ingress["metadata"]["namespace"], "shop");
+    }
+
+    /// A hostname added to a service whose Ingress has no HTTPS yet gets it from the chart's
+    /// `ClusterIssuer`: the apply patches in cert-manager's annotation and a `tls` entry whose
+    /// Secret is named after the Ingress, as a new service's is, and the plan says so.
+    #[tokio::test]
+    async fn a_domain_added_to_an_ingress_gets_https_from_the_charts_issuer() {
+        let cluster = cluster();
+        let service: Service = serde_json::from_value(json!({
+            "metadata": {"name": "web", "namespace": "shop"},
+            "spec": {"selector": {"app": "web"}, "ports": [{"port": 8080}]}
+        }))
+        .unwrap();
+        let ingress: Ingress = serde_json::from_value(json!({
+            "metadata": {"name": "web", "namespace": "shop", "resourceVersion": "3"},
+            "spec": {"rules": [{"host": "web.example.com", "http": {"paths": [{
+                "path": "/", "pathType": "Prefix",
+                "backend": {"service": {"name": "web", "port": {"number": 8080}}}}]}}]}
+        }))
+        .unwrap();
+        cluster.update(|s| {
+            let objects = s.objects.get_mut("shop").unwrap();
+            objects.services.push(service);
+            objects.ingresses.push(ingress);
+        });
+        let settings = Settings {
+            domains: DomainSettings {
+                suffix: None,
+                cluster_issuer: Some("letsencrypt".to_owned()),
+            },
+            ..Settings::default()
+        };
+        let app = app_with(&cluster, settings);
+        let request = json!({"changes": [{"op": "addDomain",
+            "workload": {"kind": "Deployment", "name": "web"}, "hostname": "www.example.com"}]});
+        let (status, planned) = plan(&app, &request).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        assert_eq!(
+            planned["warnings"],
+            json!([{"code": "httpsCertificate", "hostname": "www.example.com", "issuer": "letsencrypt"}])
+        );
+        let (status, applied) = apply(&app, &planned).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let ingress = cluster
+            .inspect(|s| s.objects["shop"].ingresses[0].clone())
+            .unwrap();
+        let ingress = serde_json::to_value(ingress).unwrap();
+        assert_eq!(
+            ingress["metadata"]["annotations"],
+            json!({"cert-manager.io/cluster-issuer": "letsencrypt"})
+        );
+        assert_eq!(
+            ingress["spec"]["tls"],
+            json!([{"hosts": ["www.example.com"], "secretName": "web-tls"}])
+        );
     }
 
     /// A create the person's rights do not allow is refused at the plan's dry run, at its

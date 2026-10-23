@@ -1,0 +1,23 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Ingress", "name": "web-web-example-test"},
+      "write": {
+        "type": "create",
+        "body": {
+          "metadata": {
+            "name": "web-web-example-test",
+            "namespace": "demo",
+            "annotations": {"cert-manager.io/cluster-issuer": "letsencrypt"}
+          },
+          "spec": {
+            "tls": [{"hosts": ["web.example.test"], "secretName": "web-web-example-test-tls"}]
+          }
+        }
+      }
+    }
+  ],
+  "warnings": [
+    {"code": "httpsCertificate", "hostname": "web.example.test", "issuer": "letsencrypt"}
+  ]
+}

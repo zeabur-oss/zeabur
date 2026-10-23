@@ -565,6 +565,26 @@ pub enum Warning {
         /// The new hostname.
         hostname: String,
     },
+    /// The new hostname is listed for HTTPS on an Ingress cert-manager watches: once applied,
+    /// cert-manager asks this issuer for its certificate.
+    #[serde(rename_all = "camelCase")]
+    HttpsCertificate {
+        /// The hostname.
+        hostname: String,
+        /// The `ClusterIssuer` or `Issuer` the Ingress names.
+        issuer: String,
+    },
+    /// The new hostname is served over HTTP only.
+    #[serde(rename_all = "camelCase")]
+    HttpOnly {
+        /// The hostname.
+        hostname: String,
+        /// Why.
+        reason: HttpOnlyReason,
+        /// The Ingress whose certificates come from elsewhere, for `certificatesElsewhere`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        route: Option<String>,
+    },
     /// The new `HTTPRoute` attaches to this Gateway, the first of several.
     #[serde(rename_all = "camelCase")]
     GatewayChosen {
@@ -773,4 +793,16 @@ pub struct Plan {
     pub impact: Vec<WorkloadRef>,
     /// What to know before applying.
     pub warnings: Vec<Warning>,
+}
+
+/// Why a new hostname gets no HTTPS.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum HttpOnlyReason {
+    /// The chart names no `ClusterIssuer` (`domains.clusterIssuer`) and the Ingress no issuer.
+    NoIssuer,
+    /// The Ingress lists certificates cert-manager does not issue; the new hostname has to be
+    /// added where they are made.
+    CertificatesElsewhere,
 }

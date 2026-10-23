@@ -1,0 +1,18 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Ingress", "name": "shop"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "9"},
+          {"op": "add", "path": "/spec/rules/-", "value": {"host": "www.example.test", "http": {"paths": [{"path": "/", "pathType": "Prefix", "backend": {"service": {"name": "web", "port": {"number": 8080}}}}]}}},
+          {"op": "add", "path": "/spec/tls/-", "value": {"hosts": ["www.example.test"], "secretName": "shop-www-example-test-tls"}}
+        ]
+      }
+    }
+  ],
+  "warnings": [
+    {"code": "httpsCertificate", "hostname": "www.example.test", "issuer": "shop-issuer"}
+  ]
+}

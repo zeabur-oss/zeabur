@@ -2955,6 +2955,11 @@ export interface components {
       | "targetPort"
       | "ready"
     /**
+     * @description Why a new hostname gets no HTTPS.
+     * @enum {string}
+     */
+    HttpOnlyReason: "noIssuer" | "certificatesElsewhere"
+    /**
      * @description One `envFrom` entry. Imports are not flattened into variables: a ConfigMap's twelve keys
      *     shown as twelve entries would misrepresent what the workload says.
      */
@@ -3950,6 +3955,24 @@ export interface components {
           hostname: string
           /** @description The route. */
           route: string
+        }
+      | {
+          /** @enum {string} */
+          code: "httpsCertificate"
+          /** @description The hostname. */
+          hostname: string
+          /** @description The `ClusterIssuer` or `Issuer` the Ingress names. */
+          issuer: string
+        }
+      | {
+          /** @enum {string} */
+          code: "httpOnly"
+          /** @description The hostname. */
+          hostname: string
+          /** @description Why. */
+          reason: components["schemas"]["HttpOnlyReason"]
+          /** @description The Ingress whose certificates come from elsewhere, for `certificatesElsewhere`. */
+          route?: string | null
         }
       | {
           /** @enum {string} */

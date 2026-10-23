@@ -41,5 +41,12 @@
         ]
       }
     }
+  ],
+  "warnings": [
+    {
+      "code": "httpOnly",
+      "hostname": "www.example.test",
+      "reason": "noIssuer"
+    }
   ]
 }

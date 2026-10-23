@@ -18,8 +18,8 @@ pub mod terminal;
 pub mod token;
 
 pub use change::{
-    Change, ConnectionRef, DataEdit, DataKind, FieldOwners, ObjectName, Plan, PlanRequest,
-    PlannedObject, ProbeKind, RouteKind, RouteRef, Target, Warning, Write,
+    Change, ConnectionRef, DataEdit, DataKind, FieldOwners, HttpOnlyReason, ObjectName, Plan,
+    PlanRequest, PlannedObject, ProbeKind, RouteKind, RouteRef, Target, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};
