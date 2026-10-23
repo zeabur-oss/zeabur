@@ -20,6 +20,7 @@ const stalls = new Set<Diagnosis["kind"]>([
   "quotaBlocked",
   "configMissing",
   "runFailed",
+  "podSecurity",
 ])
 
 /** The event reasons each kind of diagnosis already explains, on the objects it names. */
@@ -32,6 +33,7 @@ const explains: Record<Diagnosis["kind"], readonly string[]> = {
   unschedulable: ["FailedScheduling"],
   quotaBlocked: ["FailedCreate"],
   configMissing: ["FailedMount", "Failed"],
+  podSecurity: ["FailedCreate", "Failed"],
   unreachable: [],
   unexplained: [],
 }

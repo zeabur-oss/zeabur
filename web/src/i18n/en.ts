@@ -239,6 +239,7 @@ export const en = {
   "reason.evicted": "Moved off its machine",
   "reason.releaseStuck": "Rollout stuck",
   "reason.gaveUp": "Gave up",
+  "reason.security": "Blocked by security settings",
   "phase.Running": "Running",
   "phase.Progressing": "Progressing",
   "phase.Degraded": "Degraded",
@@ -1240,7 +1241,8 @@ export const en = {
   "title.details": (ns: string) => `${ns} details`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
   "title.restartAll": (ns: string) => `Restart every service in ${ns}`,
-  "confirm.createProject": "Creates the namespace with the project label. Nothing else changes.",
+  "confirm.createProject":
+    "Creates the namespace with the project label; it allows only Strict services (Pod Security restricted). Nothing else changes.",
   "confirm.adopt": "Adds the project label to the namespace. Nothing in it changes.",
   "confirm.unadopt": "The namespace stops showing as a project. Nothing in it is deleted.",
   "confirm.debugContainer": (pod: string) =>
@@ -1442,6 +1444,7 @@ export const en = {
   "plan.showAll": (n: number) => `Show all ${n}`,
   "plan.alsoRestart": (count: number): string =>
     count === 1 ? "Restart it too" : "Restart them too",
+  "plan.alsoRestrict": "Make the project Strict too",
   "plan.restartByItself": "Restart automatically next time",
   "plan.other": "Other fields",
   "plan.field.size": "Size",
@@ -1517,6 +1520,8 @@ export const en = {
     `${route} lists the old host for HTTPS; ${host} needs a new certificate`,
   "warn.httpsCertificate": (host: string, issuer: string) =>
     `${host} uses HTTPS: cert-manager (${issuer}) issues its certificate after you apply`,
+  "warn.projectCanBeRestricted":
+    "No service in the project needs Compatible any more; the project can be Strict again.",
   "warn.httpOnlyNoIssuer": (host: string) =>
     `${host} is HTTP only. An administrator can name a cert-manager issuer to make new domains HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
@@ -1601,6 +1606,41 @@ export const en = {
     `${names} ${count === 1 ? "is" : "are"} set to restart with Reloader; Zeabur can't see whether it runs in this cluster.`,
   "confirm.configReloadOn": (name: string) =>
     `${name} restarts when a ConfigMap or Secret it reads changes. Nothing restarts now.`,
+  "confirm.securityRestricted": (name: string) =>
+    `${name} becomes Strict: it runs as a non-root user and can't gain privileges. Its replicas are replaced.`,
+  "confirm.securityBaseline": (name: string) =>
+    `${name} becomes Compatible: it may run as root. Its replicas are replaced.`,
+  "confirm.podSecurityBaseline":
+    "The project allows Compatible services: Pod Security enforces baseline instead of restricted. Services that break restricted are still warned about and audited.",
+  "confirm.podSecurityRestricted":
+    "The project becomes Strict again: Pod Security enforces restricted and refuses replicas that run as root.",
+  "title.security": (name: string) => `Security of ${name}`,
+  "title.projectStrict": "Make the project Strict",
+  "security.hint":
+    "What the service's containers may do. Strict suits most images; choose Compatible for an image that must run as root.",
+  "security.profile.restricted": "Strict (recommended)",
+  "security.profile.baseline": "Compatible",
+  "security.profile.privileged": "Unrestricted",
+  "security.about.restricted":
+    "Runs as a non-root user and can't gain privileges. An image that runs as root, such as nginx:latest, won't start; use an unprivileged one, such as nginxinc/nginx-unprivileged.",
+  "security.about.baseline": "May run as root, but still can't reach the host or gain privileges.",
+  "security.about.privileged":
+    "Its settings ask for more than Compatible allows, such as reaching the host; they were set outside Zeabur. Edit its YAML to change them.",
+  "security.lowers":
+    "The project allows only Strict services now; this also lets it run Compatible ones.",
+  "security.needsAdmin":
+    "Compatible needs the project to allow it, and changing the project's security needs an admin.",
+  "security.what": "Letting the project run Compatible services",
+  "security.project": "Project",
+  "security.projectLevel.restricted": "Strict for every service",
+  "security.projectLevel.baseline": "Allows Compatible services",
+  "security.projectLevel.privileged": "Unrestricted",
+  "security.projectLevel.unset": "The cluster's default",
+  "security.raise": "Make the project Strict",
+  "security.kube.service": "Service meets",
+  "security.kube.project": "Project enforces",
+  "security.kube.unset": "No label: the cluster's default",
+  "security.kube.strict": "Strict sets",
   "confirm.configReloadOff": (name: string) =>
     `${name} no longer restarts when its ConfigMaps or Secrets change.`,
   "confirm.alsoReads": (names: string, object: string, count: number) =>
@@ -1669,6 +1709,8 @@ export const en = {
   "action.saveValues": "Save values",
   "action.turnOn": "Turn on",
   "action.turnOff": "Turn off",
+  "action.makeStrict": "Make Strict",
+  "action.makeCompatible": "Make Compatible",
   "action.addDomain": "Add domain",
   "action.renameDomain": "Rename domain",
   "action.removeDomain": "Remove domain",
@@ -1869,6 +1911,7 @@ export const en = {
   "diagnosis.action.variables": "Variables",
   "diagnosis.action.storage": "Storage",
   "diagnosis.action.yaml": "Edit YAML",
+  "diagnosis.action.security": "Security",
   "gap.title": "Missing setup",
   "gap.warning": "Warning",
   "gap.advice": "Advice",
@@ -2032,7 +2075,7 @@ export const en = {
     "This URL is HTTP only. An administrator can name a cert-manager issuer to make it HTTPS.",
   "add.noPublicUrl": "Your role can't add a public domain in this project.",
   "add.more": "More settings",
-  "add.moreSummary": "Variables, volume, size, replicas and a private registry.",
+  "add.moreSummary": "Variables, volume, size, replicas, a private registry and security.",
   "add.variables": "Variables",
   "add.variablesHint": "KEY=value lines, as in a .env file.",
   "add.variablesBad": (lines: string) => `Not KEY=value: line ${lines}.`,
@@ -2101,7 +2144,7 @@ export const en = {
   "add.problem.deployKey": "Create the deploy key and add it to the repository.",
   "add.token": "Token",
   "add.problem.token": "Enter the username and token.",
-  "add.gitMoreSummary": "Root directory, variables and size.",
+  "add.gitMoreSummary": "Root directory, variables, size and security.",
   "add.field.directory": "Root directory",
   "add.directoryHint":
     "The folder to build, for a repository with several apps. Empty: the whole repository.",
@@ -2756,6 +2799,7 @@ export const en = {
   "part.storage": "Storage",
   "part.compute": "Compute",
   "part.health-checks": "Health checks",
+  "part.security": "Security",
   "form.healthHint":
     "Checks the cluster runs on each replica: whether it takes traffic, whether to restart it, and when it has started.",
   "draft.add": "Add to changes",
@@ -2922,6 +2966,8 @@ export const en = {
     `The rollout of ${p.name} is stuck: a new replica reads a secret or config that doesn't exist.`,
   "sentence.rollout.stuck.runFailed": (p: P) =>
     `The rollout of ${p.name} is stuck: a new replica's run failed.`,
+  "sentence.rollout.stuck.podSecurity": (p: P) =>
+    `The rollout of ${p.name} is stuck: security settings keep a new replica from starting.`,
   "sentence.fix.multiAttach": (p: P) =>
     `The old replica still holds its volume, and a volume attaches to one machine at a time. In YAML, set ${p.service || "the service"}'s strategy.type to Recreate so the old replica stops first; each release then takes it offline for the seconds the new one needs to start.`,
   "sentence.fix.outOfMemory": (p: P) =>

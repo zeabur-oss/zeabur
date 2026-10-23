@@ -3,7 +3,12 @@
 // repository with a tag no build makes, and Keel moves it to each image the Build pushes.
 import type { Schemas } from "@/api/client"
 import { KEEL_WEBHOOK } from "@/model/builds"
-import { imageObjects, type DomainSettings, type ImageService } from "@/model/image-service"
+import {
+  imageObjects,
+  projectLevel,
+  type DomainSettings,
+  type ImageService,
+} from "@/model/image-service"
 
 type Change = Schemas["Change"]
 type Manifest = Record<string, unknown>
@@ -30,7 +35,7 @@ export interface Repository {
 
 export interface GitService extends Pick<
   ImageService,
-  "name" | "port" | "publicUrl" | "host" | "variables" | "size"
+  "name" | "port" | "publicUrl" | "host" | "variables" | "size" | "security"
 > {
   url: string
   /** Empty: the repository's default branch. */
@@ -60,6 +65,7 @@ export const newGitService = (): GitService => ({
   host: "",
   variables: [],
   size: "small",
+  security: "restricted",
 })
 
 const SEGMENT = /^[A-Za-z0-9._-]+$/
@@ -172,6 +178,7 @@ export function gitObjects(
       secretVariables: true,
       size: form.size,
       replicas: 1,
+      security: form.security,
     },
     domains,
   ).map((object) =>
@@ -225,6 +232,7 @@ export function createGitService(
   project: string,
   registry: string,
   domains: DomainSettings,
+  enforced?: Schemas["PodSecurityLevel"] | null,
 ): Change[] {
   const changes: Change[] = gitObjects(form, project, registry, domains).map((object) => ({
     op: "create",
@@ -232,6 +240,7 @@ export function createGitService(
   }))
   if (form.access === "deployKey" && form.sealedKey)
     changes.push({ op: "deployKey", name: credentialsName(form.name), key: form.sealedKey })
+  changes.push(...projectLevel(form.security, enforced))
   return changes
 }
 

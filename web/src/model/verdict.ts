@@ -53,9 +53,12 @@ const kindTrouble: Partial<Record<Diagnosis["kind"], Trouble>> = {
   runFailed: { as: "reason", word: "runFailed" },
   probeFailure: { as: "healthCheck" },
   quotaBlocked: { as: "quota" },
+  podSecurity: { as: "reason", word: "security" },
 }
 
 function troubleOf(status: Status, causes: Diagnosis[]): Trouble {
+  // The kubelet reports a container that may not run as root as a config error.
+  if (causes.some((c) => c.kind === "podSecurity")) return { as: "reason", word: "security" }
   const word = reasonWord(status.reason, status.task ?? false)
   if (word) return { as: "reason", word }
   for (const cause of causes) {

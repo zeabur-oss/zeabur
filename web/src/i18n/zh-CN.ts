@@ -214,6 +214,7 @@ export const zhCN: Messages = {
   "reason.evicted": "已移出节点",
   "reason.releaseStuck": "部署卡住",
   "reason.gaveUp": "已放弃重试",
+  "reason.security": "被安全性设置拦下",
   "phase.Running": "运行中",
   "phase.Progressing": "部署中",
   "phase.Degraded": "未全部就绪",
@@ -1122,7 +1123,8 @@ export const zhCN: Messages = {
   "title.details": (ns) => `${ns} 的详细信息`,
   "title.pauseAll": (ns) => `暂停 ${ns} 的所有服务`,
   "title.restartAll": (ns) => `重启 ${ns} 的所有服务`,
-  "confirm.createProject": "创建带有项目标签的 Namespace，其他内容都不会改变。",
+  "confirm.createProject":
+    "创建带有项目标签的 Namespace，只允许「严格」服务（Pod Security restricted）。其他内容都不会改变。",
   "confirm.adopt": "为这个 Namespace 加上项目标签，其中的对象都不会改变。",
   "confirm.unadopt": "这个 Namespace 不再显示为项目，其中的对象都不会删除。",
   "confirm.debugContainer": (pod: string) =>
@@ -1307,6 +1309,7 @@ export const zhCN: Messages = {
   "plan.noMatch": "没有匹配的变更。",
   "plan.showAll": (n) => `显示全部 ${n} 个`,
   "plan.alsoRestart": () => "一并重启",
+  "plan.alsoRestrict": "项目也恢复为严格",
   "plan.restartByItself": "下次自动重启",
   "plan.other": "其他字段",
   "plan.field.size": "大小",
@@ -1375,6 +1378,7 @@ export const zhCN: Messages = {
     `${route} 的 HTTPS 配置仍是旧域名；${host} 需要新的证书`,
   "warn.httpsCertificate": (host: string, issuer: string) =>
     `${host} 会使用 HTTPS：应用后由 cert-manager（${issuer}）签发证书`,
+  "warn.projectCanBeRestricted": "项目里已经没有服务需要「兼容」，项目可以恢复为「严格」。",
   "warn.httpOnlyNoIssuer": (host: string) =>
     `${host} 只有 HTTP。管理员指定 cert-manager 的签发者后，新域名会使用 HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
@@ -1443,6 +1447,39 @@ export const zhCN: Messages = {
     `${names} 已设置由 Reloader 重启；Zeabur 无法确认这个集群是否运行着 Reloader。`,
   "confirm.configReloadOn": (name) =>
     `${name} 读取的 ConfigMap 或 Secret 变更时会自动重启。现在不会重启。`,
+  "confirm.securityRestricted": (name) =>
+    `${name} 改为「严格」：以非 root 用户运行，且无法提升权限。它的副本会被替换。`,
+  "confirm.securityBaseline": (name) =>
+    `${name} 改为「兼容」：允许以 root 运行。它的副本会被替换。`,
+  "confirm.podSecurityBaseline":
+    "项目改为允许「兼容」服务：Pod Security 强制等级从 restricted 改为 baseline。不符合 restricted 的服务仍会收到警告并记入审计日志。",
+  "confirm.podSecurityRestricted":
+    "项目恢复为「严格」：Pod Security 强制 restricted 等级，拒绝以 root 运行的副本。",
+  "title.security": (name) => `${name} 的安全性`,
+  "title.projectStrict": "将项目恢复为严格",
+  "security.hint":
+    "服务的容器能做哪些事。「严格」适合大多数镜像；镜像必须以 root 运行时，请选「兼容」。",
+  "security.profile.restricted": "严格（推荐）",
+  "security.profile.baseline": "兼容",
+  "security.profile.privileged": "不受限",
+  "security.about.restricted":
+    "以非 root 用户运行，且无法提升权限。以 root 运行的镜像（例如 nginx:latest）无法启动；请改用不需要 root 的版本，例如 nginxinc/nginx-unprivileged。",
+  "security.about.baseline": "允许以 root 运行，但仍无法访问主机或提升权限。",
+  "security.about.privileged":
+    "这个服务有超出「兼容」范围的设置，例如访问主机；这些是在 Zeabur 以外设置的。要变更请编辑 YAML。",
+  "security.lowers": "项目目前只允许「严格」服务；这次也会让项目允许「兼容」服务。",
+  "security.needsAdmin": "「兼容」需要项目允许，而变更项目的安全性需要管理员。",
+  "security.what": "让项目允许「兼容」服务",
+  "security.project": "项目",
+  "security.projectLevel.restricted": "所有服务均为严格",
+  "security.projectLevel.baseline": "允许兼容服务",
+  "security.projectLevel.privileged": "不受限",
+  "security.projectLevel.unset": "集群默认",
+  "security.raise": "将项目恢复为严格",
+  "security.kube.service": "服务符合",
+  "security.kube.project": "项目强制",
+  "security.kube.unset": "没有标签：集群默认",
+  "security.kube.strict": "「严格」会设置",
   "confirm.configReloadOff": (name) => `${name} 的 ConfigMap 或 Secret 变更时，不再自动重启。`,
   "confirm.alsoReads": (names, object) => `也会影响 ${names}（读取 ${object}）。`,
   "confirm.alsoAffects": (names) => `也会影响 ${names}。`,
@@ -1497,6 +1534,8 @@ export const zhCN: Messages = {
   "action.saveValues": "保存值",
   "action.turnOn": "开启",
   "action.turnOff": "关闭",
+  "action.makeStrict": "改为严格",
+  "action.makeCompatible": "改为兼容",
   "action.addDomain": "添加域名",
   "action.renameDomain": "更改域名",
   "action.removeDomain": "移除域名",
@@ -1692,6 +1731,7 @@ export const zhCN: Messages = {
   "diagnosis.action.variables": "变量",
   "diagnosis.action.storage": "存储",
   "diagnosis.action.yaml": "编辑 YAML",
+  "diagnosis.action.security": "安全性",
   "gap.title": "缺少的设置",
   "gap.warning": "警告",
   "gap.advice": "建议",
@@ -1843,7 +1883,7 @@ export const zhCN: Messages = {
   "add.httpOnly": "这个网址只有 HTTP。管理员指定 cert-manager 的签发者后会使用 HTTPS。",
   "add.noPublicUrl": "你的角色不能在这个项目新建公开域名。",
   "add.more": "更多设置",
-  "add.moreSummary": "环境变量、磁盘、规格、副本数和私有 registry。",
+  "add.moreSummary": "环境变量、磁盘、规格、副本数、私有 registry 和安全性。",
   "add.variables": "环境变量",
   "add.variablesHint": "每行一个 KEY=value，和 .env 文件相同。",
   "add.variablesBad": (lines) => `第 ${lines} 行不是 KEY=value。`,
@@ -1907,7 +1947,7 @@ export const zhCN: Messages = {
   "add.problem.deployKey": "请创建部署密钥，并加到仓库。",
   "add.token": "令牌",
   "add.problem.token": "请输入用户名和令牌。",
-  "add.gitMoreSummary": "根目录、环境变量和规格。",
+  "add.gitMoreSummary": "根目录、环境变量、规格和安全性。",
   "add.field.directory": "根目录",
   "add.directoryHint": "要构建的文件夹，适用于放了多个应用的仓库。留空表示整个仓库。",
   "add.problem.directory": "仓库里的文件夹，例如 apps/web。",
@@ -2514,6 +2554,7 @@ export const zhCN: Messages = {
   "part.storage": "存储",
   "part.compute": "计算资源",
   "part.health-checks": "健康检查",
+  "part.security": "安全性",
   "form.healthHint": "集群在每个副本上运行的检查：能不能接收流量、要不要重启，以及是否已经启动。",
   "draft.add": "加入变更",
   "draft.pendingHere": "有等待检查的变更",
@@ -2655,6 +2696,8 @@ export const zhCN: Messages = {
   "sentence.rollout.stuck.configMissing": (p) =>
     `${p.name} 的部署卡住了：新副本读取的机密或配置文件不存在。`,
   "sentence.rollout.stuck.runFailed": (p) => `${p.name} 的部署卡住了：新副本运行失败。`,
+  "sentence.rollout.stuck.podSecurity": (p) =>
+    `${p.name} 的部署卡住了：安全性设置让新副本无法启动。`,
   "sentence.fix.multiAttach": (p) =>
     `旧副本还占着卷，而卷一次只能挂载到一台机器上。在 YAML 中把 ${p.service || "服务"} 的 strategy.type 设为 Recreate，让旧副本先停止；代价是每次部署时，新副本启动的那几秒服务会中断。`,
   "sentence.fix.outOfMemory": (p) =>

@@ -9,6 +9,7 @@ import { clusterQuery, creatableQuery, projectQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
+import { SecurityProfileField, useProjectSecurity } from "@/components/security-profile"
 import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
 import {
@@ -77,6 +78,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
         ...view.routes.map((r) => r.name),
       ]
     : []
+  const { enforced } = useProjectSecurity(project)
   const [form, setForm] = useState<GitService>(newGitService)
   const [env, setEnv] = useState("")
   const [named, setNamed] = useState(false)
@@ -153,6 +155,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
         project,
         registry,
         domains,
+        enforced,
       ),
     })
   }
@@ -459,6 +462,11 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
                   items={imageSizes.map((p) => ({ value: p, label: t(`db.size.${p}`) }))}
                 />
               </FormField>
+              <SecurityProfileField
+                project={project}
+                value={form.security}
+                onChange={(security) => set({ security })}
+              />
             </div>
           </CollapsibleContent>
         </Collapsible>

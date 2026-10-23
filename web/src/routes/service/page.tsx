@@ -96,6 +96,7 @@ const tabOfPart: Record<DraftPart, Page> = {
   compute: "settings",
   "health-checks": "settings",
   storage: "settings",
+  security: "settings",
 }
 
 /** Tabs whose forms keep what was typed while another tab is shown. */

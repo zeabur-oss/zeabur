@@ -158,6 +158,14 @@ function sentenceOf(
       return change.enabled
         ? t("confirm.configReloadOn", change.workload.name)
         : t("confirm.configReloadOff", change.workload.name)
+    case "securityProfile":
+      return change.profile === "restricted"
+        ? t("confirm.securityRestricted", change.workload.name)
+        : t("confirm.securityBaseline", change.workload.name)
+    case "podSecurity":
+      return change.level === "restricted"
+        ? t("confirm.podSecurityRestricted")
+        : t("confirm.podSecurityBaseline")
     case "image":
       return t("confirm.image", change.workload.name, imageTag(change.image))
     case "rebuild":
@@ -710,6 +718,10 @@ export function actionOf(t: Translate, ask: Asked): string {
       return t("action.openDebugTerminal")
     case "clusterTools":
       return t("action.openToolsTerminal")
+    case "securityProfile":
+      return change.profile === "restricted" ? t("action.makeStrict") : t("action.makeCompatible")
+    case "podSecurity":
+      return change.level === "restricted" ? t("action.makeStrict") : t("action.save")
   }
 }
 

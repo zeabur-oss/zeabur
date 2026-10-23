@@ -116,6 +116,8 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "unadopt":
     case "debugContainer":
     case "clusterTools":
+    case "securityProfile":
+    case "podSecurity":
       return { risk: "normal" }
     case "adopt":
     case "createProject":
