@@ -23,6 +23,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   openTerminal: { role: "developer", rule: "create pods/exec" },
   readLogs: { role: "developer", rule: "get pods/log" },
   build: { role: "developer", rule: "patch builds.builder.zeabur.com" },
+  deployFromGit: { role: "developer", rule: "create builds.builder.zeabur.com" },
   changeNetworkPolicies: { role: "developer", rule: "patch networkpolicies.networking.k8s.io" },
   changeMembers: { role: "admin", rule: "create rolebindings.rbac.authorization.k8s.io" },
   installComponents: { role: "admin", rule: "create helmcharts.helm.cattle.io" },

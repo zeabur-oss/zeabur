@@ -232,6 +232,18 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         yaml: Option<String>,
     },
+    /// Create the Secret that holds an SSH deploy key Zeabur generated, for Zeabur Builder to
+    /// fetch a private repository: a `kubernetes.io/ssh-auth` Secret with the private key and the
+    /// Git host's `known_hosts`, labelled `builder.zeabur.com/git-credentials: "true"`. The key is
+    /// sealed by the server that made it; the API opens it and plans the Secret as a `create`,
+    /// so the private key never travels in the clear.
+    #[serde(rename_all = "camelCase")]
+    DeployKey {
+        /// The Secret's name.
+        name: String,
+        /// The sealed key, as `POST /projects/{p}/deploy-keys` returned it.
+        key: String,
+    },
     /// Delete one object of the project, as `kubectl delete` does: what it owns goes after it
     /// (background propagation). Refused for an object Helm, Argo CD or Flux manages, and for one
     /// a controller owns, except a Pod, which its owner replaces (see the `delete` module).

@@ -674,3 +674,22 @@ group("restartRuleApplies", () => {
     expect(restartRuleApplies(plan({ objects: [created] }))).toBe(false)
   })
 })
+
+group("deploying from Git", () => {
+  const deployment = {
+    apiVersion: "apps/v1",
+    kind: "Deployment",
+    metadata: { name: "site" },
+  } as unknown as Record<string, never>
+  const changes: Schemas["Change"][] = [
+    { op: "create", object: deployment },
+    { op: "deployKey", name: "site-git", key: "k1.sealed" },
+  ]
+
+  test("the deploy key reads as the Secret it creates, and the button still creates", () => {
+    const d = describe(t, { changes }, plan(), pods({}))
+    expect(d.lines).toContain("confirm.deployKey(site-git)")
+    expect(d.lines.join(" ")).not.toContain("k1.sealed")
+    expect(actionOf(t, { changes })).toBe("action.create")
+  })
+})

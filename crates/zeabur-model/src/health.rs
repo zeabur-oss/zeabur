@@ -48,6 +48,8 @@ pub enum StatusWord {
     Completed,
     /// The workload's status is too thin to judge.
     Unknown,
+    /// Its image is still being built: Zeabur Builder has not pushed the first one yet.
+    Building,
 }
 
 /// A service's health, the word for it, and why when a pod keeps failing.

@@ -569,6 +569,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/deploy-keys": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Makes an SSH deploy key for a repository on `host`: the public key to add there, and the
+     *     private key sealed for the plan that creates its Secret.
+     */
+    post: operations["createDeployKey"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/events": {
     parameters: {
       query?: never
@@ -1522,6 +1542,18 @@ export interface components {
      * @enum {string}
      */
     BlockerKind: "quota" | "node"
+    /**
+     * @description Where a service deployed from Git keeps its images, as an administrator installed Zeabur (the
+     *     chart's `builds`).
+     */
+    BuildSettings: {
+      /**
+       * @description The registry Zeabur Builder pushes to and nodes pull from, such as `zot.zot.svc:5000`; a
+       *     new service's images are `<registry>/<project>/<service>`. `None`: services are not
+       *     deployed from Git.
+       */
+      registry?: string | null
+    }
     /** @description Whether a capability is present on the cluster, and on what evidence. */
     Capability: {
       /** @description The catalogue's components for it: what to install when it is missing. */
@@ -1770,6 +1802,14 @@ export interface components {
           yaml?: string | null
         }
       | {
+          /** @description The sealed key, as `POST /projects/{p}/deploy-keys` returned it. */
+          key: string
+          /** @description The Secret's name. */
+          name: string
+          /** @enum {string} */
+          op: "deployKey"
+        }
+      | {
           /** @description Its name. */
           name: string
           /** @enum {string} */
@@ -1852,6 +1892,8 @@ export interface components {
     }
     /** @description The cluster. */
     Cluster: {
+      /** @description Where a service deployed from Git keeps its images. */
+      builds: components["schemas"]["BuildSettings"]
       /** @description What you may change in the cluster itself. */
       can: components["schemas"]["ClusterRights"]
       /** @description The distribution, when the version names one: `k3s` or `rke2`. */
@@ -2407,6 +2449,20 @@ export interface components {
       resource: string
       /** @description The request verb (`create`, `patch`, …). */
       verb: string
+    }
+    /** @description The Git host a deploy key is for. */
+    DeployKeyRequest: {
+      /** @description `github.com` or `gitlab.com`. */
+      host: string
+    }
+    /** @description A new deploy key. */
+    DeployKeyResponse: {
+      /** @description When the sealed key stops working, RFC 3339. */
+      expiresAt: string
+      /** @description The private key, sealed: give it back in a plan's `deployKey` change. */
+      key: string
+      /** @description The public key, one `ssh-ed25519 …` line, to add on the Git host. */
+      publicKey: string
     }
     /** @description One explained failure of a service's container. */
     Diagnosis: {
@@ -4698,6 +4754,8 @@ export interface components {
       deleteServices: components["schemas"]["Permission"]
       /** @description Create services: `create` on deployments and services. */
       deploy: components["schemas"]["Permission"]
+      /** @description Deploy a service from Git: `create` on deployments, services and Zeabur Builder's builds. */
+      deployFromGit: components["schemas"]["Permission"]
       /** @description Open a terminal in a container: `create` on `pods/exec`. */
       openTerminal: components["schemas"]["Permission"]
       /** @description Read the pods' logs: `get` on `pods/log`. */
@@ -5408,6 +5466,7 @@ export interface components {
       | "scaledToZero"
       | "completed"
       | "unknown"
+      | "building"
     /**
      * @description Whether the metrics store answered, as the person. An open set.
      * @enum {string}
@@ -6791,6 +6850,40 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  createDeployKey: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DeployKeyRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["DeployKeyResponse"]
+        }
+      }
+      400: {
         headers: {
           [name: string]: unknown
         }

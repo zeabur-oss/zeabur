@@ -152,6 +152,7 @@ pub(crate) async fn get(
         distribution: distribution(&version),
         kubernetes_version: version,
         domains: state.settings.domains.clone(),
+        builds: state.settings.builds.clone(),
         can: crate::projects::rights::ClusterRights::of(rules.as_ref().ok()),
     }))
 }

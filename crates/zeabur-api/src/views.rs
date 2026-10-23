@@ -78,6 +78,8 @@ pub struct Cluster {
     pub distribution: Option<String>,
     /// How a new service's public URL is made.
     pub domains: crate::settings::DomainSettings,
+    /// Where a service deployed from Git keeps its images.
+    pub builds: crate::settings::BuildSettings,
     /// What you may change in the cluster itself.
     pub can: crate::projects::rights::ClusterRights,
 }

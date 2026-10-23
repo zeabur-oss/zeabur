@@ -197,6 +197,8 @@ function sentenceOf(
       return t("confirm.adopt")
     case "createProject":
       return t("confirm.createProject")
+    case "deployKey":
+      return t("confirm.deployKey", change.name)
     case "unadopt":
       return t("confirm.unadopt")
     case "details":
@@ -635,7 +637,8 @@ export function undoTitle(t: Translate, undo: readonly Change[], asked: readonly
 const storageOps = new Set<Change["op"]>(["addVolume", "expandVolume", "editMount", "removeVolume"])
 
 export function actionOf(t: Translate, ask: Asked): string {
-  const ops = new Set(ask.changes.map((c) => c.op))
+  // A deploy key opens into the create of its Secret: a form that sends one still creates.
+  const ops = new Set(ask.changes.map((c) => (c.op === "deployKey" ? "create" : c.op)))
   const [change] = ask.changes
   if (!change) return t("plan.apply")
   if (writtenCreates(ask.changes))
@@ -697,6 +700,7 @@ export function actionOf(t: Translate, ask: Asked): string {
     case "adopt":
       return t("action.adopt")
     case "createProject":
+    case "deployKey":
       return t("action.create")
     case "unadopt":
       return t("action.unadopt")

@@ -67,6 +67,8 @@ pub struct Settings {
     pub account_url: Option<String>,
     /// How a new service's public URL is made.
     pub domains: DomainSettings,
+    /// Where a service deployed from Git keeps its images.
+    pub builds: BuildSettings,
 }
 
 /// How a new service's public URL is made, as an administrator installed Zeabur (the chart's
@@ -82,6 +84,18 @@ pub struct DomainSettings {
     /// is HTTP only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cluster_issuer: Option<String>,
+}
+
+/// Where a service deployed from Git keeps its images, as an administrator installed Zeabur (the
+/// chart's `builds`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildSettings {
+    /// The registry Zeabur Builder pushes to and nodes pull from, such as `zot.zot.svc:5000`; a
+    /// new service's images are `<registry>/<project>/<service>`. `None`: services are not
+    /// deployed from Git.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub registry: Option<String>,
 }
 
 /// Where Zeabur Identity keeps its people, and the address its setup links open.
@@ -118,6 +132,7 @@ impl Default for Settings {
             identity: IdentitySettings::default(),
             account_url: None,
             domains: DomainSettings::default(),
+            builds: BuildSettings::default(),
         }
     }
 }

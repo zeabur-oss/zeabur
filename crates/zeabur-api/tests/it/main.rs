@@ -9,6 +9,7 @@ mod cluster_name;
 #[path = "../common/mod.rs"]
 mod common;
 mod creations;
+mod deploy_from_git;
 mod durability;
 mod evidence;
 mod exec;

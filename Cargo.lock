@@ -2444,6 +2444,7 @@ name = "zeabur-core"
 version = "0.0.1"
 dependencies = [
  "aws-lc-rs",
+ "base64",
  "http",
  "serde",
  "serde_json",

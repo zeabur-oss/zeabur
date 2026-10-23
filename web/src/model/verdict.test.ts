@@ -165,6 +165,26 @@ describe("verdictOf", () => {
     expect(verdict.reach).toBeUndefined()
   })
 
+  test("a service waiting for its first build is under way, and a failed build is the problem", () => {
+    const building = verdictOf({
+      status: { health: "progress", word: "building", ready: 0, desired: 1 },
+      said: said({}),
+      routes: [],
+      checks: none,
+    })
+    expect(building).toEqual({ tone: "progress", headline: { as: "deploying" } })
+    const failed = verdictOf({
+      status: { health: "fail", word: "failed", reason: "BuildFailed", ready: 0, desired: 1 },
+      said: said({}),
+      routes: [],
+      checks: none,
+    })
+    expect(failed.headline).toEqual({
+      as: "problem",
+      trouble: { as: "reason", word: "buildFailed" },
+    })
+  })
+
   test("a task keeps its own word unless it fails", () => {
     expect(
       verdictOf({

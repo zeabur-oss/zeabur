@@ -70,6 +70,10 @@ spec:
             - name: ZEABUR_CLUSTER_ISSUER
               value: {{ . | quote }}
             {{- end }}
+            {{- with .Values.builds.registry }}
+            - name: ZEABUR_BUILD_REGISTRY
+              value: {{ . | quote }}
+            {{- end }}
             - name: ZEABUR_ISSUER_URL
               value: {{ required "issuer.url is required" $issuer.url | quote }}
             - name: ZEABUR_CLIENT_ID

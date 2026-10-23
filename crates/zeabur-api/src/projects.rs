@@ -39,6 +39,7 @@
 pub mod backups;
 pub mod builds;
 pub mod databases;
+pub mod deploy_keys;
 pub(crate) mod events;
 pub mod namespace;
 pub mod network_policy;
@@ -157,7 +158,8 @@ type Services = (ProjectHealth, Vec<ServiceSummary>);
 async fn health_of(cluster: Arc<dyn Cluster>, project: String) -> Option<Services> {
     let objects = cluster.namespace_workloads(&project).await.ok()?;
     let (snapshot, _) = snapshot(objects);
-    let projection = zeabur_graph::project(&snapshot);
+    let mut projection = zeabur_graph::project(&snapshot);
+    builds::first_images(cluster.as_ref(), &project, &mut projection.services).await;
     let services: Vec<ServiceSummary> = projection.services.iter().map(service_summary).collect();
     let counts = ProjectHealth::count(services.iter().map(|s| s.health));
     Some((counts, services))
@@ -265,6 +267,7 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
     for service in &mut projection.services {
         service.diagnoses = namespace.diagnose(service);
     }
+    builds::first_images(cluster, project, &mut projection.services).await;
     let extensions = ProjectExtensions {
         network_policy: network_policy::extension(cluster, &snapshot, &projection, &mut unreadable)
             .await?,

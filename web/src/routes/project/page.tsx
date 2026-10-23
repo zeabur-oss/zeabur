@@ -3,6 +3,7 @@ import { getRouteApi, Link } from "@tanstack/react-router"
 import { Fragment, useState, type ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 import DatabaseIcon from "~icons/ph/database"
+import GitBranchIcon from "~icons/ph/git-branch"
 import ListBulletsIcon from "~icons/ph/list-bullets"
 import LightbulbIcon from "~icons/ph/lightbulb"
 import PackageIcon from "~icons/ph/package"
@@ -455,6 +456,14 @@ function NextStep({ project }: { project: string }) {
                     label={t("add.image")}
                     body={t("add.card.image")}
                     onClick={() => openAdd(project, "image")}
+                  />
+                ) : null}
+                {choices.git.open ? (
+                  <AddTile
+                    icon={<GitBranchIcon aria-hidden="true" />}
+                    label={t("add.git")}
+                    body={t("add.card.git")}
+                    onClick={() => openAdd(project, "git")}
                   />
                 ) : null}
                 {installed.map(({ engine }) => (

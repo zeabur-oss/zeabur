@@ -49,6 +49,7 @@ import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
 import { alertsFor, folded } from "@/model/alerts"
+import { runsOf } from "@/model/builds"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
@@ -65,6 +66,7 @@ import {
   type Service,
 } from "@/model/service"
 import type { ServicePlace } from "@/routes/search"
+import { useServiceBuilds } from "@/routes/service/builds"
 import { UsageGlance } from "@/routes/service/usage"
 
 type OnTab = (place: ServicePlace, pod?: string) => void
@@ -132,7 +134,7 @@ export function OverviewTab({
           }
         />
       ) : null}
-      {said.rollout.as === "card" && rollout.data ? (
+      {said.rollout.as === "card" && rollout.data && !waitsForFirstBuild(service) ? (
         <Rollout project={project} service={service} data={rollout.data} />
       ) : null}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
@@ -349,6 +351,35 @@ function Rollout({
   )
 }
 
+const waitsForFirstBuild = (service: Service) =>
+  statusOf(service).word === "building" || statusOf(service).reason === "BuildFailed"
+
+/** A service waiting for its first image: the build under way, or why it failed. */
+function FirstBuild({
+  project,
+  service,
+  onTab,
+}: {
+  project: string
+  service: Service
+  onTab: OnTab
+}) {
+  const t = useT()
+  const { builds, built } = useServiceBuilds(project, service)
+  const build = built[0]?.build
+  const run = build ? runsOf(builds.data?.runs ?? [], build)[0] : undefined
+  const failed = statusOf(service).reason === "BuildFailed"
+  const why = failed
+    ? (run?.message ?? run?.reason ?? build?.message ?? build?.reason ?? undefined)
+    : t("overview.building")
+  return (
+    <p className="mt-1 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
+      {why ? <span className="min-w-0 break-words">{why}</span> : null}
+      <More onClick={() => onTab("builds")}>{t("overview.seeBuild")}</More>
+    </p>
+  )
+}
+
 function More({ onClick, children }: { onClick: () => void; children: string }) {
   return (
     <button
@@ -390,6 +421,7 @@ function Summary({
     .at(-1)
   const since = started ?? service.created ?? undefined
   const setup = verdict.reach ? reachSetup(verdict.reach) : undefined
+  const firstBuild = waitsForFirstBuild(service)
   return (
     <SummaryCard aria-label={t("common.status")}>
       <SummaryCardMain>
@@ -414,13 +446,14 @@ function Summary({
             </Tooltip>
           </SummaryCardSince>
         ) : null}
-        {(facts || term) && !isHealthy(status) ? (
+        {firstBuild ? <FirstBuild project={project} service={service} onTab={onTab} /> : null}
+        {(facts || term) && !isHealthy(status) && !firstBuild ? (
           <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm text-secondary">
             {facts}
             {term ? <TermDetail translate="no">{term}</TermDetail> : null}
           </p>
         ) : null}
-        {!isHealthy(status) && !explained ? <Exceptions service={service} /> : null}
+        {!isHealthy(status) && !explained && !firstBuild ? <Exceptions service={service} /> : null}
         {status.unchecked ? (
           <p className="mt-2 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
             {t("status.uncheckedWhy")}
