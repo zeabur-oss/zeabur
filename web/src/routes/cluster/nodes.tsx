@@ -10,6 +10,7 @@ import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusDot, StatusPill } from "@/components/status"
 import { NotRead } from "@/components/unreachable"
+import { NodeShells } from "@/components/node-shell"
 import { Button } from "@zeabur/design-system/components/button"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
@@ -531,6 +532,7 @@ function NodeRow({
           </span>
         </div>
       </div>
+      <NodeShells node={node.name} />
       {metrics === "available" && !node.usage ? (
         <span className="sr-only">{t("cluster.noUsageYet")}</span>
       ) : null}

@@ -1,0 +1,31 @@
+// Root shells on nodes (`/api/v1/cluster/node-shells`), for cluster administrators.
+import { queryOptions } from "@tanstack/react-query"
+
+import { api, unwrap, type Schemas } from "@/api/client"
+import { queryClient } from "@/api/queries"
+
+export type NodeShell = Schemas["NodeShellView"]
+export type NodeShellPlan = Schemas["NodeShellPlan"]
+export type NodeShellRequest = Schemas["NodeShellPlanRequest"]
+
+export const nodeShellsQuery = queryOptions({
+  queryKey: ["cluster", "node-shells"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/node-shells", { signal })),
+  refetchInterval: (query) =>
+    query.state.data?.shells.some((shell) => shell.phase === "starting") ? 1500 : 15_000,
+  refetchIntervalInBackground: false,
+  retry: false,
+})
+
+export function refreshNodeShells() {
+  void queryClient.invalidateQueries({ queryKey: nodeShellsQuery.queryKey })
+}
+
+/** Writes nothing. */
+export async function planNodeShell(request: NodeShellRequest, signal?: AbortSignal) {
+  return unwrap(await api.POST("/api/v1/cluster/node-shells/plan", { body: request, signal }))
+}
+
+export async function applyNodeShell(token: string) {
+  return unwrap(await api.POST("/api/v1/cluster/node-shells/apply", { body: { token } }))
+}
