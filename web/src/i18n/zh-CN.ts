@@ -103,7 +103,7 @@ export const zhCN: Messages = {
   "problem.title.log-unavailable": "无法获取日志",
   "problem.title.conflict": "在此期间已有其他更改",
   "problem.title.managed": "由其他工具管理",
-  "problem.title.plan-expired": "计划已过期",
+  "problem.title.plan-expired": "这份变更已过期",
   "problem.title.system-namespace": "这是 Kubernetes 自用的 Namespace",
   "problem.title.invalid": "集群拒绝了这项更改",
   "problem.title.too-many-requests": "集群繁忙",
@@ -121,7 +121,7 @@ export const zhCN: Messages = {
   "problem.fix.conflict": "刷新页面查看最新版本，再做一次更改。",
   "problem.fix.managed":
     "到管理工具读取配置的地方更改，例如 Helm values 或 Git 仓库。这里仍然可以重启。",
-  "problem.fix.plan-expired": "重新生成计划。",
+  "problem.fix.plan-expired": "重新检查变更。",
   "problem.fix.system-namespace": "改为使用你自己的 Namespace。",
   "problem.fix.invalid": "修正详细信息中集群指出的字段，然后重试。",
   "problem.fix.too-many-requests": "稍等片刻再重试。",
@@ -151,11 +151,11 @@ export const zhCN: Messages = {
   "problemPage.rule.log-unavailable":
     "集群只保留容器这一次与上一次运行的日志，而且只在副本还存在时保留。从未写出的日志，或副本已经不在的日志，都无法读取。",
   "problemPage.rule.conflict":
-    "Zeabur 只会把更改写到你预览的那个版本上。如果之后有人或其他程序（例如部署工具、自动扩缩）改了这个对象，就什么都不会写入，谁的更改都不会丢失。",
+    "Zeabur 只会把更改写到你检查过的那个版本上。如果之后有人或其他程序（例如部署工具、自动扩缩）改了这个对象，就什么都不会写入，谁的更改都不会丢失。",
   "problemPage.rule.managed":
     "这个对象由其他工具（Helm、Argo CD、Flux）管理。那个工具下一次同步或升级时，会换回自己的版本，覆盖在这里做的更改，所以 Zeabur 不接受。",
   "problemPage.rule.plan-expired":
-    "计划就是你预览过、Zeabur 将要写入的内容。它只在几分钟内有效，确保应用时内容仍然符合集群当前的状态。",
+    "你检查过的变更，就是 Zeabur 将要写入的内容。它只在几分钟内有效，确保应用时内容仍然符合集群当前的状态。",
   "problemPage.rule.system-namespace":
     "Kubernetes 保留了几个 Namespace 给自己的组件使用（kube-system、kube-public、kube-node-lease），它们不能成为项目。",
   "problemPage.rule.invalid":
@@ -1032,7 +1032,7 @@ export const zhCN: Messages = {
   "create.more": "其他可创建的类型",
   "create.documents": (n) => `${n} 份文档`,
   "create.editor": "要创建的 YAML",
-  "create.review": "预览",
+  "create.review": "检查变更",
   "create.empty": "用 YAML 写下要创建的对象，或添加模板。",
   "create.inOrder": "创建顺序",
   "create.inOrderHint":
@@ -1042,13 +1042,13 @@ export const zhCN: Messages = {
   "create.showInYaml": "在 YAML 中显示",
   "create.problems": (n) => `${n} 个问题`,
   "create.notes": (n) => `${n} 条提醒`,
-  "create.fixFirst": "修正上面的问题后才能预览。",
+  "create.fixFirst": "修正上面的问题后才能检查变更。",
   "create.found.invalidYaml": "这一行读不成 YAML：请检查缩进和引号。",
   "create.found.missingField": (field) => `每个对象都需要 ${field}。`,
   "create.found.clusterScoped": (kind) => `${kind} 属于整个集群，Zeabur 只在项目内创建对象。`,
   "create.found.notServed": (kind, apiVersion) => `这个集群没有提供 ${kind}（${apiVersion}）。`,
   "create.found.rights": (kind, project) =>
-    `你的权限似乎不能在 ${project} 创建 ${kind}，预览时会再询问集群。`,
+    `你的权限似乎不能在 ${project} 创建 ${kind}，检查变更时会再询问集群。`,
   "create.found.otherNamespace": (namespace, project) =>
     `命名空间 ${namespace} 不是这个项目。请删掉这一行，或改成 ${project}。`,
   "create.found.duplicate": (kind, name) => `${kind} ${name} 写了两次。`,
@@ -1076,13 +1076,13 @@ export const zhCN: Messages = {
   "yaml.hidden": "Secret 的值已隐藏。",
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
-  // 变更计划
-  "plan.planning": "正在计算…",
+  // 检查变更
+  "plan.planning": "正在检查变更…",
   "plan.apply": "应用",
   "plan.applying": "正在应用…",
   "plan.cancel": "取消",
   "plan.back": "返回",
-  "plan.replan": "重新预览",
+  "plan.replan": "重新检查",
   "plan.details": "技术细节",
   "plan.expiresIn": (time: string) => `${time} 后失效`,
   "plan.expired": "已失效",
@@ -1400,7 +1400,7 @@ export const zhCN: Messages = {
 
   // 编辑
   "edit.add": "添加",
-  "edit.review": "预览变更",
+  "edit.review": "检查变更",
   "edit.cancel": "取消",
   "edit.edit": (name: string) => `编辑 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
@@ -2106,10 +2106,10 @@ export const zhCN: Messages = {
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "把下面的配置交给管理员。它只授予这项权限，而且只在这个项目有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
-    `计划只在 ${p.minutes} 分钟内有效。重新生成计划。`,
+    `检查过的变更只在 ${p.minutes} 分钟内有效。重新检查一次。`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "重新生成计划。计划只能在生成它的服务器上，用原来的令牌原样应用。",
-  "sentence.problem.conflict.fix.review": () => "重新预览，从它当前的状态开始。",
+    "重新检查变更。变更只能在检查它的服务器上，用原来的令牌原样应用。",
+  "sentence.problem.conflict.fix.review": () => "重新检查，从它当前的状态开始。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等它开始运行；它的日志和事件会说明为什么还没运行。",
   "sentence.problem.unavailable.fix.tryAgainSoon": () => "稍后再试一次。",
@@ -2143,10 +2143,10 @@ export const zhCN: Messages = {
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "它不存在。"),
   "sentence.problem.summary.log-unavailable": () => "无法读取这份日志。",
   "sentence.problem.summary.conflict": (p) =>
-    p.name ? `你预览之后，${p.name} 又有了更改。` : "你预览之后，它又有了更改。",
+    p.name ? `你检查之后，${p.name} 又有了更改。` : "你检查之后，它又有了更改。",
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "这由其他工具管理。",
-  "sentence.problem.summary.plan-expired": () => "计划已过期。",
+  "sentence.problem.summary.plan-expired": () => "这份变更已过期。",
   "sentence.problem.summary.system-namespace": (p) =>
     p.name ? `${p.name} 是 Kubernetes 自用的 Namespace。` : "这是 Kubernetes 自用的 Namespace。",
   "sentence.problem.summary.invalid": (p) =>
@@ -2247,9 +2247,9 @@ export const zhCN: Messages = {
   "part.health-checks": "健康检查",
   "form.healthHint": "集群在每个副本上运行的检查：能不能接收流量、要不要重启，以及是否已经启动。",
   "draft.add": "加入变更",
-  "draft.pendingHere": "有等待预览的变更",
+  "draft.pendingHere": "有等待检查的变更",
   "draft.count": (n) => `${n} 项变更待应用`,
-  "draft.review": "预览变更",
+  "draft.review": "检查变更",
   "draft.none": "暂无变更",
   "draft.save": "保存",
   "draft.leaveTitle": "不保存就离开？",

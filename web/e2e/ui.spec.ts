@@ -610,7 +610,8 @@ async function confirmPlan(
 }
 
 /** Sends the service page's pending changes to review. */
-const review = (page: Page) => page.getByRole("button", { name: "Review", exact: true }).click()
+const review = (page: Page) =>
+  page.getByRole("button", { name: "Review changes", exact: true }).click()
 
 async function editorReplicas(page: Page): Promise<number | undefined> {
   const answer = await page.request.get(`/api/v1/projects/${namespace}`)
@@ -878,7 +879,7 @@ test("an object's YAML is edited and planned", async ({ page }) => {
   await expect(panel.locator(".cm-editor")).toHaveCSS("display", "flex")
   await text.getByText("untouched").dblclick()
   await page.keyboard.type("edited")
-  await panel.getByRole("button", { name: "Review" }).click()
+  await panel.getByRole("button", { name: "Review changes" }).click()
   await confirmPlan(page, "Edit editor-config", "Save YAML", "Zeabur writes the YAML as it is")
   await expect(page.locator("[data-sonner-toaster]")).toHaveCSS("position", "fixed")
   await expect(panel.getByRole("figure", { name: "YAML of editor-config" })).toContainText(
@@ -1124,7 +1125,7 @@ test("a Deployment and a Service are created from templates and drawn on the map
   await page.getByRole("button", { name: "Add a template" }).click()
   await page.getByRole("menuitem", { name: "Service", exact: true }).click()
   await expect(page.getByText("2 documents")).toBeVisible()
-  await page.getByRole("button", { name: "Review", exact: true }).click()
+  await page.getByRole("button", { name: "Review changes", exact: true }).click()
   await confirmPlan(page, `Create 2 objects in ${namespace}`, "Create 2 objects", "Service hello")
   await expect(page).toHaveURL(new RegExp(`${project}/objects`))
   await page.goto(`${project}?view=map`)
@@ -1145,7 +1146,7 @@ test("a create the cluster refuses points at its document and line", async ({ pa
       "          image: busybox:1.37\n",
   )
   await expect(page.getByText("2 documents")).toBeVisible()
-  await page.getByRole("button", { name: "Review", exact: true }).click()
+  await page.getByRole("button", { name: "Review changes", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: `Create 2 objects in ${namespace}` })
   await expect(dialog).toContainText("Document 2, line 11")
   await dialog.getByRole("button", { name: "Show in YAML" }).click()

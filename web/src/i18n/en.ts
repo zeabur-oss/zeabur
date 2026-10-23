@@ -118,7 +118,7 @@ export const en = {
   "problem.title.log-unavailable": "The log is not available",
   "problem.title.conflict": "It changed in the meantime",
   "problem.title.managed": "Another tool manages it",
-  "problem.title.plan-expired": "The plan expired",
+  "problem.title.plan-expired": "These changes expired",
   "problem.title.system-namespace": "Kubernetes keeps this namespace for itself",
   "problem.title.invalid": "The cluster rejected the change",
   "problem.title.too-many-requests": "The cluster is busy",
@@ -139,7 +139,7 @@ export const en = {
   "problem.fix.conflict": "Reload to see the latest version, then make the change again.",
   "problem.fix.managed":
     "Change it where the managing tool reads it, such as Helm values or a Git repository. Restarting still works here.",
-  "problem.fix.plan-expired": "Make the plan again.",
+  "problem.fix.plan-expired": "Review the changes again.",
   "problem.fix.system-namespace": "Use a namespace of your own instead.",
   "problem.fix.invalid": "Correct the fields the cluster names in the details, then try again.",
   "problem.fix.too-many-requests": "Wait a moment and try again.",
@@ -176,7 +176,7 @@ export const en = {
   "problemPage.rule.managed":
     "Another tool (Helm, Argo CD, Flux) owns this object and puts its own version back at its next sync or upgrade. A change made here would be undone, so Zeabur refuses it.",
   "problemPage.rule.plan-expired":
-    "A plan is what Zeabur will write, as you reviewed it. It holds for a few minutes only, so what is applied still matches the cluster as it is.",
+    "Reviewed changes are what Zeabur will write, as you saw them. They hold for a few minutes only, so what is applied still matches the cluster as it is.",
   "problemPage.rule.system-namespace":
     "Kubernetes keeps some namespaces for its own components (kube-system, kube-public, kube-node-lease). They cannot become projects.",
   "problemPage.rule.invalid":
@@ -1138,7 +1138,7 @@ export const en = {
   "create.more": "Other kinds you may create",
   "create.documents": (n: number) => plural(n, "document", "documents"),
   "create.editor": "YAML to create",
-  "create.review": "Review",
+  "create.review": "Review changes",
   "create.empty": "Write the objects as YAML, or add a template.",
   "create.inOrder": "Created in this order",
   "create.inOrderHint":
@@ -1182,7 +1182,7 @@ export const en = {
   "yaml.label": (name: string) => `YAML of ${name}`,
 
   // Plans
-  "plan.planning": "Planning…",
+  "plan.planning": "Checking changes…",
   "plan.apply": "Apply",
   "plan.applying": "Applying…",
   "plan.cancel": "Cancel",
@@ -1543,7 +1543,7 @@ export const en = {
 
   // Editing
   "edit.add": "Add",
-  "edit.review": "Review",
+  "edit.review": "Review changes",
   "edit.cancel": "Cancel",
   "edit.edit": (name: string) => `Edit ${name}`,
   "edit.remove": (name: string) => `Remove ${name}`,
@@ -2298,9 +2298,9 @@ export const en = {
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "Send this to an admin. It grants only that permission, and only in this project.",
   "sentence.problem.planExpired.fix.again": (p: P) =>
-    `Plans last ${p.minutes} minutes. Make the plan again.`,
+    `Reviewed changes hold for ${p.minutes} minutes. Review them again.`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "Make the plan again. A plan applies only on the server that made it, with its token unchanged.",
+    "Review the changes again. They apply only on the server that checked them, with their token unchanged.",
   "sentence.problem.conflict.fix.review": () => "Review again to start from its current state.",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "Wait until it runs; its logs and events say why it doesn't.",
@@ -2340,7 +2340,7 @@ export const en = {
     p.name ? `${p.name} changed after you reviewed it.` : "It changed after you reviewed it.",
   "sentence.problem.summary.managed": (p: P) =>
     p.name ? `Another tool manages ${p.name}.` : "Another tool manages this.",
-  "sentence.problem.summary.plan-expired": () => "The plan expired.",
+  "sentence.problem.summary.plan-expired": () => "These changes expired.",
   "sentence.problem.summary.system-namespace": (p: P) =>
     `${p.name ?? "This namespace"} belongs to Kubernetes itself.`,
   "sentence.problem.summary.invalid": (p: P) =>
@@ -2455,7 +2455,7 @@ export const en = {
   "draft.add": "Add to changes",
   "draft.pendingHere": "has changes waiting for review",
   "draft.count": (n: number) => plural(n, "change pending", "changes pending"),
-  "draft.review": "Review",
+  "draft.review": "Review changes",
   "draft.none": "No changes yet",
   "draft.save": "Save",
   "draft.leaveTitle": "Leave without saving?",

@@ -201,7 +201,7 @@ why. Add a row before introducing a new concept.
 | restart | 重新啟動 | 重启 | |
 | roll back | 回滾 | 回滚 | |
 | apply a change | 套用 | 应用 | |
-| review (a plan) | 預覽 | 预览 | |
+| review changes (a plan, as the API and docs keep calling it) | 檢查變更 | 检查变更 | Never 計畫／计划 on screen: it reads as a schedule. Expired: 這份變更已過期 |
 | run a command | 執行 | 运行 | |
 | use an existing namespace (show it as a project) | 使用既有的 Namespace | 使用已有的 Namespace | A namespace's own row says 使用這個 Namespace; the API and zeaburctl keep adopt |
 | remove from Zeabur | 移除 | 移除 | |

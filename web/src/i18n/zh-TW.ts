@@ -103,7 +103,7 @@ export const zhTW: Messages = {
   "problem.title.log-unavailable": "無法取得日誌",
   "problem.title.conflict": "這段期間已有其他變更",
   "problem.title.managed": "由其他工具管理",
-  "problem.title.plan-expired": "計畫已過期",
+  "problem.title.plan-expired": "這份變更已過期",
   "problem.title.system-namespace": "這是 Kubernetes 自用的 Namespace",
   "problem.title.invalid": "叢集拒絕了這項變更",
   "problem.title.too-many-requests": "叢集忙碌中",
@@ -121,7 +121,7 @@ export const zhTW: Messages = {
   "problem.fix.conflict": "重新載入看最新版本，再做一次變更。",
   "problem.fix.managed":
     "到管理工具讀取設定的地方變更，例如 Helm values 或 Git 儲存庫。這裡仍然可以重新啟動。",
-  "problem.fix.plan-expired": "重新產生計畫。",
+  "problem.fix.plan-expired": "重新檢查變更。",
   "problem.fix.system-namespace": "改為使用你自己的 Namespace。",
   "problem.fix.invalid": "修正細節中叢集指出的欄位，再試一次。",
   "problem.fix.too-many-requests": "稍等一下再試一次。",
@@ -151,11 +151,11 @@ export const zhTW: Messages = {
   "problemPage.rule.log-unavailable":
     "叢集只保留容器這一次與上一次執行的日誌，而且只在副本還存在時保留。從未寫出的日誌，或副本已經不在的日誌，都無法讀取。",
   "problemPage.rule.conflict":
-    "Zeabur 只會把變更寫到你預覽的那個版本上。如果之後有人或其他程式（例如部署工具、自動擴縮）改了這個物件，就什麼都不會寫入，誰的變更都不會遺失。",
+    "Zeabur 只會把變更寫到你檢查過的那個版本上。如果之後有人或其他程式（例如部署工具、自動擴縮）改了這個物件，就什麼都不會寫入，誰的變更都不會遺失。",
   "problemPage.rule.managed":
     "這個物件由其他工具（Helm、Argo CD、Flux）管理。那個工具下一次同步或升級時，會換回自己的版本，蓋掉在這裡做的變更，所以 Zeabur 不接受。",
   "problemPage.rule.plan-expired":
-    "計畫就是你預覽過、Zeabur 將要寫入的內容。它只在幾分鐘內有效，這樣套用時，內容仍符合叢集現況。",
+    "你檢查過的變更，就是 Zeabur 將要寫入的內容。它只在幾分鐘內有效，這樣套用時，內容仍符合叢集現況。",
   "problemPage.rule.system-namespace":
     "Kubernetes 保留了幾個 Namespace 給自己的元件使用（kube-system、kube-public、kube-node-lease），它們不能成為專案。",
   "problemPage.rule.invalid":
@@ -1035,7 +1035,7 @@ export const zhTW: Messages = {
   "create.more": "其他可建立的類型",
   "create.documents": (n) => `${n} 份文件`,
   "create.editor": "要建立的 YAML",
-  "create.review": "預覽",
+  "create.review": "檢查變更",
   "create.empty": "用 YAML 寫下要建立的物件，或加入範本。",
   "create.inOrder": "建立順序",
   "create.inOrderHint":
@@ -1045,13 +1045,13 @@ export const zhTW: Messages = {
   "create.showInYaml": "在 YAML 中顯示",
   "create.problems": (n) => `${n} 個問題`,
   "create.notes": (n) => `${n} 則提醒`,
-  "create.fixFirst": "修正上面的問題後才能預覽。",
+  "create.fixFirst": "修正上面的問題後才能檢查變更。",
   "create.found.invalidYaml": "這一行讀不成 YAML：請檢查縮排和引號。",
   "create.found.missingField": (field) => `每個物件都需要 ${field}。`,
   "create.found.clusterScoped": (kind) => `${kind} 屬於整個叢集，Zeabur 只在專案內建立物件。`,
   "create.found.notServed": (kind, apiVersion) => `這個叢集沒有提供 ${kind}（${apiVersion}）。`,
   "create.found.rights": (kind, project) =>
-    `你的權限似乎不能在 ${project} 建立 ${kind}，預覽時會再問叢集。`,
+    `你的權限似乎不能在 ${project} 建立 ${kind}，檢查變更時會再問叢集。`,
   "create.found.otherNamespace": (namespace, project) =>
     `命名空間 ${namespace} 不是這個專案。請刪掉這一行，或改成 ${project}。`,
   "create.found.duplicate": (kind, name) => `${kind} ${name} 寫了兩次。`,
@@ -1079,13 +1079,13 @@ export const zhTW: Messages = {
   "yaml.hidden": "Secret 的值已隱藏。",
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
-  // 變更計畫
-  "plan.planning": "正在計算…",
+  // 檢查變更
+  "plan.planning": "正在檢查變更…",
   "plan.apply": "套用",
   "plan.applying": "正在套用…",
   "plan.cancel": "取消",
   "plan.back": "返回",
-  "plan.replan": "重新預覽",
+  "plan.replan": "重新檢查",
   "plan.details": "技術細節",
   "plan.expiresIn": (time: string) => `${time} 後失效`,
   "plan.expired": "已失效",
@@ -1403,7 +1403,7 @@ export const zhTW: Messages = {
 
   // 編輯
   "edit.add": "新增",
-  "edit.review": "預覽變更",
+  "edit.review": "檢查變更",
   "edit.cancel": "取消",
   "edit.edit": (name: string) => `編輯 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
@@ -2110,10 +2110,10 @@ export const zhTW: Messages = {
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "把下面的設定交給管理員。它只授予這項權限，而且只在這個專案有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
-    `計畫只在 ${p.minutes} 分鐘內有效。重新產生計畫。`,
+    `檢查過的變更只在 ${p.minutes} 分鐘內有效。重新檢查一次。`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "重新產生計畫。計畫只能在產生它的伺服器上，用原本的權杖原封不動地套用。",
-  "sentence.problem.conflict.fix.review": () => "重新預覽，從它目前的狀態開始。",
+    "重新檢查變更。變更只能在檢查它的伺服器上，用原本的權杖原封不動地套用。",
+  "sentence.problem.conflict.fix.review": () => "重新檢查，從它目前的狀態開始。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等它開始執行；它的日誌和事件會說明為什麼還沒執行。",
   "sentence.problem.unavailable.fix.tryAgainSoon": () => "稍後再試一次。",
@@ -2147,10 +2147,10 @@ export const zhTW: Messages = {
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "它不存在。"),
   "sentence.problem.summary.log-unavailable": () => "無法讀取這份日誌。",
   "sentence.problem.summary.conflict": (p) =>
-    p.name ? `你預覽之後，${p.name} 又有了變更。` : "你預覽之後，它又有了變更。",
+    p.name ? `你檢查之後，${p.name} 又有了變更。` : "你檢查之後，它又有了變更。",
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "這由其他工具管理。",
-  "sentence.problem.summary.plan-expired": () => "計畫已過期。",
+  "sentence.problem.summary.plan-expired": () => "這份變更已過期。",
   "sentence.problem.summary.system-namespace": (p) =>
     p.name ? `${p.name} 是 Kubernetes 自用的 Namespace。` : "這是 Kubernetes 自用的 Namespace。",
   "sentence.problem.summary.invalid": (p) =>
@@ -2252,9 +2252,9 @@ export const zhTW: Messages = {
   "form.healthHint":
     "叢集在每個副本上執行的檢查：能不能接收流量、要不要重新啟動，以及是否已經啟動。",
   "draft.add": "加入變更",
-  "draft.pendingHere": "有等待預覽的變更",
+  "draft.pendingHere": "有等待檢查的變更",
   "draft.count": (n) => `${n} 項變更待套用`,
-  "draft.review": "預覽變更",
+  "draft.review": "檢查變更",
   "draft.none": "尚無變更",
   "draft.save": "儲存",
   "draft.leaveTitle": "不儲存就離開？",
