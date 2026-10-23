@@ -31,6 +31,7 @@ import { parseAnsi } from "@/lib/ansi"
 import { openShell } from "@/lib/dock"
 import { cn } from "@/lib/utils"
 import { isTask, podHealth, podReason, worstPod, type Service } from "@/model/service"
+import { logTone } from "@/model/severity"
 import { ranges } from "@/model/usage"
 import { useLogStream } from "@/routes/service/log-stream"
 import {
@@ -79,11 +80,11 @@ function parseLine(raw: string, source?: string): Line {
   }
 }
 
-const severityBar: Record<Severity, string> = {
-  error: "bg-fail",
-  warn: "bg-warn",
-  info: "bg-transparent",
-  debug: "bg-transparent",
+const toneBg = { fail: "bg-fail", warn: "bg-warn" } as const
+
+const severityBar = (severity: Severity) => {
+  const tone = logTone[severity]
+  return tone ? toneBg[tone] : "bg-transparent"
 }
 
 export function LogsTab({
@@ -573,7 +574,7 @@ function LogView({
   const times = lines.map((l) => l.time).filter((x): x is number => x !== undefined)
   const first = times.length ? Math.min(...times) : 0
   const last = times.length ? Math.max(...times) : 0
-  const buckets = Array.from({ length: n }, () => ({ warning: 0, normal: 0 }))
+  const buckets = Array.from({ length: n }, () => ({ error: 0, warning: 0, normal: 0 }))
   matching.forEach((line, i) => {
     const pos =
       line.time !== undefined && last > first
@@ -581,7 +582,9 @@ function LogView({
         : i / Math.max(matching.length - 1, 1)
     const bucket = buckets[Math.min(n - 1, Math.floor(pos * n))]
     if (!bucket) return
-    if (line.severity === "error" || line.severity === "warn") bucket.warning++
+    const tone = logTone[line.severity]
+    if (tone === "fail") bucket.error++
+    else if (tone === "warn") bucket.warning++
     else bucket.normal++
   })
   const fmt = (ms: number) =>
@@ -641,8 +644,8 @@ function LogView({
       <div className="flex flex-col gap-2 border-b px-3 pt-2.5 pb-2">
         <div className="flex flex-wrap items-center gap-1.5">
           {chip("all", t("common.all"), matching.length)}
-          {chip("error", t("logs.error"), counts.error, "bg-fail")}
-          {chip("warn", t("logs.warn"), counts.warn, "bg-warn")}
+          {chip("error", t("logs.error"), counts.error, severityBar("error"))}
+          {chip("warn", t("logs.warn"), counts.warn, severityBar("warn"))}
           {chip("info", t("logs.info"), counts.info + counts.debug, "bg-foreground/30")}
           <span className="ml-auto flex items-center gap-1">
             {!stick ? (
@@ -716,7 +719,7 @@ function LogView({
                   style={{ "--start": `${item.start}px` }}
                 >
                   <span
-                    className={cn("w-0.75 shrink-0 self-stretch", severityBar[line.severity])}
+                    className={cn("w-0.75 shrink-0 self-stretch", severityBar(line.severity))}
                     aria-hidden="true"
                   />
                   {timestamps && line.stamp ? (

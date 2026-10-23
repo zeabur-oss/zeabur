@@ -118,6 +118,7 @@ export function Hint({ children, label }: { children: ReactNode; label: string }
 }
 
 export interface Bucket {
+  error: number
   warning: number
   normal: number
 }
@@ -134,12 +135,12 @@ export function Histogram({
   labels?: [string, string]
 }) {
   // A few lines a bucket stay short bars, so a quiet, even stream does not fill the chart.
-  const max = Math.max(4, ...buckets.map((b) => b.warning + b.normal))
+  const max = Math.max(4, ...buckets.map((b) => b.error + b.warning + b.normal))
   return (
     <div className={cn("flex flex-col gap-1", className)} aria-hidden="true">
       <div className={cn("flex items-end gap-0.75", height)}>
         {buckets.map((bucket, i) => {
-          const total = bucket.warning + bucket.normal
+          const total = bucket.error + bucket.warning + bucket.normal
           return (
             // oxlint-disable-next-line react/no-array-index-key -- buckets are positional
             <div key={i} className="flex h-full min-w-0 flex-1 flex-col justify-end">
@@ -150,7 +151,8 @@ export function Histogram({
                   className="flex h-(--bar) w-full flex-col overflow-hidden rounded-xs"
                   style={{ "--bar": `${Math.max(8, (total / max) * 100)}%` }}
                 >
-                  <div className="grow-(--grow) bg-fail/85" style={{ "--grow": bucket.warning }} />
+                  <div className="grow-(--grow) bg-fail/85" style={{ "--grow": bucket.error }} />
+                  <div className="grow-(--grow) bg-warn/85" style={{ "--grow": bucket.warning }} />
                   <div
                     className="grow-(--grow) bg-foreground/20"
                     style={{ "--grow": bucket.normal }}
