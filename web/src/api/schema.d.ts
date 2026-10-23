@@ -213,6 +213,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/join": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What a new node needs to join the cluster: the supervisor's address, the CA hash for the
+     *     token, the server's location, and the join tokens that have not expired (never their
+     *     secrets). Each read is the person's; one they may not make is listed in `unreadable`.
+     */
+    get: operations["getJoin"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/nodes": {
     parameters: {
       query?: never
@@ -3135,6 +3156,48 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description Who it enrols a passkey for. */
       username: string
+    }
+    /**
+     * @description Why this cluster cannot take a node from Zeabur.
+     * @enum {string}
+     */
+    JoinBlocked: "notRke2"
+    /** @description Where the server is, from its node's labels, for the new node to compare with its own. */
+    JoinExpect: {
+      /** @description `installer.zeabur.com/provider`. */
+      provider: string
+      /** @description `topology.kubernetes.io/region`. */
+      region: string
+    }
+    /** @description What a new node needs to join, as far as the person may read it. */
+    JoinInfo: {
+      blocked?: components["schemas"]["JoinBlocked"] | null
+      /** @description 64 hex characters of the cluster CA's SHA-256, for the `K10` token. */
+      caHash?: string | null
+      expect?: components["schemas"]["JoinExpect"] | null
+      /** @description kube-apiserver's version (`v1.34.1+rke2r1`). */
+      kubernetesVersion: string
+      /** @description The supervisor a new node joins, `https://<address>:9345`. */
+      server?: string | null
+      /** @description Bootstrap tokens that have not expired, soonest to expire first. */
+      tokens: components["schemas"]["JoinToken"][]
+      /** @description The reads that were refused. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description A bootstrap token that has not expired, without its secret. */
+    JoinToken: {
+      /** @description When the Secret was created. */
+      created?: string | null
+      /** @description Its `description`. */
+      description?: string | null
+      /** @description Its `expiration` (RFC 3339); absent when it never expires. */
+      expires?: string | null
+      /** @description The token id; the Secret is `bootstrap-token-<id>`. */
+      id: string
+      /** @description Its `app.kubernetes.io/managed-by` label (`zeabur`, `zeabur-installer`). */
+      managedBy?: string | null
+      /** @description The Secret's name. */
+      secret: string
     }
     /** @description A workload's Keel policy. */
     KeelPolicy: {
@@ -6078,6 +6141,33 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["IncidentList"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getJoin: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["JoinInfo"]
         }
       }
       401: {

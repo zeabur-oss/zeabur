@@ -14,6 +14,7 @@
 //! | `GET /api/v1/cluster/events` | events of every namespace, newest first, `limit` of them |
 //! | `GET /api/v1/cluster/gaps` | what the cluster itself is missing, with fixes |
 //! | `GET /api/v1/cluster/incidents` | components down and nodes not ready, with the domains and projects they reach |
+//! | `GET /api/v1/cluster/join` | what a new node needs to join: supervisor, CA hash, location, join tokens (never their secrets) |
 //! | `GET /api/v1/cluster/capabilities` | what is installed (with versions), and what to install |
 //! | `GET /api/v1/cluster/components/{capability}/{component}/install` | how to install it yourself, in four forms |
 //! | `GET /api/v1/settings/metrics-store` | the metrics store history is read from, whether it answers, who may change it |
@@ -181,6 +182,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::capabilities))
         .routes(routes!(cluster::config_reload::get))
         .routes(routes!(cluster::install::guide_for))
+        .routes(routes!(cluster::join::get))
         .routes(routes!(cluster::nodes))
         .routes(routes!(cluster::health))
         .routes(routes!(cluster::upgrades))

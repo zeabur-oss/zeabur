@@ -15,6 +15,7 @@
 //! | `GET /cluster/events` | `events.k8s.io` events, all namespaces (`scope=cluster` keeps those about the cluster) | `list events.events.k8s.io` |
 //! | `GET /cluster/alerts` | Falco's `ClusterPolicyReport`s (`zeabur_modules::falco`) | `list clusterpolicyreports.wgpolicyk8s.io`; refused or not installed is a state, not an error |
 //! | `GET /cluster/config-reload` | Deployments' metadata, all namespaces; Reloader's Deployment | nothing: `unknown` when refused (see [`config_reload`]) |
+//! | `GET /cluster/join` | `/version`; nodes, `kube-root-ca.crt` and bootstrap token Secrets in `kube-system` when allowed | nothing; the rest fill in the supervisor, the CA hash and the tokens (see [`join`]) |
 //! | `GET /cluster/capabilities` | CRDs, APIServices, classes, `HelmChart`s, Helm release Secrets' labels, workloads | all of them: in practice a cluster administrator |
 //!
 //! The page shows the cluster itself, not its projects: Home lists those from `GET /projects`
@@ -53,6 +54,7 @@ pub mod config_reload;
 pub(crate) mod disks;
 pub(crate) mod health;
 pub mod install;
+pub mod join;
 pub mod modules;
 
 use std::collections::BTreeMap;
