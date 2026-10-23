@@ -59,6 +59,10 @@ pub(crate) fn fault(kind: DiagnosisKind, cause: &Message) -> Fault {
             _ => Fault::new(Configuration, You),
         },
         DiagnosisKind::QuotaBlocked => Fault::new(Cluster, ClusterAdmin),
+        DiagnosisKind::PodSecurity => match cause.params.get("level").map(String::as_str) {
+            Some("baseline" | "privileged") => Fault::new(Configuration, ClusterAdmin),
+            _ => Fault::new(Configuration, You),
+        },
         DiagnosisKind::Unschedulable => match variant {
             "placement" | "claimMissing" => Fault::new(Configuration, You),
             _ => Fault::new(Cluster, ClusterAdmin),
@@ -136,6 +140,11 @@ mod tests {
                 FaultOrigin::Configuration,
             ),
             (
+                DiagnosisKind::PodSecurity,
+                "diagnosis.podSecurity.cause.runsAsRoot",
+                FaultOrigin::Configuration,
+            ),
+            (
                 DiagnosisKind::Unexplained,
                 "diagnosis.unexplained.cause.waiting",
                 FaultOrigin::Unknown,
@@ -146,6 +155,12 @@ mod tests {
         }
         let pull = Message::new("diagnosis.imagePull.cause.unreachable")
             .with("image", "registry.example.test/app:1");
+        let privileged =
+            Message::new("diagnosis.podSecurity.cause.refused").with("level", "baseline");
+        assert_eq!(
+            fault(DiagnosisKind::PodSecurity, &privileged).fixer,
+            Fixer::ClusterAdmin
+        );
         assert_eq!(
             fault(DiagnosisKind::ImagePull, &pull),
             Fault::new(FaultOrigin::Upstream, Fixer::ClusterAdmin).of("registry.example.test")

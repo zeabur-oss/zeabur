@@ -5302,6 +5302,7 @@ components:
       - quotaBlocked
       - unschedulable
       - configMissing
+      - podSecurity
       - unexplained
     DiskState:
       type: string
@@ -11823,6 +11824,7 @@ components:
       - quota
       - configMissing
       - runFailed
+      - podSecurity
       - deadlineExceeded
       - replicaFailure
     Suggestion:

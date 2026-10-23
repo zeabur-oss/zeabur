@@ -23,6 +23,10 @@
 //!   workload [k8s-quota]. Only a refusal by a quota ("exceeded quota: {name}") is `quotaBlocked`.
 //! - *Scheduling.* A pod whose `PodScheduled` condition is `False` with reason `Unschedulable`
 //!   waits for a node with room [k8s-pod-conditions]; the scheduler's message says why.
+//! - *Pod Security.* A container that must not run as root (`runAsNonRoot`) but whose image would,
+//!   or names its user so the kubelet cannot tell, waits in `CreateContainerConfigError` with the
+//!   kubelet's words. Pods that break the namespace's enforced level are refused when created,
+//!   reported as for a quota, with `violates PodSecurity "<level>:<version>"` [k8s-psa].
 //! - *Configuration.* `CreateContainerConfigError` is how the kubelet reports a container whose
 //!   Secret or ConfigMap, or a key in one, is missing; it does not start until it exists. A volume
 //!   from a missing Secret or ConfigMap shows no such reason: the containers wait in
@@ -41,6 +45,7 @@
 //! applies, with this occurrence's numbers; this module writes no prose.
 //!
 //! [k8s-quota]: https://kubernetes.io/docs/concepts/policy/resource-quotas/
+//! [k8s-psa]: https://kubernetes.io/docs/concepts/security/pod-security-admission/
 //! [k8s-pod-conditions]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-conditions
 //!
 //! [k8s-restart-policy]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy
@@ -195,6 +200,7 @@ impl<'a> Namespace<'a> {
                     .find(|c| c.name == status.name)
                     .and_then(|c| c.image.clone());
                 image_pull(&mut found, pod, status, image.as_deref(), pod_events);
+                runs_as_root(&mut found, pod, status);
                 missing.extend(config_missing(&mut found, pod, status));
                 if runs {
                     run_failed(&mut found, pod, status, self.job_of(&pod.name));
@@ -213,6 +219,7 @@ impl<'a> Namespace<'a> {
         if let Some(workload) = workload {
             let about = self.events_about(workload.kind().as_str(), workload.name());
             quota_blocked(&mut found, workload, about);
+            pod_security_refused(&mut found, workload, about);
             traffic::unreachable(&mut found, service, &self.traffic, workload);
         }
         let mut diagnoses = found.finish(runs);
@@ -874,7 +881,9 @@ fn config_missing(
     status: &ContainerStatusSummary,
 ) -> Option<(&'static str, String)> {
     let waiting = status.waiting.as_ref()?;
-    if waiting.reason.as_deref() != Some("CreateContainerConfigError") {
+    if waiting.reason.as_deref() != Some("CreateContainerConfigError")
+        || waiting.message.as_deref().is_some_and(is_non_root_check)
+    {
         return None;
     }
     let missing = waiting.message.as_deref().and_then(missing_config);
@@ -1107,6 +1116,112 @@ fn quota_blocked(found: &mut Found, workload: Workload<'_>, events: &[&Event]) {
                 condition.message.as_deref().unwrap_or_default(),
                 Origin::field(
                     kind,
+                    name,
+                    "status.conditions[type=ReplicaFailure]".to_owned(),
+                ),
+                condition.last_update_time.as_ref().map(|t| t.0),
+            );
+        }
+    }
+    for event in events.iter().filter(|e| e.reason == "FailedCreate") {
+        add(&event.note, event.origin.clone(), event.last_seen);
+    }
+}
+
+// ── Pod Security ────────────────────────────────────────────────────────────────────────────────
+
+/// Whether a `CreateContainerConfigError` message is the kubelet's `runAsNonRoot` check
+/// [k8s-kuberuntime-security]: `container has runAsNonRoot and image will run as root` or
+/// `… image has non-numeric user (nginx), cannot verify user is non-root`.
+///
+/// [k8s-kuberuntime-security]: https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kuberuntime/security_context_others.go
+fn is_non_root_check(message: &str) -> bool {
+    message.contains("container has runAsNonRoot")
+}
+
+/// A container the kubelet does not start because it must not run as root and its image
+/// would, or names its user so the kubelet cannot tell.
+fn runs_as_root(found: &mut Found, pod: &PodSummary, status: &ContainerStatusSummary) {
+    let Some(waiting) = status.waiting.as_ref() else {
+        return;
+    };
+    let message = waiting.message.as_deref().unwrap_or_default();
+    if waiting.reason.as_deref() != Some("CreateContainerConfigError")
+        || !is_non_root_check(message)
+    {
+        return;
+    }
+    let (cause, fix) = if message.contains("non-numeric user") {
+        ("nonNumericUser", "numericUser")
+    } else {
+        ("runsAsRoot", "compatible")
+    };
+    let sentence = |key: &str| Message::new(key).with("container", &status.name);
+    found.add(
+        DiagnosisKind::PodSecurity,
+        &status.name,
+        &pod.name,
+        (
+            sentence(&format!("diagnosis.podSecurity.cause.{cause}")),
+            sentence("diagnosis.podSecurity.why.runAsNonRoot"),
+            sentence(&format!("diagnosis.podSecurity.fix.{fix}")),
+        ),
+        vec![status_field(pod, status, "state.waiting")],
+        None,
+    );
+}
+
+/// What Pod Security admission writes when it refuses a pod [k8s-psa-admission]:
+/// `violates PodSecurity "restricted:latest": allowPrivilegeEscalation != false (…), …`. Returns
+/// the level and what the pod breaks.
+///
+/// [k8s-psa-admission]: https://github.com/kubernetes/pod-security-admission/blob/master/admission/admission.go
+fn pod_security_of(message: &str) -> Option<(&str, &str)> {
+    let (_, rest) = message.split_once("violates PodSecurity \"")?;
+    let (level, rest) = rest.split_once('"')?;
+    let level = level.split(':').next()?;
+    let breaks = rest.trim_start_matches(':').trim();
+    (!level.is_empty()).then_some((level, breaks))
+}
+
+/// Pod Security admission refusing the workload's pods; `events` are those about the workload.
+fn pod_security_refused(found: &mut Found, workload: Workload<'_>, events: &[&Event]) {
+    let name = workload.name();
+    let mut add = |message: &str, evidence: Origin, when: Option<Timestamp>| {
+        let Some((level, breaks)) = pod_security_of(message) else {
+            return;
+        };
+        let cause = Message::new("diagnosis.podSecurity.cause.refused")
+            .with("service", name)
+            .with("level", level);
+        let why = Message::new("diagnosis.podSecurity.why.refused")
+            .with("level", level)
+            .with("breaks", truncate(breaks));
+        let fix = if level == "restricted" {
+            Message::new("diagnosis.podSecurity.fix.compatible")
+        } else {
+            Message::new("diagnosis.podSecurity.fix.privileged").with("level", level)
+        };
+        found.add(
+            DiagnosisKind::PodSecurity,
+            "",
+            "",
+            (cause, why, fix),
+            vec![evidence],
+            when,
+        );
+    };
+    if let Workload::Deployment(deployment) = workload {
+        for condition in deployment
+            .status
+            .iter()
+            .flat_map(|s| s.conditions.iter().flatten())
+            .filter(|c| c.type_ == "ReplicaFailure" && c.status == "True")
+        {
+            add(
+                condition.message.as_deref().unwrap_or_default(),
+                Origin::field(
+                    "Deployment",
                     name,
                     "status.conditions[type=ReplicaFailure]".to_owned(),
                 ),
@@ -1382,6 +1497,31 @@ mod tests {
             quota_of("pods \"a\" is forbidden: violates PodSecurity"),
             None
         );
+    }
+
+    #[test]
+    fn a_pod_security_refusal_names_its_level_and_what_the_pod_breaks() {
+        assert_eq!(
+            pod_security_of(
+                "pods \"web-1\" is forbidden: violates PodSecurity \"restricted:latest\": \
+                 runAsNonRoot != true (pod or container \"web\" must set \
+                 securityContext.runAsNonRoot=true)"
+            ),
+            Some((
+                "restricted",
+                "runAsNonRoot != true (pod or container \"web\" must set \
+                 securityContext.runAsNonRoot=true)"
+            ))
+        );
+        assert_eq!(
+            pod_security_of("pods \"a\" is forbidden: exceeded quota: compute"),
+            None
+        );
+        assert!(is_non_root_check(
+            "container has runAsNonRoot and image will run as root (pod: \"web-1_shop\", \
+             container: web)"
+        ));
+        assert!(!is_non_root_check("secret \"db\" not found"));
     }
 
     #[test]

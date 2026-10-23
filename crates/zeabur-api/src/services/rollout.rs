@@ -78,6 +78,8 @@ pub enum StuckReason {
     ConfigMissing,
     /// A new pod's run failed.
     RunFailed,
+    /// Pod Security keeps a new pod from running.
+    PodSecurity,
     /// The Deployment's `progressDeadlineSeconds` passed.
     DeadlineExceeded,
     /// The Deployment's controller could not create a pod (`ReplicaFailure`).
@@ -189,6 +191,7 @@ const fn stuck_by(kind: DiagnosisKind) -> Option<StuckReason> {
         DiagnosisKind::QuotaBlocked => Some(StuckReason::Quota),
         DiagnosisKind::ConfigMissing => Some(StuckReason::ConfigMissing),
         DiagnosisKind::RunFailed => Some(StuckReason::RunFailed),
+        DiagnosisKind::PodSecurity => Some(StuckReason::PodSecurity),
         DiagnosisKind::ProbeFailure | DiagnosisKind::Unreachable | DiagnosisKind::Unexplained => {
             None
         }
@@ -204,6 +207,7 @@ const fn reason_key(reason: StuckReason) -> &'static str {
         StuckReason::Quota => "quota",
         StuckReason::ConfigMissing => "configMissing",
         StuckReason::RunFailed => "runFailed",
+        StuckReason::PodSecurity => "podSecurity",
         StuckReason::DeadlineExceeded => "deadlineExceeded",
         StuckReason::ReplicaFailure => "replicaFailure",
     }

@@ -1,0 +1,32 @@
+[
+  {
+    "kind": "podSecurity",
+    "container": null,
+    "pods": [],
+    "cause": {
+      "key": "diagnosis.podSecurity.cause.refused",
+      "params": {
+        "service": "web",
+        "level": "restricted"
+      }
+    },
+    "why": {
+      "key": "diagnosis.podSecurity.why.refused",
+      "params": {
+        "level": "restricted",
+        "breaks": "allowPrivilegeEscalation != false (container \"web\" must set securityContext.allowPrivilegeEscalation=false)"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.podSecurity.fix.compatible"
+    },
+    "evidence": [
+      {
+        "kind": "Deployment",
+        "name": "web",
+        "fieldPath": "status.conditions[type=ReplicaFailure]"
+      }
+    ],
+    "lastSeen": "2026-10-23T11:55:00Z"
+  }
+]

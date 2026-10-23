@@ -1,0 +1,4 @@
+description: A container that must not run as root, whose image would, waits in CreateContainerConfigError; it is a Pod Security diagnosis, not a missing config.
+operation: gaps.diagnose
+params:
+  now: "2026-10-23T12:00:00Z"

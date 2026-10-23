@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - name: web
+          image: nginx:latest
+status:
+  replicas: 0
+  conditions:
+    - type: ReplicaFailure
+      status: "True"
+      reason: FailedCreate
+      message: 'pods "web-5d8f7-x2k9q" is forbidden: violates PodSecurity "restricted:latest": allowPrivilegeEscalation != false (container "web" must set securityContext.allowPrivilegeEscalation=false)'
+      lastUpdateTime: "2026-10-23T11:55:00Z"
+      lastTransitionTime: "2026-10-23T11:55:00Z"
