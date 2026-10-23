@@ -537,15 +537,15 @@ function PrivateAddress({ endpoint: e, namespace }: { endpoint: Endpoint; namesp
               </span>
               {p ? (
                 <span
-                  className="flex items-center gap-1.5 font-mono type-meta text-muted-foreground"
+                  className="flex items-center gap-1.5 type-meta text-muted-foreground"
                   translate="no"
                 >
                   {p.targetPort && /^\d+$/.test(p.targetPort) && p.targetPort !== String(p.port) ? (
                     <Tooltip content={t("net.forwardsTo", p.targetPort)}>
-                      <span>→ {p.targetPort}</span>
+                      <span className="font-mono">→ {p.targetPort}</span>
                     </Tooltip>
                   ) : null}
-                  <span className="type-nano">{p.protocol}</span>
+                  <span>{p.protocol}</span>
                 </span>
               ) : null}
             </li>
