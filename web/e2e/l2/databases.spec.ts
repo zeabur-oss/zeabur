@@ -195,10 +195,13 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
         timeout: 60_000,
       })
       const connect = viewer.getByRole("region", { name: "Connect" })
-      await connect.getByRole("button", { name: "Reveal" }).click()
-      await expect(connect).toContainText(`${db.secret} needs admin rights`)
+      // Closed, naming the role that opens it, rather than refused after a click.
+      await expect(connect.getByRole("button", { name: "Reveal" })).toBeDisabled()
+      await expect(connect).toContainText("Needs Developer access")
       await viewer.getByRole("tab", { name: "Backups" }).click()
-      await expect(viewer.getByRole("region", { name: "Backups" })).toContainText("Succeeded")
+      const backups = viewer.getByRole("region", { name: "Backups" })
+      await expect(backups).toContainText("Succeeded")
+      await expect(viewer.getByRole("button", { name: "Back up now" })).toBeDisabled()
 
       const refused = await planAndApply(viewer, project, [{ op: "create", object: db.backup }])
       expect(refused.status, JSON.stringify(refused.body)).toBe(403)
