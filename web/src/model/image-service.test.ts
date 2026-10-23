@@ -138,7 +138,7 @@ describe("objects", () => {
 
   test("a volume makes one replica that is recreated, not rolled", () => {
     const objects = imageObjects(
-      form({ replicas: 3, volume: { mountPath: "/data", size: "1Gi" } }),
+      form({ replicas: 3, volumes: [{ name: "data", mountPath: "/data", size: "1Gi" }] }),
       {},
     )
     expect(kinds(objects)).toEqual(["PersistentVolumeClaim/web-data", "Deployment/web"])

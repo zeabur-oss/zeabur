@@ -5,7 +5,8 @@ import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import { api, toProblem, unwrap } from "@/api/client"
-import { clusterQuery, creatableQuery, projectQuery } from "@/api/queries"
+import { clusterQuery, creatableQuery } from "@/api/queries"
+import { useTakenNames } from "@/components/add/taken"
 import { FormField } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
@@ -70,14 +71,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const domains = cluster?.domains ?? {}
   const registry = cluster?.builds.registry ?? ""
   const options = imageOptions(rightsOf(useQuery(creatableQuery(project)).data))
-  const view = useQuery(projectQuery(project)).data
-  const taken = view
-    ? [
-        ...view.services.map((s) => s.name),
-        ...view.endpoints.map((e) => e.name),
-        ...view.routes.map((r) => r.name),
-      ]
-    : []
+  const taken = useTakenNames(project)
   const { enforced } = useProjectSecurity(project)
   const [form, setForm] = useState<GitService>(newGitService)
   const [env, setEnv] = useState("")

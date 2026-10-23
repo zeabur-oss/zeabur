@@ -3,7 +3,8 @@ import { useNavigate } from "@tanstack/react-router"
 import { useId, useState, type ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
-import { clusterQuery, creatableQuery, projectQuery } from "@/api/queries"
+import { clusterQuery, creatableQuery } from "@/api/queries"
+import { useTakenNames } from "@/components/add/taken"
 import { FormField, quantity } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { PortNoteHint, useImageInspection } from "@/components/add/image-port"
@@ -79,14 +80,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const navigate = useNavigate()
   const domains = useQuery(clusterQuery).data?.domains ?? {}
   const options = imageOptions(rightsOf(useQuery(creatableQuery(project)).data))
-  const view = useQuery(projectQuery(project)).data
-  const taken = view
-    ? [
-        ...view.services.map((s) => s.name),
-        ...view.endpoints.map((e) => e.name),
-        ...view.routes.map((r) => r.name),
-      ]
-    : []
+  const taken = useTakenNames(project)
   const { enforced } = useProjectSecurity(project)
   const [form, setForm] = useState<ImageService>(newImageService)
   const [extras, setExtras] = useState<Extras>(newExtras)
@@ -123,7 +117,9 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
     host,
     variables: env.variables,
     secretVariables: secrets && form.secretVariables,
-    volume: volume ? { mountPath: extras.mountPath.trim(), size: extras.volumeSize } : undefined,
+    volumes: volume
+      ? [{ name: "data", mountPath: extras.mountPath.trim(), size: extras.volumeSize }]
+      : undefined,
     replicas: volume ? 1 : form.replicas,
     registry: registry
       ? { server: extras.server.trim(), username: extras.username, password: extras.password }

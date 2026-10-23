@@ -2211,6 +2211,61 @@ export const zhCN: Messages = {
   "add.palette.image": (project) => `在 ${project} 部署镜像`,
   "add.palette.database": (engine, project) => `在 ${project} 新建 ${engine}`,
   "add.git": "从 Git 部署",
+  "add.compose": "Docker Compose",
+  "add.composeTitle": "导入 Docker Compose",
+  "add.composeBody": (project) =>
+    `Compose 文件中的每个服务都会在 ${project} 中创建一个服务。创建前会先让你确认要新增的对象。`,
+  "add.composeFile": "Compose 文件",
+  "add.composeHint":
+    "粘贴或上传 compose.yaml。Zeabur 不会保留这个文件，导入后的服务和其他服务一样编辑。",
+  "add.composeUpload": "上传文件",
+  "add.composeRead": "读取文件",
+  "add.composeReading": "正在读取…",
+  "add.composeChanged": "内容已改动，请重新读取文件再确认。",
+  "add.composeEnvFile": (path) => `${path} 的内容`,
+  "add.composeEnvHint": "Compose 文件从这里读取环境变量。留空则跳过这些变量。",
+  "add.composeUnset": (names) => `没有设置 ${names}，将为空值。粘贴设置它的 .env 文件。`,
+  "add.composeNoEnvFile": (paths) =>
+    `没有提供 ${paths}，其中的变量不会导入。导入后可在「变量」中补上。`,
+  "add.composeServices": (count) => `服务（${count}）`,
+  "add.composeManaged": (engine) => `创建由 operator 管理的 ${engine}`,
+  "add.composeManagedHint": (image) =>
+    `替代 ${image}。新数据库是空的，Compose 卷中的数据不会复制过来。其他服务的连接变量会改为指向它。`,
+  "add.composeKept.noOperator": (image) => `直接运行 ${image}：导入暂不创建 SeaweedFS 对象存储。`,
+  "add.composeKept.notInstalled": (image, engine) =>
+    `直接运行 ${image}：尚未安装 ${engine} 的 operator。在「组件」中安装后，即可改由 operator 管理。`,
+  "add.composeKept.unknown": (image, engine) =>
+    `直接运行 ${image}：Zeabur 无法确认是否已安装 ${engine} 的 operator。`,
+  "add.composeKept.role": (image) => `直接运行 ${image}：你的角色不能在这个项目中创建数据库。`,
+  "add.composeBuildOnly": "不会创建：它只有 build:，没有镜像。请改用「从 Git 部署」。",
+  "add.composePorts": (ports) => `监听 ${ports}`,
+  "add.composeVolumes": (paths) => `卷挂载在 ${paths}，每个 1 GiB，之后可以扩容`,
+  "add.composeWaits": (names) => `等 ${names} 可以连接后再启动`,
+  "add.composeSecurity": "这些服务使用「兼容」安全级别，因为大多数 Compose 镜像以 root 运行。",
+  "add.composeMention": (variable, service) =>
+    `${variable} 提到了 ${service}，但 Zeabur 无法改写这种格式。导入后请检查。`,
+  "add.composePlan": (count) => `导入 ${count} 个服务`,
+  "add.composeFinding.privileged": "跳过 privileged：容器不会获得节点的完整权限。",
+  "add.composeFinding.hostNetwork": "跳过 network_mode: host：服务有自己的网络地址。",
+  "add.composeFinding.hostPid": "跳过 pid: host：服务看不到节点上的进程。",
+  "add.composeFinding.devices": "跳过 devices：容器不会获得节点的设备。",
+  "add.composeFinding.capAdd": (capabilities) =>
+    `跳过 cap_add（${capabilities}）：服务不能获得更多 Linux capability。`,
+  "add.composeFinding.dockerSocket": (source) =>
+    `不会挂载 ${source}：Docker socket 能控制整个节点，而且节点不一定运行 Docker。`,
+  "add.composeFinding.hostPath": (source, target) =>
+    `不会把 ${source} 挂载到 ${target}：这是 Docker 主机上的目录。导入后把文件放进卷或 ConfigMap。`,
+  "add.composeFinding.healthcheck":
+    "跳过 healthcheck：Zeabur 会检查第一个端口能否连接。可以在「设置」中修改检查方式。",
+  "add.composeFinding.build": (image) =>
+    `跳过 build:，直接拉取 ${image}。如果这个镜像只在本地构建，请改用「从 Git 部署」。`,
+  "add.composeFinding.buildOnly": "跳过 build:。请改用「从 Git 部署」。",
+  "add.composeFinding.udpPort": (port) =>
+    `跳过 UDP 端口 ${port}：服务的 Kubernetes Service 只承载 TCP。`,
+  "add.composeFinding.sharedVolume": (volume) =>
+    `卷 ${volume} 在 Compose 中由多个服务共用；这里每个服务各有一个。`,
+  "add.composeFinding.renamed": (from, to) =>
+    `${from} 改名为 ${to}，因为名称只能使用小写字母、数字和连字符。用 ${from} 连接的服务需要改用新名称。`,
   "add.gitTitle": "从 Git 部署",
   "add.gitBody": (project) => `构建 Git 仓库，在 ${project} 运行。创建前会先让你确认要新建的对象。`,
   "add.field.repository": "仓库",

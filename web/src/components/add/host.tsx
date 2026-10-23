@@ -1,4 +1,5 @@
 import { installedEngines, NewDatabaseDrawer, useDatabases } from "@/components/databases"
+import { ComposeDrawer } from "@/components/add/compose-drawer"
 import { GitDrawer } from "@/components/add/git-drawer"
 import { ImageDrawer } from "@/components/add/image-drawer"
 import { adding, type AddWhat } from "@/lib/adding"
@@ -9,6 +10,7 @@ export function AddHost({ project, what }: { project: string; what: AddWhat }) {
   const close = () => adding.set(null)
   if (what === "image") return <ImageDrawer project={project} onClose={close} />
   if (what === "git") return <GitDrawer project={project} onClose={close} />
+  if (what === "compose") return <ComposeDrawer project={project} onClose={close} />
   return <DatabaseForm project={project} engine={what} onClose={close} />
 }
 

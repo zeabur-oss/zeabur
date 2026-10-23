@@ -116,6 +116,9 @@ export function AddMenu({ project, compact = false }: { project: string; compact
           {t("add.image")}
         </GatedMenuItem>
         <GitItem project={project} git={choices.git} />
+        <GatedMenuItem gate={choices.gates.image} onClick={() => openAdd(project, "compose")}>
+          {t("add.compose")}
+        </GatedMenuItem>
         {!choices.gates.database.open ? (
           <>
             <MenuSeparator />

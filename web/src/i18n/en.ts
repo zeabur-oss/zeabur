@@ -2431,6 +2431,69 @@ export const en = {
   "add.palette.image": (project: string) => `Deploy an image in ${project}`,
   "add.palette.database": (engine: string, project: string) => `New ${engine} in ${project}`,
   "add.git": "Deploy from Git",
+  "add.compose": "Docker Compose",
+  "add.composeTitle": "Import Docker Compose",
+  "add.composeBody": (project: string) =>
+    `Makes a service in ${project} for each service of a Compose file. You review the objects before anything is created.`,
+  "add.composeFile": "Compose file",
+  "add.composeHint":
+    "Paste compose.yaml or upload it. Zeabur doesn't keep the file: once imported, the services are edited like any other.",
+  "add.composeUpload": "Upload file",
+  "add.composeRead": "Read file",
+  "add.composeReading": "Reading…",
+  "add.composeChanged": "The text changed. Read the file again to review it.",
+  "add.composeEnvFile": (path: string) => `Contents of ${path}`,
+  "add.composeEnvHint":
+    "The Compose file reads its variables from this file. Leave it empty to skip them.",
+  "add.composeUnset": (names: string) =>
+    `Nothing sets ${names}, so it stays empty. Paste the .env file that sets it.`,
+  "add.composeNoEnvFile": (paths: string) =>
+    `${paths} wasn't given; its variables are left out. Add them under Variables after import.`,
+  "add.composeServices": (count: number) => `Services (${count})`,
+  "add.composeManaged": (engine: string) => `Create ${engine} run by its operator`,
+  "add.composeManagedHint": (image: string) =>
+    `Instead of ${image}. It starts empty: data in a Compose volume isn't copied. Other services' connection variables point at it.`,
+  "add.composeKept.noOperator": (image: string) =>
+    `Runs ${image} as it is: an import doesn't create SeaweedFS object storage yet.`,
+  "add.composeKept.notInstalled": (image: string, engine: string) =>
+    `Runs ${image} as it is: the ${engine} operator isn't installed. Install it in Components to have it run by the operator.`,
+  "add.composeKept.unknown": (image: string, engine: string) =>
+    `Runs ${image} as it is: Zeabur can't tell whether the ${engine} operator is installed.`,
+  "add.composeKept.role": (image: string) =>
+    `Runs ${image} as it is: your role can't create databases in this project.`,
+  "add.composeBuildOnly": "Not created: it has no image, only build:. Deploy it from Git instead.",
+  "add.composePorts": (ports: string) => `Listens on ${ports}`,
+  "add.composeVolumes": (paths: string) => `Volume at ${paths}, 1 GiB each; grow it later`,
+  "add.composeWaits": (names: string) => `Starts once ${names} accept connections`,
+  "add.composeSecurity":
+    "The services use Compatible security, because most Compose images run as root.",
+  "add.composeMention": (variable: string, service: string) =>
+    `${variable} names ${service} in a form Zeabur doesn't rewrite. Check it after import.`,
+  "add.composePlan": (count: number) => `Import ${plural(count, "service", "services")}`,
+  "add.composeFinding.privileged":
+    "privileged is left out: a container doesn't get full access to the node.",
+  "add.composeFinding.hostNetwork":
+    "network_mode: host is left out: the service has its own network address.",
+  "add.composeFinding.hostPid":
+    "pid: host is left out: the service can't see the node's processes.",
+  "add.composeFinding.devices": "devices is left out: a container doesn't get the node's devices.",
+  "add.composeFinding.capAdd": (capabilities: string) =>
+    `cap_add (${capabilities}) is left out: a service can't get more Linux capabilities.`,
+  "add.composeFinding.dockerSocket": (source: string) =>
+    `${source} isn't mounted: the Docker socket controls the whole node, and nodes may not run Docker.`,
+  "add.composeFinding.hostPath": (source: string, target: string) =>
+    `${source} isn't mounted at ${target}: it is a folder on the Docker host. Put its files in a volume or a ConfigMap after import.`,
+  "add.composeFinding.healthcheck":
+    "healthcheck is left out: Zeabur checks that the first port accepts connections. Change the check in Settings.",
+  "add.composeFinding.build": (image: string) =>
+    `build: is left out and ${image} is pulled. If the image is only built locally, deploy it from Git instead.`,
+  "add.composeFinding.buildOnly": "build: is left out. Deploy it from Git instead.",
+  "add.composeFinding.udpPort": (port: string) =>
+    `UDP port ${port} is left out: the service's Kubernetes Service carries TCP only.`,
+  "add.composeFinding.sharedVolume": (volume: string) =>
+    `Volume ${volume} is shared in Compose; here each service gets its own.`,
+  "add.composeFinding.renamed": (from: string, to: string) =>
+    `${from} is named ${to}, as names are lowercase letters, digits and hyphens. Services that reach it as ${from} need the new name.`,
   "add.gitTitle": "Deploy from Git",
   "add.gitBody": (project: string) =>
     `Builds a Git repository and runs it in ${project}. You review the objects before anything is created.`,
