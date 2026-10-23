@@ -28,6 +28,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   changeMembers: { role: "admin", rule: "create rolebindings.rbac.authorization.k8s.io" },
   installComponents: { role: "admin", rule: "create helmcharts.helm.cattle.io" },
   changeNodes: { role: "admin", rule: "patch nodes" },
+  changeBackups: { role: "admin", rule: "create schedules.velero.io" },
 }
 
 export const neededRole = (right: Right): NeededRole => rules[right].role
@@ -82,6 +83,7 @@ export function unknownRights(): ProjectRights {
 const clusterOnly: Record<keyof ClusterRights, true> = {
   installComponents: true,
   changeNodes: true,
+  changeBackups: true,
 }
 
 const workloads = ["deployments", "statefulsets", "daemonsets"]

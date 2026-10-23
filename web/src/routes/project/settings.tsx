@@ -1,13 +1,14 @@
 // Deleting the namespace is not offered: plans refuse it (`tenant_level`).
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
-import { getRouteApi } from "@tanstack/react-router"
+import { getRouteApi, Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 
 import type { Schemas } from "@/api/client"
 import { namespaceQuery, projectQuery } from "@/api/queries"
 import { AccessDialog, AdoptButton } from "@/components/adopt"
+import { useBackups } from "@/components/backups"
 import { CopyButton } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
@@ -16,10 +17,12 @@ import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { projectGlyphs } from "@/components/project-icon"
 import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
-import { useT } from "@/i18n"
+import { useI18n, useT } from "@/i18n"
+import { formatAgo } from "@/lib/format"
+import { projectCoverage } from "@/model/cluster-backups"
 import { DISPLAY_NAME_MAX, mayChange, projectIcons, type ProjectIconName } from "@/model/project"
 import type { Service } from "@/model/service"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { Card, CardFooter, CardRow, SectionLabel } from "@zeabur/design-system/components/card"
 import { Input } from "@zeabur/design-system/components/input"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
@@ -112,6 +115,7 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
           </CardRow>
         </Card>
       </Group>
+      {namespace.adopted ? <ClusterBackups project={namespace.name} /> : null}
       {namespace.adopted ? <BatchActions project={namespace.name} /> : null}
       {namespace.adopted && !namespace.system ? (
         <Group label={t("projectSettings.danger")}>
@@ -407,6 +411,45 @@ function BatchActions({ project }: { project: string }) {
         </CardRow>
       </Card>
       {planner.dialog}
+    </Group>
+  )
+}
+
+/** Whether the cluster's Velero backups cover the project; nothing when Velero can't be read. */
+function ClusterBackups({ project }: { project: string }) {
+  const t = useT()
+  const { locale } = useI18n()
+  const data = useBackups(project).data
+  const coverage = data ? projectCoverage(data) : undefined
+  if (!coverage) return null
+  const line = (() => {
+    switch (coverage.as) {
+      case "noVelero":
+        return t("clusterBackups.project.noVelero")
+      case "notCovered":
+        return t("clusterBackups.project.notCovered")
+      case "waiting":
+        return t("clusterBackups.project.waiting")
+      case "last": {
+        const ago = coverage.at ? formatAgo(coverage.at, locale) : "—"
+        return coverage.outcome === "failed"
+          ? t("clusterBackups.project.lastFailed", ago)
+          : t("clusterBackups.project.last", ago)
+      }
+    }
+  })()
+  return (
+    <Group label={t("backups.title")}>
+      <Card variant="list">
+        <CardRow label={t("clusterBackups.project.label")} description={line}>
+          <Link
+            to="/cluster/backups"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {t("clusterBackups.project.open")}
+          </Link>
+        </CardRow>
+      </Card>
     </Group>
   )
 }

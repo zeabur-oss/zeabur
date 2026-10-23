@@ -288,6 +288,26 @@ export async function applyNodePolicies(token: string) {
   return unwrap(await api.POST("/api/v1/cluster/node-policies/apply", { body: { token } }))
 }
 
+export const clusterBackupsQuery = queryOptions({
+  queryKey: ["cluster", "backups"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/backups", { signal })),
+  refetchInterval: CLUSTER_POLL,
+  refetchIntervalInBackground: false,
+  retryOnMount: false,
+})
+
+/** What a change to Velero's location or schedule writes, and the token; writes nothing. */
+export async function planClusterBackups(
+  request: Schemas["BackupsPlanRequest"],
+  signal?: AbortSignal,
+) {
+  return unwrap(await api.POST("/api/v1/cluster/backups/plan", { body: request, signal }))
+}
+
+export async function applyClusterBackups(token: string) {
+  return unwrap(await api.POST("/api/v1/cluster/backups/apply", { body: { token } }))
+}
+
 /** What stopping scheduling, resuming it or maintenance does to a node's pods; writes nothing. */
 export async function planNodeMaintenance(
   node: string,

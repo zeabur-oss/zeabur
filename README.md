@@ -60,6 +60,10 @@ than you have, and keeps no state of its own: no database, no custom resources.
   details. A plan shows the fields it writes and who owns them now; the apply writes only those
   fields, and is refused if anything changed since the plan.
 - **Releases and rollback** of a workload's pod template, through the same plans.
+- **Cluster backups** with [Velero](https://velero.io): where they go (S3-compatible storage,
+  keys kept in a Secret), a schedule for the whole cluster or chosen projects with the files in
+  volumes copied, and each backup's outcome in plain words, set through the same plans.
+  Databases keep their own backups; restoring is left to the `velero` command-line tool.
 - **Logs and a terminal**: a pod's logs, followed live, and a shell in a container.
 - **Usage**: CPU and memory now (metrics-server) and their history (a Prometheus-compatible
   store such as VictoriaMetrics).

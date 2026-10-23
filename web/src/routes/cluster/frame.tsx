@@ -12,7 +12,11 @@ import { useUpgradeBadge } from "@/routes/cluster/upgrade"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 
-const paths = { overview: "/cluster", components: "/cluster/components" } as const
+const paths = {
+  overview: "/cluster",
+  backups: "/cluster/backups",
+  components: "/cluster/components",
+} as const
 
 export type ClusterTab = keyof typeof paths
 
@@ -31,6 +35,7 @@ export function ClusterFrame({ tab, children }: { tab: ClusterTab; children: Rea
           <Heading />
           <TabsList aria-label={t("cluster.tabs")}>
             <TabsTrigger value="overview">{t("cluster.overview")}</TabsTrigger>
+            <TabsTrigger value="backups">{t("cluster.backups")}</TabsTrigger>
             <TabsTrigger value="components">{t("settings.components")}</TabsTrigger>
           </TabsList>
         </PageColumn>
