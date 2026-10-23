@@ -219,6 +219,14 @@ function sentenceOf(
       return t("confirm.scheduleTask", change.name, change.from.name)
     case "runTask":
       return t("confirm.runTask", change.cronJob)
+    case "redirect":
+      return change.to
+        ? t("confirm.redirect", change.hostname, change.to)
+        : t("confirm.redirectOff", change.hostname, change.workload.name)
+    case "basicAuth":
+      return change.user
+        ? t("confirm.basicAuth", change.route.name)
+        : t("confirm.basicAuthOff", change.route.name)
   }
 }
 
@@ -731,6 +739,10 @@ export function actionOf(t: Translate, ask: Asked): string {
       return t("action.create")
     case "runTask":
       return t("tasks.runNow")
+    case "redirect":
+      return change.to ? t("action.redirect") : t("action.stopRedirect")
+    case "basicAuth":
+      return change.user ? t("action.askPassword") : t("action.stopPassword")
   }
 }
 

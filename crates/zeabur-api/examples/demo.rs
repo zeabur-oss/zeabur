@@ -616,10 +616,16 @@ fn shop() -> NamespaceObjects {
             ),
         ],
         ingresses: vec![
-            from::<Ingress>(json!({"metadata": {"name": "web", "namespace": "shop"},
+            // www redirects to the apex through a Traefik middleware.
+            from::<Ingress>(json!({"metadata": {"name": "web", "namespace": "shop",
+                    "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0001",
+                    "annotations": {"traefik.ingress.kubernetes.io/router.middlewares":
+                        "shop-web-redirect-www-shop-example-com@kubernetescrd"}},
                 "spec": {"rules": [{"host": "shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
+                    "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}},
+                    {"host": "www.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
                     "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}}],
-                    "tls": [{"hosts": ["shop.example.com"], "secretName": "shop-tls"}]},
+                    "tls": [{"hosts": ["shop.example.com", "www.shop.example.com"], "secretName": "shop-tls"}]},
                 "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
             from::<Ingress>(json!({"metadata": {"name": "api", "namespace": "shop"},
                 "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
@@ -1628,6 +1634,12 @@ fn state() -> State {
                 true,
             ),
             ServedResource::readable("upgrade.cattle.io", "v1", "plans", "Plan", true),
+            ServedResource {
+                verbs: ["create", "delete", "get", "list", "patch"]
+                    .map(str::to_owned)
+                    .to_vec(),
+                ..ServedResource::readable("traefik.io", "v1alpha1", "middlewares", "Middleware", true)
+            },
             ServedResource::readable("cert-manager.io", "v1", "certificates", "Certificate", true),
             ServedResource::readable(
                 "acme.cert-manager.io",
@@ -1734,6 +1746,16 @@ fn state() -> State {
         .chain(alerting_served())
         .collect(),
         dynamic: [
+            from(json!({
+                "apiVersion": "traefik.io/v1alpha1", "kind": "Middleware",
+                "metadata": {"name": "web-redirect-www-shop-example-com", "namespace": "shop",
+                    "resourceVersion": "3",
+                    "ownerReferences": [{"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+                        "name": "web", "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0001"}]},
+                "spec": {"redirectRegex": {
+                    "regex": "^https?://www\\.shop\\.example\\.com(:[0-9]+)?/(.*)",
+                    "replacement": "https://shop.example.com/${2}", "permanent": true}}
+            })),
             certificate(
                 "shop",
                 "shop-tls",

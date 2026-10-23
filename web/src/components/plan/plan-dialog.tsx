@@ -778,6 +778,10 @@ function warningSentence(
       return t("warn.toolsCredentialExposed", warning.namespace)
     case "taskImageCopied":
       return t("warn.taskImageCopied", warning.from.name, warning.image)
+    case "permanentRedirect":
+      return t("warn.permanentRedirect", warning.hostname)
+    case "passwordOverHttp":
+      return t("warn.passwordOverHttp", t("common.list", warning.hostnames))
     case "debugContainerStays":
     case "debugContainerReused":
     case "toolsPod":

@@ -1,17 +1,20 @@
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
-import { Fragment, useState, type ReactElement, type ReactNode } from "react"
+import { Fragment, lazy, Suspense, useState, type ReactElement, type ReactNode } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
+import ArrowBendUpRightIcon from "~icons/ph/arrow-bend-up-right"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretDownIcon from "~icons/ph/caret-down"
 import ClockIcon from "~icons/ph/clock"
 import GlobeIcon from "~icons/ph/globe"
 import HourglassMediumIcon from "~icons/ph/hourglass-medium-bold"
+import LockKeyIcon from "~icons/ph/lock-key"
 import LockSimpleBoldIcon from "~icons/ph/lock-simple-bold"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import PlugsIcon from "~icons/ph/plugs"
 import PlusIcon from "~icons/ph/plus"
+import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TrashIcon from "~icons/ph/trash"
 
 import { clusterQuery, traceQuery } from "@/api/queries"
@@ -58,6 +61,8 @@ import {
 import { refusedPlaces } from "@/routes/project/data"
 import { Reachability } from "@/routes/service/reachability"
 
+const DomainAccess = lazy(() => import("@/routes/service/domain-access"))
+
 // RFC 1123 host names, with the leading wildcard label Ingress and HTTPRoute allow. A hint only:
 // the plan checks the name again.
 const hostname = /^(\*\.)?([a-z0-9]([-a-z0-9]*[a-z0-9])?\.)*[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
@@ -95,6 +100,7 @@ export function NetworkingTab({
   const planner = usePlanner(project)
   const [adding, setAdding] = useState<string>()
   const [renaming, setRenaming] = useState<{ from: string; to: string }>()
+  const [access, setAccess] = useState<{ route: Schemas["Route"]; host: string }>()
   const managed = service.provenance.tool ?? undefined
   const workload = { kind: service.kind, name: service.name }
   const draft = useDraft()
@@ -117,11 +123,20 @@ export function NetworkingTab({
       {t("vars.undo")}
     </Button>
   )
+  const fullRoute = (route: PublicRoute) =>
+    routesOf(network, service).find((r) => r.name === route.ingress)
   const routeOf = (route: PublicRoute): Schemas["RouteRef"] => ({
-    kind: (routesOf(network, service).find((r) => r.name === route.ingress)?.origin.kind ??
-      "Ingress") as Schemas["RouteKind"],
+    kind: (fullRoute(route)?.origin.kind ?? "Ingress") as Schemas["RouteKind"],
     name: route.ingress,
   })
+  // Redirects and passwords are Traefik middlewares, which only an Ingress that Traefik serves
+  // can list.
+  const traefikIngress = (route: PublicRoute) => {
+    const full = fullRoute(route)
+    return full?.origin.kind === "Ingress" && (!full.class || full.class.includes("traefik"))
+      ? full
+      : undefined
+  }
   const canWrite = endpoints.length > 0 && !managed
   const domainGate = useGate(project, "changeDomains")
   const refusedRoutes = refusedAmong(unreadable, refusedPlaces.routes)
@@ -284,6 +299,8 @@ export function NetworkingTab({
                       const more = folded ? "max-sm:hidden" : undefined
                       const check = edit ? undefined : checkOf(route.host)
                       const firstOfHost = shown.findIndex((r) => r.host === route.host) === i
+                      const traefik = traefikIngress(route)
+                      const redirected = traefik?.redirects?.some((r) => r.host === route.host)
                       return (
                         <Fragment key={key}>
                           <tr
@@ -323,6 +340,18 @@ export function NetworkingTab({
                                 <span className="flex min-w-0 flex-col gap-1 max-sm:w-full">
                                   <span className="flex min-w-0 items-center gap-2">
                                     <Host route={route} certificate={check?.certificate} />
+                                    {redirected ? (
+                                      <span className="flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
+                                        <ArrowBendUpRightIcon aria-hidden="true" />
+                                        {t("domainAccess.redirects")}
+                                      </span>
+                                    ) : null}
+                                    {traefik?.basicAuth ? (
+                                      <span className="flex shrink-0 items-center gap-1 type-meta text-muted-foreground">
+                                        <LockKeyIcon aria-hidden="true" />
+                                        {t("domainAccess.protected")}
+                                      </span>
+                                    ) : null}
                                     <span className="flex-1 sm:hidden" />
                                     {route.host && !route.https ? (
                                       <span className="shrink-0 type-meta text-warn-strong">
@@ -378,6 +407,24 @@ export function NetworkingTab({
                                 <span className="flex justify-end">{undo(edit)}</span>
                               ) : route.host ? (
                                 <span className="flex items-center justify-end gap-0.5">
+                                  {traefik ? (
+                                    <Managed tool={managed} gate={domainGate}>
+                                      <Button
+                                        variant="muted"
+                                        size="icon-xs"
+                                        disabled={Boolean(managed)}
+                                        aria-label={t("domainAccess.open", route.host)}
+                                        title={t("domainAccess.open", route.host)}
+                                        onClick={() =>
+                                          route.host
+                                            ? setAccess({ route: traefik, host: route.host })
+                                            : undefined
+                                        }
+                                      >
+                                        <SlidersHorizontalIcon aria-hidden="true" />
+                                      </Button>
+                                    </Managed>
+                                  ) : null}
                                   <Managed tool={managed} gate={domainGate}>
                                     <Button
                                       variant="muted"
@@ -509,6 +556,17 @@ export function NetworkingTab({
       ) : null}
       <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.policies)} />
       {planner.dialog}
+      {access ? (
+        <Suspense fallback={null}>
+          <DomainAccess
+            project={project}
+            service={service}
+            route={access.route}
+            host={access.host}
+            onClose={() => setAccess(undefined)}
+          />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

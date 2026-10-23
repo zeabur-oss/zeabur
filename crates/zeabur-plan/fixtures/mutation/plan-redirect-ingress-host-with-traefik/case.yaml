@@ -1,0 +1,11 @@
+description: "A redirect on an Ingress is a Traefik redirectRegex middleware that matches only its hostname, owned by the Ingress and listed first in its annotation."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: redirect
+        route: {kind: Ingress, name: shop}
+        workload: {kind: Deployment, name: web}
+        hostname: www.shop.example.test
+        to: shop.example.test

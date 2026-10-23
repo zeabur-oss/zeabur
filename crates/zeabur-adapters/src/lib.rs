@@ -8,6 +8,7 @@ pub mod images;
 pub mod operators;
 pub mod provenance;
 pub mod selector;
+pub mod traefik;
 
 /// The label and annotation keys and the field manager, Zeabur's by default.
 pub use zeabur_kernel::names::Conventions;

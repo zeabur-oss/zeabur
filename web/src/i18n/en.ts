@@ -1744,6 +1744,12 @@ export const en = {
     `Add CronJob ${name}: it runs the command in a new container copied from ${service}. ${service} doesn't restart.`,
   "confirm.runTask": (name: string) =>
     `Start one run of ${name} now, as a new Job. Its schedule doesn't change.`,
+  "confirm.redirect": (host: string, to: string) => `Send visitors of ${host} to ${to}.`,
+  "confirm.redirectOff": (host: string, service: string) =>
+    `Show ${service} on ${host} again, without the redirect.`,
+  "confirm.basicAuth": (route: string) =>
+    `Ask for a password on every domain of Ingress ${route}. The cluster keeps only a bcrypt hash of it.`,
+  "confirm.basicAuthOff": (route: string) => `Stop asking for a password on Ingress ${route}.`,
   "confirm.deployKey": (name: string) => `Create Secret ${name} with the new deploy key.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
@@ -1782,6 +1788,10 @@ export const en = {
   "action.isolate": "Isolate",
   "action.allow": "Allow",
   "action.create": "Create",
+  "action.redirect": "Redirect",
+  "action.stopRedirect": "Remove redirect",
+  "action.askPassword": "Ask for password",
+  "action.stopPassword": "Remove password",
   "action.delete": "Delete",
   // Toasts
   "toast.region": "Notifications",
@@ -3193,8 +3203,48 @@ export const en = {
   "tasks.run.failed": "Failed",
   "tasks.manual": "Started by hand",
   "tasks.allRuns": (n: number) => `Show all ${n} runs`,
+  "domainAccess.open": (host: string) => `Redirect or password for ${host}`,
+  "domainAccess.title": (host: string) => `Access to ${host}`,
+  "domainAccess.planTitle": (host: string) => `Change access to ${host}`,
+  "domainAccess.lead": "Send visitors to another domain, or ask them for a password first.",
+  "domainAccess.goes": (host: string) => `When someone opens ${host}`,
+  "domainAccess.serve": (service: string) => `Show ${service}`,
+  "domainAccess.redirect": "Send them to another domain",
+  "domainAccess.to": "Domain to send them to",
+  "domainAccess.toHint": "The path stays the same, and the new address uses HTTPS.",
+  "domainAccess.badTo": "Enter a domain, like example.com.",
+  "domainAccess.sameTo": "Enter a domain other than this one.",
+  "domainAccess.kind": "Redirect type",
+  "domainAccess.permanent": "Permanent (301)",
+  "domainAccess.temporary": "Temporary (302)",
+  "domainAccess.permanentHint":
+    "Browsers remember a permanent redirect. Use temporary until you are sure.",
+  "domainAccess.password": "Ask for a password",
+  "domainAccess.passwordHint":
+    "Visitors enter a username and password before they see the service. Zeabur keeps only a hash of the password.",
+  "domainAccess.passwordShared": (hosts: string) =>
+    `The password also covers ${hosts}, because they share this Ingress.`,
+  "domainAccess.passwordSet": "A password is set.",
+  "domainAccess.change": "Change",
+  "domainAccess.username": "Username",
+  "domainAccess.newPassword": "Password",
+  "domainAccess.badUser": "Enter a username without spaces or colons.",
+  "domainAccess.badPassword": "Use at least 8 characters, and at most 72 bytes.",
+  "domainAccess.nothing": "Nothing changed.",
+  "domainAccess.redirects": "Redirects",
+  "domainAccess.protected": "Password",
+  "domainAccess.kube.annotation": "Middleware list",
+  "domainAccess.kube.redirect": "Redirect",
+  "domainAccess.kube.password": "Password",
+  "domainAccess.kube.users": "Users",
+  "domainAccess.kube.usersValue": (name: string) =>
+    `Secret ${name}, key users: one htpasswd line with a bcrypt hash`,
   "warn.taskImageCopied": (service: string, image: string) =>
     `The task runs ${image}, ${service}'s image now; a later image change to ${service} doesn't reach it`,
+  "warn.permanentRedirect": (host: string) =>
+    `Browsers remember a permanent redirect: if you remove it later, earlier visitors of ${host} still go to the old target until they clear their cache`,
+  "warn.passwordOverHttp": (hosts: string) =>
+    `${hosts} has no HTTPS, so the password crosses the network readable there`,
   "form.healthHint":
     "Checks the cluster runs on each replica: whether it takes traffic, whether to restart it, and when it has started.",
   "draft.add": "Add to changes",

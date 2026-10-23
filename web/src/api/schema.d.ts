@@ -2311,6 +2311,19 @@ export interface components {
       /** @description Its namespace. */
       namespace: string
     }
+    /** @description A [`Change::BasicAuth`]. */
+    BasicAuthChange: {
+      /** @description The Ingress. */
+      route: components["schemas"]["RouteRef"]
+      user?: components["schemas"]["BasicAuthUser"] | null
+    }
+    /** @description The user of a [`Change::BasicAuth`]. Zeabur keeps only a bcrypt hash of the password. */
+    BasicAuthUser: {
+      /** @description The password, 8 to 72 bytes. */
+      password: string
+      /** @description The user name; no colon. */
+      username: string
+    }
     /** @description One limit the new pods exceed. */
     Blocker: {
       /**
@@ -2442,6 +2455,14 @@ export interface components {
           /** @description The route. */
           route: components["schemas"]["RouteRef"]
         }
+      | (components["schemas"]["RedirectChange"] & {
+          /** @enum {string} */
+          op: "redirect"
+        })
+      | (components["schemas"]["BasicAuthChange"] & {
+          /** @enum {string} */
+          op: "basicAuth"
+        })
       | {
           /** @enum {string} */
           op: "restart"
@@ -5664,6 +5685,20 @@ export interface components {
         }
       | {
           /** @enum {string} */
+          code: "permanentRedirect"
+          /** @description The hostname that redirects. */
+          hostname: string
+        }
+      | {
+          /** @enum {string} */
+          code: "passwordOverHttp"
+          /** @description Its hostnames without HTTPS. */
+          hostnames: string[]
+          /** @description The Ingress. */
+          route: string
+        }
+      | {
+          /** @enum {string} */
           code: "taskImageCopied"
           /** @description The service. */
           from: components["schemas"]["WorkloadRef"]
@@ -6353,6 +6388,22 @@ export interface components {
           /** @description The tool. */
           tool: components["schemas"]["Tool"]
         }
+    /** @description A [`Change::Redirect`]. */
+    RedirectChange: {
+      /** @description The hostname that redirects. */
+      hostname: string
+      /** @description `301 Moved Permanently` when true, else `302 Found`. */
+      permanent?: boolean
+      /** @description The route. */
+      route: components["schemas"]["RouteRef"]
+      /** @description The hostname to redirect to; absent stops the redirect. */
+      to?: string | null
+      /**
+       * @description The workload the route sends requests to. An `HTTPRoute` that stops redirecting sends
+       *     them to it again.
+       */
+      workload: components["schemas"]["WorkloadRef"]
+    }
     /** @description Credentials for the image's registry. */
     RegistryLogin: {
       /** @description The password or access token. */
@@ -6569,6 +6620,7 @@ export interface components {
     Route: {
       /** @description The Services it routes to, sorted, without duplicates. */
       backends: string[]
+      basicAuth?: components["schemas"]["RouteMiddleware"] | null
       /**
        * @description Its class: `spec.ingressClassName`, else the older `kubernetes.io/ingress.class`
        *     annotation [k8s-ingress-class].
@@ -6584,6 +6636,11 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description The tool that manages the Ingress, if any. */
       provenance: components["schemas"]["Provenance"]
+      /**
+       * @description The hosts that Traefik redirects to another host, with the middleware Zeabur makes,
+       *     sorted by host.
+       */
+      redirects?: components["schemas"]["RouteMiddleware"][]
       /**
        * @description Which requests reach which Service port: the default backend first, then each rule's
        *     paths in order. Every rule of the Ingress is listed, also those for other workloads'
@@ -6601,6 +6658,13 @@ export interface components {
      * @enum {string}
      */
     RouteKind: "Ingress" | "HTTPRoute"
+    /** @description A Traefik `Middleware` an Ingress lists. */
+    RouteMiddleware: {
+      /** @description The host it acts on; absent when it acts on every host of the Ingress. */
+      host?: string | null
+      /** @description The `Middleware`'s name. */
+      middleware: string
+    }
     /** @description A route object: an Ingress or a Gateway API `HTTPRoute`. */
     RouteRef: {
       /** @description `Ingress` or `HTTPRoute`. */

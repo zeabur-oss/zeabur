@@ -1,0 +1,8 @@
+description: "Turning basic auth off takes the middleware out of the Ingress annotation first, then deletes the middleware and the Secret of users."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: basicAuth
+        route: {kind: Ingress, name: shop}

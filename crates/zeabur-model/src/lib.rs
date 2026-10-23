@@ -34,7 +34,8 @@ pub use http_route::{
     ParentReference, RouteCondition, RouteParentStatus, RouteStatus,
 };
 pub use network::{
-    Endpoint, InferredFrom, Port, PortProtocol, ProtocolInference, Route, RouteRule,
+    Endpoint, InferredFrom, Port, PortProtocol, ProtocolInference, Route, RouteMiddleware,
+    RouteRule,
 };
 pub use pod_security::PodSecurityLevel;
 pub use project::{

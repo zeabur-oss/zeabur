@@ -7,12 +7,12 @@ use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use zeabur_adapters::Conventions;
 use zeabur_adapters::provenance::{detect_tool, managed_by};
+use zeabur_adapters::{Conventions, traefik};
 use zeabur_model::{
     Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin,
     ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,
-    Route, Service, WorkloadRef,
+    Route, RouteMiddleware, Service, WorkloadRef,
 };
 
 use crate::attribution::{attribution_of, ingress_backends, relations_of};
@@ -180,18 +180,38 @@ fn route(object: &Ingress) -> Route {
         .collect();
     tls_hosts.sort();
     tls_hosts.dedup();
+    let middlewares = traefik::middlewares(&object.metadata);
+    let hostnames: Vec<String> = object
+        .spec
+        .iter()
+        .flat_map(|spec| spec.rules.iter().flatten())
+        .filter_map(|rule| rule.host.clone())
+        .collect();
+    let mut redirects: Vec<RouteMiddleware> = hostnames
+        .iter()
+        .map(|host| RouteMiddleware {
+            host: Some(host.clone()),
+            middleware: traefik::redirect_name(name, host),
+        })
+        .filter(|r| middlewares.contains(&r.middleware))
+        .collect();
+    redirects.sort_by(|a, b| a.host.cmp(&b.host));
+    redirects.dedup();
+    let basic_auth = Some(traefik::basic_auth_name(name))
+        .filter(|m| middlewares.contains(m))
+        .map(|middleware| RouteMiddleware {
+            host: None,
+            middleware,
+        });
     Route {
         name: name.to_owned(),
-        hostnames: object
-            .spec
-            .iter()
-            .flat_map(|spec| spec.rules.iter().flatten())
-            .filter_map(|rule| rule.host.clone())
-            .collect(),
+        hostnames,
         backends,
         class: ingress_class(object),
         rules: route_rules(object),
         tls_hosts,
+        redirects,
+        basic_auth,
         provenance: provenance(&object.metadata),
         origin: Origin::object("Ingress", name),
     }

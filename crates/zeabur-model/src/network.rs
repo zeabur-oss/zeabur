@@ -124,10 +124,30 @@ pub struct Route {
     /// configured, not that the certificate is valid.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tls_hosts: Vec<String>,
+    /// The hosts that Traefik redirects to another host, with the middleware Zeabur makes,
+    /// sorted by host.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub redirects: Vec<RouteMiddleware>,
+    /// The middleware Zeabur makes for Traefik to ask for a user name and password; its Secret
+    /// of users has the same name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub basic_auth: Option<RouteMiddleware>,
     /// The tool that manages the Ingress, if any.
     pub provenance: Provenance,
     /// The Ingress object.
     pub origin: Origin,
+}
+
+/// A Traefik `Middleware` an Ingress lists.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct RouteMiddleware {
+    /// The host it acts on; absent when it acts on every host of the Ingress.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    /// The `Middleware`'s name.
+    pub middleware: String,
 }
 
 /// One backend of an Ingress: the requests that reach a Service port.

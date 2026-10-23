@@ -61,6 +61,11 @@ pub enum Change {
         /// The hostname.
         hostname: String,
     },
+    /// Redirect a hostname to another hostname, or stop (see the `access` module).
+    Redirect(RedirectChange),
+    /// Ask for a user name and password on every hostname of an Ingress, or stop (see the
+    /// `access` module).
+    BasicAuth(BasicAuthChange),
     /// Replace a workload's pods, as `kubectl rollout restart` does.
     #[serde(rename_all = "camelCase")]
     Restart {
@@ -386,12 +391,67 @@ impl Change {
     }
 }
 
+const fn yes() -> bool {
+    true
+}
+
 const fn three() -> i32 {
     3
 }
 
 const fn one() -> i32 {
     1
+}
+
+/// A [`Change::Redirect`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct RedirectChange {
+    /// The route.
+    pub route: RouteRef,
+    /// The workload the route sends requests to. An `HTTPRoute` that stops redirecting sends
+    /// them to it again.
+    pub workload: WorkloadRef,
+    /// The hostname that redirects.
+    pub hostname: String,
+    /// The hostname to redirect to; absent stops the redirect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+    /// `301 Moved Permanently` when true, else `302 Found`.
+    #[serde(default = "yes")]
+    pub permanent: bool,
+}
+
+/// A [`Change::BasicAuth`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct BasicAuthChange {
+    /// The Ingress.
+    pub route: RouteRef,
+    /// The one user that may sign in; absent stops asking.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user: Option<BasicAuthUser>,
+}
+
+/// The user of a [`Change::BasicAuth`]. Zeabur keeps only a bcrypt hash of the password.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct BasicAuthUser {
+    /// The user name; no colon.
+    pub username: String,
+    /// The password, 8 to 72 bytes.
+    pub password: String,
+}
+
+impl std::fmt::Debug for BasicAuthUser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BasicAuthUser")
+            .field("username", &self.username)
+            .finish_non_exhaustive()
+    }
 }
 
 /// A CronJob's `concurrencyPolicy` [k8s-concurrency].
@@ -893,6 +953,22 @@ pub enum Warning {
         namespace: String,
         /// Its name.
         pod: String,
+    },
+    /// Browsers keep a permanent redirect: after it stops, visitors who saw it still go to the
+    /// other hostname until their browser forgets it.
+    #[serde(rename_all = "camelCase")]
+    PermanentRedirect {
+        /// The hostname that redirects.
+        hostname: String,
+    },
+    /// The Ingress serves these hostnames over plain HTTP, so the password crosses the network
+    /// readable on them.
+    #[serde(rename_all = "camelCase")]
+    PasswordOverHttp {
+        /// The Ingress.
+        route: String,
+        /// Its hostnames without HTTPS.
+        hostnames: Vec<String>,
     },
     /// The new task runs the service's image as it is now; a later change to the service's
     /// image does not reach the task.

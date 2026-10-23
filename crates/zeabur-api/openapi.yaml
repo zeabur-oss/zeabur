@@ -4241,6 +4241,35 @@ components:
         namespace:
           type: string
           description: Its namespace.
+    BasicAuthChange:
+      type: object
+      description: A [`Change::BasicAuth`].
+      required:
+      - route
+      properties:
+        route:
+          $ref: "#/components/schemas/RouteRef"
+          description: The Ingress.
+        user:
+          oneOf:
+          - $ref: "#/components/schemas/BasicAuthUser"
+            description: The one user that may sign in; absent stops asking.
+          - type: "null"
+    BasicAuthUser:
+      type: object
+      description: >-
+        The user of a [`Change::BasicAuth`]. Zeabur keeps only a bcrypt hash of the
+        password.
+      required:
+      - username
+      - password
+      properties:
+        password:
+          type: string
+          description: The password, 8 to 72 bytes.
+        username:
+          type: string
+          description: The user name; no colon.
     Blocker:
       type: object
       description: One limit the new pods exceed.
@@ -4494,6 +4523,34 @@ components:
           route:
             $ref: "#/components/schemas/RouteRef"
             description: The route.
+      - allOf:
+        - $ref: "#/components/schemas/RedirectChange"
+          description: Redirect a hostname to another hostname, or stop (see the `access` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - redirect
+        description: Redirect a hostname to another hostname, or stop (see the `access` module).
+      - allOf:
+        - $ref: "#/components/schemas/BasicAuthChange"
+          description: |-
+            Ask for a user name and password on every hostname of an Ingress, or stop (see the
+            `access` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - basicAuth
+        description: |-
+          Ask for a user name and password on every hostname of an Ingress, or stop (see the
+          `access` module).
       - type: object
         description: Replace a workload's pods, as `kubectl rollout restart` does.
         required:
@@ -10836,6 +10893,42 @@ components:
             description: Its name.
       - type: object
         description: |-
+          Browsers keep a permanent redirect: after it stops, visitors who saw it still go to the
+          other hostname until their browser forgets it.
+        required:
+        - hostname
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - permanentRedirect
+          hostname:
+            type: string
+            description: The hostname that redirects.
+      - type: object
+        description: |-
+          The Ingress serves these hostnames over plain HTTP, so the password crosses the network
+          readable on them.
+        required:
+        - route
+        - hostnames
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - passwordOverHttp
+          hostnames:
+            type: array
+            items:
+              type: string
+            description: Its hostnames without HTTPS.
+          route:
+            type: string
+            description: The Ingress.
+      - type: object
+        description: |-
           The new task runs the service's image as it is now; a later change to the service's
           image does not reach the task.
         required:
@@ -12223,6 +12316,33 @@ components:
       description: |-
         Why an `envFrom` entry is read-only. Either way the way out is the same: override one
         variable with a same-named `env` entry, which takes precedence and leaves the import alone.
+    RedirectChange:
+      type: object
+      description: A [`Change::Redirect`].
+      required:
+      - route
+      - workload
+      - hostname
+      properties:
+        hostname:
+          type: string
+          description: The hostname that redirects.
+        permanent:
+          type: boolean
+          description: "`301 Moved Permanently` when true, else `302 Found`."
+        route:
+          $ref: "#/components/schemas/RouteRef"
+          description: The route.
+        to:
+          type:
+          - string
+          - "null"
+          description: The hostname to redirect to; absent stops the redirect.
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: |-
+            The workload the route sends requests to. An `HTTPRoute` that stops redirecting sends
+            them to it again.
     RegistryLogin:
       type: object
       description: Credentials for the image's registry.
@@ -12606,6 +12726,13 @@ components:
           items:
             type: string
           description: The Services it routes to, sorted, without duplicates.
+        basicAuth:
+          oneOf:
+          - $ref: "#/components/schemas/RouteMiddleware"
+            description: |-
+              The middleware Zeabur makes for Traefik to ask for a user name and password; its Secret
+              of users has the same name.
+          - type: "null"
         class:
           type:
           - string
@@ -12629,6 +12756,13 @@ components:
         provenance:
           $ref: "#/components/schemas/Provenance"
           description: The tool that manages the Ingress, if any.
+        redirects:
+          type: array
+          items:
+            $ref: "#/components/schemas/RouteMiddleware"
+          description: |-
+            The hosts that Traefik redirects to another host, with the middleware Zeabur makes,
+            sorted by host.
         rules:
           type: array
           items:
@@ -12650,6 +12784,20 @@ components:
       enum:
       - Ingress
       - HTTPRoute
+    RouteMiddleware:
+      type: object
+      description: A Traefik `Middleware` an Ingress lists.
+      required:
+      - middleware
+      properties:
+        host:
+          type:
+          - string
+          - "null"
+          description: The host it acts on; absent when it acts on every host of the Ingress.
+        middleware:
+          type: string
+          description: The `Middleware`'s name.
     RouteRef:
       type: object
       description: "A route object: an Ingress or a Gateway API `HTTPRoute`."

@@ -127,6 +127,8 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "deployKey":
     case "scheduleTask":
     case "runTask":
+    case "redirect":
+    case "basicAuth":
       return { risk: "normal" }
   }
 }
@@ -286,7 +288,10 @@ export function destinationOf(
       return tab(change.workload, "networking")
     case "renameDomain":
     case "removeDomain":
+    case "basicAuth":
       return tab(service, "networking")
+    case "redirect":
+      return tab(change.workload, "networking")
     case "addVolume":
     case "editMount":
     case "removeVolume":

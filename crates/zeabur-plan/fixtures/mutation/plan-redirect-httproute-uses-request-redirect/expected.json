@@ -1,0 +1,16 @@
+{
+  "objects": [
+    {
+      "target": {"apiVersion": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute", "plural": "httproutes", "name": "web-www"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "5"},
+          {"op": "test", "path": "/spec/rules", "value": [{"backendRefs": [{"name": "web", "port": 8080}]}]},
+          {"op": "replace", "path": "/spec/rules", "value": [{"filters": [{"type": "RequestRedirect", "requestRedirect": {"scheme": "https", "hostname": "shop.example.test", "statusCode": 302}}]}]}
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}

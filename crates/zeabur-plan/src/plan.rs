@@ -396,6 +396,14 @@ impl<'a> Planner<'a> {
             Change::AddDomain { workload, hostname } => self.add_domain(workload, hostname),
             Change::RenameDomain { route, from, to } => self.rename_domain(route, from, to),
             Change::RemoveDomain { route, hostname } => self.remove_domain(route, hostname),
+            Change::Redirect(redirect) => self.redirect(
+                &redirect.route,
+                &redirect.workload,
+                &redirect.hostname,
+                redirect.to.as_deref(),
+                redirect.permanent,
+            ),
+            Change::BasicAuth(auth) => self.basic_auth(&auth.route, auth.user.as_ref()),
             Change::Create { .. } => self.create(change, index),
             Change::Restart { workload } => self.restart_workload(workload),
             Change::Rollback { workload, revision } => self.rollback(workload, *revision),
@@ -1009,7 +1017,7 @@ impl<'a> Planner<'a> {
     }
 
     /// The workloads behind Services `services`.
-    fn behind(&self, services: &BTreeSet<String>) -> Vec<WorkloadRef> {
+    pub(crate) fn behind(&self, services: &BTreeSet<String>) -> Vec<WorkloadRef> {
         self.project
             .services
             .iter()
@@ -1290,7 +1298,10 @@ impl<'a> Planner<'a> {
     }
 
     /// The route object `route`, its metadata and the Services it routes to.
-    fn route(&self, route: &RouteRef) -> Result<(Value, ObjectMeta, BTreeSet<String>), PlanError> {
+    pub(crate) fn route(
+        &self,
+        route: &RouteRef,
+    ) -> Result<(Value, ObjectMeta, BTreeSet<String>), PlanError> {
         let missing = || {
             error(
                 ErrorKind::NotFound,
@@ -1643,7 +1654,7 @@ pub(crate) fn yaml(object: Option<&Value>) -> Option<String> {
     object.and_then(|o| zeabur_graph::manifest::to_yaml(o).ok())
 }
 
-fn array(object: &Value, path: &str) -> Vec<Value> {
+pub(crate) fn array(object: &Value, path: &str) -> Vec<Value> {
     object
         .pointer(path)
         .and_then(Value::as_array)
@@ -1688,11 +1699,11 @@ fn metadata(object: &Value) -> ObjectMeta {
         .unwrap_or_default()
 }
 
-fn ingress_target(name: &str) -> Target {
+pub(crate) fn ingress_target(name: &str) -> Target {
     Target::of::<k8s_openapi::api::networking::v1::Ingress>(name)
 }
 
-fn http_route_target(name: &str) -> Target {
+pub(crate) fn http_route_target(name: &str) -> Target {
     Target {
         api_version: "gateway.networking.k8s.io/v1".to_owned(),
         kind: "HTTPRoute".to_owned(),

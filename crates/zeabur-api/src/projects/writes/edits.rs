@@ -85,5 +85,53 @@ pub(super) async fn edited_objects(
             });
         }
     }
+    out.extend(middlewares(cluster, project, request).await?);
+    Ok(out)
+}
+
+/// The Traefik middlewares the request's redirects and basic auth update or delete, where they
+/// exist.
+async fn middlewares(
+    cluster: &dyn Cluster,
+    project: &str,
+    request: &PlanRequest,
+) -> Result<Vec<Fetched>, ApiError> {
+    let mut out = Vec::new();
+    for (resource, name) in request
+        .changes
+        .iter()
+        .filter_map(zeabur_plan::access::middleware_read)
+    {
+        let reference = zeabur_kube::ResourceRef::new(
+            &resource.group,
+            &resource.version,
+            &resource.resource,
+            "Middleware",
+        );
+        // Absent, or not served without Traefik: the plan then makes it, or says Traefik is needed.
+        let found = cluster
+            .find_object(&reference, Some(project), &name)
+            .await
+            .and_then(|found| {
+                found
+                    .map(serde_json::to_value)
+                    .transpose()
+                    .map_err(|e| ClusterError::Decode(e.to_string()))
+            })
+            .map_err(|e| {
+                read_problem(
+                    e,
+                    &format!("middleware {name}"),
+                    get_read(&resource.group, &resource.resource, Some(project), &name),
+                )
+            })?;
+        if let Some(object) = found {
+            out.push(Fetched {
+                resource,
+                name,
+                object,
+            });
+        }
+    }
     Ok(out)
 }

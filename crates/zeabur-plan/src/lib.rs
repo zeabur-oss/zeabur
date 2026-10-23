@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+pub mod access;
 pub mod builds;
 mod change;
 pub mod checks;
@@ -22,9 +23,9 @@ pub mod terminal;
 pub mod token;
 
 pub use change::{
-    Change, ConnectionRef, DataEdit, DataKind, FieldOwners, HttpOnlyReason, KeptReason, ObjectName,
-    Plan, PlanRequest, PlannedObject, ProbeKind, RouteKind, RouteRef, Target, TaskConcurrency,
-    Warning, Write,
+    BasicAuthUser, Change, ConnectionRef, DataEdit, DataKind, FieldOwners, HttpOnlyReason,
+    KeptReason, ObjectName, Plan, PlanRequest, PlannedObject, ProbeKind, RouteKind, RouteRef,
+    Target, TaskConcurrency, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};

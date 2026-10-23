@@ -72,6 +72,8 @@ pub(crate) async fn compute(
         | Change::AddDomain { .. }
         | Change::RenameDomain { .. }
         | Change::RemoveDomain { .. }
+        | Change::Redirect(_)
+        | Change::BasicAuth(_)
         | Change::Restart { .. }
         | Change::Rollback { .. }
         | Change::ExpandVolume { .. }

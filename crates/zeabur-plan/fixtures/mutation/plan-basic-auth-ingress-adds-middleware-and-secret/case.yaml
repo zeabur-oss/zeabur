@@ -1,0 +1,9 @@
+description: "Basic auth on an Ingress keeps a bcrypt htpasswd line in a Secret, adds a basicAuth middleware that removes the header, lists it last, and warns about hostnames without HTTPS."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: basicAuth
+        route: {kind: Ingress, name: shop}
+        user: {username: ops, password: correct horse}

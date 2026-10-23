@@ -1101,3 +1101,10 @@ name = "futures-executor"
 kind = "unsafe"
 reason = "Enabled by rmcp's default `futures` features (and unified with kube's futures). An UnparkMutex (unsafe Send/Sync and UnsafeCell access guarded by its atomic state) used by its thread pool and local executor; Zeabur runs on tokio and calls neither"
 approved = "2026-10-16"
+
+# --- Basic auth on a domain (bcrypt): Traefik reads a bcrypt htpasswd hash.
+[[crate]]
+name = "byteorder"
+kind = "unsafe"
+reason = "Under blowfish, for bcrypt. Reads and writes integers of fixed byte order through pointer copies over slices it has checked for length"
+approved = "pending"

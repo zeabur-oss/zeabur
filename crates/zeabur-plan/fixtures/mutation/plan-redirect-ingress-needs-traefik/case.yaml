@@ -1,0 +1,10 @@
+description: "Without Traefik's Middleware kind, a redirect on an Ingress is refused and says Traefik is needed."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: redirect
+        route: {kind: Ingress, name: shop}
+        workload: {kind: Deployment, name: web}
+        hostname: www.shop.example.test
+        to: shop.example.test

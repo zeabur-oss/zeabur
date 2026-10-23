@@ -18,13 +18,17 @@ pub(super) fn from_yaml(request: &PlanRequest) -> bool {
         .any(|c| matches!(c, Change::Create { yaml: Some(_), .. }))
 }
 
-/// The kinds discovery names, for a request that creates objects; none otherwise, and the
-/// planner knows only the kinds it creates itself.
+/// The kinds discovery names, for a request that creates objects or Traefik middlewares; none
+/// otherwise, and the planner knows only the kinds it creates itself.
 pub(super) async fn served_kinds(
     cluster: &dyn Cluster,
     request: &PlanRequest,
 ) -> Result<Vec<ServedKind>, ApiError> {
-    if !from_yaml(request) {
+    let middlewares = request
+        .changes
+        .iter()
+        .any(|c| zeabur_plan::access::middleware_read(c).is_some());
+    if !from_yaml(request) && !middlewares {
         return Ok(Vec::new());
     }
     let served = cluster

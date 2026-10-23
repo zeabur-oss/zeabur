@@ -86,6 +86,8 @@ zeabur-fixtures = { path = "crates/zeabur-fixtures", version = "0.0.1" }
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }
 # Already in the binary through k8s-openapi; Secret values are base64 on the wire.
 base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+# The htpasswd hash of a basic auth password (zeabur-plan); Traefik reads bcrypt.
+bcrypt = { version = "0.17", default-features = false, features = ["alloc"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "tracing", "json", "ws"] }
 clap = { version = "4", default-features = false, features = ["std", "derive", "env", "help", "usage", "error-context"] }
 form_urlencoded = "1"
