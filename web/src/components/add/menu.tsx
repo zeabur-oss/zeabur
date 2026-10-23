@@ -46,7 +46,7 @@ export interface AddChoices {
 
 /** Engines whose operator is known to be installed or not. An operator whose databases can't be
  * read is left out. */
-function knownEngines(operators: { engine: Engine; state: string }[]) {
+function knownEngines(operators: { engine: Engine; state: string }[] = []) {
   return engines.flatMap((engine) => {
     const state = operators.find((o) => o.engine === engine)?.state
     return state === "installed" || state === "not-installed"
@@ -85,10 +85,9 @@ export function useAddChoices(project: string | undefined): AddChoices | undefin
     capabilities: capabilities.data?.items,
     registry: cluster ? (cluster.builds.registry ?? "") : undefined,
   })
-  const operators = databases.data?.operators ?? []
   const imageGate = gates("deploy")
   const databaseGate = gates("changeDatabases")
-  const offered = databaseGate.open ? knownEngines(operators) : []
+  const offered = databaseGate.open ? knownEngines(databases.data?.operators) : []
   const yaml = (creatable.data?.items ?? []).some((k) => k.access !== "denied")
   return {
     image: imageGate.open,
