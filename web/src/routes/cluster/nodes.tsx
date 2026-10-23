@@ -31,6 +31,7 @@ import {
 import type { Health } from "@/model/service"
 import { useIssueText } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
+import { AddNodeButton, JoinTokens } from "@/routes/cluster/add-node"
 import { Section } from "@/routes/cluster/section"
 import { Meter } from "@zeabur/design-system/components/meter"
 
@@ -146,6 +147,7 @@ export function NodesSection() {
       id="cluster-nodes"
       title={t("cluster.nodes")}
       count={data ? data.items.length : undefined}
+      action={<AddNodeButton />}
     >
       {nodes.isPending ? (
         <LoadingRows label={t("common.loading")} rows={2} />
@@ -204,6 +206,7 @@ export function NodesSection() {
           </div>
           <Notes data={data} />
           <NodeList nodes={data.items} skew={skew} metrics={data.metrics} />
+          <JoinTokens />
         </div>
       ) : null}
     </Section>

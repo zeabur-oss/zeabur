@@ -278,6 +278,26 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/join:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        What a new node needs to join the cluster: the supervisor's address, the CA hash for the
+        token, the server's location, and the join tokens that have not expired (never their
+        secrets). Each read is the person's; one they may not make is listed in `unreadable`.
+      operationId: getJoin
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JoinInfo"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/nodes:
     get:
       tags:
@@ -6039,6 +6059,100 @@ components:
         username:
           type: string
           description: Who it enrols a passkey for.
+    JoinBlocked:
+      type: string
+      description: Why this cluster cannot take a node from Zeabur.
+      enum:
+      - notRke2
+    JoinExpect:
+      type: object
+      description: >-
+        Where the server is, from its node's labels, for the new node to compare with
+        its own.
+      required:
+      - provider
+      - region
+      properties:
+        provider:
+          type: string
+          description: "`installer.zeabur.com/provider`."
+        region:
+          type: string
+          description: "`topology.kubernetes.io/region`."
+    JoinInfo:
+      type: object
+      description: What a new node needs to join, as far as the person may read it.
+      required:
+      - kubernetesVersion
+      - tokens
+      - unreadable
+      properties:
+        blocked:
+          oneOf:
+          - $ref: "#/components/schemas/JoinBlocked"
+            description: Why nodes cannot be added; absent when they can.
+          - type: "null"
+        caHash:
+          type:
+          - string
+          - "null"
+          description: 64 hex characters of the cluster CA's SHA-256, for the `K10` token.
+        expect:
+          oneOf:
+          - $ref: "#/components/schemas/JoinExpect"
+            description: The server's provider and region, when its node is labelled with both.
+          - type: "null"
+        kubernetesVersion:
+          type: string
+          description: kube-apiserver's version (`v1.34.1+rke2r1`).
+        server:
+          type:
+          - string
+          - "null"
+          description: The supervisor a new node joins, `https://<address>:9345`.
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/JoinToken"
+          description: Bootstrap tokens that have not expired, soonest to expire first.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: The reads that were refused.
+    JoinToken:
+      type: object
+      description: A bootstrap token that has not expired, without its secret.
+      required:
+      - id
+      - secret
+      properties:
+        created:
+          type:
+          - string
+          - "null"
+          description: When the Secret was created.
+        description:
+          type:
+          - string
+          - "null"
+          description: Its `description`.
+        expires:
+          type:
+          - string
+          - "null"
+          description: Its `expiration` (RFC 3339); absent when it never expires.
+        id:
+          type: string
+          description: The token id; the Secret is `bootstrap-token-<id>`.
+        managedBy:
+          type:
+          - string
+          - "null"
+          description: Its `app.kubernetes.io/managed-by` label (`zeabur`, `zeabur-installer`).
+        secret:
+          type: string
+          description: The Secret's name.
     KeelPolicy:
       type: object
       description: A workload's Keel policy.

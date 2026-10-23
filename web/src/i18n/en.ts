@@ -446,6 +446,65 @@ export const en = {
   "cluster.whatUsage": "node usage",
   "cluster.whatWarnings": "the cluster's warnings",
   "cluster.whatComponents": "the installed components",
+  "join.add": "Add node",
+  "join.title": "Add node",
+  "join.body":
+    "A new VM joins this cluster as a worker. Zeabur creates a join token; you run Zeabur Installer on the VM with it.",
+  "join.unavailable.notRke2":
+    "Only a cluster installed with Zeabur Installer (RKE2) can add nodes here. Add nodes to this cluster with the tools it was installed with.",
+  "join.unavailable.noCaHash":
+    "Zeabur cannot read the cluster's CA certificate (ConfigMap kube-root-ca.crt in kube-system), which the join token needs.",
+  "join.before": "Before you start",
+  "join.warn.sameRegion":
+    "Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.",
+  "join.warn.ports":
+    "Allow these between the nodes: TCP 9345 and 6443 to the servers, TCP 10250 and 9099 and UDP 8472 (Canal VXLAN) between all nodes, and TCP 2379 to 2381 between servers. Keep UDP 8472 closed to the internet.",
+  "join.warn.storageLocal":
+    "Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.",
+  "join.warn.udp":
+    "UDP 8472 cannot be checked from here. If it is blocked, pods on different nodes cannot reach each other.",
+  "join.role": "Role",
+  "join.worker": "Worker",
+  "join.workerHint": "Runs your services. The control plane stays on the servers you have.",
+  "join.serverNote": (command: string) =>
+    `To add a server (control plane), run ${command} on an existing server.`,
+  "join.serversHa":
+    "The control plane survives losing a server only with three or more servers: etcd needs a majority. With two, losing either one stops the cluster, so add a third.",
+  "join.lifetime": "Token works for",
+  "join.hours": (n: number) => plural(n, "hour", "hours"),
+  "join.lifetimeHint": "Any number of VMs can join with it until then.",
+  "join.server": "Server address",
+  "join.serverHint":
+    "A server's internal address. Change it if the new VM reaches the server another way.",
+  "join.serverProblem.empty": "Enter the address the new VM reaches the server at.",
+  "join.serverProblem.invalid": "Write it as https://<address>:9345.",
+  "join.planTitle": "Create a join token",
+  "join.planNote": (until: string) =>
+    `The token is shown once, after it is created. Until ${until}, any machine that has it can join this cluster as a worker.`,
+  "join.creating": "Creating the join token…",
+  "join.created": (until: string) => `Join token created. It works until ${until}.`,
+  "join.stepBinary":
+    "Copy the zeabur-installer binary to the new VM: the same one you installed the first server with.",
+  "join.stepRun": "On the new VM, run this as root:",
+  "join.stepRunHint":
+    "plan shows the network checks and warnings and changes nothing; apply installs RKE2 as a worker and waits until the node is Ready.",
+  "join.script": "Commands for the new VM",
+  "join.shownOnce":
+    "This is the only time the token is shown. Anyone who has it can add a machine to this cluster until it expires. Revoke it under Join tokens once your node has joined.",
+  "join.waiting": "Waiting for the new node…",
+  "join.joining": (name: string) => `${name} joined and is starting.`,
+  "join.joined": (name: string) => `${name} joined and is Ready.`,
+  "join.cannotWatch": "Zeabur cannot list the nodes, so it cannot tell when the new one joins.",
+  "join.viewNode": "View node",
+  "join.done": "Done",
+  "join.tokens": "Join tokens",
+  "join.expires": "Expires",
+  "join.never": "Never expires",
+  "join.byZeabur": "Created in Zeabur",
+  "join.byInstaller": "Created by zeabur-installer",
+  "join.revoke": "Revoke",
+  "join.revokeTitle": (id: string) => `Revoke join token ${id}`,
+  "join.revokeNote": "Nodes that already joined stay. No new machine can join with this token.",
 
   // Projects
   "projects.title": "Projects",

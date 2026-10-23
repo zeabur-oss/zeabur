@@ -264,6 +264,13 @@ export const installQuery = (capability: string, component: string, profile?: st
     staleTime: Infinity,
   })
 
+export const joinQuery = queryOptions({
+  queryKey: ["cluster", "join"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/join", { signal })),
+  staleTime: 30_000,
+  retryOnMount: false,
+})
+
 /** `kinds` are `<group>/<resource>` (`core` for the core group); `all` reads every kind controllers
  * do not generate. */
 export interface ObjectsRead {
