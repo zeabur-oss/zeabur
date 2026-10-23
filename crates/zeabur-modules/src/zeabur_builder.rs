@@ -9,6 +9,7 @@
 //!
 //! [builder]: https://github.com/zeabur/builder
 
+use k8s_openapi::jiff::{SignedDuration, Timestamp};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
@@ -53,8 +54,11 @@ pub struct ZeaburBuilderBuild {
     pub repository: Option<String>,
     /// The Git repository.
     pub git_url: Option<String>,
-    /// The branch or tag it follows.
+    /// The branch or tag it follows; `HEAD` (or none) follows the repository's default branch.
     pub git_ref: Option<String>,
+    /// The ref the newest commit came from, such as `refs/heads/master`, when the controller
+    /// reports it.
+    pub resolved_ref: Option<String>,
     /// The `ClusterBuilder`.
     pub builder: Option<String>,
     /// Whether builds are paused.
@@ -71,10 +75,58 @@ pub struct ZeaburBuilderBuild {
     pub reason: Option<String>,
     /// The message.
     pub message: Option<String>,
+    /// Why it cannot build: `SourceReady` or `BuilderReady` when `False`.
+    pub problem: Option<ZeaburBuilderProblem>,
     /// The Keel webhooks it tells of new images.
     pub keel_webhooks: Vec<String>,
     /// The value of the rebuild annotation, when set.
     pub rebuild_requested: Option<String>,
+}
+
+/// A `Build` that cannot build: the ref cannot be resolved (`SourceReady`) or its
+/// `ClusterBuilder` is missing (`BuilderReady`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ZeaburBuilderProblem {
+    /// `SourceReady` or `BuilderReady`.
+    pub condition: String,
+    /// The controller's reason, such as `RefNotFound`, `AuthFailed` or `HostKeyMismatch`.
+    pub reason: Option<String>,
+    /// The controller's message.
+    pub message: Option<String>,
+    /// When the condition turned `False`.
+    pub since: Option<String>,
+    /// Whether it needs someone to act. Only `ResolveFailed` (a timeout or a server error) may
+    /// clear by itself, so it counts once it has lasted [`TRANSIENT`].
+    pub lasting: bool,
+}
+
+/// How long a `ResolveFailed` may last before it counts as a failure.
+pub const TRANSIENT: SignedDuration = SignedDuration::from_mins(5);
+
+fn problem(object: &DynamicObject, now: Option<Timestamp>) -> Option<ZeaburBuilderProblem> {
+    ["SourceReady", "BuilderReady"]
+        .into_iter()
+        .find_map(|kind| {
+            let found = condition(object, kind).filter(|c| c["status"] == "False")?;
+            let reason = field(Some(found), "reason");
+            let since = field(Some(found), "lastTransitionTime");
+            let lasting = reason.as_deref() != Some("ResolveFailed")
+                || match (
+                    now,
+                    since.as_deref().and_then(|s| s.parse::<Timestamp>().ok()),
+                ) {
+                    (Some(now), Some(since)) => now.duration_since(since) >= TRANSIENT,
+                    _ => true,
+                };
+            Some(ZeaburBuilderProblem {
+                condition: kind.to_owned(),
+                reason,
+                message: field(Some(found), "message"),
+                since,
+                lasting,
+            })
+        })
 }
 
 /// A `BuildRun`.
@@ -87,6 +139,8 @@ pub struct ZeaburBuilderRun {
     pub build: String,
     /// The commit.
     pub revision: Option<String>,
+    /// The ref the commit came from, such as `refs/heads/master`.
+    pub git_ref: Option<String>,
     /// `webhook`, `poll`, `manual`, `baseImage` or `replan`.
     pub trigger: Option<String>,
     /// `Pending`, `Planning`, `Building`, `Succeeded`, `Failed` or `Cancelled`.
@@ -133,9 +187,9 @@ fn field(value: Option<&serde_json::Value>, key: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// The `Build`s, sorted by name.
+/// The `Build`s, sorted by name, read at `now` (see [`ZeaburBuilderProblem::lasting`]).
 #[must_use]
-pub fn builds(objects: &[DynamicObject]) -> Vec<ZeaburBuilderBuild> {
+pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBuilderBuild> {
     let mut out: Vec<ZeaburBuilderBuild> = objects
         .iter()
         .map(|b| {
@@ -147,6 +201,7 @@ pub fn builds(objects: &[DynamicObject]) -> Vec<ZeaburBuilderBuild> {
                     .or_else(|| latest_image.as_deref().map(|i| repository(i).to_owned())),
                 git_url: text(b, "/spec/source/git/url"),
                 git_ref: text(b, "/spec/source/git/ref"),
+                resolved_ref: text(b, "/status/resolvedRef"),
                 builder: text(b, "/spec/builderRef"),
                 suspended: b
                     .data
@@ -159,6 +214,7 @@ pub fn builds(objects: &[DynamicObject]) -> Vec<ZeaburBuilderBuild> {
                 ready: field(ready, "status"),
                 reason: field(ready, "reason"),
                 message: field(ready, "message"),
+                problem: problem(b, now),
                 keel_webhooks: b
                     .data
                     .pointer("/spec/notify")
@@ -192,6 +248,7 @@ pub fn runs(objects: &[DynamicObject]) -> Vec<ZeaburBuilderRun> {
                 name: r.metadata.name.clone()?,
                 build: text(r, "/spec/buildRef")?,
                 revision: text(r, "/spec/revision"),
+                git_ref: text(r, "/spec/ref"),
                 trigger: text(r, "/spec/trigger"),
                 phase: text(r, "/status/phase"),
                 reason: text(r, "/status/reason"),
@@ -219,9 +276,10 @@ pub const BUILD_FAILED: &str = "BuildFailed";
 ///
 /// It is building, not failing to pull an image that does not exist. A container runs a `Build`'s
 /// image when the repositories match, the `Build`'s own (`spec.output.image`), as a service
-/// deployed from Git has. When the newest run failed, or the `Build` is not ready and nothing runs,
-/// the service has failed with [`BUILD_FAILED`]. Its diagnoses go: the missing image and the
-/// replicas it leaves unready both come from the build.
+/// deployed from Git has. When the newest run failed, or nothing runs and the `Build` is not
+/// ready or has a lasting [`ZeaburBuilderProblem`], such as a branch that does not exist, the
+/// service has failed with [`BUILD_FAILED`]. Its diagnoses go: the missing image and the replicas
+/// it leaves unready both come from the build.
 pub fn first_image(
     service: &mut zeabur_model::Service,
     builds: &[ZeaburBuilderBuild],
@@ -248,7 +306,9 @@ pub fn first_image(
         )
     });
     let failed = newest.is_some_and(|run| run.phase.as_deref() == Some("Failed"))
-        || (!running && build.ready.as_deref() == Some("False"));
+        || (!running
+            && (build.ready.as_deref() == Some("False")
+                || build.problem.as_ref().is_some_and(|p| p.lasting)));
     service.status = if failed {
         zeabur_model::ServiceStatus {
             health: zeabur_model::Health::Fail,
@@ -301,7 +361,7 @@ mod tests {
                 "conditions": [{"type": "Ready", "status": "True", "reason": "Succeeded",
                     "lastTransitionTime": "2026-10-23T08:00:00Z"}]}
         }));
-        let found = builds(&[build]);
+        let found = builds(&[build], None);
         assert_eq!(found[0].repository.as_deref(), Some("zot:5000/demo/web"));
         assert_eq!(found[0].ready.as_deref(), Some("True"));
         assert_eq!(
@@ -323,7 +383,7 @@ mod tests {
                 "source": {"git": {"url": "https://example.com/acme/api", "ref": "main"}}}
         }));
         assert_eq!(
-            builds(&[build])[0].repository.as_deref(),
+            builds(&[build], None)[0].repository.as_deref(),
             Some("ghcr.io/acme/api")
         );
         let run = |name: &str, created: &str| {
@@ -340,5 +400,48 @@ mod tests {
         ]);
         assert_eq!(found[0].name, "api-b");
         assert_eq!(found[1].reason.as_deref(), Some("BuildFailed"));
+    }
+
+    #[test]
+    fn a_source_that_cannot_be_resolved_is_a_problem_and_a_timeout_only_once_it_lasts() {
+        let build = |reason: &str, since: &str| {
+            object(serde_json::json!({
+                "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+                "metadata": {"name": "web"},
+                "spec": {"builderRef": "railpack",
+                    "source": {"git": {"url": "https://example.com/acme/web", "ref": "HEAD"}}},
+                "status": {"resolvedRef": "refs/heads/master", "conditions": [
+                    {"type": "BuilderReady", "status": "True", "reason": "Found"},
+                    {"type": "SourceReady", "status": "False", "reason": reason,
+                        "message": "no branch or tag `main`", "lastTransitionTime": since},
+                    {"type": "Ready", "status": "Unknown", "reason": "NotBuilt"}]}
+            }))
+        };
+        let now: Timestamp = "2026-10-23T08:10:00Z".parse().unwrap();
+        let found = builds(&[build("RefNotFound", "2026-10-23T08:09:00Z")], Some(now));
+        assert_eq!(found[0].resolved_ref.as_deref(), Some("refs/heads/master"));
+        let problem = found[0].problem.as_ref().unwrap();
+        assert_eq!(problem.condition, "SourceReady");
+        assert_eq!(problem.reason.as_deref(), Some("RefNotFound"));
+        assert_eq!(problem.message.as_deref(), Some("no branch or tag `main`"));
+        assert!(problem.lasting);
+
+        let recent = builds(&[build("ResolveFailed", "2026-10-23T08:09:00Z")], Some(now));
+        assert!(!recent[0].problem.as_ref().unwrap().lasting);
+        let old = builds(&[build("ResolveFailed", "2026-10-23T08:00:00Z")], Some(now));
+        assert!(old[0].problem.as_ref().unwrap().lasting);
+
+        let missing = object(serde_json::json!({
+            "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+            "metadata": {"name": "web"},
+            "spec": {"builderRef": "nope", "source": {"git": {"url": "https://example.com/a/b"}}},
+            "status": {"conditions": [{"type": "BuilderReady", "status": "False",
+                "reason": "BuilderNotFound", "message": "no ClusterBuilder `nope`"}]}
+        }));
+        let found = builds(&[missing], Some(now));
+        let problem = found[0].problem.as_ref().unwrap();
+        assert_eq!(problem.condition, "BuilderReady");
+        assert!(problem.lasting);
+        assert_eq!(found[0].git_ref, None);
     }
 }

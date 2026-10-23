@@ -11479,7 +11479,9 @@ components:
           type:
           - string
           - "null"
-          description: The branch or tag it follows.
+          description: >-
+            The branch or tag it follows; `HEAD` (or none) follows the repository's default
+            branch.
         gitUrl:
           type:
           - string
@@ -11508,6 +11510,11 @@ components:
         name:
           type: string
           description: Its name.
+        problem:
+          oneOf:
+          - $ref: "#/components/schemas/ZeaburBuilderProblem"
+            description: "Why it cannot build: `SourceReady` or `BuilderReady` when `False`."
+          - type: "null"
         ready:
           type:
           - string
@@ -11535,9 +11542,50 @@ components:
           description: |-
             The repository it pushes to, without tag or digest; unknown until the first image when
             the controller's default registry is used.
+        resolvedRef:
+          type:
+          - string
+          - "null"
+          description: |-
+            The ref the newest commit came from, such as `refs/heads/master`, when the controller
+            reports it.
         suspended:
           type: boolean
           description: Whether builds are paused.
+    ZeaburBuilderProblem:
+      type: object
+      description: |-
+        A `Build` that cannot build: the ref cannot be resolved (`SourceReady`) or its
+        `ClusterBuilder` is missing (`BuilderReady`).
+      required:
+      - condition
+      - lasting
+      properties:
+        condition:
+          type: string
+          description: "`SourceReady` or `BuilderReady`."
+        lasting:
+          type: boolean
+          description: |-
+            Whether it needs someone to act. Only `ResolveFailed` (a timeout or a server error) may
+            clear by itself, so it counts once it has lasted [`TRANSIENT`].
+        message:
+          type:
+          - string
+          - "null"
+          description: The controller's message.
+        reason:
+          type:
+          - string
+          - "null"
+          description: >-
+            The controller's reason, such as `RefNotFound`, `AuthFailed` or
+            `HostKeyMismatch`.
+        since:
+          type:
+          - string
+          - "null"
+          description: When the condition turned `False`.
     ZeaburBuilderRun:
       type: object
       description: A `BuildRun`.
@@ -11564,6 +11612,11 @@ components:
           - string
           - "null"
           description: When it finished.
+        gitRef:
+          type:
+          - string
+          - "null"
+          description: The ref the commit came from, such as `refs/heads/master`.
         message:
           type:
           - string

@@ -98,3 +98,15 @@ test("a request to build again counts as building until a run answers it", () =>
   expect(building(data([answered], "2026-10-23T08:00:30Z"), now)).toBe(false)
   expect(building(data([run({})], "2026-10-23T07:30:00Z"), now)).toBe(false)
 })
+
+test("a new Build counts as building until it has a run or a problem", () => {
+  const fresh = (over: Partial<Build>) =>
+    ({
+      builds: [build({ latestImage: null, problem: null, ...over })],
+      runs: [],
+      keel: [],
+    }) as unknown as Builds
+  expect(building(fresh({}), 0)).toBe(true)
+  const problem = { condition: "SourceReady", lasting: true } as Build["problem"]
+  expect(building(fresh({ problem }), 0)).toBe(false)
+})

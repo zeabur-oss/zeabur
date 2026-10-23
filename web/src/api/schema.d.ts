@@ -5961,7 +5961,7 @@ export interface components {
     ZeaburBuilderBuild: {
       /** @description The `ClusterBuilder`. */
       builder?: string | null
-      /** @description The branch or tag it follows. */
+      /** @description The branch or tag it follows; `HEAD` (or none) follows the repository's default branch. */
       gitRef?: string | null
       /** @description The Git repository. */
       gitUrl?: string | null
@@ -5975,6 +5975,7 @@ export interface components {
       message?: string | null
       /** @description Its name. */
       name: string
+      problem?: components["schemas"]["ZeaburBuilderProblem"] | null
       /** @description The `Ready` condition: `True`, `False` or `Unknown`. */
       ready?: string | null
       /** @description Its reason and message, as the controller wrote them. */
@@ -5988,8 +5989,32 @@ export interface components {
        *     the controller's default registry is used.
        */
       repository?: string | null
+      /**
+       * @description The ref the newest commit came from, such as `refs/heads/master`, when the controller
+       *     reports it.
+       */
+      resolvedRef?: string | null
       /** @description Whether builds are paused. */
       suspended: boolean
+    }
+    /**
+     * @description A `Build` that cannot build: the ref cannot be resolved (`SourceReady`) or its
+     *     `ClusterBuilder` is missing (`BuilderReady`).
+     */
+    ZeaburBuilderProblem: {
+      /** @description `SourceReady` or `BuilderReady`. */
+      condition: string
+      /**
+       * @description Whether it needs someone to act. Only `ResolveFailed` (a timeout or a server error) may
+       *     clear by itself, so it counts once it has lasted [`TRANSIENT`].
+       */
+      lasting: boolean
+      /** @description The controller's message. */
+      message?: string | null
+      /** @description The controller's reason, such as `RefNotFound`, `AuthFailed` or `HostKeyMismatch`. */
+      reason?: string | null
+      /** @description When the condition turned `False`. */
+      since?: string | null
     }
     /** @description A `BuildRun`. */
     ZeaburBuilderRun: {
@@ -6001,6 +6026,8 @@ export interface components {
       digest?: string | null
       /** @description When it finished. */
       finished?: string | null
+      /** @description The ref the commit came from, such as `refs/heads/master`. */
+      gitRef?: string | null
       /** @description Details, at most 1 KiB of the Job's output. */
       message?: string | null
       /** @description Its name, also its Job's and its pod's label. */

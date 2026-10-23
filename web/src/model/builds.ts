@@ -86,13 +86,29 @@ export function runTone(run: BuildRun): RunTone {
 
 const FINISHED = new Set(["Succeeded", "Failed", "Cancelled"])
 
+/** The branch the Build builds: what its default branch resolved to, or the ref it names. */
+export function branchOf(build: Build): string | undefined {
+  const named = build.gitRef && build.gitRef !== "HEAD" ? build.gitRef : undefined
+  const name = (build.resolvedRef ?? named)?.replace(/^refs\/(heads|tags)\//, "")
+  return name === "HEAD" ? undefined : name
+}
+
+/** Why the Build cannot build, unless a run is under way. */
+export function buildProblem(build: Build, latest: BuildRun | undefined) {
+  if (latest && (!latest.phase || !FINISHED.has(latest.phase))) return undefined
+  return build.problem ?? undefined
+}
+
 /**
- * Whether a build is under way or about to be: a run not finished yet, or a request to build
- * again, at most two minutes old, that no run has answered yet.
+ * Whether a build is under way or about to be: a run not finished yet, a Build with no image, run
+ * or problem yet, or a request to build again, at most two minutes old, that no run has answered
+ * yet.
  */
 export function building(data: Builds, now: number): boolean {
   if (data.runs.some((run) => !run.phase || !FINISHED.has(run.phase))) return true
   return data.builds.some((build) => {
+    if (!build.latestImage && !build.problem && !data.runs.some((r) => r.build === build.name))
+      return true
     const asked = build.rebuildRequested ? Date.parse(build.rebuildRequested) : Number.NaN
     if (!Number.isFinite(asked) || now - asked > 120_000) return false
     const newest = data.runs.find((run) => run.build === build.name)

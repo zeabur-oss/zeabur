@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
-import { KEEL_WEBHOOK, builtContainers, repositoryOf } from "@/model/builds"
+import {
+  KEEL_WEBHOOK,
+  branchOf,
+  buildProblem,
+  builtContainers,
+  repositoryOf,
+  type Build,
+  type BuildRun,
+} from "@/model/builds"
 import {
   branchProblem,
   createGitService,
@@ -66,7 +74,7 @@ describe("repository addresses", () => {
   test("branches and folders are checked as Git takes them", () => {
     expect(branchProblem("main")).toBeUndefined()
     expect(branchProblem("release/1.2")).toBeUndefined()
-    expect(branchProblem("")).toBe("empty")
+    expect(branchProblem("")).toBeUndefined()
     expect(branchProblem("a..b")).toBe("invalid")
     expect(directoryProblem("")).toBeUndefined()
     expect(directoryProblem("./apps/web/")).toBeUndefined()
@@ -82,7 +90,7 @@ describe("the objects", () => {
     expect(build.apiVersion).toBe("builder.zeabur.com/v1alpha1")
     expect(build.spec).toEqual({
       builderRef: "railpack",
-      source: { git: { url: "https://github.com/acme/site.git", ref: "main" } },
+      source: { git: { url: "https://github.com/acme/site.git", ref: "HEAD" } },
       output: { image: "zot.zot.svc:5000/shop/site" },
       notify: [{ type: "keel", url: KEEL_WEBHOOK }],
     })
@@ -144,6 +152,14 @@ describe("the objects", () => {
     expect(JSON.stringify(changes)).not.toContain("PRIVATE KEY")
   })
 
+  test("no branch follows the default branch; a branch is taken as typed", () => {
+    expect(newGitService().branch).toBe("")
+    const ref = (branch: string) =>
+      find(gitObjects(form({ branch }), "shop", "zot:5000", {}), "Build").spec.source.git.ref
+    expect(ref("  ")).toBe("HEAD")
+    expect(ref(" release/1.2 ")).toBe("release/1.2")
+  })
+
   test("a public domain adds an Ingress", () => {
     const objects = gitObjects(
       form({ publicUrl: true, host: "site.example.com" }),
@@ -187,4 +203,32 @@ describe("what the cluster lacks", () => {
 
 test("a failed first build reads as one", () => {
   expect(reasonWord("BuildFailed", false)).toBe("buildFailed")
+})
+
+describe("the Builds tab", () => {
+  const build = (patch: Partial<Build>) =>
+    ({ name: "site", gitRef: "HEAD", resolvedRef: null, problem: null, ...patch }) as Build
+  test("shows the branch the default branch resolved to, or none before it resolves", () => {
+    expect(branchOf(build({ resolvedRef: "refs/heads/master" }))).toBe("master")
+    expect(branchOf(build({}))).toBeUndefined()
+    expect(branchOf(build({ gitRef: null }))).toBeUndefined()
+    expect(branchOf(build({ gitRef: "release/1.2" }))).toBe("release/1.2")
+    expect(branchOf(build({ gitRef: "main", resolvedRef: "refs/heads/main" }))).toBe("main")
+  })
+
+  test("a source problem counts unless a run is under way", () => {
+    const problem = {
+      condition: "SourceReady",
+      reason: "RefNotFound",
+      message: "no branch or tag `main`",
+      since: null,
+      lasting: true,
+    }
+    const failed = build({ problem })
+    const run = (phase: string) => ({ name: "site-1", build: "site", phase }) as BuildRun
+    expect(buildProblem(failed, undefined)).toEqual(problem)
+    expect(buildProblem(failed, run("Failed"))).toEqual(problem)
+    expect(buildProblem(failed, run("Building"))).toBeUndefined()
+    expect(buildProblem(build({}), undefined)).toBeUndefined()
+  })
 })
