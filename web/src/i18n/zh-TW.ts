@@ -394,6 +394,61 @@ export const zhTW: Messages = {
   "cluster.whatUsage": "節點用量",
   "cluster.whatWarnings": "叢集的警告",
   "cluster.whatComponents": "已安裝的元件",
+  "join.add": "新增節點",
+  "join.title": "新增節點",
+  "join.body":
+    "新的 VM 會以工作節點加入這個叢集。Zeabur 建立加入權杖，你再用它在 VM 上執行 Zeabur Installer。",
+  "join.unavailable.notRke2":
+    "只有用 Zeabur Installer（RKE2）安裝的叢集能在這裡新增節點。請用安裝這個叢集的工具新增節點。",
+  "join.unavailable.noCaHash":
+    "Zeabur 讀不到叢集的 CA 憑證（kube-system 裡的 ConfigMap kube-root-ca.crt），加入權杖需要它。",
+  "join.before": "開始之前",
+  "join.warn.sameRegion":
+    "所有節點都放在同一家主機供應商的同一個區域。同一區域裡的不同可用區沒問題。跨供應商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存空間，也可能讓叢集不穩定。",
+  "join.warn.ports":
+    "節點之間要開放：通往伺服器的 TCP 9345 和 6443；所有節點之間的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；伺服器之間的 TCP 2379 到 2381。UDP 8472 不要對網際網路開放。",
+  "join.warn.storageLocal":
+    "預設 local-path 儲存類別的磁碟區會留在建立它的節點上：用到它的 Pod 只能在那個節點上執行，資料也跟著那個節點。",
+  "join.warn.udp": "這裡無法檢查 UDP 8472。如果它被擋住，不同節點上的 Pod 會連不到彼此。",
+  "join.role": "角色",
+  "join.worker": "工作節點",
+  "join.workerHint": "執行你的服務。控制平面留在現有的伺服器上。",
+  "join.serverNote": (command) => `要新增伺服器（控制平面），請在現有的伺服器上執行 ${command}。`,
+  "join.serversHa":
+    "控制平面要有三台以上的伺服器，才能在少一台時繼續運作：etcd 需要過半數。只有兩台時，任何一台故障都會讓叢集停擺，所以要加第三台。",
+  "join.lifetime": "權杖有效時間",
+  "join.hours": (n) => `${n} 小時`,
+  "join.lifetimeHint": "在這之前，可以讓任意數量的 VM 加入。",
+  "join.server": "伺服器位址",
+  "join.serverHint": "伺服器的內部位址。如果新的 VM 要透過別的位址連到伺服器，請修改。",
+  "join.serverProblem.empty": "請輸入新的 VM 連到伺服器的位址。",
+  "join.serverProblem.invalid": "請寫成 https://<位址>:9345。",
+  "join.planTitle": "建立加入權杖",
+  "join.planNote": (until) =>
+    `權杖只會在建立後顯示一次。在 ${until} 之前，任何拿到它的機器都能以工作節點加入這個叢集。`,
+  "join.creating": "正在建立加入權杖…",
+  "join.created": (until) => `已建立加入權杖，有效到 ${until}。`,
+  "join.stepBinary": "把 zeabur-installer 執行檔複製到新的 VM，用安裝第一台伺服器時的同一個。",
+  "join.stepRun": "在新的 VM 上以 root 執行：",
+  "join.stepRunHint":
+    "plan 會列出網路檢查和警告，不會改動任何東西；apply 會把 RKE2 安裝成工作節點，並等到節點就緒。",
+  "join.script": "新 VM 要執行的指令",
+  "join.shownOnce":
+    "權杖只會顯示這一次。在過期之前，任何拿到它的人都能把機器加進這個叢集。節點加入後，請在「加入權杖」撤銷它。",
+  "join.waiting": "正在等新節點加入…",
+  "join.joining": (name) => `${name} 已加入，正在啟動。`,
+  "join.joined": (name) => `${name} 已加入，並已就緒。`,
+  "join.cannotWatch": "Zeabur 無法列出節點，所以看不到新節點何時加入。",
+  "join.viewNode": "檢視節點",
+  "join.done": "完成",
+  "join.tokens": "加入權杖",
+  "join.expires": "到期",
+  "join.never": "不會過期",
+  "join.byZeabur": "在 Zeabur 建立",
+  "join.byInstaller": "由 zeabur-installer 建立",
+  "join.revoke": "撤銷",
+  "join.revokeTitle": (id) => `撤銷加入權杖 ${id}`,
+  "join.revokeNote": "已加入的節點會留著。之後不能再用這個權杖加入新機器。",
 
   "projects.title": "專案",
   "projects.adopted": "專案",

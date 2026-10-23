@@ -394,6 +394,61 @@ export const zhCN: Messages = {
   "cluster.whatUsage": "节点用量",
   "cluster.whatWarnings": "集群的警告",
   "cluster.whatComponents": "已安装的组件",
+  "join.add": "添加节点",
+  "join.title": "添加节点",
+  "join.body":
+    "新的 VM 会以工作节点加入这个集群。Zeabur 创建加入令牌，你再用它在 VM 上运行 Zeabur Installer。",
+  "join.unavailable.notRke2":
+    "只有用 Zeabur Installer（RKE2）安装的集群能在这里添加节点。请用安装这个集群的工具添加节点。",
+  "join.unavailable.noCaHash":
+    "Zeabur 读不到集群的 CA 证书（kube-system 中的 ConfigMap kube-root-ca.crt），加入令牌需要它。",
+  "join.before": "开始之前",
+  "join.warn.sameRegion":
+    "所有节点都放在同一家云服务商的同一个区域。同一区域内的不同可用区没有问题。跨服务商或跨区域时，延迟会拖慢 etcd、Kubernetes API 和存储，也可能让集群不稳定。",
+  "join.warn.ports":
+    "节点之间要放行：到服务器的 TCP 9345 和 6443；所有节点之间的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；服务器之间的 TCP 2379 到 2381。UDP 8472 不要对互联网开放。",
+  "join.warn.storageLocal":
+    "默认 local-path 存储类的卷会留在创建它的节点上：使用它的 Pod 只能在那个节点上运行，数据也跟着那个节点。",
+  "join.warn.udp": "这里无法检查 UDP 8472。如果它被拦截，不同节点上的 Pod 会互相连不上。",
+  "join.role": "角色",
+  "join.worker": "工作节点",
+  "join.workerHint": "运行你的服务。控制平面留在现有的服务器上。",
+  "join.serverNote": (command) => `要添加服务器（控制平面），请在现有的服务器上运行 ${command}。`,
+  "join.serversHa":
+    "控制平面要有三台以上的服务器，才能在少一台时继续运行：etcd 需要过半数。只有两台时，任何一台故障都会让集群停止，所以要加第三台。",
+  "join.lifetime": "令牌有效时间",
+  "join.hours": (n) => `${n} 小时`,
+  "join.lifetimeHint": "在此之前，可以让任意数量的 VM 加入。",
+  "join.server": "服务器地址",
+  "join.serverHint": "服务器的内部地址。如果新的 VM 要通过别的地址连到服务器，请修改。",
+  "join.serverProblem.empty": "请输入新的 VM 连到服务器的地址。",
+  "join.serverProblem.invalid": "请写成 https://<地址>:9345。",
+  "join.planTitle": "创建加入令牌",
+  "join.planNote": (until) =>
+    `令牌只会在创建后显示一次。在 ${until} 之前，任何拿到它的机器都能以工作节点加入这个集群。`,
+  "join.creating": "正在创建加入令牌…",
+  "join.created": (until) => `已创建加入令牌，有效到 ${until}。`,
+  "join.stepBinary": "把 zeabur-installer 可执行文件复制到新的 VM，用安装第一台服务器时的同一个。",
+  "join.stepRun": "在新的 VM 上以 root 运行：",
+  "join.stepRunHint":
+    "plan 会列出网络检查和警告，不会改动任何东西；apply 会把 RKE2 安装为工作节点，并等到节点就绪。",
+  "join.script": "新 VM 要运行的命令",
+  "join.shownOnce":
+    "令牌只会显示这一次。在过期之前，任何拿到它的人都能把机器加入这个集群。节点加入后，请在“加入令牌”中撤销它。",
+  "join.waiting": "正在等新节点加入…",
+  "join.joining": (name) => `${name} 已加入，正在启动。`,
+  "join.joined": (name) => `${name} 已加入，并已就绪。`,
+  "join.cannotWatch": "Zeabur 无法列出节点，所以看不到新节点何时加入。",
+  "join.viewNode": "查看节点",
+  "join.done": "完成",
+  "join.tokens": "加入令牌",
+  "join.expires": "到期",
+  "join.never": "不会过期",
+  "join.byZeabur": "在 Zeabur 中创建",
+  "join.byInstaller": "由 zeabur-installer 创建",
+  "join.revoke": "撤销",
+  "join.revokeTitle": (id) => `撤销加入令牌 ${id}`,
+  "join.revokeNote": "已加入的节点会保留。之后不能再用这个令牌加入新机器。",
 
   "projects.title": "项目",
   "projects.adopted": "项目",
