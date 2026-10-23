@@ -1,6 +1,8 @@
-//! Docker Compose import: `POST /projects/{p}/compose` reads a Compose file as the services it
-//! makes ([`zeabur_plan::compose`]). It reads nothing from the cluster and writes nothing; the
-//! web interface plans the objects as the "Docker image" and database forms do.
+//! Docker Compose import: `POST /projects/{p}/compose`.
+//!
+//! Reads a Compose file as the services it makes ([`zeabur_plan::compose`]). It reads nothing
+//! from the cluster and writes nothing; the web interface plans the objects as the "Docker image"
+//! and database forms do.
 
 use axum::Json;
 use axum::extract::{Path, State};
