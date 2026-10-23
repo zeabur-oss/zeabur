@@ -1,11 +1,16 @@
-// The pieces of a cluster-wide plan dialog (a node terminal, the cluster's kubectl terminal): its
-// writes, the bindings that stop it, and a footer that applies the plan until its token runs out.
+// The pieces of a plan dialog: its writes, the bindings that stop it, and a footer that applies
+// the plan until its token runs out.
+import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query"
+import type { ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 import WarningCircleIcon from "~icons/ph/warning-circle"
 
 import type { Schemas } from "@/api/client"
+import { Frame } from "@/components/members/frame"
+import { LoadingRows } from "@/components/page"
 import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
-import { YamlBlock } from "@/components/yaml"
+import { Problem } from "@/components/problem"
+import { YamlBlock, YamlDiff } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { subjectName } from "@/model/node-shell"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
@@ -16,7 +21,62 @@ import {
   CollapsibleTrigger,
 } from "@zeabur/design-system/components/collapsible"
 
-export function PlanFooter({
+/** A plan dialog: planning, then what the plan does, and a footer that applies it. */
+export function PlanFrame<P extends { expiresAt: string; token?: string | null }>({
+  title,
+  plan,
+  apply,
+  action,
+  destructive,
+  ready = (data) => data !== undefined,
+  what,
+  onClose,
+  children,
+}: {
+  title: string
+  plan: UseQueryResult<P>
+  apply: UseMutationResult<unknown, Error, string>
+  action: string
+  destructive?: boolean
+  /** The plan has something to apply. */
+  ready?: (data: P | undefined) => boolean
+  what?: string
+  onClose: () => void
+  children: (data: P) => ReactNode
+}) {
+  const t = useT()
+  return (
+    <Frame
+      title={title}
+      wide
+      onClose={onClose}
+      footer={
+        <PlanFooter
+          expiresAt={plan.data?.expiresAt}
+          ready={!plan.isFetching && ready(plan.data)}
+          token={plan.data?.token ?? undefined}
+          action={action}
+          destructive={destructive}
+          applying={apply.isPending}
+          onCancel={onClose}
+          onReplan={() => void plan.refetch()}
+          onApply={(token) => apply.mutate(token)}
+        />
+      }
+    >
+      {plan.isPending || plan.isFetching ? (
+        <LoadingRows label={t("plan.planning")} rows={3} />
+      ) : plan.isError ? (
+        <Problem error={plan.error} what={what} retry={() => void plan.refetch()} />
+      ) : (
+        children(plan.data)
+      )}
+      {apply.isError ? <Problem error={apply.error} what={what} /> : null}
+    </Frame>
+  )
+}
+
+function PlanFooter({
   expiresAt,
   ready,
   token,
@@ -46,11 +106,7 @@ export function PlanFooter({
       <Button variant="ghost" size="sm" onClick={onCancel}>
         {t("plan.cancel")}
       </Button>
-      {ready && token && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
-        <span className="type-meta text-muted-foreground tabular-nums">
-          {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
-        </span>
-      ) : null}
+      {ready && token ? <Expiry left={left} /> : null}
       <span className="ml-auto">
         {expired || (ready && !token) ? (
           <Button size="sm" variant="outline" onClick={onReplan}>
@@ -72,7 +128,60 @@ export function PlanFooter({
   )
 }
 
+function Expiry({ left }: { left: number | undefined }) {
+  const t = useT()
+  if (left === undefined || left >= COUNTDOWN_FROM_SECONDS) return null
+  return (
+    <span className="type-meta text-muted-foreground tabular-nums">
+      {left <= 0 ? t("plan.expired") : t("plan.expiresIn", clock(left))}
+    </span>
+  )
+}
+
 export function PlanWrites({ writes }: { writes: Schemas["ShellWrite"][] }) {
+  const t = useT()
+  return (
+    <Details>
+      {writes.map((write) => {
+        const label = `${write.kind}/${write.name}`
+        return (
+          <WriteSection key={label} label={label} meta={t(`nodeShell.write.${write.action}`)}>
+            {write.yaml ? <YamlBlock yaml={write.yaml} label={label} /> : null}
+          </WriteSection>
+        )
+      })}
+    </Details>
+  )
+}
+
+/** Each object a plan writes, as a diff from what is there now. */
+export function PlanDiffs({
+  writes,
+}: {
+  writes: {
+    kind: string
+    name: string
+    namespace: string
+    beforeYaml?: string | null
+    afterYaml?: string | null
+  }[]
+}) {
+  return (
+    <Details>
+      {writes.map((write) => (
+        <WriteSection
+          key={`${write.namespace}/${write.kind}/${write.name}`}
+          label={`${write.kind}/${write.name}`}
+          meta={write.namespace}
+        >
+          <YamlDiff before={write.beforeYaml ?? ""} after={write.afterYaml ?? ""} />
+        </WriteSection>
+      ))}
+    </Details>
+  )
+}
+
+function Details({ children }: { children: ReactNode }) {
   const t = useT()
   return (
     <Collapsible>
@@ -81,24 +190,29 @@ export function PlanWrites({ writes }: { writes: Schemas["ShellWrite"][] }) {
         {t("plan.details")}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="flex flex-col gap-4 pt-3">
-          {writes.map((write) => {
-            const label = `${write.kind}/${write.name}`
-            return (
-              <section key={label} aria-label={label} className="flex min-w-0 flex-col gap-2">
-                <span className="min-w-0 font-mono text-sm font-medium break-all" translate="no">
-                  {label}
-                  <span className="ml-2 font-sans font-normal type-meta text-muted-foreground">
-                    {t(`nodeShell.write.${write.action}`)}
-                  </span>
-                </span>
-                {write.yaml ? <YamlBlock yaml={write.yaml} label={label} /> : null}
-              </section>
-            )
-          })}
-        </div>
+        <div className="flex flex-col gap-4 pt-3">{children}</div>
       </CollapsibleContent>
     </Collapsible>
+  )
+}
+
+function WriteSection({
+  label,
+  meta,
+  children,
+}: {
+  label: string
+  meta: string
+  children: ReactNode
+}) {
+  return (
+    <section aria-label={label} className="flex min-w-0 flex-col gap-2">
+      <span className="min-w-0 font-mono text-sm font-medium break-all" translate="no">
+        {label}
+        <span className="ml-2 font-sans font-normal type-meta text-muted-foreground">{meta}</span>
+      </span>
+      {children}
+    </section>
   )
 }
 

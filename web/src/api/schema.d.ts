@@ -522,6 +522,60 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/notifications": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The cluster's channels, in `observability`, and whether Zeabur's alert rules are installed. */
+    get: operations["getClusterNotifications"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/notifications/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Carries out the cluster's notifications plan by its token. */
+    post: operations["applyClusterNotifications"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/notifications/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out what adding, changing, testing or removing one of the cluster's channels writes,
+     *     and a token to apply it; writes nothing. Secrets never appear in the answer.
+     */
+    post: operations["planClusterNotifications"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/tools": {
     parameters: {
       query?: never
@@ -1083,6 +1137,67 @@ export interface paths {
     get: operations["listNetworkPolicyPresets"]
     put?: never
     post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/notifications": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The channels of a project, the events each receives and whether Alertmanager took it. Read
+     *     as the person; the operator's API not served is `state: not-installed`. Secrets are never
+     *     read.
+     */
+    get: operations["getProjectNotifications"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/notifications/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Carries out a project's notifications plan by its token: checks it, dry-runs every write,
+     *     then writes.
+     */
+    post: operations["applyProjectNotifications"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/notifications/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out what adding, changing, testing or removing one of a project's channels writes, and
+     *     a token to apply it; writes nothing. Secrets never appear in the answer.
+     */
+    post: operations["planProjectNotifications"]
     delete?: never
     options?: never
     head?: never
@@ -1839,6 +1954,126 @@ export interface components {
       /** @description The kinds of its diagnoses this incident explains, sorted; empty when it shows none yet. */
       symptoms?: components["schemas"]["DiagnosisKind"][]
     }
+    /** @description One channel, without its secrets. */
+    AlertmanagerChannel: {
+      /** @description The `VMAlertmanagerConfig`. */
+      config: string
+      /** @description The events it receives; empty for one Zeabur did not make. */
+      events: components["schemas"]["AlertmanagerEvent"][]
+      /** @description Where it sends. */
+      kind: components["schemas"]["AlertmanagerChannelKind"]
+      /** @description Whether Zeabur made it, and so may change it. */
+      managed: boolean
+      /** @description The channel's name; the config's for one Zeabur did not make. */
+      name: string
+      /** @description Why the operator refused it. */
+      reason?: string | null
+      /** @description Whether Alertmanager took it. */
+      status: components["schemas"]["AlertmanagerChannelStatus"]
+      /** @description The address, chat or server it sends to, when it is not a secret. */
+      target?: string | null
+    }
+    /**
+     * @description Where a channel sends.
+     * @enum {string}
+     */
+    AlertmanagerChannelKind:
+      | "slack"
+      | "discord"
+      | "telegram"
+      | "email"
+      | "webhook"
+      | "ntfy"
+      | "gotify"
+      | "other"
+    /**
+     * @description A channel's settings, secrets included. They go into the channel's Secret and spec; Zeabur
+     *     never shows them again.
+     */
+    AlertmanagerChannelSettings:
+      | {
+          /** @enum {string} */
+          kind: "slack"
+          /** @description `https://hooks.slack.com/services/…`. */
+          webhookUrl: string
+        }
+      | {
+          /** @enum {string} */
+          kind: "discord"
+          /** @description `https://discord.com/api/webhooks/…`. */
+          webhookUrl: string
+        }
+      | {
+          /** @description The bot's token, from `@BotFather`. */
+          botToken: string
+          /**
+           * Format: int64
+           * @description The chat to post in.
+           */
+          chatId: number
+          /** @enum {string} */
+          kind: "telegram"
+        }
+      | {
+          /** @description The sender's address. */
+          from: string
+          /** @enum {string} */
+          kind: "email"
+          /** @description The SMTP password. */
+          password?: string
+          /** @description The SMTP server, `host:port`. */
+          smarthost: string
+          /** @description The address to send to. */
+          to: string
+          /** @description The SMTP user; empty for none. */
+          username?: string
+        }
+      | {
+          /** @description Sent as `Authorization: Bearer …`; empty for none. */
+          bearerToken?: string
+          /** @enum {string} */
+          kind: "webhook"
+          /** @description The URL, `https://…` or `http://…`. */
+          url: string
+        }
+      | {
+          /** @description An access token for a protected topic; empty for none. */
+          accessToken?: string
+          /** @enum {string} */
+          kind: "ntfy"
+          /** @description The ntfy server; `https://ntfy.sh` when empty. */
+          server?: string
+          /** @description The topic. */
+          topic: string
+        }
+      | {
+          /** @description The application's token. */
+          appToken: string
+          /** @enum {string} */
+          kind: "gotify"
+        }
+    /**
+     * @description Whether Alertmanager took a channel.
+     * @enum {string}
+     */
+    AlertmanagerChannelStatus: "active" | "rejected" | "waiting"
+    /**
+     * @description An event a channel can receive.
+     * @enum {string}
+     */
+    AlertmanagerEvent:
+      | "build-failed"
+      | "build-succeeded"
+      | "deploy-failed"
+      | "deploy-succeeded"
+      | "crash-loop"
+      | "out-of-memory"
+      | "database-unhealthy"
+      | "backup-failed"
+      | "volume-almost-full"
+      | "certificate"
+      | "node-not-ready"
+      | "runtime-security"
     /** @description One object an apply wrote. */
     Applied: {
       /** @description Its `resourceVersion` after the write. */
@@ -4788,6 +5023,99 @@ export interface components {
       taints: components["schemas"]["Taint"][]
       usage?: components["schemas"]["Resources"] | null
     }
+    /** @description One object a plan writes. */
+    NotificationWrite: {
+      /** @description What it does. */
+      action: components["schemas"]["NotificationWriteAction"]
+      /** @description The object as it will be, YAML, a Secret's values hidden; absent for a deletion. */
+      afterYaml?: string | null
+      /** @description The object as it is, YAML; absent for a creation and for a Secret. */
+      beforeYaml?: string | null
+      /** @description The object's kind. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace. */
+      namespace: string
+    }
+    /**
+     * @description What a write does.
+     * @enum {string}
+     */
+    NotificationWriteAction: "create" | "patch" | "delete"
+    /** @description The channels of a project or of the cluster. */
+    Notifications: {
+      /** @description Whether the person may add, change and remove channels. */
+      canChange: components["schemas"]["Permission"]
+      /** @description Whether the person may send a test. */
+      canTest: components["schemas"]["Permission"]
+      /** @description The channels, Zeabur's first, by name. */
+      channels: components["schemas"]["AlertmanagerChannel"][]
+      /** @description The events a channel here can receive. */
+      events: components["schemas"]["AlertmanagerEvent"][]
+      /** @description The namespace the channels are in. */
+      namespace: string
+      /**
+       * @description Whether the catalog's rule set is installed; for the cluster only, absent when it could
+       *     not be read.
+       */
+      rulesInstalled?: boolean | null
+      /** @description Whether the operator's API is served and the channels could be read. */
+      state: components["schemas"]["ProviderState"]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description What an apply wrote. */
+    NotificationsApplied: {
+      /** @description The objects written, `Kind/name`. */
+      written: string[]
+    }
+    /** @description The token of a plan to apply. */
+    NotificationsApply: {
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description A plan, and the token that applies it. */
+    NotificationsPlan: {
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /** @description The writes, in order; empty when nothing changes. */
+      writes: components["schemas"]["NotificationWrite"][]
+    }
+    /** @description What to plan. */
+    NotificationsPlanRequest:
+      | {
+          /** @description The events it receives. */
+          events: components["schemas"]["AlertmanagerEvent"][]
+          /** @description Its name. */
+          name: string
+          /** @enum {string} */
+          op: "add"
+          /** @description Where it sends, secrets included. */
+          settings: components["schemas"]["AlertmanagerChannelSettings"]
+        }
+      | {
+          /** @description The events it receives after the change. */
+          events: components["schemas"]["AlertmanagerEvent"][]
+          /** @description The channel. */
+          name: string
+          /** @enum {string} */
+          op: "events"
+        }
+      | {
+          /** @description The channel. */
+          name: string
+          /** @enum {string} */
+          op: "remove"
+        }
+      | {
+          /** @description The channel. */
+          name: string
+          /** @enum {string} */
+          op: "test"
+        }
     /**
      * @description Whether the person may list a kind, as one `SelfSubjectRulesReview` hints, or as a list
      *     answered.
@@ -8099,6 +8427,143 @@ export interface operations {
       }
     }
   }
+  getClusterNotifications: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Notifications"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyClusterNotifications: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NotificationsApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NotificationsApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planClusterNotifications: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NotificationsPlanRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NotificationsPlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
   clusterTools: {
     parameters: {
       query?: never
@@ -9171,6 +9636,152 @@ export interface operations {
         }
       }
       404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getProjectNotifications: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["Notifications"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyProjectNotifications: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NotificationsApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NotificationsApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planProjectNotifications: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NotificationsPlanRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NotificationsPlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
         headers: {
           [name: string]: unknown
         }

@@ -308,6 +308,52 @@ export async function applyClusterBackups(token: string) {
   return unwrap(await api.POST("/api/v1/cluster/backups/apply", { body: { token } }))
 }
 
+/** Where alerts go: a project's channels, or the cluster's when `project` is absent. */
+export const notificationsQuery = (project?: string) =>
+  queryOptions({
+    queryKey: project ? ["project", project, "notifications"] : ["cluster", "notifications"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        project
+          ? await api.GET("/api/v1/projects/{project}/notifications", {
+              params: { path: { project } },
+              signal,
+            })
+          : await api.GET("/api/v1/cluster/notifications", { signal }),
+      ),
+    refetchInterval: CLUSTER_POLL,
+    refetchIntervalInBackground: false,
+    retryOnMount: false,
+  })
+
+/** What adding, changing, testing or removing a channel writes, and the token; writes nothing. */
+export async function planNotifications(
+  project: string | undefined,
+  request: Schemas["NotificationsPlanRequest"],
+  signal?: AbortSignal,
+) {
+  return unwrap(
+    project
+      ? await api.POST("/api/v1/projects/{project}/notifications/plan", {
+          params: { path: { project } },
+          body: request,
+          signal,
+        })
+      : await api.POST("/api/v1/cluster/notifications/plan", { body: request, signal }),
+  )
+}
+
+export async function applyNotifications(project: string | undefined, token: string) {
+  return unwrap(
+    project
+      ? await api.POST("/api/v1/projects/{project}/notifications/apply", {
+          params: { path: { project } },
+          body: { token },
+        })
+      : await api.POST("/api/v1/cluster/notifications/apply", { body: { token } }),
+  )
+}
+
 /** What stopping scheduling, resuming it or maintenance does to a node's pods; writes nothing. */
 export async function planNodeMaintenance(
   node: string,

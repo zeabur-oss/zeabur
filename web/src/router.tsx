@@ -13,6 +13,7 @@ import {
 import {
   capabilitiesQuery,
   clusterBackupsQuery,
+  notificationsQuery,
   clusterQuery,
   clusterWarningsQuery,
   databasesQuery,
@@ -54,12 +55,14 @@ import {
 //   /cluster                                   the cluster: version, attention, nodes, warnings
 //   /cluster/backups                           Velero's backups: where they go, the schedule, each
 //                                              run
+//   /cluster/notifications                     where node and runtime-security alerts go
 //   /cluster/components                        installed components and the catalogue
 //   /projects                                  every project and namespace
 //   /projects/$project                         the project: its problems, then its services as a
 //                                              map or a list (?view=map|list, ?service=… quick look)
 //   /projects/$project/architecture, /services moved: redirect to the project with that view
-//   /projects/$project/settings                Settings: the project's details, adopted or not
+//   /projects/$project/settings                Settings: the project's details, adopted or not,
+//                                              and where its alerts go
 //   /projects/$project/objects                 Objects: every object by kind, ?object=… opens
 //                                              its YAML
 //   /projects/$project/create                  objects written as YAML, created through a plan
@@ -315,6 +318,16 @@ const clusterBackupsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/cluster/backups"), "BackupsPage"),
 })
 
+const clusterNotificationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cluster/notifications",
+  loader: () => load(ensure(clusterQuery), ensure(upgradesQuery), ensure(notificationsQuery())),
+  component: lazyRouteComponent(
+    () => import("@/routes/cluster/notifications"),
+    "NotificationsPage",
+  ),
+})
+
 const componentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/cluster/components",
@@ -357,6 +370,7 @@ export const router = createRouter({
     accountRoute,
     membersRoute,
     clusterBackupsRoute,
+    clusterNotificationsRoute,
     componentsRoute,
     problemRoute,
     movedComponentsRoute,

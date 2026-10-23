@@ -11,6 +11,7 @@ import { AccessDialog, AdoptButton } from "@/components/adopt"
 import { useBackups } from "@/components/backups"
 import { CopyButton } from "@/components/bits"
 import { FormField } from "@/components/form-field"
+import { Notifications } from "@/components/notifications"
 import { LoadingRows } from "@/components/page"
 import { GateTip, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
@@ -115,8 +116,15 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
           </CardRow>
         </Card>
       </Group>
-      {namespace.adopted ? <ClusterBackups project={namespace.name} /> : null}
-      {namespace.adopted ? <BatchActions project={namespace.name} /> : null}
+      {namespace.adopted ? (
+        <>
+          <ClusterBackups project={namespace.name} />
+          <Group label={t("notify.title")}>
+            <Notifications project={namespace.name} />
+          </Group>
+          <BatchActions project={namespace.name} />
+        </>
+      ) : null}
       {namespace.adopted && !namespace.system ? (
         <Group label={t("projectSettings.danger")}>
           <Card variant="list">

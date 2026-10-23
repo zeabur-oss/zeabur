@@ -3,7 +3,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useId, useState, type ReactNode } from "react"
-import CaretRightIcon from "~icons/ph/caret-right"
 import InfoIcon from "~icons/ph/info"
 import WarningIcon from "~icons/ph/warning"
 
@@ -17,15 +16,13 @@ import {
 } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { FormField } from "@/components/form-field"
+import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { GateTip, useHintGate } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
-import { Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
-import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
 import { Problem } from "@/components/problem"
 import { Schedule } from "@/components/schedule"
 import { StatusDot, StatusPill } from "@/components/status"
-import { YamlDiff } from "@/components/yaml"
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
 import { useQuantityFormat } from "@/lib/quantity"
@@ -58,11 +55,6 @@ import { Section } from "@/routes/cluster/section"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { Checkbox } from "@zeabur/design-system/components/checkbox"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
 import {
   Empty,
   EmptyContent,
@@ -831,100 +823,38 @@ function PlanDialog({
     },
     onError: refresh,
   })
-  const left = useSecondsLeft(plan.data?.expiresAt)
-  const expired = left !== undefined && left <= 0
-  const writes = plan.data?.writes ?? []
-  const nothing = plan.data !== undefined && writes.length === 0
-  const ready = plan.data && !plan.isFetching
+  return (
+    <PlanFrame
+      title={title}
+      plan={plan}
+      apply={apply}
+      action={t("plan.apply")}
+      ready={(data) => (data?.writes.length ?? 0) > 0}
+      onClose={onClose}
+    >
+      {(data) => <Planned writes={data.writes} />}
+    </PlanFrame>
+  )
+}
+
+function Planned({ writes }: { writes: Schemas["BackupWrite"][] }) {
+  const t = useT()
+  if (writes.length === 0) return <p>{t("clusterBackups.plan.nothing")}</p>
   const thing = (write: Schemas["BackupWrite"]) =>
     write.kind === "Backup"
       ? t("clusterBackups.thing.Backup", write.name)
       : t(`clusterBackups.thing.${write.kind as "Secret"}`)
   return (
-    <Frame
-      title={title}
-      wide
-      onClose={onClose}
-      footer={
-        <div className="flex w-full flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("plan.cancel")}
-          </Button>
-          {ready && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
-            <span className="type-meta text-muted-foreground tabular-nums">
-              {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
-            </span>
-          ) : null}
-          <span className="ml-auto">
-            {expired ? (
-              <Button size="sm" onClick={() => void plan.refetch()}>
-                {t("plan.replan")}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                disabled={!ready || nothing}
-                loading={apply.isPending}
-                onClick={() => plan.data && apply.mutate(plan.data.token)}
-              >
-                {t("plan.apply")}
-              </Button>
-            )}
-          </span>
-        </div>
-      }
-    >
-      {plan.isPending || plan.isFetching ? (
-        <LoadingRows label={t("plan.planning")} rows={3} />
-      ) : plan.isError ? (
-        <Problem error={plan.error} />
-      ) : nothing ? (
-        <p>{t("clusterBackups.plan.nothing")}</p>
-      ) : (
-        <>
-          <ul className="flex flex-col gap-1">
-            {writes.map((w) => (
-              <li key={`${w.kind}/${w.name}`}>{t(`clusterBackups.plan.${w.action}`, thing(w))}</li>
-            ))}
-          </ul>
-          {writes.some((w) => w.kind === "Secret") ? (
-            <p className="type-meta text-muted-foreground">{t("clusterBackups.plan.keysHidden")}</p>
-          ) : null}
-          <Writes writes={writes} />
-        </>
-      )}
-      {apply.isError ? <Problem error={apply.error} /> : null}
-    </Frame>
-  )
-}
-
-function Writes({ writes }: { writes: Schemas["BackupWrite"][] }) {
-  const t = useT()
-  return (
-    <Collapsible>
-      <CollapsibleTrigger variant="disclosure" className="mt-1">
-        <CaretRightIcon aria-hidden="true" />
-        {t("plan.details")}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="flex flex-col gap-4 pt-3">
-          {writes.map((write) => (
-            <section
-              key={`${write.kind}/${write.name}`}
-              aria-label={`${write.kind}/${write.name}`}
-              className="flex min-w-0 flex-col gap-2"
-            >
-              <span className="min-w-0 font-mono text-sm font-medium break-all" translate="no">
-                {`${write.kind}/${write.name}`}
-                <span className="ml-2 font-sans font-normal type-meta text-muted-foreground">
-                  {write.namespace}
-                </span>
-              </span>
-              <YamlDiff before={write.beforeYaml ?? ""} after={write.afterYaml ?? ""} />
-            </section>
-          ))}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <>
+      <ul className="flex flex-col gap-1">
+        {writes.map((w) => (
+          <li key={`${w.kind}/${w.name}`}>{t(`clusterBackups.plan.${w.action}`, thing(w))}</li>
+        ))}
+      </ul>
+      {writes.some((w) => w.kind === "Secret") ? (
+        <p className="type-meta text-muted-foreground">{t("clusterBackups.plan.keysHidden")}</p>
+      ) : null}
+      <PlanDiffs writes={writes} />
+    </>
   )
 }

@@ -8,11 +8,9 @@ import {
   refreshClusterTools,
   type ClusterToolsPlan,
 } from "@/api/cluster-tools"
-import { Exposed, PlanFooter, PlanWrites } from "@/components/cluster-plan"
-import { Consequence, Frame } from "@/components/members/frame"
-import { LoadingRows } from "@/components/page"
+import { Exposed, PlanFrame, PlanWrites } from "@/components/cluster-plan"
+import { Consequence } from "@/components/members/frame"
 import { terminalLines } from "@/components/plan/describe"
-import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
 
 export function ClusterToolsDialog({
@@ -41,36 +39,16 @@ export function ClusterToolsDialog({
     onError: refreshClusterTools,
   })
   return (
-    <Frame
+    <PlanFrame
       title={t("clusterTools.title")}
-      wide
+      plan={plan}
+      apply={apply}
+      action={t("action.openToolsTerminal")}
+      what={t("clusterTools.what")}
       onClose={onClose}
-      footer={
-        <PlanFooter
-          expiresAt={plan.data?.expiresAt}
-          ready={!!plan.data && !plan.isFetching}
-          token={plan.data?.token ?? undefined}
-          action={t("action.openToolsTerminal")}
-          applying={apply.isPending}
-          onCancel={onClose}
-          onReplan={() => void plan.refetch()}
-          onApply={(token) => apply.mutate(token)}
-        />
-      }
     >
-      {plan.isPending || plan.isFetching ? (
-        <LoadingRows label={t("plan.planning")} rows={3} />
-      ) : plan.isError ? (
-        <Problem
-          error={plan.error}
-          what={t("clusterTools.what")}
-          retry={() => void plan.refetch()}
-        />
-      ) : (
-        <Planned plan={plan.data} />
-      )}
-      {apply.isError ? <Problem error={apply.error} what={t("clusterTools.what")} /> : null}
-    </Frame>
+      {(data) => <Planned plan={data} />}
+    </PlanFrame>
   )
 }
 

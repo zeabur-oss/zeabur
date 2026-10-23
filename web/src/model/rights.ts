@@ -2,7 +2,13 @@ import type { Schemas } from "@/api/client"
 
 export type ProjectRights = Schemas["ProjectRights"]
 export type ClusterRights = Schemas["ClusterRights"]
-export type Right = keyof ProjectRights | keyof ClusterRights
+/** Rights a page reads itself rather than from the project's or the cluster's review. */
+type PageRight =
+  | "changeNotifications"
+  | "testNotifications"
+  | "changeClusterNotifications"
+  | "testClusterNotifications"
+export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
 type Permission = Schemas["Permission"]
 
 /** The least product role that holds a right. */
@@ -29,6 +35,16 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   installComponents: { role: "admin", rule: "create helmcharts.helm.cattle.io" },
   changeNodes: { role: "admin", rule: "patch nodes" },
   changeBackups: { role: "admin", rule: "create schedules.velero.io" },
+  changeNotifications: {
+    role: "developer",
+    rule: "create vmalertmanagerconfigs.operator.victoriametrics.com",
+  },
+  testNotifications: { role: "developer", rule: "create jobs.batch" },
+  changeClusterNotifications: {
+    role: "admin",
+    rule: "create vmalertmanagerconfigs.operator.victoriametrics.com",
+  },
+  testClusterNotifications: { role: "admin", rule: "create jobs.batch" },
 }
 
 export const neededRole = (right: Right): NeededRole => rules[right].role
@@ -81,7 +97,7 @@ export function gate(right: Right, permission: Permission | undefined, asker: As
 export function unknownRights(): ProjectRights {
   return Object.fromEntries(
     (Object.keys(rules) as Right[])
-      .filter((r) => !(r in clusterOnly))
+      .filter((r) => !(r in notProject))
       .map((r) => [r, "unknown" as const]),
   ) as ProjectRights
 }
@@ -90,6 +106,14 @@ const clusterOnly: Record<keyof ClusterRights, true> = {
   installComponents: true,
   changeNodes: true,
   changeBackups: true,
+}
+
+const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
+  ...clusterOnly,
+  changeNotifications: true,
+  testNotifications: true,
+  changeClusterNotifications: true,
+  testClusterNotifications: true,
 }
 
 const workloads = ["deployments", "statefulsets", "daemonsets"]

@@ -15,6 +15,7 @@ import { PageColumn } from "@zeabur/design-system/components/page-column"
 const paths = {
   overview: "/cluster",
   backups: "/cluster/backups",
+  notifications: "/cluster/notifications",
   components: "/cluster/components",
 } as const
 
@@ -36,6 +37,7 @@ export function ClusterFrame({ tab, children }: { tab: ClusterTab; children: Rea
           <TabsList aria-label={t("cluster.tabs")}>
             <TabsTrigger value="overview">{t("cluster.overview")}</TabsTrigger>
             <TabsTrigger value="backups">{t("cluster.backups")}</TabsTrigger>
+            <TabsTrigger value="notifications">{t("notify.title")}</TabsTrigger>
             <TabsTrigger value="components">{t("settings.components")}</TabsTrigger>
           </TabsList>
         </PageColumn>

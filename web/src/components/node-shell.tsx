@@ -15,11 +15,9 @@ import {
   type NodeShellRequest,
 } from "@/api/node-shells"
 import { Ago, CopyButton } from "@/components/bits"
-import { Exposed, PlanFooter, PlanWrites } from "@/components/cluster-plan"
+import { Exposed, PlanFrame, PlanWrites } from "@/components/cluster-plan"
 import { useMayActAsClusterAdmin } from "@/components/gate"
-import { Consequence, Frame } from "@/components/members/frame"
-import { LoadingRows } from "@/components/page"
-import { Problem } from "@/components/problem"
+import { Consequence } from "@/components/members/frame"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
 import { openNodeShell } from "@/lib/dock"
@@ -160,41 +158,29 @@ export function NodeShellDialog({
   })
   const open = request.op === "open"
   return (
-    <Frame
+    <PlanFrame
       title={open ? t("nodeShell.openTitle", request.node) : t("nodeShell.removeTitle")}
-      wide
+      plan={plan}
+      apply={apply}
+      action={open ? t("nodeShell.open") : t("nodeShell.remove")}
+      destructive={!open}
+      what={t("nodeShell.what")}
       onClose={onClose}
-      footer={
-        <PlanFooter
-          expiresAt={plan.data?.expiresAt}
-          ready={!!plan.data && !plan.isFetching}
-          token={plan.data?.token ?? undefined}
-          action={open ? t("nodeShell.open") : t("nodeShell.remove")}
-          destructive={!open}
-          applying={apply.isPending}
-          onCancel={onClose}
-          onReplan={() => void plan.refetch()}
-          onApply={(token) => apply.mutate(token)}
-        />
-      }
     >
-      {plan.isPending || plan.isFetching ? (
-        <LoadingRows label={t("plan.planning")} rows={3} />
-      ) : plan.isError ? (
-        <Problem error={plan.error} what={t("nodeShell.what")} retry={() => void plan.refetch()} />
-      ) : open ? (
-        <OpenPlan plan={plan.data} />
-      ) : (
-        <>
-          <p>
-            {t("nodeShell.removeLine", plan.data.pod, plan.data.node)}
-            {plan.data.person ? ` ${t("nodeShell.openedBy", plan.data.person)}` : ""}
-          </p>
-          <PlanWrites writes={plan.data.writes} />
-        </>
-      )}
-      {apply.isError ? <Problem error={apply.error} what={t("nodeShell.what")} /> : null}
-    </Frame>
+      {(data) =>
+        open ? (
+          <OpenPlan plan={data} />
+        ) : (
+          <>
+            <p>
+              {t("nodeShell.removeLine", data.pod, data.node)}
+              {data.person ? ` ${t("nodeShell.openedBy", data.person)}` : ""}
+            </p>
+            <PlanWrites writes={data.writes} />
+          </>
+        )
+      }
+    </PlanFrame>
   )
 }
 
