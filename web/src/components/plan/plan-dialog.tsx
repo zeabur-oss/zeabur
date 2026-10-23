@@ -745,9 +745,7 @@ function warningSentence(
     case "httpsCertificate":
       return t("warn.httpsCertificate", warning.hostname, warning.issuer)
     case "httpOnly":
-      return warning.reason === "certificatesElsewhere"
-        ? t("warn.httpOnlyElsewhere", warning.hostname, warning.route ?? "")
-        : t("warn.httpOnlyNoIssuer", warning.hostname)
+      return httpOnlySentence(t, warning)
     case "gatewayChosen":
       return t("warn.gatewayChosen", `${warning.namespace}/${warning.name}`, warning.of)
     case "gatewaysUnreadable":
@@ -802,6 +800,29 @@ function warningSentence(
   }
 }
 
+function httpOnlySentence(
+  t: Translate,
+  warning: Extract<Schemas["PlanWarning"], { code: "httpOnly" }>,
+): string {
+  switch (warning.reason) {
+    case "certificatesElsewhere":
+      return t("warn.httpOnlyElsewhere", warning.hostname, warning.route ?? "")
+    case "wildcardNeedsDns01":
+      return t("warn.httpOnlyWildcard", warning.hostname)
+    default:
+      return t("warn.httpOnlyNoIssuer", warning.hostname)
+  }
+}
+
+function certificateWarning(
+  t: Translate,
+  warning: Extract<Schemas["PlanWarning"], { code: "ownCertificate" | "issuerShared" }>,
+): string {
+  return warning.code === "ownCertificate"
+    ? t("warn.ownCertificate", warning.hostname, warning.notAfter.slice(0, 10))
+    : t("warn.issuerShared", warning.route, warning.issuer, t("common.list", warning.hostnames))
+}
+
 function accessWarning(
   t: Translate,
   warning: Extract<
@@ -813,6 +834,8 @@ function accessWarning(
         | "passwordOverHttp"
         | "publicPort"
         | "publicPortBlocked"
+        | "ownCertificate"
+        | "issuerShared"
     }
   >,
 ): string {
@@ -829,5 +852,7 @@ function accessWarning(
         : t("warn.publicPort", warning.port)
     case "publicPortBlocked":
       return t("warn.publicPortBlocked", warning.port, t("common.list", warning.policies))
+    default:
+      return certificateWarning(t, warning)
   }
 }

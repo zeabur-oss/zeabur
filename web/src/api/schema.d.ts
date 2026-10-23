@@ -272,6 +272,64 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/issuers": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The `ClusterIssuers`, each with its `Ready` condition and, where the form can change it, its
+     *     DNS provider's settings without the secret. Read as the person.
+     */
+    get: operations["getClusterIssuers"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/issuers/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Carries out an issuer plan by its token: checks it, dry-runs every write, then writes. */
+    post: operations["applyClusterIssuer"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/issuers/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out what creating or changing a Let's Encrypt `ClusterIssuer` with a DNS-01 solver
+     *     writes, and a token to apply it; writes nothing. The provider's token never appears in the
+     *     answer.
+     */
+    post: operations["planClusterIssuer"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/join": {
     parameters: {
       query?: never
@@ -921,6 +979,23 @@ export interface paths {
      *     person. `state` is `not-installed` when the cluster does not serve `builder.zeabur.com`.
      */
     get: operations["getProjectBuilds"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/certificates/{secret}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The dates of the certificate a domain's tls entry names, read as the person. */
+    get: operations["getCertificateDates"]
     put?: never
     post?: never
     delete?: never
@@ -2004,6 +2079,14 @@ export interface components {
       /** @description Your user name, as kube-apiserver authenticated you. */
       username: string
     }
+    /** @description A [`Change::AddDomain`]. */
+    AddDomainChange: {
+      certificate?: components["schemas"]["CertificateSource"] | null
+      /** @description The hostname. */
+      hostname: string
+      /** @description The workload. */
+      workload: components["schemas"]["WorkloadRef"]
+    }
     /**
      * @description What kind of address a trace follows.
      * @enum {string}
@@ -2453,6 +2536,15 @@ export interface components {
      * @enum {string}
      */
     CapacityStatus: "fits" | "short" | "unknown"
+    /** @description A [`Change::Certificate`]. */
+    CertificateChange: {
+      /** @description Where its certificate comes from. */
+      certificate: components["schemas"]["CertificateSource"]
+      /** @description The hostname. */
+      hostname: string
+      /** @description The route; only an Ingress names its certificates. */
+      route: components["schemas"]["RouteRef"]
+    }
     /** @description A domain's certificate, as cert-manager reports it. */
     CertificateCheck: {
       /** @description cert-manager's own words, in English. */
@@ -2466,6 +2558,31 @@ export interface components {
       /** @description How it stands. */
       state: components["schemas"]["CertificateState"]
     }
+    /** @description The dates of the certificate in a `kubernetes.io/tls` Secret. Never its key. */
+    CertificateDates: {
+      /** @description When it expires, RFC 3339. */
+      notAfter: string
+      /** @description From when the certificate is valid, RFC 3339. */
+      notBefore: string
+      /** @description The Secret. */
+      secret: string
+    }
+    /** @description Where the certificate of a hostname comes from. */
+    CertificateSource:
+      | {
+          /** @enum {string} */
+          from: "issuer"
+          /** @description The `ClusterIssuer`. */
+          name: string
+        }
+      | {
+          /** @description The certificate, then its intermediates, PEM. */
+          certificate: string
+          /** @enum {string} */
+          from: "own"
+          /** @description Its private key, PEM. It is never shown again. */
+          key: string
+        }
     /**
      * @description How a domain's certificate stands.
      * @enum {string}
@@ -2493,14 +2610,10 @@ export interface components {
           /** @enum {string} */
           op: "data"
         }
-      | {
-          /** @description The hostname. */
-          hostname: string
+      | (components["schemas"]["AddDomainChange"] & {
           /** @enum {string} */
           op: "addDomain"
-          /** @description The workload. */
-          workload: components["schemas"]["WorkloadRef"]
-        }
+        })
       | {
           /** @description The hostname now. */
           from: string
@@ -2538,6 +2651,10 @@ export interface components {
       | (components["schemas"]["MaintenanceChange"] & {
           /** @enum {string} */
           op: "maintenance"
+        })
+      | (components["schemas"]["CertificateChange"] & {
+          /** @enum {string} */
+          op: "certificate"
         })
       | (components["schemas"]["EnvImportChange"] & {
           /** @enum {string} */
@@ -2942,6 +3059,19 @@ export interface components {
       leaders: components["schemas"]["LeaderLease"][]
       /** @description Every check passed. */
       ready: boolean
+    }
+    /** @description The cluster's `ClusterIssuers`. */
+    ClusterIssuers: {
+      /** @description Whether the person may create `ClusterIssuers`. */
+      canChange: components["schemas"]["Permission"]
+      /** @description The issuer a new domain gets when none is chosen. */
+      default?: string | null
+      /** @description The issuers, by name. */
+      issuers: components["schemas"]["IssuerView"][]
+      /** @description Whether cert-manager is installed and its issuers could be read. */
+      state: components["schemas"]["ProviderState"]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
     }
     /** @description A kind that belongs to the whole cluster. */
     ClusterKind: {
@@ -3683,6 +3813,56 @@ export interface components {
        */
       usedBytes: number
     }
+    /** @description A DNS provider's settings for a DNS-01 solver. A blank secret field keeps the Secret's value. */
+    Dns01Provider:
+      | {
+          /** @description The API token. */
+          apiToken?: string
+          /** @enum {string} */
+          provider: "cloudflare"
+        }
+      | {
+          /** @description The access key ID. */
+          accessKeyId: string
+          /** @description The hosted zone; empty to let cert-manager find it. */
+          hostedZoneId?: string
+          /** @enum {string} */
+          provider: "route53"
+          /** @description The region. */
+          region: string
+          /** @description The secret access key. */
+          secretAccessKey?: string
+        }
+      | {
+          /** @description The Google Cloud project. */
+          project: string
+          /** @enum {string} */
+          provider: "cloudDns"
+          /** @description The service account's JSON key. */
+          serviceAccountJson?: string
+        }
+      | {
+          /** @enum {string} */
+          provider: "digitalocean"
+          /** @description The API token. */
+          token?: string
+        }
+      | {
+          /** @description The service principal's client ID. */
+          clientId: string
+          /** @description Its client secret. */
+          clientSecret?: string
+          /** @description The zone. */
+          hostedZoneName: string
+          /** @enum {string} */
+          provider: "azureDns"
+          /** @description The resource group of the zone. */
+          resourceGroupName: string
+          /** @description The subscription. */
+          subscriptionId: string
+          /** @description The tenant. */
+          tenantId: string
+        }
     /**
      * @description Whether a domain's DNS sends it to the cluster, as looked up from where Zeabur runs.
      * @enum {string}
@@ -4386,7 +4566,7 @@ export interface components {
      * @description Why a new hostname gets no HTTPS.
      * @enum {string}
      */
-    HttpOnlyReason: "noIssuer" | "certificatesElsewhere"
+    HttpOnlyReason: "noIssuer" | "certificatesElsewhere" | "wildcardNeedsDns01"
     /** @description What the image's configuration says, or why it could not be read. */
     ImageInspection: {
       /**
@@ -4598,6 +4778,71 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description Who it enrols a passkey for. */
       username: string
+    }
+    /** @description A Let's Encrypt `ClusterIssuer` with a DNS-01 solver, to create or change. */
+    IssuerRequest: {
+      /** @description The DNS provider. */
+      dns: components["schemas"]["Dns01Provider"]
+      /** @description Where Let's Encrypt sends expiry notices; may be empty. */
+      email?: string
+      /** @description The `ClusterIssuer`'s name. */
+      name: string
+      /** @description Use Let's Encrypt's staging server, whose certificates browsers do not trust. */
+      staging?: boolean
+    }
+    /** @description One `ClusterIssuer`. */
+    IssuerView: {
+      dns?: components["schemas"]["Dns01Provider"] | null
+      /** @description Its email. */
+      email?: string | null
+      /** @description The condition's message. */
+      message?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description Its `Ready` condition. */
+      ready: components["schemas"]["Readiness"]
+      /** @description The ACME server; absent for a CA, Vault or self-signed issuer. */
+      server?: string | null
+      /** @description Its challenge solvers: `http01`, or `dns01` with the provider, as `dns01:cloudflare`. */
+      solvers: string[]
+      /** @description It uses Let's Encrypt's staging server. */
+      staging: boolean
+      /** @description It can issue wildcard certificates. */
+      wildcards: boolean
+    }
+    /** @description What an issuer plan writes. */
+    IssuerWrite: {
+      /** @description `create` or `patch`. */
+      action: string
+      /** @description The object as it will be, YAML; a Secret's value is not in it. */
+      afterYaml: string
+      /** @description The object as it is, YAML; absent for a creation. */
+      beforeYaml?: string | null
+      /** @description The object's kind. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace; empty for the `ClusterIssuer`. */
+      namespace: string
+    }
+    /** @description What an apply wrote. */
+    IssuersApplied: {
+      /** @description The objects written, `Kind/name`. */
+      written: string[]
+    }
+    /** @description The token of a plan to apply. */
+    IssuersApply: {
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description An issuer plan, and the token that applies it. */
+    IssuersPlan: {
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /** @description The writes, in order; empty when nothing changes. */
+      writes: components["schemas"]["IssuerWrite"][]
     }
     /**
      * @description Why this cluster cannot take a node from Zeabur.
@@ -5795,6 +6040,24 @@ export interface components {
         }
       | {
           /** @enum {string} */
+          code: "ownCertificate"
+          /** @description The hostname. */
+          hostname: string
+          /** @description When the certificate expires, RFC 3339. */
+          notAfter: string
+        }
+      | {
+          /** @enum {string} */
+          code: "issuerShared"
+          /** @description The other hostnames listed for HTTPS. */
+          hostnames: string[]
+          /** @description The issuer. */
+          issuer: string
+          /** @description The Ingress. */
+          route: string
+        }
+      | {
+          /** @enum {string} */
           code: "httpOnly"
           /** @description The hostname. */
           hostname: string
@@ -6746,6 +7009,11 @@ export interface components {
           /** @description The tool. */
           tool: components["schemas"]["Tool"]
         }
+    /**
+     * @description Whether an issuer is ready, from its `Ready` condition.
+     * @enum {string}
+     */
+    Readiness: "ready" | "notReady" | "unknown"
     /** @description A [`Change::Redirect`]. */
     RedirectChange: {
       /** @description The hostname that redirects. */
@@ -6998,6 +7266,14 @@ export interface components {
       errorPages?: components["schemas"]["RouteMiddleware"] | null
       /** @description The hosts its rules match. */
       hostnames: string[]
+      /**
+       * @description The cert-manager issuer the Ingress names in `cert-manager.io/cluster-issuer` or
+       *     `cert-manager.io/issuer`: cert-manager issues a certificate for each of its `spec.tls`
+       *     entries [cm-ingress].
+       *
+       *     [cm-ingress]: https://cert-manager.io/docs/usage/ingress/
+       */
+      issuer?: string | null
       /** @description The hosts that show the maintenance page instead of their workload, sorted. */
       maintenance?: string[]
       /** @description The Ingress's name. */
@@ -7017,6 +7293,8 @@ export interface components {
        *     Services, so a client filters by `service`.
        */
       rules: components["schemas"]["RouteRule"][]
+      /** @description The Secret that holds each HTTPS host's certificate, from `spec.tls`, sorted by host. */
+      tls?: components["schemas"]["RouteTls"][]
       /**
        * @description The hosts its `spec.tls` serves over HTTPS, sorted, without duplicates. It says HTTPS is
        *     configured, not that the certificate is valid.
@@ -7056,6 +7334,16 @@ export interface components {
       port?: string | null
       /** @description The backend Service's name. */
       service: string
+    }
+    /** @description The Secret an Ingress names for one HTTPS host. */
+    RouteTls: {
+      /** @description The host. */
+      host: string
+      /**
+       * @description The `kubernetes.io/tls` Secret; absent when the entry names none and the controller's
+       *     default certificate serves the host.
+       */
+      secret?: string | null
     }
     /** @description The way to one address of a service. */
     RouteTrace: {
@@ -8657,6 +8945,127 @@ export interface operations {
       }
     }
   }
+  getClusterIssuers: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ClusterIssuers"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyClusterIssuer: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["IssuersApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["IssuersApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planClusterIssuer: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["IssuerRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["IssuersPlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
   getJoin: {
     parameters: {
       query?: never
@@ -9953,6 +10362,53 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getCertificateDates: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        /** @description A kubernetes.io/tls Secret */
+        secret: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["CertificateDates"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
         headers: {
           [name: string]: unknown
         }

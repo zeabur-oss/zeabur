@@ -308,6 +308,35 @@ export async function applyClusterBackups(token: string) {
   return unwrap(await api.POST("/api/v1/cluster/backups/apply", { body: { token } }))
 }
 
+export const clusterIssuersQuery = queryOptions({
+  queryKey: ["cluster", "issuers"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/issuers", { signal })),
+  retryOnMount: false,
+})
+
+/** What creating or changing a DNS-01 issuer writes, and the token; writes nothing. */
+export async function planClusterIssuer(request: Schemas["IssuerRequest"], signal?: AbortSignal) {
+  return unwrap(await api.POST("/api/v1/cluster/issuers/plan", { body: request, signal }))
+}
+
+export async function applyClusterIssuer(token: string) {
+  return unwrap(await api.POST("/api/v1/cluster/issuers/apply", { body: { token } }))
+}
+
+/** The dates of the certificate in a project's `kubernetes.io/tls` Secret; never its key. */
+export const certificateDatesQuery = (project: string, secret: string) =>
+  queryOptions({
+    queryKey: ["project", project, "certificate", secret],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/certificates/{secret}", {
+          params: { path: { project, secret } },
+          signal,
+        }),
+      ),
+    retry: false,
+  })
+
 /** Where alerts go: a project's channels, or the cluster's when `project` is absent. */
 export const notificationsQuery = (project?: string) =>
   queryOptions({

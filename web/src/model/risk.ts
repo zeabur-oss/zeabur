@@ -147,7 +147,16 @@ type ServiceChange = Extract<
 /** The changes of scheduled tasks, routes, shared variables and public ports. */
 export type AccessChange = Extract<
   Change,
-  { op: "scheduleTask" | "runTask" | "redirect" | "basicAuth" | "envImport" | "publicPort" }
+  {
+    op:
+      | "scheduleTask"
+      | "runTask"
+      | "redirect"
+      | "basicAuth"
+      | "certificate"
+      | "envImport"
+      | "publicPort"
+  }
 >
 
 /** Whether an object is a NetworkPolicy that shuts its pods off: it limits what they send
@@ -342,6 +351,7 @@ function accessTab(change: Change, service?: WorkloadRef): [WorkloadRef | undefi
     case "basicAuth":
     case "errorPages":
     case "maintenance":
+    case "certificate":
       return [service, "networking"]
     case "redirect":
     case "publicPort":

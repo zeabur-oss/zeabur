@@ -7,6 +7,7 @@ import ArrowRightIcon from "~icons/ph/arrow-right"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretDownIcon from "~icons/ph/caret-down"
 import ClockIcon from "~icons/ph/clock"
+import CertificateIcon from "~icons/ph/certificate"
 import GlobeIcon from "~icons/ph/globe"
 import HardHatIcon from "~icons/ph/hard-hat"
 import HourglassMediumIcon from "~icons/ph/hourglass-medium-bold"
@@ -18,7 +19,7 @@ import PlusIcon from "~icons/ph/plus"
 import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TrashIcon from "~icons/ph/trash"
 
-import { clusterQuery, traceQuery } from "@/api/queries"
+import { clusterIssuersQuery, clusterQuery, traceQuery } from "@/api/queries"
 import { DnsHint, DomainSetup, DomainState } from "@/components/domain-setup"
 import { GateTip, useGate } from "@/components/gate"
 import { ReviewWord, useDraft } from "@/components/plan/draft"
@@ -40,6 +41,7 @@ import {
   EmptyTitle,
 } from "@zeabur/design-system/components/empty"
 import { Input } from "@zeabur/design-system/components/input"
+import { Select } from "@zeabur/design-system/components/select"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useT } from "@/i18n"
@@ -48,6 +50,7 @@ import { cn } from "@/lib/utils"
 import { domainsLead, filterRoutes, needsSetup, plainFirst } from "@/model/domains"
 import { stagedDomains, type DomainEdit } from "@/model/draft"
 import type { Gate } from "@/model/rights"
+import { canIssue } from "@/model/cluster-issuers"
 import { isLongList } from "@/model/lists"
 import {
   endpointsOf,
@@ -65,6 +68,7 @@ import { Reachability } from "@/routes/service/reachability"
 
 const DomainAccess = lazy(() => import("@/routes/service/domain-access"))
 const DomainPages = lazy(() => import("@/routes/service/domain-pages"))
+const DomainCertificate = lazy(() => import("@/routes/service/domain-certificate"))
 
 // RFC 1123 host names, with the leading wildcard label Ingress and HTTPRoute allow. A hint only:
 // the plan checks the name again.
@@ -216,11 +220,12 @@ export function NetworkingTab({
               <HostForm
                 value={adding}
                 hint={hint}
+                chooseIssuer
                 onCancel={() => setAdding(undefined)}
-                onReview={(host) => {
+                onReview={(host, certificate) => {
                   planner.plan({
                     title: t("title.addDomain", host),
-                    changes: [{ op: "addDomain", workload, hostname: host }],
+                    changes: [{ op: "addDomain", workload, hostname: host, ...certificate }],
                   })
                   setAdding(undefined)
                 }}
@@ -390,6 +395,14 @@ export function NetworkingTab({
                                 <span className="flex justify-end">{undo(edit)}</span>
                               ) : route.host ? (
                                 <span className="flex items-center justify-end gap-0.5">
+                                  <CertificateButton
+                                    route={ingress}
+                                    host={route.host}
+                                    managed={managed}
+                                    gate={domainGate}
+                                    project={project}
+                                    service={service}
+                                  />
                                   <PagesButton
                                     route={ingress}
                                     host={route.host}
@@ -734,6 +747,33 @@ function PagesButton({ route, host, ...rest }: RowDrawerProps) {
   )
 }
 
+/** Opens the certificate drawer of one domain of an Ingress. An HTTPRoute's certificate is set on
+ * its Gateway, which is the cluster's. */
+function CertificateButton({ route, host, ...rest }: RowDrawerProps) {
+  const t = useT()
+  if (!host) return null
+  return (
+    <RowDrawer
+      {...rest}
+      label={t("domainCert.open", host)}
+      off={route ? undefined : t("domainCert.gateway")}
+      icon={<CertificateIcon aria-hidden="true" />}
+    >
+      {(onClose) =>
+        route ? (
+          <DomainCertificate
+            project={rest.project}
+            service={rest.service}
+            route={route}
+            host={host}
+            onClose={onClose}
+          />
+        ) : null
+      }
+    </RowDrawer>
+  )
+}
+
 interface RowDrawerProps {
   route?: Schemas["Route"]
   host?: string | null
@@ -743,30 +783,34 @@ interface RowDrawerProps {
   service: Service
 }
 
-/** An icon button on a domain row that opens a lazy drawer. */
+/** An icon button on a domain row that opens a lazy drawer. With `off`, the button is off and
+ * says why. */
 function RowDrawer({
   managed,
   gate,
   label,
+  off,
   icon,
   children,
 }: {
   managed?: string
   gate: Gate
   label: string
+  off?: string
   icon: ReactElement
   children: (onClose: () => void) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const title = off ?? label
   return (
     <>
       <Managed tool={managed} gate={gate}>
         <Button
           variant="muted"
           size="icon-xs"
-          disabled={Boolean(managed)}
-          aria-label={label}
-          title={label}
+          disabled={Boolean(managed) || off !== undefined}
+          aria-label={title}
+          title={title}
           onClick={() => setOpen(true)}
         >
           {icon}
@@ -787,23 +831,29 @@ function Managed({ tool, gate, children }: { tool?: string; gate: Gate; children
   )
 }
 
+type Certificate = Pick<Schemas["AddDomainChange"], "certificate">
+
 function HostForm({
   value,
   hint,
+  chooseIssuer = false,
   onCancel,
   onReview,
 }: {
   value: string
   /** What the typed host will need, once it is a host name. */
   hint?: (host: string) => ReactNode
+  /** Offer the cluster's issuers besides the default one. */
+  chooseIssuer?: boolean
   onCancel: () => void
-  onReview: (host: string) => void
+  onReview: (host: string, certificate: Certificate) => void
 }) {
   const t = useT()
+  const [issuer, setIssuer] = useState("")
   const form = useForm({
     defaultValues: { host: value },
     onSubmit: ({ value: { host } }) => {
-      if (isHost(host)) onReview(host.trim().toLowerCase())
+      if (isHost(host)) onReview(host.trim().toLowerCase(), issuerChoice(issuer))
     },
   })
   return (
@@ -847,7 +897,52 @@ function HostForm({
           }
         </form.Subscribe>
       ) : null}
+      {chooseIssuer ? (
+        <form.Subscribe selector={(s) => s.values.host.trim().toLowerCase()}>
+          {(host) => <IssuerChoice host={host} value={issuer} onChange={setIssuer} />}
+        </form.Subscribe>
+      ) : null}
     </form>
+  )
+}
+
+const issuerChoice = (issuer: string): Certificate =>
+  issuer ? { certificate: { from: "issuer", name: issuer } } : {}
+
+/** The issuer of a new domain: the default one, or another the person may read. Shown only when
+ * there is a choice; a wildcard host needs a DNS-01 issuer. */
+function IssuerChoice({
+  host,
+  value,
+  onChange,
+}: {
+  host: string
+  value: string
+  onChange: (issuer: string) => void
+}) {
+  const t = useT()
+  const data = useQuery(clusterIssuersQuery).data
+  const issuers = data?.state === "installed" ? data.issuers : []
+  const others = issuers.filter((i) => i.name !== data?.default)
+  if (others.length === 0) return null
+  const chosen = issuers.find((i) => i.name === (value || data?.default))
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2">
+      <span className="type-meta text-muted-foreground">{t("domainCert.issuer")}</span>
+      <Select
+        size="sm"
+        className="sm:w-60"
+        value={value}
+        onValueChange={(next) => onChange(String(next))}
+        items={[
+          { value: "", label: t("domainCert.defaultIssuer", data?.default ?? "—") },
+          ...others.map((i) => ({ value: i.name, label: i.name })),
+        ]}
+      />
+      {chosen && !canIssue(chosen, host) ? (
+        <span className="type-meta text-warn-strong">{t("domainCert.needsDns", chosen.name)}</span>
+      ) : null}
+    </div>
   )
 }
 

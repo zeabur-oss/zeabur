@@ -7270,7 +7270,7 @@ components:
         required:
         - provider
         properties:
-          api_token:
+          apiToken:
             type: string
             description: The API token.
           provider:
@@ -7281,13 +7281,13 @@ components:
         description: AWS Route 53, with an access key.
         required:
         - region
-        - access_key_id
+        - accessKeyId
         - provider
         properties:
-          access_key_id:
+          accessKeyId:
             type: string
             description: The access key ID.
-          hosted_zone_id:
+          hostedZoneId:
             type: string
             description: The hosted zone; empty to let cert-manager find it.
           provider:
@@ -7297,7 +7297,7 @@ components:
           region:
             type: string
             description: The region.
-          secret_access_key:
+          secretAccessKey:
             type: string
             description: The secret access key.
       - type: object
@@ -7313,7 +7313,7 @@ components:
             type: string
             enum:
             - cloudDns
-          service_account_json:
+          serviceAccountJson:
             type: string
             description: The service account's JSON key.
       - type: object
@@ -7331,33 +7331,33 @@ components:
       - type: object
         description: Azure DNS, with a service principal.
         required:
-        - subscription_id
-        - tenant_id
-        - client_id
-        - resource_group_name
-        - hosted_zone_name
+        - subscriptionId
+        - tenantId
+        - clientId
+        - resourceGroupName
+        - hostedZoneName
         - provider
         properties:
-          client_id:
+          clientId:
             type: string
             description: The service principal's client ID.
-          client_secret:
+          clientSecret:
             type: string
             description: Its client secret.
-          hosted_zone_name:
+          hostedZoneName:
             type: string
             description: The zone.
           provider:
             type: string
             enum:
             - azureDns
-          resource_group_name:
+          resourceGroupName:
             type: string
             description: The resource group of the zone.
-          subscription_id:
+          subscriptionId:
             type: string
             description: The subscription.
-          tenant_id:
+          tenantId:
             type: string
             description: The tenant.
       description: >-

@@ -240,6 +240,10 @@ function accessSentence(t: Translate, change: AccessChange | ServiceChange): str
       return change.user
         ? t("confirm.basicAuth", change.route.name)
         : t("confirm.basicAuthOff", change.route.name)
+    case "certificate":
+      return change.certificate.from === "own"
+        ? t("confirm.certificateOwn", change.hostname)
+        : t("confirm.certificateIssuer", change.hostname, change.certificate.name)
     default:
       return serviceSentence(t, change)
   }
@@ -801,6 +805,8 @@ function accessAction(t: Translate, change: AccessChange | ServiceChange): strin
       return change.to ? t("action.redirect") : t("action.stopRedirect")
     case "basicAuth":
       return change.user ? t("action.askPassword") : t("action.stopPassword")
+    case "certificate":
+      return t("action.useCertificate")
     default:
       return serviceAction(t, change)
   }

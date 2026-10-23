@@ -43,19 +43,17 @@ const STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 
 /// A DNS provider's settings for a DNS-01 solver. A blank secret field keeps the Secret's value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(
-    tag = "provider",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
+#[serde(tag = "provider", rename_all = "camelCase")]
 pub enum Dns01Provider {
     /// Cloudflare, with an API token that may edit the zone's DNS.
+    #[serde(rename_all = "camelCase")]
     Cloudflare {
         /// The API token.
         #[serde(default)]
         api_token: String,
     },
     /// AWS Route 53, with an access key.
+    #[serde(rename_all = "camelCase")]
     Route53 {
         /// The region.
         region: String,
@@ -69,6 +67,7 @@ pub enum Dns01Provider {
         hosted_zone_id: String,
     },
     /// Google Cloud DNS, with a service account key.
+    #[serde(rename_all = "camelCase")]
     CloudDns {
         /// The Google Cloud project.
         project: String,
@@ -77,12 +76,14 @@ pub enum Dns01Provider {
         service_account_json: String,
     },
     /// `DigitalOcean`, with an API token.
+    #[serde(rename_all = "camelCase")]
     Digitalocean {
         /// The API token.
         #[serde(default)]
         token: String,
     },
     /// Azure DNS, with a service principal.
+    #[serde(rename_all = "camelCase")]
     AzureDns {
         /// The subscription.
         subscription_id: String,

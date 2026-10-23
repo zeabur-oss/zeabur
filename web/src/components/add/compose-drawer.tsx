@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { useId, useRef, useState, type ChangeEvent, type ReactNode } from "react"
+import { useId, useState, type ReactNode } from "react"
 
 import { api, toProblem, unwrap } from "@/api/client"
 import {
@@ -11,11 +11,11 @@ import {
   objectStorageQuery,
 } from "@/api/queries"
 import { useTakenNames } from "@/components/add/taken"
-import { FormField } from "@/components/form-field"
 import { useGates } from "@/components/gate"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { useProjectSecurity } from "@/components/security-profile"
+import { TextFile } from "@/components/text-file"
 import { useT, type Translate } from "@/i18n"
 import {
   composeChanges,
@@ -42,7 +42,6 @@ import { Card, CardRow, SectionLabel } from "@zeabur/design-system/components/ca
 import { Input } from "@zeabur/design-system/components/input"
 import { Label } from "@zeabur/design-system/components/label"
 import { Switch } from "@zeabur/design-system/components/switch"
-import { Textarea } from "@zeabur/design-system/components/textarea"
 
 type Finding = ComposeService["findings"][number]
 type Offer = ReturnType<typeof managedOffer>
@@ -146,6 +145,7 @@ export function ComposeDrawer({ project, onClose }: { project: string; onClose: 
         <TextFile
           label={t("add.composeFile")}
           hint={t("add.composeHint")}
+          upload={t("add.composeUpload")}
           value={yaml}
           rows={10}
           placeholder={"services:\n  web:\n    image: ghcr.io/acme/web:1.4"}
@@ -278,6 +278,7 @@ function EnvFiles({
     <TextFile
       key={path}
       label={t("add.composeEnvFile", path)}
+      upload={t("add.composeUpload")}
       hint={
         path === ".env" && unset.length > 0
           ? t("add.composeUnset", unset.join(t("common.sep")))
@@ -288,57 +289,6 @@ function EnvFiles({
       onChange={(text) => onChange(path, text)}
     />
   ))
-}
-
-function TextFile({
-  label,
-  hint,
-  value,
-  rows,
-  placeholder,
-  onChange,
-  autoFocus,
-}: {
-  label: string
-  hint: string
-  value: string
-  rows: number
-  placeholder?: string
-  onChange: (text: string) => void
-  autoFocus?: boolean
-}) {
-  const t = useT()
-  const input = useRef<HTMLInputElement>(null)
-  const upload = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) void file.text().then(onChange)
-    event.target.value = ""
-  }
-  return (
-    <FormField label={label} hint={hint}>
-      <div className="flex flex-col gap-2">
-        <Textarea
-          mono
-          className="max-h-80"
-          rows={rows}
-          value={value}
-          placeholder={placeholder}
-          spellCheck={false}
-          autoFocus={autoFocus}
-          onChange={(event) => onChange(event.target.value)}
-        />
-        <input ref={input} type="file" hidden onChange={upload} />
-        <Button
-          variant="outline"
-          size="sm"
-          className="self-start"
-          onClick={() => input.current?.click()}
-        >
-          {t("add.composeUpload")}
-        </Button>
-      </div>
-    </FormField>
-  )
 }
 
 function Services({

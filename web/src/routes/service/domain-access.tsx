@@ -128,19 +128,21 @@ function problemsOf(
 }
 
 /** Redirect one domain of an Ingress, or ask for a password on all of its domains. */
+export interface DomainDrawerProps {
+  project: string
+  service: Service
+  route: Schemas["Route"]
+  host: string
+  onClose: () => void
+}
+
 export default function DomainAccessDrawer({
   project,
   service,
   route,
   host,
   onClose,
-}: {
-  project: string
-  service: Service
-  route: Schemas["Route"]
-  host: string
-  onClose: () => void
-}) {
+}: DomainDrawerProps) {
   const t = useT()
   const step = usePlanStep(project, onClose)
   const existing = useExisting(project, route, host)

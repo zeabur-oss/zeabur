@@ -20,6 +20,7 @@ import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { AttentionRow, useAttention } from "@/routes/cluster/attention"
 import { HealthSection } from "@/routes/cluster/health"
+import { IssuersSection } from "@/routes/cluster/issuers"
 import { NodesSection } from "@/routes/cluster/nodes"
 import { Section } from "@/routes/cluster/section"
 
@@ -31,6 +32,7 @@ export function ClusterPage() {
       <HealthSection />
       <NodesSection />
       <WarningsSection />
+      <IssuersSection />
       <NodeAlerts />
     </ClusterFrame>
   )

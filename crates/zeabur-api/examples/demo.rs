@@ -700,7 +700,8 @@ fn shop() -> NamespaceObjects {
             from::<Ingress>(json!({"metadata": {"name": "web", "namespace": "shop",
                     "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0001",
                     "annotations": {"traefik.ingress.kubernetes.io/router.middlewares":
-                        "shop-web-redirect-www-shop-example-com@kubernetescrd,shop-web-error-pages@kubernetescrd"}},
+                        "shop-web-redirect-www-shop-example-com@kubernetescrd,shop-web-error-pages@kubernetescrd",
+                        "cert-manager.io/cluster-issuer": "letsencrypt"}},
                 "spec": {"rules": [{"host": "shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
                     "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}},
                     {"host": "www.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
@@ -710,7 +711,8 @@ fn shop() -> NamespaceObjects {
             // The API shows the maintenance page.
             from::<Ingress>(json!({"metadata": {"name": "api", "namespace": "shop",
                     "annotations": {"zeabur.com/maintenance-backend":
-                        r#"{"api.shop.example.com":[{"service":{"name":"api","port":{"name":"http"}}}]}"#}},
+                        r#"{"api.shop.example.com":[{"service":{"name":"api","port":{"name":"http"}}}]}"#,
+                        "cert-manager.io/cluster-issuer": "letsencrypt"}},
                 "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
                     "backend": {"service": {"name": "zeabur-error-pages", "port": {"number": 8081}}}}]}}],
                     "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
@@ -1599,6 +1601,7 @@ fn state() -> State {
         internal_tools(),
         edge(),
         kube_system(),
+        cert_manager(),
     ] {
         place(&mut project.pods);
         objects.insert(project.namespace.clone(), project);
@@ -1889,6 +1892,16 @@ fn state() -> State {
         .chain(velero_served())
         .chain(k8up_served())
         .chain(alerting_served())
+        .chain([ServedResource {
+            verbs: ["create", "get", "list", "patch"].map(str::to_owned).to_vec(),
+            ..ServedResource::readable(
+                "cert-manager.io",
+                "v1",
+                "clusterissuers",
+                "ClusterIssuer",
+                false,
+            )
+        }])
         .collect(),
         dynamic: [
             from(json!({
@@ -2144,6 +2157,7 @@ fn state() -> State {
         .chain(velero())
         .chain(k8up())
         .chain(alerting())
+        .chain(cluster_issuers())
         .collect(),
         // The metrics store where Zeabur's recommendation installs it.
         proxied: BTreeMap::from([(
@@ -2993,6 +3007,51 @@ fn nodes() -> Vec<Node> {
 }
 
 /// k3s's own pods in kube-system.
+/// The `ClusterIssuers`: `letsencrypt` answers HTTP-01 challenges through Traefik, and
+/// `letsencrypt-dns` answers DNS-01 challenges through Cloudflare, which wildcard domains need.
+fn cluster_issuers() -> Vec<DynamicObject> {
+    let issuer = |name: &str, solver: Value| {
+        from(json!({
+            "apiVersion": "cert-manager.io/v1", "kind": "ClusterIssuer",
+            "metadata": {"name": name, "resourceVersion": "7"},
+            "spec": {"acme": {"server": "https://acme-v02.api.letsencrypt.org/directory",
+                "email": "ops@example.com",
+                "privateKeySecretRef": {"name": format!("{name}-account-key")},
+                "solvers": [solver]}},
+            "status": {"conditions": [{"type": "Ready", "status": "True", "reason": "ACMEAccountRegistered",
+                "message": "The ACME account was registered with the ACME server"}]}
+        }))
+    };
+    vec![
+        issuer(
+            "letsencrypt",
+            json!({"http01": {"ingress": {"ingressClassName": "traefik"}}}),
+        ),
+        issuer(
+            "letsencrypt-dns",
+            json!({"dns01": {"cloudflare": {"apiTokenSecretRef":
+                {"name": "letsencrypt-dns-dns-credentials", "key": "api-token"}}}}),
+        ),
+    ]
+}
+
+/// cert-manager's controller, whose namespace holds the secrets of `ClusterIssuers`.
+fn cert_manager() -> NamespaceObjects {
+    NamespaceObjects {
+        namespace: "cert-manager".to_owned(),
+        deployments: vec![from(json!({
+            "metadata": {"name": "cert-manager", "namespace": "cert-manager",
+                "labels": {"app.kubernetes.io/name": "cert-manager"}},
+            "spec": {"selector": {"matchLabels": {"app": "cert-manager"}},
+                "template": {"metadata": {"labels": {"app": "cert-manager"}},
+                    "spec": {"containers": [{"name": "cert-manager-controller",
+                        "image": "quay.io/jetstack/cert-manager-controller:v1.21.2",
+                        "args": ["--v=2", "--cluster-resource-namespace=$(POD_NAMESPACE)"]}]}}}
+        }))],
+        ..NamespaceObjects::default()
+    }
+}
+
 fn kube_system() -> NamespaceObjects {
     let pod = |name: &str, cpu: &str, memory: &str| -> Pod {
         let replica_set = name.rsplit_once('-').map_or(name, |(set, _)| set);
