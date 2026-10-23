@@ -13,7 +13,8 @@ use zeabur_adapters::group::{
 };
 use zeabur_adapters::operators::{database_cluster, is_operator};
 use zeabur_model::{
-    Classification, ManagedBy, Origin, Phase, Replicas, WorkloadKind, WorkloadRef, WorkloadSummary,
+    Classification, ManagedBy, Origin, Phase, Replicas, TaskSchedule, WorkloadKind, WorkloadRef,
+    WorkloadSummary,
 };
 
 use crate::project::provenance;
@@ -483,6 +484,30 @@ pub fn summarise_with(
             .as_ref()
             .map(|time| time.0.to_string()),
         provenance: provenance(workload.meta()),
+        schedule: schedule(workload),
         origin: Origin::object(workload.kind().as_str(), workload.name()),
     }
+}
+
+fn schedule(workload: Workload<'_>) -> Option<TaskSchedule> {
+    let Workload::CronJob(cron_job) = workload else {
+        return None;
+    };
+    let spec = cron_job.spec.as_ref()?;
+    Some(TaskSchedule {
+        cron: spec.schedule.clone(),
+        time_zone: spec.time_zone.clone(),
+        suspended: spec.suspend.unwrap_or(false),
+        last_scheduled: cron_job
+            .status
+            .as_ref()
+            .and_then(|s| s.last_schedule_time.as_ref())
+            .map(|time| time.0.to_string()),
+        task_of: cron_job
+            .metadata
+            .labels
+            .as_ref()
+            .and_then(|l| l.get(zeabur_adapters::LABEL_TASK_OF))
+            .cloned(),
+    })
 }

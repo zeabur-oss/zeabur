@@ -215,6 +215,10 @@ function sentenceOf(
       return t("confirm.debugContainer", change.pod)
     case "clusterTools":
       return t("confirm.clusterTools")
+    case "scheduleTask":
+      return t("confirm.scheduleTask", change.name, change.from.name)
+    case "runTask":
+      return t("confirm.runTask", change.cronJob)
   }
 }
 
@@ -723,6 +727,10 @@ export function actionOf(t: Translate, ask: Asked): string {
       return change.profile === "restricted" ? t("action.makeStrict") : t("action.makeCompatible")
     case "podSecurity":
       return change.level === "restricted" ? t("action.makeStrict") : t("action.save")
+    case "scheduleTask":
+      return t("action.create")
+    case "runTask":
+      return t("tasks.runNow")
   }
 }
 

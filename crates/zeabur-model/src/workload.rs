@@ -271,6 +271,32 @@ pub struct WorkloadSummary {
     pub created: Option<String>,
     /// The tool that manages the workload, if any.
     pub provenance: Provenance,
+    /// A CronJob's schedule; absent for other kinds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule: Option<TaskSchedule>,
     /// The workload object.
     pub origin: Origin,
+}
+
+/// When a CronJob runs [k8s-cronjob].
+///
+/// [k8s-cronjob]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct TaskSchedule {
+    /// The cron expression (`spec.schedule`).
+    pub cron: String,
+    /// The IANA time zone of the expression (`spec.timeZone`); absent: the controller's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_zone: Option<String>,
+    /// The controller starts no new runs (`spec.suspend`).
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub suspended: bool,
+    /// When a run was last started, in RFC 3339.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_scheduled: Option<String>,
+    /// The service it was made from: its `zeabur.com/task-of` label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_of: Option<String>,
 }

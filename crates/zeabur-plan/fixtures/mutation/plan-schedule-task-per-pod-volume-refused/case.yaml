@@ -1,0 +1,3 @@
+description: "A StatefulSet's per-pod volume comes from its claim templates, which a task cannot mount, so the task is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "scheduleTask", "from": {"kind": "StatefulSet", "name": "db"}, "name": "db-dump", "schedule": "@daily", "command": "pg_dumpall > /tmp/x"}]}}

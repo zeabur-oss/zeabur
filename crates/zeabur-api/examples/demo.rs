@@ -931,7 +931,9 @@ fn billing() -> NamespaceObjects {
     let ns = "billing";
     let run = "invoice-run-29342880";
     let cron_job: CronJob = from(json!({
-        "metadata": {"name": "invoice-run", "namespace": ns},
+        "metadata": {"name": "invoice-run", "namespace": ns,
+            "uid": "00000000-0000-0000-0000-000000000000",
+            "labels": {"zeabur.com/task-of": "api"}},
         "spec": {"schedule": "0 2 * * *", "jobTemplate": {"spec": {"template": {"spec": {
             "restartPolicy": "Never",
             "containers": [{"name": "invoice-run", "image": "ghcr.io/example/billing:3.2.0",
@@ -939,13 +941,29 @@ fn billing() -> NamespaceObjects {
         "status": {"lastScheduleTime": "2026-10-14T02:00:00Z"}
     }));
     let job: Job = from(json!({
-        "metadata": {"name": run, "namespace": ns, "ownerReferences": [{"apiVersion": "batch/v1",
+        "metadata": {"name": run, "namespace": ns, "creationTimestamp": "2026-10-14T02:00:00Z",
+            "ownerReferences": [{"apiVersion": "batch/v1",
             "kind": "CronJob", "name": "invoice-run",
             "uid": "00000000-0000-0000-0000-000000000000", "controller": true}]},
         "spec": {"backoffLimit": 0, "template": {"spec": {"restartPolicy": "Never",
             "containers": [{"name": "invoice-run", "image": "ghcr.io/example/billing:3.2.0"}]}}},
-        "status": {"failed": 1, "conditions": [{"type": "Failed", "status": "True",
+        "status": {"failed": 1, "startTime": "2026-10-14T02:00:00Z",
+            "conditions": [{"type": "Failed", "status": "True",
             "reason": "BackoffLimitExceeded", "message": "Job has reached the specified backoff limit"}]}
+    }));
+    // A run started by hand the day before, which succeeded.
+    let manual: Job = from(json!({
+        "metadata": {"name": "invoice-run-manual-1013091500", "namespace": ns,
+            "creationTimestamp": "2026-10-13T09:15:00Z",
+            "annotations": {"cronjob.kubernetes.io/instantiate": "manual"},
+            "ownerReferences": [{"apiVersion": "batch/v1",
+            "kind": "CronJob", "name": "invoice-run",
+            "uid": "00000000-0000-0000-0000-000000000000", "controller": true}]},
+        "spec": {"backoffLimit": 0, "template": {"spec": {"restartPolicy": "Never",
+            "containers": [{"name": "invoice-run", "image": "ghcr.io/example/billing:3.2.0"}]}}},
+        "status": {"succeeded": 1, "startTime": "2026-10-13T09:15:00Z",
+            "completionTime": "2026-10-13T09:16:12Z",
+            "conditions": [{"type": "Complete", "status": "True"}]}
     }));
     let failed = json!({"phase": "Failed", "containerStatuses": [{"name": "invoice-run",
         "ready": false, "restartCount": 0, "image": "example", "imageID": "",
@@ -962,7 +980,7 @@ fn billing() -> NamespaceObjects {
         )],
         stateful_sets: vec![stateful_set_in(ns, "db", "postgres:18", "20Gi", &json!([]))],
         cron_jobs: vec![cron_job],
-        jobs: vec![job],
+        jobs: vec![job, manual],
         pods: vec![
             pod_in(ns, "api-5b7d9-c3v8n", "api", None, &running("api", 0)),
             pod_in(ns, "api-5b7d9-m1x4q", "api", None, &running("api", 0)),

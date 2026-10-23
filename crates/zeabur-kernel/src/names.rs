@@ -16,6 +16,9 @@ pub const LABEL_PROJECT: &str = "zeabur.com/project";
 /// Label on a workload that names its group within a project.
 pub const LABEL_GROUP: &str = "zeabur.com/group";
 
+/// Label on a scheduled task's CronJob that names the service it was made from.
+pub const LABEL_TASK_OF: &str = "zeabur.com/task-of";
+
 /// Annotation on a project's namespace: the name to show instead of the namespace's.
 ///
 /// OpenShift keeps the same detail as `openshift.io/display-name`. Annotations, not labels: they

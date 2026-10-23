@@ -1,0 +1,3 @@
+description: "Run now creates a Job from the CronJob's jobTemplate as kubectl create job --from does: annotated manual and controlled by the CronJob."
+operation: mutation.plan
+params: {"now": "2026-10-23T10:15:30Z", "request": {"changes": [{"op": "runTask", "cronJob": "nightly"}]}}

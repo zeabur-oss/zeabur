@@ -3081,6 +3081,40 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/services/{kind}/{name}/runs":
+    get:
+      tags:
+      - services
+      summary: A CronJob's runs, newest first.
+      operationId: taskRuns
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: kind
+        in: path
+        description: cronjob; any case
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskRuns"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/services/{kind}/{name}/timeline":
     get:
       tags:
@@ -4963,6 +4997,67 @@ components:
             type: string
             enum:
             - details
+      - type: object
+        description: |-
+          Make a scheduled task from a service: a CronJob that runs a command in a copy of one of
+          its containers (see the `tasks` module).
+        required:
+        - from
+        - name
+        - schedule
+        - command
+        - op
+        properties:
+          command:
+            type: string
+            description: The command, run by `/bin/sh -c`.
+          concurrency:
+            $ref: "#/components/schemas/TaskConcurrency"
+            description: What happens when a run is due while the last one still runs.
+          container:
+            type:
+            - string
+            - "null"
+            description: The container to copy; may be left out when the workload has only one.
+          from:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: "The service: a Deployment, StatefulSet or DaemonSet."
+          keepFailed:
+            type: integer
+            format: int32
+            description: How many failed runs to keep.
+          keepSucceeded:
+            type: integer
+            format: int32
+            description: How many succeeded runs to keep.
+          name:
+            type: string
+            description: The CronJob's name.
+          op:
+            type: string
+            enum:
+            - scheduleTask
+          schedule:
+            type: string
+            description: When it runs, a cron expression such as `0 3 * * *`.
+          timeZone:
+            type:
+            - string
+            - "null"
+            description: The IANA time zone of the schedule; by default the controller's, usually UTC.
+      - type: object
+        description: Run a CronJob now, as `kubectl create job --from=cronjob/<name>` does.
+        required:
+        - cronJob
+        - op
+        properties:
+          cronJob:
+            type: string
+            description: The CronJob.
+          op:
+            type: string
+            enum:
+            - runTask
       - type: object
         description: |-
           Add a debug container to a pod, for a terminal in a container whose image has no shell:
@@ -10741,6 +10836,25 @@ components:
             description: Its name.
       - type: object
         description: |-
+          The new task runs the service's image as it is now; a later change to the service's
+          image does not reach the task.
+        required:
+        - from
+        - image
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - taskImageCopied
+          from:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The service.
+          image:
+            type: string
+            description: The image.
+      - type: object
+        description: |-
           Once applied, every workload of the project meets the restricted level, but the project
           enforces only this one: a `podSecurity` change to `restricted` would raise it.
         required:
@@ -12634,6 +12748,13 @@ components:
       description: >-
         One address's way, and the plan that fixes where it stops when Zeabur can write
         one.
+    RunStatus:
+      type: string
+      description: How a run stands.
+      enum:
+      - running
+      - succeeded
+      - failed
     RuntimeAlerts:
       type: object
       description: Falco's recent alerts in one place.
@@ -13411,6 +13532,94 @@ components:
           - string
           - "null"
           description: Its value.
+    TaskConcurrency:
+      type: string
+      description: |-
+        A CronJob's `concurrencyPolicy` [k8s-concurrency].
+        
+        [k8s-concurrency]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#concurrency-policy
+      enum:
+      - forbid
+      - allow
+      - replace
+    TaskRun:
+      type: object
+      description: One run of a CronJob.
+      required:
+      - name
+      - status
+      - manual
+      - pods
+      properties:
+        finished:
+          type:
+          - string
+          - "null"
+          description: When it ended, in RFC 3339.
+        manual:
+          type: boolean
+          description: "Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`)."
+        name:
+          type: string
+          description: The Job's name.
+        pods:
+          type: array
+          items:
+            type: string
+          description: Its pods, newest last, for their logs.
+        started:
+          type:
+          - string
+          - "null"
+          description: When it started, in RFC 3339.
+        status:
+          $ref: "#/components/schemas/RunStatus"
+          description: How it stands.
+    TaskRuns:
+      type: object
+      description: A CronJob's runs.
+      required:
+      - id
+      - runs
+      properties:
+        id:
+          type: string
+          description: "`projects/<project>/services/cronjob/<name>/runs`."
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskRun"
+          description: The newest runs first, at most 50.
+    TaskSchedule:
+      type: object
+      description: |-
+        When a CronJob runs [k8s-cronjob].
+        
+        [k8s-cronjob]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
+      required:
+      - cron
+      properties:
+        cron:
+          type: string
+          description: The cron expression (`spec.schedule`).
+        lastScheduled:
+          type:
+          - string
+          - "null"
+          description: When a run was last started, in RFC 3339.
+        suspended:
+          type: boolean
+          description: The controller starts no new runs (`spec.suspend`).
+        taskOf:
+          type:
+          - string
+          - "null"
+          description: "The service it was made from: its `zeabur.com/task-of` label."
+        timeZone:
+          type:
+          - string
+          - "null"
+          description: "The IANA time zone of the expression (`spec.timeZone`); absent: the controller's."
     Timeline:
       type: object
       description: A timeline.
@@ -14234,6 +14443,11 @@ components:
             oneOf:
             - $ref: "#/components/schemas/Replicas"
               description: Ready and desired replicas; absent for a CronJob, which has no meaningful ratio.
+            - type: "null"
+          schedule:
+            oneOf:
+            - $ref: "#/components/schemas/TaskSchedule"
+              description: A CronJob's schedule; absent for other kinds.
             - type: "null"
       description: A workload as lists show it.
     Writer:

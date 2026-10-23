@@ -1642,6 +1642,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/services/{kind}/{name}/runs": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** A CronJob's runs, newest first. */
+    get: operations["taskRuns"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/services/{kind}/{name}/timeline": {
     parameters: {
       query?: never
@@ -2645,6 +2662,40 @@ export interface components {
           icon?: components["schemas"]["ProjectIcon"] | null
           /** @enum {string} */
           op: "details"
+        }
+      | {
+          /** @description The command, run by `/bin/sh -c`. */
+          command: string
+          /** @description What happens when a run is due while the last one still runs. */
+          concurrency?: components["schemas"]["TaskConcurrency"]
+          /** @description The container to copy; may be left out when the workload has only one. */
+          container?: string | null
+          /** @description The service: a Deployment, StatefulSet or DaemonSet. */
+          from: components["schemas"]["WorkloadRef"]
+          /**
+           * Format: int32
+           * @description How many failed runs to keep.
+           */
+          keepFailed?: number
+          /**
+           * Format: int32
+           * @description How many succeeded runs to keep.
+           */
+          keepSucceeded?: number
+          /** @description The CronJob's name. */
+          name: string
+          /** @enum {string} */
+          op: "scheduleTask"
+          /** @description When it runs, a cron expression such as `0 3 * * *`. */
+          schedule: string
+          /** @description The IANA time zone of the schedule; by default the controller's, usually UTC. */
+          timeZone?: string | null
+        }
+      | {
+          /** @description The CronJob. */
+          cronJob: string
+          /** @enum {string} */
+          op: "runTask"
         }
       | {
           /** @description The container whose processes it shares; by default the pod's default container. */
@@ -5613,6 +5664,14 @@ export interface components {
         }
       | {
           /** @enum {string} */
+          code: "taskImageCopied"
+          /** @description The service. */
+          from: components["schemas"]["WorkloadRef"]
+          /** @description The image. */
+          image: string
+        }
+      | {
+          /** @enum {string} */
           code: "projectCanBeRestricted"
           /** @description The level the project enforces now. */
           level: components["schemas"]["PodSecurityLevel"]
@@ -6582,6 +6641,11 @@ export interface components {
     RouteTraceView: components["schemas"]["RouteTrace"] & {
       fix?: components["schemas"]["PlanRequest"] | null
     }
+    /**
+     * @description How a run stands.
+     * @enum {string}
+     */
+    RunStatus: "running" | "succeeded" | "failed"
     /** @description Falco's recent alerts in one place. */
     RuntimeAlerts: {
       /**
@@ -7019,6 +7083,52 @@ export interface components {
       /** @description Its value. */
       value?: string | null
     }
+    /**
+     * @description A CronJob's `concurrencyPolicy` [k8s-concurrency].
+     *
+     *     [k8s-concurrency]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#concurrency-policy
+     * @enum {string}
+     */
+    TaskConcurrency: "forbid" | "allow" | "replace"
+    /** @description One run of a CronJob. */
+    TaskRun: {
+      /** @description When it ended, in RFC 3339. */
+      finished?: string | null
+      /** @description Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`). */
+      manual: boolean
+      /** @description The Job's name. */
+      name: string
+      /** @description Its pods, newest last, for their logs. */
+      pods: string[]
+      /** @description When it started, in RFC 3339. */
+      started?: string | null
+      /** @description How it stands. */
+      status: components["schemas"]["RunStatus"]
+    }
+    /** @description A CronJob's runs. */
+    TaskRuns: {
+      /** @description `projects/<project>/services/cronjob/<name>/runs`. */
+      id: string
+      /** @description The newest runs first, at most 50. */
+      runs: components["schemas"]["TaskRun"][]
+    }
+    /**
+     * @description When a CronJob runs [k8s-cronjob].
+     *
+     *     [k8s-cronjob]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
+     */
+    TaskSchedule: {
+      /** @description The cron expression (`spec.schedule`). */
+      cron: string
+      /** @description When a run was last started, in RFC 3339. */
+      lastScheduled?: string | null
+      /** @description The controller starts no new runs (`spec.suspend`). */
+      suspended?: boolean
+      /** @description The service it was made from: its `zeabur.com/task-of` label. */
+      taskOf?: string | null
+      /** @description The IANA time zone of the expression (`spec.timeZone`); absent: the controller's. */
+      timeZone?: string | null
+    }
     /** @description A timeline. */
     Timeline: {
       /** @description `projects/<project>/timeline` or `projects/<project>/services/<kind>/<name>/timeline`. */
@@ -7451,6 +7561,7 @@ export interface components {
       /** @description The tool that manages the workload, if any. */
       provenance: components["schemas"]["Provenance"]
       replicas?: components["schemas"]["Replicas"] | null
+      schedule?: components["schemas"]["TaskSchedule"] | null
     }
     /** @description Who wrote, as far as `managedFields` say. */
     Writer: {
@@ -10896,6 +11007,38 @@ export interface operations {
         }
         content: {
           "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  taskRuns: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        project: string
+        /** @description cronjob; any case */
+        kind: string
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["TaskRuns"]
         }
       }
       404: {

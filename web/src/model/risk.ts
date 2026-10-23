@@ -125,6 +125,8 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "rebuild":
       return { risk: "low" }
     case "deployKey":
+    case "scheduleTask":
+    case "runTask":
       return { risk: "normal" }
   }
 }

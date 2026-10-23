@@ -208,6 +208,7 @@ mod tests {
                 replicas: replicas.map(|(ready, desired)| Replicas { ready, desired }),
                 image: None,
                 created: None,
+                schedule: None,
                 provenance: Provenance {
                     tool: None,
                     managed_by: None,

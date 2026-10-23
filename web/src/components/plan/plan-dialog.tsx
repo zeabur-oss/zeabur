@@ -678,6 +678,8 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
     }
     case "httpsCertificate":
       return { text: warningSentence(t, warning), health: "ok" }
+    case "taskImageCopied":
+      return { text: warningSentence(t, warning), health: "idle" }
     default:
       return { text: warningSentence(t, warning) }
   }
@@ -774,6 +776,8 @@ function warningSentence(
         .join(" ")
     case "toolsCredentialExposed":
       return t("warn.toolsCredentialExposed", warning.namespace)
+    case "taskImageCopied":
+      return t("warn.taskImageCopied", warning.from.name, warning.image)
     case "debugContainerStays":
     case "debugContainerReused":
     case "toolsPod":

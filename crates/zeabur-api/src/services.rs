@@ -6,6 +6,7 @@ pub mod history;
 pub mod logs;
 pub mod releases;
 pub mod rollout;
+pub mod runs;
 pub mod trace;
 
 use axum::Json;

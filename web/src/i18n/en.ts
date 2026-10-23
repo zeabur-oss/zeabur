@@ -1740,6 +1740,10 @@ export const en = {
   "confirm.yamlAsIs":
     "Zeabur writes the YAML as it is: every field you changed takes effect at once.",
   "confirm.create": (kind: string, name: string) => `Create ${kind} ${name}.`,
+  "confirm.scheduleTask": (name: string, service: string) =>
+    `Add CronJob ${name}: it runs the command in a new container copied from ${service}. ${service} doesn't restart.`,
+  "confirm.runTask": (name: string) =>
+    `Start one run of ${name} now, as a new Job. Its schedule doesn't change.`,
   "confirm.deployKey": (name: string) => `Create Secret ${name} with the new deploy key.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
@@ -3142,6 +3146,55 @@ export const en = {
   "part.compute": "Compute",
   "part.health-checks": "Health checks",
   "part.security": "Security",
+  "part.tasks": "Scheduled tasks",
+  "tasks.hint":
+    "Run a command from this service on a schedule, such as a nightly cleanup or a report.",
+  "tasks.none": "No scheduled tasks",
+  "tasks.noneHint": "Add one to run a command from this service at set times.",
+  "tasks.another": "Run another command on a schedule",
+  "tasks.add": "Add scheduled task",
+  "tasks.paused": "Paused",
+  "tasks.badName": (max: number) =>
+    `Use up to ${max} lowercase letters, digits and hyphens, starting and ending with a letter or digit.`,
+  "tasks.needCommand": "Enter the command to run.",
+  "tasks.needSchedule": "Enter when it runs.",
+  "tasks.badKeep": "Enter a whole number from 0 to 100.",
+  "tasks.planTitle": (name: string, service: string) =>
+    `Add scheduled task ${name} from ${service}`,
+  "tasks.addTitle": (service: string) => `Add a scheduled task to ${service}`,
+  "tasks.addHint": (service: string) =>
+    `Each run starts a new container with ${service}'s image, variables and volumes as they are now. A later image change to ${service} doesn't reach the task.`,
+  "tasks.command": "Command",
+  "tasks.commandHint": "Runs in a shell, from the image's working folder.",
+  "tasks.schedule": "Schedule",
+  "tasks.scheduleHint": "Five cron fields: minute, hour, day of month, month, day of week.",
+  "tasks.zone": "Time zone",
+  "tasks.zoneHint": "Leave empty to use the cluster's clock, usually UTC.",
+  "tasks.name": "Name",
+  "tasks.container": "Container to copy",
+  "tasks.overlap": "If the last run is still running",
+  "tasks.overlap.forbid": "Skip the new run",
+  "tasks.overlap.allow": "Run both",
+  "tasks.overlap.replace": "Stop the last run and start the new one",
+  "tasks.keepSucceeded": "Successful runs to keep",
+  "tasks.keepFailed": "Failed runs to keep",
+  "tasks.kube.object": "Creates",
+  "tasks.kube.command": "Command",
+  "tasks.kube.copied": "Copied from the service",
+  "tasks.kube.copiedValue":
+    "image, env, envFrom, volumeMounts and the volumes they use, resources, securityContext, serviceAccountName, imagePullSecrets, nodeSelector, affinity, tolerations",
+  "tasks.runs": "Runs",
+  "tasks.runTitle": (name: string) => `Run ${name} now`,
+  "tasks.runNow": "Run now",
+  "tasks.noRuns":
+    "No runs yet. The first one starts at the next scheduled time, or now with Run now.",
+  "tasks.run.running": "Running",
+  "tasks.run.succeeded": "Succeeded",
+  "tasks.run.failed": "Failed",
+  "tasks.manual": "Started by hand",
+  "tasks.allRuns": (n: number) => `Show all ${n} runs`,
+  "warn.taskImageCopied": (service: string, image: string) =>
+    `The task runs ${image}, ${service}'s image now; a later image change to ${service} doesn't reach it`,
   "form.healthHint":
     "Checks the cluster runs on each replica: whether it takes traffic, whether to restart it, and when it has started.",
   "draft.add": "Add to changes",

@@ -528,6 +528,22 @@ export const rolloutQuery = (project: string, kind: string, name: string) =>
     refetchIntervalInBackground: false,
   })
 
+/** A CronJob's runs, newest first; polled faster while one runs. */
+export const taskRunsQuery = (project: string, name: string) =>
+  queryOptions({
+    queryKey: ["project", project, "runs", name],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/services/{kind}/{name}/runs", {
+          params: servicePath(project, "CronJob", name),
+          signal,
+        }),
+      ),
+    refetchInterval: (query) =>
+      query.state.data?.runs.some((r) => r.status === "running") ? 3_000 : POLL,
+    refetchIntervalInBackground: false,
+  })
+
 export const serviceTimelineQuery = (project: string, kind: string, name: string) =>
   queryOptions({
     queryKey: ["project", project, "timeline", kind, name],

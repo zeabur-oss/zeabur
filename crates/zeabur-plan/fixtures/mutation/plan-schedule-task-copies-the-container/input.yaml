@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+  labels: {app.kubernetes.io/name: web, zeabur.com/group: shop}
+spec:
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      serviceAccountName: web
+      containers:
+        - name: app
+          image: example/web:1.0
+          ports: [{containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /healthz, port: 8080}}
+          envFrom: [{secretRef: {name: web-env}}]
+          env: [{name: MODE, value: production}]
+          volumeMounts: [{name: data, mountPath: /data}]
+        - name: proxy
+          image: example/proxy:1.0
+          volumeMounts: [{name: cache, mountPath: /cache}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: web-data}
+        - name: cache
+          emptyDir: {}

@@ -1,0 +1,45 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "target": {"apiVersion": "batch/v1", "kind": "CronJob", "name": "web-cleanup", "plural": "cronjobs"},
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "batch/v1",
+          "kind": "CronJob",
+          "metadata": {
+            "name": "web-cleanup",
+            "namespace": "demo",
+            "labels": {"app.kubernetes.io/name": "web-cleanup", "zeabur.com/group": "shop", "zeabur.com/task-of": "web"}
+          },
+          "spec": {
+            "schedule": "0 3 * * *",
+            "concurrencyPolicy": "Forbid",
+            "successfulJobsHistoryLimit": 3,
+            "failedJobsHistoryLimit": 1,
+            "jobTemplate": {"spec": {"template": {
+              "metadata": {"labels": {"app.kubernetes.io/name": "web-cleanup"}},
+              "spec": {
+                "restartPolicy": "Never",
+                "serviceAccountName": "web",
+                "containers": [{
+                  "name": "app",
+                  "image": "example/web:1.0",
+                  "command": ["/bin/sh", "-c", "bin/cleanup --days 30"],
+                  "env": [{"name": "MODE", "value": "production"}],
+                  "envFrom": [{"secretRef": {"name": "web-env"}}],
+                  "volumeMounts": [{"name": "data", "mountPath": "/data"}],
+                  "ports": null,
+                  "readinessProbe": null
+                }],
+                "volumes": [{"name": "data", "persistentVolumeClaim": {"claimName": "web-data"}}]
+              }
+            }}}
+          }
+        }
+      }
+    }
+  ],
+  "warnings": [{"code": "taskImageCopied", "from": {"kind": "Deployment", "name": "web"}, "image": "example/web:1.0"}]
+}

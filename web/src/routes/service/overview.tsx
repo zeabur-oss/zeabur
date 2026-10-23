@@ -67,6 +67,7 @@ import {
 } from "@/model/service"
 import type { ServicePlace } from "@/routes/search"
 import { useServiceBuilds } from "@/routes/service/builds"
+import { TaskRunsCard } from "@/routes/service/tasks"
 import { UsageGlance } from "@/routes/service/usage"
 
 type OnTab = (place: ServicePlace, pod?: string) => void
@@ -134,6 +135,7 @@ export function OverviewTab({
           }
         />
       ) : null}
+      {service.kind === "CronJob" ? <TaskRunsCard project={project} service={service} /> : null}
       {said.rollout.as === "card" && rollout.data && !buildSays(service) ? (
         <Rollout project={project} service={service} data={rollout.data} />
       ) : null}

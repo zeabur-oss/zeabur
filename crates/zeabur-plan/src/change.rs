@@ -314,6 +314,40 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         icon: Option<ProjectIcon>,
     },
+    /// Make a scheduled task from a service: a CronJob that runs a command in a copy of one of
+    /// its containers (see the `tasks` module).
+    #[serde(rename_all = "camelCase")]
+    ScheduleTask {
+        /// The service: a Deployment, StatefulSet or DaemonSet.
+        from: WorkloadRef,
+        /// The container to copy; may be left out when the workload has only one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        container: Option<String>,
+        /// The CronJob's name.
+        name: String,
+        /// When it runs, a cron expression such as `0 3 * * *`.
+        schedule: String,
+        /// The IANA time zone of the schedule; by default the controller's, usually UTC.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        time_zone: Option<String>,
+        /// The command, run by `/bin/sh -c`.
+        command: String,
+        /// What happens when a run is due while the last one still runs.
+        #[serde(default)]
+        concurrency: TaskConcurrency,
+        /// How many succeeded runs to keep.
+        #[serde(default = "three")]
+        keep_succeeded: i32,
+        /// How many failed runs to keep.
+        #[serde(default = "one")]
+        keep_failed: i32,
+    },
+    /// Run a CronJob now, as `kubectl create job --from=cronjob/<name>` does.
+    #[serde(rename_all = "camelCase")]
+    RunTask {
+        /// The CronJob.
+        cron_job: String,
+    },
     /// Add a debug container to a pod, for a terminal in a container whose image has no shell:
     /// an ephemeral container with a shell image, sharing the target container's processes
     /// (see the `terminal` module). Kubernetes keeps it until the pod is replaced. When one of
@@ -349,6 +383,42 @@ impl Change {
             self,
             Self::CreateProject { .. } | Self::Adopt | Self::Unadopt | Self::Details { .. }
         )
+    }
+}
+
+const fn three() -> i32 {
+    3
+}
+
+const fn one() -> i32 {
+    1
+}
+
+/// A CronJob's `concurrencyPolicy` [k8s-concurrency].
+///
+/// [k8s-concurrency]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#concurrency-policy
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum TaskConcurrency {
+    /// Skip the new run.
+    #[default]
+    Forbid,
+    /// Start it beside the last one.
+    Allow,
+    /// Stop the last one and start the new one.
+    Replace,
+}
+
+impl TaskConcurrency {
+    /// The value Kubernetes reads.
+    #[must_use]
+    pub const fn as_kubernetes(self) -> &'static str {
+        match self {
+            Self::Forbid => "Forbid",
+            Self::Allow => "Allow",
+            Self::Replace => "Replace",
+        }
     }
 }
 
@@ -823,6 +893,15 @@ pub enum Warning {
         namespace: String,
         /// Its name.
         pod: String,
+    },
+    /// The new task runs the service's image as it is now; a later change to the service's
+    /// image does not reach the task.
+    #[serde(rename_all = "camelCase")]
+    TaskImageCopied {
+        /// The service.
+        from: WorkloadRef,
+        /// The image.
+        image: String,
     },
     /// Once applied, every workload of the project meets the restricted level, but the project
     /// enforces only this one: a `podSecurity` change to `restricted` would raise it.

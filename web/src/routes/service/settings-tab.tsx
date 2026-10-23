@@ -24,13 +24,19 @@ const Security = lazy(() =>
     default: m.SecuritySection,
   })),
 )
+const Tasks = lazy(() =>
+  import("@/routes/service/tasks").then((m) => ({
+    default: m.TasksSection,
+  })),
+)
 const HealthChecks = lazy(() =>
   import("@/routes/service/settings").then((m) => ({
     default: m.HealthChecksSection,
   })),
 )
 
-/** Compute, health checks and storage, one under the other; edits wait in the draft. */
+/** Compute, health checks, storage, security and scheduled tasks, one under the other; edits wait
+ * in the draft. */
 export function SettingsTab({
   project,
   service,
@@ -55,6 +61,7 @@ export function SettingsTab({
     "storage",
     // A Job's pod template can't change.
     ...(service.kind === "Job" ? [] : (["security"] as const)),
+    ...(isTask(service.kind) ? [] : (["tasks"] as const)),
   ]
 
   useEffect(() => {
@@ -111,6 +118,11 @@ export function SettingsTab({
           {parts.includes("security") ? (
             <Part id="security">
               <Security project={project} service={service} />
+            </Part>
+          ) : null}
+          {parts.includes("tasks") ? (
+            <Part id="tasks">
+              <Tasks project={project} service={service} />
             </Part>
           ) : null}
         </Suspense>
