@@ -9,7 +9,7 @@
 //! | `GET /api/v1/projects/{p}/tools/{name}/terminal` | a terminal in it, over a WebSocket, as `pods/exec` (see `pods::exec`) |
 //! | `DELETE /api/v1/projects/{p}/tools/{name}` | deletes it |
 //!
-//! `cluster::tools` serves the same for an administrator's cluster tools pods ([`Scope`]).
+//! `cluster::tools` serves the same for an administrator's cluster tools pods (`Scope`).
 //!
 //! # The credential
 //!

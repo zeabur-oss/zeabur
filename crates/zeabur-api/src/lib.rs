@@ -195,9 +195,14 @@ promised a stable `/api/v1`.",
 struct ApiDoc;
 
 fn routes() -> OpenApiRouter<AppState> {
-    OpenApiRouter::with_openapi(ApiDoc::openapi())
+    let router = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .routes(routes!(identity::whoami))
-        .routes(routes!(identity::get))
+        .routes(routes!(identity::get));
+    remaining_routes(cluster_routes(router))
+}
+
+fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
+    router
         .routes(routes!(cluster::get))
         .routes(routes!(cluster::capabilities))
         .routes(routes!(cluster::backups::get))
@@ -228,6 +233,10 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(alerts::cluster))
         .routes(routes!(gaps::cluster))
         .routes(routes!(incidents::cluster))
+}
+
+fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
+    router
         .routes(routes!(projects::list))
         .routes(routes!(projects::get))
         .routes(routes!(projects::namespace::get))

@@ -25,7 +25,7 @@
 //! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location.
 //!
 //! `storageclasses.storage.k8s.io` and `persistentvolumes` in `ZEABUR_DEMO_FORBID` refuse
-//! reading the StorageClasses (local-path, the default, and Longhorn) and the volumes behind
+//! reading the storage classes (local-path, the default, and Longhorn) and the volumes behind
 //! claims.
 //!
 //! `namespaces` in `ZEABUR_DEMO_FORBID` refuses creating projects. New public URLs are suggested
