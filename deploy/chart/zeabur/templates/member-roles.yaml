@@ -6,7 +6,8 @@
 # A project role aggregates the ClusterRoles labelled `zeabur.com/aggregate-to-<role>`: the rule
 # sets files/member-role-sets.yaml names for it (its own rules are `<role>-rules`) and those of
 # components installed next to it, such as Zeabur Proxy's zeabur-proxy-logs-reader.
-# kube-controller-manager writes the aggregate's rules
+# kube-controller-manager writes the aggregate's rules, so the chart leaves the field out
+# (with it, a server-side apply upgrade conflicts with the controller)
 # (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
 {{- $sets := .Files.Get "files/member-role-sets.yaml" | fromYaml }}
 {{- range $name, $rules := .Files.Get "files/member-roles.yaml" | fromYaml }}
@@ -37,7 +38,6 @@ aggregationRule:
   clusterRoleSelectors:
     - matchLabels:
         zeabur.com/aggregate-to-{{ $role }}: "true"
-rules: []
 {{- end }}
 {{- end }}
 {{- if or .Values.memberRoles.enabled .Values.proxy.enabled }}
