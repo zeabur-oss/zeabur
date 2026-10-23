@@ -9,7 +9,6 @@ import { PlanFallback } from "@/components/plan/fallback"
 import { CommandPalette } from "@/components/shell/command-palette"
 import { DockSlot } from "@/components/shell/dock-slot"
 import { AdminBadge } from "@/components/shell/admin-badge"
-import { ProjectSidebar } from "@/components/shell/project-sidebar"
 import { Sidebar } from "@/components/shell/sidebar"
 import { useT } from "@/i18n"
 import { adding } from "@/lib/adding"
@@ -31,6 +30,10 @@ const Toaster = lazy(() =>
 const ElevationDialog = lazy(() =>
   import("@/components/elevation-dialog").then((m) => ({ default: m.ElevationDialog })),
 )
+// Only project pages show the project sidebar, with its "New" menu and the services' states.
+const ProjectSidebar = lazy(() =>
+  import("@/components/shell/project-sidebar").then((m) => ({ default: m.ProjectSidebar })),
+)
 // The "New" forms load when one opens.
 const AddHost = lazy(() => import("@/components/add/host").then((m) => ({ default: m.AddHost })))
 
@@ -43,7 +46,13 @@ export function AppShell() {
   const theme = useTheme()
   const pathname = useLocation({ select: (location) => location.pathname })
   const content = usePageTransition<HTMLElement>(pathname)
-  const nav = place.project ? <ProjectSidebar project={place.project} /> : <Sidebar />
+  const nav = place.project ? (
+    <Suspense fallback={null}>
+      <ProjectSidebar project={place.project} />
+    </Suspense>
+  ) : (
+    <Sidebar />
+  )
 
   return (
     <TooltipProvider>
