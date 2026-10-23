@@ -408,7 +408,7 @@ export const zhTW: Messages = {
   "join.warn.ports":
     "節點之間要開放：通往伺服器的 TCP 9345 和 6443；所有節點之間的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；伺服器之間的 TCP 2379 到 2381。UDP 8472 不要對網際網路開放。",
   "join.warn.storageLocal":
-    "預設 local-path 儲存類別的磁碟區會留在建立它的節點上：用到它的 Pod 只能在那個節點上執行，資料也跟著那個節點。",
+    "預設的 local-path 儲存只把資料存在一個節點上。用到這些資料的 Pod 只能在那個節點執行；那個節點不在了，資料也就不在了。",
   "join.warn.udp": "這裡無法檢查 UDP 8472。如果它被擋住，不同節點上的 Pod 會連不到彼此。",
   "join.role": "角色",
   "join.worker": "工作節點",
@@ -420,8 +420,8 @@ export const zhTW: Messages = {
   "join.hours": (n) => `${n} 小時`,
   "join.lifetimeHint": "在這之前，可以讓任意數量的 VM 加入。",
   "join.server": "伺服器位址",
-  "join.serverHint": "伺服器的內部位址。如果新的 VM 要透過別的位址連到伺服器，請修改。",
-  "join.serverProblem.empty": "請輸入新的 VM 連到伺服器的位址。",
+  "join.serverHint": "伺服器的內部位址。新的 VM 連不到這個位址時，改成它連得到的那個。",
+  "join.serverProblem.empty": "請輸入伺服器位址，新的 VM 會用它來連線。",
   "join.serverProblem.invalid": "請寫成 https://<位址>:9345。",
   "join.planTitle": "建立加入權杖",
   "join.planNote": (until) =>
