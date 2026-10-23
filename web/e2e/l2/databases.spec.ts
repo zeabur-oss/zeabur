@@ -181,7 +181,12 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
     })
 
     await test.step(`the Developer reads ${db.name} as YAML and has a terminal`, async () => {
-      await expect(developer.getByRole("button", { name: "Terminal", exact: true })).toBeEnabled()
+      await expect(
+        developer
+          .locator("main header")
+          .first()
+          .getByRole("button", { name: "Terminal", exact: true }),
+      ).toBeEnabled()
       await developer.getByRole("tab", { name: "Logs" }).click()
       await expect(developer.getByRole("tabpanel")).toBeVisible()
       await developer.getByRole("tab", { name: "Settings" }).click()
@@ -236,7 +241,12 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       await expect(connect).toContainText("Needs Developer access")
       // Viewers do not read logs or open terminals.
       await expect(viewer.getByRole("tab", { name: "Logs" })).toHaveCount(0)
-      await expect(viewer.getByRole("button", { name: "Terminal", exact: true })).toBeDisabled()
+      await expect(
+        viewer
+          .locator("main header")
+          .first()
+          .getByRole("button", { name: "Terminal", exact: true }),
+      ).toBeDisabled()
       await viewer.getByRole("tab", { name: "Backups" }).click()
       const backups = viewer.getByRole("region", { name: "Backups" })
       await expect(backups).toContainText("Succeeded")

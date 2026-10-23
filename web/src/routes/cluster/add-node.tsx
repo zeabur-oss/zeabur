@@ -24,6 +24,7 @@ import {
   LIFETIMES,
   liveTokens,
   newToken,
+  secretName,
   serverProblem,
   tokenSecret,
   tokenString,
@@ -165,6 +166,7 @@ function AddNodeDrawer({
           <Ready
             script={joinScript({ server, token: tokenString(caHash, stage.token), expect })}
             until={formatTime(stage.until, locale)}
+            token={stage.token.id}
             before={stage.before}
             onClose={onClose}
           />
@@ -219,9 +221,9 @@ function AddNodeDrawer({
               label={t("join.lifetime")}
               value={String(lifetime)}
               onChange={(value) => setLifetime(Number(value) as Lifetime)}
-              options={LIFETIMES.map((hours) => ({
-                value: String(hours),
-                label: t("join.hours", hours),
+              options={LIFETIMES.map((minutes) => ({
+                value: String(minutes),
+                label: minutes < 60 ? t("join.minutes", minutes) : t("join.hours", minutes / 60),
               }))}
             />
           </div>
@@ -267,17 +269,41 @@ function ServerNote() {
 function Ready({
   script,
   until,
+  token,
   before,
   onClose,
 }: {
   script: string
   until: string
+  token: string
   before: Set<string>
   onClose: () => void
 }) {
   const t = useT()
   const nodes = useQuery({ ...nodesQuery, refetchInterval: WATCH_MS })
   const node = nodes.data ? joined(before, nodes.data.items) : undefined
+  const [revoked, setRevoked] = useState(false)
+  const planner = usePlanner(
+    "kube-system",
+    () => {
+      setRevoked(true)
+      void queryClient.invalidateQueries({ queryKey: joinQuery.queryKey })
+    },
+    true,
+  )
+  const revoke = () =>
+    planner.plan({
+      title: t("join.revokeTitle", token),
+      changes: [
+        {
+          op: "delete",
+          resource: { group: "", version: "v1", resource: "secrets" },
+          name: secretName(token),
+        },
+      ],
+      notes: [t("join.revokeNote")],
+      view: "/cluster",
+    })
   return (
     <div className="flex flex-col gap-5">
       <p className="flex items-center gap-2">
@@ -313,6 +339,17 @@ function Ready({
             >
               {t("join.viewNode")}
             </Link>
+            {node.ready ? (
+              revoked ? (
+                <span className="type-meta text-muted-foreground sm:ml-auto">
+                  {t("join.revokedNow")}
+                </span>
+              ) : (
+                <Button variant="outline" size="xs" className="sm:ml-auto" onClick={revoke}>
+                  {t("join.revokeNow")}
+                </Button>
+              )
+            ) : null}
           </>
         ) : (
           <span className="flex items-center gap-2 text-muted-foreground">
@@ -321,6 +358,7 @@ function Ready({
           </span>
         )}
       </div>
+      {planner.dialog}
     </div>
   )
 }

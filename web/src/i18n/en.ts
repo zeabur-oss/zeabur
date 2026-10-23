@@ -472,6 +472,7 @@ export const en = {
     "The control plane survives losing a server only with three or more servers: etcd needs a majority. With two, losing either one stops the cluster, so add a third.",
   "join.lifetime": "Token works for",
   "join.hours": (n: number) => plural(n, "hour", "hours"),
+  "join.minutes": (n: number) => plural(n, "minute", "minutes"),
   "join.lifetimeHint": "Any number of VMs can join with it until then.",
   "join.server": "Server address",
   "join.serverHint":
@@ -490,12 +491,14 @@ export const en = {
     "plan shows the network checks and warnings and changes nothing; apply installs RKE2 as a worker and waits until the node is Ready.",
   "join.script": "Commands for the new VM",
   "join.shownOnce":
-    "This is the only time the token is shown. Anyone who has it can add a machine to this cluster until it expires. Revoke it under Join tokens once your node has joined.",
+    "This is the only time the token is shown. Anyone who has it can add a machine to this cluster until it expires. Revoke it once your node has joined.",
   "join.waiting": "Waiting for the new node…",
   "join.joining": (name: string) => `${name} joined and is starting.`,
   "join.joined": (name: string) => `${name} joined and is Ready.`,
   "join.cannotWatch": "Zeabur cannot list the nodes, so it cannot tell when the new one joins.",
   "join.viewNode": "View node",
+  "join.revokeNow": "Revoke token",
+  "join.revokedNow": "Token revoked",
   "join.done": "Done",
   "join.tokens": "Join tokens",
   "join.expires": "Expires",

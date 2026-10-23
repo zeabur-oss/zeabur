@@ -70,8 +70,8 @@ describe("join tokens", () => {
   })
 
   test("expiry is RFC 3339 UTC to the second", () => {
-    expect(expiration(new Date("2026-10-23T08:00:00.123Z"), 24)).toBe("2026-10-24T08:00:00Z")
-    expect(expiration(new Date("2026-10-23T08:00:00Z"), 1)).toBe("2026-10-23T09:00:00Z")
+    expect(expiration(new Date("2026-10-23T08:00:00.123Z"), 60)).toBe("2026-10-23T09:00:00Z")
+    expect(expiration(new Date("2026-10-23T08:00:00Z"), 30)).toBe("2026-10-23T08:30:00Z")
   })
 
   test("the token string pins the CA", () => {

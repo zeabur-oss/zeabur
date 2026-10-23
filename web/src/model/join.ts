@@ -5,9 +5,10 @@ import type { Schemas } from "@/api/client"
 type JoinInfo = Schemas["JoinInfo"]
 type NodeView = Schemas["NodeView"]
 
-export const LIFETIMES = [1, 24] as const
+/** Minutes a token works for: long enough to join a VM, short enough not to linger. */
+export const LIFETIMES = [30, 60] as const
 export type Lifetime = (typeof LIFETIMES)[number]
-export const DEFAULT_LIFETIME: Lifetime = 24
+export const DEFAULT_LIFETIME: Lifetime = 60
 
 const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
 export const AUTH_GROUP = "system:bootstrappers:rke2:default-node-token"
@@ -44,11 +45,11 @@ export function newToken(
   return { id, secret: randomText(16, random) }
 }
 
-const secretName = (id: string) => `bootstrap-token-${id}`
+export const secretName = (id: string) => `bootstrap-token-${id}`
 
 /** RFC 3339 in UTC, to the second. */
-export const expiration = (now: Date, hours: number) =>
-  new Date(now.getTime() + hours * 3_600_000).toISOString().replace(/\.\d{3}Z$/, "Z")
+export const expiration = (now: Date, minutes: number) =>
+  new Date(now.getTime() + minutes * 60_000).toISOString().replace(/\.\d{3}Z$/, "Z")
 
 /** The Secret `rke2 token create` writes, labelled as Zeabur's. */
 export function tokenSecret(token: JoinToken, expires: string) {
