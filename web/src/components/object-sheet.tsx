@@ -37,7 +37,7 @@ export function ObjectSheet({
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
-        <div className="flex items-center gap-2 border-b px-5 py-3">
+        <div className="flex items-center gap-2 border-b px-6 py-3">
           <DialogTitle className="flex min-w-0 flex-1 items-baseline">
             <span className="truncate font-mono" translate="no">
               {address.name}
@@ -57,17 +57,24 @@ export function ObjectSheet({
             </Badge>
           ) : null}
           <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t("common.close")} />}
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="-mr-1"
+                aria-label={t("common.close")}
+              />
+            }
           >
             <XIcon aria-hidden="true" />
           </DialogClose>
         </div>
         {object.isPending ? (
-          <div className="p-5">
+          <div className="px-6 py-5">
             <LoadingRows label={t("common.loading")} rows={8} />
           </div>
         ) : object.isError ? (
-          <div className="p-5">
+          <div className="px-6 py-5">
             <Problem error={object.error} />
           </div>
         ) : (
@@ -77,13 +84,13 @@ export function ObjectSheet({
             variant="page"
             className="min-h-0 flex-1"
           >
-            <div className="px-5 pt-4">
+            <div className="px-6 pt-4">
               <TabsList aria-label={t("object.tabs")}>
                 <TabsTrigger value="overview">{t("tab.overview")}</TabsTrigger>
                 <TabsTrigger value="yaml">{t("tab.yaml")}</TabsTrigger>
               </TabsList>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-5">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
               <TabsContent value="overview">
                 <ObjectOverview
                   project={project}

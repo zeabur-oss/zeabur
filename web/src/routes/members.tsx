@@ -366,7 +366,7 @@ function MemberPanel({
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
-        <div className="flex items-center gap-3 border-b px-5 py-3">
+        <div className="flex items-center gap-3 border-b px-6 py-3">
           <Avatar size="sm" shape="circle" name={name} />
           <div className="flex min-w-0 flex-1 flex-col">
             <DialogTitle>{name}</DialogTitle>
@@ -375,12 +375,19 @@ function MemberPanel({
             </span>
           </div>
           <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t("common.close")} />}
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="-mr-1"
+                aria-label={t("common.close")}
+              />
+            }
           >
             <XIcon aria-hidden="true" />
           </DialogClose>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-5 py-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-6 py-4">
           <dl className="grid grid-cols-pairs gap-x-4 gap-y-2 text-sm">
             <dt className="text-muted-foreground">{t("account.role")}</dt>
             <dd className="flex min-w-0 flex-col">
@@ -426,7 +433,7 @@ function MemberPanel({
             <LinkedList member={member} own={member.you} />
           </section>
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t px-5 py-3">
+        <div className="flex flex-wrap items-center gap-2 border-t px-6 py-3">
           {canChangeAccess(member, projectRoles) ? (
             <GateTip gate={manage}>
               <Button

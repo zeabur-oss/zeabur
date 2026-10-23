@@ -146,7 +146,7 @@ export function DataEditor({
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
-        <div className="flex items-center gap-2 border-b px-5 py-3">
+        <div className="flex items-center gap-2 border-b px-6 py-3">
           <DialogTitle className="flex min-w-0 flex-1 items-baseline">
             <span className="truncate font-mono" translate="no">
               {name}
@@ -162,12 +162,19 @@ export function DataEditor({
             </Badge>
           ) : null}
           <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t("common.close")} />}
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="-mr-1"
+                aria-label={t("common.close")}
+              />
+            }
           >
             <XIcon aria-hidden="true" />
           </DialogClose>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
           {readers.length > 0 ? (
             <p className="flex flex-wrap items-center gap-1.5 type-meta text-muted-foreground">
               {t("data.readers")}
@@ -354,7 +361,7 @@ export function DataEditor({
             </Button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 border-t px-5 py-3">
+        <div className="flex flex-wrap items-center gap-3 border-t px-6 py-3">
           <form.Subscribe selector={(s) => changesOf(s.values).length}>
             {(count) => (
               <span className="ml-auto flex items-center gap-2">

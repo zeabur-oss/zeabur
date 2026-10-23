@@ -993,7 +993,7 @@ function RowMenu({
 function DialogBar({ title, mono }: { title: ReactNode; mono?: boolean }) {
   const t = useT()
   return (
-    <div className="flex items-center gap-2 border-b px-5 py-3">
+    <div className="flex items-center gap-2 border-b px-6 py-3">
       <div className="min-w-0 flex-1 truncate">
         <DialogTitle>
           <span
@@ -1005,7 +1005,9 @@ function DialogBar({ title, mono }: { title: ReactNode; mono?: boolean }) {
         </DialogTitle>
       </div>
       <DialogClose
-        render={<Button variant="ghost" size="icon-sm" aria-label={t("common.close")} />}
+        render={
+          <Button variant="ghost" size="icon-sm" className="-mr-1" aria-label={t("common.close")} />
+        }
       >
         <XIcon aria-hidden="true" />
       </DialogClose>
@@ -1023,7 +1025,7 @@ function Preview({ place, path, onClose }: { place: Place; path: string; onClose
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
         <DialogBar title={nameOf(path)} mono />
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
           {preview.isPending ? (
             <LoadingRows label={t("files.loading")} />
           ) : preview.isError ? (
@@ -1041,7 +1043,7 @@ function Preview({ place, path, onClose }: { place: Place; path: string; onClose
             </pre>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-3 border-t px-5 py-2.5">
+        <div className="flex flex-wrap items-center gap-3 border-t px-6 py-2.5">
           <span className="truncate font-mono type-meta text-muted-foreground" translate="no">
             {path}
           </span>
@@ -1100,11 +1102,11 @@ function Confirm({
           }}
         >
           <DialogBar title={title} />
-          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-4 text-sm">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-6 py-4 text-sm">
             {children}
             {problem ? <Problem problem={problem} /> : null}
           </div>
-          <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
+          <div className="flex items-center justify-end gap-2 border-t px-6 py-3">
             <Button type="button" variant="ghost" size="sm" onClick={onClose} disabled={busy}>
               {t("plan.cancel")}
             </Button>

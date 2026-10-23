@@ -71,7 +71,7 @@ export function InstallSheet({
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
-        <div className="flex items-center gap-2 border-b px-5 py-3">
+        <div className="flex items-center gap-2 border-b px-6 py-3">
           <DialogTitle className="flex min-w-0 flex-1 items-baseline">
             <span className="truncate">{name}</span>
             <span className="ml-2 shrink-0 type-meta font-normal text-muted-foreground">
@@ -79,12 +79,19 @@ export function InstallSheet({
             </span>
           </DialogTitle>
           <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t("common.close")} />}
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="-mr-1"
+                aria-label={t("common.close")}
+              />
+            }
           >
             <XIcon aria-hidden="true" />
           </DialogClose>
         </div>
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
           {guide.isPending ? (
             <LoadingRows label={t("common.loading")} rows={8} />
           ) : guide.isError ? (
