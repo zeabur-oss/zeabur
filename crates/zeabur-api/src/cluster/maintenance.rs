@@ -269,6 +269,9 @@ pub struct EvictedPod {
     pub name: String,
     /// What happened.
     pub outcome: EvictOutcome,
+    /// One of Zeabur's own pods: once it is leaving, the passes after it fail until Zeabur is up
+    /// again on another node.
+    pub zeabur: bool,
     /// The budget it waits on, when one was found.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget: Option<String>,
@@ -1144,6 +1147,7 @@ async fn pass(
             namespace: target.namespace.clone(),
             name: target.name.clone(),
             outcome: EvictOutcome::Gone,
+            zeabur: target.zeabur,
             budget: None,
             retry_after_seconds: None,
             detail: None,

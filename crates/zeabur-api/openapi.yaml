@@ -5680,6 +5680,7 @@ components:
       - namespace
       - name
       - outcome
+      - zeabur
       properties:
         budget:
           type:
@@ -5707,6 +5708,11 @@ components:
           format: int32
           description: How long kube-apiserver asked to wait before trying again.
           minimum: 0
+        zeabur:
+          type: boolean
+          description: |-
+            One of Zeabur's own pods: once it is leaving, the passes after it fail until Zeabur is up
+            again on another node.
     EvidenceBundle:
       type: object
       description: A service's evidence, as Markdown.

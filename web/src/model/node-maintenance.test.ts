@@ -9,6 +9,7 @@ import {
   LONGEST_WAIT_MS,
   nextWait,
   settled,
+  zeaburLeaving,
 } from "@/model/node-maintenance"
 
 type Outcome = Schemas["EvictOutcome"]
@@ -16,7 +17,7 @@ type Outcome = Schemas["EvictOutcome"]
 const progress = (...pods: (Outcome | [Outcome, number])[]): Schemas["DrainProgress"] => {
   const list = pods.map((pod, i) => {
     const [outcome, retry] = Array.isArray(pod) ? pod : [pod, undefined]
-    return { namespace: "shop", name: `p${i}`, outcome, retryAfterSeconds: retry }
+    return { namespace: "shop", name: `p${i}`, outcome, zeabur: false, retryAfterSeconds: retry }
   })
   const remaining = list.filter((p) => p.outcome !== "gone").length
   return { cordoned: true, pods: list, remaining, done: remaining === 0 }
@@ -147,5 +148,22 @@ describe("the plan", () => {
     )
     expect(kubectlCommand("drain", "vps-3", true)).toEndWith(" --force")
     expect(kubectlCommand("uncordon", "vps-3", false)).toBe("kubectl uncordon vps-3")
+  })
+
+  test("a failed pass once Zeabur itself is leaving ends the passes quietly", async () => {
+    const first = progress("gone", "leaving")
+    first.pods[1] = { ...first.pods[1], zeabur: true }
+    expect(zeaburLeaving(first)).toBe(true)
+    expect(zeaburLeaving(progress("gone", "leaving"))).toBe(false)
+    const last = await drain({
+      first,
+      pass: async () => {
+        throw new Error("503")
+      },
+      sleep: async () => {},
+      signal: new AbortController().signal,
+      onProgress: () => {},
+    })
+    expect(last).toBe(first)
   })
 })

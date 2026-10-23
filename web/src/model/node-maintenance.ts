@@ -19,6 +19,12 @@ export function settled(progress: DrainProgress): boolean {
   )
 }
 
+/** Zeabur's own replica is leaving the node: the passes after it fail until Zeabur is up again
+ * elsewhere, and that Zeabur does not know this browser's session. */
+export function zeaburLeaving(progress: DrainProgress): boolean {
+  return progress.pods.some((pod) => pod.zeabur && pod.outcome === "leaving")
+}
+
 /** How long to wait before the next pass: while a budget holds a replica, twice the last wait (at
  * least what kube-apiserver asked for, at most 30 s); else 2 s. */
 export function nextWait(progress: DrainProgress, previous: number | undefined): number {
@@ -38,7 +44,8 @@ export interface DrainLoop {
   onProgress: (progress: DrainProgress) => void
 }
 
-/** Repeats passes until nothing another pass can change, or until `signal` aborts. */
+/** Repeats passes until nothing another pass can change, until `signal` aborts, or until a pass
+ * fails while Zeabur itself is leaving. */
 export async function drain({
   first,
   pass,
@@ -53,7 +60,12 @@ export async function drain({
     wait = nextWait(progress, holding ? wait : undefined)
     await sleep(wait, signal)
     if (signal.aborted) break
-    progress = await pass()
+    try {
+      progress = await pass()
+    } catch (error) {
+      if (zeaburLeaving(progress)) break
+      throw error
+    }
     onProgress(progress)
   }
   return progress

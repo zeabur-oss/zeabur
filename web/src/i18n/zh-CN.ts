@@ -523,6 +523,8 @@ export const zhCN: Messages = {
       ? `${node} 已进入维护，副本都迁走了。`
       : `${node} 已进入维护。有 ${kept} 个副本的数据只在 ${node} 上，所以留在原处。`,
   "maint.stopped": "有些副本迁不走。",
+  "maint.zeaburMoving": (node) =>
+    `Zeabur 本身正在迁出 ${node}，这个页面会断线一分钟左右。之后刷新页面，再开一次管理员权限。`,
   "maint.outcome.waiting": (budget) => (budget ? `等待中断预算 ${budget}` : "等待中断预算"),
   "maint.outcome.refused": "你没有权限迁走它",
   "maint.outcome.failed": "迁不走",

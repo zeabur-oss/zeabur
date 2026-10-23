@@ -523,6 +523,8 @@ export const zhTW: Messages = {
       ? `${node} 已進入維護，副本都移走了。`
       : `${node} 已進入維護。有 ${kept} 個副本的資料只在 ${node} 上，所以留在原地。`,
   "maint.stopped": "有些副本移不走。",
+  "maint.zeaburMoving": (node) =>
+    `Zeabur 本身正在移出 ${node}，這個頁面會斷線一分鐘左右。之後重新整理頁面，再開一次管理員權限。`,
   "maint.outcome.waiting": (budget) => (budget ? `等待中斷預算 ${budget}` : "等待中斷預算"),
   "maint.outcome.refused": "你沒有權限移走它",
   "maint.outcome.failed": "移不走",

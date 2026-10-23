@@ -2974,6 +2974,11 @@ export interface components {
        * @description How long kube-apiserver asked to wait before trying again.
        */
       retryAfterSeconds?: number | null
+      /**
+       * @description One of Zeabur's own pods: once it is leaving, the passes after it fail until Zeabur is up
+       *     again on another node.
+       */
+      zeabur: boolean
     }
     /** @description A service's evidence, as Markdown. */
     EvidenceBundle: {

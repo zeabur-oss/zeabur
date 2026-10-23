@@ -150,7 +150,7 @@ mod tests {
         assert!(unschedulable(&cluster));
         assert_eq!(
             progress["pods"],
-            json!([{"namespace": "shop", "name": "web", "outcome": "leaving"}])
+            json!([{"namespace": "shop", "name": "web", "outcome": "leaving", "zeabur": false}])
         );
         assert_eq!(progress["done"], false);
 

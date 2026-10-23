@@ -594,6 +594,8 @@ export const en = {
       ? `${node} is in maintenance. No replica is left to move.`
       : `${node} is in maintenance. ${kept === 1 ? "1 replica stays because its data is" : `${kept} replicas stay because their data is`} only on ${node}.`,
   "maint.stopped": "Some replicas could not be moved.",
+  "maint.zeaburMoving": (node: string) =>
+    `Zeabur itself is moving off ${node}, so this page loses its connection for a minute. Reload then, and turn on admin rights again.`,
   "maint.outcome.waiting": (budget?: string) =>
     budget ? `Waiting on disruption budget ${budget}` : "Waiting on a disruption budget",
   "maint.outcome.refused": "You may not move it",

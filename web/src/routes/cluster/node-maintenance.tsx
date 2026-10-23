@@ -35,6 +35,7 @@ import {
   kubectlCommand,
   sleep,
   type PodGroup,
+  zeaburLeaving,
 } from "@/model/node-maintenance"
 import type { Health } from "@/model/service"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
@@ -208,7 +209,7 @@ function MaintenanceDialog({
         onClose={onClose}
         footer={
           <div className="flex w-full flex-wrap items-center gap-2">
-            {!running && !progress.done ? (
+            {!running && !progress.done && !zeaburLeaving(progress) ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -548,7 +549,8 @@ function Progress({
 }) {
   const t = useT()
   const held = progress.pods.filter((pod) => pod.outcome !== "gone" && pod.outcome !== "leaving")
-  const stuck = !running && !progress.done
+  const moving = !running && !progress.done && zeaburLeaving(progress)
+  const stuck = !running && !progress.done && !moving
   const health: Health = progress.done ? "idle" : stuck ? "fail" : "progress"
   return (
     <>
@@ -556,9 +558,11 @@ function Progress({
         <StatusDot health={health} />
         {progress.done
           ? t("maint.done", node, kept)
-          : stuck
-            ? t("maint.stopped")
-            : t("maint.progress", node, progress.remaining, progress.pods.length)}
+          : moving
+            ? t("maint.zeaburMoving", node)
+            : stuck
+              ? t("maint.stopped")
+              : t("maint.progress", node, progress.remaining, progress.pods.length)}
       </p>
       {held.length > 0 ? (
         <ul className="flex flex-col gap-1">
@@ -585,7 +589,7 @@ function Progress({
           ))}
         </ul>
       ) : null}
-      {!progress.done ? (
+      {!progress.done && !moving ? (
         <p className="type-meta text-muted-foreground">{t("maint.leaveNote")}</p>
       ) : null}
     </>
