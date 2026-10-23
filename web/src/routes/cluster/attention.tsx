@@ -214,11 +214,17 @@ export function AttentionRow({ item, inset = false }: { item: ClusterItem; inset
     <li
       className={
         inset
-          ? "flex items-start gap-x-3 border-t border-rule px-4 py-3 first:border-t-0"
+          ? "flex items-start gap-x-4 border-t border-rule px-4 py-3 first:border-t-0"
           : "flex items-start gap-x-3 border-t border-rule py-2.5 first:border-t-0"
       }
     >
-      <StatusDot health={item.health} className="mt-1.5 shrink-0" />
+      {inset ? (
+        <span className="flex h-5 w-4 shrink-0 items-center justify-center">
+          <StatusDot health={item.health} />
+        </span>
+      ) : (
+        <StatusDot health={item.health} className="mt-1.5 shrink-0" />
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3">
           <span className="min-w-0 font-medium break-words">{item.text}</span>
