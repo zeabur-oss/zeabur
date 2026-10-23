@@ -242,131 +242,145 @@ const secret = (name: string, data: Record<string, string>) =>
 /** MOCO's containers besides `mysqld`, which run as the pod's user. */
 const MOCO_CONTAINERS = ["agent", "moco-init", "slow-log"]
 
-/** The object the form creates. */
-function databaseObject(form: NewDatabase): Manifest {
-  const resources = presetResources[form.engine][form.size]
-  const image = imageOf(form.engine, form.version)
-  switch (form.engine) {
-    case "postgresql":
-      return {
-        apiVersion: "postgresql.cnpg.io/v1",
-        kind: "Cluster",
-        metadata: { name: form.name },
-        spec: {
-          instances: form.members,
-          imageName: image,
-          storage: {
-            size: form.storage,
-            ...(form.storageClass ? { storageClass: form.storageClass } : {}),
-          },
-          resources,
+type Build = (form: NewDatabase, image: string, resources: Resources) => Manifest
+
+/** The object the form creates, by engine. */
+const BUILD: Record<Engine, Build> = {
+  postgresql: (form, image, resources) => {
+    return {
+      apiVersion: "postgresql.cnpg.io/v1",
+      kind: "Cluster",
+      metadata: { name: form.name },
+      spec: {
+        instances: form.members,
+        imageName: image,
+        storage: {
+          size: form.storage,
+          ...(form.storageClass ? { storageClass: form.storageClass } : {}),
         },
-      }
-    case "mongodb":
-      return {
-        apiVersion: "psmdb.percona.com/v1",
-        kind: "PerconaServerMongoDB",
-        // The operator deletes the data claims with the cluster, as CloudNativePG does.
-        // https://docs.percona.com/percona-operator-for-mongodb/operator.html#metadata
-        metadata: { name: form.name, finalizers: ["percona.com/delete-psmdb-pvc"] },
-        spec: {
-          image,
-          // Fewer than three members is allowed only when asked for by name: it has no redundancy.
-          // https://docs.percona.com/percona-operator-for-mongodb/operator.html#unsafeflagsreplsetsize
-          ...(form.members < 3 ? { unsafeFlags: { replsetSize: true } } : {}),
-          replsets: [
-            {
-              name: "rs0",
-              size: form.members,
-              resources,
-              volumeSpec: {
-                persistentVolumeClaim: {
-                  ...(form.storageClass ? { storageClassName: form.storageClass } : {}),
-                  resources: { requests: { storage: form.storage } },
-                },
+        resources,
+      },
+    }
+  },
+  mongodb: (form, image, resources) => {
+    return {
+      apiVersion: "psmdb.percona.com/v1",
+      kind: "PerconaServerMongoDB",
+      // The operator deletes the data claims with the cluster, as CloudNativePG does.
+      // https://docs.percona.com/percona-operator-for-mongodb/operator.html#metadata
+      metadata: { name: form.name, finalizers: ["percona.com/delete-psmdb-pvc"] },
+      spec: {
+        image,
+        // Fewer than three members is allowed only when asked for by name: it has no redundancy.
+        // https://docs.percona.com/percona-operator-for-mongodb/operator.html#unsafeflagsreplsetsize
+        ...(form.members < 3 ? { unsafeFlags: { replsetSize: true } } : {}),
+        replsets: [
+          {
+            name: "rs0",
+            size: form.members,
+            resources,
+            volumeSpec: {
+              persistentVolumeClaim: {
+                ...(form.storageClass ? { storageClassName: form.storageClass } : {}),
+                resources: { requests: { storage: form.storage } },
               },
             },
-          ],
-          sharding: { enabled: false },
-          // The user services connect as; the operator keeps its password in
-          // `<name>-custom-user-secret`, key `app`.
-          users: [{ name: "app", db: "app", roles: [{ name: "readWrite", db: "app" }] }],
-          backup: { enabled: false, image: PBM_IMAGE },
-        },
-      }
-    case "mysql":
-      // MOCO's images run as 10000; services connect as `moco-writable`, whose password MOCO
-      // keeps in `moco-<name>`.
-      return {
-        apiVersion: "moco.cybozu.com/v1beta2",
-        kind: "MySQLCluster",
-        metadata: { name: form.name },
-        spec: {
-          replicas: form.members,
-          podTemplate: {
-            spec: {
-              securityContext: restrictedPod(10000),
-              containers: [{ name: "mysqld", image, resources, securityContext: restricted }],
-            },
           },
-          volumeClaimTemplates: [
-            {
-              metadata: { name: "mysql-data" },
-              spec: claimSpec(form.storage, form.storageClass),
-            },
-          ],
-          overwriteContainers: MOCO_CONTAINERS.map((name) => ({
-            name,
-            securityContext: restricted,
-          })),
-        },
-      }
-    case "mariadb":
-      return {
-        apiVersion: "k8s.mariadb.com/v1alpha1",
-        kind: "MariaDB",
-        metadata: { name: form.name },
-        spec: {
-          image,
-          replicas: form.members,
-          ...(form.members > 1 ? { replication: { enabled: true } } : {}),
-          rootPasswordSecretKeyRef: { name: `${form.name}-root`, key: "password", generate: false },
-          database: "app",
-          username: "app",
-          passwordSecretKeyRef: { name: `${form.name}-app`, key: "password", generate: false },
-          storage: {
-            size: form.storage,
-            ...(form.storageClass ? { storageClassName: form.storageClass } : {}),
+        ],
+        sharding: { enabled: false },
+        // The user services connect as; the operator keeps its password in
+        // `<name>-custom-user-secret`, key `app`.
+        users: [{ name: "app", db: "app", roles: [{ name: "readWrite", db: "app" }] }],
+        backup: { enabled: false, image: PBM_IMAGE },
+      },
+    }
+  },
+  mysql: (form, image, resources) => {
+    // MOCO's images run as 10000. The annotations name the database and Secret that the
+    // setup Job makes for services.
+    return {
+      apiVersion: "moco.cybozu.com/v1beta2",
+      kind: "MySQLCluster",
+      metadata: {
+        name: form.name,
+        annotations: { [APP_DATABASE]: "app", [APP_SECRET]: `${form.name}-app` },
+      },
+      spec: {
+        replicas: form.members,
+        podTemplate: {
+          spec: {
+            securityContext: restrictedPod(10000),
+            containers: [{ name: "mysqld", image, resources, securityContext: restricted }],
           },
-          resources,
-          podSecurityContext: restrictedPod(999),
+        },
+        volumeClaimTemplates: [
+          {
+            metadata: { name: "mysql-data" },
+            spec: claimSpec(form.storage, form.storageClass),
+          },
+        ],
+        overwriteContainers: MOCO_CONTAINERS.map((name) => ({
+          name,
           securityContext: restricted,
+        })),
+      },
+    }
+  },
+  mariadb: (form, image, resources) => {
+    return {
+      apiVersion: "k8s.mariadb.com/v1alpha1",
+      kind: "MariaDB",
+      metadata: { name: form.name },
+      spec: {
+        image,
+        replicas: form.members,
+        ...(form.members > 1 ? { replication: { enabled: true } } : {}),
+        rootPasswordSecretKeyRef: { name: `${form.name}-root`, key: "password", generate: false },
+        database: "app",
+        username: "app",
+        passwordSecretKeyRef: { name: `${form.name}-app`, key: "password", generate: false },
+        storage: {
+          size: form.storage,
+          ...(form.storageClass ? { storageClassName: form.storageClass } : {}),
         },
-      }
-    case "dragonfly":
-      return {
-        apiVersion: "dragonflydb.io/v1alpha1",
-        kind: "Dragonfly",
-        metadata: { name: form.name },
-        spec: {
-          image,
-          replicas: form.members,
-          resources,
-          authentication: { passwordFromSecret: { name: `${form.name}-auth`, key: "password" } },
-          // Snapshots on a volume each hour; Dragonfly also saves one when it stops.
-          snapshot: {
-            cron: "0 * * * *",
-            persistentVolumeClaimSpec: claimSpec(form.storage, form.storageClass),
-          },
-          podSecurityContext: restrictedPod(999),
-          containerSecurityContext: restricted,
+        resources,
+        podSecurityContext: restrictedPod(999),
+        securityContext: restricted,
+      },
+    }
+  },
+  dragonfly: (form, image, resources) => {
+    return {
+      apiVersion: "dragonflydb.io/v1alpha1",
+      kind: "Dragonfly",
+      metadata: { name: form.name },
+      spec: {
+        image,
+        replicas: form.members,
+        resources,
+        authentication: { passwordFromSecret: { name: `${form.name}-auth`, key: "password" } },
+        // Snapshots on a volume each hour; Dragonfly also saves one when it stops.
+        snapshot: {
+          cron: "0 * * * *",
+          persistentVolumeClaimSpec: claimSpec(form.storage, form.storageClass),
         },
-      }
-  }
+        podSecurityContext: restrictedPod(999),
+        containerSecurityContext: restricted,
+      },
+    }
+  },
 }
 
-/** The Secrets Zeabur makes for a database: MariaDB's root and app passwords, Dragonfly's. */
+const databaseObject = (form: NewDatabase): Manifest =>
+  BUILD[form.engine](
+    form,
+    imageOf(form.engine, form.version),
+    presetResources[form.engine][form.size],
+  )
+
+/** The Secrets Zeabur makes for a database: the app passwords, MariaDB's root, Dragonfly's. */
 function passwordSecrets(form: NewDatabase, password: () => string): Change[] {
+  if (form.engine === "mysql") return [secret(`${form.name}-app`, { password: password() })]
   if (form.engine === "mariadb")
     return [
       secret(`${form.name}-root`, { password: password() }),
@@ -376,9 +390,59 @@ function passwordSecrets(form: NewDatabase, password: () => string): Change[] {
   return []
 }
 
+export const APP_DATABASE = "zeabur.com/app-database"
+export const APP_SECRET = "zeabur.com/app-secret"
+
+// Waits for the primary, then makes the database and its user as `moco-writable`. The passwords
+// go in through a file descriptor and standard input, so no process's arguments hold them.
+const APP_SETUP = `set -eu
+sql() { mysql --defaults-extra-file=<(printf '[client]\\npassword=%s\\n' "$WRITABLE_PASSWORD") -h "$HOST" -u moco-writable "$@"; }
+for _ in $(seq 120); do sql -e 'SELECT 1' >/dev/null 2>&1 && break; sleep 5; done
+sql <<SQL
+CREATE DATABASE IF NOT EXISTS app;
+CREATE USER IF NOT EXISTS 'app'@'%' IDENTIFIED BY '$APP_PASSWORD';
+GRANT ALL ON app.* TO 'app'@'%';
+SQL`
+
+/** MOCO makes no database: this Job makes `app` and its user, as the person who creates it. */
+function appSetup(form: NewDatabase, image: string): Manifest {
+  const from = (name: string, key: string) => ({ secretKeyRef: { name, key } })
+  return {
+    apiVersion: "batch/v1",
+    kind: "Job",
+    metadata: { name: `${form.name}-app-setup` },
+    spec: {
+      backoffLimit: 6,
+      template: {
+        spec: {
+          restartPolicy: "OnFailure",
+          securityContext: restrictedPod(10000),
+          containers: [
+            {
+              name: "setup",
+              image,
+              command: ["bash", "-c", APP_SETUP],
+              env: [
+                { name: "HOST", value: `moco-${form.name}-primary` },
+                {
+                  name: "WRITABLE_PASSWORD",
+                  valueFrom: from(`moco-${form.name}`, "WRITABLE_PASSWORD"),
+                },
+                { name: "APP_PASSWORD", valueFrom: from(`${form.name}-app`, "password") },
+              ],
+              securityContext: restricted,
+            },
+          ],
+        },
+      },
+    },
+  }
+}
+
 export const createDatabase = (form: NewDatabase, password = newPassword): Change[] => [
   ...passwordSecrets(form, password),
   create(databaseObject(form)),
+  ...(form.engine === "mysql" ? [create(appSetup(form, imageOf("mysql", form.version)))] : []),
 ]
 
 export type Frequency = "daily" | "weekly"
@@ -907,78 +971,89 @@ function withContainer(containers: Manifest[] | undefined, name: string, patch: 
     : [...list, { name, ...patch }]
 }
 
+interface Reshaping {
+  spec: Manifest
+  members: number
+  resources?: Resources
+  storage: string
+  database: Database
+}
+
+const field = (spec: Manifest, key: string) => (spec[key] as Manifest | undefined) ?? {}
+
+function reshapeMongodb({ spec, members, resources, storage, database }: Reshaping) {
+  const [first = {}, ...rest] = (spec.replsets as Manifest[] | undefined) ?? []
+  const volume = field(first, "volumeSpec")
+  const claim = field(volume, "persistentVolumeClaim")
+  spec.replsets = [
+    {
+      ...first,
+      size: members,
+      ...(resources ? { resources } : {}),
+      volumeSpec: { ...volume, persistentVolumeClaim: withStorage(claim, storage) },
+    },
+    ...rest,
+  ]
+  if (storage !== database.storage) spec.enableVolumeExpansion = true
+  const { replsetSize: _, ...flags } = field(spec, "unsafeFlags")
+  const kept = members < 3 ? { ...flags, replsetSize: true } : flags
+  if (Object.keys(kept).length > 0) spec.unsafeFlags = kept
+  else delete spec.unsafeFlags
+}
+
+function reshapeMysql({ spec, members, resources, storage }: Reshaping) {
+  spec.replicas = members
+  const template = field(spec, "podTemplate")
+  const pod = field(template, "spec")
+  if (resources) {
+    const containers = withContainer(pod.containers as Manifest[] | undefined, "mysqld", {
+      resources,
+    })
+    spec.podTemplate = { ...template, spec: { ...pod, containers } }
+  }
+  const templates = (spec.volumeClaimTemplates as Manifest[] | undefined) ?? []
+  spec.volumeClaimTemplates = templates.map((t) =>
+    field(t, "metadata").name === "mysql-data"
+      ? { ...t, spec: withStorage(field(t, "spec"), storage) }
+      : t,
+  )
+}
+
+const RESHAPE: Record<Engine, (shaping: Reshaping) => void> = {
+  postgresql: ({ spec, members, resources, storage }) => {
+    spec.instances = members
+    if (resources) spec.resources = resources
+    spec.storage = { ...field(spec, "storage"), size: storage }
+  },
+  mongodb: reshapeMongodb,
+  mysql: reshapeMysql,
+  mariadb: ({ spec, members, resources, storage }) => {
+    spec.replicas = members
+    if (members > 1) spec.replication = { ...field(spec, "replication"), enabled: true }
+    if (resources) spec.resources = resources
+    spec.storage = { ...field(spec, "storage"), size: storage }
+  },
+  dragonfly: ({ spec, members, resources }) => {
+    spec.replicas = members
+    if (resources) spec.resources = resources
+  },
+}
+
 /** The edit that gives the database `shape`: instances, the size of each, and its storage. A
  * MongoDB volume grows only with `enableVolumeExpansion`, and fewer than three members needs
  * `unsafeFlags.replsetSize`; a MariaDB of more than one member replicates.
  * https://docs.percona.com/percona-operator-for-mongodb/scaling.html */
 export function reshapeDatabase(database: Database, shape: DatabaseShape): Change[] {
   const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
-  const spec = (object.spec ??= {})
-  const resources = shape.size
-    ? structuredClone(presetResources[database.engine][shape.size])
-    : undefined
-  const storage = shape.storage.trim()
-  switch (database.engine) {
-    case "postgresql":
-      spec.instances = shape.members
-      if (resources) spec.resources = resources
-      spec.storage = { ...(spec.storage as Manifest | undefined), size: storage }
-      break
-    case "mongodb": {
-      const [first = {}, ...rest] = (spec.replsets as Manifest[] | undefined) ?? []
-      const volume = (first.volumeSpec as Manifest | undefined) ?? {}
-      const claim = (volume.persistentVolumeClaim as Manifest | undefined) ?? {}
-      spec.replsets = [
-        {
-          ...first,
-          size: shape.members,
-          ...(resources ? { resources } : {}),
-          volumeSpec: { ...volume, persistentVolumeClaim: withStorage(claim, storage) },
-        },
-        ...rest,
-      ]
-      if (storage !== database.storage) spec.enableVolumeExpansion = true
-      const flags = { ...(spec.unsafeFlags as Manifest | undefined) }
-      if (shape.members < 3) flags.replsetSize = true
-      else delete flags.replsetSize
-      if (Object.keys(flags).length > 0) spec.unsafeFlags = flags
-      else delete spec.unsafeFlags
-      break
-    }
-    case "mysql": {
-      spec.replicas = shape.members
-      const template = (spec.podTemplate as Manifest | undefined) ?? {}
-      const pod = (template.spec as Manifest | undefined) ?? {}
-      if (resources)
-        spec.podTemplate = {
-          ...template,
-          spec: {
-            ...pod,
-            containers: withContainer(pod.containers as Manifest[] | undefined, "mysqld", {
-              resources,
-            }),
-          },
-        }
-      spec.volumeClaimTemplates = ((spec.volumeClaimTemplates as Manifest[] | undefined) ?? []).map(
-        (t) =>
-          (t.metadata as Manifest | undefined)?.name === "mysql-data"
-            ? { ...t, spec: withStorage((t.spec as Manifest | undefined) ?? {}, storage) }
-            : t,
-      )
-      break
-    }
-    case "mariadb":
-      spec.replicas = shape.members
-      if (shape.members > 1)
-        spec.replication = { ...(spec.replication as Manifest | undefined), enabled: true }
-      if (resources) spec.resources = resources
-      spec.storage = { ...(spec.storage as Manifest | undefined), size: storage }
-      break
-    case "dragonfly":
-      spec.replicas = shape.members
-      if (resources) spec.resources = resources
-      break
-  }
+  RESHAPE[database.engine]({
+    spec: (object.spec ??= {}),
+    members: shape.members,
+    resources: shape.size
+      ? structuredClone(presetResources[database.engine][shape.size])
+      : undefined,
+    storage: shape.storage.trim(),
+    database,
+  })
   const { group, version, resource } = databaseAddress(database)
   return [
     {

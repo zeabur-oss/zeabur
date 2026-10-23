@@ -2526,7 +2526,8 @@ export const en = {
   "db.connect": "Connect",
   "db.inCluster": "Reachable from inside the cluster.",
   "db.noDatabase":
-    "MOCO creates no database. Create the ones your app uses as moco-writable, and add the name to the connection string.",
+    "This cluster has no app database. Services connect as moco-writable, which can create one.",
+  "db.appDatabase": "App database",
   "db.noAuth": (engine: string) =>
     `This ${engine} has no password: anything in the cluster can connect to it.`,
   "db.export": "Export",

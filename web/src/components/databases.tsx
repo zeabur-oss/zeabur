@@ -9,7 +9,7 @@ import { databasesQuery, nodesQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { FormField, quantity } from "@/components/form-field"
 import { ConnectFields, namingOf, newChoice, useTargets, type Choice } from "@/components/connect"
-import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { growthWords, StorageClassField, useStorage } from "@/components/storage-class"
@@ -169,6 +169,18 @@ export function NewDatabaseButton({
   )
 }
 
+/** The licence of an engine whose terms limit how it may be offered. */
+function Licence({ engine }: { engine: Engine }) {
+  const t = useT()
+  const licence = engineLicence[engine]
+  if (!licence) return null
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t("db.licence", engineName(engine), licence)}
+    </p>
+  )
+}
+
 export function NewDatabaseDrawer({
   project,
   engines: available,
@@ -235,24 +247,9 @@ export function NewDatabaseDrawer({
       onClose={onClose}
       title={t("db.new")}
       description={t("db.newBody")}
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("edit.cancel")}
-          </Button>
-          <Button size="sm" onClick={review}>
-            {t("edit.review")}
-          </Button>
-        </div>
-      }
+      footer={<ReviewFooter onCancel={onClose} onReview={review} />}
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          review()
-        }}
-      >
+      <ReviewForm onReview={review}>
         {available.length > 1 ? (
           <FormField label={t("db.field.engine")}>
             <Select
@@ -367,11 +364,7 @@ export function NewDatabaseDrawer({
           engine={engineName(form.engine)}
           onChange={(name) => set({ storageClass: chosenClass(storage, name) })}
         />
-        {engineLicence[form.engine] ? (
-          <p className="type-meta text-muted-foreground">
-            {t("db.licence", engineName(form.engine), engineLicence[form.engine] ?? "")}
-          </p>
-        ) : null}
+        <Licence engine={form.engine} />
         {form.members === 1 ? (
           <Alert variant="warn">
             <WarningIcon aria-hidden="true" />
@@ -386,7 +379,7 @@ export function NewDatabaseDrawer({
           optional
           tried={tried}
         />
-      </form>
+      </ReviewForm>
     </PlanDrawer>
   )
 }

@@ -45,6 +45,7 @@ import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { partsOf } from "@/model/database-parts"
 import {
+  APP_DATABASE,
   backUpNow,
   backupsOn,
   canBackUpNow,
@@ -217,10 +218,6 @@ function Body({
       () => undefined,
     )
   const terminalGate = gates("openTerminal")
-  const tool = exportTool[database.engine]
-  // MOCO's dump reads moco-writable's password from its Secret.
-  const exportGate =
-    terminalGate.open && database.engine === "mysql" ? gates("readSecrets") : terminalGate
 
   return (
     <Tabs
@@ -256,9 +253,7 @@ function Body({
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:pl-13">
-              {backupsOn(database) && canBackUpNow(database.engine) ? (
-                <BackUpNow project={project} database={database} />
-              ) : null}
+              {backupsOn(database) ? <BackUpNow project={project} database={database} /> : null}
               <GateTip gate={terminalGate} className="max-sm:hidden">
                 <Button
                   variant="outline"
@@ -294,20 +289,7 @@ function Body({
                     <CopyIcon aria-hidden="true" />
                     {t("service.copyName")}
                   </MenuItem>
-                  {tool ? (
-                    <GatedMenuItem
-                      gate={exportGate}
-                      render={<a href={exportUrl(project, database)} download />}
-                    >
-                      <DownloadSimpleIcon aria-hidden="true" />
-                      <span className="flex min-w-0 flex-col">
-                        {t("db.export")}
-                        <span className="type-meta text-muted-foreground">
-                          {t("db.exportHint", tool)}
-                        </span>
-                      </span>
-                    </GatedMenuItem>
-                  ) : null}
+                  <ExportItem project={project} database={database} />
                   <MenuSeparator />
                   <GatedMenuItem
                     gate={gates("changeDatabases")}
@@ -392,11 +374,32 @@ function Body({
   )
 }
 
+/** A dump through the person's own exec into the database's pod. */
+function ExportItem({ project, database }: { project: string; database: Database }) {
+  const t = useT()
+  const terminalGate = useGate(project, "openTerminal")
+  const secretsGate = useGate(project, "readSecrets")
+  const tool = exportTool[database.engine]
+  if (!tool) return null
+  // MOCO's dump reads moco-writable's password from its Secret.
+  const gate = terminalGate.open && database.engine === "mysql" ? secretsGate : terminalGate
+  return (
+    <GatedMenuItem gate={gate} render={<a href={exportUrl(project, database)} download />}>
+      <DownloadSimpleIcon aria-hidden="true" />
+      <span className="flex min-w-0 flex-col">
+        {t("db.export")}
+        <span className="type-meta text-muted-foreground">{t("db.exportHint", tool)}</span>
+      </span>
+    </GatedMenuItem>
+  )
+}
+
 function BackUpNow({ project, database }: { project: string; database: Database }) {
   const t = useT()
   const planner = usePlanner(project)
   const gate = useGate(project, "backUpDatabases")
   const starting = !database.backups.ready
+  if (!canBackUpNow(database.engine)) return null
   const plan = () =>
     planner.plan({
       title: t("db.backup.planNow", database.name),
@@ -492,8 +495,6 @@ function Overview({
   const t = useT()
   const preset = presetOf(database.engine, database.resources)
   const run = lastRun(database)
-  const services = useQuery(projectQuery(project)).data?.services ?? []
-  const troubled = partsOf(database, services).find((s) => (s.diagnoses?.length ?? 0) > 0)
   return (
     <div className="flex flex-col gap-7">
       <Restored project={project} database={database} />
@@ -553,6 +554,28 @@ function Overview({
           </SummaryCardAside>
         ) : null}
       </SummaryCard>
+      <Cautions project={project} database={database} />
+      <KubeDetails
+        facts={[
+          [
+            t("db.fact.members"),
+            `${database.kind}/${database.name} ${membersField[database.engine]}`,
+          ],
+        ]}
+      />
+      <Warnings events={events} onEvents={onEvents} />
+      <Connection project={project} database={database} />
+    </div>
+  )
+}
+
+/** Warnings about this database and the services under it. */
+function Cautions({ project, database }: { project: string; database: Database }) {
+  const t = useT()
+  const services = useQuery(projectQuery(project)).data?.services ?? []
+  const troubled = partsOf(database, services).find((s) => (s.diagnoses?.length ?? 0) > 0)
+  return (
+    <>
       {database.members === 1 ? (
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
@@ -570,17 +593,7 @@ function Overview({
           <AlertDescription>{t("db.noAuth", engineName(database.engine))}</AlertDescription>
         </Alert>
       ) : null}
-      <KubeDetails
-        facts={[
-          [
-            t("db.fact.members"),
-            `${database.kind}/${database.name} ${membersField[database.engine]}`,
-          ],
-        ]}
-      />
-      <Warnings events={events} onEvents={onEvents} />
-      <Connection project={project} database={database} />
-    </div>
+    </>
   )
 }
 
@@ -648,9 +661,7 @@ function Connection({ project, database }: { project: string; database: Database
     <Section id="db-connect" title={t("db.connect")}>
       <ConnectServices project={project} database={database} />
       <p className="type-meta text-muted-foreground">{t("db.inCluster")}</p>
-      {database.engine === "mysql" ? (
-        <p className="type-meta text-muted-foreground">{t("db.noDatabase")}</p>
-      ) : null}
+      <NoAppDatabase database={database} />
       <Rows>
         <Row label={t("db.host")}>
           {mono(c.host)}
@@ -658,15 +669,9 @@ function Connection({ project, database }: { project: string; database: Database
         </Row>
         <Row label={t("db.port")}>{mono(String(c.port))}</Row>
         {c.database ? <Row label={t("db.database")}>{mono(c.database)}</Row> : null}
-        {c.username || c.usernameKey ? (
-          <Row label={t("db.username")}>
-            {username ? (
-              mono(username)
-            ) : (
-              <span className="type-meta text-muted-foreground">{t("db.inSecret", c.secret)}</span>
-            )}
-          </Row>
-        ) : null}
+        <UsernameRow connection={c}>
+          {username ? mono(username) : <InSecret secret={c.secret} />}
+        </UsernameRow>
         <Row label={t("db.password")}>
           {shown ? mono(password) : mono("••••••••")}
           {shown ? (
@@ -699,6 +704,36 @@ function Connection({ project, database }: { project: string; database: Database
       {secret?.problem ? <Problem problem={secret.problem} what={c.secret} /> : null}
     </Section>
   )
+}
+
+/** A MOCO cluster made outside Zeabur has no app database. */
+function NoAppDatabase({ database }: { database: Database }) {
+  const t = useT()
+  if (database.engine !== "mysql" || database.connection.database) return null
+  return (
+    <>
+      <p className="type-meta text-muted-foreground">{t("db.noDatabase")}</p>
+      <KubeDetails facts={[[t("db.appDatabase"), `metadata.annotations["${APP_DATABASE}"]`]]} />
+    </>
+  )
+}
+
+/** Dragonfly has no username to show. */
+function UsernameRow({
+  connection,
+  children,
+}: {
+  connection: Database["connection"]
+  children: ReactNode
+}) {
+  const t = useT()
+  if (!connection.username && !connection.usernameKey) return null
+  return <Row label={t("db.username")}>{children}</Row>
+}
+
+function InSecret({ secret }: { secret: string }) {
+  const t = useT()
+  return <span className="type-meta text-muted-foreground">{t("db.inSecret", secret)}</span>
 }
 
 /** Which services read the database, and connecting another. */
@@ -777,23 +812,33 @@ function Backups({
   )
 }
 
+const targetNote: Partial<Record<Database["engine"], "db.backup.walNote" | "db.backup.snapshots">> =
+  { postgresql: "db.backup.walNote", dragonfly: "db.backup.snapshots" }
+
+/** How long the destination keeps backups, as each operator counts it. */
+function useRetention(database: Database) {
+  const t = useT()
+  const retention = database.backups.store?.retention
+  if (!retention) return keepsEverything(database.engine) ? t("db.backup.keepsEverything") : "—"
+  if (database.engine === "mongodb") return t("db.backup.retentionCount", retention)
+  const days = daysOf(retention)
+  return days === undefined ? retention : t("db.backup.retentionDays", days)
+}
+
+/** Whole days in a duration such as "7d" or "168h". */
+function daysOf(duration: string) {
+  const days = duration.match(/^(\d+)d$/)?.[1]
+  if (days) return Number(days)
+  const hours = Number(duration.match(/^(\d+)h$/)?.[1] ?? Number.NaN)
+  return hours % 24 === 0 ? hours / 24 : undefined
+}
+
 function Target({ database }: { database: Database }) {
   const t = useT()
+  const retention = useRetention(database)
   const store = database.backups.store
   if (!store) return null
-  const days = store.retention?.match(/^(\d+)d$/)?.[1]
-  const hours = Number(store.retention?.match(/^(\d+)h$/)?.[1] ?? Number.NaN)
-  const retention = !store.retention
-    ? keepsEverything(database.engine)
-      ? t("db.backup.keepsEverything")
-      : "—"
-    : database.engine === "mongodb"
-      ? t("db.backup.retentionCount", store.retention)
-      : days
-        ? t("db.backup.retentionDays", Number(days))
-        : hours % 24 === 0
-          ? t("db.backup.retentionDays", hours / 24)
-          : store.retention
+  const note = targetNote[database.engine]
   return (
     <Section id="db-target" title={t("db.backup.destination")}>
       <Rows>
@@ -827,12 +872,7 @@ function Target({ database }: { database: Database }) {
         </Row>
         <Row label={t("db.backup.retention")}>{retention}</Row>
       </Rows>
-      {database.engine === "postgresql" ? (
-        <p className="type-meta text-muted-foreground">{t("db.backup.walNote")}</p>
-      ) : null}
-      {database.engine === "dragonfly" ? (
-        <p className="type-meta text-muted-foreground">{t("db.backup.snapshots")}</p>
-      ) : null}
+      {note ? <p className="type-meta text-muted-foreground">{t(note)}</p> : null}
     </Section>
   )
 }
@@ -880,21 +920,19 @@ function SetUp({ project, database }: { project: string; database: Database }) {
   const planner = usePlanner(project)
   const setUpGate = useGate(project, "changeDatabases")
   const problems = targetProblems(target)
-  const set = (patch: Partial<BackupTarget>) => setTarget((v) => ({ ...v, ...patch }))
-  const error = (problem: (typeof problems)[number]) =>
-    tried && problems.includes(problem) ? [t(`db.backup.problem.${problem}`)] : []
+  const startsEmpty = database.engine === "dragonfly" && database.members === 1
   const review = () => {
     setTried(true)
     if (problems.length > 0) return
     planner.plan({
       title: t("db.backup.plan", database.name),
       changes: enableBackups(database, target),
-      notes:
-        database.engine === "dragonfly" && database.members === 1
-          ? [t("db.backup.startsEmpty")]
-          : undefined,
+      notes: startsEmpty ? [t("db.backup.startsEmpty")] : undefined,
     })
   }
+  const set = (patch: Partial<BackupTarget>) => setTarget((v) => ({ ...v, ...patch }))
+  const error = (problem: (typeof problems)[number]) =>
+    tried && problems.includes(problem) ? [t(`db.backup.problem.${problem}`)] : []
   return (
     <Section id="db-setup" title={t("db.backup.setUp")}>
       <p className="text-sm text-muted-foreground">{t("db.backup.setUpBody")}</p>
@@ -1002,7 +1040,7 @@ function SetUp({ project, database }: { project: string; database: Database }) {
         {keepsEverything(database.engine) ? (
           <p className="type-meta text-muted-foreground">{t("db.backup.keepsEverything")}</p>
         ) : null}
-        {database.engine === "dragonfly" && database.members === 1 ? (
+        {startsEmpty ? (
           <Alert variant="warn">
             <WarningIcon aria-hidden="true" />
             <AlertDescription>{t("db.backup.startsEmpty")}</AlertDescription>

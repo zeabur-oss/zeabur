@@ -2306,8 +2306,8 @@ export const zhTW: Messages = {
   "db.fact.operator": "Operator 回報",
   "db.connect": "連線",
   "db.inCluster": "只能從叢集內部連線。",
-  "db.noDatabase":
-    "MOCO 不會建立資料庫。請以 moco-writable 建立應用程式要用的資料庫，再把名稱加到連線字串。",
+  "db.noDatabase": "這個叢集沒有應用程式資料庫。服務以 moco-writable 連線，它可以建立資料庫。",
+  "db.appDatabase": "應用程式資料庫",
   "db.noAuth": (engine) => `這個 ${engine} 沒有設定密碼，叢集裡的任何程式都能連線。`,
   "db.export": "匯出",
   "db.exportHint": (tool) => `下載 ${tool} 在主要執行個體產生的傾印檔，透過你的終端機權限執行。`,
@@ -2410,8 +2410,8 @@ export const zhTW: Messages = {
   "db.restore.asOf": "新資料庫的資料停在備份當時，之後寫入的不會包含。",
   "db.restore.sharedSecret": (secret) =>
     `新資料庫沿用原本的 Secret ${secret}，因為備份裡有相同的使用者與密碼。`,
-  "db.restored.from": (name, time) => `從 ${name} 在 ${time} 的備份還原`,
-  "db.restored.copy": (name, time) => `${name} 由這個資料庫 ${time} 的備份還原而來`,
+  "db.restored.from": (name, time) => `從 ${name} ${time}的備份還原`,
+  "db.restored.copy": (name, time) => `${name} 由這個資料庫 ${time}的備份還原而來`,
   "db.restored.point": "把服務指向這裡",
   "db.restored.pointTitle": (name) => `把服務指向 ${name}`,
   "db.restored.keep": (name) => `${name} 會繼續執行。不再需要時，請到它的頁面刪除。`,

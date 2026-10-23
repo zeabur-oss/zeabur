@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 
 import type { PlanStepState } from "@/components/plan/planner"
 import { useT } from "@/i18n"
+import { Button } from "@zeabur/design-system/components/button"
 import { Drawer } from "@zeabur/design-system/components/drawer"
 
 /** A form in a drawer whose plan is the drawer's second step, with Back to the form. */
@@ -36,5 +37,41 @@ export function PlanDrawer({
       <div hidden={!!asked}>{children}</div>
       {step.view}
     </Drawer>
+  )
+}
+
+/** A plan drawer's form: Enter reviews the changes, as the footer's button does. */
+export function ReviewForm({ onReview, children }: { onReview: () => void; children: ReactNode }) {
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onReview()
+      }}
+    >
+      {children}
+    </form>
+  )
+}
+
+/** A plan drawer's footer: cancel, or review the changes. */
+export function ReviewFooter({
+  onCancel,
+  onReview,
+}: {
+  onCancel: () => void
+  onReview: () => void
+}) {
+  const t = useT()
+  return (
+    <div className="flex justify-end gap-2">
+      <Button variant="ghost" size="sm" onClick={onCancel}>
+        {t("edit.cancel")}
+      </Button>
+      <Button size="sm" onClick={onReview}>
+        {t("edit.review")}
+      </Button>
+    </div>
   )
 }

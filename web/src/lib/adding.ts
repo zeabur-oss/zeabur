@@ -1,7 +1,7 @@
+import type { Schemas } from "@/api/client"
 import { store } from "@/lib/stores"
-import type { Engine } from "@/model/databases"
 
-export type AddWhat = "image" | "git" | Engine
+export type AddWhat = "image" | "git" | Schemas["DatabaseEngine"]
 
 /** The "New" form open over any page, so the menu, the palette and the empty project share it. */
 export const adding = store<{ project: string; what: AddWhat } | null>(null)

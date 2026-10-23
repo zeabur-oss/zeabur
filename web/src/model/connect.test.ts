@@ -272,12 +272,12 @@ describe("connecting MySQL, MariaDB and Dragonfly", () => {
       {
         op: "set",
         name: "MYSQLPASSWORD",
-        valueFrom: { secretName: "moco-orders", key: "WRITABLE_PASSWORD" },
+        valueFrom: { secretName: "orders-app", key: "password" },
       },
       {
         op: "set",
         name: "DATABASE_URL",
-        value: "mysql://moco-writable:$(MYSQLPASSWORD)@moco-orders-primary.shop.svc:3306/",
+        value: "mysql://app:$(MYSQLPASSWORD)@moco-orders-primary.shop.svc:3306/app",
       },
     ])
     const maria = pendingDatabase({ ...newDatabase("mariadb", 1), members: 2 }, "shop")

@@ -425,7 +425,7 @@ describe("MySQL, MariaDB and Dragonfly", () => {
   test("MySQL is a MOCO cluster whose every container passes the restricted standard", () => {
     const form = { ...newDatabase("mysql", 3), storageClass: "fast" }
     expect(form.members).toBe(3)
-    const [cluster] = objects(createDatabase(form, password))
+    const [, cluster] = objects(createDatabase(form, password))
     expect(cluster?.kind).toBe("MySQLCluster")
     const pod = cluster?.spec.podTemplate.spec
     expect(pod.securityContext).toMatchObject({ runAsNonRoot: true, runAsUser: 10000 })
@@ -439,6 +439,26 @@ describe("MySQL, MariaDB and Dragonfly", () => {
       "slow-log",
     ])
     expect(cluster?.spec.volumeClaimTemplates[0].spec.storageClassName).toBe("fast")
+  })
+
+  test("MySQL gets an app database and user from a Job that reads the passwords from Secrets", () => {
+    const changes = objects(createDatabase(newDatabase("mysql", 1), password))
+    expect(changes.map((o) => `${o.kind}/${o.metadata.name}`)).toEqual([
+      "Secret/mysql-app",
+      "MySQLCluster/mysql",
+      "Job/mysql-app-setup",
+    ])
+    expect(changes[1]?.metadata.annotations).toEqual({
+      "zeabur.com/app-database": "app",
+      "zeabur.com/app-secret": "mysql-app",
+    })
+    const setup = changes[2]?.spec.template.spec.containers[0]
+    expect(setup.env.map((e: { name: string }) => e.name)).toEqual([
+      "HOST",
+      "WRITABLE_PASSWORD",
+      "APP_PASSWORD",
+    ])
+    expect(setup.securityContext).toMatchObject({ allowPrivilegeEscalation: false })
   })
 
   test("MariaDB and Dragonfly get their passwords in Secrets Zeabur makes first", () => {

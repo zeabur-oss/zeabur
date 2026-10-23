@@ -137,7 +137,7 @@ describe("restoring into a new database", () => {
     })
   })
 
-  test("MySQL restores to the backup's time with MOCO's restore job reading the same bucket", () => {
+  test("MySQL restores to the backup's time, reading the same bucket and the same app Secret", () => {
     const mysql = base({
       engine: "mysql",
       apiVersion: "moco.cybozu.com/v1beta2",
@@ -155,12 +155,16 @@ describe("restoring into a new database", () => {
         },
       },
       object: {
+        metadata: {
+          annotations: { "zeabur.com/app-database": "app", "zeabur.com/app-secret": "shop-app" },
+        },
         spec: { replicas: 3, backupPolicyName: "shop-backups" },
       } as unknown as Database["object"],
     })
     const [cluster] = bodies(
       restoreChanges(mysql, { ...point, from: "2026-10-22T03:00:00Z" }, "copy", "demo"),
     )
+    expect(cluster?.metadata.annotations).toMatchObject({ "zeabur.com/app-secret": "shop-app" })
     expect(cluster?.spec.backupPolicyName).toBeUndefined()
     expect(cluster?.spec.restore).toMatchObject({
       sourceName: "shop",

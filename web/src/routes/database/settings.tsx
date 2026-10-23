@@ -108,10 +108,7 @@ function Shape({ project, database }: { project: string; database: Database }) {
     ? memberChoices[database.engine]
     : [...memberChoices[database.engine], database.members].sort((a, b) => a - b)
   const disabled = !gate.open
-  const storageClass = classNamed(useStorage(project), database.storageClass)
-  const growable = useStorage(project)?.classes.some((c) => c.allowExpansion) ?? false
-  const operatorFixed = storageFixed(database.engine)
-  const fixed = operatorFixed || storageClass?.allowExpansion === false
+  const { storageClass, fixed, description } = useGrowth(project, database)
   const review = () => {
     setTried(true)
     if (problem) return
@@ -179,19 +176,7 @@ function Shape({ project, database }: { project: string; database: Database }) {
           </FormField>
         </div>
       </Part>
-      <Part
-        id="storage"
-        title={t("part.storage")}
-        description={
-          operatorFixed
-            ? t("db.storage.operatorFixed", engineName(database.engine))
-            : storageClass === undefined
-              ? t("storage.growUnknown")
-              : fixed
-                ? t("storage.fixed", storageClass.name, growable)
-                : t("storage.grows")
-        }
-      >
+      <Part id="storage" title={t("part.storage")} description={description}>
         <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
           <FormField
             label={t("db.field.storage")}
@@ -226,6 +211,29 @@ function Shape({ project, database }: { project: string; database: Database }) {
       {planner.dialog}
     </form>
   )
+}
+
+/** Whether the volume can grow, and why not. */
+function useGrowth(project: string, database: Database) {
+  const t = useT()
+  const storage = useStorage(project)
+  const storageClass = classNamed(storage, database.storageClass)
+  const growable = storage?.classes.some((c) => c.allowExpansion) ?? false
+  if (storageFixed(database.engine)) {
+    return {
+      storageClass,
+      fixed: true,
+      description: t("db.storage.operatorFixed", engineName(database.engine)),
+    }
+  }
+  const fixed = storageClass?.allowExpansion === false
+  const description =
+    storageClass === undefined
+      ? t("storage.growUnknown")
+      : fixed
+        ? t("storage.fixed", storageClass.name, growable)
+        : t("storage.grows")
+  return { storageClass, fixed, description }
 }
 
 function Part({

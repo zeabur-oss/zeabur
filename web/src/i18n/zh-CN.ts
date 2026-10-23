@@ -2301,8 +2301,8 @@ export const zhCN: Messages = {
   "db.fact.operator": "Operator 报告",
   "db.connect": "连接",
   "db.inCluster": "只能从集群内部连接。",
-  "db.noDatabase":
-    "MOCO 不会创建数据库。请以 moco-writable 创建应用要用的数据库，再把名称加到连接字符串。",
+  "db.noDatabase": "这个集群没有应用数据库。服务以 moco-writable 连接，它可以创建数据库。",
+  "db.appDatabase": "应用数据库",
   "db.noAuth": (engine) => `这个 ${engine} 没有设置密码，集群里的任何程序都能连接。`,
   "db.export": "导出",
   "db.exportHint": (tool) => `下载 ${tool} 在主实例生成的转储文件，通过你的终端权限执行。`,
@@ -2404,8 +2404,8 @@ export const zhCN: Messages = {
   "db.restore.asOf": "新数据库的数据停在备份当时，之后写入的不会包含。",
   "db.restore.sharedSecret": (secret) =>
     `新数据库沿用原来的 Secret ${secret}，因为备份里有相同的用户和密码。`,
-  "db.restored.from": (name, time) => `从 ${name} 在 ${time} 的备份恢复`,
-  "db.restored.copy": (name, time) => `${name} 由这个数据库 ${time} 的备份恢复而来`,
+  "db.restored.from": (name, time) => `从 ${name} ${time}的备份恢复`,
+  "db.restored.copy": (name, time) => `${name} 由这个数据库 ${time}的备份恢复而来`,
   "db.restored.point": "把服务指向这里",
   "db.restored.pointTitle": (name) => `把服务指向 ${name}`,
   "db.restored.keep": (name) => `${name} 会继续运行。不再需要时，请到它的页面删除。`,

@@ -7,7 +7,7 @@ import { databasesQuery } from "@/api/queries"
 import { useTargets } from "@/components/connect"
 import { FormField } from "@/components/form-field"
 import { GateTip, useGate } from "@/components/gate"
-import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanner, usePlanStep } from "@/components/plan/planner"
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
@@ -105,24 +105,9 @@ function RestoreDrawer({
       onClose={onClose}
       title={t("db.restore.title", database.name)}
       description={t("db.restore.body")}
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("edit.cancel")}
-          </Button>
-          <Button size="sm" onClick={review}>
-            {t("edit.review")}
-          </Button>
-        </div>
-      }
+      footer={<ReviewFooter onCancel={onClose} onReview={review} />}
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          review()
-        }}
-      >
+      <ReviewForm onReview={review}>
         <FormField label={t("db.restore.point")}>
           <Select
             size="sm"
@@ -147,7 +132,7 @@ function RestoreDrawer({
           />
         </FormField>
         <p className="type-meta text-muted-foreground">{t("db.restore.asOf")}</p>
-      </form>
+      </ReviewForm>
     </PlanDrawer>
   )
 }

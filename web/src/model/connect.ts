@@ -300,17 +300,18 @@ export function pendingDatabase(form: NewDatabase, project: string): Connectable
         },
       }
     case "mysql": {
-      const user = { secret: `moco-${name}`, passwordKey: "WRITABLE_PASSWORD" }
+      const user = { secret: `${name}-app`, passwordKey: "password" }
       return {
         engine,
         name,
         connection: {
           host: at(`moco-${name}-primary`),
           port: 3306,
-          username: "moco-writable",
+          username: "app",
+          database: "app",
           ...user,
         },
-        app: { username: "moco-writable", ...user },
+        app: { username: "app", database: "app", ...user },
       }
     }
     case "mariadb": {
