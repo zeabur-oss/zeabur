@@ -39,6 +39,7 @@
 pub mod backups;
 pub mod builds;
 pub mod databases;
+pub mod deploy_keys;
 pub(crate) mod events;
 pub mod namespace;
 pub mod network_policy;

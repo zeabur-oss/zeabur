@@ -87,6 +87,7 @@ pub(crate) async fn compute(
         | Change::Resources { .. }
         | Change::Edit { .. }
         | Change::Create { .. }
+        | Change::DeployKey { .. }
         | Change::Delete { .. }
         | Change::CreateProject { .. }
         | Change::Adopt

@@ -66,7 +66,7 @@ use zeabur_plan::{Change, ErrorKind, GatewayRef, Input, Plan, PlanError, PlanReq
 use crate::error::{ApiError, project_read, read_problem};
 use crate::handlers::{AppState, Credential, Everyday, Person};
 use crate::plan_token::{self as token, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
-use crate::projects::snapshot;
+use crate::projects::{deploy_keys, snapshot};
 
 /// A plan and the token that applies it.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -277,20 +277,21 @@ pub(crate) async fn plan(
         person: &identity.username,
         handoff: handoff.as_ref(),
     };
+    let opened = deploy_keys::open(&state, &identity.username, &project, &request)?;
     let plan = compute_any(
         &planner,
         cluster.as_ref(),
         &project,
-        &request,
+        &opened,
         &made_at,
         state.settings.domains.cluster_issuer.as_deref(),
     )
     .await?;
-    let from_yaml = creations::from_yaml(&request);
+    let from_yaml = creations::from_yaml(&opened);
     if from_yaml {
         creations::dry_run(cluster.as_ref(), &project, &plan).await?;
     }
-    let preview = preview::read(cluster.as_ref(), &project, &plan, &request).await?;
+    let preview = preview::read(cluster.as_ref(), &project, &plan, &opened).await?;
     let gaps = if from_yaml {
         creations::gaps(&project, &plan)
     } else {
@@ -404,11 +405,12 @@ pub(crate) async fn apply(
         person: &identity.username,
         handoff: handoff.as_ref(),
     };
+    let opened = deploy_keys::open(&state, &identity.username, &project, &claims.request)?;
     let plan = compute_any(
         &planner,
         cluster.as_ref(),
         &project,
-        &claims.request,
+        &opened,
         &claims.made_at,
         state.settings.domains.cluster_issuer.as_deref(),
     )
