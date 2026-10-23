@@ -39,6 +39,7 @@ const engines = [
     engine: "PostgreSQL",
     path: "postgresql",
     name: postgres,
+    kind: "Cluster",
     secret: `${postgres}-app`,
     // A name of the Developer's own; the companions follow it.
     variable: "E2E_DATABASE_URL",
@@ -57,6 +58,7 @@ const engines = [
           engine: "MongoDB",
           path: "mongodb",
           name: mongo,
+          kind: "PerconaServerMongoDB",
           secret: `${mongo}-secrets`,
           variable: "E2E_MONGO_URL",
           variables: ["E2E_MONGOPASSWORD", "E2E_MONGO_URL"],
@@ -178,6 +180,21 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       await developer.goto(databasePage(db.path, db.name))
     })
 
+    await test.step(`the Developer reads ${db.name} as YAML and has a terminal`, async () => {
+      await expect(developer.getByRole("button", { name: "Terminal", exact: true })).toBeEnabled()
+      await developer.getByRole("tab", { name: "Logs" }).click()
+      await expect(developer.getByRole("tabpanel")).toBeVisible()
+      await developer.getByRole("tab", { name: "Settings" }).click()
+      await developer
+        .getByRole("group", { name: "Views" })
+        .getByRole("button", { name: "YAML" })
+        .click()
+      const yaml = developer.getByRole("figure", { name: `YAML of ${db.name}` })
+      await expect(yaml).toContainText(`kind: ${db.kind}`)
+      await expect(developer.locator("main")).toContainText("kubectl exec")
+      await developer.goto(databasePage(db.path, db.name))
+    })
+
     await test.step(`the Developer backs ${db.name} up to S3 and backs it up now`, async () => {
       await developer.getByRole("tab", { name: "Backups" }).click()
       const setUp = developer.getByRole("region", { name: "Set up backups" })
@@ -217,6 +234,9 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       // Closed, naming the role that opens it, rather than refused after a click.
       await expect(connect.getByRole("button", { name: "Reveal" })).toBeDisabled()
       await expect(connect).toContainText("Needs Developer access")
+      // Viewers do not read logs or open terminals.
+      await expect(viewer.getByRole("tab", { name: "Logs" })).toHaveCount(0)
+      await expect(viewer.getByRole("button", { name: "Terminal", exact: true })).toBeDisabled()
       await viewer.getByRole("tab", { name: "Backups" }).click()
       const backups = viewer.getByRole("region", { name: "Backups" })
       await expect(backups).toContainText("Succeeded")

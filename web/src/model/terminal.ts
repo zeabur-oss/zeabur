@@ -80,9 +80,12 @@ export function terminalUrl(
   project: string,
   pod: string,
   container: string | undefined,
+  command: string[] = [],
 ): string {
   const scheme = location.protocol === "https:" ? "wss:" : "ws:"
-  const query = container ? `?${new URLSearchParams({ container })}` : ""
+  const params = new URLSearchParams(container ? { container } : {})
+  for (const arg of command) params.append("command", arg)
+  const query = params.size > 0 ? `?${params}` : ""
   return `${scheme}//${location.host}/api/v1/projects/${encodeURIComponent(project)}/pods/${encodeURIComponent(pod)}/exec${query}`
 }
 

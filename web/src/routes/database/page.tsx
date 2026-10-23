@@ -1,42 +1,58 @@
-// One database an operator runs: whether it serves and how to reach it, then its backups.
+// One database an operator runs, with a service's tabs: how it is and how to reach it, its
+// members' logs, backups, events, and its settings with the operator's object as YAML.
 import { useQuery } from "@tanstack/react-query"
-import { getRouteApi, Link } from "@tanstack/react-router"
+import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
+import { toast } from "sonner"
 import ArchiveIcon from "~icons/ph/archive"
+import CaretRightIcon from "~icons/ph/caret-right"
+import CopyIcon from "~icons/ph/copy"
 import DatabaseIcon from "~icons/ph/database"
+import DotsThreeIcon from "~icons/ph/dots-three"
 import EyeIcon from "~icons/ph/eye"
 import EyeSlashIcon from "~icons/ph/eye-slash"
+import GearSixIcon from "~icons/ph/gear-six"
 import InfoIcon from "~icons/ph/info"
+import ListBulletsIcon from "~icons/ph/list-bullets"
 import PlugsConnectedIcon from "~icons/ph/plugs-connected"
+import TerminalWindowIcon from "~icons/ph/terminal-window"
+import TextAlignLeftIcon from "~icons/ph/text-align-left"
+import TrashIcon from "~icons/ph/trash"
 import WarningIcon from "~icons/ph/warning"
 
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import { useLogsReadable } from "@/api/logs-access"
 import { databasesQuery, projectQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { ConnectDrawer, useTargets } from "@/components/connect"
 import { CopyText } from "@/components/copy-text"
 import { DatabaseState } from "@/components/databases"
-import { OpenInTerminal } from "@/components/dock/open-in-terminal"
+import { EventList } from "@/components/events"
 import { FormField } from "@/components/form-field"
 import { Freshness } from "@/components/freshness"
-import { GateTip, useGate } from "@/components/gate"
+import { GatedMenuItem, GateTip, useGate, useGates } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Schedule } from "@/components/schedule"
 import { StatusPill } from "@/components/status"
 import { useI18n, useT } from "@/i18n"
+import { openDatabaseShell } from "@/lib/dock"
+import type { Icon } from "@/lib/icon"
 import { formatDate } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import {
   backUpNow,
   backupsOn,
-  commands,
   connectionUri,
+  deleteDatabase,
   enableBackups,
   engineName,
+  eventsOf,
   lastRun,
   newBackupTarget,
   presetOf,
+  serverContainer,
   stateHealth,
   targetProblems,
   type BackupTarget,
@@ -44,10 +60,23 @@ import {
   type Frequency,
 } from "@/model/databases"
 import { connected } from "@/model/connect"
-import type { Health } from "@/model/service"
+import { isWarning, type Event, type Health } from "@/model/service"
+import { useProjectEvents } from "@/routes/project/data"
+import { DatabaseSettings } from "@/routes/database/settings"
+import { databaseTabs, type DatabaseTab, type ServiceMode } from "@/routes/search"
+import { TabRow } from "@/routes/service/tab-row"
+import { Events, MemberLogs } from "@/routes/service/views"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
+import { Container } from "@zeabur/design-system/components/container"
 import { Input } from "@zeabur/design-system/components/input"
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuSeparator,
+  MenuTrigger,
+} from "@zeabur/design-system/components/menu"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { Select } from "@zeabur/design-system/components/select"
 import {
@@ -63,7 +92,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
 
-type Tab = "overview" | "backups"
+const tabIcons: Record<DatabaseTab, Icon> = {
+  overview: InfoIcon,
+  logs: TextAlignLeftIcon,
+  backups: ArchiveIcon,
+  events: ListBulletsIcon,
+  settings: GearSixIcon,
+}
+
+const tabLabel = {
+  overview: "tab.overview",
+  logs: "tab.logs",
+  backups: "db.tab.backups",
+  events: "tab.events",
+  settings: "tab.settings",
+} as const
 
 const outcomeHealth: Record<Schemas["BackupOutcome"], Health> = {
   succeeded: "ok",
@@ -79,20 +122,20 @@ export function DatabasePage() {
   const query = useQuery(databasesQuery(project))
   if (query.error)
     return (
-      <PageColumn width="content" className="mt-8">
+      <Column>
         <Problem error={query.error} what={t("db.title")} retry={() => void query.refetch()} />
-      </PageColumn>
+      </Column>
     )
   if (!query.data) return null
   const database = query.data.items.find((d) => d.engine === engine && d.name === name)
   if (!database)
     return (
-      <PageColumn width="content" className="mt-8">
+      <Column>
         <p className="text-sm text-muted-foreground">{t("db.notFound")}</p>
         <Link to="/projects/$project" params={{ project }} className="text-sm hover:underline">
           {t("projectSettings.back")}
         </Link>
-      </PageColumn>
+      </Column>
     )
   const operator = query.data.operators.find((o) => o.engine === database.engine)
   return (
@@ -103,6 +146,14 @@ export function DatabasePage() {
       updatedAt={query.dataUpdatedAt}
       failed={query.isRefetchError}
     />
+  )
+}
+
+function Column({ children }: { children: ReactNode }) {
+  return (
+    <PageColumn width="content" className="my-6 md:my-8">
+      {children}
+    </PageColumn>
   )
 }
 
@@ -123,15 +174,47 @@ function Body({
   const { locale } = useI18n()
   const search = route.useSearch()
   const navigate = route.useNavigate()
-  const tab: Tab = search.tab ?? "overview"
-  const setTab = (next: Tab) =>
-    void navigate({ search: { tab: next === "overview" ? undefined : next }, replace: true })
+  const leave = useNavigate()
+  const logs = useLogsReadable(project)
+  const gates = useGates(project)
+  const events = eventsOf(useProjectEvents(project), database)
+  const unreadable = useQuery(projectQuery(project)).data?.unreadable ?? []
+  const tab: DatabaseTab = search.tab === "logs" && !logs ? "overview" : (search.tab ?? "overview")
+  const shown = databaseTabs.filter((value) => value !== "logs" || logs)
+  const wide = tab === "logs"
+  const setTab = (next: DatabaseTab) =>
+    void navigate({
+      search: (previous) => ({
+        tab: next === "overview" ? undefined : next,
+        pod: next === "logs" || next === "events" ? previous.pod : undefined,
+      }),
+      hash: "",
+    })
+  const setMode = (next?: ServiceMode) =>
+    void navigate({
+      search: (previous) => ({ ...previous, mode: next === "yaml" ? "yaml" : undefined }),
+      hash: "",
+    })
+  const setPod = (pod?: string) =>
+    void navigate({ search: (previous) => ({ ...previous, pod: pod || undefined }), replace: true })
+  const deleter = usePlanner(
+    project,
+    () => void leave({ to: "/projects/$project", params: { project }, search: {} }),
+  )
+  const shell = (pod?: string) => openDatabaseShell(project, database, pod)
+  const copyName = () =>
+    navigator.clipboard.writeText(`${database.resource}/${database.name}`).then(
+      () => toast.success(t("common.copied")),
+      () => undefined,
+    )
+  const terminalGate = gates("openTerminal")
+
   return (
     <Tabs
       value={tab}
-      onValueChange={(value) => setTab(value as Tab)}
+      onValueChange={(value) => setTab(value as DatabaseTab)}
       variant="page"
-      className="flex flex-1 flex-col"
+      className={cn("flex flex-1 flex-col", wide && "min-h-0")}
     >
       <header className="shrink-0">
         <PageColumn width="content">
@@ -161,30 +244,121 @@ function Body({
             </div>
             <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:pl-13">
               {backupsOn(database) ? <BackUpNow project={project} database={database} /> : null}
+              <GateTip gate={terminalGate} className="max-sm:hidden">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="max-sm:hidden"
+                  onClick={() => shell(search.pod)}
+                >
+                  <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+                  {t("tab.terminal")}
+                </Button>
+              </GateTip>
+              <GateTip gate={terminalGate} className="sm:hidden">
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  className="sm:hidden"
+                  aria-label={t("tab.terminal")}
+                  onClick={() => shell(search.pod)}
+                >
+                  <TerminalWindowIcon aria-hidden="true" />
+                </Button>
+              </GateTip>
+              <Menu>
+                <MenuTrigger
+                  render={
+                    <Button variant="outline" size="icon-sm" aria-label={t("service.more")} />
+                  }
+                >
+                  <DotsThreeIcon aria-hidden="true" />
+                </MenuTrigger>
+                <MenuContent>
+                  <MenuItem onClick={() => void copyName()}>
+                    <CopyIcon aria-hidden="true" />
+                    {t("service.copyName")}
+                  </MenuItem>
+                  <MenuSeparator />
+                  <GatedMenuItem
+                    gate={gates("changeDatabases")}
+                    onClick={() =>
+                      deleter.plan({
+                        title: t("title.delete", database.kind, database.name),
+                        changes: deleteDatabase(database),
+                      })
+                    }
+                  >
+                    <TrashIcon aria-hidden="true" />
+                    {t("db.delete")}
+                  </GatedMenuItem>
+                </MenuContent>
+              </Menu>
             </div>
           </div>
-          <TabsList aria-label={t("db.tabs")} className="w-full">
-            <TabsTrigger value="overview" className="flex-1">
-              <InfoIcon aria-hidden="true" className="max-sm:hidden" />
-              {t("db.tab.overview")}
-            </TabsTrigger>
-            <TabsTrigger value="backups" className="flex-1">
-              <ArchiveIcon aria-hidden="true" className="max-sm:hidden" />
-              {t("db.tab.backups")}
-            </TabsTrigger>
-          </TabsList>
+          <TabRow>
+            <TabsList aria-label={t("db.tabs")} className="w-full">
+              {shown.map((value) => {
+                const TabIcon = tabIcons[value]
+                return (
+                  <TabsTrigger key={value} value={value} className="flex-1">
+                    <TabIcon aria-hidden="true" className="max-sm:hidden" />
+                    {t(tabLabel[value])}
+                  </TabsTrigger>
+                )
+              })}
+            </TabsList>
+          </TabRow>
         </PageColumn>
       </header>
-      <PageColumn width="content" gap="md" className="mt-3 mb-16">
+      <PageColumn width="content" className={cn("mt-3", wide ? "mb-4 min-h-0 flex-1" : "mb-16")}>
         <TabsContent value="overview">
-          {tab === "overview" ? <Overview project={project} database={database} /> : null}
+          {tab === "overview" ? (
+            <Overview
+              project={project}
+              database={database}
+              events={events}
+              onEvents={() => setTab("events")}
+            />
+          ) : null}
+        </TabsContent>
+        <TabsContent value="logs" className={tab === "logs" ? "flex min-h-0 flex-col" : undefined}>
+          {tab === "logs" ? (
+            <MemberLogs
+              project={project}
+              source={{
+                name: database.name,
+                pods: database.pods,
+                containers: [serverContainer[database.engine]],
+                shell,
+              }}
+              pod={search.pod}
+              onPodChange={setPod}
+            />
+          ) : null}
         </TabsContent>
         <TabsContent value="backups">
           {tab === "backups" ? (
             <Backups project={project} database={database} readable={backupsReadable} />
           ) : null}
         </TabsContent>
+        <TabsContent value="events">
+          {tab === "events" ? (
+            <Events events={events} pod={search.pod} unreadable={unreadable} onPod={setPod} />
+          ) : null}
+        </TabsContent>
+        <TabsContent value="settings">
+          {tab === "settings" ? (
+            <DatabaseSettings
+              project={project}
+              database={database}
+              mode={search.mode}
+              onMode={setMode}
+            />
+          ) : null}
+        </TabsContent>
       </PageColumn>
+      {deleter.dialog}
     </Tabs>
   )
 }
@@ -194,32 +368,73 @@ function BackUpNow({ project, database }: { project: string; database: Database 
   const planner = usePlanner(project)
   const gate = useGate(project, "backUpDatabases")
   const starting = !database.backups.ready
+  const plan = () =>
+    planner.plan({
+      title: t("db.backup.planNow", database.name),
+      changes: backUpNow(database, new Date()),
+    })
   return (
     <>
       {starting ? (
-        <span id="db-backups-starting" className="type-meta text-muted-foreground">
+        <span id="db-backups-starting" className="type-meta text-muted-foreground max-sm:hidden">
           {t("db.backup.starting")}
         </span>
       ) : null}
-      <GateTip gate={gate}>
+      <GateTip gate={gate} className="max-sm:hidden">
         <Button
           variant="outline"
           size="sm"
+          className="max-sm:hidden"
           disabled={starting}
           aria-describedby={starting ? "db-backups-starting" : undefined}
-          onClick={() =>
-            planner.plan({
-              title: t("db.backup.planNow", database.name),
-              changes: backUpNow(database, new Date()),
-            })
-          }
+          onClick={plan}
         >
           <ArchiveIcon aria-hidden="true" data-icon="inline-start" />
           {t("db.backup.now")}
         </Button>
       </GateTip>
+      <GateTip gate={gate} className="sm:hidden">
+        <Button
+          variant="outline"
+          size="icon-sm"
+          className="sm:hidden"
+          disabled={starting}
+          aria-label={t("db.backup.now")}
+          title={starting ? t("db.backup.starting") : undefined}
+          onClick={plan}
+        >
+          <ArchiveIcon aria-hidden="true" />
+        </Button>
+      </GateTip>
       {planner.dialog}
     </>
+  )
+}
+
+/** The newest warnings, as a service's overview shows them, and the way to all events. */
+function Warnings({ events, onEvents }: { events: Event[]; onEvents: () => void }) {
+  const t = useT()
+  const warnings = events.filter(isWarning)
+  if (warnings.length === 0) return null
+  return (
+    <Container
+      title={t("overview.warnings")}
+      titleAction={
+        <button
+          type="button"
+          onClick={onEvents}
+          className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary outline-none hover:text-main"
+        >
+          {t("common.all")}
+          <CaretRightIcon className="size-3.5" aria-hidden="true" />
+        </button>
+      }
+      variant="list"
+    >
+      <div className="px-4">
+        <EventList events={warnings} limit={3} compact plain />
+      </div>
+    </Container>
   )
 }
 
@@ -234,7 +449,17 @@ function Section({ id, title, children }: { id: string; title: string; children:
   )
 }
 
-function Overview({ project, database }: { project: string; database: Database }) {
+function Overview({
+  project,
+  database,
+  events,
+  onEvents,
+}: {
+  project: string
+  database: Database
+  events: Event[]
+  onEvents: () => void
+}) {
   const t = useT()
   const preset = presetOf(database.engine, database.resources)
   const run = lastRun(database)
@@ -314,8 +539,8 @@ function Overview({ project, database }: { project: string; database: Database }
           ],
         ]}
       />
+      <Warnings events={events} onEvents={onEvents} />
       <Connection project={project} database={database} />
-      <Commands project={project} database={database} />
     </div>
   )
 }
@@ -450,35 +675,6 @@ function ConnectServices({ project, database }: { project: string; database: Dat
         <ConnectDrawer project={project} database={database} onClose={() => setOpen(false)} />
       ) : null}
     </div>
-  )
-}
-
-function Commands({ project, database }: { project: string; database: Database }) {
-  const t = useT()
-  const { describe, shell } = commands(project, database)
-  const rows = [
-    { label: t("db.command.describe"), command: describe },
-    { label: t("db.command.shell"), command: shell },
-  ]
-  return (
-    <Section id="db-commands" title={t("db.commands")}>
-      <ul className="flex flex-col gap-3">
-        {rows.map((row) => (
-          <li key={row.label} className="flex flex-col gap-1.5">
-            <span className="type-meta text-muted-foreground">{row.label}</span>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-muted/40 py-1.5 pr-1.5 pl-3">
-              <code className="min-w-48 flex-1 type-mono break-all" translate="no">
-                {row.command}
-              </code>
-              <div className="ml-auto flex items-center">
-                <CopyText value={() => row.command} label={t("common.copy")} />
-                <OpenInTerminal project={project} command={row.command} />
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </Section>
   )
 }
 

@@ -290,6 +290,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
             .as_ref()
             .map(|t| t.0.to_string()),
         object: databases::written(cluster),
+        pods: Vec::new(),
         name,
     }
 }
@@ -300,6 +301,30 @@ mod tests {
 
     fn object(value: Value) -> DynamicObject {
         serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn its_mongod_pods_are_members_and_its_other_pods_are_not() {
+        let mongo = database(
+            "shop",
+            &object(serde_json::json!({
+                "apiVersion": "psmdb.percona.com/v1", "kind": "PerconaServerMongoDB",
+                "metadata": {"name": "mongo", "namespace": "shop"}, "spec": {}
+            })),
+            &[],
+        );
+        let labels = |instance: &str, component: &str| {
+            [
+                ("app.kubernetes.io/instance", instance),
+                ("app.kubernetes.io/component", component),
+            ]
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect()
+        };
+        assert!(mongo.is_member(&labels("mongo", "mongod")));
+        assert!(!mongo.is_member(&labels("mongo", "cfg")));
+        assert!(!mongo.is_member(&labels("other", "mongod")));
     }
 
     #[test]

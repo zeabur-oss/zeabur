@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, test } from "bun:test"
 
-import { closeTab, commandTyped, dock, isDockShortcut, openKubectl, openShell } from "@/lib/dock"
+import {
+  closeTab,
+  commandTyped,
+  dock,
+  isDockShortcut,
+  openDatabaseShell,
+  openKubectl,
+  openShell,
+} from "@/lib/dock"
 
 describe("the dock", () => {
   beforeEach(() => dock.set({ open: false, tabs: [], focus: 0 }))
@@ -36,6 +44,22 @@ describe("the dock", () => {
     ])
     expect(state.active).toBe("shell:shop/Deployment/api")
     expect(state.tabs[0]).toMatchObject({ pod: "api-1" })
+  })
+
+  test("a database's terminal is a shell tab that names the database", () => {
+    const orders = { engine: "postgresql", kind: "Cluster", name: "orders" }
+    openDatabaseShell("shop", orders)
+    openDatabaseShell("shop", orders, "orders-2")
+    expect(dock.get().tabs).toStrictEqual([
+      {
+        id: "shell:shop/Cluster/orders",
+        kind: "shell",
+        project: "shop",
+        service: { kind: "Cluster", name: "orders" },
+        pod: "orders-2",
+        database: { engine: "postgresql", name: "orders" },
+      },
+    ])
   })
 
   test("asking for kubectl again counts the ask; opening from an old link does not", () => {

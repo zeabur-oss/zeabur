@@ -317,6 +317,20 @@ fn pod_in(
     }))
 }
 
+/// A member of a database in `shop`, labelled as its operator labels it, with no workload.
+fn member(name: &str, container: &str, labels: &[(&str, &str)]) -> Pod {
+    let labels: serde_json::Map<String, Value> = labels
+        .iter()
+        .map(|(k, v)| ((*k).to_owned(), Value::from(*v)))
+        .collect();
+    from(json!({
+        "metadata": {"name": name, "namespace": "shop", "labels": labels,
+            "creationTimestamp": minutes_ago(2900)},
+        "spec": {"containers": [{"name": container, "image": "example"}], "nodeName": "vps-1"},
+        "status": running(container, 0)
+    }))
+}
+
 /// A running, ready pod's status.
 fn running(container: &str, restarts: i32) -> Value {
     json!({"phase": "Running", "containerStatuses": [{"name": container, "ready": true,
@@ -504,6 +518,39 @@ fn shop() -> NamespaceObjects {
             pod("worker-84c2d-w2e5r", "worker", false, 14, None),
             pod("db-0", "db", true, 0, Some("db")),
             pod("redis-0", "redis", true, 0, Some("redis")),
+            member(
+                "orders-1",
+                "postgres",
+                &[
+                    ("cnpg.io/cluster", "orders"),
+                    ("cnpg.io/instanceName", "orders-1"),
+                    ("cnpg.io/instanceRole", "primary"),
+                ],
+            ),
+            member(
+                "sessions-rs0-0",
+                "mongod",
+                &[
+                    ("app.kubernetes.io/instance", "sessions"),
+                    ("app.kubernetes.io/component", "mongod"),
+                ],
+            ),
+            member(
+                "sessions-rs0-1",
+                "mongod",
+                &[
+                    ("app.kubernetes.io/instance", "sessions"),
+                    ("app.kubernetes.io/component", "mongod"),
+                ],
+            ),
+            member(
+                "sessions-rs0-2",
+                "mongod",
+                &[
+                    ("app.kubernetes.io/instance", "sessions"),
+                    ("app.kubernetes.io/component", "mongod"),
+                ],
+            ),
         ],
         services: vec![
             service("web", 80, "http"),
@@ -1402,6 +1449,14 @@ fn state() -> State {
                  2026-10-14T02:00:04Z \u{1b}[31mERROR\u{1b}[0m connect db:5432: password authentication failed for user \"billing\"\n\
                  2026-10-14T02:00:04Z exit status 1"
                     .to_owned(),
+            ),
+            (
+                "shop/orders-1".to_owned(),
+                "{\"level\":\"info\",\"msg\":\"database system is ready to accept connections\",\"logger\":\"postgres\"}".to_owned(),
+            ),
+            (
+                "shop/sessions-rs0-0".to_owned(),
+                "{\"t\":{\"$date\":\"2026-10-14T02:00:00Z\"},\"s\":\"I\",\"c\":\"REPL\",\"msg\":\"Transition to primary complete\"}".to_owned(),
             ),
             (
                 "shop/db-0".to_owned(),

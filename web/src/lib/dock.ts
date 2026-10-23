@@ -7,6 +7,11 @@ export interface ServiceRef {
   name: string
 }
 
+export interface DatabaseRef {
+  engine: string
+  name: string
+}
+
 export type DockTab =
   | {
       id: string
@@ -27,6 +32,8 @@ export type DockTab =
       pod?: string
       /** Named in the tab when the replica has more than one. */
       container?: string
+      /** A database's members instead of a service's replicas: `service` is its object. */
+      database?: DatabaseRef
     }
 
 export interface DockState {
@@ -80,16 +87,32 @@ const shellId = (project: string, service: ServiceRef) =>
   `shell:${project}/${service.kind}/${service.name}`
 
 /** Opens a terminal in the service, or shows the one already open. */
-export function openShell(project: string, service: ServiceRef, pod?: string) {
+export function openShell(
+  project: string,
+  service: ServiceRef,
+  pod?: string,
+  database?: DatabaseRef,
+) {
   const state = dock.get()
   const id = shellId(project, service)
   const tabs = state.tabs.some((tab) => tab.id === id)
     ? state.tabs.map((tab) =>
         tab.id === id && tab.kind === "shell" && pod ? { ...tab, pod } : tab,
       )
-    : [...state.tabs, { id, kind: "shell" as const, project, service, pod }]
+    : [...state.tabs, { id, kind: "shell" as const, project, service, pod, database }]
   dock.set({ tabs, active: id, open: true, focus: state.focus + 1 })
 }
+
+/** Opens a terminal in the database's server, or shows the one already open. */
+export const openDatabaseShell = (
+  project: string,
+  database: DatabaseRef & { kind: string },
+  pod?: string,
+) =>
+  openShell(project, { kind: database.kind, name: database.name }, pod, {
+    engine: database.engine,
+    name: database.name,
+  })
 
 /** Opens the project's kubectl terminal, or shows it. An ask attaches to the tools pod named, or a
  * running one, or plans one; without, the tab lists the person's tools pods. A `command` is typed

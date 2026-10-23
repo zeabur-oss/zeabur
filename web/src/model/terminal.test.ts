@@ -115,6 +115,11 @@ describe("terminal address and access", () => {
     expect(
       terminalUrl({ protocol: "http:", host: "127.0.0.1:8080" }, "a b", "p/1", undefined),
     ).toBe("ws://127.0.0.1:8080/api/v1/projects/a%20b/pods/p%2F1/exec")
+    expect(
+      terminalUrl({ protocol: "https:", host: "z" }, "shop", "pg-1", "postgres", ["psql", "app"]),
+    ).toBe(
+      "wss://z/api/v1/projects/shop/pods/pg-1/exec?container=postgres&command=psql&command=app",
+    )
   })
 
   test("the Role to ask for grants get and create on pods/exec in the namespace only", () => {

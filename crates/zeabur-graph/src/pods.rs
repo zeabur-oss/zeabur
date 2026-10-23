@@ -66,7 +66,9 @@ fn selects(selector: &LabelSelector, labels: Option<&BTreeMap<String, String>>) 
     !selector::is_empty(selector) && selector::matches(selector, labels.unwrap_or(&empty))
 }
 
-fn summary(namespace: &str, pod: &Pod, now: Option<Timestamp>) -> PodSummary {
+/// A pod as a service shows it, at `now` (its age).
+#[must_use]
+pub fn summary(namespace: &str, pod: &Pod, now: Option<Timestamp>) -> PodSummary {
     let name = name_of(&pod.metadata);
     let status = pod.status.as_ref();
     let statuses = status

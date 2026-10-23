@@ -4316,6 +4316,7 @@ components:
       - connection
       - backups
       - object
+      - pods
       properties:
         apiVersion:
           type: string
@@ -4379,6 +4380,11 @@ components:
           - string
           - "null"
           description: The operator's own words for it (`Cluster in healthy state`, `ready`).
+        pods:
+          type: array
+          items:
+            $ref: "#/components/schemas/PodSummary"
+          description: Its members' pods, by name; empty when they cannot be read.
         primary:
           type:
           - string

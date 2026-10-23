@@ -20,7 +20,7 @@ pub use env::{env, env_from};
 pub use health::{failing, pod_health, status};
 pub use mounts::mounts;
 pub use network::{port_protocol, ports};
-pub use pods::pods_of;
+pub use pods::{pods_of, summary as pod_summary};
 pub use project::{endpoint, project, project_with, provenance};
 pub use snapshot::Snapshot;
 pub use workload::{

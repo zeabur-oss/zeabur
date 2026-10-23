@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
 import { api, isStatus, unwrap } from "@/api/client"
-import { debugQuery, projectQuery, queryClient, toolsQuery } from "@/api/queries"
+import { databasesQuery, debugQuery, projectQuery, queryClient, toolsQuery } from "@/api/queries"
 import { Session } from "@/components/dock/session"
 import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
@@ -10,6 +10,8 @@ import { Problem } from "@/components/problem"
 import { useI18n, useT } from "@/i18n"
 import { commandTyped, openKubectl, updateShell, type DockTab } from "@/lib/dock"
 import { formatAgo } from "@/lib/format"
+import { serverContainer, shellCommand, shellPod } from "@/model/databases"
+import type { Pod } from "@/model/service"
 import { terminalUrl, toolsTerminalUrl } from "@/model/terminal"
 import { Button } from "@zeabur/design-system/components/button"
 import { Card, CardRow, SectionLabel } from "@zeabur/design-system/components/card"
@@ -23,21 +25,97 @@ import { Select } from "@zeabur/design-system/components/select"
 
 type ShellTabProps = { tab: Extract<DockTab, { kind: "shell" }>; shown: boolean; focus: number }
 
-/** A shell in one of the service's containers, or a debug container beside it. */
-export function ShellTab({ tab, shown, focus }: ShellTabProps) {
+/** A shell in one of the service's containers, or a debug container beside it; for a database,
+ * its engine's shell in the server's container. */
+export function ShellTab(props: ShellTabProps) {
+  return props.tab.database ? <DatabaseShell {...props} /> : <ServiceShell {...props} />
+}
+
+function ServiceShell({ tab, shown, focus }: ShellTabProps) {
   const t = useT()
   const view = useQuery(projectQuery(tab.project, { poll: false }))
   const service = view.data?.services.find(
     (s) => s.kind === tab.service.kind && s.name === tab.service.name,
   )
-  const pods = service?.pods ?? []
-  const pod = pods.find((p) => p.name === tab.pod) ?? pods.find((p) => p.ready) ?? pods[0]
-  const containerNames =
-    pod && pod.containers.length > 0
-      ? pod.containers
-      : (service?.containers ?? []).map((c) => c.name)
+  if (view.isPending) return <LoadingRows label={t("common.loading")} rows={2} />
+  if (view.isError) return <Problem error={view.error} />
+  if (!service) return <NoPod gone />
+  return (
+    <PodShell
+      tab={tab}
+      shown={shown}
+      focus={focus}
+      pods={service.pods}
+      containers={service.containers.map((c) => c.name)}
+      debug
+    />
+  )
+}
+
+function DatabaseShell({ tab, shown, focus }: ShellTabProps) {
+  const t = useT()
+  const query = useQuery(databasesQuery(tab.project))
+  const database = query.data?.items.find(
+    (d) => d.engine === tab.database?.engine && d.name === tab.database.name,
+  )
+  if (query.isPending) return <LoadingRows label={t("common.loading")} rows={2} />
+  if (query.isError) return <Problem error={query.error} />
+  if (!database) return <NoPod gone />
+  const server = serverContainer[database.engine]
+  return (
+    <PodShell
+      tab={tab}
+      shown={shown}
+      focus={focus}
+      pods={database.pods}
+      containers={[server]}
+      preferred={{ pod: shellPod(database), container: server, command: shellCommand(database) }}
+    />
+  )
+}
+
+function NoPod({ gone = false }: { gone?: boolean }) {
+  const t = useT()
+  return (
+    <Empty className="flex-1">
+      <EmptyHeader>
+        <EmptyTitle>{gone ? t("dock.gone") : t("logs.noPods")}</EmptyTitle>
+        {gone ? null : <EmptyDescription>{t("terminal.noPodsBody")}</EmptyDescription>}
+      </EmptyHeader>
+    </Empty>
+  )
+}
+
+function PodShell({
+  tab,
+  shown,
+  focus,
+  pods,
+  containers,
+  preferred,
+  debug: offersDebug = false,
+}: ShellTabProps & {
+  pods: Pod[]
+  /** The containers a pod runs, when the pod does not list them. */
+  containers: string[]
+  /** Where it opens first, and what runs in that container instead of a shell. */
+  preferred?: { pod: string; container: string; command: string[] }
+  /** Offers a debug container when the image has no shell. */
+  debug?: boolean
+}) {
+  const t = useT()
+  const pod =
+    pods.find((p) => p.name === tab.pod) ??
+    pods.find((p) => p.name === preferred?.pod) ??
+    pods.find((p) => p.ready) ??
+    pods[0]
+  const containerNames = pod && pod.containers.length > 0 ? pod.containers : containers
   const chosen =
-    tab.container && containerNames.includes(tab.container) ? tab.container : containerNames[0]
+    tab.container && containerNames.includes(tab.container)
+      ? tab.container
+      : preferred && containerNames.includes(preferred.container)
+        ? preferred.container
+        : containerNames[0]
   const several = containerNames.length > 1
   const [attempt, setAttempt] = useState(0)
   const [debug, setDebug] = useState<{ pod: string; target?: string; name: string }>()
@@ -48,19 +126,10 @@ export function ShellTab({ tab, shown, focus }: ShellTabProps) {
       updateShell(tab.id, { pod: pod.name, container: several ? chosen : undefined })
   }, [tab.id, tab.pod, tab.container, pod, chosen, several])
 
-  if (view.isPending) return <LoadingRows label={t("common.loading")} rows={2} />
-  if (view.isError) return <Problem error={view.error} />
-  if (!service || !pod)
-    return (
-      <Empty className="flex-1">
-        <EmptyHeader>
-          <EmptyTitle>{service ? t("logs.noPods") : t("dock.gone")}</EmptyTitle>
-          {service ? <EmptyDescription>{t("terminal.noPodsBody")}</EmptyDescription> : null}
-        </EmptyHeader>
-      </Empty>
-    )
+  if (!pod) return <NoPod />
   const debugName = debug?.pod === pod.name && debug.target === chosen ? debug.name : undefined
-  const url = terminalUrl(window.location, tab.project, pod.name, debugName ?? chosen)
+  const command = preferred && chosen === preferred.container ? preferred.command : []
+  const url = terminalUrl(window.location, tab.project, pod.name, debugName ?? chosen, command)
   return (
     <Session
       id={tab.id}
@@ -98,12 +167,14 @@ export function ShellTab({ tab, shown, focus }: ShellTabProps) {
         </>
       }
       noShell={
-        <DebugOffer
-          project={tab.project}
-          pod={pod.name}
-          container={chosen}
-          onAttach={(name) => setDebug({ pod: pod.name, target: chosen, name })}
-        />
+        offersDebug ? (
+          <DebugOffer
+            project={tab.project}
+            pod={pod.name}
+            container={chosen}
+            onAttach={(name) => setDebug({ pod: pod.name, target: chosen, name })}
+          />
+        ) : undefined
       }
       // Not `a => a + 1`: the refusal's button and the rights it granted both call this, and
       // must start one connection, not two.

@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { getRouteApi, useBlocker } from "@tanstack/react-router"
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
-import CaretRightIcon from "~icons/ph/caret-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
 import ChartBarIcon from "~icons/ph/chart-bar"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
@@ -74,6 +73,7 @@ import { OverviewTab } from "@/routes/service/overview"
 import { MetricsTab } from "@/routes/service/metrics"
 import { PendingMark, SettingsTab } from "@/routes/service/settings-tab"
 import { VariablesTab } from "@/routes/service/variables"
+import { TabRow } from "@/routes/service/tab-row"
 import { Events, Logs, ModeSwitch } from "@/routes/service/views"
 
 const tabIcons: Record<Page, Icon> = {
@@ -582,64 +582,5 @@ function Column({ children }: { children: React.ReactNode }) {
     <PageColumn width="content" className="my-6 md:my-8">
       {children}
     </PageColumn>
-  )
-}
-
-/** The tabs, with a button to scroll on while some of them are out of view. */
-function TabRow({ children }: { children: ReactNode }) {
-  const t = useT()
-  const ref = useRef<HTMLDivElement>(null)
-  const [overflow, setOverflow] = useState<"none" | "more" | "end">("none")
-  const list = () => ref.current?.querySelector<HTMLElement>("[role=tablist]") ?? undefined
-  const showing = overflow !== "none"
-  useLayoutEffect(() => {
-    const row = list()
-    if (!row) return
-    const check = () =>
-      setOverflow(
-        row.scrollWidth <= row.clientWidth + 1
-          ? "none"
-          : row.scrollLeft + row.clientWidth >= row.scrollWidth - 1
-            ? "end"
-            : "more",
-      )
-    check()
-    row.addEventListener("scroll", check, { passive: true })
-    const observer = new ResizeObserver(check)
-    observer.observe(row)
-    return () => {
-      row.removeEventListener("scroll", check)
-      observer.disconnect()
-    }
-  }, [])
-  // The button narrows the row: keep the chosen tab clear of it.
-  useLayoutEffect(() => {
-    const row = list()
-    const active = row?.querySelector<HTMLElement>("[aria-selected=true]")
-    if (!row || !active || !showing) return
-    const end = active.offsetLeft + active.offsetWidth - row.scrollLeft
-    if (end > row.clientWidth) row.scrollLeft += end - row.clientWidth + 24
-  }, [showing])
-  return (
-    <div ref={ref} className="flex items-center gap-1 pt-1 pb-3">
-      <div className="min-w-0 flex-1">{children}</div>
-      {overflow === "none" ? null : (
-        <Button
-          variant="muted"
-          size="icon-sm"
-          aria-label={t("service.moreTabs")}
-          className={cn(overflow === "end" && "invisible")}
-          onClick={() => {
-            const row = list()
-            row?.scrollBy({
-              left: row.clientWidth * 0.6,
-              behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-            })
-          }}
-        >
-          <CaretRightIcon aria-hidden="true" />
-        </Button>
-      )}
-    </div>
   )
 }
