@@ -152,6 +152,10 @@ pub struct Service {
     /// annotations; absent when they ask for none. Whether Reloader runs is the cluster's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_reload: Option<crate::ConfigReload>,
+    /// The strictest Pod Security Standards level its pod template meets; absent when it has
+    /// none. Whether the namespace enforces a level is the namespace's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pod_security: Option<crate::PodSecurityLevel>,
     /// What is going wrong with it, in plain words, sorted by kind then container. The
     /// projection leaves this empty: diagnoses need the namespace's events and the time of the
     /// read, so the API fills it in when it serves the project document.

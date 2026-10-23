@@ -3820,6 +3820,45 @@ components:
             description: The workload.
       - type: object
         description: |-
+          Set the Pod Security level a workload's pods meet (see the `pod_security` module):
+          `restricted` writes the settings the restricted standard asks for into its pod template;
+          `baseline` removes the ones that keep an image running as root from starting. The pods
+          are replaced.
+        required:
+        - workload
+        - profile
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - securityProfile
+          profile:
+            $ref: "#/components/schemas/PodSecurityLevel"
+            description: "`restricted` or `baseline`."
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: "The workload: a Deployment, StatefulSet, DaemonSet or CronJob."
+      - type: object
+        description: |-
+          Set the Pod Security level enforced in the project, the Namespace's
+          `pod-security.kubernetes.io/enforce` label (see the `pod_security` module). `baseline`
+          lowers only a `restricted` label and writes nothing otherwise; `restricted` is refused
+          while a workload, as the plan leaves it, does not meet it. Written before the other
+          changes of the plan.
+        required:
+        - level
+        - op
+        properties:
+          level:
+            $ref: "#/components/schemas/PodSecurityLevel"
+            description: "`restricted` or `baseline`."
+          op:
+            type: string
+            enum:
+            - podSecurity
+      - type: object
+        description: |-
           Replace one object of the project with an edited copy, written as YAML.
           
           Fields the server sets (`status`, `resourceVersion`, `managedFields`, …) are kept whatever
@@ -9279,6 +9318,21 @@ components:
           pod:
             type: string
             description: Its name.
+      - type: object
+        description: |-
+          Once applied, every workload of the project meets the restricted level, but the project
+          enforces only this one: a `podSecurity` change to `restricted` would raise it.
+        required:
+        - level
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - projectCanBeRestricted
+          level:
+            $ref: "#/components/schemas/PodSecurityLevel"
+            description: The level the project enforces now.
       description: Something a person should know before applying.
     PlannedObject:
       type: object
@@ -9427,6 +9481,13 @@ components:
       - complete
       - partial
       - unreadable
+    PodSecurityLevel:
+      type: string
+      description: A Pod Security Standards level, from the least to the most restrictive.
+      enum:
+      - privileged
+      - baseline
+      - restricted
     PodSummary:
       type: object
       description: One pod of a workload.
@@ -10244,7 +10305,8 @@ components:
             $ref: "#/components/schemas/Permission"
             description: |-
               Whether the person may adopt it or let it go: patch it, and where the admission policy
-              guards its labels, also `zeabur-manage` it.
+              guards its labels, also `zeabur-manage` it. Changing its Pod Security level needs the
+              same.
           canChange:
             $ref: "#/components/schemas/Permission"
             description: "Whether the person may patch the Namespace: change its details."
@@ -10259,6 +10321,13 @@ components:
           origin:
             $ref: "#/components/schemas/Origin"
             description: The Namespace.
+          podSecurity:
+            oneOf:
+            - $ref: "#/components/schemas/PodSecurityLevel"
+              description: |-
+                The Pod Security level enforced in it, its `pod-security.kubernetes.io/enforce` label;
+                absent when the label is not set, and the cluster's default applies, or names no level.
+            - type: "null"
           role:
             oneOf:
             - $ref: "#/components/schemas/AccountRole"
@@ -11281,6 +11350,13 @@ components:
             description: >-
               Its resource name, `projects/<project>/services/<kind>/<name>`; see
               [`crate::id`].
+          podSecurity:
+            oneOf:
+            - $ref: "#/components/schemas/PodSecurityLevel"
+              description: |-
+                The strictest Pod Security Standards level its pod template meets; absent when it has
+                none. Whether the namespace enforces a level is the namespace's.
+            - type: "null"
           pods:
             type: array
             items:

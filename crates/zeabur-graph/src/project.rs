@@ -249,6 +249,7 @@ fn service(
             .annotations
             .as_ref()
             .and_then(zeabur_model::ConfigReload::from_annotations),
+        pod_security: workload.pod_spec().map(crate::pod_security::level),
         diagnoses: Vec::new(),
     };
     service.data_store = data_store(&service);

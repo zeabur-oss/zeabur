@@ -189,6 +189,7 @@ async fn compute(
         Some(Vec::new())
     };
     let objects = edited_objects(cluster, project, request).await?;
+    let namespace = namespace::pod_security_namespace(cluster, project, request).await?;
     let replica_sets = replica_sets_of_deleted(cluster, project, request).await?;
     let reclaim_policies = reclaim_policies(cluster, request, &snapshot, &routes, &objects).await?;
     let changes_data = request.changes.iter().any(|c| {
@@ -213,7 +214,7 @@ async fn compute(
             objects: &objects,
             replica_sets: &replica_sets,
             reclaim_policies: &reclaim_policies,
-            namespace: None,
+            namespace: namespace.as_ref(),
             reloader,
             kinds: &kinds,
             cluster_issuer,

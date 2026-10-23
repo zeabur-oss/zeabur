@@ -19,7 +19,8 @@
 //! RBAC cannot limit a patch to some labels: a rule names verbs, resources and object names,
 //! never fields [k8s-rbac-names]. So the right to adopt a namespace is also the right to change
 //! its other labels, such as the Pod Security Admission levels `pod-security.kubernetes.io/*`
-//! [k8s-psa-labels]; the interface says so when it asks for the right.
+//! [k8s-psa-labels]; the interface says so when it asks for the right. Lowering the project's
+//! level for a service that runs as root is such a change, so it needs the same right.
 //!
 //! With the member roles, Developers may patch their project's Namespace, and the chart's
 //! admission policy (`deploy/chart/zeabur/templates/namespace-policy.yaml`) keeps such a patch to
@@ -38,7 +39,7 @@ use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, MANAGE_VERB, is_system_namespace};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Access, AccessRules, ResourceRef};
-use zeabur_model::{Origin, ProjectDetails};
+use zeabur_model::{Origin, PodSecurityLevel, ProjectDetails};
 
 use super::rights::ProjectRights;
 use crate::account::{AccountRole, role};
@@ -96,8 +97,13 @@ pub struct ProjectNamespace {
     /// Whether the person may patch the Namespace: change its details.
     pub can_change: Permission,
     /// Whether the person may adopt it or let it go: patch it, and where the admission policy
-    /// guards its labels, also `zeabur-manage` it.
+    /// guards its labels, also `zeabur-manage` it. Changing its Pod Security level needs the
+    /// same.
     pub can_adopt: Permission,
+    /// The Pod Security level enforced in it, its `pod-security.kubernetes.io/enforce` label;
+    /// absent when the label is not set, and the cluster's default applies, or names no level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pod_security: Option<PodSecurityLevel>,
     /// Your role in the project, from your rights there; absent when they could not be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<AccountRole>,
@@ -213,6 +219,11 @@ pub(crate) async fn get(
         details: ProjectDetails::from_annotations(metadata.annotations.as_ref()),
         can_change,
         can_adopt,
+        pod_security: metadata
+            .labels
+            .as_ref()
+            .and_then(|labels| labels.get(PodSecurityLevel::ENFORCE))
+            .and_then(|level| PodSecurityLevel::parse(level)),
         role,
         can,
         labels_guarded: guarded,

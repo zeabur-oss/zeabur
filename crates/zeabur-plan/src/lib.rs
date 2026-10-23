@@ -11,6 +11,7 @@ pub mod json;
 pub mod node_shell;
 mod owned;
 mod plan;
+mod pod_security;
 mod project;
 pub mod releases;
 mod reload;

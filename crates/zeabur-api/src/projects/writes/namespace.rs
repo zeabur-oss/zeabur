@@ -43,3 +43,38 @@ pub(super) async fn compute_namespace(
     )
     .map_err(plan_problem)
 }
+
+/// The Namespace, for a plan that sets the project's Pod Security level or a service's profile
+/// (whose plan says when the project could be raised). Only the level needs it: for a profile
+/// alone, a Namespace the person may not read is left out.
+pub(super) async fn pod_security_namespace(
+    cluster: &dyn Cluster,
+    project: &str,
+    request: &PlanRequest,
+) -> Result<Option<serde_json::Value>, ApiError> {
+    let level = request
+        .changes
+        .iter()
+        .any(|c| matches!(c, Change::PodSecurity { .. }));
+    let profile = request
+        .changes
+        .iter()
+        .any(|c| matches!(c, Change::SecurityProfile { .. }));
+    if !level && !profile {
+        return Ok(None);
+    }
+    let resource = zeabur_kube::ResourceRef::new("", "v1", "namespaces", "Namespace");
+    let what = format!("namespace {project}");
+    match cluster.get_object(&resource, None, project).await {
+        Ok(namespace) => namespace
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|e| ApiError::from(ClusterError::Decode(e.to_string()).into_problem(&what))),
+        Err(_) if !level => Ok(None),
+        Err(e) => Err(read_problem(
+            e,
+            &what,
+            get_read("", "namespaces", None, project),
+        )),
+    }
+}

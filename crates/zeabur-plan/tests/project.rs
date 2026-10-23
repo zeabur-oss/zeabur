@@ -399,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn a_new_project_is_a_namespace_with_the_project_label_and_nothing_else() {
+    fn a_new_project_is_a_restricted_namespace_with_the_project_label_and_nothing_else() {
         let plan = create("my-app", None, Some("  My app ")).unwrap();
         assert_eq!(plan.objects.len(), 1);
         let object = &plan.objects[0];
@@ -412,7 +412,12 @@ mod tests {
             body,
             &json!({"apiVersion": "v1", "kind": "Namespace", "metadata": {
                 "name": "my-app",
-                "labels": {LABEL: "true"},
+                "labels": {
+                    LABEL: "true",
+                    "pod-security.kubernetes.io/enforce": "restricted",
+                    "pod-security.kubernetes.io/audit": "restricted",
+                    "pod-security.kubernetes.io/warn": "restricted",
+                },
                 "annotations": {"zeabur.com/display-name": "My app"}
             }})
         );

@@ -21,6 +21,7 @@ mod maintenance;
 mod members;
 mod namespace;
 mod node_shell;
+mod pod_security;
 mod preview;
 mod releases;
 mod reloader;
