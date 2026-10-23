@@ -324,6 +324,27 @@ someone who is still a member only gives them a setup link.
 only Admin or nothing, and RBAC you write yourself decides the rest. The ClusterRole names are fixed: install one Zeabur
 per cluster.
 
+## Tokens for scripts and CI
+
+Zeabur has no API tokens of its own. Its state is Kubernetes objects, so a script uses a
+ServiceAccount token with kube-apiserver, and RBAC decides what it may do. To give a CI job the
+Developer role in the project `shop` (the same three ClusterRoles a Developer member gets):
+
+```sh
+kubectl -n shop create serviceaccount ci
+for role in zeabur-project-developer zeabur-project-builds-read zeabur-project-builds-write; do
+  kubectl -n shop create rolebinding "ci-$role" --clusterrole="$role" --serviceaccount=shop:ci
+done
+kubectl -n shop create token ci --duration=1h       # a short-lived token
+```
+
+The job then runs, for example, `kubectl -n shop rollout restart deployment/api` or
+`kubectl -n shop set image deployment/api api=<image>`. Zeabur shows these changes as it shows its
+own. If the CI cannot request a new token for each run, put a long-lived token in a Secret of type
+`kubernetes.io/service-account-token`
+([Kubernetes docs](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#manually-create-an-api-token-for-a-serviceaccount)).
+Delete that Secret to revoke the token.
+
 ## Check what Zeabur may do
 
 Zeabur's service account may do nothing a new service account cannot:
