@@ -192,6 +192,30 @@ pub struct Database {
     /// backups on) starts from, so the edit changes only what it adds.
     #[schema(value_type = Object)]
     pub object: serde_json::Value,
+    /// Its members' pods, by name; empty when they cannot be read.
+    pub pods: Vec<zeabur_model::PodSummary>,
+}
+
+impl Database {
+    /// Whether a pod with `labels` is one of its members. CloudNativePG labels an instance with
+    /// `cnpg.io/cluster` and `cnpg.io/instanceName` (its jobs have no instance name); the Percona
+    /// Operator labels a replica set member with `app.kubernetes.io/instance` and
+    /// `app.kubernetes.io/component: mongod`.
+    /// <https://cloudnative-pg.io/documentation/current/labels_annotations/>
+    #[must_use]
+    pub fn is_member(&self, labels: &std::collections::BTreeMap<String, String>) -> bool {
+        let label = |key: &str| labels.get(key).map(String::as_str);
+        match self.engine {
+            Engine::Postgresql => {
+                label("cnpg.io/cluster") == Some(&self.name)
+                    && label("cnpg.io/instanceName").is_some()
+            }
+            Engine::Mongodb => {
+                label("app.kubernetes.io/instance") == Some(&self.name)
+                    && label("app.kubernetes.io/component") == Some("mongod")
+            }
+        }
+    }
 }
 
 /// `object` without `status` and `managedFields`.

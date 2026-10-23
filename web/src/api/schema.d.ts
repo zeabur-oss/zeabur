@@ -2233,6 +2233,8 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description The operator's own words for it (`Cluster in healthy state`, `ready`). */
       phase?: string | null
+      /** @description Its members' pods, by name; empty when they cannot be read. */
+      pods: components["schemas"]["PodSummary"][]
       /** @description The member taking writes. */
       primary?: string | null
       /** @description The provider (module id). */

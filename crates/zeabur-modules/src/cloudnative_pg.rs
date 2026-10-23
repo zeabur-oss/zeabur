@@ -311,6 +311,7 @@ pub fn database(
             .as_ref()
             .map(|t| t.0.to_string()),
         object: databases::written(cluster),
+        pods: Vec::new(),
         name,
     }
 }
@@ -385,6 +386,38 @@ mod tests {
 
     fn object(value: serde_json::Value) -> DynamicObject {
         serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn its_instances_are_members_and_its_jobs_and_other_clusters_are_not() {
+        let pg = database(
+            "shop",
+            &object(serde_json::json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                "metadata": {"name": "pg", "namespace": "shop"}, "spec": {"instances": 1}
+            })),
+            &[],
+            &[],
+            &[],
+        );
+        let labels = |pairs: &[(&str, &str)]| {
+            pairs
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect()
+        };
+        assert!(pg.is_member(&labels(&[
+            ("cnpg.io/cluster", "pg"),
+            ("cnpg.io/instanceName", "pg-1")
+        ])));
+        assert!(!pg.is_member(&labels(&[
+            ("cnpg.io/cluster", "pg"),
+            ("cnpg.io/jobRole", "initdb")
+        ])));
+        assert!(!pg.is_member(&labels(&[
+            ("cnpg.io/cluster", "pg2"),
+            ("cnpg.io/instanceName", "pg2-1")
+        ])));
     }
 
     #[test]

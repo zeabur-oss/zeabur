@@ -10,6 +10,9 @@
 //! details come from the objects, and the interface reveals the password, as the person, only
 //! when asked (`POST /projects/{p}/secrets/{name}/reveal`).
 //!
+//! Each database carries its members' pods, which its logs, events and terminal are read from; a
+//! refused pod read leaves them empty.
+//!
 //! Databases are created, changed and backed up through plans like any other change: the kinds
 //! are in `zeabur_plan::CREATABLE`, and the writes go with the person's credential.
 
@@ -18,7 +21,9 @@ use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::Cluster;
+use zeabur_kube::k8s_openapi::api::core::v1::Pod;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::{Cluster, ClusterExt};
 use zeabur_modules::databases::{Database, Engine};
 use zeabur_modules::{cloudnative_pg, percona_mongodb};
 
@@ -143,6 +148,23 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectDatabases, 
         backups: state,
     });
 
+    if !items.is_empty() {
+        let pods = match cluster.list::<Pod>(Some(project)).await {
+            Ok(pods) => pods,
+            Err(error) if error.code() == Some(403) => Vec::new(),
+            Err(error) => return Err(failed(error)),
+        };
+        let now = Some(Timestamp::now());
+        for database in &mut items {
+            let empty = std::collections::BTreeMap::new();
+            database.pods = pods
+                .iter()
+                .filter(|p| database.is_member(p.metadata.labels.as_ref().unwrap_or(&empty)))
+                .map(|p| zeabur_graph::pod_summary(project, p, now))
+                .collect();
+            database.pods.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+    }
     items.sort_by(|a, b| (a.engine, &a.name).cmp(&(b.engine, &b.name)));
     Ok(ProjectDatabases {
         operators,
