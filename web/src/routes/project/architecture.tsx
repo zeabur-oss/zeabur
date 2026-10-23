@@ -13,6 +13,7 @@ import MinusIcon from "~icons/ph/minus"
 import PlusIcon from "~icons/ph/plus"
 
 import { Hint } from "@/components/bits"
+import { KubeTip } from "@/components/kube-details"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { usePresence } from "@zeabur/design-system/components/presence"
 import { ServiceIcon } from "@/components/service-icon"
@@ -265,7 +266,30 @@ function Graph({
             }}
           >
             <div className="flex h-7.5 items-center gap-2 px-3 type-meta font-medium text-muted-foreground">
-              {t(laneTitle[frame.lane])}
+              {frame.lane === "workers" ? (
+                <KubeTip
+                  facts={[
+                    [
+                      t(laneTitle[frame.lane]),
+                      [
+                        ...new Set(
+                          graph.nodes
+                            .filter((n) => n.lane === frame.lane)
+                            .map((n) => n.service.kind),
+                        ),
+                      ]
+                        .toSorted()
+                        .join(", "),
+                    ],
+                  ]}
+                >
+                  <button type="button" className="cursor-help outline-none">
+                    {t(laneTitle[frame.lane])}
+                  </button>
+                </KubeTip>
+              ) : (
+                t(laneTitle[frame.lane])
+              )}
               <span className="flex items-center gap-1 tracking-normal normal-case">
                 <StatusDot
                   health={frame.ready === frame.total ? "ok" : "fail"}
@@ -513,9 +537,12 @@ function ServiceCard({
             />
           ) : null}
         </span>
-        {first ? (
-          <span className="flex min-w-0">
-            <Badge variant="fail">{t(`origin.${originOf(first).origin}`)}</Badge>
+        {first || service.kind === "CronJob" ? (
+          <span className="flex min-w-0 gap-1">
+            {service.kind === "CronJob" ? (
+              <Badge variant="secondary">{t("lane.scheduled")}</Badge>
+            ) : null}
+            {first ? <Badge variant="fail">{t(`origin.${originOf(first).origin}`)}</Badge> : null}
           </span>
         ) : null}
         <span className="mt-auto flex items-center gap-2 text-xs">

@@ -216,7 +216,7 @@ export const zhTW: Messages = {
 
   "role.web": "網站",
   "role.internal": "私有服務",
-  "role.worker": "背景工作",
+  "role.worker": "背景服務",
   "role.job": "批次工作",
   "role.data": "資料",
 
@@ -496,8 +496,9 @@ export const zhTW: Messages = {
 
   "lane.web": "網站",
   "lane.internal": "私有服務",
-  "lane.workers": "背景與批次工作",
+  "lane.workers": "背景服務",
   "lane.data": "資料",
+  "lane.scheduled": "排程",
   "edge.declared": "宣告",
   "edge.inferred": "推測",
   "edge.route": "經由公開網域",
@@ -789,7 +790,7 @@ export const zhTW: Messages = {
   "net.exposeHint": "要新增私有位址，請套用 Service 或執行這個指令。",
   "net.noneTitle": (name) => `${name} 無法接收連線`,
   "net.noneBody":
-    "它沒有私有位址，也沒有公開網域。只會主動往外連的背景工作兩者都不需要，仍然可以連到其他服務和網際網路。",
+    "它沒有私有位址，也沒有公開網域。只會主動往外連的背景服務兩者都不需要，仍然可以連到其他服務和網際網路。",
   "net.scheduledTitle": (name) => `${name} 不接收流量`,
   "net.scheduledBody": "批次工作執行完就結束，不會有連線進來；它仍然可以連到其他服務和網際網路。",
   "reach.fromDomains": "公開網域",
@@ -1601,7 +1602,7 @@ export const zhTW: Messages = {
   "add.imageBody": (project) => `在 ${project} 執行容器映像檔。建立前會先讓你確認要新增的物件。`,
   "add.field.image": "映像檔",
   "add.field.port": "連接埠",
-  "add.portHint": "留空表示不接受連線，例如背景工作。",
+  "add.portHint": "留空表示不接受連線，例如背景服務。",
   "add.noTag": "沒有寫版本時會用 latest，之後不好追蹤。",
   "add.problem.image.empty": "填入要執行的映像檔。",
   "add.problem.image.invalid": "映像檔位址，例如 ghcr.io/acme/web:1.4。",

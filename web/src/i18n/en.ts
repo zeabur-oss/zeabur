@@ -240,7 +240,7 @@ export const en = {
   // Roles
   "role.web": "Web",
   "role.internal": "Private services",
-  "role.worker": "Workers",
+  "role.worker": "Background",
   "role.job": "Jobs",
   "role.data": "Data",
 
@@ -553,8 +553,9 @@ export const en = {
   // Architecture
   "lane.web": "Web",
   "lane.internal": "Private services",
-  "lane.workers": "Workers & jobs",
+  "lane.workers": "Background services",
   "lane.data": "Data",
+  "lane.scheduled": "Scheduled",
   "edge.declared": "Declared",
   "edge.inferred": "Inferred",
   "edge.route": "its public domain",
@@ -872,7 +873,7 @@ export const en = {
   "net.exposeHint": "To add one, apply a Service or run this command.",
   "net.noneTitle": (name: string) => `${name} can't receive connections`,
   "net.noneBody":
-    "It has no private address and no public domain. A worker that only makes outgoing connections needs neither, and can still reach other services and the internet.",
+    "It has no private address and no public domain. A background service that only makes outgoing connections needs neither, and can still reach other services and the internet.",
   "net.scheduledTitle": (name: string) => `${name} doesn't receive traffic`,
   "net.scheduledBody":
     "A job runs and exits, so nothing connects to it. It can still connect to other services and the internet.",
@@ -1754,7 +1755,7 @@ export const en = {
     `Runs a container image in ${project}. You review the objects before anything is created.`,
   "add.field.image": "Image",
   "add.field.port": "Port",
-  "add.portHint": "Leave empty for a worker that takes no connections.",
+  "add.portHint": "Leave empty for a background service that takes no connections.",
   "add.noTag": "Without a tag the registry serves latest, which is hard to track later.",
   "add.problem.image.empty": "Enter the image to run.",
   "add.problem.image.invalid": "An image reference, like ghcr.io/acme/web:1.4.",

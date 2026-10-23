@@ -206,7 +206,7 @@ why. Add a row before introducing a new concept.
 | view (compact action) | 檢視 | 查看 | |
 | jobs (Jobs and CronJobs together) | 批次工作 | 批处理任务 | One-off Jobs are not scheduled |
 | scheduled job | 排程工作 | 定时任务 | A CronJob |
-| background job | 背景工作 | 后台任务 | |
+| background service (no public domain; the map's lane and the sidebar's group) | 背景服務 | 后台服务 | A CronJob in it is marked 排程／定时 |
 | health check | 健康檢查 | 健康检查 | |
 | traffic check (readiness) | 就緒檢查 | 就绪检查 | |
 | restart check (liveness) | 存活檢查 | 存活检查 | |

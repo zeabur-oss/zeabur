@@ -216,7 +216,7 @@ export const zhCN: Messages = {
 
   "role.web": "Web",
   "role.internal": "私有服务",
-  "role.worker": "后台任务",
+  "role.worker": "后台服务",
   "role.job": "批处理任务",
   "role.data": "数据",
 
@@ -495,8 +495,9 @@ export const zhCN: Messages = {
 
   "lane.web": "Web",
   "lane.internal": "私有服务",
-  "lane.workers": "后台与批处理任务",
+  "lane.workers": "后台服务",
   "lane.data": "数据",
+  "lane.scheduled": "定时",
   "edge.declared": "声明",
   "edge.inferred": "推断",
   "edge.route": "经由公开域名",
@@ -787,7 +788,7 @@ export const zhCN: Messages = {
   "net.exposeHint": "要添加私有地址，请应用 Service 或运行这条命令。",
   "net.noneTitle": (name) => `${name} 无法接收连接`,
   "net.noneBody":
-    "它没有私有地址，也没有公开域名。只主动向外连接的后台任务两者都不需要，仍然可以连接其他服务和互联网。",
+    "它没有私有地址，也没有公开域名。只主动向外连接的后台服务两者都不需要，仍然可以连接其他服务和互联网。",
   "net.scheduledTitle": (name) => `${name} 不接收流量`,
   "net.scheduledBody": "批处理任务运行完就结束，不会有连接进来；它仍然可以连接其他服务和互联网。",
   "reach.fromDomains": "公开域名",
@@ -1597,7 +1598,7 @@ export const zhCN: Messages = {
   "add.imageBody": (project) => `在 ${project} 运行容器镜像。创建前会先让你确认要新建的对象。`,
   "add.field.image": "镜像",
   "add.field.port": "端口",
-  "add.portHint": "留空表示不接受连接，例如后台任务。",
+  "add.portHint": "留空表示不接受连接，例如后台服务。",
   "add.noTag": "没有写版本时会用 latest，之后不好追踪。",
   "add.problem.image.empty": "填写要运行的镜像。",
   "add.problem.image.invalid": "镜像地址，例如 ghcr.io/acme/web:1.4。",
