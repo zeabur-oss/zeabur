@@ -791,20 +791,25 @@ export function Storage({
 }
 
 /** The project's object storage, when there is some or the operator is installed to make it. */
-export function ObjectStorageSection({ project }: { project: string }) {
+export function ObjectStorageSection({
+  project,
+  bare = false,
+}: {
+  project: string
+  bare?: boolean
+}) {
   const t = useT()
   const data = useObjectStorage(project).data
   if (!data) return null
   if (data.items.length === 0 && data.state !== "installed" && data.state !== "refused") return null
   return (
-    <section aria-labelledby="project-object-storage" className="flex flex-col gap-1">
-      <Heading
-        id="project-object-storage"
-        title={t("s3.title")}
-        count={data.items.length || undefined}
-      >
-        <NewObjectStorageButton project={project} data={data} />
-      </Heading>
+    <StoreSection
+      bare={bare}
+      id="project-object-storage"
+      title={t("s3.title")}
+      count={data.items.length}
+      button={(size) => <NewObjectStorageButton project={project} data={data} size={size} />}
+    >
       {data.items.length === 0 && data.state === "installed" ? (
         <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
           {t("s3.empty")}
@@ -817,7 +822,7 @@ export function ObjectStorageSection({ project }: { project: string }) {
         </ul>
       )}
       <ObjectStorageNotes data={data} />
-    </section>
+    </StoreSection>
   )
 }
 
@@ -847,21 +852,48 @@ export function Databases({ project, bare = false }: { project: string; bare?: b
       <OperatorNotes data={data} />
     </>
   )
+  return (
+    <StoreSection
+      bare={bare}
+      id="project-databases"
+      title={t("db.title")}
+      count={data.items.length}
+      button={(size) => <NewDatabaseButton project={project} data={data} size={size} />}
+    >
+      {body}
+    </StoreSection>
+  )
+}
+
+/** A side section of what operators run; `bare` in a drawer, which has the title. */
+function StoreSection({
+  bare,
+  id,
+  title,
+  count,
+  button,
+  children,
+}: {
+  bare: boolean
+  id: string
+  title: string
+  count: number
+  button: (size: "xs" | "sm") => ReactNode
+  children: ReactNode
+}) {
   if (bare)
     return (
       <div className="flex flex-col gap-1">
-        <div className="flex">
-          <NewDatabaseButton project={project} data={data} size="sm" />
-        </div>
-        {body}
+        <div className="flex">{button("sm")}</div>
+        {children}
       </div>
     )
   return (
-    <section aria-labelledby="project-databases" className="flex flex-col gap-1">
-      <Heading id="project-databases" title={t("db.title")} count={data.items.length || undefined}>
-        <NewDatabaseButton project={project} data={data} />
+    <section aria-labelledby={id} className="flex flex-col gap-1">
+      <Heading id={id} title={title} count={count || undefined}>
+        {button("xs")}
       </Heading>
-      {body}
+      {children}
     </section>
   )
 }
@@ -1030,7 +1062,7 @@ export function SectionChips({
 }) {
   const t = useT()
   const [open, setOpen] = useState<
-    "alerts" | "activity" | "domains" | "storage" | "databases" | "backups"
+    "alerts" | "activity" | "domains" | "storage" | "databases" | "objectStorage" | "backups"
   >()
   const { trouble } = useActivityCounts(project, events)
   const domains = summarise(data).domains.length
@@ -1038,6 +1070,7 @@ export function SectionChips({
   const backups = useBackupCount(project)
   const alerts = useProjectAlerts(project)
   const databases = useDatabases(project).data?.items.length ?? 0
+  const stores = useObjectStorage(project).data?.items.length ?? 0
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
   const chip = (key: NonNullable<typeof open>, label: string, count: ReactNode) => (
     <Button key={key} variant="outline" size="sm" onClick={() => setOpen(key)}>
@@ -1051,7 +1084,29 @@ export function SectionChips({
     domains: t("common.domains"),
     storage: t("tab.storage"),
     databases: t("db.title"),
+    objectStorage: t("s3.title"),
     backups: t("backups.title"),
+  }
+  const bodies = {
+    alerts: () => <Alerts project={project} services={data.services} bare />,
+    activity: () => (
+      <Activity
+        project={project}
+        services={data.services}
+        events={events}
+        unreadable={unreadable}
+        bare
+      />
+    ),
+    domains: () => (
+      <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} bare />
+    ),
+    storage: () => (
+      <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} bare />
+    ),
+    databases: () => <Databases project={project} bare />,
+    objectStorage: () => <ObjectStorageSection project={project} bare />,
+    backups: () => <Backups project={project} bare />,
   }
   return (
     <nav aria-label={t("project.sections")} className="flex flex-wrap gap-2">
@@ -1066,6 +1121,7 @@ export function SectionChips({
       {domains > 0 ? chip("domains", t("common.domains"), domains) : null}
       {volumes > 0 ? chip("storage", t("tab.storage"), volumes) : null}
       {databases > 0 ? chip("databases", t("db.title"), databases) : null}
+      {stores > 0 ? chip("objectStorage", t("s3.title"), stores) : null}
       {backups
         ? chip("backups", t("backups.title"), `${backups.scheduled}/${backups.total}`)
         : null}
@@ -1077,25 +1133,7 @@ export function SectionChips({
         title={open ? titles[open] : undefined}
         closeLabel={t("common.close")}
       >
-        {open === "alerts" ? (
-          <Alerts project={project} services={data.services} bare />
-        ) : open === "activity" ? (
-          <Activity
-            project={project}
-            services={data.services}
-            events={events}
-            unreadable={unreadable}
-            bare
-          />
-        ) : open === "domains" ? (
-          <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} bare />
-        ) : open === "storage" ? (
-          <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} bare />
-        ) : open === "databases" ? (
-          <Databases project={project} bare />
-        ) : open === "backups" ? (
-          <Backups project={project} bare />
-        ) : null}
+        {open ? bodies[open]() : null}
       </Drawer>
     </nav>
   )

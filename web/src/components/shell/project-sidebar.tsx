@@ -1,16 +1,17 @@
 import { useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import { Link, type LinkProps } from "@tanstack/react-router"
 import { useMemo } from "react"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
 import CubeIcon from "~icons/ph/cube"
 import DatabaseIcon from "~icons/ph/database"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GearSixIcon from "~icons/ph/gear-six"
+import HardDrivesIcon from "~icons/ph/hard-drives"
 import InfoIcon from "~icons/ph/info"
 import SquaresFourIcon from "~icons/ph/squares-four"
 import StackIcon from "~icons/ph/stack"
 
-import { databasesQuery, projectQuery } from "@/api/queries"
+import { databasesQuery, objectStorageQuery, projectQuery } from "@/api/queries"
 import { AddMenu } from "@/components/add/menu"
 import { RoleIcon, ServiceIcon } from "@/components/service-icon"
 import { DockToggle } from "@/components/shell/dock-slot"
@@ -22,7 +23,13 @@ import { StatusDot, StatusPill, useStatusWord } from "@/components/status"
 import { useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { addressOf, objectKey } from "@/lib/objects"
-import { databaseLink, serviceLink, usePlace, type ProjectEntry } from "@/lib/place"
+import {
+  databaseLink,
+  objectStorageLink,
+  serviceLink,
+  usePlace,
+  type ProjectEntry,
+} from "@/lib/place"
 import { useProjectSummary } from "@/lib/project-name"
 import { remembered } from "@/lib/stores"
 import { foldDatabases } from "@/model/database-parts"
@@ -182,6 +189,7 @@ function ProjectNav({ project }: { project: string }) {
           ) : null}
         </SidebarSection>
         <DatabaseSection project={project} />
+        <ObjectStorageSection project={project} />
         <SidebarSection
           title={t("column.advanced")}
           open={advancedOpen || advancedHolds}
@@ -320,33 +328,72 @@ function DatabaseSection({ project }: { project: string }) {
   if (items.length === 0) return null
   return (
     <SidebarSection title={t("db.title")}>
-      {items.map((database) => {
-        const word = t(`db.state.${database.state}`)
-        return (
-          <SidebarItem
-            key={`${database.engine}/${database.name}`}
-            render={
-              <Link
-                {...databaseLink(project, database)}
-                activeOptions={{ exact: true, includeSearch: false }}
-              />
-            }
-            icon={<DatabaseIcon aria-hidden="true" />}
-            current={place.database === `${database.engine}/${database.name}`}
-            trailing={
-              <Tooltip content={word}>
-                <span className="flex size-4 items-center justify-center">
-                  <StatusDot health={stateHealth[database.state]} />
-                  <span className="sr-only">{word}</span>
-                </span>
-              </Tooltip>
-            }
-          >
-            <span translate="no">{database.name}</span>
-          </SidebarItem>
-        )
-      })}
+      {items.map((database) => (
+        <StoreItem
+          key={`${database.engine}/${database.name}`}
+          link={databaseLink(project, database)}
+          icon={DatabaseIcon}
+          current={place.database === `${database.engine}/${database.name}`}
+          state={database.state}
+          name={database.name}
+        />
+      ))}
     </SidebarSection>
+  )
+}
+
+function ObjectStorageSection({ project }: { project: string }) {
+  const t = useT()
+  const place = usePlace()
+  const items = useQuery(objectStorageQuery(project)).data?.items ?? []
+  if (items.length === 0) return null
+  return (
+    <SidebarSection title={t("s3.title")}>
+      {items.map((store) => (
+        <StoreItem
+          key={store.name}
+          link={objectStorageLink(project, store)}
+          icon={HardDrivesIcon}
+          current={place.objectStorage === store.name}
+          state={store.state}
+          name={store.name}
+        />
+      ))}
+    </SidebarSection>
+  )
+}
+
+function StoreItem({
+  link,
+  icon: ItemIcon,
+  current,
+  state,
+  name,
+}: {
+  link: LinkProps
+  icon: Icon
+  current: boolean
+  state: keyof typeof stateHealth
+  name: string
+}) {
+  const t = useT()
+  const word = t(`db.state.${state}`)
+  return (
+    <SidebarItem
+      render={<Link {...link} activeOptions={{ exact: true, includeSearch: false }} />}
+      icon={<ItemIcon aria-hidden="true" />}
+      current={current}
+      trailing={
+        <Tooltip content={word}>
+          <span className="flex size-4 items-center justify-center">
+            <StatusDot health={stateHealth[state]} />
+            <span className="sr-only">{word}</span>
+          </span>
+        </Tooltip>
+      }
+    >
+      <span translate="no">{name}</span>
+    </SidebarItem>
   )
 }
 
