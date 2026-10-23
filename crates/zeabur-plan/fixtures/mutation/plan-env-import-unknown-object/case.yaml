@@ -1,0 +1,9 @@
+description: "Importing a ConfigMap that does not exist is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: envImport
+        workload: {kind: Deployment, name: web}
+        kind: ConfigMap
+        name: missing

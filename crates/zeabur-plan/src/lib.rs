@@ -18,14 +18,15 @@ pub mod releases;
 mod reload;
 pub mod rules;
 mod settings;
+mod shared;
 mod tasks;
 pub mod terminal;
 pub mod token;
 
 pub use change::{
-    BasicAuthUser, Change, ConnectionRef, DataEdit, DataKind, FieldOwners, HttpOnlyReason,
-    KeptReason, ObjectName, Plan, PlanRequest, PlannedObject, ProbeKind, RouteKind, RouteRef,
-    Target, TaskConcurrency, Warning, Write,
+    BasicAuthUser, Change, ConnectionRef, DataEdit, DataKind, EnvImportChange, FieldOwners,
+    HttpOnlyReason, KeptReason, ObjectName, Plan, PlanRequest, PlannedObject, ProbeKind, RouteKind,
+    RouteRef, Target, TaskConcurrency, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};

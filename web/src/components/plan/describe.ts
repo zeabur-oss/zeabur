@@ -227,6 +227,10 @@ function sentenceOf(
       return change.user
         ? t("confirm.basicAuth", change.route.name)
         : t("confirm.basicAuthOff", change.route.name)
+    case "envImport":
+      return change.remove
+        ? t("confirm.envImportOff", change.kind, change.name, change.workload.name)
+        : t("confirm.envImport", change.kind, change.name, change.workload.name)
   }
 }
 
@@ -743,6 +747,8 @@ export function actionOf(t: Translate, ask: Asked): string {
       return change.to ? t("action.redirect") : t("action.stopRedirect")
     case "basicAuth":
       return change.user ? t("action.askPassword") : t("action.stopPassword")
+    case "envImport":
+      return t("action.saveVariables")
   }
 }
 

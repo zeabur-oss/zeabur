@@ -2,7 +2,7 @@
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
-import { useState, type ReactNode } from "react"
+import { lazy, Suspense, useState, type ReactNode } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 
 import type { Schemas } from "@/api/client"
@@ -31,6 +31,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/c
 import { Textarea } from "@zeabur/design-system/components/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@zeabur/design-system/components/toggle-group"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
+
+const SharedVariables = lazy(() =>
+  import("@/routes/project/shared-variables").then((m) => ({ default: m.SharedVariablesSection })),
+)
 
 const route = getRouteApi("/projects/$project/settings")
 
@@ -118,6 +122,9 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
       </Group>
       {namespace.adopted ? (
         <>
+          <Suspense fallback={<LoadingRows label={t("common.loading")} rows={2} />}>
+            <SharedVariables project={namespace.name} />
+          </Suspense>
           <ClusterBackups project={namespace.name} />
           <Group label={t("notify.title")}>
             <Notifications project={namespace.name} />

@@ -1,0 +1,9 @@
+description: "Importing every key of a shared Secret adds an envFrom list with a secretRef to a container that has none."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: envImport
+        workload: {kind: Deployment, name: web}
+        kind: Secret
+        name: shared

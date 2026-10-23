@@ -66,6 +66,9 @@ pub enum Change {
     /// Ask for a user name and password on every hostname of an Ingress, or stop (see the
     /// `access` module).
     BasicAuth(BasicAuthChange),
+    /// Give a container every key of a ConfigMap or Secret as variables (`envFrom`), or stop
+    /// (see the `shared` module).
+    EnvImport(EnvImportChange),
     /// Replace a workload's pods, as `kubectl rollout restart` does.
     #[serde(rename_all = "camelCase")]
     Restart {
@@ -421,6 +424,25 @@ pub struct RedirectChange {
     /// `301 Moved Permanently` when true, else `302 Found`.
     #[serde(default = "yes")]
     pub permanent: bool,
+}
+
+/// A [`Change::EnvImport`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct EnvImportChange {
+    /// The workload.
+    pub workload: WorkloadRef,
+    /// The container; may be left out when the workload has only one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container: Option<String>,
+    /// `ConfigMap` or `Secret`.
+    pub kind: DataKind,
+    /// Its name.
+    pub name: String,
+    /// Stop importing it instead.
+    #[serde(default)]
+    pub remove: bool,
 }
 
 /// A [`Change::BasicAuth`].

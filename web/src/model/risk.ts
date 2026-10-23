@@ -129,6 +129,7 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "runTask":
     case "redirect":
     case "basicAuth":
+    case "envImport":
       return { risk: "normal" }
   }
 }
@@ -277,6 +278,7 @@ export function destinationOf(
     case "rollback":
       return tab(change.workload, "deployments")
     case "env":
+    case "envImport":
       return tab(change.workload, "variables")
     case "scale":
     case "resources":

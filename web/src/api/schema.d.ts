@@ -2463,6 +2463,10 @@ export interface components {
           /** @enum {string} */
           op: "basicAuth"
         })
+      | (components["schemas"]["EnvImportChange"] & {
+          /** @enum {string} */
+          op: "envImport"
+        })
       | {
           /** @enum {string} */
           op: "restart"
@@ -3636,6 +3640,19 @@ export interface components {
       /** @description The literal value, for `set`. */
       value?: string | null
       valueFrom?: components["schemas"]["EnvValueFrom"] | null
+    }
+    /** @description A [`Change::EnvImport`]. */
+    EnvImportChange: {
+      /** @description The container; may be left out when the workload has only one. */
+      container?: string | null
+      /** @description `ConfigMap` or `Secret`. */
+      kind: components["schemas"]["DataKind"]
+      /** @description Its name. */
+      name: string
+      /** @description Stop importing it instead. */
+      remove?: boolean
+      /** @description The workload. */
+      workload: components["schemas"]["WorkloadRef"]
     }
     /** @description A value read from a Secret or ConfigMap key, or a pod field. */
     EnvValueFrom: {
@@ -6485,6 +6502,8 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description The tool that manages the resource, if any. */
       provenance: components["schemas"]["Provenance"]
+      /** @description A ConfigMap or Secret of shared variables, labelled `zeabur.com/shared-variables: "true"`. */
+      sharedVariables?: boolean
     }
     /**
      * @description The kinds of resource attributed to workloads.

@@ -1,0 +1,10 @@
+description: "Stopping an import removes its envFrom entry behind a test of the name at that index; the other entries stay."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: envImport
+        workload: {kind: Deployment, name: web}
+        kind: ConfigMap
+        name: shared
+        remove: true

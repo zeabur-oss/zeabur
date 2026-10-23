@@ -4551,6 +4551,22 @@ components:
         description: |-
           Ask for a user name and password on every hostname of an Ingress, or stop (see the
           `access` module).
+      - allOf:
+        - $ref: "#/components/schemas/EnvImportChange"
+          description: |-
+            Give a container every key of a ConfigMap or Secret as variables (`envFrom`), or stop
+            (see the `shared` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - envImport
+        description: |-
+          Give a container every key of a ConfigMap or Secret as variables (`envFrom`), or stop
+          (see the `shared` module).
       - type: object
         description: Replace a workload's pods, as `kubectl rollout restart` does.
         required:
@@ -6883,6 +6899,31 @@ components:
           - $ref: "#/components/schemas/EnvValueFrom"
             description: Where the value is read from instead, for `set`.
           - type: "null"
+    EnvImportChange:
+      type: object
+      description: A [`Change::EnvImport`].
+      required:
+      - workload
+      - kind
+      - name
+      properties:
+        container:
+          type:
+          - string
+          - "null"
+          description: The container; may be left out when the workload has only one.
+        kind:
+          $ref: "#/components/schemas/DataKind"
+          description: "`ConfigMap` or `Secret`."
+        name:
+          type: string
+          description: Its name.
+        remove:
+          type: boolean
+          description: Stop importing it instead.
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
     EnvValueFrom:
       type: object
       description: A value read from a Secret or ConfigMap key, or a pod field.
@@ -12491,6 +12532,9 @@ components:
         provenance:
           $ref: "#/components/schemas/Provenance"
           description: The tool that manages the resource, if any.
+        sharedVariables:
+          type: boolean
+          description: "A ConfigMap or Secret of shared variables, labelled `zeabur.com/shared-variables: \"true\"`."
     ResourceKind:
       type: string
       description: The kinds of resource attributed to workloads.

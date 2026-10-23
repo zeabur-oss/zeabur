@@ -25,10 +25,11 @@ import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import PlugsIcon from "~icons/ph/plugs"
 import PlugsConnectedIcon from "~icons/ph/plugs-connected"
 import PlusIcon from "~icons/ph/plus"
+import StackIcon from "~icons/ph/stack"
 import TrashIcon from "~icons/ph/trash"
 
 import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
-import { configMapsQuery, databasesQuery } from "@/api/queries"
+import { configMapsQuery, databasesQuery, projectQuery } from "@/api/queries"
 import { CopyButton, Hint, ManagedTip, Segmented } from "@/components/bits"
 import { ConnectDrawer, useTargets } from "@/components/connect"
 import { FilterField } from "@/components/filter-field"
@@ -80,6 +81,7 @@ import { isLongList } from "@/model/lists"
 import type { Gate } from "@/model/rights"
 import { envSecretsOf, type Service } from "@/model/service"
 
+const UseShared = lazy(() => import("@/routes/service/use-shared"))
 const DataEditor = lazy(() =>
   import("@/components/data-editor").then((m) => ({ default: m.DataEditor })),
 )
@@ -137,6 +139,10 @@ export function VariablesTab({
 
   const databases = useQuery(databasesQuery(project)).data?.items ?? []
   const [connecting, setConnecting] = useState(false)
+  const [sharing, setSharing] = useState(false)
+  const shared = (useQuery(projectQuery(project)).data?.resources ?? []).some(
+    (r) => r.sharedVariables,
+  )
   const targets = useTargets(project)
   const mayConnect =
     databases.some((d) => d.app) &&
@@ -592,6 +598,34 @@ export function VariablesTab({
               whole
               onOpen={(kind, n) => setEditor({ kind, name: n })}
             />
+            {editing || managed || i.readOnly || !i.source.name ? null : (
+              <GateTip gate={gates("changeServices")}>
+                <Button
+                  variant="muted"
+                  size="icon-xs"
+                  aria-label={t("useShared.stop", i.source.name)}
+                  title={t("useShared.stop", i.source.name)}
+                  onClick={() =>
+                    planner.plan({
+                      title: t("useShared.stop", i.source.name ?? ""),
+                      service: workload,
+                      changes: [
+                        {
+                          op: "envImport",
+                          workload,
+                          container: multi ? container : undefined,
+                          kind: i.source.kind === "Secret" ? "Secret" : "ConfigMap",
+                          name: i.source.name ?? "",
+                          remove: true,
+                        },
+                      ],
+                    })
+                  }
+                >
+                  <TrashIcon aria-hidden="true" />
+                </Button>
+              </GateTip>
+            )}
           </span>
         </li>
         {Object.entries(revealed ?? {}).map(([k, v]) => (
@@ -1048,6 +1082,21 @@ export function VariablesTab({
           </div>
         </>
       )}
+      {editing || !shared || managed ? null : (
+        <div>
+          <GateTip gate={gates("changeServices")}>
+            <Button variant="outline" size="sm" onClick={() => setSharing(true)}>
+              <StackIcon aria-hidden="true" data-icon="inline-start" />
+              {t("useShared.open")}
+            </Button>
+          </GateTip>
+        </div>
+      )}
+      {sharing ? (
+        <Suspense fallback={null}>
+          <UseShared project={project} service={service} onClose={() => setSharing(false)} />
+        </Suspense>
+      ) : null}
       <KubeDetails facts={kubeFacts} />
       {editor ? (
         <Suspense fallback={null}>

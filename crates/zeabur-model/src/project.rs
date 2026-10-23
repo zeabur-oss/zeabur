@@ -197,6 +197,9 @@ pub struct Resource {
     /// For a ConfigMap or Secret, how many keys it holds, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key_count: Option<usize>,
+    /// A ConfigMap or Secret of shared variables, labelled `zeabur.com/shared-variables: "true"`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shared_variables: bool,
     /// The resource object.
     pub origin: Origin,
 }

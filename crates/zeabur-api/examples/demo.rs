@@ -495,7 +495,23 @@ fn shop() -> NamespaceObjects {
         .and_then(|s| s.template.spec.as_mut())
         .and_then(|s| s.containers.first_mut())
     {
-        container.env_from = Some(vec![from(json!({"configMapRef": {"name": "web-config"}}))]);
+        container.env_from = Some(vec![
+            from(json!({"configMapRef": {"name": "web-config"}})),
+            from(json!({"configMapRef": {"name": "shared-config"}})),
+        ]);
+    }
+    if let Some(container) = api
+        .spec
+        .as_mut()
+        .and_then(|s| s.template.spec.as_mut())
+        .and_then(|s| s.containers.first_mut())
+    {
+        container.env_from = Some(vec![from(
+            json!({"configMapRef": {"name": "shared-config"}}),
+        )]);
+        container.env.get_or_insert_with(Vec::new).push(from(
+            json!({"name": "SENTRY_DSN", "valueFrom": secret("shared-keys", "SENTRY_DSN")}),
+        ));
     }
     web.metadata.annotations = Some(BTreeMap::from([(
         zeabur_model::ConfigReload::AUTO.to_owned(),
@@ -586,18 +602,36 @@ fn shop() -> NamespaceObjects {
             service("db", 5432, "postgres"),
             service("redis", 6379, "redis"),
         ],
-        config_maps: vec![from::<ConfigMap>(
-            json!({"metadata": {"name": "web-config", "namespace": "shop"},
-            "data": {"LOG_LEVEL": "info", "FEATURE_CHECKOUT_V2": "true"}}),
-        )],
-        secrets: vec![SecretSummary {
-            secret: Secret {
-                metadata: from(json!({"name": "db-credentials", "namespace": "shop"})),
-                type_: Some("Opaque".to_owned()),
-                ..Secret::default()
+        config_maps: vec![
+            from::<ConfigMap>(
+                json!({"metadata": {"name": "web-config", "namespace": "shop"},
+                "data": {"LOG_LEVEL": "info", "FEATURE_CHECKOUT_V2": "true"}}),
+            ),
+            from::<ConfigMap>(
+                json!({"metadata": {"name": "shared-config", "namespace": "shop",
+                    "labels": {"zeabur.com/shared-variables": "true"}},
+                "data": {"APP_URL": "https://shop.example.com", "TZ": "Asia/Taipei"}}),
+            ),
+        ],
+        secrets: vec![
+            SecretSummary {
+                secret: Secret {
+                    metadata: from(json!({"name": "db-credentials", "namespace": "shop"})),
+                    type_: Some("Opaque".to_owned()),
+                    ..Secret::default()
+                },
+                key_count: 2,
             },
-            key_count: 2,
-        }],
+            SecretSummary {
+                secret: Secret {
+                    metadata: from(json!({"name": "shared-keys", "namespace": "shop",
+                        "labels": {"zeabur.com/shared-variables": "true"}})),
+                    type_: Some("Opaque".to_owned()),
+                    ..Secret::default()
+                },
+                key_count: 2,
+            },
+        ],
         persistent_volume_claims: vec![
             from::<PersistentVolumeClaim>(
                 json!({"metadata": {"name": "data-db-0", "namespace": "shop"},
@@ -1993,16 +2027,28 @@ fn state() -> State {
             "shop/worker-84c2d-w2e5r".to_owned(),
             "\u{1b}[31mERROR\u{1b}[0m connect redis:6379: connection refused\npanic: queue unavailable".to_owned(),
         )]),
-        secret_values: BTreeMap::from([(
-            "shop/db-credentials".to_owned(),
-            BTreeMap::from([
-                ("username".to_owned(), b"shop".to_vec()),
-                (
-                    "password".to_owned(),
-                    b"correct-horse-battery-staple".to_vec(),
-                ),
-            ]),
-        )]),
+        secret_values: BTreeMap::from([
+            (
+                "shop/db-credentials".to_owned(),
+                BTreeMap::from([
+                    ("username".to_owned(), b"shop".to_vec()),
+                    (
+                        "password".to_owned(),
+                        b"correct-horse-battery-staple".to_vec(),
+                    ),
+                ]),
+            ),
+            (
+                "shop/shared-keys".to_owned(),
+                BTreeMap::from([
+                    (
+                        "SENTRY_DSN".to_owned(),
+                        b"https://4f1c@o1.ingest.example.com/7".to_vec(),
+                    ),
+                    ("MAILER_TOKEN".to_owned(), b"mt_live_51b2".to_vec()),
+                ]),
+            ),
+        ]),
         facts,
         ..State::default()
     }

@@ -1,0 +1,15 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Deployment", "name": "web"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "41"},
+          {"op": "test", "path": "/spec/template/spec/containers/0/envFrom/1/configMapRef/name", "value": "shared"},
+          {"op": "remove", "path": "/spec/template/spec/containers/0/envFrom/1"}
+        ]
+      }
+    }
+  ]
+}

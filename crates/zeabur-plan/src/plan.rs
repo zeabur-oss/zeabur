@@ -404,6 +404,7 @@ impl<'a> Planner<'a> {
                 redirect.permanent,
             ),
             Change::BasicAuth(auth) => self.basic_auth(&auth.route, auth.user.as_ref()),
+            Change::EnvImport(import) => self.env_import(import),
             Change::Create { .. } => self.create(change, index),
             Change::Restart { workload } => self.restart_workload(workload),
             Change::Rollback { workload, revision } => self.rollback(workload, *revision),
@@ -653,7 +654,6 @@ impl<'a> Planner<'a> {
 
     // ── Environment ──────────────────────────────────────────────────────────────────────────
 
-    #[expect(clippy::too_many_lines, reason = "one change kind, read top to bottom")]
     fn env(
         &mut self,
         reference: &WorkloadRef,
@@ -671,30 +671,7 @@ impl<'a> Planner<'a> {
             ));
         }
         Self::refuse_managed(found.meta(), reference.kind.as_str(), &reference.name)?;
-        let spec = found.pod_spec();
-        let containers: Vec<&str> = spec.map_or_else(Vec::new, |s| {
-            s.containers.iter().map(|c| c.name.as_str()).collect()
-        });
-        let name = match container {
-            Some(name) => name.to_owned(),
-            None if containers.len() == 1 => containers
-                .first()
-                .map_or_else(String::new, |c| (*c).to_owned()),
-            None => {
-                return Err(error(
-                    ErrorKind::BadRequest,
-                    "container_required",
-                    "The workload has several containers; name one.",
-                ));
-            }
-        };
-        let Some(position) = containers.iter().position(|c| *c == name) else {
-            return Err(error(
-                ErrorKind::NotFound,
-                "unknown_container",
-                format!("{} has no container {name}.", reference.name),
-            ));
-        };
+        let (name, position) = container_at(found, reference, container)?;
         let object = workload_json(found)?;
         let index = self.working(workload_target(found), object);
         self.impact.insert(reference.clone());
@@ -1665,6 +1642,38 @@ pub(crate) fn array(object: &Value, path: &str) -> Vec<Value> {
 pub(crate) fn to_json<T: serde::Serialize>(object: &T) -> Result<Value, PlanError> {
     serde_json::to_value(object)
         .map_err(|e| error(ErrorKind::Invalid, "unreadable_object", e.to_string()))
+}
+
+/// The name and index of `container` in `found`'s pod, or of its only container.
+pub(crate) fn container_at(
+    found: Workload<'_>,
+    reference: &WorkloadRef,
+    container: Option<&str>,
+) -> Result<(String, usize), PlanError> {
+    let containers: Vec<&str> = found.pod_spec().map_or_else(Vec::new, |s| {
+        s.containers.iter().map(|c| c.name.as_str()).collect()
+    });
+    let name = match container {
+        Some(name) => name.to_owned(),
+        None if containers.len() == 1 => containers
+            .first()
+            .map_or_else(String::new, |c| (*c).to_owned()),
+        None => {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "container_required",
+                "The workload has several containers; name one.",
+            ));
+        }
+    };
+    let Some(position) = containers.iter().position(|c| *c == name) else {
+        return Err(error(
+            ErrorKind::NotFound,
+            "unknown_container",
+            format!("{} has no container {name}.", reference.name),
+        ));
+    };
+    Ok((name, position))
 }
 
 pub(crate) fn workload_json(workload: Workload<'_>) -> Result<Value, PlanError> {

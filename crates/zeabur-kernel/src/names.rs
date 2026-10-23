@@ -19,6 +19,10 @@ pub const LABEL_GROUP: &str = "zeabur.com/group";
 /// Label on a scheduled task's CronJob that names the service it was made from.
 pub const LABEL_TASK_OF: &str = "zeabur.com/task-of";
 
+/// Label, `"true"`, on a ConfigMap or Secret that holds variables several services of a project
+/// share.
+pub const LABEL_SHARED_VARIABLES: &str = "zeabur.com/shared-variables";
+
 /// Annotation on a project's namespace: the name to show instead of the namespace's.
 ///
 /// OpenShift keeps the same detail as `openshift.io/display-name`. Annotations, not labels: they

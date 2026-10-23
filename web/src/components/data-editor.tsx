@@ -54,7 +54,7 @@ function changesOf({ edits, added }: Draft): Schemas["DataEdit"][] {
 }
 
 /** From its YAML, whose values the server hides. */
-function secretKeys(yaml: string): string[] {
+export function secretKeys(yaml: string): string[] {
   const keys: string[] = []
   let inData = false
   for (const line of yaml.split("\n")) {

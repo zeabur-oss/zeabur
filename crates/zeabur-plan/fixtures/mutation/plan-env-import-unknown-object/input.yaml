@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: shared
+  namespace: demo
+  labels: {zeabur.com/shared-variables: "true"}
+type: Opaque
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+spec:
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: example/web:1.0
