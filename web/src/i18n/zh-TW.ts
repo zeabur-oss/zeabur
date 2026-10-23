@@ -1185,8 +1185,8 @@ export const zhTW: Messages = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的憑證不是 cert-manager 簽發的，請到產生憑證的地方加入 ${host}`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
-    `掛接到 Gateway ${gateway}（共找到 ${of} 個）`,
-  "warn.gatewaysUnreadable": "無法讀取 Gateway：Zeabur 改用 Ingress",
+    `公開網域會掛接到 Gateway ${gateway}（共找到 ${of} 個）`,
+  "warn.gatewaysUnreadable": "無法讀取 Gateway：公開網域不會掛接到 Gateway",
   "warn.secretValuesUnknown": (name: string) => `無法讀取 ${name} 的值：差異只列出鍵名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 讀取 ConfigMap 或 Secret：回滾不會改動它們的內容`,
@@ -1631,11 +1631,11 @@ export const zhTW: Messages = {
   "add.problem.port.invalid": "1 到 65535 之間的連接埠。",
   "add.problem.host.empty": "填入網域。",
   "add.problem.host.invalid": "網域名稱，例如 web.example.com。",
-  "add.publicUrl": "公開網址",
+  "add.publicUrl": "公開網域",
   "add.hostHint": "把這個網域的 DNS 指向叢集的 Ingress。",
   "add.https": (issuer) => `HTTPS 憑證由 cert-manager（${issuer}）簽發。`,
   "add.httpOnly": "這個網址只有 HTTP。管理員指定 cert-manager 的簽發者後會使用 HTTPS。",
-  "add.noPublicUrl": "你的角色不能在這個專案新增公開網址（Ingress）。",
+  "add.noPublicUrl": "你的角色不能在這個專案新增公開網域。",
   "add.more": "更多設定",
   "add.moreSummary": "環境變數、磁碟、規格、副本數和私有 registry。",
   "add.variables": "環境變數",

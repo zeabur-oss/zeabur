@@ -1183,8 +1183,8 @@ export const zhCN: Messages = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的证书不是由 cert-manager 签发的，请到生成证书的地方加入 ${host}`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
-    `连接到 Gateway ${gateway}（共找到 ${of} 个）`,
-  "warn.gatewaysUnreadable": "无法读取 Gateway：Zeabur 改用 Ingress",
+    `公开域名会连接到 Gateway ${gateway}（共找到 ${of} 个）`,
+  "warn.gatewaysUnreadable": "无法读取 Gateway：公开域名不会连接到 Gateway",
   "warn.secretValuesUnknown": (name: string) => `无法读取 ${name} 的值：差异只列出键名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 读取 ConfigMap 或 Secret：回滚不会改动它们的内容`,
@@ -1627,11 +1627,11 @@ export const zhCN: Messages = {
   "add.problem.port.invalid": "1 到 65535 之间的端口。",
   "add.problem.host.empty": "填写域名。",
   "add.problem.host.invalid": "域名，例如 web.example.com。",
-  "add.publicUrl": "公开网址",
+  "add.publicUrl": "公开域名",
   "add.hostHint": "把这个域名的 DNS 指向集群的 Ingress。",
   "add.https": (issuer) => `HTTPS 证书由 cert-manager（${issuer}）签发。`,
   "add.httpOnly": "这个网址只有 HTTP。管理员指定 cert-manager 的签发者后会使用 HTTPS。",
-  "add.noPublicUrl": "你的角色不能在这个项目新建公开网址（Ingress）。",
+  "add.noPublicUrl": "你的角色不能在这个项目新建公开域名。",
   "add.more": "更多设置",
   "add.moreSummary": "环境变量、磁盘、规格、副本数和私有 registry。",
   "add.variables": "环境变量",

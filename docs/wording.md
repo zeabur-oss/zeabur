@@ -227,7 +227,7 @@ why. Add a row before introducing a new concept.
 | suggestion (a gap to close) | 建議 | 建议 | |
 | errors in the app / settings to change / caused by the cluster (where a problem comes from, as a group title) | 應用程式出錯／需要調整設定／叢集造成的問題 | 应用出错／需要调整配置／集群造成的问题 | Group titles on Home; beside a single problem, a cause outside the service is a sentence, and the reader's own is not said |
 | this needs a cluster administrator (who must act, when it is not the reader) | 這需要叢集管理員處理 | 这需要集群管理员处理 | Leads the fix, with 複製診斷 as the primary action; never said when the reader can fix it |
-| public domain | 公開網域 | 公开域名 | An Ingress or HTTPRoute host; the dashboard's 公有網路 names the network, not the address |
+| public domain | 公開網域 | 公开域名 | An Ingress or HTTPRoute host; the dashboard's 公有網路 names the network, not the address. Ingress and HTTPRoute appear only in the Kubernetes details, YAML and suggestions about those objects; never "public URL" |
 | private network | 私有網路 | 私有网络 | Reaching a service from inside the cluster through its `Service`; the dashboard says 內網 |
 | private address | 私有位址 | 私有地址 | A `Service` DNS name and port; never 內部位址 |
 | private service (reachable only inside the cluster) | 私有服務 | 私有服务 | Replaces "internal" (內部) as a role |

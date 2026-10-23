@@ -1298,8 +1298,8 @@ export const en = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} is HTTP only: ${route}'s certificates don't come from cert-manager, so add ${host} where they're made`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
-    `Attaches to Gateway ${gateway} (${of} found)`,
-  "warn.gatewaysUnreadable": "Unable to read Gateways: Zeabur uses an Ingress",
+    `Attaches the public domain to Gateway ${gateway} (${of} found)`,
+  "warn.gatewaysUnreadable": "Unable to read Gateways: the public domain won't attach to one",
   "warn.secretValuesUnknown": (name: string) =>
     `Unable to read ${name}'s values: the diff shows keys only`,
   "warn.configNotRolledBack": (workload: string) =>
@@ -1786,12 +1786,12 @@ export const en = {
   "add.problem.port.invalid": "A port from 1 to 65535.",
   "add.problem.host.empty": "Enter the domain.",
   "add.problem.host.invalid": "A domain name, like web.example.com.",
-  "add.publicUrl": "Public URL",
+  "add.publicUrl": "Public domain",
   "add.hostHint": "Point this domain's DNS at the cluster's ingress.",
   "add.https": (issuer: string) => `HTTPS, with a certificate from cert-manager (${issuer}).`,
   "add.httpOnly":
     "This URL is HTTP only. An administrator can name a cert-manager issuer to make it HTTPS.",
-  "add.noPublicUrl": "Your role can't add a public URL (Ingress) in this project.",
+  "add.noPublicUrl": "Your role can't add a public domain in this project.",
   "add.more": "More settings",
   "add.moreSummary": "Variables, volume, size, replicas and a private registry.",
   "add.variables": "Variables",
