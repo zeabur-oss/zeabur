@@ -265,6 +265,12 @@ function MemberRow({
           >
             {member.username}
           </span>
+          <span
+            className="truncate type-meta text-muted-foreground md:hidden"
+            title={t("common.list", access)}
+          >
+            {t("common.list", access)}
+          </span>
         </span>
       </button>
       <span className="flex min-w-0 flex-col text-muted-foreground max-md:hidden">
@@ -520,6 +526,9 @@ function Pending({ invitations }: { invitations: Invitation[] }) {
             </span>
             <span className="text-muted-foreground max-md:col-start-1 max-md:row-start-2">
               {invitation.newMember ? t("members.pendingNew") : t("members.pendingAdds")}
+              <span className="block type-meta md:hidden">
+                {t("members.expires", formatAgo(invitation.expiresAt, locale))}
+              </span>
             </span>
             <span className="text-muted-foreground max-md:hidden md:col-span-2">
               <Tooltip content={formatTime(invitation.expiresAt, locale)}>
