@@ -690,8 +690,11 @@ fn docs_build() -> [DynamicObject; 2] {
         "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
         "metadata": {"name": "docs", "namespace": "blog"},
         "spec": {"builderRef": "railpack",
-            "source": {"git": {"url": "https://github.com/example/docs.git", "ref": "main"}},
+            "source": {"git": {"url": "https://github.com/example/docs.git", "ref": "main",
+                "contextDir": "site"}},
             "output": {"image": "zot.zot.svc:5000/blog/docs"},
+            "env": [{"name": "NPM_TOKEN", "valueFrom": {"secretKeyRef":
+                {"name": "docs-build-env", "key": "NPM_TOKEN"}}}],
             "notify": [{"type": "keel",
                 "url": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"}]},
         "status": if failed {
@@ -758,6 +761,14 @@ fn blog() -> NamespaceObjects {
             service_in(ns, "db", 5432, "postgres"),
         ],
         ingresses: vec![ingress(ns, "blog.example.com", "web")],
+        secrets: vec![SecretSummary {
+            secret: Secret {
+                metadata: from(json!({"name": "docs-build-env", "namespace": ns})),
+                type_: Some("Opaque".to_owned()),
+                ..Secret::default()
+            },
+            key_count: 1,
+        }],
         ..NamespaceObjects::default()
     }
 }

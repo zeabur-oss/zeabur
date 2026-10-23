@@ -14,30 +14,26 @@ import { SecurityProfileField, useProjectSecurity } from "@/components/security-
 import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
 import {
-  branchProblem,
   buildMethods,
   createGitService,
   deployKeyHost,
   deployKeyPage,
-  directoryProblem,
+  gitProblems,
   newGitService,
   parseRepository,
   tokenUser,
-  urlProblem,
   type Access,
   type BuildMethod,
+  type GitProblems,
   type GitService,
 } from "@/model/git-service"
 import {
-  hostProblem,
   imageOptions,
   imageResources,
   imageSizes,
   nameFromImage,
   parseEnv,
-  portProblem,
   rightsOf,
-  serviceNameProblem,
   suggestedHost,
   type ImageSize,
 } from "@/model/image-service"
@@ -75,6 +71,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const { enforced } = useProjectSecurity(project)
   const [form, setForm] = useState<GitService>(newGitService)
   const [env, setEnv] = useState("")
+  const [buildEnv, setBuildEnv] = useState("")
   const [named, setNamed] = useState(false)
   const [hosted, setHosted] = useState(false)
   const [userSet, setUserSet] = useState(false)
@@ -98,6 +95,8 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const publicUrl = options.publicUrl && port !== "" && form.publicUrl
   const host = hosted ? form.host : suggestedHost(name, project, domains.suffix)
   const variables = parseEnv(env)
+  const buildVariables = parseEnv(buildEnv)
+  const dockerfile = form.method === "dockerfile" ? form.dockerfile : ""
   const username = userSet ? form.username : tokenUser(repo?.host)
   const key = deployKey && deployKey.host === keyHost ? deployKey : undefined
 
@@ -112,17 +111,27 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
     onSuccess: (made, gitHost) => setDeployKey({ host: gitHost, ...made }),
   })
 
-  const problems = {
-    url: urlProblem(form.url),
-    branch: branchProblem(form.branch),
-    name: serviceNameProblem(name, taken),
-    port: portProblem(port),
-    host: publicUrl ? hostProblem(host) : undefined,
-    directory: directoryProblem(form.directory),
-    env: variables.bad.length > 0,
-    key: access === "deployKey" && !key,
-    token: access === "token" && (form.token.trim() === "" || username.trim() === ""),
+  const resolved: GitService = {
+    ...form,
+    access,
+    name,
+    port,
+    publicUrl,
+    host,
+    username,
+    variables: variables.variables,
+    dockerfile,
+    buildVariables: buildVariables.variables.flatMap((v) =>
+      "value" in v ? [{ name: v.name, value: v.value }] : [],
+    ),
+    sealedKey: key?.key,
   }
+  const problems = gitProblems(resolved, {
+    taken,
+    badEnv: variables.bad.length > 0,
+    badBuildEnv: buildVariables.bad.length > 0,
+    hasKey: !!key,
+  })
   const blocked = Object.values(problems).some(Boolean)
   const shown = (problem: unknown, text: () => string) => (tried && problem ? [text()] : [])
 
@@ -134,28 +143,12 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
     if (blocked) return
     planner.plan({
       title: t("add.planGit", name),
-      changes: createGitService(
-        {
-          ...form,
-          access,
-          name,
-          port,
-          publicUrl,
-          host,
-          username,
-          variables: variables.variables,
-          sealedKey: key?.key,
-        },
-        project,
-        registry,
-        domains,
-        enforced,
-      ),
+      changes: createGitService(resolved, project, registry, domains, enforced),
     })
   }
 
-  const resources = imageResources[form.size]
-  const moreOpen = tried && (!!problems.directory || problems.env)
+  const moreOpen =
+    tried && (!!problems.directory || !!problems.dockerfile || problems.env || problems.buildEnv)
   const keyPage = repo ? deployKeyPage(repo) : undefined
 
   return (
@@ -410,64 +403,146 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
             <p className="mt-1 type-meta text-muted-foreground">{t("add.gitMoreSummary")}</p>
           )}
           <CollapsibleContent>
-            <div className="flex flex-col gap-4 pt-4">
-              <FormField
-                label={t("add.field.directory")}
-                hint={t("add.directoryHint")}
-                errors={shown(problems.directory, () => t("add.problem.directory"))}
-              >
-                <Input
-                  size="sm"
-                  mono
-                  value={form.directory}
-                  placeholder="apps/web"
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(event) => set({ directory: event.target.value })}
-                />
-              </FormField>
-              <FormField
-                label={t("add.variables")}
-                hint={t("add.variablesHint")}
-                errors={shown(problems.env, () => t("add.variablesBad", variables.bad.join(", ")))}
-              >
-                <Textarea
-                  mono
-                  rows={4}
-                  value={env}
-                  placeholder={"DATABASE_URL=postgres://…\nLOG_LEVEL=info"}
-                  spellCheck={false}
-                  onChange={(event) => setEnv(event.target.value)}
-                />
-              </FormField>
-              <FormField
-                label={t("db.field.size")}
-                hint={t(
-                  "db.sizeDetail",
-                  resources.requests.cpu,
-                  resources.requests.memory,
-                  resources.limits.memory,
-                )}
-              >
-                <Select
-                  size="sm"
-                  value={form.size}
-                  onValueChange={(size) => set({ size: size as ImageSize })}
-                  items={imageSizes.map((p) => ({ value: p, label: t(`db.size.${p}`) }))}
-                />
-              </FormField>
-              <SecurityProfileField
-                project={project}
-                built
-                value={form.security}
-                onChange={(security) => set({ security })}
-              />
-            </div>
+            <MoreFields
+              project={project}
+              form={form}
+              set={set}
+              env={env}
+              onEnv={setEnv}
+              buildEnv={buildEnv}
+              onBuildEnv={setBuildEnv}
+              problems={problems}
+              bad={{ env: variables.bad, buildEnv: buildVariables.bad }}
+              shown={shown}
+            />
           </CollapsibleContent>
         </Collapsible>
         <Note>{t("add.gitAfter")}</Note>
       </form>
     </PlanDrawer>
+  )
+}
+
+/** The fields behind "More settings": where and how to build, variables, size and security. */
+function MoreFields({
+  project,
+  form,
+  set,
+  env,
+  onEnv,
+  buildEnv,
+  onBuildEnv,
+  problems,
+  bad,
+  shown,
+}: {
+  project: string
+  form: GitService
+  set: (patch: Partial<GitService>) => void
+  env: string
+  onEnv: (env: string) => void
+  buildEnv: string
+  onBuildEnv: (env: string) => void
+  problems: GitProblems
+  bad: { env: number[]; buildEnv: number[] }
+  shown: (problem: unknown, text: () => string) => string[]
+}) {
+  const t = useT()
+  const resources = imageResources[form.size]
+  return (
+    <div className="flex flex-col gap-4 pt-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormField
+          label={t("add.field.directory")}
+          hint={t("add.directoryHint")}
+          errors={shown(problems.directory, () => t("add.problem.directory"))}
+        >
+          <Input
+            size="sm"
+            mono
+            value={form.directory}
+            placeholder="apps/web"
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => set({ directory: event.target.value })}
+          />
+        </FormField>
+        {form.method === "dockerfile" ? (
+          <FormField
+            label={t("add.field.dockerfile")}
+            hint={t("add.dockerfileHint")}
+            errors={shown(problems.dockerfile, () => t("add.problem.dockerfile"))}
+          >
+            <Input
+              size="sm"
+              mono
+              value={form.dockerfile}
+              placeholder="Dockerfile"
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(event) => set({ dockerfile: event.target.value })}
+            />
+          </FormField>
+        ) : null}
+      </div>
+      <FormField
+        label={t("add.variables")}
+        hint={t("add.variablesHint")}
+        errors={shown(problems.env, () => t("add.variablesBad", bad.env.join(", ")))}
+      >
+        <Textarea
+          mono
+          rows={4}
+          value={env}
+          placeholder={"DATABASE_URL=postgres://…\nLOG_LEVEL=info"}
+          spellCheck={false}
+          onChange={(event) => onEnv(event.target.value)}
+        />
+      </FormField>
+      <FormField
+        label={t("add.buildVariables")}
+        hint={
+          <>
+            <span className="block">{t("add.buildVariablesHint")}</span>
+            {form.method === "dockerfile" ? (
+              <span className="block">{t("add.buildVariablesDockerfile")}</span>
+            ) : null}
+          </>
+        }
+        errors={shown(problems.buildEnv, () => t("add.variablesBad", bad.buildEnv.join(", ")))}
+      >
+        <Textarea
+          mono
+          rows={3}
+          value={buildEnv}
+          placeholder="NPM_TOKEN=…"
+          spellCheck={false}
+          onChange={(event) => onBuildEnv(event.target.value)}
+        />
+      </FormField>
+      <FormField
+        label={t("db.field.size")}
+        hint={t(
+          "db.sizeDetail",
+          resources.requests.cpu,
+          resources.requests.memory,
+          resources.limits.memory,
+        )}
+      >
+        <Select
+          size="sm"
+          value={form.size}
+          onValueChange={(size) => set({ size: size as ImageSize })}
+          items={imageSizes.map((p) => ({ value: p, label: t(`db.size.${p}`) }))}
+        />
+      </FormField>
+      <SecurityProfileField
+        project={project}
+        built
+        value={form.security}
+        onChange={(security) => set({ security })}
+      />
+    </div>
   )
 }
 

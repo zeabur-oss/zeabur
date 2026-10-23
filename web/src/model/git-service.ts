@@ -2,15 +2,19 @@
 // whose image is the Build's (docs/design: basic create). The Deployment names the Build's
 // repository with a tag no build makes, and Keel moves it to each image the Build pushes.
 import type { Schemas } from "@/api/client"
-import { KEEL_WEBHOOK } from "@/model/builds"
+import { KEEL_WEBHOOK, type Build } from "@/model/builds"
 import {
+  hostProblem,
   imageObjects,
+  portProblem,
   projectLevel,
+  serviceNameProblem,
   type DomainSettings,
   type ImageService,
 } from "@/model/image-service"
 
 type Change = Schemas["Change"]
+type EnvEdit = Schemas["EnvEdit"]
 type Manifest = Record<string, unknown>
 
 export type BuildMethod = "railpack" | "dockerfile"
@@ -43,6 +47,10 @@ export interface GitService extends Pick<
   /** Empty: the repository's root. */
   directory: string
   method: BuildMethod
+  /** For `dockerfile`, relative to `directory`. Empty: `Dockerfile`. */
+  dockerfile: string
+  /** Passed to the build as BuildKit secrets, from the Secret `<name>-build-env`. */
+  buildVariables: { name: string; value: string }[]
   access: Access
   /** For `token`. */
   username: string
@@ -56,6 +64,8 @@ export const newGitService = (): GitService => ({
   branch: "",
   directory: "",
   method: "railpack",
+  dockerfile: "",
+  buildVariables: [],
   access: "public",
   username: "",
   token: "",
@@ -134,22 +144,63 @@ export function branchProblem(branch: string): "invalid" | undefined {
   return BRANCH.test(value) ? undefined : "invalid"
 }
 
-export function directoryProblem(directory: string): "invalid" | undefined {
-  const value = directory
+/** A path inside the repository as the Build takes it: no `./` in front, no `/` behind. */
+const cleanPath = (path: string) =>
+  path
     .trim()
     .replace(/^\.?\/+/, "")
     .replace(/\/+$/, "")
+
+/** No segment may start with a dot, as the Build's schema says, so `..` cannot climb out. */
+const PATH_SEGMENT = /^[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$/
+
+/** What is wrong with a directory or Dockerfile path; empty is fine. */
+export function pathProblem(path: string): "invalid" | undefined {
+  const value = cleanPath(path)
   if (value === "") return undefined
-  return value.split("/").every((s) => s !== "" && s !== ".." && SEGMENT.test(s))
-    ? undefined
-    : "invalid"
+  return value.split("/").every((s) => PATH_SEGMENT.test(s)) ? undefined : "invalid"
 }
+
+/** What is wrong with each field of a form whose name, port, host, access and user are already
+ * resolved. */
+export function gitProblems(
+  form: GitService,
+  {
+    taken,
+    badEnv,
+    badBuildEnv,
+    hasKey,
+  }: { taken: readonly string[]; badEnv: boolean; badBuildEnv: boolean; hasKey: boolean },
+) {
+  return {
+    url: urlProblem(form.url),
+    branch: branchProblem(form.branch),
+    name: serviceNameProblem(form.name, taken),
+    port: portProblem(form.port),
+    host: form.publicUrl ? hostProblem(form.host) : undefined,
+    directory: pathProblem(form.directory),
+    dockerfile: pathProblem(form.dockerfile),
+    env: badEnv,
+    buildEnv: badBuildEnv,
+    key: form.access === "deployKey" && !hasKey,
+    token: form.access === "token" && (form.token.trim() === "" || form.username.trim() === ""),
+  }
+}
+
+export type GitProblems = ReturnType<typeof gitProblems>
 
 /** `<registry>/<project>/<service>`: where the Build pushes and the Deployment pulls from. */
 const imageRepository = (registry: string, project: string, name: string) =>
   `${registry.replace(/\/+$/, "")}/${project}/${name}`
 
 const credentialsName = (name: string) => `${name}-git`
+/** The Secret that holds a Build's variables. */
+export const buildEnvSecret = (build: string) => `${build}-build-env`
+
+const fromSecret = (secret: string, name: string) => ({
+  name,
+  valueFrom: { secretKeyRef: { name: secret, key: name } },
+})
 
 /** The objects the form creates, the deploy key aside: it is a change of its own. */
 export function gitObjects(
@@ -202,10 +253,17 @@ export function gitObjects(
       type: "kubernetes.io/basic-auth",
       stringData: { username: form.username.trim(), password: form.token.trim() },
     })
-  const directory = form.directory
-    .trim()
-    .replace(/^\.?\/+/, "")
-    .replace(/\/+$/, "")
+  const directory = cleanPath(form.directory)
+  const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
+  const envSecret = buildEnvSecret(name)
+  if (form.buildVariables.length > 0)
+    objects.push({
+      apiVersion: "v1",
+      kind: "Secret",
+      metadata: { name: envSecret, labels },
+      type: "Opaque",
+      stringData: Object.fromEntries(form.buildVariables.map((v) => [v.name, v.value])),
+    })
   objects.push(...service, {
     apiVersion: "builder.zeabur.com/v1alpha1",
     kind: "Build",
@@ -217,10 +275,14 @@ export function gitObjects(
           url: repo ? (form.access === "deployKey" ? sshUrl(repo) : httpsUrl(repo)) : form.url,
           ref: form.branch.trim() || DEFAULT_BRANCH_REF,
           ...(directory ? { contextDir: directory } : {}),
+          ...(dockerfile ? { dockerfile } : {}),
         },
         ...(credentials ? { credentialsRef: { name: credentials } } : {}),
       },
       output: { image: repository },
+      ...(form.buildVariables.length > 0
+        ? { env: form.buildVariables.map((v) => fromSecret(envSecret, v.name)) }
+        : {}),
       notify: [{ type: "keel", url: KEEL_WEBHOOK }],
     },
   })
@@ -241,6 +303,79 @@ export function createGitService(
   if (form.access === "deployKey" && form.sealedKey)
     changes.push({ op: "deployKey", name: credentialsName(form.name), key: form.sealedKey })
   changes.push(...projectLevel(form.security, enforced))
+  return changes
+}
+
+/** A Build's options as the service's settings edit them. */
+export interface BuildOptions {
+  directory: string
+  dockerfile: string
+  /** Variables to remove, by name. */
+  removed: string[]
+  /** Variables to add, or whose values to replace. */
+  set: { name: string; value: string }[]
+}
+
+export const buildOptionsOf = (build: Build): BuildOptions => ({
+  directory: build.contextDir ?? "",
+  dockerfile: build.dockerfile ?? "",
+  removed: [],
+  set: [],
+})
+
+/** The changes that give `build` these options. Values go to its Secret `<build>-build-env`: a
+ * `data` change when a variable already reads from it, else a new Secret. */
+export function buildOptionsChanges(build: Build, options: BuildOptions): Change[] {
+  const secret = buildEnvSecret(build.name)
+  const setNames = new Set(options.set.map((v) => v.name))
+  const wired = (name: string) =>
+    build.env.some((e) => e.name === name && e.secret === secret && e.key === name)
+  const env: EnvEdit[] = [
+    ...options.removed
+      .filter((name) => !setNames.has(name) && build.env.some((e) => e.name === name))
+      .map((name): EnvEdit => ({ op: "remove", name })),
+    ...options.set
+      .filter((v) => !wired(v.name))
+      .map((v): EnvEdit => ({
+        op: "set",
+        name: v.name,
+        valueFrom: { secretName: secret, key: v.name },
+      })),
+  ]
+  const directory = cleanPath(options.directory)
+  const dockerfile = cleanPath(options.dockerfile)
+  const changes: Change[] = []
+  const edit = {
+    ...(directory === (build.contextDir ?? "") ? {} : { contextDir: directory }),
+    ...(dockerfile === (build.dockerfile ?? "") ? {} : { dockerfile }),
+    ...(env.length > 0 ? { env } : {}),
+  }
+  if (Object.keys(edit).length > 0) changes.push({ op: "buildOptions", build: build.name, ...edit })
+  const exists = build.env.some((e) => e.secret === secret)
+  const dropped = options.removed.filter(
+    (name) => !setNames.has(name) && build.env.some((e) => e.name === name && e.secret === secret),
+  )
+  if (exists && (options.set.length > 0 || dropped.length > 0))
+    changes.push({
+      op: "data",
+      kind: "Secret",
+      name: secret,
+      changes: [
+        ...dropped.map((key) => ({ op: "remove", key })),
+        ...options.set.map((v) => ({ op: "set", key: v.name, value: v.value })),
+      ],
+    })
+  else if (!exists && options.set.length > 0)
+    changes.push({
+      op: "create",
+      object: {
+        apiVersion: "v1",
+        kind: "Secret",
+        metadata: { name: secret, labels: { "app.kubernetes.io/name": build.name } },
+        type: "Opaque",
+        stringData: Object.fromEntries(options.set.map((v) => [v.name, v.value])),
+      } as unknown as Record<string, never>,
+    })
   return changes
 }
 

@@ -1,12 +1,16 @@
 import { useLocation } from "@tanstack/react-router"
 import { lazy, Suspense, useEffect, type ReactNode } from "react"
 
+import { useQuery } from "@tanstack/react-query"
+
 import type { Schemas } from "@/api/client"
+import { buildsQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { cn } from "@/lib/utils"
 import { useDraft } from "@/components/plan/draft"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { useT } from "@/i18n"
+import { buildsOf } from "@/model/builds"
 import { isTask, type Network, type Service } from "@/model/service"
 import { refusedPlaces } from "@/routes/project/data"
 import type { ServiceMode, SettingsPart } from "@/routes/search"
@@ -17,6 +21,11 @@ import { YamlTab } from "@/routes/service/yaml"
 const Compute = lazy(() =>
   import("@/routes/service/settings").then((m) => ({
     default: m.ComputeSection,
+  })),
+)
+const BuildSection = lazy(() =>
+  import("@/routes/service/settings").then((m) => ({
+    default: m.BuildSection,
   })),
 )
 const Security = lazy(() =>
@@ -35,8 +44,8 @@ const HealthChecks = lazy(() =>
   })),
 )
 
-/** Compute, health checks, storage, security and scheduled tasks, one under the other; edits wait
- * in the draft. */
+/** Build, compute, health checks, storage, security and scheduled tasks, one under the other;
+ * edits other than the build's wait in the draft. */
 export function SettingsTab({
   project,
   service,
@@ -55,14 +64,8 @@ export function SettingsTab({
   const t = useT()
   const draft = useDraft()
   const hash = useLocation({ select: (l) => l.hash })
-  const parts: SettingsPart[] = [
-    "compute",
-    ...(isTask(service.kind) ? [] : (["health-checks"] as const)),
-    "storage",
-    // A Job's pod template can't change.
-    ...(service.kind === "Job" ? [] : (["security"] as const)),
-    ...(isTask(service.kind) ? [] : (["tasks"] as const)),
-  ]
+  const builds = buildsOf(service, useQuery(buildsQuery(project)).data?.builds)
+  const parts = partsOf(service, builds.length > 0)
 
   useEffect(() => {
     if (!hash || mode) return
@@ -101,6 +104,11 @@ export function SettingsTab({
       {/* Kept while the YAML shows, so edits typed here stay in the draft. */}
       <div key={draft?.generation} hidden={mode === "yaml"} className="flex min-w-0 flex-col gap-8">
         <Suspense fallback={<LoadingRows label={t("common.loading")} rows={4} />}>
+          {parts.includes("build") ? (
+            <Part id="build">
+              <BuildSection project={project} builds={builds} />
+            </Part>
+          ) : null}
           <Part id="compute">
             <Compute project={project} service={service} />
           </Part>
@@ -129,6 +137,18 @@ export function SettingsTab({
       </div>
     </div>
   )
+}
+
+function partsOf(service: Service, built: boolean): SettingsPart[] {
+  return [
+    ...(built ? (["build"] as const) : []),
+    "compute",
+    ...(isTask(service.kind) ? [] : (["health-checks"] as const)),
+    "storage",
+    // A Job's pod template can't change.
+    ...(service.kind === "Job" ? [] : (["security"] as const)),
+    ...(isTask(service.kind) ? [] : (["tasks"] as const)),
+  ]
 }
 
 function Part({ id, children }: { id: SettingsPart; children: ReactNode }) {

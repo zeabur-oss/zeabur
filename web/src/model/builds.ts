@@ -53,6 +53,12 @@ export function builtContainers(service: Service, builds: readonly Build[]): Bui
   return out
 }
 
+/** The Builds that make any of the service's images, each once. */
+export function buildsOf(service: Service, builds: readonly Build[] | undefined): Build[] {
+  const found = builtContainers(service, builds ?? []).map((b) => b.build)
+  return found.filter((b, i) => found.findIndex((other) => other.name === b.name) === i)
+}
+
 /** Whether `image` is the Build's newest: the same digest, or the same tag when it has none. */
 export function runsLatest(image: string, build: Build): boolean | undefined {
   const latest = build.latestImage

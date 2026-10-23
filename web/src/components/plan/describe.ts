@@ -220,9 +220,9 @@ function sentenceOf(
   }
 }
 
-type ImportOrPort = Extract<Change, { op: "envImport" | "publicPort" }>
+type ImportPortOrBuild = Extract<Change, { op: "envImport" | "publicPort" | "buildOptions" }>
 
-function accessSentence(t: Translate, change: AccessChange): string {
+function accessSentence(t: Translate, change: AccessChange | ImportPortOrBuild): string {
   switch (change.op) {
     case "scheduleTask":
       return t("confirm.scheduleTask", change.name, change.from.name)
@@ -237,11 +237,11 @@ function accessSentence(t: Translate, change: AccessChange): string {
         ? t("confirm.basicAuth", change.route.name)
         : t("confirm.basicAuthOff", change.route.name)
     default:
-      return importOrPortSentence(t, change)
+      return importPortOrBuildSentence(t, change)
   }
 }
 
-function importOrPortSentence(t: Translate, change: ImportOrPort): string {
+function importPortOrBuildSentence(t: Translate, change: ImportPortOrBuild): string {
   switch (change.op) {
     case "envImport":
       return change.remove
@@ -251,6 +251,8 @@ function importOrPortSentence(t: Translate, change: ImportOrPort): string {
       return change.remove
         ? t("confirm.publicPortOff", change.port, change.workload.name)
         : t("confirm.publicPort", change.port, change.workload.name)
+    case "buildOptions":
+      return t("confirm.buildOptions", change.build)
   }
 }
 
@@ -766,7 +768,7 @@ export function actionOf(t: Translate, ask: Asked): string {
   }
 }
 
-function accessAction(t: Translate, change: AccessChange): string {
+function accessAction(t: Translate, change: AccessChange | ImportPortOrBuild): string {
   switch (change.op) {
     case "scheduleTask":
       return t("action.create")
@@ -777,16 +779,18 @@ function accessAction(t: Translate, change: AccessChange): string {
     case "basicAuth":
       return change.user ? t("action.askPassword") : t("action.stopPassword")
     default:
-      return importOrPortAction(t, change)
+      return importPortOrBuildAction(t, change)
   }
 }
 
-function importOrPortAction(t: Translate, change: ImportOrPort): string {
+function importPortOrBuildAction(t: Translate, change: ImportPortOrBuild): string {
   switch (change.op) {
     case "envImport":
       return t("action.saveVariables")
     case "publicPort":
       return change.remove ? t("action.closePort") : t("action.openPort")
+    case "buildOptions":
+      return t("action.saveBuildOptions")
   }
 }
 

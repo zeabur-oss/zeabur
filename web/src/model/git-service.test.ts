@@ -11,14 +11,16 @@ import {
 } from "@/model/builds"
 import {
   branchProblem,
+  buildOptionsChanges,
+  buildOptionsOf,
   createGitService,
   deployKeyHost,
   deployKeyPage,
-  directoryProblem,
   gitMissing,
   gitObjects,
   newGitService,
   parseRepository,
+  pathProblem,
   tokenUser,
   urlProblem,
   type GitService,
@@ -76,9 +78,11 @@ describe("repository addresses", () => {
     expect(branchProblem("release/1.2")).toBeUndefined()
     expect(branchProblem("")).toBeUndefined()
     expect(branchProblem("a..b")).toBe("invalid")
-    expect(directoryProblem("")).toBeUndefined()
-    expect(directoryProblem("./apps/web/")).toBeUndefined()
-    expect(directoryProblem("../etc")).toBe("invalid")
+    expect(pathProblem("")).toBeUndefined()
+    expect(pathProblem("./apps/web/")).toBeUndefined()
+    expect(pathProblem("docker/Dockerfile.prod")).toBeUndefined()
+    expect(pathProblem("../etc")).toBe("invalid")
+    expect(pathProblem("apps/.cache")).toBe("invalid")
   })
 })
 
@@ -135,6 +139,33 @@ describe("the objects", () => {
     expect(build.spec.source.git.contextDir).toBe("apps/web")
     expect(build.spec.source.credentialsRef).toEqual({ name: "site-git" })
     expect(find(objects, "Service")).toBeUndefined()
+  })
+
+  test("build variables go to their own Secret, which the Build reads key by key", () => {
+    const objects = gitObjects(
+      form({
+        method: "dockerfile",
+        dockerfile: "./docker/Dockerfile.prod",
+        buildVariables: [{ name: "NPM_TOKEN", value: "npm_1" }],
+      }),
+      "shop",
+      "zot:5000",
+      {},
+    )
+    const secret = objects.find((o) => (o.metadata as Object).name === "site-build-env") as Object
+    expect(secret.stringData).toEqual({ NPM_TOKEN: "npm_1" })
+    const build = find(objects, "Build")
+    expect(build.spec.source.git.dockerfile).toBe("docker/Dockerfile.prod")
+    expect(build.spec.env).toEqual([
+      {
+        name: "NPM_TOKEN",
+        valueFrom: { secretKeyRef: { name: "site-build-env", key: "NPM_TOKEN" } },
+      },
+    ])
+    expect(JSON.stringify(build)).not.toContain("npm_1")
+    const railpack = find(gitObjects(form({ dockerfile: "x" }), "shop", "zot:5000", {}), "Build")
+    expect(railpack.spec.source.git.dockerfile).toBeUndefined()
+    expect(railpack.spec.env).toBeUndefined()
   })
 
   test("a deploy key is a change of its own, and the Build uses SSH", () => {
@@ -201,6 +232,77 @@ describe("the objects", () => {
       { clusterIssuer: "letsencrypt" },
     )
     expect(find(objects, "Ingress").spec.rules[0].host).toBe("site.example.com")
+  })
+})
+
+describe("build options in the service's settings", () => {
+  const built = (env: Build["env"]) =>
+    ({ name: "site", contextDir: "apps/web", dockerfile: null, env }) as unknown as Build
+  const wired = { name: "NPM_TOKEN", secret: "site-build-env", key: "NPM_TOKEN" }
+
+  test("nothing changed plans nothing", () => {
+    const build = built([wired])
+    expect(buildOptionsChanges(build, buildOptionsOf(build))).toEqual([])
+  })
+
+  test("a new value of a wired variable changes only its Secret", () => {
+    const build = built([wired])
+    expect(
+      buildOptionsChanges(build, {
+        ...buildOptionsOf(build),
+        set: [{ name: "NPM_TOKEN", value: "npm_2" }],
+      }),
+    ).toEqual([
+      {
+        op: "data",
+        kind: "Secret",
+        name: "site-build-env",
+        changes: [{ op: "set", key: "NPM_TOKEN", value: "npm_2" }],
+      },
+    ])
+  })
+
+  test("the first variable makes the Secret; a removed one leaves the Build and its key", () => {
+    const first = buildOptionsChanges(built([]), {
+      directory: "",
+      dockerfile: "Dockerfile.prod",
+      removed: [],
+      set: [{ name: "SENTRY_TOKEN", value: "s" }],
+    })
+    expect(first[0]).toEqual({
+      op: "buildOptions",
+      build: "site",
+      contextDir: "",
+      dockerfile: "Dockerfile.prod",
+      env: [
+        {
+          op: "set",
+          name: "SENTRY_TOKEN",
+          valueFrom: { secretName: "site-build-env", key: "SENTRY_TOKEN" },
+        },
+      ],
+    })
+    expect(first[1]).toMatchObject({ op: "create", object: { kind: "Secret" } })
+    const literal = { name: "NODE_ENV", secret: null, key: null }
+    const build = built([wired, literal])
+    expect(
+      buildOptionsChanges(build, { ...buildOptionsOf(build), removed: ["NPM_TOKEN", "NODE_ENV"] }),
+    ).toEqual([
+      {
+        op: "buildOptions",
+        build: "site",
+        env: [
+          { op: "remove", name: "NPM_TOKEN" },
+          { op: "remove", name: "NODE_ENV" },
+        ],
+      },
+      {
+        op: "data",
+        kind: "Secret",
+        name: "site-build-env",
+        changes: [{ op: "remove", key: "NPM_TOKEN" }],
+      },
+    ])
   })
 })
 

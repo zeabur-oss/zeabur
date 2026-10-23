@@ -1697,6 +1697,8 @@ export const en = {
   "confirm.image": (service: string, tag: string) => `${service} will run ${tag}.`,
   "confirm.rebuild": (build: string) =>
     `Zeabur Builder builds ${build} again from the newest commit of its branch.`,
+  "confirm.buildOptions": (build: string) =>
+    `Zeabur Builder builds ${build} with these options from the next build.`,
   "confirm.autoUpdateOn": (service: string) =>
     `Each new build of ${service} will go live as soon as it finishes.`,
   "confirm.autoUpdateOff": (service: string) =>
@@ -1768,6 +1770,7 @@ export const en = {
   "action.restart": "Restart",
   "action.deploy": "Deploy",
   "action.rebuild": "Build again",
+  "action.saveBuildOptions": "Save build options",
   "action.autoUpdateOn": "Turn on",
   "action.autoUpdateOff": "Turn off",
   "action.saveVariables": "Save variables",
@@ -1822,6 +1825,7 @@ export const en = {
   "title.configReload": (service: string) => `Auto-restart ${service}`,
   "title.deployBuild": (service: string) => `Deploy the newest build to ${service}`,
   "title.rebuild": (build: string) => `Build ${build} again`,
+  "title.buildOptions": (build: string) => `Change how ${build} is built`,
   "title.autoUpdateOn": (service: string) => `Auto-deploy ${service}`,
   "title.autoUpdateOff": (service: string) => `Stop auto-deploying ${service}`,
   "title.addDomain": (host: string) => `Add ${host}`,
@@ -2508,7 +2512,8 @@ export const en = {
   "add.method.dockerfile": "Dockerfile",
   "add.methodHint.railpack":
     "Detects the language and builds without a Dockerfile. Pick Dockerfile if the repository has one.",
-  "add.methodHint.dockerfile": "Builds the Dockerfile in the root directory.",
+  "add.methodHint.dockerfile":
+    "Builds the Dockerfile in the root directory. Name another file under More settings.",
   "add.gitPortHint":
     "The port the app listens on, also passed as PORT. Leave empty for a background service.",
   "add.access": "Repository access",
@@ -2528,11 +2533,18 @@ export const en = {
   "add.problem.deployKey": "Create the deploy key and add it to the repository.",
   "add.token": "Token",
   "add.problem.token": "Enter the username and token.",
-  "add.gitMoreSummary": "Root directory, variables, size and security.",
+  "add.gitMoreSummary": "Root directory, variables, build variables, size and security.",
   "add.field.directory": "Root directory",
   "add.directoryHint":
     "The folder to build, for a repository with several apps. Empty: the whole repository.",
   "add.problem.directory": "A folder in the repository, like apps/web.",
+  "add.field.dockerfile": "Dockerfile",
+  "add.dockerfileHint": "Relative to the root directory. Empty: Dockerfile.",
+  "add.problem.dockerfile": "A file in the repository, like docker/Dockerfile.prod.",
+  "add.buildVariables": "Build variables",
+  "add.buildVariablesHint":
+    "KEY=value lines that only the build reads, such as a registry token. They are passed as secrets and are not kept in the image.",
+  "add.buildVariablesDockerfile": "A Dockerfile reads one with RUN --mount=type=secret,id=KEY.",
   "add.gitAfter":
     "The first build starts when you apply. After that, each new commit on the branch is built and deployed automatically.",
   "add.planGit": (name: string) => `Deploy ${name} from Git`,
@@ -3227,6 +3239,16 @@ export const en = {
   "part.networking": "Networking",
   "part.storage": "Storage",
   "part.compute": "Compute",
+  "buildOptions.hint":
+    "Where Zeabur Builder builds from in the repository, and the variables only the build reads.",
+  "buildOptions.none": "No build variables yet. Add KEY=value lines below.",
+  "buildOptions.fromSecret": (secret: string) => `Value in Secret ${secret}`,
+  "buildOptions.literal": "Value written in the Build",
+  "buildOptions.remove": "Remove",
+  "buildOptions.add": "Add or replace",
+  "buildOptions.addHint": (secret: string) =>
+    `KEY=value lines. The values go to Secret ${secret}; the build reads them as secrets and does not keep them in the image.`,
+  "part.build": "Build",
   "part.health-checks": "Health checks",
   "part.security": "Security",
   "part.tasks": "Scheduled tasks",

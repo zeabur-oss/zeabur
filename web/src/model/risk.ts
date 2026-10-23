@@ -132,11 +132,13 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
   }
 }
 
-function weighAccess(change: AccessChange): { risk: Risk; reason?: Reason } {
+function weighAccess(change: AccessChange | BuildOptions): { risk: Risk; reason?: Reason } {
   return change.op === "publicPort" && !change.remove
     ? { risk: "high", reason: "opensPort" }
     : { risk: "normal" }
 }
+
+type BuildOptions = Extract<Change, { op: "buildOptions" }>
 
 /** The changes of scheduled tasks, routes, shared variables and public ports. */
 export type AccessChange = Extract<

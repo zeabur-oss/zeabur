@@ -18,6 +18,9 @@ import { FormField, quantity } from "@/components/form-field"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { useHold } from "@/components/plan/draft"
 
+// One chunk for every section: a chunk of its own moves shared code onto the first page load.
+export { BuildSection } from "@/routes/service/build-settings"
+
 const probeKinds = ["readiness", "liveness", "startup"] as const
 type ProbeKind = (typeof probeKinds)[number]
 
