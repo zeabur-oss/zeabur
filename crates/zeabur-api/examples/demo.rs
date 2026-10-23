@@ -19,7 +19,7 @@
 //! no `/auth/elevate` to grant them). `services/proxy` in `ZEABUR_DEMO_FORBID` refuses the
 //! sample metrics store, whose history and disk use are made up like the live usage. A
 //! system-upgrade-controller Plan resolves a newer patch, so the cluster page shows one; the demo
-//! makes no outbound request.
+//! makes no outbound request: domains resolve from a fixed table (`dns`).
 //!
 //! `namespaces` in `ZEABUR_DEMO_FORBID` refuses creating projects. New public URLs are suggested
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
@@ -359,14 +359,43 @@ fn service_in(namespace: &str, name: &str, port: i32, port_name: &str) -> Servic
             "ports": [{"name": port_name, "port": port, "targetPort": target}]}}))
 }
 
+/// The address Traefik writes into every Ingress's status.
+const ENTRY: &str = "203.0.113.10";
+
 /// An Ingress in `namespace` routing `host` to the Service `backend`, with TLS.
 fn ingress(namespace: &str, host: &str, backend: &str) -> Ingress {
     from(
         json!({"metadata": {"name": backend, "namespace": namespace},
         "spec": {"rules": [{"host": host, "http": {"paths": [{"path": "/", "pathType": "Prefix",
             "backend": {"service": {"name": backend, "port": {"name": "http"}}}}]}}],
-            "tls": [{"hosts": [host], "secretName": format!("{backend}-tls")}]}}),
+            "tls": [{"hosts": [host], "secretName": format!("{backend}-tls")}]},
+        "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}}),
     )
+}
+
+/// A cert-manager Certificate for the Secret `secret`, with `conditions`.
+fn certificate(namespace: &str, secret: &str, host: &str, conditions: &Value) -> DynamicObject {
+    from(json!({
+        "apiVersion": "cert-manager.io/v1", "kind": "Certificate",
+        "metadata": {"name": secret, "namespace": namespace},
+        "spec": {"secretName": secret, "dnsNames": [host]},
+        "status": {"conditions": conditions, "notAfter": "2027-01-21T08:00:00Z"}
+    }))
+}
+
+/// What the demo's DNS answers: shop points at the cluster, its API not yet, billing behind a
+/// CDN, and the rest nowhere.
+fn dns() -> zeabur_api::resolve::Fixed {
+    zeabur_api::resolve::Fixed(BTreeMap::from(
+        [
+            ("shop.example.com", ENTRY),
+            ("blog.example.com", ENTRY),
+            ("billing.example.com", "198.51.100.24"),
+            ("pay.example.com", ENTRY),
+            ("stats.example.com", ENTRY),
+        ]
+        .map(|(name, address)| (name.to_owned(), vec![address.to_owned()])),
+    ))
 }
 
 fn shop() -> NamespaceObjects {
@@ -515,11 +544,13 @@ fn shop() -> NamespaceObjects {
             from::<Ingress>(json!({"metadata": {"name": "web", "namespace": "shop"},
                 "spec": {"rules": [{"host": "shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
                     "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}}],
-                    "tls": [{"hosts": ["shop.example.com"], "secretName": "shop-tls"}]}})),
+                    "tls": [{"hosts": ["shop.example.com"], "secretName": "shop-tls"}]},
+                "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
             from::<Ingress>(json!({"metadata": {"name": "api", "namespace": "shop"},
                 "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
                     "backend": {"service": {"name": "api", "port": {"name": "http"}}}}]}}],
-                    "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]}})),
+                    "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
+                "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
         ],
         ..NamespaceObjects::default()
     }
@@ -1194,6 +1225,14 @@ fn state() -> State {
                 true,
             ),
             ServedResource::readable("upgrade.cattle.io", "v1", "plans", "Plan", true),
+            ServedResource::readable("cert-manager.io", "v1", "certificates", "Certificate", true),
+            ServedResource::readable(
+                "acme.cert-manager.io",
+                "v1",
+                "challenges",
+                "Challenge",
+                true,
+            ),
             ServedResource::readable("postgresql.cnpg.io", "v1", "clusters", "Cluster", true),
             ServedResource::readable(
                 "postgresql.cnpg.io",
@@ -1256,6 +1295,40 @@ fn state() -> State {
             ),
         ],
         dynamic: [
+            certificate(
+                "shop",
+                "shop-tls",
+                "shop.example.com",
+                &json!([{"type": "Ready", "status": "True", "reason": "Ready"}]),
+            ),
+            certificate(
+                "shop",
+                "api-tls",
+                "api.shop.example.com",
+                &json!([{"type": "Ready", "status": "False", "reason": "DoesNotExist"},
+                    {"type": "Issuing", "status": "True", "reason": "DoesNotExist"}]),
+            ),
+            from(json!({
+                "apiVersion": "acme.cert-manager.io/v1", "kind": "Challenge",
+                "metadata": {"name": "api-tls-1-3141592", "namespace": "shop"},
+                "spec": {"dnsName": "api.shop.example.com", "type": "HTTP-01"},
+                "status": {"state": "pending", "presented": true,
+                    "reason": "Waiting for HTTP-01 challenge propagation: failed to perform self check GET request 'http://api.shop.example.com/.well-known/acme-challenge/x': dial tcp: lookup api.shop.example.com: no such host"}
+            })),
+            certificate(
+                "billing",
+                "api-tls",
+                "billing.example.com",
+                &json!([{"type": "Ready", "status": "True", "reason": "Ready"}]),
+            ),
+            certificate(
+                "analytics",
+                "dashboard-tls",
+                "stats.example.com",
+                &json!([{"type": "Ready", "status": "False", "reason": "DoesNotExist"},
+                    {"type": "Issuing", "status": "False", "reason": "Failed",
+                     "message": "The certificate request has failed to complete and will be retried: Failed to wait for order resource \"dashboard-tls-1-2718281\" to become ready: order is in \"errored\" state: Failed to create Order: 429 urn:ietf:params:acme:error:rateLimited: too many certificates already issued for this exact set of identifiers in the last 168h0m0s"}]),
+            ),
             usage("vps-1", "1420m", "1730Mi"),
             usage("vps-2", "310m", "2210Mi"),
             usage("vps-3", "180m", "940Mi"),
@@ -2079,8 +2152,9 @@ async fn main() -> std::io::Result<()> {
         },
         ..zeabur_api::Settings::default()
     };
-    let app = zeabur_api::router_with_settings(Arc::new(access), settings)
-        .fallback_service(zeabur_ui::router());
+    let app =
+        zeabur_api::router_with_settings_and_resolver(Arc::new(access), settings, Arc::new(dns()))
+            .fallback_service(zeabur_ui::router());
     // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090.
     let addr = std::env::var("ZEABUR_DEMO_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await?;

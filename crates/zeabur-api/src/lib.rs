@@ -339,12 +339,21 @@ pub fn router_with_resolver(
     access: Arc<dyn ClusterAccess>,
     resolver: Arc<dyn resolve::Resolve>,
 ) -> Router {
+    router_with_settings_and_resolver(access, Settings::default(), resolver)
+}
+
+/// [`router_with_settings`], looking domains up with `resolver`; for tests and the demo.
+pub fn router_with_settings_and_resolver(
+    access: Arc<dyn ClusterAccess>,
+    settings: Settings,
+    resolver: Arc<dyn resolve::Resolve>,
+) -> Router {
     build_with(
         access,
         zeabur_kube::k8s_openapi::jiff::Timestamp::now,
         PlanKey::random().ok().map(Arc::new),
         pods::exec::IDLE,
-        Settings::default(),
+        settings,
         resolver,
         Arc::new(account::Fixed(None)),
         None,
