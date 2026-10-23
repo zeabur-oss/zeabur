@@ -1,9 +1,12 @@
 //! The planner for the project's Namespace: creating it, adopting it, letting it go, and its
 //! details.
 //!
-//! - **Creating** writes a new Namespace with the project label and, when given, the display name;
-//!   nothing else. kube-apiserver refuses it (`409 AlreadyExists`) if the name was taken since the
-//!   plan, which refuses a name that exists when it plans.
+//! - **Creating** writes a new Namespace with the project label, the Pod Security labels and, when
+//!   given, the display name; nothing else. The Pod Security labels enforce, audit and warn at
+//!   `restricted` [k8s-psa-labels], whatever the cluster's default, so a new project's pods are
+//!   held to the same level on every cluster; a service that needs root lowers `enforce` (the
+//!   `pod_security` module). kube-apiserver refuses the Namespace (`409 AlreadyExists`) if the name
+//!   was taken since the plan, which refuses a name that exists when it plans.
 //! - **Adopting** adds one label, `zeabur.com/project: "true"`; **letting go** removes it. Nothing
 //!   else on the Namespace changes, and nothing in it: a namespace that is no longer adopted keeps
 //!   every object, and is only no longer shown as a project.
@@ -21,10 +24,11 @@
 //! ([`NODE_SHELL_NAMESPACE`]), which only cluster administrators may use.
 //!
 //! [rfc6902-add]: https://www.rfc-editor.org/rfc/rfc6902#section-4.1
+//! [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
 
 use serde_json::{Value, json};
 use zeabur_kernel::names::{NODE_SHELL_NAMESPACE, is_system_namespace};
-use zeabur_model::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, ProjectIcon};
+use zeabur_model::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, PodSecurityLevel, ProjectIcon};
 
 use crate::change::Target;
 use crate::checks::is_dns_label;
@@ -122,9 +126,15 @@ impl Planner<'_> {
         )?;
         let annotations =
             display_name.map(|d| json!({ conventions.display_name_annotation.clone(): d }));
+        let restricted = PodSecurityLevel::Restricted.as_str();
         let mut metadata = json!({
             "name": name,
-            "labels": { conventions.project_label.clone(): ADOPTED },
+            "labels": {
+                conventions.project_label.clone(): ADOPTED,
+                PodSecurityLevel::ENFORCE: restricted,
+                PodSecurityLevel::AUDIT: restricted,
+                PodSecurityLevel::WARN: restricted,
+            },
         });
         if let (Some(annotations), Some(map)) = (annotations, metadata.as_object_mut()) {
             map.insert("annotations".to_owned(), annotations);

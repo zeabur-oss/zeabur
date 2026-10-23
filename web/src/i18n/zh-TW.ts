@@ -214,6 +214,7 @@ export const zhTW: Messages = {
   "reason.evicted": "已移出節點",
   "reason.releaseStuck": "部署卡住",
   "reason.gaveUp": "已放棄重試",
+  "reason.security": "被安全性設定擋下",
   "phase.Running": "執行中",
   "phase.Progressing": "部署中",
   "phase.Degraded": "未全數就緒",
@@ -1124,7 +1125,8 @@ export const zhTW: Messages = {
   "title.details": (ns) => `${ns} 的詳細資料`,
   "title.pauseAll": (ns) => `暫停 ${ns} 的所有服務`,
   "title.restartAll": (ns) => `重新啟動 ${ns} 的所有服務`,
-  "confirm.createProject": "建立帶有專案標籤的 Namespace，其他東西都不會變。",
+  "confirm.createProject":
+    "建立帶有專案標籤的 Namespace，只允許「嚴格」服務（Pod Security restricted）。其他東西都不會變。",
   "confirm.adopt": "為這個 Namespace 加上專案標籤，裡面的物件都不會變。",
   "confirm.unadopt": "這個 Namespace 不再顯示為專案，裡面的物件都不會刪除。",
   "confirm.debugContainer": (pod: string) =>
@@ -1309,6 +1311,7 @@ export const zhTW: Messages = {
   "plan.noMatch": "沒有符合的變更。",
   "plan.showAll": (n) => `顯示全部 ${n} 個`,
   "plan.alsoRestart": () => "一併重新啟動",
+  "plan.alsoRestrict": "專案也恢復為嚴格",
   "plan.restartByItself": "下次自動重新啟動",
   "plan.other": "其他欄位",
   "plan.field.size": "大小",
@@ -1377,6 +1380,7 @@ export const zhTW: Messages = {
     `${route} 的 HTTPS 設定仍是舊網域；${host} 需要新的憑證`,
   "warn.httpsCertificate": (host: string, issuer: string) =>
     `${host} 會使用 HTTPS：套用後由 cert-manager（${issuer}）簽發憑證`,
+  "warn.projectCanBeRestricted": "專案裡已經沒有服務需要「相容」，專案可以恢復為「嚴格」。",
   "warn.httpOnlyNoIssuer": (host: string) =>
     `${host} 只有 HTTP。管理員指定 cert-manager 的簽發者後，新網域會使用 HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
@@ -1445,6 +1449,41 @@ export const zhTW: Messages = {
     `${names} 已設定由 Reloader 重新啟動；Zeabur 無法確認這個叢集有沒有執行 Reloader。`,
   "confirm.configReloadOn": (name) =>
     `${name} 讀取的 ConfigMap 或 Secret 變更時會自動重新啟動。現在不會重新啟動。`,
+  "confirm.securityRestricted": (name) =>
+    `${name} 改為「嚴格」：以非 root 使用者執行，且無法提升權限。它的副本會被替換。`,
+  "confirm.securityBaseline": (name) =>
+    `${name} 改為「相容」：允許以 root 執行。它的副本會被替換。`,
+  "confirm.podSecurityBaseline":
+    "專案改為允許「相容」服務：Pod Security 強制等級從 restricted 改為 baseline。不符合 restricted 的服務仍會收到警告並記入稽核紀錄。",
+  "confirm.podSecurityRestricted":
+    "專案恢復為「嚴格」：Pod Security 強制 restricted 等級，拒絕以 root 執行的副本。",
+  "title.security": (name) => `${name} 的安全性`,
+  "title.projectStrict": "將專案恢復為嚴格",
+  "security.hint":
+    "服務的容器能做哪些事。「嚴格」適合大多數映像檔；映像檔必須以 root 執行時，請選「相容」。",
+  "security.profile.restricted": "嚴格（建議）",
+  "security.profile.baseline": "相容",
+  "security.profile.privileged": "不受限",
+  "security.about.restricted":
+    "以非 root 使用者執行，且無法提升權限。以 root 執行的映像檔（例如 nginx:latest）無法啟動；請改用不需要 root 的版本，例如 nginxinc/nginx-unprivileged。",
+  "security.aboutBuilt":
+    "以非 root 使用者執行，且無法提升權限。Railpack 建置的映像檔以使用者 1000 執行；Dockerfile 需要用數字指定非 root 的使用者，例如 USER 1000。",
+  "security.about.baseline": "允許以 root 執行，但仍無法存取主機或提升權限。",
+  "security.about.privileged":
+    "這個服務有超出「相容」範圍的設定，例如存取主機；這些是在 Zeabur 以外設定的。要變更請編輯 YAML。",
+  "security.lowers": "專案目前只允許「嚴格」服務；這次也會讓專案允許「相容」服務。",
+  "security.needsAdmin": "「相容」需要專案允許，而變更專案的安全性需要管理員。",
+  "security.what": "讓專案允許「相容」服務",
+  "security.project": "專案",
+  "security.projectLevel.restricted": "所有服務皆為嚴格",
+  "security.projectLevel.baseline": "允許相容服務",
+  "security.projectLevel.privileged": "不受限",
+  "security.projectLevel.unset": "叢集預設",
+  "security.raise": "將專案恢復為嚴格",
+  "security.kube.service": "服務符合",
+  "security.kube.project": "專案強制",
+  "security.kube.unset": "沒有標籤：叢集預設",
+  "security.kube.strict": "「嚴格」會設定",
   "confirm.configReloadOff": (name) => `${name} 的 ConfigMap 或 Secret 變更時，不再自動重新啟動。`,
   "confirm.alsoReads": (names, object) => `也會影響 ${names}（讀取 ${object}）。`,
   "confirm.alsoAffects": (names) => `也會影響 ${names}。`,
@@ -1499,6 +1538,8 @@ export const zhTW: Messages = {
   "action.saveValues": "儲存值",
   "action.turnOn": "開啟",
   "action.turnOff": "關閉",
+  "action.makeStrict": "改為嚴格",
+  "action.makeCompatible": "改為相容",
   "action.addDomain": "新增網域",
   "action.renameDomain": "更改網域",
   "action.removeDomain": "移除網域",
@@ -1695,6 +1736,7 @@ export const zhTW: Messages = {
   "diagnosis.action.variables": "環境變數",
   "diagnosis.action.storage": "儲存空間",
   "diagnosis.action.yaml": "編輯 YAML",
+  "diagnosis.action.security": "安全性",
   "gap.title": "缺少的設定",
   "gap.warning": "警告",
   "gap.advice": "建議",
@@ -1846,7 +1888,7 @@ export const zhTW: Messages = {
   "add.httpOnly": "這個網址只有 HTTP。管理員指定 cert-manager 的簽發者後會使用 HTTPS。",
   "add.noPublicUrl": "你的角色不能在這個專案新增公開網域。",
   "add.more": "更多設定",
-  "add.moreSummary": "環境變數、磁碟、規格、副本數和私有 registry。",
+  "add.moreSummary": "環境變數、磁碟、規格、副本數、私有 registry 和安全性。",
   "add.variables": "環境變數",
   "add.variablesHint": "一行一個 KEY=value，和 .env 檔案相同。",
   "add.variablesBad": (lines) => `第 ${lines} 行不是 KEY=value。`,
@@ -1911,7 +1953,7 @@ export const zhTW: Messages = {
   "add.problem.deployKey": "請建立部署金鑰，並加到儲存庫。",
   "add.token": "權杖",
   "add.problem.token": "請輸入使用者名稱和權杖。",
-  "add.gitMoreSummary": "根目錄、環境變數和規格。",
+  "add.gitMoreSummary": "根目錄、環境變數、規格和安全性。",
   "add.field.directory": "根目錄",
   "add.directoryHint": "要建置的資料夾，適用放了多個應用程式的儲存庫。留空表示整個儲存庫。",
   "add.problem.directory": "儲存庫裡的資料夾，例如 apps/web。",
@@ -2518,6 +2560,7 @@ export const zhTW: Messages = {
   "part.storage": "儲存空間",
   "part.compute": "運算資源",
   "part.health-checks": "健康檢查",
+  "part.security": "安全性",
   "form.healthHint":
     "叢集在每個副本上執行的檢查：能不能接收流量、要不要重新啟動，以及是否已經啟動。",
   "draft.add": "加入變更",
@@ -2661,6 +2704,8 @@ export const zhTW: Messages = {
   "sentence.rollout.stuck.configMissing": (p) =>
     `${p.name} 的部署卡住了：新副本讀取的機密或設定檔不存在。`,
   "sentence.rollout.stuck.runFailed": (p) => `${p.name} 的部署卡住了：新副本執行失敗。`,
+  "sentence.rollout.stuck.podSecurity": (p) =>
+    `${p.name} 的部署卡住了：安全性設定讓新副本無法啟動。`,
   "sentence.fix.multiAttach": (p) =>
     `舊副本還占著磁碟區，而磁碟區一次只能掛在一台機器上。在 YAML 把 ${p.service || "服務"} 的 strategy.type 設為 Recreate，讓舊副本先停止；代價是每次部署時，新副本啟動的那幾秒服務會中斷。`,
   "sentence.fix.outOfMemory": (p) =>

@@ -19,6 +19,11 @@ const Compute = lazy(() =>
     default: m.ComputeSection,
   })),
 )
+const Security = lazy(() =>
+  import("@/routes/service/security").then((m) => ({
+    default: m.SecuritySection,
+  })),
+)
 const HealthChecks = lazy(() =>
   import("@/routes/service/settings").then((m) => ({
     default: m.HealthChecksSection,
@@ -44,9 +49,13 @@ export function SettingsTab({
   const t = useT()
   const draft = useDraft()
   const hash = useLocation({ select: (l) => l.hash })
-  const parts: SettingsPart[] = isTask(service.kind)
-    ? ["compute", "storage"]
-    : ["compute", "health-checks", "storage"]
+  const parts: SettingsPart[] = [
+    "compute",
+    ...(isTask(service.kind) ? [] : (["health-checks"] as const)),
+    "storage",
+    // A Job's pod template can't change.
+    ...(service.kind === "Job" ? [] : (["security"] as const)),
+  ]
 
   useEffect(() => {
     if (!hash || mode) return
@@ -99,6 +108,11 @@ export function SettingsTab({
               <StorageTab project={project} service={service} />
             </div>
           </Part>
+          {parts.includes("security") ? (
+            <Part id="security">
+              <Security project={project} service={service} />
+            </Part>
+          ) : null}
         </Suspense>
       </div>
     </div>

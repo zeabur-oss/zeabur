@@ -31,6 +31,9 @@ pub enum DiagnosisKind {
     /// A container cannot start because a Secret or ConfigMap it reads, or a key in one, is
     /// missing (`CreateContainerConfigError`), or a volume from one cannot be mounted.
     ConfigMissing,
+    /// Pod Security keeps it from running: the kubelet does not start a container that must
+    /// not run as root but would, or admission refuses its pods for the namespace's level.
+    PodSecurity,
     /// It is failing and no other diagnosis explains why: the fallback, so the raw reason is
     /// never the only thing said.
     Unexplained,

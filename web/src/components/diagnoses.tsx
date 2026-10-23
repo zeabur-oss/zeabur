@@ -55,6 +55,7 @@ export interface DiagnosisAction {
     | "diagnosis.action.variables"
     | "diagnosis.action.storage"
     | "diagnosis.action.yaml"
+    | "diagnosis.action.security"
   pod?: string
 }
 
@@ -100,6 +101,10 @@ function actionOf(d: Diagnosis): DiagnosisAction {
         : { tab: "events", label: "diagnosis.action.events", pod }
     case "imagePull":
       return { tab: "events", label: "diagnosis.action.events", pod }
+    case "podSecurity":
+      return d.fix.key.endsWith(".privileged")
+        ? { tab: "yaml", label: "diagnosis.action.yaml" }
+        : { tab: "security", label: "diagnosis.action.security" }
   }
 }
 

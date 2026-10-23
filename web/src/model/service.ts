@@ -130,6 +130,7 @@ export type ReasonWord =
   | "releaseStuck"
   | "gaveUp"
   | "buildFailed"
+  | "security"
 
 const reasonWords: Record<string, ReasonWord> = {
   CrashLoopBackOff: "crashing",

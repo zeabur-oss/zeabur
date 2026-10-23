@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use zeabur_model::{ProjectIcon, WorkloadRef};
+use zeabur_model::{PodSecurityLevel, ProjectIcon, WorkloadRef};
 
 use crate::checks::{ProbeRequest, ResourceRef, VolumeRequest};
 use crate::rules::{EnvEdit, FieldChange};
@@ -202,6 +202,27 @@ pub enum Change {
         /// Limits, the same way.
         #[serde(default)]
         limits: BTreeMap<String, String>,
+    },
+    /// Set the Pod Security level a workload's pods meet (see the `pod_security` module):
+    /// `restricted` writes the settings the restricted standard asks for into its pod template;
+    /// `baseline` removes the ones that keep an image running as root from starting. The pods
+    /// are replaced.
+    #[serde(rename_all = "camelCase")]
+    SecurityProfile {
+        /// The workload: a Deployment, StatefulSet, DaemonSet or CronJob.
+        workload: WorkloadRef,
+        /// `restricted` or `baseline`.
+        profile: PodSecurityLevel,
+    },
+    /// Set the Pod Security level enforced in the project, the Namespace's
+    /// `pod-security.kubernetes.io/enforce` label (see the `pod_security` module). `baseline`
+    /// lowers only a `restricted` label and writes nothing otherwise; `restricted` is refused
+    /// while a workload, as the plan leaves it, does not meet it. Written before the other
+    /// changes of the plan.
+    #[serde(rename_all = "camelCase")]
+    PodSecurity {
+        /// `restricted` or `baseline`.
+        level: PodSecurityLevel,
     },
     /// Replace one object of the project with an edited copy, written as YAML.
     ///
@@ -802,6 +823,13 @@ pub enum Warning {
         namespace: String,
         /// Its name.
         pod: String,
+    },
+    /// Once applied, every workload of the project meets the restricted level, but the project
+    /// enforces only this one: a `podSecurity` change to `restricted` would raise it.
+    #[serde(rename_all = "camelCase")]
+    ProjectCanBeRestricted {
+        /// The level the project enforces now.
+        level: PodSecurityLevel,
     },
 }
 

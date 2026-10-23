@@ -2014,6 +2014,20 @@ export interface components {
           workload: components["schemas"]["WorkloadRef"]
         }
       | {
+          /** @enum {string} */
+          op: "securityProfile"
+          /** @description `restricted` or `baseline`. */
+          profile: components["schemas"]["PodSecurityLevel"]
+          /** @description The workload: a Deployment, StatefulSet, DaemonSet or CronJob. */
+          workload: components["schemas"]["WorkloadRef"]
+        }
+      | {
+          /** @description `restricted` or `baseline`. */
+          level: components["schemas"]["PodSecurityLevel"]
+          /** @enum {string} */
+          op: "podSecurity"
+        }
+      | {
           /** @description Its name. */
           name: string
           /** @enum {string} */
@@ -2754,6 +2768,7 @@ export interface components {
       | "quotaBlocked"
       | "unschedulable"
       | "configMissing"
+      | "podSecurity"
       | "unexplained"
     /**
      * @description Whether disk use could be read from the metrics store. An open set.
@@ -4808,6 +4823,12 @@ export interface components {
           /** @description Its name. */
           pod: string
         }
+      | {
+          /** @enum {string} */
+          code: "projectCanBeRestricted"
+          /** @description The level the project enforces now. */
+          level: components["schemas"]["PodSecurityLevel"]
+        }
     /** @description One object a plan writes. */
     PlannedObject: {
       /** @description The object as it will be, the same way; absent when the write deletes it. */
@@ -4875,6 +4896,11 @@ export interface components {
      * @enum {string}
      */
     PodScan: "complete" | "partial" | "unreadable"
+    /**
+     * @description A Pod Security Standards level, from the least to the most restrictive.
+     * @enum {string}
+     */
+    PodSecurityLevel: "privileged" | "baseline" | "restricted"
     /** @description One pod of a workload. */
     PodSummary: {
       /**
@@ -5280,7 +5306,8 @@ export interface components {
       can: components["schemas"]["ProjectRights"]
       /**
        * @description Whether the person may adopt it or let it go: patch it, and where the admission policy
-       *     guards its labels, also `zeabur-manage` it.
+       *     guards its labels, also `zeabur-manage` it. Changing its Pod Security level needs the
+       *     same.
        */
       canAdopt: components["schemas"]["Permission"]
       /** @description Whether the person may patch the Namespace: change its details. */
@@ -5294,6 +5321,7 @@ export interface components {
       name: string
       /** @description The Namespace. */
       origin: components["schemas"]["Origin"]
+      podSecurity?: components["schemas"]["PodSecurityLevel"] | null
       role?: components["schemas"]["AccountRole"] | null
       /** @description Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
       system: boolean
@@ -5829,6 +5857,7 @@ export interface components {
       endpointNames: string[]
       /** @description Its resource name, `projects/<project>/services/<kind>/<name>`; see [`crate::id`]. */
       id: string
+      podSecurity?: components["schemas"]["PodSecurityLevel"] | null
       /** @description Its pods, sorted by name. */
       pods: components["schemas"]["PodSummary"][]
       /**
@@ -6115,6 +6144,7 @@ export interface components {
       | "quota"
       | "configMissing"
       | "runFailed"
+      | "podSecurity"
       | "deadlineExceeded"
       | "replicaFailure"
     /**

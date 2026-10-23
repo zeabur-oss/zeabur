@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: nginx:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-1
+  namespace: demo
+  labels:
+    app: web
+spec:
+  containers:
+    - name: web
+      image: nginx:latest
+status:
+  phase: Pending
+  containerStatuses:
+    - name: web
+      image: nginx:latest
+      imageID: ""
+      ready: false
+      restartCount: 0
+      state:
+        waiting:
+          reason: CreateContainerConfigError
+          message: 'container has runAsNonRoot and image will run as root (pod: "web-1_demo(0b6c1e0a-7f0e-4f55-9d0b-2f6a8f1c9b11)", container: web)'

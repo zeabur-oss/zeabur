@@ -38,7 +38,7 @@ use serde_json::{Value, json};
 use zeabur_adapters::provenance::{Tool, detect_tool};
 use zeabur_graph::{Snapshot, Workload, workloads};
 use zeabur_kernel::names::{Conventions, GatewayRef};
-use zeabur_model::{HttpRoute, Project, SourceKind, WorkloadKind, WorkloadRef};
+use zeabur_model::{HttpRoute, PodSecurityLevel, Project, SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{
     Change, DataEdit, DataKind, FieldOwners, HttpOnlyReason, Plan, PlanRequest, PlannedObject,
@@ -267,6 +267,8 @@ pub(crate) struct Planner<'a> {
     pub(crate) warnings: Vec<Warning>,
     /// The objects `create` changes make, with the index of their change.
     pub(crate) created: Vec<(Target, usize)>,
+    /// The level a `podSecurity` change asks the project to enforce.
+    pub(crate) pod_security: Option<PodSecurityLevel>,
 }
 
 /// The plan for `request` against `input`.
@@ -330,6 +332,7 @@ pub fn plan_with(
         impact: BTreeSet::new(),
         warnings: Vec::new(),
         created: Vec::new(),
+        pod_security: None,
     };
     for index in crate::create::order(&request.changes) {
         let Some(change) = request.changes.get(index) else {
@@ -340,10 +343,29 @@ pub fn plan_with(
             ..e
         })?;
     }
+    let restricts = request.changes.iter().any(|c| {
+        matches!(
+            c,
+            Change::SecurityProfile {
+                profile: PodSecurityLevel::Restricted,
+                ..
+            }
+        )
+    });
+    planner
+        .project_pod_security(request.changes.len() == 1, restricts)
+        .map_err(|e| PlanError {
+            change: request
+                .changes
+                .iter()
+                .position(|c| matches!(c, Change::PodSecurity { .. })),
+            ..e
+        })?;
     planner.finish()
 }
 
 impl<'a> Planner<'a> {
+    #[expect(clippy::too_many_lines, reason = "one arm per change kind")]
     fn change(&mut self, change: &Change, index: usize) -> Result<(), PlanError> {
         match change {
             Change::Env {
@@ -406,6 +428,10 @@ impl<'a> Planner<'a> {
             } => self.auto_update(workload, *enabled, build.as_deref(), webhook.as_deref()),
             Change::Scale { workload, replicas } => self.scale(workload, *replicas),
             Change::ConfigReload { workload, enabled } => self.config_reload(workload, *enabled),
+            Change::SecurityProfile { workload, profile } => {
+                self.security_profile(workload, *profile)
+            }
+            Change::PodSecurity { level } => self.ask_pod_security(*level),
             Change::Resources {
                 workload,
                 container,

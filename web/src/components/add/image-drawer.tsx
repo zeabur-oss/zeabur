@@ -7,6 +7,7 @@ import { clusterQuery, creatableQuery, projectQuery } from "@/api/queries"
 import { FormField, quantity } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
+import { SecurityProfileField, useProjectSecurity } from "@/components/security-profile"
 import { useT } from "@/i18n"
 import { handOff } from "@/lib/adding"
 import { serviceLink } from "@/lib/place"
@@ -82,6 +83,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
         ...view.routes.map((r) => r.name),
       ]
     : []
+  const { enforced } = useProjectSecurity(project)
   const [form, setForm] = useState<ImageService>(newImageService)
   const [extras, setExtras] = useState<Extras>(newExtras)
   const [named, setNamed] = useState(false)
@@ -138,7 +140,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
     if (blocked) return
     planner.plan({
       title: t("add.planImage", name),
-      changes: createImageService(service(), domains),
+      changes: createImageService(service(), domains, enforced),
     })
   }
   const editYaml = () => {
@@ -434,6 +436,11 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                   ) : null}
                 </div>
               ) : null}
+              <SecurityProfileField
+                project={project}
+                value={form.security}
+                onChange={(security) => set({ security })}
+              />
             </div>
           </CollapsibleContent>
         </Collapsible>

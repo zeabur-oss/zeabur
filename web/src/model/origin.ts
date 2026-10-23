@@ -30,6 +30,8 @@ export function originOf(d: Diagnosis): ProblemOrigin {
         : { origin: "configuration", fixer: "you" }
     case "quotaBlocked":
       return { origin: "cluster", fixer: "clusterAdmin" }
+    case "podSecurity":
+      return { origin: "configuration", fixer: "you" }
     case "unschedulable":
       return cause.endsWith(".cpu") || cause.endsWith(".memory")
         ? { origin: "cluster", fixer: "you" }

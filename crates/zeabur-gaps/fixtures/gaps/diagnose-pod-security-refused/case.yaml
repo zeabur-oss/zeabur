@@ -1,0 +1,4 @@
+description: A Deployment whose pods Pod Security admission refuses carries the ReplicaFailure condition its ReplicaSet reported; the level and what the pods break are named.
+operation: gaps.diagnose
+params:
+  now: "2026-10-23T12:00:00Z"

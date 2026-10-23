@@ -3081,5 +3081,31 @@
   "en": "Open service1's events.",
   "zh-TW": "開啟 service1 的事件。",
   "zh-CN": "查看 service1 的事件。"
+ },
+ {
+  "key": "diagnosis.podSecurity.cause.runsAsRoot",
+  "params": {
+   "container": "container1"
+  },
+  "en": "container1 can't start: its image runs as root, and the service's security is Strict.",
+  "zh-TW": "container1 無法啟動：映像檔以 root 執行，但服務的安全性設為「嚴格」。",
+  "zh-CN": "container1 无法启动：镜像以 root 运行，但服务的安全性设为「严格」。"
+ },
+ {
+  "key": "diagnosis.podSecurity.why.refused",
+  "params": {
+   "level": "level1",
+   "breaks": "breaks1"
+  },
+  "en": "The cluster refuses replicas that break the project's level1 level: breaks1.",
+  "zh-TW": "叢集會拒絕不符合專案 level1 等級的副本：breaks1。",
+  "zh-CN": "集群会拒绝不符合项目 level1 等级的副本：breaks1。"
+ },
+ {
+  "key": "diagnosis.podSecurity.fix.compatible",
+  "params": {},
+  "en": "Use an image that runs without root: nginxinc/nginx-unprivileged instead of nginx, or, for a service built from your Dockerfile, a numeric user such as USER 1000 in it. Otherwise, choose Compatible security in the service's settings.",
+  "zh-TW": "改用不需要 root 的映像檔：例如以 nginxinc/nginx-unprivileged 取代 nginx；服務若從你的 Dockerfile 建置，就在 Dockerfile 裡用數字指定使用者，例如 USER 1000。否則請在服務設定裡把安全性改為「相容」。",
+  "zh-CN": "改用不需要 root 的镜像：例如以 nginxinc/nginx-unprivileged 替代 nginx；服务若从你的 Dockerfile 构建，就在 Dockerfile 里用数字指定用户，例如 USER 1000。否则请在服务设置里把安全性改为「兼容」。"
  }
 ]

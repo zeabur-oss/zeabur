@@ -29,7 +29,7 @@ mod tests {
     use proptest::prelude::*;
     use serde_json::{Value, from_value, json};
     use zeabur_graph::Snapshot;
-    use zeabur_model::{Tool, WorkloadKind, WorkloadRef};
+    use zeabur_model::{PodSecurityLevel, Tool, WorkloadKind, WorkloadRef};
     use zeabur_plan::checks::{ProbeHandler, ProbeRequest, ResourceRef};
     use zeabur_plan::json::apply_patch;
     use zeabur_plan::rules::EnvEdit;
@@ -289,7 +289,7 @@ mod tests {
     }
 
     /// The change kinds that write an object that exists.
-    const CASES: usize = 18;
+    const CASES: usize = 19;
 
     /// Case `which` on `world`: the world (with the workload kind the change needs), the change,
     /// the object it writes and the path of the field it changes, in `managedFields` terms.
@@ -524,6 +524,15 @@ mod tests {
                     vec![field("type")],
                 )
             }
+            17 => (
+                w.clone(),
+                Change::SecurityProfile {
+                    workload: w.reference(),
+                    profile: PodSecurityLevel::Restricted,
+                },
+                "workload",
+                at(&[field("securityContext")]),
+            ),
             _ => {
                 let mut edited = zeabur_plan::edit::editable(&w.objects()["configmap"]);
                 edited["data"][&w.key] = json!("2");

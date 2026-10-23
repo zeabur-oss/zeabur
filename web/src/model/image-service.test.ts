@@ -80,7 +80,11 @@ describe("objects", () => {
       name: "web",
       image: "ghcr.io/acme/web:1.4",
       resources: { requests: { cpu: "100m", memory: "128Mi" }, limits: { memory: "256Mi" } },
+      securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } },
     })
+    const pod = (objects[0] as any).spec.template.spec
+    expect(pod.automountServiceAccountToken).toBe(false)
+    expect(pod.securityContext.runAsNonRoot).toBe(true)
     expect((objects[0] as any).spec.selector.matchLabels).toEqual({
       "app.kubernetes.io/name": "web",
     })
@@ -164,6 +168,18 @@ describe("objects", () => {
       "create",
       "create",
     ])
+  })
+
+  test("Compatible lowers a project that allows only Strict services, in the same plan", () => {
+    const compatible = form({ security: "baseline" })
+    expect(createImageService(compatible, {}, "restricted").at(-1)).toEqual({
+      op: "podSecurity",
+      level: "baseline",
+    })
+    expect(createImageService(compatible, {}, "baseline").map((c) => c.op)).toEqual(["create"])
+    expect(createImageService(form({}), {}, "restricted").map((c) => c.op)).toEqual(["create"])
+    const pod = (imageObjects(compatible, {})[0] as any).spec.template.spec
+    expect(pod.securityContext).toEqual({ seccompProfile: { type: "RuntimeDefault" } })
   })
 })
 

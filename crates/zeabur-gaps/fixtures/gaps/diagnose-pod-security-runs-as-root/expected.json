@@ -1,0 +1,34 @@
+[
+  {
+    "kind": "podSecurity",
+    "container": "web",
+    "pods": [
+      "web-1"
+    ],
+    "cause": {
+      "key": "diagnosis.podSecurity.cause.runsAsRoot",
+      "params": {
+        "container": "web"
+      }
+    },
+    "why": {
+      "key": "diagnosis.podSecurity.why.runAsNonRoot",
+      "params": {
+        "container": "web"
+      }
+    },
+    "fix": {
+      "key": "diagnosis.podSecurity.fix.compatible",
+      "params": {
+        "container": "web"
+      }
+    },
+    "evidence": [
+      {
+        "kind": "Pod",
+        "name": "web-1",
+        "fieldPath": "status.containerStatuses[name=web].state.waiting"
+      }
+    ]
+  }
+]

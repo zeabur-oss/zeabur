@@ -9,6 +9,7 @@ mod health;
 mod http_route;
 pub mod id;
 mod network;
+mod pod_security;
 mod project;
 mod provenance;
 mod reload;
@@ -35,6 +36,7 @@ pub use http_route::{
 pub use network::{
     Endpoint, InferredFrom, Port, PortProtocol, ProtocolInference, Route, RouteRule,
 };
+pub use pod_security::PodSecurityLevel;
 pub use project::{
     Connection, ConnectionEvidence, DataStore, Project, Relation, RelationKind, Resource,
     ResourceKind, Service,

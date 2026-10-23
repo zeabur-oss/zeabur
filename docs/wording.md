@@ -238,6 +238,8 @@ why. Add a row before introducing a new concept.
 | kubectl terminal (a shell with kubectl and helm in the cluster) | kubectl 終端機 | kubectl 终端 | Runs as the signed-in user |
 | node terminal (a root shell on a node's host); terminal pod (the privileged pod it runs in) | 節點終端機；終端機 Pod | 节点终端；终端 Pod | For cluster administrators only. Say plainly that it is full root on the host and bypasses Zeabur |
 | scratch space (an `emptyDir`) | 暫存空間 | 临时空间 | Emptied when the replica is replaced |
+| Strict (a service's security; the project allowing only Strict services) | 嚴格 | 严格 | Pod Security `restricted`: runs as non-root, no privilege escalation. The choice reads 嚴格（建議）／严格（推荐）; the level is in the Kubernetes details |
+| Compatible (security that lets a container run as root) | 相容 | 兼容 | Pod Security `baseline`; the project enforcing it "allows Compatible services" |
 | Details for Kubernetes users (the one disclosure of a section) | 給 Kubernetes 使用者的細節 | 给 Kubernetes 用户的细节 | Holds the section's kinds and fields |
 
 ## Server sentences

@@ -2,6 +2,7 @@
 // change of one plan (docs/design: basic create). No `app.kubernetes.io/managed-by`: a plan
 // refuses to change an object another tool manages.
 import type { Schemas } from "@/api/client"
+import { lowersProject, templateSecurity, type Profile } from "@/model/pod-security"
 
 type Change = Schemas["Change"]
 type Manifest = Record<string, unknown>
@@ -37,6 +38,7 @@ export interface ImageService {
   size: ImageSize
   replicas: number
   registry?: { server: string; username: string; password: string }
+  security: Profile
 }
 
 export interface DomainSettings {
@@ -54,6 +56,7 @@ export const newImageService = (): ImageService => ({
   secretVariables: true,
   size: "small",
   replicas: 1,
+  security: "restricted",
 })
 
 const NAME_MAX = 40
@@ -203,6 +206,7 @@ export function imageObjects(form: ImageService, domains: DomainSettings): Manif
         ? { name: v.name, value: v.value }
         : { name: v.name, valueFrom: { secretKeyRef: { name: v.from.secret, key: v.from.key } } },
     )
+  const security = templateSecurity(form.security)
   const container: Manifest = {
     name,
     image: form.image.trim(),
@@ -212,6 +216,7 @@ export function imageObjects(form: ImageService, domains: DomainSettings): Manif
     resources: imageResources[form.size],
     ...(port ? { readinessProbe: { tcpSocket: { port } } } : {}),
     ...(form.volume ? { volumeMounts: [{ name: "data", mountPath: form.volume.mountPath }] } : {}),
+    ...security.container,
   }
   objects.push({
     apiVersion: "apps/v1",
@@ -226,6 +231,7 @@ export function imageObjects(form: ImageService, domains: DomainSettings): Manif
         metadata: { labels },
         spec: {
           ...(registry ? { imagePullSecrets: [{ name: `${name}-registry` }] } : {}),
+          ...security.pod,
           containers: [container],
           ...(form.volume
             ? { volumes: [{ name: "data", persistentVolumeClaim: { claimName: `${name}-data` } }] }
@@ -275,11 +281,24 @@ export function imageObjects(form: ImageService, domains: DomainSettings): Manif
   return objects
 }
 
-export const createImageService = (form: ImageService, domains: DomainSettings): Change[] =>
-  imageObjects(form, domains).map((object) => ({
+/** `enforced`: the project's Pod Security level, which Compatible lowers in the same plan. */
+export const createImageService = (
+  form: ImageService,
+  domains: DomainSettings,
+  enforced?: Schemas["PodSecurityLevel"] | null,
+): Change[] => [
+  ...imageObjects(form, domains).map((object): Change => ({
     op: "create",
     object: object as Record<string, never>,
-  }))
+  })),
+  ...projectLevel(form.security, enforced),
+]
+
+/** The project's level a new service of `profile` needs, as a change when it must be lowered. */
+export const projectLevel = (
+  profile: Profile,
+  enforced: Schemas["PodSecurityLevel"] | null | undefined,
+): Change[] => (lowersProject(profile, enforced) ? [{ op: "podSecurity", level: "baseline" }] : [])
 
 /** What a person may create, by kind, as the creatable list hints; absent kinds are unknown. */
 export type Rights = (group: string, resource: string) => Schemas["ObjectAccess"]

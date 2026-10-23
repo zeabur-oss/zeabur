@@ -54,6 +54,7 @@ describe("a diagnosis's action", () => {
     })
     expect(diagnosisAction(diagnosis("configMissing", "x")).tab).toBe("variables")
     expect(diagnosisAction(diagnosis("quotaBlocked", "x")).label).toBe("diagnosis.action.replicas")
+    expect(diagnosisAction(diagnosis("podSecurity", "x")).tab).toBe("security")
   })
 
   test("follows the cause where one kind has several", () => {
@@ -87,6 +88,7 @@ describe("a diagnosis's action", () => {
       "quotaBlocked",
       "unschedulable",
       "configMissing",
+      "podSecurity",
       "unexplained",
     ]
     for (const kind of kinds)

@@ -8,6 +8,7 @@ mod health;
 pub mod manifest;
 mod mounts;
 mod network;
+pub mod pod_security;
 mod pods;
 mod project;
 mod restart;

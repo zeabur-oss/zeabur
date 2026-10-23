@@ -20,7 +20,7 @@ export type ServiceMode = keyof typeof serviceModes
 const modes = Object.keys(serviceModes) as ServiceMode[]
 
 /** The parts of Settings, each an anchor. */
-const settingsParts = ["storage", "compute", "health-checks"] as const
+const settingsParts = ["storage", "compute", "health-checks", "security"] as const
 export type SettingsPart = (typeof settingsParts)[number]
 
 /** The parts a pending edit can belong to. */
@@ -75,6 +75,7 @@ export function servicePlace(place?: ServicePlace): {
     case "storage":
     case "compute":
     case "health-checks":
+    case "security":
       return { tab: "settings", hash: place }
     default:
       return { tab: place }
