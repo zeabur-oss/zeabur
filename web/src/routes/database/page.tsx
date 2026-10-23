@@ -312,7 +312,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex flex-col gap-x-4 gap-y-0.5 border-t border-rule py-2.5 sm:flex-row sm:items-center">
       <dt className="shrink-0 type-meta text-muted-foreground sm:w-40">{label}</dt>
-      <dd className="flex min-w-0 items-center gap-2">{children}</dd>
+      <dd className="flex min-h-8 min-w-0 items-center gap-2">{children}</dd>
     </div>
   )
 }
