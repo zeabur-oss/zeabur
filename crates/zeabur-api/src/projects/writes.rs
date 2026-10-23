@@ -190,7 +190,7 @@ async fn compute(
     };
     let objects = edited_objects(cluster, project, request).await?;
     let replica_sets = replica_sets_of_deleted(cluster, project, request).await?;
-    let reclaim_policies = reclaim_policies(cluster, request, &snapshot).await?;
+    let reclaim_policies = reclaim_policies(cluster, request, &snapshot, &objects).await?;
     let changes_data = request.changes.iter().any(|c| {
         matches!(c, Change::Data { .. })
             || matches!(c, Change::Edit { resource, .. } if resource.group.is_empty()

@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use zeabur_kube::k8s_openapi::api::apps::v1::ReplicaSet;
 use zeabur_kube::{Cluster, ClusterExt as _};
 use zeabur_model::WorkloadRef;
-use zeabur_plan::{Change, PlanRequest};
+use zeabur_plan::{Change, Fetched, PlanRequest};
 
 use crate::error::ApiError;
 
@@ -41,8 +41,9 @@ pub(super) async fn replica_sets_of_deleted(
     }
 }
 
-/// The reclaim policy of the PersistentVolume of each claim `request` deletes, as the person
-/// may read it [k8s-reclaim]; a volume they may not read is left out, and the plan says the
+/// The reclaim policy of the PersistentVolume of each claim `request` deletes, a deleted MongoDB's
+/// data claims included (`objects` holds the MongoDB as read), as the person may read it
+/// [k8s-reclaim]; a volume they may not read is left out, and the plan says the
 /// policy is unknown.
 ///
 /// [k8s-reclaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
@@ -50,13 +51,24 @@ pub(super) async fn reclaim_policies(
     cluster: &dyn Cluster,
     request: &PlanRequest,
     snapshot: &zeabur_graph::Snapshot,
+    objects: &[Fetched],
 ) -> Result<BTreeMap<String, String>, ApiError> {
     let volumes = zeabur_kube::ResourceRef::new("", "v1", "persistentvolumes", "PersistentVolume");
-    let mut out = BTreeMap::new();
+    let mut claims: Vec<String> = Vec::new();
     for (resource, name) in deleted(request) {
-        if !(resource.group.is_empty() && resource.resource == "persistentvolumeclaims") {
-            continue;
+        if resource.group.is_empty() && resource.resource == "persistentvolumeclaims" {
+            claims.push(name.to_owned());
+        } else if resource.group == "psmdb.percona.com"
+            && resource.resource == "perconaservermongodbs"
+            && let Some(found) = objects
+                .iter()
+                .find(|f| &f.resource == resource && f.name == name)
+        {
+            claims.extend(zeabur_plan::mongodb_data_claims(&found.object, snapshot));
         }
+    }
+    let mut out = BTreeMap::new();
+    for name in &claims {
         let Some(volume) = snapshot
             .persistent_volume_claim(name)
             .and_then(|c| c.spec.as_ref())

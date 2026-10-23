@@ -26,6 +26,11 @@
 //! - **A PersistentVolumeClaim** may take its data with it: its PersistentVolume's reclaim policy
 //!   decides, `Delete` (the volume goes) or `Retain` (it stays, released) [k8s-reclaim]. The plan
 //!   names the policy when the person could read the volume, and says it is unknown otherwise.
+//! - **A Percona MongoDB** (`PerconaServerMongoDB`) takes its data claims with it, as a
+//!   CloudNativePG cluster does through `ownerReferences`. The operator deletes them when the
+//!   object carries the finalizer `percona.com/delete-psmdb-pvc` [psmdb-finalizers], and the plan
+//!   lists them with what goes with it; without the finalizer the plan deletes each claim itself,
+//!   after the object. Backups in object storage stay.
 //! - **A ConfigMap, Secret or claim in use**: the plan names the workloads that still read or mount
 //!   it, whose new pods will not start without it; a claim a pod uses stays until no pod does
 //!   [k8s-in-use].
@@ -37,13 +42,14 @@
 //! [k8s-gc]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/
 //! [k8s-reclaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 //! [k8s-in-use]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#storage-object-in-use-protection
+//! [psmdb-finalizers]: https://docs.percona.com/percona-operator-for-mongodb/operator.html#metadata
 
 use std::collections::BTreeSet;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::Value;
 use zeabur_adapters::provenance::{Tool, detect_tool};
-use zeabur_graph::{pods_of, workloads};
+use zeabur_graph::{Snapshot, pods_of, workloads};
 use zeabur_model::{SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{ObjectName, PlannedObject, Target, Warning, Write};
@@ -62,6 +68,52 @@ fn refused(resource: &ResourceRef) -> Option<&'static str> {
         ("", "endpoints") | ("discovery.k8s.io", "endpointslices") => Some("controller_managed"),
         _ => None,
     }
+}
+
+/// The finalizer that has the Percona operator delete a MongoDB's claims with it.
+pub const MONGODB_CLAIMS_FINALIZER: &str = "percona.com/delete-psmdb-pvc";
+
+/// The data claims of `PerconaServerMongoDB` `cluster` in `snapshot`, by name.
+///
+/// They are `mongod-data-<cluster>-<replset>-<n>`, from its replica sets' StatefulSets
+/// (`-nv-<n>` and `-hidden-<n>` for non-voting and hidden members), and from its config servers
+/// (`cfg`) when sharded. A claim a controller owns is left out: it goes with its owner.
+#[must_use]
+pub fn mongodb_data_claims(cluster: &Value, snapshot: &Snapshot) -> Vec<String> {
+    let name = cluster
+        .pointer("/metadata/name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let mut replsets: Vec<&str> = cluster
+        .pointer("/spec/replsets")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|r| r.get("name").and_then(Value::as_str))
+        .collect();
+    if cluster.pointer("/spec/sharding/enabled") == Some(&Value::Bool(true)) {
+        replsets.push("cfg");
+    }
+    let ordinal = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let of_member = |rest: &str| {
+        ordinal(rest)
+            || ["nv-", "hidden-"]
+                .iter()
+                .any(|p| rest.strip_prefix(p).is_some_and(ordinal))
+    };
+    snapshot
+        .persistent_volume_claims
+        .iter()
+        .filter(|c| zeabur_adapters::controller_of(&c.metadata).is_none())
+        .filter_map(|c| c.metadata.name.clone())
+        .filter(|claim| {
+            replsets.iter().any(|rs| {
+                claim
+                    .strip_prefix(&format!("mongod-data-{name}-{rs}-"))
+                    .is_some_and(of_member)
+            })
+        })
+        .collect()
 }
 
 /// An object the plan read, as the dependents search sees it.
@@ -105,6 +157,13 @@ impl Planner<'_> {
             ));
         }
         let object = self.deletable_object(resource, name)?;
+        let data_claims = if resource.group == "psmdb.percona.com"
+            && resource.resource == "perconaservermongodbs"
+        {
+            mongodb_data_claims(&object, self.input.snapshot)
+        } else {
+            Vec::new()
+        };
         let meta: ObjectMeta = object
             .get("metadata")
             .cloned()
@@ -182,7 +241,23 @@ impl Planner<'_> {
             kind: kind.clone(),
             name: name.to_owned(),
         };
-        let dependents = self.dependents(&this, meta.uid.as_deref());
+        let mut dependents = self.dependents(&this, meta.uid.as_deref());
+        let operator_deletes_claims = meta
+            .finalizers
+            .iter()
+            .flatten()
+            .any(|f| f == MONGODB_CLAIMS_FINALIZER);
+        if operator_deletes_claims {
+            for claim in &data_claims {
+                let claim = ObjectName {
+                    kind: "PersistentVolumeClaim".to_owned(),
+                    name: claim.clone(),
+                };
+                if !dependents.contains(&claim) {
+                    dependents.push(claim);
+                }
+            }
+        }
         if !dependents.is_empty() {
             self.warnings.push(Warning::DeletesDependents {
                 target: this.clone(),
@@ -196,24 +271,12 @@ impl Planner<'_> {
             });
         }
         if kind == "PersistentVolumeClaim" {
-            let volume = self
-                .input
-                .snapshot
-                .persistent_volume_claim(name)
-                .and_then(|c| c.spec.as_ref())
-                .and_then(|s| s.volume_name.clone())
-                .or_else(|| {
-                    object_text(&self.objects, &this, "/spec/volumeName").map(str::to_owned)
-                });
-            let reclaim_policy = volume
-                .as_ref()
-                .and_then(|v| self.input.reclaim_policies.get(v))
-                .cloned();
-            self.warnings.push(Warning::ClaimDataMayBeLost {
-                claim: name.to_owned(),
-                volume,
-                reclaim_policy,
-            });
+            self.claim_data_warning(&this);
+        }
+        if !operator_deletes_claims {
+            for claim in &data_claims {
+                self.delete_data_claim(claim)?;
+            }
         }
         let users = self.users(&this);
         if !users.is_empty() {
@@ -223,6 +286,60 @@ impl Planner<'_> {
                 workloads: users,
             });
         }
+        Ok(())
+    }
+
+    fn claim_data_warning(&mut self, claim: &ObjectName) {
+        let volume = self
+            .input
+            .snapshot
+            .persistent_volume_claim(&claim.name)
+            .and_then(|c| c.spec.as_ref())
+            .and_then(|s| s.volume_name.clone())
+            .or_else(|| object_text(&self.objects, claim, "/spec/volumeName").map(str::to_owned));
+        let reclaim_policy = volume
+            .as_ref()
+            .and_then(|v| self.input.reclaim_policies.get(v))
+            .cloned();
+        self.warnings.push(Warning::ClaimDataMayBeLost {
+            claim: claim.name.clone(),
+            volume,
+            reclaim_policy,
+        });
+    }
+
+    /// Deletes claim `name` with the database whose data it holds; the database's pods are
+    /// going too, so the claim is not said to be still used.
+    fn delete_data_claim(&mut self, name: &str) -> Result<(), PlanError> {
+        let target = Target {
+            api_version: "v1".to_owned(),
+            kind: "PersistentVolumeClaim".to_owned(),
+            plural: "persistentvolumeclaims".to_owned(),
+            name: name.to_owned(),
+        };
+        if let Some(working) = self.objects.iter().find(|w| w.target == target) {
+            return if working.deleted {
+                Ok(())
+            } else {
+                Err(deleted_and_changed(&target.kind, name))
+            };
+        }
+        let Some(claim) = self.input.snapshot.persistent_volume_claim(name) else {
+            return Ok(());
+        };
+        let object = to_json(claim)?;
+        self.objects.push(Working {
+            target,
+            original: Some(object.clone()),
+            current: object,
+            operations: Vec::new(),
+            owners: Vec::new(),
+            deleted: true,
+        });
+        self.claim_data_warning(&ObjectName {
+            kind: "PersistentVolumeClaim".to_owned(),
+            name: name.to_owned(),
+        });
         Ok(())
     }
 
