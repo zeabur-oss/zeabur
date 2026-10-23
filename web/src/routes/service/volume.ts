@@ -1,5 +1,6 @@
-// What the new-volume form sends: the claim name and access mode only when the person changed
-// them, so the server's defaults (`<workload>-<volume>`, ReadWriteOnce) stay in one place.
+// What the new-volume form sends: the claim name, access mode and StorageClass only when the
+// person changed them, so the defaults (`<workload>-<volume>`, ReadWriteOnce, the cluster's
+// class) stay in one place.
 import type { Schemas } from "@/api/client"
 
 /** The access modes a new claim may ask for, the default first. */
@@ -24,6 +25,8 @@ export interface VolumeValues {
   /** `null` while the person has not typed one: the field shows the default. */
   claimName: string | null
   accessMode: Schemas["AccessMode"]
+  /** Absent for the cluster's default. */
+  storageClass?: string
 }
 
 /** The claim name the server picks when none is given. */
@@ -42,5 +45,6 @@ export function volumeRequest(workload: string, values: VolumeValues): Schemas["
         ? undefined
         : claimName,
     accessMode: values.accessMode === "ReadWriteOnce" ? undefined : values.accessMode,
+    ...(values.storageClass ? { storageClass: values.storageClass } : {}),
   }
 }

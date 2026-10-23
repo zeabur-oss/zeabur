@@ -197,6 +197,26 @@ commands in any pod on the node. Where the store is not set up, refuses, does no
 holds no series for a node or claim, the answer says which, and the interface says it in one
 line instead of a number; requests and requested sizes are still shown.
 
+## Storage classes
+
+`GET /api/v1/projects/{project}/storage` lists the cluster's StorageClasses and, for each of
+the project's PersistentVolumeClaims, its class and the node its PersistentVolume is kept on.
+Both are cluster-scoped and read as the person; the chart's member role grants `list` on
+StorageClasses and `get` on PersistentVolumes, and a refusal is named in `unreadable` instead of
+failing the answer.
+
+A class is shown by the kind of disk its provisioner gives:
+
+| Kind | Provisioners | What it means |
+|---|---|---|
+| local | `rancher.io/local-path`, `openebs.io/local`, `kubernetes.io/no-provisioner` | A directory or disk of one node; the PersistentVolume's node affinity pins its pods there |
+| replicated | `driver.longhorn.io` | Copies on several nodes; a volume follows its pod |
+| other | any other | Up to its driver |
+
+A new volume, or a database's storage, goes on the class chosen for it; the default sends no
+`storageClassName`, so the cluster's default applies. Growing a volume is offered only when its
+class has `allowVolumeExpansion`; the plan refuses it otherwise (`expansion_not_allowed`).
+
 ## Accounts
 
 Zeabur holds no credentials and reads none of the issuer's objects. The Account page shows what

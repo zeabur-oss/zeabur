@@ -7,6 +7,7 @@ import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { FormField } from "@/components/form-field"
 import { GateNote, GateTip, useGate } from "@/components/gate"
 import { LoadingRows } from "@/components/page"
+import { kindWord, useStorage } from "@/components/storage-class"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { YamlView } from "@/components/yaml-view"
@@ -23,6 +24,7 @@ import {
   type Database,
   type SizePreset,
 } from "@/model/databases"
+import { classNamed } from "@/model/storage"
 import type { ServiceMode } from "@/routes/search"
 import { ModeSwitch } from "@/routes/service/views"
 import { Button } from "@zeabur/design-system/components/button"
@@ -104,6 +106,9 @@ function Shape({ project, database }: { project: string; database: Database }) {
     ? memberChoices[database.engine]
     : [...memberChoices[database.engine], database.members].sort((a, b) => a - b)
   const disabled = !gate.open
+  const storageClass = classNamed(useStorage(project), database.storageClass)
+  const growable = useStorage(project)?.classes.some((c) => c.allowExpansion) ?? false
+  const fixed = storageClass?.allowExpansion === false
   const review = () => {
     setTried(true)
     if (problem) return
@@ -171,10 +176,25 @@ function Shape({ project, database }: { project: string; database: Database }) {
           </FormField>
         </div>
       </Part>
-      <Part id="storage" title={t("part.storage")} description={t("db.storageHint")}>
+      <Part
+        id="storage"
+        title={t("part.storage")}
+        description={
+          storageClass === undefined
+            ? t("storage.growUnknown")
+            : fixed
+              ? t("storage.fixed", storageClass.name, growable)
+              : t("storage.grows")
+        }
+      >
         <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2">
           <FormField
             label={t("db.field.storage")}
+            hint={
+              storageClass
+                ? t("storage.option", kindWord(t, storageClass), storageClass.name, false)
+                : undefined
+            }
             errors={
               tried && problem
                 ? [
@@ -189,7 +209,7 @@ function Shape({ project, database }: { project: string; database: Database }) {
               size="sm"
               mono
               value={storage}
-              disabled={disabled}
+              disabled={disabled || fixed}
               autoComplete="off"
               spellCheck={false}
               onChange={(event) => setStorage(event.target.value)}

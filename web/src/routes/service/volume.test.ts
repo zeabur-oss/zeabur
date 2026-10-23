@@ -36,6 +36,11 @@ describe("the new-volume form", () => {
     expect(request.accessMode).toBe("ReadWriteMany")
   })
 
+  test("sends a StorageClass only when one other than the default is chosen", () => {
+    expect(volumeRequest("web", values({ storageClass: "longhorn" })).storageClass).toBe("longhorn")
+    expect("storageClass" in volumeRequest("web", values())).toBe(false)
+  })
+
   test("does not send a claim name typed back to the default", () => {
     expect(volumeRequest("web", values({ claimName: "web-uploads" })).claimName).toBe(undefined)
   })

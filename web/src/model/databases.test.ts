@@ -129,6 +129,23 @@ describe("a new database", () => {
     } as never)
   })
 
+  test("a chosen storage class goes where each operator reads it", () => {
+    const pg = createDatabase({ ...newDatabase("postgresql", 1), storageClass: "longhorn" })[0]
+    expect((pg as never as { object: { spec: { storage: unknown } } }).object.spec.storage).toEqual(
+      { size: "5Gi", storageClass: "longhorn" },
+    )
+    const mongo = createDatabase({ ...newDatabase("mongodb", 3), storageClass: "local-path" })[0]
+    const replset = (
+      mongo as never as { object: { spec: { replsets: [Record<string, unknown>] } } }
+    ).object.spec.replsets[0]
+    expect(replset.volumeSpec).toEqual({
+      persistentVolumeClaim: {
+        storageClassName: "local-path",
+        resources: { requests: { storage: "10Gi" } },
+      },
+    })
+  })
+
   test("a MongoDB replica set under three members says so, and is never sharded", () => {
     const one = createDatabase(newDatabase("mongodb", 1))[0] as never as { object: { spec: never } }
     const spec = one.object.spec as Record<string, unknown>
