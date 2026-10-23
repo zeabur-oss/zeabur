@@ -5,12 +5,13 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import PlusIcon from "~icons/ph/plus"
 import WarningFillIcon from "~icons/ph/warning-fill"
 
-import { isStatus } from "@/api/client"
-import { joinQuery, nodesQuery, queryClient } from "@/api/queries"
+import { isStatus, toProblem } from "@/api/client"
+import { joinQuery, nodesQuery, queryClient, sessionQuery } from "@/api/queries"
 import { Ago, Segmented } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { GateTip, useClusterGate } from "@/components/gate"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { offersElevation, Refused } from "@/components/refused"
 import { usePlanner, usePlanStep } from "@/components/plan/planner"
 import { StatusDot } from "@/components/status"
 import { YamlBlock } from "@/components/yaml"
@@ -337,7 +338,7 @@ function Ready({
       </Alert>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t pt-4" aria-live="polite">
         {nodes.isError && isStatus(nodes.error, 403) ? (
-          <span className="text-muted-foreground">{t("join.cannotWatch")}</span>
+          <CannotWatch error={nodes.error} />
         ) : node ? (
           <>
             <span className="flex items-center gap-2">
@@ -387,6 +388,20 @@ function Ready({
       {planner.dialog}
     </div>
   )
+}
+
+/** Admin rights that lapse while the drawer waits stop the watch; they can be taken again here. */
+function CannotWatch({ error }: { error: unknown }) {
+  const t = useT()
+  const session = useQuery(sessionQuery).data
+  const refusal = toProblem(error)
+  if (offersElevation(refusal, session?.elevation))
+    return (
+      <div className="w-full">
+        <Refused refusal={refusal} what={t("refused.see", t("cluster.whatNodes"))} line />
+      </div>
+    )
+  return <span className="text-muted-foreground">{t("join.cannotWatch")}</span>
 }
 
 /** What plan says when the VM cannot reach the server, as plan says it. */
