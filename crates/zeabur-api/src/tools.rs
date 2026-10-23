@@ -58,7 +58,7 @@ use zeabur_kube::{Cluster, ExecRequest, ExitStatus, WriteRequest};
 use zeabur_plan::terminal::{self as plans, TOOLS_CONTAINER, TOOLS_PROJECT_ANNOTATION};
 
 use crate::access::{Elevation, Handoff};
-use crate::error::{ApiError, offer_elevation, read_problem};
+use crate::error::{ApiError, offer_elevation, read_problem, review_refusal};
 use crate::handlers::{AppState, Person};
 use crate::pods::exec::{self, ServerFrame, Terminal};
 use crate::projects::writes::terminal::{list_pods, read_pod};
@@ -500,13 +500,13 @@ async fn open(
     let cluster = terminal.cluster.as_ref();
     let (pod, person) = own_pod(cluster, namespace, name).await?;
     exec::pick_container(&pod, name, Some(TOOLS_CONTAINER.to_owned()))?;
-    let exec_right = || Denied {
-        verb: "get".to_owned(),
-        group: String::new(),
-        resource: "pods/exec".to_owned(),
-        name: Some(name.to_owned()),
-        namespace: Some(namespace.to_owned()),
-    };
+    let exec_right = || exec::exec_right(namespace, name);
+    if matches!(cluster.review_access(&exec_right()).await, Ok(false)) {
+        return Err(review_refusal(
+            &format!("a terminal in tools pod {name}"),
+            exec_right(),
+        ));
+    }
     let mut input = kubeconfig(handoff, &person, project);
     let args = [
         handoff.expires_at.as_second().to_string(),

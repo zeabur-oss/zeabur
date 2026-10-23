@@ -3,8 +3,10 @@
 //! `GET /api/v1/projects/{project}/pods/{pod}/exec?container=…&command=…` upgrades to a
 //! WebSocket [rfc6455] and runs the command in the container through `pods/exec` with the
 //! person's credential, with standard input and a TTY, as `kubectl exec -it` does
-//! [k8s-exec]. Opening it takes `get` on `pods/exec` (the WebSocket handshake is a GET
-//! [k8s-verbs]; `kubectl exec` over SPDY takes `create`). Like every request, the terminal goes
+//! [k8s-exec]. Opening it takes `create` on `pods/exec`, which Zeabur asks kube-apiserver about
+//! first (a `SelfSubjectAccessReview`): the WebSocket handshake is a GET, which RBAC checks as
+//! `get` [k8s-verbs], and only from Kubernetes 1.31 does kube-apiserver also require `create`, as
+//! it always has for `kubectl exec` over SPDY [kep-4006]. Like every request, the terminal goes
 //! with the admin credential while the person holds one
 //! ([`ClusterAccess::for_request`](crate::access::ClusterAccess::for_request)); where admin rights
 //! are offered and not in use, the cluster's refusal arrives as an `error` frame with an
@@ -70,6 +72,7 @@
 //! [rfc6455]: https://www.rfc-editor.org/rfc/rfc6455
 //! [k8s-exec]: https://kubernetes.io/docs/tasks/debug/debug-application/get-shell-running-container/
 //! [k8s-verbs]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb
+//! [kep-4006]: https://github.com/kubernetes/enhancements/tree/master/keps/sig-api-machinery/4006-transition-spdy-to-websockets
 //! [distroless]: https://github.com/GoogleContainerTools/distroless
 //! [kubelet]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
 //! [fetch-metadata]: https://www.w3.org/TR/fetch-metadata/
@@ -100,7 +103,7 @@ use zeabur_kube::{
 };
 
 use crate::access::Elevation;
-use crate::error::{ApiError, get_read, offer_elevation, read_problem};
+use crate::error::{ApiError, get_read, offer_elevation, read_problem, review_refusal};
 use crate::handlers::AppState;
 
 /// How long a terminal may stay without a byte either way before the server closes it.
@@ -301,7 +304,7 @@ where
 ///
 /// Binary messages carry terminal bytes both ways; text messages are JSON control frames,
 /// `ClientFrame` to the server and `ServerFrame` to the browser. The handshake answers `101
-/// Switching Protocols`; every later failure (`403` with `denied` naming `get` on
+/// Switching Protocols`; every later failure (`403` with `denied` naming `create` on
 /// `pods/exec`, `elevation-required` where admin rights are offered and not in use; a pod or
 /// container that does not exist, a container that is not running) arrives as an `error` frame,
 /// which a browser can read where it cannot read a refused handshake. After `exit` or `error` the
@@ -368,36 +371,46 @@ async fn open(
         .map_err(|e| read_problem(e, &what, get_read("", "pods", Some(project), pod)))?
         .ok_or_else(|| Problem::new(Kind::NotFound, format!("There is no pod named {pod}.")))?;
     let container = pick_container(&object.data, pod, query.container)?;
+    let right = exec_right(project, pod);
+    if matches!(cluster.review_access(&right).await, Ok(false)) {
+        return Err(exec_refusal(review_refusal(
+            &format!("a terminal in pod {pod}"),
+            right,
+        )));
+    }
     let request = ExecRequest {
         container: container.clone(),
         command: query.command,
     };
-    let session = cluster.exec(project, pod, &request).await.map_err(|e| {
-        let mut refusal = read_problem(
-            e,
-            &format!("a terminal in pod {pod}"),
-            // The upgrade to kube-apiserver is a WebSocket handshake, a GET, so RBAC refuses `get`
-            // on `pods/exec` [k8s-verbs].
-            Denied {
-                verb: "get".to_owned(),
-                group: String::new(),
-                resource: "pods/exec".to_owned(),
-                name: Some(pod.to_owned()),
-                namespace: Some(project.to_owned()),
-            },
-        );
-        // R8: the one right a terminal needs, which an administrator can grant in this project
-        // alone; the web interface shows the Role and RoleBinding.
-        if refusal.0.kind == Kind::Forbidden {
-            refusal.0.fix_for_occasion(
-                "Ask a cluster administrator for `get` and `create` on `pods/exec` in this \
-                 project; it grants only that, in this project only.",
-                zeabur_core::message::Message::new("problem.forbidden.fix.sendGrant"),
-            );
-        }
-        refusal
-    })?;
+    let session = cluster
+        .exec(project, pod, &request)
+        .await
+        .map_err(|e| exec_refusal(read_problem(e, &format!("a terminal in pod {pod}"), right)))?;
     Ok((container, session))
+}
+
+/// `create` on `pods/exec`, which a terminal takes.
+pub(crate) fn exec_right(namespace: &str, pod: &str) -> Denied {
+    Denied {
+        verb: "create".to_owned(),
+        group: String::new(),
+        resource: "pods/exec".to_owned(),
+        name: Some(pod.to_owned()),
+        namespace: Some(namespace.to_owned()),
+    }
+}
+
+/// R8: the one right a terminal needs, which an administrator can grant in this project alone;
+/// the web interface shows the Role and RoleBinding.
+fn exec_refusal(mut refusal: ApiError) -> ApiError {
+    if refusal.0.kind == Kind::Forbidden {
+        refusal.0.fix_for_occasion(
+            "Ask a cluster administrator for `get` and `create` on `pods/exec` in this \
+             project; it grants only that, in this project only.",
+            zeabur_core::message::Message::new("problem.forbidden.fix.sendGrant"),
+        );
+    }
+    refusal
 }
 
 fn names<'a>(pod: &'a Value, path: &str) -> Vec<&'a str> {

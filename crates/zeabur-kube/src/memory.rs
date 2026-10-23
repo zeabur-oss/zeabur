@@ -140,6 +140,10 @@ pub struct State {
     /// Every cluster-wide `SelfSubjectAccessReview` (one without a namespace) answers no, and
     /// creating a Namespace is refused.
     pub cluster_wide_denied: bool,
+    /// Rights every `SelfSubjectAccessReview` answers no to, as `verb resource` (`create
+    /// pods/exec`); the calls themselves are not refused, as on a cluster that checks fewer
+    /// verbs.
+    pub refused_rights: BTreeSet<String>,
 }
 
 /// A command [`Cluster::run`] ran.
@@ -1231,8 +1235,9 @@ impl Cluster for MemoryCluster {
     // ── Reads for releases, storage and YAML edits ───────────────────────────────────────────
 
     /// Allowed unless every call is refused, the namespace is, the request is cluster-wide and
-    /// [`State::cluster_wide_denied`], or it names an object whose writes are refused
-    /// ([`State::forbidden_writes`]); admission refusals are allowed, as on a cluster.
+    /// [`State::cluster_wide_denied`], it is among [`State::refused_rights`], or it names an
+    /// object whose writes are refused ([`State::forbidden_writes`]); admission refusals are
+    /// allowed, as on a cluster.
     fn review_access<'a>(&'a self, request: &'a Denied) -> Answer<'a, bool> {
         Box::pin(async move {
             let state = self.lock()?;
@@ -1243,7 +1248,11 @@ impl Cluster for MemoryCluster {
                         .is_some_and(|(_, refused)| refused == name)
                 })
             });
+            let refused_right = state
+                .refused_rights
+                .contains(&format!("{} {}", request.verb, request.resource));
             Ok(!(state.forbid_everything
+                || refused_right
                 || (namespace.is_none() && state.cluster_wide_denied)
                 || namespace.is_some_and(|n| state.forbidden_namespaces.contains(n))
                 || refused_object))

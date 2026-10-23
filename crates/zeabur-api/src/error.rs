@@ -2,7 +2,8 @@
 //!
 //! **Refusals offer elevation.** Where elevation is offered and not in use
 //! ([`Elevation::Available`]), every refusal from kube-apiserver (a `403` that carries its
-//! answer in `kubernetes`) leaves as `elevation-required`: the same status, `denied` and
+//! answer in `kubernetes`, or the request a `SelfSubjectAccessReview` refused in `denied`) leaves
+//! as `elevation-required`: the same status, `denied` and
 //! `kubernetes`, so the interface can offer "Retry as admin" next to any of them. This happens
 //! once, in [`offer_elevation_on_refusal`] around every route, and for the terminal, whose
 //! refusal travels in a frame after the upgrade, in [`offer_elevation`] itself. Zeabur's own
@@ -53,9 +54,10 @@ impl IntoResponse for ApiError {
     }
 }
 
-/// Whether kube-apiserver refused the request: a `forbidden` that carries its answer.
+/// Whether kube-apiserver refused the request: a `forbidden` that carries its answer, or the
+/// request it said no to in a `SelfSubjectAccessReview` ([`review_refusal`]).
 fn is_cluster_refusal(problem: &Problem) -> bool {
-    problem.kind == Kind::Forbidden && problem.kubernetes.is_some()
+    problem.kind == Kind::Forbidden && (problem.kubernetes.is_some() || problem.denied.is_some())
 }
 
 /// A refusal from kube-apiserver, kept on its response for [`offer_elevation_on_refusal`].
@@ -111,6 +113,17 @@ pub(crate) fn read_problem(error: ClusterError, what: &str, read: Denied) -> Api
     if problem.kind == Kind::Forbidden {
         problem.deny(read);
     }
+    ApiError::from(problem)
+}
+
+/// `denied`, which a `SelfSubjectAccessReview` answered no to before Zeabur sent it, about
+/// `what`.
+pub(crate) fn review_refusal(what: &str, denied: Denied) -> ApiError {
+    let mut problem = Problem::new(
+        Kind::Forbidden,
+        format!("The cluster does not let you open {what}."),
+    );
+    problem.deny(denied);
     ApiError::from(problem)
 }
 

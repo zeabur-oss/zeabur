@@ -835,7 +835,7 @@ export interface paths {
      * A terminal in a container, over a WebSocket.
      * @description Binary messages carry terminal bytes both ways; text messages are JSON control frames,
      *     `ClientFrame` to the server and `ServerFrame` to the browser. The handshake answers `101
-     *     Switching Protocols`; every later failure (`403` with `denied` naming `get` on
+     *     Switching Protocols`; every later failure (`403` with `denied` naming `create` on
      *     `pods/exec`, `elevation-required` where admin rights are offered and not in use; a pod or
      *     container that does not exist, a container that is not running) arrives as an `error` frame,
      *     which a browser can read where it cannot read a refused handshake. After `exit` or `error` the
