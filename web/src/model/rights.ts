@@ -9,6 +9,7 @@ type PageRight =
   | "changeClusterNotifications"
   | "testClusterNotifications"
   | "changeIssuers"
+  | "changeS3Destinations"
 export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
 type Permission = Schemas["Permission"]
 
@@ -49,6 +50,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
     rule: "create vmalertmanagerconfigs.operator.victoriametrics.com",
   },
   testClusterNotifications: { role: "admin", rule: "create jobs.batch" },
+  changeS3Destinations: { role: "admin", rule: "create secrets -n zeabur-s3-destinations" },
 }
 
 export const neededRole = (right: Right): NeededRole => rules[right].role
@@ -119,6 +121,7 @@ const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
   testNotifications: true,
   changeClusterNotifications: true,
   testClusterNotifications: true,
+  changeS3Destinations: true,
 }
 
 const workloads = ["deployments", "statefulsets", "daemonsets"]

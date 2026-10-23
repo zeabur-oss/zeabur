@@ -1,6 +1,7 @@
 // The cluster's Velero backups as the Backups tab tells them: one verdict first, then where
 // backups go, when they run, and how each went.
 import type { Schemas } from "@/api/client"
+import { type Destination, joinFolder } from "@/model/s3-destinations"
 import type { Health } from "@/model/service"
 
 type Data = Schemas["ClusterBackups"]
@@ -90,7 +91,23 @@ export interface LocationForm {
   endpoint: string
   accessKeyId: string
   secretAccessKey: string
+  /** The S3 destination whose keys the plan copies; typed keys when absent. */
+  destination?: string
 }
+
+/** The fields `destination` fills, in a folder of its own; manual entry when absent. */
+export const pickLocation = (destination?: Destination): Partial<LocationForm> =>
+  destination
+    ? {
+        destination: destination.name,
+        endpoint: destination.endpoint,
+        bucket: destination.bucket,
+        region: destination.region,
+        prefix: joinFolder(destination.prefix, "velero"),
+        accessKeyId: "",
+        secretAccessKey: "",
+      }
+    : { destination: undefined }
 
 export function locationForm(location: Location | undefined): LocationForm {
   return {
@@ -112,11 +129,15 @@ export function locationProblems(form: LocationForm, editing: boolean): Location
   const endpoint = form.endpoint.trim()
   if (endpoint && !/^https?:\/\/[^\s/]+\S*$/.test(endpoint)) problems.push("endpoint")
   if (form.prefix.includes("..") || /\s/.test(form.prefix)) problems.push("prefix")
+  if (form.destination === undefined) problems.push(...keyProblems(form, editing))
+  return problems
+}
+
+function keyProblems(form: LocationForm, editing: boolean): LocationProblem[] {
   const id = form.accessKeyId.trim()
   const secret = form.secretAccessKey.trim()
-  if (!editing && (!id || !secret)) problems.push("keys")
-  else if (editing && Boolean(id) !== Boolean(secret)) problems.push("bothKeys")
-  return problems
+  if (!editing && (!id || !secret)) return ["keys"]
+  return editing && Boolean(id) !== Boolean(secret) ? ["bothKeys"] : []
 }
 
 export function locationRequest(form: LocationForm): Schemas["BackupsPlanRequest"] {
@@ -128,6 +149,7 @@ export function locationRequest(form: LocationForm): Schemas["BackupsPlanRequest
     endpoint: form.endpoint.trim().replace(/\/+$/, ""),
     accessKeyId: form.accessKeyId.trim(),
     secretAccessKey: form.secretAccessKey.trim(),
+    destination: form.destination,
   }
 }
 

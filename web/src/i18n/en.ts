@@ -1770,6 +1770,8 @@ export const en = {
   "confirm.maintenance": (host: string) =>
     `Show the maintenance page on ${host}. The service keeps running.`,
   "confirm.maintenanceOff": (host: string) => `Send visitors of ${host} to the service again.`,
+  "confirm.copyS3Keys": (name: string, destination: string) =>
+    `Copy the keys of ${destination} into Secret ${name}.`,
   "confirm.deployKey": (name: string) => `Create Secret ${name} with the new deploy key.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
@@ -2781,6 +2783,20 @@ export const en = {
   "db.backup.setUp": "Set up backups",
   "db.backup.setUpBody":
     "Backups go to an S3-compatible bucket you provide. The keys are kept as a Secret in this project.",
+  "s3d.title": "S3 destinations",
+  "s3d.body":
+    "Backup forms offer these. Choosing one copies its keys into the project; later changes here do not reach the copies.",
+  "s3d.add": "Add destination",
+  "s3d.plan.save": (name: string) => `Save S3 destination ${name}`,
+  "s3d.plan.remove": (name: string) => `Remove S3 destination ${name}`,
+  "s3d.problem.taken": "This name is taken.",
+  "s3d.pick": "S3 destination",
+  "s3d.manual": "Enter manually",
+  "s3d.copied": (name: string) =>
+    `The plan copies the keys of ${name} here. Later changes to them do not reach this copy.`,
+  "s3d.denied": (namespace: string) =>
+    `You may not read the keys (Secrets in ${namespace}). Enter them yourself.`,
+  "s3d.from": (name: string) => `Keys copied from ${name}`,
   "db.backup.endpoint": "Endpoint",
   "db.backup.bucket": "Bucket",
   "db.backup.path": "Folder",

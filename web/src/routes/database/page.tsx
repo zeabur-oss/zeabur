@@ -18,6 +18,7 @@ import { databasesQuery, projectQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { ConnectServices } from "@/components/connect"
 import { CopyText } from "@/components/copy-text"
+import { useBackups } from "@/components/backups"
 import { DatabaseState } from "@/components/databases"
 import {
   CardRow,
@@ -50,6 +51,7 @@ import {
   enableBackups,
   engineName,
   eventsOf,
+  backupNames,
   exportTool,
   exportUrl,
   fixedFolder,
@@ -579,7 +581,7 @@ function Backups({
         </Alert>
       ) : null}
       {on && store ? (
-        <Target database={database} />
+        <Target project={project} database={database} />
       ) : pluginMissing ? null : (
         <>
           {store ? (
@@ -619,7 +621,7 @@ function daysOf(duration: string) {
   return hours % 24 === 0 ? hours / 24 : undefined
 }
 
-function Target({ database }: { database: Database }) {
+function Target({ project, database }: { project: string; database: Database }) {
   const t = useT()
   const retention = useRetention(database)
   const store = database.backups.store
@@ -657,10 +659,20 @@ function Target({ database }: { database: Database }) {
           )}
         </CardRow>
         <CardRow label={t("db.backup.retention")}>{retention}</CardRow>
+        <KeysFrom project={project} secret={store.secret ?? backupNames(database.name).secret} />
       </CardRows>
       {note ? <p className="type-meta text-muted-foreground">{t(note)}</p> : null}
     </Section>
   )
+}
+
+/** The S3 destination the keys were copied from, when they were. */
+function KeysFrom({ project, secret }: { project: string; secret: string }) {
+  const t = useT()
+  const from = useBackups(project).data?.keysFrom[secret]
+  return from ? (
+    <CardRow label={t("clusterBackups.kube.keys")}>{t("s3d.from", from)}</CardRow>
+  ) : null
 }
 
 function Runs({ database }: { database: Database }) {

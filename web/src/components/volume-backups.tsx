@@ -144,6 +144,7 @@ function ClaimRow({
   const t = useT()
   const claim = coverage.target.name
   const schedule = scheduleOf(data, claim)
+  const from = data.keysFrom[`${claim}-backup`]
   const keeps = Object.entries(schedule?.retention ?? {})
     .filter(([, n]) => n > 0)
     .map(([period, n]) => t(`backups.volume.keep.${period}` as "backups.volume.keep.last", n))
@@ -155,6 +156,7 @@ function ClaimRow({
         : ""}
       {t("common.sep")}
       {schedule.provider}
+      {from ? `${t("common.sep")}${t("s3d.from", from)}` : ""}
     </>
   ) : undefined
   const action = schedule ? (

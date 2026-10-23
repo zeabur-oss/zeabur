@@ -21,6 +21,7 @@ import { GateTip, useHintGate } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
+import { DestinationPicker } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
 import { StatusDot, StatusPill } from "@/components/status"
 import { useI18n, useT } from "@/i18n"
@@ -33,6 +34,7 @@ import {
   lastGood,
   locationForm,
   locationProblems,
+  pickLocation,
   locationRequest,
   mainLocation,
   mainSchedule,
@@ -51,6 +53,7 @@ import {
 import type { Gate } from "@/model/rights"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, type Role } from "@/routes/cluster/forbidden"
+import { S3DestinationsSection } from "@/routes/cluster/s3-destinations"
 import { Section } from "@/routes/cluster/section"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
@@ -109,6 +112,7 @@ export function BackupsPage() {
       ) : data ? (
         <Installed data={data} />
       ) : null}
+      <S3DestinationsSection />
     </ClusterFrame>
   )
 }
@@ -332,6 +336,7 @@ function LocationSection({
                 </span>
               ) : null}
             </Row>
+            <KeysFrom name={data.keysFrom} />
           </Rows>
           {location.phase === "unavailable" && location.message ? (
             <p className="type-meta break-words text-muted-foreground">{location.message}</p>
@@ -355,6 +360,16 @@ function LocationSection({
   )
 }
 
+function KeysFrom({ name }: { name?: string | null }) {
+  const t = useT()
+  if (!name) return null
+  return (
+    <Row label={t("clusterBackups.kube.keys")}>
+      <span className="type-meta text-muted-foreground">{t("s3d.from", name)}</span>
+    </Row>
+  )
+}
+
 function InsideWarning() {
   const t = useT()
   return (
@@ -366,6 +381,36 @@ function InsideWarning() {
 }
 
 const formBox = "flex flex-col gap-4 rounded-xl border border-main bg-card p-5"
+
+function LocationKeys({
+  form,
+  set,
+  hint,
+  errors,
+}: {
+  form: LocationForm
+  set: (patch: Partial<LocationForm>) => void
+  hint?: string
+  errors: string[]
+}) {
+  const t = useT()
+  const key = (field: "accessKeyId" | "secretAccessKey") => ({
+    size: "sm" as const,
+    mono: true,
+    value: form[field],
+    onChange: (event: { target: { value: string } }) => set({ [field]: event.target.value }),
+  })
+  return (
+    <>
+      <FormField label={t("clusterBackups.accessKey")} hint={hint} errors={errors}>
+        <Input {...key("accessKeyId")} autoComplete="off" spellCheck={false} />
+      </FormField>
+      <FormField label={t("clusterBackups.secretKey")}>
+        <Input {...key("secretAccessKey")} type="password" autoComplete="new-password" />
+      </FormField>
+    </>
+  )
+}
 
 function LocationEditor({
   editing,
@@ -406,6 +451,7 @@ function LocationEditor({
       }}
     >
       <p className="type-meta text-muted-foreground">{t("clusterBackups.outside")}</p>
+      <DestinationPicker value={form.destination} onPick={(d) => set(pickLocation(d))} />
       <FormField
         label={t("clusterBackups.endpoint")}
         hint={t("clusterBackups.endpointHint")}
@@ -425,23 +471,14 @@ function LocationEditor({
         >
           <Input {...text("prefix", "zeabur")} />
         </FormField>
-        <FormField
-          label={t("clusterBackups.accessKey")}
-          hint={editing ? t("clusterBackups.keepKeys") : undefined}
-          errors={[...error("keys"), ...error("bothKeys")]}
-        >
-          <Input {...text("accessKeyId")} />
-        </FormField>
-        <FormField label={t("clusterBackups.secretKey")}>
-          <Input
-            size="sm"
-            mono
-            type="password"
-            value={form.secretAccessKey}
-            autoComplete="new-password"
-            onChange={(event) => set({ secretAccessKey: event.target.value })}
+        {form.destination === undefined ? (
+          <LocationKeys
+            form={form}
+            set={set}
+            hint={editing ? t("clusterBackups.keepKeys") : undefined}
+            errors={[...error("keys"), ...error("bothKeys")]}
           />
-        </FormField>
+        ) : null}
         <FormField label={t("clusterBackups.region")} hint={t("clusterBackups.regionHint")}>
           <Input {...text("region", "us-east-1")} />
         </FormField>

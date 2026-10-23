@@ -224,7 +224,10 @@ type ServiceChange =
   | Extract<Change, { op: "envImport" | "publicPort" | "buildOptions" | "labelVolume" }>
   | PagesChange
 
-type PagesChange = Extract<Change, { op: "errorPageHtml" | "errorPages" | "maintenance" }>
+type PagesChange = Extract<
+  Change,
+  { op: "errorPageHtml" | "errorPages" | "maintenance" | "copyS3Keys" }
+>
 
 function accessSentence(t: Translate, change: AccessChange | ServiceChange): string {
   switch (change.op) {
@@ -280,6 +283,8 @@ function pagesSentence(t: Translate, change: PagesChange): string {
       return change.enabled
         ? t("confirm.maintenance", change.hostname)
         : t("confirm.maintenanceOff", change.hostname)
+    case "copyS3Keys":
+      return t("confirm.copyS3Keys", secretName(change.object), change.destination)
   }
 }
 
@@ -712,9 +717,18 @@ export function undoTitle(t: Translate, undo: readonly Change[], asked: readonly
 
 const storageOps = new Set<Change["op"]>(["addVolume", "expandVolume", "editMount", "removeVolume"])
 
+// A deploy key and copied S3 keys open into the create of a Secret: a form that sends one still
+// creates.
+const opOf = (change: Change): Change["op"] =>
+  change.op === "deployKey" || change.op === "copyS3Keys" ? "create" : change.op
+
+const secretName = (object: unknown): string => {
+  const meta = (object as { metadata?: { name?: unknown } }).metadata
+  return typeof meta?.name === "string" ? meta.name : ""
+}
+
 export function actionOf(t: Translate, ask: Asked): string {
-  // A deploy key opens into the create of its Secret: a form that sends one still creates.
-  const ops = new Set(ask.changes.map((c) => (c.op === "deployKey" ? "create" : c.op)))
+  const ops = new Set(ask.changes.map(opOf))
   const [change] = ask.changes
   if (!change) return t("plan.apply")
   if (writtenCreates(ask.changes))
@@ -835,6 +849,8 @@ function pagesAction(t: Translate, change: PagesChange): string {
       return change.enabled ? t("action.showErrorPages") : t("action.hideErrorPages")
     case "maintenance":
       return change.enabled ? t("action.startMaintenance") : t("action.endMaintenance")
+    case "copyS3Keys":
+      return t("action.create")
   }
 }
 

@@ -19,6 +19,22 @@ const target = {
 }
 
 describe("volume backups", () => {
+  test("keys from an S3 destination are copied by the plan", () => {
+    const [secret] = scheduleVolumeBackups(
+      "shop",
+      "uploads",
+      { ...target, destination: "r2" },
+      { root: true },
+      () => "pw",
+    )
+    expect(secret).toMatchObject({
+      op: "copyS3Keys",
+      destination: "r2",
+      accessKeyId: "AWS_ACCESS_KEY_ID",
+      object: { metadata: { name: "uploads-backup" }, stringData: { RESTIC_PASSWORD: "pw" } },
+    })
+  })
+
   test("a schedule backs up the labelled claim alone, to its own folder, and prunes by the retention", () => {
     const changes = scheduleVolumeBackups("shop", "uploads", target, { root: true }, () => "pw")
     expect(changes[0]).toMatchObject({

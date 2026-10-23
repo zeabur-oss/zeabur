@@ -634,6 +634,63 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/s3-destinations": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The destinations, without their keys, and what the person may do with them. Readable by
+     *     everyone signed in where Zeabur's chart is installed.
+     */
+    get: operations["getS3Destinations"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/s3-destinations/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Carries out a destinations plan by its token: checks it, dry-runs every write, then writes. */
+    post: operations["applyS3Destinations"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/s3-destinations/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out what saving or removing a destination writes, and a token to apply it; writes
+     *     nothing. The keys never appear in the answer.
+     */
+    post: operations["planS3Destinations"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/tools": {
     parameters: {
       query?: never
@@ -2398,6 +2455,11 @@ export interface components {
           accessKeyId?: string
           /** @description The bucket. */
           bucket: string
+          /**
+           * @description An S3 destination of the cluster's list to copy the keys from, instead of the keys
+           *     given.
+           */
+          destination?: string | null
           /** @description The S3-compatible endpoint, `https://…`; empty for AWS S3. */
           endpoint?: string
           /** @enum {string} */
@@ -2851,6 +2913,10 @@ export interface components {
           /** @enum {string} */
           op: "deployKey"
         }
+      | (components["schemas"]["CopyS3KeysChange"] & {
+          /** @enum {string} */
+          op: "copyS3Keys"
+        })
       | {
           /** @description Its name. */
           name: string
@@ -3019,6 +3085,8 @@ export interface components {
       backups: components["schemas"]["VeleroBackup"][]
       /** @description Whether the person may create schedules in Velero's namespace. */
       canChange: components["schemas"]["Permission"]
+      /** @description The S3 destination the main location's keys were copied from. */
+      keysFrom?: string | null
       /** @description Where backups go. */
       locations: components["schemas"]["VeleroLocation"][]
       /** @description Velero's namespace. */
@@ -3448,6 +3516,17 @@ export interface components {
       unset: string[]
       /** @description The image of the init containers that wait for a dependency (`depends_on`). */
       waitImage: string
+    }
+    /** @description The Secret of a [`Change::CopyS3Keys`]. */
+    CopyS3KeysChange: {
+      /** @description The key the access key ID goes under. */
+      accessKeyId: string
+      /** @description The destination's name. */
+      destination: string
+      /** @description The Secret to create, as for `create`; `stringData` holds its other keys. */
+      object: Record<string, never>
+      /** @description The key the secret access key goes under. */
+      secretAccessKey: string
     }
     /**
      * @description The operator-managed counterpart of a database or object-storage image.
@@ -6645,6 +6724,13 @@ export interface components {
     ProjectBackups: {
       /** @description One row per claim, then per database, then the namespace. */
       coverage: components["schemas"]["BackupCoverage"][]
+      /**
+       * @description The S3 destination each Secret's keys were copied from, by the Secret's name; empty
+       *     where the person may not list Secrets.
+       */
+      keysFrom: {
+        [key: string]: string
+      }
       /** @description The providers this build has. */
       providers: components["schemas"]["BackupProvider"][]
       /** @description The newest runs, newest first, ten at most. */
@@ -7401,6 +7487,100 @@ export interface components {
       /** @description What could not be read. */
       unreadable: components["schemas"]["UnreadableView"][]
     }
+    /** @description One S3 destination, without its keys. */
+    S3Destination: {
+      /** @description The bucket. */
+      bucket: string
+      /** @description The S3-compatible endpoint, `https://…`. */
+      endpoint: string
+      /** @description Its name. */
+      name: string
+      /** @description The ConfigMap. */
+      origin: components["schemas"]["Origin"]
+      /** @description A folder in the bucket that backups go under; empty for the bucket's root. */
+      prefix: string
+      /** @description The region; empty when the service takes any. */
+      region: string
+    }
+    /** @description A destination's fields, and its keys. */
+    S3DestinationFields: {
+      /** @description The access key ID; empty with the secret to keep the keys the destination has. */
+      accessKeyId?: string
+      /** @description The bucket. */
+      bucket: string
+      /** @description The S3-compatible endpoint, `https://…`. */
+      endpoint: string
+      /** @description Its name: lower-case letters, digits and `-`, at most 63. */
+      name: string
+      /** @description A folder in the bucket. */
+      prefix?: string
+      /** @description The region. */
+      region?: string
+      /** @description The secret access key. */
+      secretAccessKey?: string
+    }
+    /** @description One object a plan writes. */
+    S3DestinationWrite: {
+      /** @description What it does. */
+      action: components["schemas"]["S3DestinationWriteAction"]
+      /** @description The object as it will be, YAML, a Secret's values hidden; absent for a deletion. */
+      afterYaml?: string | null
+      /** @description The object as it is, YAML; absent for a creation and for a Secret. */
+      beforeYaml?: string | null
+      /** @description The object's kind. */
+      kind: string
+      /** @description Its name. */
+      name: string
+    }
+    /**
+     * @description What a write does.
+     * @enum {string}
+     */
+    S3DestinationWriteAction: "create" | "patch" | "delete"
+    /** @description The cluster's S3 destinations. */
+    S3Destinations: {
+      /** @description Whether the person may add, change and remove destinations. */
+      canChange: components["schemas"]["Permission"]
+      /** @description Whether the person may read the keys, which copying them into a project needs. */
+      canUseKeys: components["schemas"]["Permission"]
+      /** @description The destinations, by name. */
+      items: components["schemas"]["S3Destination"][]
+      /** @description The namespace they are kept in. */
+      namespace: string
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description What an apply wrote. */
+    S3DestinationsApplied: {
+      /** @description The objects written, `Kind/name`. */
+      written: string[]
+    }
+    /** @description The token of a plan to apply. */
+    S3DestinationsApply: {
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description A plan, and the token that applies it. */
+    S3DestinationsPlan: {
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /** @description The writes, in order; empty when nothing changes. */
+      writes: components["schemas"]["S3DestinationWrite"][]
+    }
+    /** @description What to plan. */
+    S3DestinationsPlanRequest:
+      | (components["schemas"]["S3DestinationFields"] & {
+          /** @enum {string} */
+          op: "save"
+        })
+      | {
+          /** @description The destination. */
+          name: string
+          /** @enum {string} */
+          op: "remove"
+        }
     /** @description The access key services use, from an `S3Credentials` of the store. */
     SeaweedAccessKey: {
       /** @description The access key ID, once the operator made it; it is not secret. */
@@ -9656,6 +9836,135 @@ export interface operations {
         }
       }
       409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getS3Destinations: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["S3Destinations"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyS3Destinations: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["S3DestinationsApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["S3DestinationsApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planS3Destinations: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["S3DestinationsPlanRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["S3DestinationsPlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
         headers: {
           [name: string]: unknown
         }

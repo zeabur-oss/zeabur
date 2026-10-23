@@ -23,6 +23,7 @@
 // https://www.dragonflydb.io/docs/managing-dragonfly/backups
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
+import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
 import type { Event, Health } from "@/model/service"
 
 export type Database = Schemas["Database"]
@@ -447,15 +448,7 @@ export const createDatabase = (form: NewDatabase, password = newPassword): Chang
 
 export type Frequency = "daily" | "weekly"
 
-export interface BackupTarget {
-  /** `https://…`, the S3-compatible service. */
-  endpoint: string
-  bucket: string
-  /** A folder in the bucket; the database's name when left empty. */
-  path: string
-  region: string
-  accessKey: string
-  secretKey: string
+export interface BackupTarget extends S3Target {
   frequency: Frequency
   /** How many days of backups to keep. */
   keepDays: number
@@ -478,14 +471,14 @@ export function targetProblems(target: BackupTarget): TargetProblem[] {
   const problems: TargetProblem[] = []
   if (!/^https?:\/\/[^\s/]+/.test(target.endpoint.trim())) problems.push("endpoint")
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(target.bucket.trim())) problems.push("bucket")
-  if (target.accessKey.trim() === "" || target.secretKey.trim() === "") problems.push("keys")
+  if (needsKeys(target)) problems.push("keys")
   if (!Number.isInteger(target.keepDays) || target.keepDays < 1 || target.keepDays > 365)
     problems.push("keep")
   return problems
 }
 
 /** The names Zeabur gives what backs a database up. */
-const backupNames = (name: string) => ({
+export const backupNames = (name: string) => ({
   secret: `${name}-backups-s3`,
   store: `${name}-backups`,
   schedule: `${name}-scheduled`,
@@ -555,11 +548,8 @@ function mariaStorage(
   }
 }
 
-const awsKeys = (target: BackupTarget, region: string) => ({
-  AWS_ACCESS_KEY_ID: target.accessKey.trim(),
-  AWS_SECRET_ACCESS_KEY: target.secretKey.trim(),
-  AWS_REGION: region || "us-east-1",
-})
+const awsKeys = (name: string, target: BackupTarget, region: string) =>
+  keysSecret(name, target, AWS_KEYS, { AWS_REGION: region || "us-east-1" })
 
 /** Engines whose backups have no retention: the person sets a lifecycle rule on the bucket. */
 export const keepsEverything = (engine: Engine) => engine === "mysql" || engine === "dragonfly"
@@ -587,11 +577,12 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
   })
   switch (database.engine) {
     case "postgresql": {
-      const keys = secret(names.secret, {
-        ACCESS_KEY_ID: target.accessKey.trim(),
-        ACCESS_SECRET_KEY: target.secretKey.trim(),
-        ...(region ? { REGION: region } : {}),
-      })
+      const keys = keysSecret(
+        names.secret,
+        target,
+        { accessKeyId: "ACCESS_KEY_ID", secretAccessKey: "ACCESS_SECRET_KEY" },
+        region ? { REGION: region } : {},
+      )
       const store = create({
         apiVersion: "barmancloud.cnpg.io/v1",
         kind: "ObjectStore",
@@ -633,10 +624,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
       return [keys, store, edit(), schedule]
     }
     case "mongodb": {
-      const keys = secret(names.secret, {
-        AWS_ACCESS_KEY_ID: target.accessKey.trim(),
-        AWS_SECRET_ACCESS_KEY: target.secretKey.trim(),
-      })
+      const keys = keysSecret(names.secret, target, AWS_KEYS)
       const backup = (spec.backup as Manifest | undefined) ?? {}
       const runs = target.frequency === "weekly" ? Math.ceil(target.keepDays / 7) : target.keepDays
       spec.backup = {
@@ -672,7 +660,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
       return [keys, edit()]
     }
     case "mysql": {
-      const keys = secret(names.secret, awsKeys(target, region))
+      const keys = awsKeys(names.secret, target, region)
       const policy = create({
         apiVersion: "moco.cybozu.com/v1beta2",
         kind: "BackupPolicy",
@@ -687,7 +675,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
       return [keys, policy, edit()]
     }
     case "mariadb": {
-      const keys = secret(names.secret, awsKeys(target, region))
+      const keys = awsKeys(names.secret, target, region)
       const backup = create({
         apiVersion: "k8s.mariadb.com/v1alpha1",
         kind: "Backup",
@@ -711,7 +699,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
       return [keys, backup]
     }
     case "dragonfly": {
-      const keys = secret(names.secret, awsKeys(target, region))
+      const keys = awsKeys(names.secret, target, region)
       const https = !endpoint.startsWith("http://")
       const host = endpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "")
       const own = (arg: string) =>

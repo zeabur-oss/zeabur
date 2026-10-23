@@ -9,6 +9,7 @@ import {
   locationForm,
   locationProblems,
   locationRequest,
+  pickLocation,
   projectCoverage,
   scheduleForm,
   scheduleProblems,
@@ -105,6 +106,19 @@ describe("the location form", () => {
     expect(locationProblems({ ...form, accessKeyId: "AKIA" }, true)).toEqual(["bothKeys"])
   })
 
+  test("a destination brings its own keys and gets a folder of its own", () => {
+    const destination = {
+      name: "r2",
+      endpoint: "https://r2.test",
+      bucket: "backups",
+      region: "",
+      prefix: "p",
+    }
+    const form = { ...locationForm(undefined), ...pickLocation(destination as never) }
+    expect(locationProblems(form, false)).toEqual([])
+    expect(locationRequest(form)).toMatchObject({ destination: "r2", prefix: "p/velero" })
+  })
+
   test("bucket, endpoint and folder are checked", () => {
     const form = {
       ...locationForm(location()),
@@ -197,6 +211,7 @@ test("the project's line comes from its own read of Velero", () => {
     providers: [{ module: "velero", state }],
     coverage: [{ target: { kind: "namespace", name: "shop" }, scheduledBy: [], ...row }],
     runs: [],
+    keysFrom: {},
     schedules: [],
     unreadable: [],
     unscheduled: [],

@@ -1591,6 +1591,8 @@ export const zhCN: Messages = {
   "confirm.errorPagesOff": (route) => `Ingress ${route} 不再显示错误页面。`,
   "confirm.maintenance": (host) => `${host} 改为显示维护页面，服务继续运行。`,
   "confirm.maintenanceOff": (host) => `${host} 的访客重新连到服务。`,
+  "confirm.copyS3Keys": (name, destination) =>
+    `创建 Secret ${name}，复制 S3 目的地 ${destination} 的密钥。`,
   "confirm.deployKey": (name) => `用新的部署密钥创建 Secret ${name}。`,
   "confirm.isolates": (name) => `${name} 之后只收发这条和其他策略允许的流量，其余流量集群会拦截。`,
   "confirm.delete": (name: string) => `删除 ${name}。删除后无法恢复。`,
@@ -2530,6 +2532,20 @@ export const zhCN: Messages = {
   "db.backup.noRun": "还没有备份",
   "db.backup.setUp": "设置备份",
   "db.backup.setUpBody": "备份会存到你提供的 S3 兼容存储桶。密钥会以 Secret 的形式存放在这个项目。",
+  "s3d.title": "S3 目的地",
+  "s3d.body":
+    "整个集群的备份表单都能选用这些存储空间。选用时会把密钥复制到项目，所以备份不依赖这份列表。在这里更换密钥，不会更新已复制的密钥。",
+  "s3d.add": "添加目的地",
+  "s3d.plan.save": (name) => `保存 S3 目的地 ${name}`,
+  "s3d.plan.remove": (name) => `移除 S3 目的地 ${name}`,
+  "s3d.problem.taken": "已有同名的目的地。",
+  "s3d.pick": "S3 目的地",
+  "s3d.manual": "手动输入",
+  "s3d.copied": (name) =>
+    `应用时会把 ${name} 的密钥复制到这个项目。之后 ${name} 更换密钥，这份副本不会随之更新。`,
+  "s3d.denied": (namespace) =>
+    `你没有权限读取集群 S3 目的地的密钥（${namespace} 中的 Secret），请自行输入密钥。`,
+  "s3d.from": (name) => `密钥复制自 ${name}`,
   "db.backup.endpoint": "端点",
   "db.backup.bucket": "存储桶",
   "db.backup.path": "文件夹",

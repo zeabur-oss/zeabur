@@ -138,10 +138,18 @@ function weighAccess(change: AccessChange | ServiceChange): { risk: Risk; reason
     : { risk: "normal" }
 }
 
-/** Changes to a service that only open a port can make riskier. */
+/** Changes to a service that only open a port can make riskier, and copied S3 keys. */
 type ServiceChange = Extract<
   Change,
-  { op: "buildOptions" | "labelVolume" | "errorPageHtml" | "errorPages" | "maintenance" }
+  {
+    op:
+      | "buildOptions"
+      | "labelVolume"
+      | "errorPageHtml"
+      | "errorPages"
+      | "maintenance"
+      | "copyS3Keys"
+  }
 >
 
 /** The changes of scheduled tasks, routes, shared variables and public ports. */

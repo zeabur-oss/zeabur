@@ -10,6 +10,7 @@ import {
   type BackupTarget,
   type TargetProblem,
 } from "@/model/databases"
+import { AWS_KEYS, keysSecret } from "@/model/s3-destinations"
 
 type Change = Schemas["Change"]
 type ProjectBackups = Schemas["ProjectBackups"]
@@ -127,17 +128,9 @@ export function scheduleVolumeBackups(
   const region = target.region.trim()
   const cron = target.frequency === "weekly" ? "0 3 * * 0" : "0 3 * * *"
   return [
-    create({
-      apiVersion: "v1",
-      kind: "Secret",
-      metadata: { name: secret },
-      type: "Opaque",
-      stringData: {
-        AWS_ACCESS_KEY_ID: target.accessKey.trim(),
-        AWS_SECRET_ACCESS_KEY: target.secretKey.trim(),
-        RESTIC_PASSWORD: password(),
-        ...(region ? { AWS_DEFAULT_REGION: region } : {}),
-      },
+    keysSecret(secret, target, AWS_KEYS, {
+      RESTIC_PASSWORD: password(),
+      ...(region ? { AWS_DEFAULT_REGION: region } : {}),
     }),
     ...(as.root ? [] : [create(restrictedPods(schedule, as))]),
     {

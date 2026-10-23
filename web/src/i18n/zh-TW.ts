@@ -1593,6 +1593,8 @@ export const zhTW: Messages = {
   "confirm.errorPagesOff": (route) => `Ingress ${route} 不再顯示錯誤頁面。`,
   "confirm.maintenance": (host) => `${host} 改為顯示維護頁面，服務繼續執行。`,
   "confirm.maintenanceOff": (host) => `${host} 的訪客重新連到服務。`,
+  "confirm.copyS3Keys": (name, destination) =>
+    `建立 Secret ${name}，金鑰從 S3 目的地 ${destination} 複製過來。`,
   "confirm.deployKey": (name) => `用新的部署金鑰建立 Secret ${name}。`,
   "confirm.isolates": (name) => `${name} 之後只收發這條和其他政策允許的流量，其餘流量叢集會擋下。`,
   "confirm.delete": (name: string) => `刪除 ${name}。刪除後無法復原。`,
@@ -2536,6 +2538,20 @@ export const zhTW: Messages = {
   "db.backup.setUp": "設定備份",
   "db.backup.setUpBody":
     "備份會存到你提供的 S3 相容儲存貯體。金鑰會以 Secret 的形式存放在這個專案。",
+  "s3d.title": "S3 目的地",
+  "s3d.body":
+    "整個叢集的備份表單都能選用這些儲存空間。選用時會把金鑰複製到專案，所以備份不依賴這份清單。在這裡更換金鑰，不會更新已複製的金鑰。",
+  "s3d.add": "新增目的地",
+  "s3d.plan.save": (name) => `儲存 S3 目的地 ${name}`,
+  "s3d.plan.remove": (name) => `移除 S3 目的地 ${name}`,
+  "s3d.problem.taken": "這個名稱已經有人用了。",
+  "s3d.pick": "S3 目的地",
+  "s3d.manual": "手動輸入",
+  "s3d.copied": (name) =>
+    `套用時會把 ${name} 的金鑰複製到這個專案。之後 ${name} 換了金鑰，這份複本不會跟著更新。`,
+  "s3d.denied": (namespace) =>
+    `你無權讀取 ${namespace} 裡的 Secret，無法複製這些目的地的金鑰，請自行輸入。`,
+  "s3d.from": (name) => `金鑰複製自 ${name}`,
   "db.backup.endpoint": "端點",
   "db.backup.bucket": "儲存貯體",
   "db.backup.path": "資料夾",
