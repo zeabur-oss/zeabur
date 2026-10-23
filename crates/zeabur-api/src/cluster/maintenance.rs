@@ -1117,6 +1117,7 @@ async fn pass(
             body: WriteBody::Evict(Preconditions {
                 uid: Some(target.uid.clone()),
                 resource_version: None,
+                grace_period_seconds: None,
             }),
             dry_run: false,
         };
@@ -1189,7 +1190,9 @@ pub(crate) async fn node_pods(
         let Some(node) = &pod.node_name else {
             continue;
         };
-        let host = hosts.get(node.as_str()).map_or(node.as_str(), String::as_str);
+        let host = hosts
+            .get(node.as_str())
+            .map_or(node.as_str(), String::as_str);
         let entry = out.entry(node.clone()).or_default();
         if !pod.terminating && pinned(pod, host, &volumes) {
             entry.pinned += 1;
@@ -1227,11 +1230,7 @@ async fn bound_volumes(cluster: &dyn Cluster) -> BTreeMap<String, Value> {
 
 /// Whether a pod listed across the cluster has a claim bound to a volume only the node called
 /// `host` can use: maintenance leaves it there unless the person opts in.
-fn pinned(
-    pod: &zeabur_kube::ClusterPod,
-    host: &str,
-    volumes: &BTreeMap<String, Value>,
-) -> bool {
+fn pinned(pod: &zeabur_kube::ClusterPod, host: &str, volumes: &BTreeMap<String, Value>) -> bool {
     pod.claims.iter().any(|claim| {
         volumes
             .get(&format!("{}/{claim}", pod.namespace))

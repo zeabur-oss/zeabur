@@ -269,6 +269,7 @@ mod tests {
         let preconditions = Preconditions {
             uid: Some("u-1".to_owned()),
             resource_version: None,
+            grace_period_seconds: None,
         };
         assert_eq!(
             eviction_body(&pod, &preconditions),
