@@ -6,13 +6,18 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import CornersOutIcon from "~icons/ph/corners-out"
+import DatabaseIcon from "~icons/ph/database"
 import GitBranchIcon from "~icons/ph/git-branch"
 import HardDriveIcon from "~icons/ph/hard-drive"
 import MinusIcon from "~icons/ph/minus"
 import PlusIcon from "~icons/ph/plus"
 
+import { projectQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
+import { EngineVersion, useDatabases } from "@/components/databases"
 import { KubeTip } from "@/components/kube-details"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { usePresence } from "@zeabur/design-system/components/presence"
@@ -20,14 +25,17 @@ import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot, useStatusWord } from "@/components/status"
 import { useT } from "@/i18n"
 import { canvasViewport, type Viewport } from "@/lib/stores"
+import { databaseLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
+import { databaseEdges, databaseNodes, type DatabaseNode } from "@/model/database-parts"
 import { edgeText } from "@/model/evidence"
 import { originOf } from "@/model/origin"
 import { troubleTone } from "@/model/severity"
 import { bounds, fittedZoom, layout, type LaidEdge, type LaidNode, type Lane } from "@/model/layout"
 import {
   claimOf,
+  claimsOf,
   domainsOf,
   imageTag,
   serviceId,
@@ -122,7 +130,14 @@ function Graph({
 }) {
   const t = useT()
   const word = useStatusWord()
-  const graph = layout(data.services, edgesOf(data))
+  const databaseList = useDatabases(project)
+  const databases = databaseList.data?.items ?? []
+  const whole = useQuery(projectQuery(project)).data ?? data
+  const graph = layout(
+    data.services,
+    [...edgesOf(data), ...databaseEdges(whole, databases)],
+    databaseNodes(databases, claimsOf(whole)),
+  )
   const box = bounds(graph)
   const viewport = useRef<HTMLDivElement>(null)
   const [view, setViewState] = useState<Viewport>(
@@ -160,8 +175,11 @@ function Graph({
       setView({ k: z, x: w / 2 - (node.x + node.w / 2) * z, y: h / 2 - (node.y + node.h / 2) * z })
       return
     }
-    setView({ k, x: (w - bw * k) / 2 - box.minX * k, y: (h - bh * k) / 2 - box.minY * k + 8 })
+    const next = { k, x: (w - bw * k) / 2 - box.minX * k, y: (h - bh * k) / 2 - box.minY * k + 8 }
+    fitted.current = next
+    setView(next)
   }
+  const fitted = useRef<Viewport>(undefined)
 
   // The route remounts per project (`remountDeps`), so `fit` and the wheel listener's `setView`
   // never belong to another project.
@@ -169,6 +187,13 @@ function Graph({
     if (!canvasViewport.get(project)) fit()
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- once per mount, which is per project
   }, [project])
+
+  // The databases arrive after the services; fit again unless the map was moved since.
+  const databasesIn = !databaseList.isPending
+  useLayoutEffect(() => {
+    if (databasesIn && canvasViewport.get(project) === fitted.current) fit()
+    // oxlint-disable-next-line react-hooks/exhaustive-deps -- once, when the databases arrive
+  }, [databasesIn])
 
   // The selected service stays in view beside the quick look.
   useLayoutEffect(() => {
@@ -276,7 +301,7 @@ function Graph({
                         ...new Set(
                           graph.nodes
                             .filter((n) => n.lane === frame.lane)
-                            .map((n) => n.service.kind),
+                            .flatMap((n) => n.service?.kind ?? []),
                         ),
                       ]
                         .toSorted()
@@ -355,27 +380,38 @@ function Graph({
           ))}
         </svg>
 
-        {graph.nodes.map((node) => (
-          <ServiceCard
-            key={node.id}
-            node={node}
-            service={node.service}
-            host={domainsOf(data, node.service)[0]?.host}
-            selected={selected === node.id}
-            faded={
-              !!active &&
-              active !== node.id &&
-              !graph.edges.some(
-                (e) =>
-                  (e.from === active && e.to === node.id) ||
-                  (e.to === active && e.from === node.id),
-              )
-            }
-            onOpen={() => onOpen(node.id)}
-            onHover={(on) => setHoverNode(on ? node.id : undefined)}
-            word={word}
-          />
-        ))}
+        {graph.nodes.map((node) => {
+          const faded =
+            !!active &&
+            active !== node.id &&
+            !graph.edges.some(
+              (e) =>
+                (e.from === active && e.to === node.id) || (e.to === active && e.from === node.id),
+            )
+          const hover = (on: boolean) => setHoverNode(on ? node.id : undefined)
+          return node.service ? (
+            <ServiceCard
+              key={node.id}
+              node={node}
+              service={node.service}
+              host={domainsOf(data, node.service)[0]?.host}
+              selected={selected === node.id}
+              faded={faded}
+              onOpen={() => onOpen(node.id)}
+              onHover={hover}
+              word={word}
+            />
+          ) : (
+            <DatabaseCard
+              key={node.id}
+              project={project}
+              node={node}
+              database={node.database}
+              faded={faded}
+              onHover={hover}
+            />
+          )
+        })}
 
         {hovered ? (
           <div
@@ -569,6 +605,75 @@ function ServiceCard({
             {claimOf(m)}
           </span>
           <span className="ml-auto font-medium text-foreground/70 tabular-nums">{m.size}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DatabaseCard({
+  project,
+  node,
+  database: { database, health, volumes },
+  faded,
+  onHover,
+}: {
+  project: string
+  node: LaidNode
+  database: DatabaseNode
+  faded: boolean
+  onHover: (on: boolean) => void
+}) {
+  const t = useT()
+  return (
+    <div
+      data-node
+      className={cn(
+        "absolute top-(--y) left-(--x) w-(--w) transition-opacity",
+        faded && "opacity-55",
+      )}
+      style={{ "--x": px(node.x), "--y": px(node.y), "--w": px(node.w) }}
+      onPointerEnter={() => onHover(true)}
+      onPointerLeave={() => onHover(false)}
+    >
+      <Link
+        {...databaseLink(project, database)}
+        className={cn(
+          "relative z-1 flex h-28 w-full flex-col gap-2 rounded-lg border bg-card p-3 text-left shadow-xs outline-none transition-colors hover:border-foreground/25",
+          health === "fail" && "border-fail/40",
+        )}
+      >
+        <span className="flex items-center gap-2.5">
+          <DatabaseIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+          <span className="flex min-w-0 flex-1 flex-col leading-tight">
+            <span className="truncate text-sm leading-tight font-semibold" translate="no">
+              {database.name}
+            </span>
+            <span className="truncate type-micro leading-tight text-muted-foreground">
+              <EngineVersion database={database} />
+            </span>
+          </span>
+        </span>
+        <span className="mt-auto flex items-center gap-2 text-xs">
+          <StatusDot health={health} />
+          <span className={cn("truncate font-medium", health === "fail" && "text-fail")}>
+            {t(`db.state.${database.state}`)}
+          </span>
+          <span className="ml-auto text-muted-foreground tabular-nums">
+            {database.ready}/{database.members}
+          </span>
+        </span>
+      </Link>
+      {volumes.map((volume) => (
+        <div
+          key={volume.name}
+          className="relative mx-2 -mt-2 flex h-9.5 items-end gap-2 rounded-b-xl border border-t-0 bg-muted/70 px-3 pb-2 type-micro leading-normal text-muted-foreground"
+        >
+          <HardDriveIcon className="size-3.5" aria-hidden="true" />
+          <span className="truncate font-mono" translate="no">
+            {volume.name}
+          </span>
+          <span className="ml-auto font-medium text-foreground/70 tabular-nums">{volume.size}</span>
         </div>
       ))}
     </div>

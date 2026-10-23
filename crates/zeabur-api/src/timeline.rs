@@ -138,8 +138,10 @@ pub struct TimelineEntry {
     /// The workload.
     pub workload: WorkloadRef,
     /// What happened, in one sentence: `timeline.release`, `timeline.write.<tool>`,
-    /// `timeline.warning.<crashLoop|evicted|unschedulable|imagePull|probe|quota|other>`,
-    /// `timeline.termination.<oomKilled|exited>`.
+    /// `timeline.warning.<crashLoop|evicted|imagePull|probe|quota|other>`,
+    /// `timeline.warning.unschedulable.<claimMissing|claimUnbound|cpu|memory|placement|other>`,
+    /// `timeline.termination.<oomKilled|exited>`. A warning names the service and, when it is
+    /// about a pod, the replica; the component's own words are in `note`, not in the sentence.
     pub message: Message,
     /// Who wrote, for a write.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -348,18 +350,23 @@ fn names_pod_of(workload: &WorkloadRef, releases: &[Release], pod: &str) -> bool
     }
 }
 
-fn warning_variant(event: &zeabur_gaps::Event) -> &'static str {
+/// The sentence for a warning: its reason folded, and for a pod that cannot be scheduled what the
+/// scheduler says is short, as the diagnosis reads it.
+fn warning_variant(event: &zeabur_gaps::Event) -> String {
     let note = event.note.to_ascii_lowercase();
     match event.reason.as_str() {
         "BackOff" if note.contains("image") => "imagePull",
         "BackOff" | "CrashLoopBackOff" => "crashLoop",
         "Evicted" | "Preempted" => "evicted",
-        "FailedScheduling" => "unschedulable",
+        "FailedScheduling" => {
+            return format!("unschedulable.{}", zeabur_gaps::shortage(&event.note));
+        }
         "Failed" | "ErrImagePull" | "ImagePullBackOff" | "InspectFailed" => "imagePull",
         "Unhealthy" => "probe",
         "FailedCreate" => "quota",
         _ => "other",
     }
+    .to_owned()
 }
 
 fn warnings(
@@ -399,19 +406,23 @@ fn warnings(
     folded
         .into_values()
         .map(|(at, count, latest, evidence)| {
-            let object = latest
-                .regarding
-                .as_ref()
-                .map_or_else(String::new, |r| format!("{}/{}", r.kind, r.name));
+            let mut message =
+                Message::new(&format!("timeline.warning.{}", warning_variant(latest)))
+                    .with("service", workload.name.clone())
+                    .with("reason", latest.reason.clone())
+                    .with("note", latest.note.clone())
+                    .with("count", count.to_string());
+            if let Some(pod) = latest.regarding.as_ref().filter(|r| r.kind == "Pod") {
+                message = message.with("replica", pod.name.clone());
+            }
+            if let Some(claim) = zeabur_gaps::missing_claim(&latest.note) {
+                message = message.with("claim", claim);
+            }
             TimelineEntry {
                 at: at.to_string(),
                 kind: EntryKind::Warning,
                 workload: workload.clone(),
-                message: Message::new(&format!("timeline.warning.{}", warning_variant(latest)))
-                    .with("reason", latest.reason.clone())
-                    .with("note", latest.note.clone())
-                    .with("count", count.to_string())
-                    .with("object", object),
+                message,
                 writer: None,
                 fields: Vec::new(),
                 release: None,
@@ -465,6 +476,8 @@ fn terminations(workload: &WorkloadRef, pods: &[&Pod]) -> Vec<TimelineEntry> {
                     kind: EntryKind::Termination,
                     workload: workload.clone(),
                     message: Message::new(&format!("timeline.termination.{variant}"))
+                        .with("service", workload.name.clone())
+                        .with("replica", name)
                         .with("pod", name)
                         .with("container", status.name.clone())
                         .with("reason", reason)
@@ -686,6 +699,60 @@ mod tests {
                 "spec.strategy.type",
                 "spec.template"
             ]
+        );
+    }
+
+    fn warning(reason: &str, note: &str, count: i32) -> zeabur_gaps::Event {
+        zeabur_gaps::Event {
+            origin: Origin::object("Event", reason),
+            regarding: Some(Origin::object("Pod", "editor-5c8d9-q2w3e")),
+            kind: "Warning".to_owned(),
+            reason: reason.to_owned(),
+            note: note.to_owned(),
+            count,
+            last_seen: Some("2026-10-01T12:00:00Z".parse().unwrap()),
+        }
+    }
+
+    #[test]
+    fn a_warning_names_the_service_and_replica_and_reads_the_scheduler_as_the_diagnosis_does() {
+        let editor = WorkloadRef {
+            kind: WorkloadKind::Deployment,
+            name: "editor".to_owned(),
+        };
+        let held = [release("editor-5c8d9", 1, true)];
+        let note =
+            "0/1 nodes are available: persistentvolumeclaim \"editor-data\" not found. not found";
+        let entries = warnings(
+            &editor,
+            &held,
+            &[
+                warning("FailedScheduling", note, 119),
+                warning(
+                    "BackOff",
+                    "Back-off restarting failed container editor",
+                    541,
+                ),
+            ],
+        );
+        let messages: Vec<_> = entries.iter().map(|e| &e.message).collect();
+        assert_eq!(messages[0].key, "timeline.warning.crashLoop");
+        assert_eq!(messages[0].params["service"], "editor");
+        assert_eq!(messages[0].params["replica"], "editor-5c8d9-q2w3e");
+        assert!(!messages[0].params.contains_key("object"));
+        assert_eq!(
+            messages[1].key,
+            "timeline.warning.unschedulable.claimMissing"
+        );
+        assert_eq!(messages[1].params["claim"], "editor-data");
+        assert_eq!(messages[1].params["note"], note);
+        assert_eq!(
+            warning_variant(&warning(
+                "FailedScheduling",
+                "0/3 nodes are available: 3 Insufficient cpu.",
+                1
+            )),
+            "unschedulable.cpu"
         );
     }
 }

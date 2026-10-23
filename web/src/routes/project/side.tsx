@@ -9,9 +9,10 @@ import LockSimpleIcon from "~icons/ph/lock-simple"
 import LockSimpleOpenIcon from "~icons/ph/lock-simple-open"
 
 import type { Schemas } from "@/api/client"
-import { projectAlertsQuery, projectTimelineQuery } from "@/api/queries"
+import { projectAlertsQuery, projectQuery, projectTimelineQuery } from "@/api/queries"
 import { AlertList, AlertsRefused, RecentNote } from "@/components/alerts"
 import { Ago, Segmented } from "@/components/bits"
+import { KubeDetails } from "@/components/kube-details"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusDot, StatusPill } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
@@ -37,7 +38,8 @@ import {
   OperatorNotes,
   useDatabases,
 } from "@/components/databases"
-import type { Database } from "@/model/databases"
+import { storageRows, type StorageRow } from "@/model/database-parts"
+import { engineName } from "@/model/databases"
 import { useSentence, useT, type Translate } from "@/i18n"
 import { databaseLink, podEventsLink, serviceLink } from "@/lib/place"
 import { useQuantityFormat } from "@/lib/quantity"
@@ -50,14 +52,13 @@ import {
   serviceId,
   statusOf,
   summarise,
-  type Claim,
   type Domain,
   type Event,
   type Project,
   type Service,
 } from "@/model/service"
 import { folded, serviceOf, type Alert } from "@/model/alerts"
-import { entryTone, severity } from "@/model/severity"
+import { activityTone, warningTone, warningVariant } from "@/model/severity"
 import { refusedPlaces } from "@/routes/project/data"
 import { FilterBox } from "@/routes/project/filter-box"
 import { MeterStack, meterPartTone } from "@zeabur/design-system/components/meter"
@@ -225,21 +226,37 @@ function TimelineEntries({
         )
         const who = writerOf(t, entry.writer)
         const named = names(entry)
+        const params = entry.message.params ?? {}
+        const replica = service ? service.pods.find((p) => p.name === params.replica) : undefined
+        const replicaName = params.replica ? (
+          service && replica ? (
+            <Link
+              {...podEventsLink(project, service, replica.name)}
+              className="hover:text-foreground hover:underline"
+              translate="no"
+            >
+              {replica.name}
+            </Link>
+          ) : (
+            <span translate="no">{params.replica}</span>
+          )
+        ) : null
+        const tone = activityTone(entry, service && statusOf(service).health)
         return (
           <TimelineItem
             key={`${entry.at}/${entry.kind}/${entry.workload.name}/${i}`}
-            tone={entryTone[entry.kind]}
+            tone={tone}
             time={<Ago iso={entry.at} />}
             title={
               <span className="wrap-anywhere">
                 {write(entry.message)}
-                {entry.count && entry.count > 1 ? (
+                {entry.count && entry.count > 1 && params.count === undefined ? (
                   <span className="text-muted-foreground"> ×{entry.count}</span>
                 ) : null}
               </span>
             }
             meta={
-              named && !who ? undefined : (
+              named && !who && !replicaName ? undefined : (
                 <span className="flex flex-wrap items-center gap-x-1.5">
                   {named ? null : service ? (
                     <Link
@@ -252,11 +269,25 @@ function TimelineEntries({
                   ) : (
                     <span translate="no">{entry.workload.name}</span>
                   )}
+                  {replicaName ? (
+                    <span>
+                      {t("events.forPod")} {replicaName}
+                    </span>
+                  ) : null}
                   {who ? <span>{t("timeline.by", who)}</span> : null}
                 </span>
               )
             }
-          />
+          >
+            {entry.kind === "warning" && params.note ? (
+              <KubeDetails
+                facts={[
+                  [t("problem.reason"), params.reason],
+                  [t("problem.message"), params.note],
+                ]}
+              />
+            ) : undefined}
+          </TimelineItem>
         )
       })}
     </Timeline>
@@ -274,24 +305,45 @@ function EventEntries({
   events: Event[]
   empty: string
 }) {
-  const objectLink = (event: Event) => {
+  const t = useT()
+  const serviceOf = (event: Event) => {
     const regarding = event.regarding
-    if (!regarding) return null
-    const label = `${regarding.kind.toLowerCase()}/${regarding.name}`
-    const service = services.find((s) =>
+    if (!regarding) return undefined
+    return services.find((s) =>
       regarding.kind === "Pod"
         ? s.pods.some((p) => p.name === regarding.name)
         : s.kind === regarding.kind && s.name === regarding.name,
     )
-    if (!service) return <span translate="no">{label}</span>
-    const link =
-      regarding.kind === "Pod"
-        ? podEventsLink(project, service, regarding.name)
-        : serviceLink(project, service, { tab: "events" })
-    return (
-      <Link {...link} className="hover:text-foreground hover:underline" translate="no">
-        {label}
+  }
+  const objectLink = (event: Event, service: Service | undefined) => {
+    const regarding = event.regarding
+    if (!regarding) return null
+    if (!service)
+      return <span translate="no">{`${regarding.kind.toLowerCase()}/${regarding.name}`}</span>
+    const link = (
+      <Link
+        {...serviceLink(project, service, { tab: "events" })}
+        className="hover:text-foreground hover:underline"
+        translate="no"
+      >
+        {service.name}
       </Link>
+    )
+    if (regarding.kind !== "Pod") return link
+    return (
+      <span className="flex flex-wrap items-center gap-x-1.5">
+        {link}
+        <span>
+          {t("events.forPod")}{" "}
+          <Link
+            {...podEventsLink(project, service, regarding.name)}
+            className="hover:text-foreground hover:underline"
+            translate="no"
+          >
+            {regarding.name}
+          </Link>
+        </span>
+      </span>
     )
   }
   if (events.length === 0)
@@ -303,28 +355,35 @@ function EventEntries({
     )
   return (
     <Timeline>
-      {events.map((event) => (
-        <TimelineItem
-          key={event.id}
-          tone={isWarning(event) ? severity.warningEvent : "neutral"}
-          time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
-          title={
-            <span>
-              <span className="font-medium" translate="no">
-                {event.reason}
+      {events.map((event) => {
+        const service = serviceOf(event)
+        return (
+          <TimelineItem
+            key={event.id}
+            tone={
+              isWarning(event)
+                ? warningTone(warningVariant(event), service && statusOf(service).health)
+                : "neutral"
+            }
+            time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
+            title={
+              <span>
+                <span className="font-medium" translate="no">
+                  {event.reason}
+                </span>
+                {event.count > 1 ? (
+                  <span className="text-muted-foreground"> ×{event.count}</span>
+                ) : null}
               </span>
-              {event.count > 1 ? (
-                <span className="text-muted-foreground"> ×{event.count}</span>
-              ) : null}
-            </span>
-          }
-          meta={objectLink(event)}
-        >
-          {event.note ? (
-            <span className="line-clamp-2 text-muted-foreground">{event.note}</span>
-          ) : undefined}
-        </TimelineItem>
-      ))}
+            }
+            meta={objectLink(event, service)}
+          >
+            {event.note ? (
+              <span className="line-clamp-2 text-muted-foreground">{event.note}</span>
+            ) : undefined}
+          </TimelineItem>
+        )
+      })}
     </Timeline>
   )
 }
@@ -508,39 +567,35 @@ export function Domains({
 const METER_PARTS = 3
 
 interface Sized {
-  claim: Claim
+  row: StorageRow
   bytes?: number
   /** Its part of the meter. */
   part: number
-  /** The database whose members use it, when no workload does (CloudNativePG's pods). */
-  database?: Database
 }
 
-const unusedVolume = (v: Sized) => v.claim.services.length === 0 && !v.database
+const unusedVolume = (v: Sized) =>
+  !v.row.database && v.row.claims.every((claim) => claim.services.length === 0)
 
 function useVolumes(project: string, data: Project) {
   const databases = useDatabases(project).data?.items ?? []
-  const claims = claimsOf(data)
-  const largest = claims
-    .filter((c) => c.sizeBytes)
-    .toSorted((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))
-    .map((c) => c.name)
-  const sized: Sized[] = claims
-    .map((claim) => {
-      const rank = largest.indexOf(claim.name)
-      return {
-        claim,
-        bytes: claim.sizeBytes ?? undefined,
-        part: rank < 0 ? -1 : Math.min(rank, METER_PARTS),
-        database: databases.find((d) => d.claims.includes(claim.name)),
-      }
+  // Claims from the whole project, so a database's volumes keep the size its workload mounts.
+  const whole = useQuery(projectQuery(project)).data ?? data
+  const rows = storageRows(claimsOf(whole), databases)
+  const largest = rows
+    .filter((r) => r.bytes)
+    .toSorted((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))
+    .map((r) => r.key)
+  const sized: Sized[] = rows
+    .map((row) => {
+      const rank = largest.indexOf(row.key)
+      return { row, bytes: row.bytes, part: rank < 0 ? -1 : Math.min(rank, METER_PARTS) }
     })
     // Unused first, then the largest.
     .toSorted(
       (a, b) =>
         Number(unusedVolume(b)) - Number(unusedVolume(a)) ||
         (b.bytes ?? 0) - (a.bytes ?? 0) ||
-        a.claim.name.localeCompare(b.claim.name),
+        a.row.key.localeCompare(b.row.key),
     )
   const parts = Array.from({ length: METER_PARTS + 1 }, (_, part) =>
     sized.filter((s) => s.part === part).reduce((sum, s) => sum + (s.bytes ?? 0), 0),
@@ -551,13 +606,18 @@ function useVolumes(project: string, data: Project) {
     total: sized.reduce((sum, c) => sum + (c.bytes ?? 0), 0),
     known: sized.some((c) => c.bytes !== undefined),
     unused: sized.filter(unusedVolume).length,
+    count: rows.reduce((sum, r) => sum + r.claims.length, 0),
   }
 }
+
+const volumeNames = (row: StorageRow) => row.claims.map((claim) => claim.name).join(", ")
 
 function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
   const t = useT()
   const { memoryParts } = useQuantityFormat()
-  const { claim, bytes, part } = volume
+  const { row, bytes, part } = volume
+  const [claim] = row.claims
+  const services = row.claims.flatMap((c) => c.services)
   const [value, unit] = bytes !== undefined ? memoryParts(bytes) : [undefined, undefined]
   return (
     <li className={sideRow}>
@@ -569,35 +629,43 @@ function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
         )}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate type-mono" translate="no">
-          {claim.name}
-        </span>
-        {claim.services.length > 0 ? (
-          <span className="truncate type-meta text-muted-foreground">
-            {claim.services.map((service, j) => (
-              <span key={serviceId(service)}>
-                {j > 0 ? ", " : ""}
-                <Link
-                  {...serviceLink(project, service, { tab: "storage" })}
-                  className="hover:text-foreground hover:underline"
-                  translate="no"
-                >
-                  {service.name}
-                </Link>
-              </span>
-            ))}
-          </span>
-        ) : volume.database ? (
-          <span className="truncate type-meta text-muted-foreground">
+        {row.database ? (
+          <>
             <Link
-              {...databaseLink(project, volume.database)}
-              className="hover:text-foreground hover:underline"
+              {...databaseLink(project, row.database)}
+              className="truncate hover:underline"
               translate="no"
             >
-              {volume.database.name}
+              <span className="type-mono">{row.database.name}</span>{" "}
+              <span className="text-muted-foreground">({engineName(row.database.engine)})</span>
             </Link>
-          </span>
-        ) : null}
+            <span className="truncate type-meta type-mono text-muted-foreground" translate="no">
+              {volumeNames(row)}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="truncate type-mono" translate="no">
+              {claim?.name}
+            </span>
+            {services.length > 0 ? (
+              <span className="truncate type-meta text-muted-foreground">
+                {services.map((service, j) => (
+                  <span key={serviceId(service)}>
+                    {j > 0 ? ", " : ""}
+                    <Link
+                      {...serviceLink(project, service, { tab: "storage" })}
+                      className="hover:text-foreground hover:underline"
+                      translate="no"
+                    >
+                      {service.name}
+                    </Link>
+                  </span>
+                ))}
+              </span>
+            ) : null}
+          </>
+        )}
       </div>
       {unusedVolume(volume) ? (
         <Tooltip content={t("storage.notMounted")}>
@@ -612,7 +680,7 @@ function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
           {value} <span className="type-meta text-muted-foreground">{unit}</span>
         </span>
       ) : (
-        <span className="shrink-0 text-muted-foreground">{claim.size ?? "—"}</span>
+        <span className="shrink-0 text-muted-foreground">{claim?.size ?? "—"}</span>
       )}
     </li>
   )
@@ -631,7 +699,10 @@ function VolumeList({
   const rows = volumes.filter(
     (v) =>
       !needle ||
-      [v.claim.name, ...v.claim.services.map((s) => s.name)]
+      [
+        v.row.database?.name ?? "",
+        ...v.row.claims.flatMap((c) => [c.name, ...c.services.map((s) => s.name)]),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(needle),
@@ -641,7 +712,7 @@ function VolumeList({
   return (
     <ul className="flex flex-col">
       {rows.map((volume) => (
-        <VolumeRow key={volume.claim.name} project={project} volume={volume} />
+        <VolumeRow key={volume.row.key} project={project} volume={volume} />
       ))}
     </ul>
   )

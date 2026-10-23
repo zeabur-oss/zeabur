@@ -74,6 +74,53 @@ export const entryTone = {
   termination: severity.restarted,
 } as const
 
+/** What a Warning event says went wrong, folded as the timeline folds it
+ * (`crates/zeabur-api/src/timeline.rs`). */
+export function warningVariant(event: { reason?: string | null; note?: string | null }): string {
+  const note = (event.note ?? "").toLowerCase()
+  switch (event.reason) {
+    case "BackOff":
+      return note.includes("image") ? "imagePull" : "crashLoop"
+    case "CrashLoopBackOff":
+      return "crashLoop"
+    case "Failed":
+    case "ErrImagePull":
+    case "ImagePullBackOff":
+    case "InspectFailed":
+      return "imagePull"
+    case "FailedScheduling":
+      return "unschedulable"
+    default:
+      return "other"
+  }
+}
+
+/** A timeline entry's warning variant (`crashLoop`, `unschedulable.claimMissing`), from its key. */
+export const timelineVariant = (key: string) => key.replace(/^timeline\.warning\./, "")
+
+/**
+ * A Warning event is amber unless it says the service cannot work until someone acts: it keeps
+ * crashing, cannot pull its image, or cannot be scheduled past the allowance, which the
+ * service's own health already says (`health`, now).
+ */
+export function warningTone(variant: string, health?: Health): "fail" | "warn" {
+  if (variant === "crashLoop") return severity.crashing
+  if (variant === "imagePull") return severity.imagePull
+  if (variant.startsWith("unschedulable") && health === "fail") return severity.unschedulable
+  return severity.warningEvent
+}
+
+/** An activity entry's tone: a warning by what it says, a container that ended by whether its
+ * service is failing now (it keeps crashing) or runs again. */
+export function activityTone(
+  entry: { kind: keyof typeof entryTone; message: { key: string } },
+  health?: Health,
+): "fail" | "warn" | "brand" | "neutral" {
+  if (entry.kind === "warning") return warningTone(timelineVariant(entry.message.key), health)
+  if (entry.kind === "termination" && health === "fail") return severity.crashing
+  return entryTone[entry.kind]
+}
+
 /** A log line by the level it names. */
 export const logTone = {
   error: severity.errorLine,

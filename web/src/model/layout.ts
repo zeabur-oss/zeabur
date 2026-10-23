@@ -4,6 +4,7 @@
 // reduce crossings; a layer with many cards wraps into up to three columns. Deterministic: the
 // same project always gives the same coordinates.
 import type { Edge } from "@/model/connections"
+import type { DatabaseNode } from "@/model/database-parts"
 import {
   isHealthy,
   roleOf,
@@ -38,15 +39,21 @@ const laneOf: Record<Role, Lane> = {
 }
 const laneOrder: Lane[] = ["web", "internal", "workers", "data"]
 
-export interface LaidNode {
+interface Placed {
   id: string
   lane: Lane
   x: number
   y: number
   w: number
   h: number
-  service: Service
 }
+
+/** A service's card, or a database's. */
+export type LaidNode = Placed &
+  ({ service: Service; database?: undefined } | { database: DatabaseNode; service?: undefined })
+
+const healthOf = (node: LaidNode): Health =>
+  node.service ? statusOf(node.service).health : node.database.health
 
 export interface LaidEdge extends Edge {
   path: string
@@ -80,7 +87,11 @@ function spread(list: string[], id: string): number {
   return (i - (list.length - 1) / 2) * 12
 }
 
-export function layout(services: Service[], allEdges: Edge[]): Layout {
+export function layout(
+  services: Service[],
+  allEdges: Edge[],
+  databases: DatabaseNode[] = [],
+): Layout {
   const nodes = new Map<string, LaidNode>()
   for (const service of services) {
     const id = serviceId(service)
@@ -94,6 +105,16 @@ export function layout(services: Service[], allEdges: Edge[]): Layout {
       service,
     })
   }
+  for (const database of databases)
+    nodes.set(database.id, {
+      id: database.id,
+      lane: "data",
+      x: 0,
+      y: 0,
+      w: CARD_W,
+      h: CARD_H + database.volumes.length * DRAWER_H,
+      database,
+    })
 
   const edges = allEdges.filter((e) => nodes.has(e.from) && nodes.has(e.to))
   const lanes = laneOrder
@@ -216,16 +237,17 @@ export function layout(services: Service[], allEdges: Edge[]): Layout {
     const members = l.ids.map((id) => nodes.get(id)).filter((n): n is LaidNode => !!n)
     const top = Math.min(...members.map((n) => n.y))
     const bottom = Math.max(...members.map((n) => n.y + n.h))
-    const laneServices = members.map((n) => n.service)
     frames.push({
       lane: l.lane,
       x: x - FRAME_PAD,
       y: top - FRAME_PAD - FRAME_HEAD,
       w: width + FRAME_PAD * 2,
       h: bottom - top + FRAME_PAD * 2 + FRAME_HEAD,
-      ready: laneServices.filter((s) => isHealthy(statusOf(s))).length,
-      total: laneServices.length,
-      health: worstOf(laneServices.map((s) => statusOf(s).health)),
+      ready: members.filter((n) =>
+        n.service ? isHealthy(statusOf(n.service)) : n.database.health === "ok",
+      ).length,
+      total: members.length,
+      health: worstOf(members.map(healthOf)),
     })
     x += width + GAP_X
   }

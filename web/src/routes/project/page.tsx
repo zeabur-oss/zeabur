@@ -416,11 +416,14 @@ function ListView({
   return (
     <PageColumn gap="md" className="mb-12">
       <Problems project={project} services={data.services} />
-      <div className="flex flex-wrap items-start gap-x-8 gap-y-7">
-        <div className="flex min-w-0 flex-main flex-col">{services}</div>
-        <div className="flex min-w-0 flex-side flex-col gap-7 empty:hidden">{side}</div>
+      {/* Activity sits under the services, so the two columns end close together. */}
+      <div className="@container">
+        <div className="overview-columns">
+          <div className="flex min-w-0 flex-col">{services}</div>
+          <div className="flex min-w-0 flex-col gap-7 empty:hidden">{side}</div>
+          <div className="min-w-0">{activity}</div>
+        </div>
       </div>
-      {activity}
     </PageColumn>
   )
 }

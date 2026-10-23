@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
+import { useMemo } from "react"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
 import CubeIcon from "~icons/ph/cube"
 import DatabaseIcon from "~icons/ph/database"
@@ -24,6 +25,7 @@ import { addressOf, objectKey } from "@/lib/objects"
 import { databaseLink, serviceLink, usePlace, type ProjectEntry } from "@/lib/place"
 import { useProjectSummary } from "@/lib/project-name"
 import { remembered } from "@/lib/stores"
+import { foldDatabases } from "@/model/database-parts"
 import { stateHealth } from "@/model/databases"
 import { projectTitle } from "@/model/project"
 import {
@@ -118,7 +120,7 @@ function ProjectNav({ project }: { project: string }) {
   const t = useT()
   const place = usePlace()
   const view = useQuery(projectQuery(project))
-  const data = view.data
+  const data = useMemo(() => view.data && foldDatabases(view.data), [view.data])
   const summary = useProjectSummary(project)
   const advancedOpen = advancedSection.useValue()
   const advancedHolds = place.entry === "objects"

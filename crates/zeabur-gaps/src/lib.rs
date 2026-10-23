@@ -9,7 +9,7 @@ mod rules;
 mod snippet;
 mod trace;
 
-pub use diagnose::{Namespace, RECENT, diagnose};
+pub use diagnose::{Namespace, RECENT, diagnose, missing_claim, shortage};
 pub use durability::EphemeralData;
 pub use event::Event;
 pub use incident::{

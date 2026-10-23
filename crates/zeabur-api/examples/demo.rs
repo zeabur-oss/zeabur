@@ -647,6 +647,153 @@ fn blog() -> NamespaceObjects {
     }
 }
 
+/// A lab like the one people try Zeabur with first: four services, one crash-looping and one
+/// waiting for a volume that does not exist, and a database of each engine with the pods,
+/// StatefulSet and volumes their operators make.
+fn lab() -> NamespaceObjects {
+    let ns = "lab";
+    let secret = |name: &str, key: &str| json!({"secretKeyRef": {"name": name, "key": key}});
+    let mut editor = deployment_in(
+        ns,
+        "editor",
+        "ghcr.io/example/editor:0.9.0",
+        1,
+        0,
+        &json!([{"name": "MONGOPASSWORD", "valueFrom": secret("mongo-mvjrswvl-custom-user-secret", "app")}]),
+    );
+    if let Some(spec) = editor.spec.as_mut().and_then(|s| s.template.spec.as_mut()) {
+        spec.volumes = Some(from(json!([{"name": "data",
+            "persistentVolumeClaim": {"claimName": "editor-e2e-data"}}])));
+        if let Some(container) = spec.containers.first_mut() {
+            container.volume_mounts = Some(from(json!([{"name": "data", "mountPath": "/data"}])));
+        }
+    }
+    let operated = |api: &str, kind: &str, name: &str| {
+        json!([{"apiVersion": api, "kind": kind, "name": name,
+            "uid": "00000000-0000-0000-0000-000000000001", "controller": true}])
+    };
+    let mongo: StatefulSet = from(json!({
+        "metadata": {"name": "mongo-mvjrswvl-rs0", "namespace": ns,
+            "creationTimestamp": created("mongo-mvjrswvl"),
+            "labels": {"app.kubernetes.io/name": "percona-server-mongodb",
+                "app.kubernetes.io/instance": "mongo-mvjrswvl",
+                "app.kubernetes.io/replset": "rs0", "app.kubernetes.io/component": "mongod"},
+            "ownerReferences": operated("psmdb.percona.com/v1", "PerconaServerMongoDB", "mongo-mvjrswvl")},
+        "spec": {"replicas": 1, "serviceName": "mongo-mvjrswvl-rs0",
+            "selector": {"matchLabels": {"app": "mongo-mvjrswvl-rs0"}},
+            "template": {"metadata": {"labels": {"app": "mongo-mvjrswvl-rs0"}}, "spec": {"containers": [{
+                "name": "mongod", "image": "percona/percona-server-mongodb:7.0.43-23",
+                "volumeMounts": [{"name": "mongod-data", "mountPath": "/data/db"}]
+            }]}},
+            "volumeClaimTemplates": [{"metadata": {"name": "mongod-data"},
+                "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "10Gi"}}}}]},
+        "status": {"replicas": 1, "readyReplicas": 1}
+    }));
+    let pending = json!({"phase": "Pending", "conditions": [{"type": "PodScheduled",
+        "status": "False", "reason": "Unschedulable", "lastTransitionTime": minutes_ago(118),
+        "message": "0/1 nodes are available: persistentvolumeclaim \"editor-e2e-data\" not found. not found"}]});
+    let claim = |name: &str, size: &str, owner: Value| {
+        from::<PersistentVolumeClaim>(json!({"metadata": {"name": name, "namespace": ns,
+                "ownerReferences": owner},
+            "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": size}}},
+            "status": {"phase": "Bound", "capacity": {"storage": size}}}))
+    };
+    NamespaceObjects {
+        namespace: ns.to_owned(),
+        deployments: vec![
+            deployment_in(
+                ns,
+                "talker",
+                "ghcr.io/example/talker:1.2.0",
+                1,
+                1,
+                &json!([{"name": "DATABASE_URL", "valueFrom": secret("pg-mvjrswvl-app", "uri")}]),
+            ),
+            deployment_in(
+                ns,
+                "crasher",
+                "ghcr.io/example/crasher:0.1.0",
+                1,
+                0,
+                &json!([]),
+            ),
+            editor,
+            deployment_in(ns, "hello", "nginx:1.29", 1, 1, &json!([])),
+        ],
+        stateful_sets: vec![mongo],
+        pods: vec![
+            pod_in(
+                ns,
+                "talker-7d9c6b5f4-k8m2p",
+                "talker",
+                None,
+                &running("talker", 0),
+            ),
+            pod_in(
+                ns,
+                "crasher-6949b848bd-mv6fd",
+                "crasher",
+                None,
+                &crash_looping("crasher", 541),
+            ),
+            from(json!({
+                "metadata": {"name": "editor-5c8d9f7b6-q2w3e", "namespace": ns,
+                    "labels": {"app": "editor"}, "creationTimestamp": minutes_ago(118)},
+                "spec": {"containers": [{"name": "editor", "image": "ghcr.io/example/editor:0.9.0"}]},
+                "status": pending
+            })),
+            pod_in(
+                ns,
+                "hello-5f7b8c9d6-x4z7c",
+                "hello",
+                None,
+                &running("hello", 0),
+            ),
+            pod_in(
+                ns,
+                "mongo-mvjrswvl-rs0-0",
+                "mongo-mvjrswvl-rs0",
+                Some(("StatefulSet", "mongo-mvjrswvl-rs0")),
+                &running("mongod", 0),
+            ),
+            from(json!({
+                "metadata": {"name": "pg-mvjrswvl-1", "namespace": ns,
+                    "labels": {"cnpg.io/cluster": "pg-mvjrswvl", "cnpg.io/instanceRole": "primary"},
+                    "ownerReferences": operated("postgresql.cnpg.io/v1", "Cluster", "pg-mvjrswvl"),
+                    "creationTimestamp": created("pg-mvjrswvl")},
+                "spec": {"containers": [{"name": "postgres",
+                    "image": "ghcr.io/cloudnative-pg/postgresql:17-standard-trixie"}]},
+                "status": running("postgres", 0)
+            })),
+        ],
+        services: vec![
+            service_in(ns, "talker", 80, "http"),
+            service_in(ns, "hello", 80, "http"),
+        ],
+        secrets: ["pg-mvjrswvl-app", "mongo-mvjrswvl-custom-user-secret"]
+            .into_iter()
+            .map(|name| SecretSummary {
+                secret: Secret {
+                    metadata: from(json!({"name": name, "namespace": ns})),
+                    type_: Some("Opaque".to_owned()),
+                    ..Secret::default()
+                },
+                key_count: 3,
+            })
+            .collect(),
+        persistent_volume_claims: vec![
+            claim("mongod-data-mongo-mvjrswvl-rs0-0", "10Gi", json!([])),
+            claim(
+                "pg-mvjrswvl-1",
+                "5Gi",
+                operated("postgresql.cnpg.io/v1", "Cluster", "pg-mvjrswvl"),
+            ),
+        ],
+        ingresses: vec![ingress(ns, "hello.example.com", "hello")],
+        ..NamespaceObjects::default()
+    }
+}
+
 /// Billing: an API, a database and a nightly CronJob whose last run failed.
 fn billing() -> NamespaceObjects {
     let ns = "billing";
@@ -1187,6 +1334,7 @@ fn state() -> State {
     for mut project in [
         shop(),
         blog(),
+        lab(),
         billing(),
         payments(),
         analytics(),
@@ -1227,6 +1375,7 @@ fn state() -> State {
         namespaces: vec![
             namespace("shop", true),
             namespace("blog", true),
+            namespace("lab", true),
             namespace("billing", true),
             namespace("payments", true),
             namespace("analytics", true),
@@ -1239,6 +1388,33 @@ fn state() -> State {
         events: BTreeMap::from([
             ("shop".to_owned(), events),
             ("blog".to_owned(), blog_events),
+            (
+                "lab".to_owned(),
+                vec![
+                    event_in(
+                        "lab",
+                        "l1",
+                        33,
+                        "Pod",
+                        "crasher-6949b848bd-mv6fd",
+                        "Warning",
+                        "BackOff",
+                        "Back-off restarting failed container crasher in pod crasher-6949b848bd-mv6fd_lab",
+                        541,
+                    ),
+                    event_in(
+                        "lab",
+                        "l2",
+                        30,
+                        "Pod",
+                        "editor-5c8d9f7b6-q2w3e",
+                        "Warning",
+                        "FailedScheduling",
+                        "0/1 nodes are available: persistentvolumeclaim \"editor-e2e-data\" not found. not found",
+                        119,
+                    ),
+                ],
+            ),
             ("billing".to_owned(), billing_events),
             ("kube-system".to_owned(), system_events),
             (
@@ -1257,6 +1433,31 @@ fn state() -> State {
             ),
         ]),
         nodes: nodes(),
+        // Lab's releases, so its warnings and restarts reach Activity.
+        replica_sets: BTreeMap::from([(
+            "lab".to_owned(),
+            [
+                ("crasher", "6949b848bd", "ghcr.io/example/crasher:0.1.0"),
+                ("editor", "5c8d9f7b6", "ghcr.io/example/editor:0.9.0"),
+                ("talker", "7d9c6b5f4", "ghcr.io/example/talker:1.2.0"),
+                ("hello", "5f7b8c9d6", "nginx:1.29"),
+            ]
+            .into_iter()
+            .map(|(name, hash, image)| {
+                from(json!({
+                    "metadata": {"name": format!("{name}-{hash}"), "namespace": "lab",
+                        "creationTimestamp": created(name),
+                        "annotations": {"deployment.kubernetes.io/revision": "1"},
+                        "ownerReferences": [{"apiVersion": "apps/v1", "kind": "Deployment",
+                            "name": name, "uid": "00000000-0000-0000-0000-000000000002",
+                            "controller": true}]},
+                    "spec": {"selector": {"matchLabels": {"app": name}},
+                        "template": {"metadata": {"labels": {"app": name}},
+                            "spec": {"containers": [{"name": name, "image": image}]}}}
+                }))
+            })
+            .collect(),
+        )]),
         // metrics-server and system-upgrade-controller, read through their modules; and
         // NetworkPolicy, so a ready-made policy shows among the objects and can be deleted; k3s's
         // HelmChart, so a component installs from the catalogue.
@@ -1409,6 +1610,26 @@ fn state() -> State {
                     "replsets": [{"name": "rs0", "size": 3}]},
                 "status": {"state": "ready", "mongoVersion": "8.0.12-4",
                     "replsets": {"rs0": {"ready": 3, "size": 3, "status": "ready"}}}
+            })),
+            from(json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                "metadata": {"name": "pg-mvjrswvl", "namespace": "lab",
+                    "creationTimestamp": created("pg-mvjrswvl")},
+                "spec": {"instances": 1, "imageName": "ghcr.io/cloudnative-pg/postgresql:17-standard-trixie",
+                    "storage": {"size": "5Gi"}},
+                "status": {"phase": "Cluster in healthy state", "readyInstances": 1,
+                    "instanceNames": ["pg-mvjrswvl-1"],
+                    "currentPrimary": "pg-mvjrswvl-1", "writeService": "pg-mvjrswvl-rw"}
+            })),
+            from(json!({
+                "apiVersion": "psmdb.percona.com/v1", "kind": "PerconaServerMongoDB",
+                "metadata": {"name": "mongo-mvjrswvl", "namespace": "lab",
+                    "creationTimestamp": created("mongo-mvjrswvl")},
+                "spec": {"image": "percona/percona-server-mongodb:7.0.43-23",
+                    "replsets": [{"name": "rs0", "size": 1}],
+                    "users": [{"name": "app", "db": "app", "roles": [{"name": "readWrite", "db": "app"}]}]},
+                "status": {"state": "ready", "mongoVersion": "7.0.43-23",
+                    "replsets": {"rs0": {"ready": 1, "size": 1, "status": "ready"}}}
             })),
             from(json!({
                 "apiVersion": "upgrade.cattle.io/v1", "kind": "Plan",
@@ -2031,6 +2252,9 @@ fn place(pods: &mut [Pod]) {
         _ => None,
     };
     for (i, pod) in pods.iter_mut().enumerate() {
+        if pod.status.as_ref().and_then(|s| s.phase.as_deref()) == Some("Pending") {
+            continue;
+        }
         let Some(spec) = pod.spec.as_mut() else {
             continue;
         };

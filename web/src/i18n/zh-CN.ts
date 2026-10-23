@@ -20,6 +20,12 @@ const verbZhCN: Record<string, string> = {
 }
 
 /** A wait in its largest unit, rounded up: 90 s is 2 minutes. */
+/** A container by its service, or the service alone when the container has its name. */
+const containerZhCN = (p: Record<string, string | undefined>) =>
+  !p.service || p.container === p.service
+    ? (p.service ?? p.container)
+    : `${p.service} 的 ${p.container}`
+
 const waitZhCN = (s: number) =>
   s < 60 ? `${s} 秒` : s < 3600 ? `${Math.ceil(s / 60)} 分钟` : `${Math.ceil(s / 3600)} 小时`
 
@@ -2423,23 +2429,28 @@ export const zhCN: Messages = {
     `Kubernetes（${p.manager}）最近一次修改${p.fields ? ` ${p.fields}` : "它"}。`,
   "sentence.timeline.write.other": (p) =>
     `${p.manager} 最近一次修改${p.fields ? ` ${p.fields}` : "它"}。`,
-  "sentence.timeline.warning.crashLoop": (p) => `${p.object} 反复崩溃、重启（${p.count} 次）。`,
-  "sentence.timeline.warning.evicted": (p) =>
-    `${p.object} 被移出所在的节点（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.unschedulable": (p) =>
-    `${p.object} 找不到可以运行的机器（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.imagePull": (p) =>
-    `${p.object} 无法下载镜像（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.probe": (p) =>
-    `${p.object} 的健康检查失败（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.quota": (p) =>
-    `${p.object} 无法创建副本（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.other": (p) =>
-    `${p.object} 发生 ${p.reason}（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
+  "sentence.timeline.warning.crashLoop": (p) => `${p.service} 反复崩溃、重启（${p.count} 次）。`,
+  "sentence.timeline.warning.evicted": (p) => `${p.service} 被移出所在的节点（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.claimMissing": (p) =>
+    `${p.service} 无法启动：它要挂载的卷 ${p.claim} 不存在（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.claimUnbound": (p) =>
+    `${p.service} 无法启动：它的卷还没准备好（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.cpu": (p) =>
+    `${p.service} 在等待可用资源：没有机器有足够的 CPU（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.memory": (p) =>
+    `${p.service} 在等待可用资源：没有机器有足够的内存（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.placement": (p) =>
+    `${p.service} 在等待可以运行它的机器（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.other": (p) =>
+    `${p.service} 在等待可以运行的机器（${p.count} 次）。`,
+  "sentence.timeline.warning.imagePull": (p) => `${p.service} 无法下载镜像（${p.count} 次）。`,
+  "sentence.timeline.warning.probe": (p) => `${p.service} 的健康检查失败（${p.count} 次）。`,
+  "sentence.timeline.warning.quota": (p) => `${p.service} 无法创建副本（${p.count} 次）。`,
+  "sentence.timeline.warning.other": (p) => `${p.service} 发生 ${p.reason}（${p.count} 次）。`,
   "sentence.timeline.termination.oomKilled": (p) =>
-    `${p.pod} 里的 ${p.container} 用完了内存，系统终止了它。`,
+    `${containerZhCN(p)} 用完了内存，系统终止了它。`,
   "sentence.timeline.termination.exited": (p) =>
-    `${p.pod} 里的 ${p.container} 退出了，退出码 ${p.exitCode}${p.reason ? `（${p.reason}）` : ""}。`,
+    `${containerZhCN(p)} 退出了，退出码 ${p.exitCode}${p.reason ? `（${p.reason}）` : ""}。`,
   "sentence.rollout.progressing": (p) =>
     `${p.name} 正在部署：${p.desired} 个副本中有 ${p.updated} 个是新的修订版本。`,
   "sentence.rollout.done": (p) => `${p.name} 已部署完成：每个副本都是当前的修订版本。`,
