@@ -363,8 +363,8 @@ export interface paths {
      *     and `4001`); `ready` names the container `shell`. Failures arrive as an `error` frame: someone
      *     who may not do everything everywhere, or may not `create` `pods/exec` in the namespace
      *     (`403`, `elevation-required` where admin rights are offered and not in use), a pod that is not
-     *     a node shell the person opened (`404`), one not running (`409`). When the terminal closes,
-     *     Zeabur deletes the pod at once.
+     *     a node shell the person opened (`404`), one not running or already open in another terminal
+     *     (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
      */
     get: operations["nodeShellTerminal"]
     put?: never
@@ -5747,7 +5747,10 @@ export interface components {
       kind: string
       /** @description Its name. */
       name: string
-      /** @description What the role grants: `create pods`, `create pods/exec`, `get pods/exec`. */
+      /**
+       * @description What the role grants: `create pods` (bound in the namespace), `create` or `get` on
+       *     `pods/exec` and `pods/attach`.
+       */
       rights: string[]
       /** @description The role it binds, `Role/name` or `ClusterRole/name`. */
       role: string

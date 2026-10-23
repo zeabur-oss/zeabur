@@ -258,7 +258,7 @@ mod tests {
             planned["exposed"],
             json!([{"kind": "ClusterRoleBinding", "name": "ops-edit",
                     "role": "ClusterRole/edit",
-                    "rights": ["create pods", "create pods/exec"],
+                    "rights": ["create pods/exec"],
                     "subjects": [{"kind": "Group", "name": "ops"}]}])
         );
 
@@ -403,6 +403,39 @@ mod tests {
         };
         assert_eq!(preconditions.grace_period_seconds, Some(0));
         assert!(pod_of(&cluster, &pod).is_none());
+    }
+
+    #[tokio::test]
+    async fn a_second_terminal_on_the_same_shell_is_refused_and_the_first_lives_on() {
+        let cluster = cluster();
+        let router = app(&cluster);
+        let (_, applied) = opened(&router).await;
+        let pod = applied["pod"].as_str().unwrap().to_owned();
+        start(&cluster, &pod);
+        let address = serve(router).await;
+        let path = format!("/api/v1/cluster/node-shells/{pod}/terminal");
+
+        let mut first = connect(address, &path).await;
+        assert_eq!(frame(&mut first).await["type"], "ready");
+        output_until(&mut first, "root@vps-1:~# ").await;
+        let mut second = connect(address, &path).await;
+        let error = frame(&mut second).await;
+        assert_eq!(error["type"], "error");
+        assert_eq!(error["problem"]["status"], 409);
+        assert!(
+            error["problem"]["detail"]
+                .as_str()
+                .unwrap()
+                .contains("already open in another tab")
+        );
+        drop(second);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(pod_of(&cluster, &pod).is_some());
+        first
+            .send(Message::binary(b"echo still\r".to_vec()))
+            .await
+            .unwrap();
+        output_until(&mut first, "still").await;
     }
 
     #[tokio::test]

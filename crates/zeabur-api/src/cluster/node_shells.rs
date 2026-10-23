@@ -32,8 +32,8 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{
-    Cluster, ClusterExt as _, DynamicObject, ExecRequest, ExecSession, Identity, ObjectTarget,
-    Preconditions, ResourceRef, WriteBody, WriteRequest,
+    Cluster, ClusterError, ClusterExt as _, DynamicObject, ExecRequest, ExecSession, Identity,
+    ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest,
 };
 use zeabur_plan::node_shell::{self as shell, NAMESPACE, NodeShell, ShellState};
 
@@ -166,7 +166,8 @@ pub struct ShellExposure {
     pub name: String,
     /// The role it binds, `Role/name` or `ClusterRole/name`.
     pub role: String,
-    /// What the role grants: `create pods`, `create pods/exec`, `get pods/exec`.
+    /// What the role grants: `create pods` (bound in the namespace), `create` or `get` on
+    /// `pods/exec` and `pods/attach`.
     pub rights: Vec<String>,
     /// Who it lets in.
     pub subjects: Vec<ShellSubject>,
@@ -922,8 +923,8 @@ async fn apply_open(
 /// and `4001`); `ready` names the container `shell`. Failures arrive as an `error` frame: someone
 /// who may not do everything everywhere, or may not `create` `pods/exec` in the namespace
 /// (`403`, `elevation-required` where admin rights are offered and not in use), a pod that is not
-/// a node shell the person opened (`404`), one not running (`409`). When the terminal closes,
-/// Zeabur deletes the pod at once.
+/// a node shell the person opened (`404`), one not running or already open in another terminal
+/// (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
 #[utoipa::path(get, path = "/api/v1/cluster/node-shells/{pod}/terminal", tag = "cluster",
     operation_id = "nodeShellTerminal",
     params(("pod" = String, Path)),
@@ -969,6 +970,40 @@ async fn run(mut socket: WebSocket, terminal: Terminal, pod: String) {
     }
 }
 
+/// Marks the pod as entered, or refuses: it is open in another terminal, and closing either would
+/// end both.
+async fn claim(cluster: &dyn Cluster, found: &Value, pod: &str) -> Result<(), ApiError> {
+    let in_use = || {
+        ApiError::from(Problem::new(
+            Kind::Conflict,
+            format!(
+                "Node shell {pod} is already open in another tab; use that one, or close it and open a new node shell."
+            ),
+        ))
+    };
+    let operations = shell::claim(found, &Timestamp::now().to_string()).ok_or_else(in_use)?;
+    let write = WriteRequest {
+        target: pod_target(pod),
+        body: WriteBody::JsonPatch(Value::Array(operations)),
+        dry_run: false,
+    };
+    match cluster.write(&write).await {
+        Ok(_) => Ok(()),
+        Err(ClusterError::Status(status)) if matches!(status.code, 409 | 422) => Err(in_use()),
+        Err(error) => Err(read_problem(
+            error,
+            &format!("node shell {pod}"),
+            Denied {
+                verb: "patch".to_owned(),
+                group: String::new(),
+                resource: "pods".to_owned(),
+                name: Some(pod.to_owned()),
+                namespace: Some(NAMESPACE.to_owned()),
+            },
+        )),
+    }
+}
+
 /// Checks that the person may enter `pod` and starts the shell; the pod's uid and the session.
 async fn enter(
     cluster: &dyn Cluster,
@@ -991,6 +1026,7 @@ async fn enter(
         )));
     }
     let container = exec::pick_container(&found, pod, Some(shell::CONTAINER.to_owned()))?;
+    claim(cluster, &found, pod).await?;
     let request = ExecRequest {
         container,
         command: shell::command(pod),

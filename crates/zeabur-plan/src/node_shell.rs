@@ -71,6 +71,8 @@ pub const NODE_LABEL: &str = "zeabur.com/node-shell-node";
 pub const PERSON_LABEL: &str = "zeabur.com/node-shell-person";
 /// The annotation with the user name of who opened it.
 pub const PERSON_ANNOTATION: &str = "zeabur.com/node-shell-person";
+/// The annotation a terminal sets when it enters, so a second one is refused.
+pub const SESSION_ANNOTATION: &str = "zeabur.com/node-shell-session";
 /// The pod's one container.
 pub const CONTAINER: &str = "shell";
 /// How long a node shell pod runs at most.
@@ -339,6 +341,35 @@ pub fn is_node_shell(pod: &Value) -> bool {
         == Some("true")
 }
 
+/// The JSON Patch that marks `pod` as entered at `at`, or `None` when a terminal already did.
+///
+/// One terminal per shell: closing a terminal deletes the pod, which would end any other. The
+/// patch tests the pod's `resourceVersion`, so of two terminals entering at once only one wins.
+#[must_use]
+pub fn claim(pod: &Value, at: &str) -> Option<Vec<Value>> {
+    let annotations = pod.pointer("/metadata/annotations");
+    if annotations
+        .and_then(|a| a.get(SESSION_ANNOTATION))
+        .is_some()
+    {
+        return None;
+    }
+    let mut operations = Vec::new();
+    if let Some(version) = pod.pointer("/metadata/resourceVersion") {
+        operations
+            .push(json!({"op": "test", "path": "/metadata/resourceVersion", "value": version}));
+    }
+    if annotations.is_none() {
+        operations.push(json!({"op": "add", "path": "/metadata/annotations", "value": {}}));
+    }
+    operations.push(json!({
+        "op": "add",
+        "path": format!("/metadata/annotations/{}", SESSION_ANNOTATION.replace('/', "~1")),
+        "value": at,
+    }));
+    Some(operations)
+}
+
 /// Whether `pod` is a node shell pod `username` opened.
 #[must_use]
 pub fn is_opened_by(pod: &Value, username: &str) -> bool {
@@ -491,7 +522,8 @@ pub struct Exposure {
     pub name: String,
     /// The role it binds, as `Role/name` or `ClusterRole/name`.
     pub role: String,
-    /// What the role grants of what matters: `create pods`, `create pods/exec`, `get pods/exec`.
+    /// What the role grants of what matters: `create pods` (in [`NAMESPACE`] only), and `create`
+    /// or `get` on `pods/exec` and `pods/attach`.
     pub rights: Vec<String>,
     /// Who it lets in.
     pub subjects: Vec<Subject>,
@@ -507,7 +539,7 @@ fn strings<'a>(rule: &'a Value, field: &str) -> Vec<&'a str> {
 }
 
 /// What `rules` grant of creating pods and running commands in them, in the core group.
-/// `get` on `pods/exec` counts: before Kubernetes 1.31 it is enough for a WebSocket exec.
+/// `get` counts: before Kubernetes 1.31 it is enough for a WebSocket exec or attach.
 fn rights_of(rules: &[Value]) -> Vec<String> {
     let mut rights = Vec::new();
     for rule in rules {
@@ -522,10 +554,15 @@ fn rights_of(rules: &[Value]) -> Vec<String> {
         let exec = resources
             .iter()
             .any(|r| matches!(*r, "pods/exec" | "pods/*" | "*/exec" | "*"));
+        let attach = resources
+            .iter()
+            .any(|r| matches!(*r, "pods/attach" | "pods/*" | "*/attach" | "*"));
         for (granted, right) in [
             (pods && verb("create"), "create pods"),
             (exec && verb("create"), "create pods/exec"),
             (exec && verb("get"), "get pods/exec"),
+            (attach && verb("create"), "create pods/attach"),
+            (attach && verb("get"), "get pods/attach"),
         ] {
             if granted && !rights.iter().any(|r| r == right) {
                 rights.push(right.to_owned());
@@ -576,8 +613,12 @@ fn find<'a>(
 ///
 /// `bindings` are the `RoleBindings` of [`NAMESPACE`] and every `ClusterRoleBinding`, `roles` the
 /// namespace's `Roles` and every `ClusterRole`. A binding counts when its role lets its subjects
-/// create pods in [`NAMESPACE`] or run commands in them. Bindings to `cluster-admin` are left out:
-/// their subjects are cluster administrators.
+/// exec or attach into pods, or, bound in [`NAMESPACE`], create pods there. Bindings to
+/// `cluster-admin` are left out: their subjects are cluster administrators.
+///
+/// Cluster-wide `create pods` is not counted: whoever holds it can already run a privileged pod
+/// in `kube-system` or any other privileged namespace, so a node shell adds nothing. That is the
+/// residual risk: such a subject (a provisioner, a CI runner) is as good as node root anyway.
 #[must_use]
 pub fn exposures(bindings: &[Value], roles: &[Value]) -> Vec<Exposure> {
     let mut found = Vec::new();
@@ -612,7 +653,10 @@ pub fn exposures(bindings: &[Value], roles: &[Value]) -> Vec<Exposure> {
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
-        let rights = rights_of(&granted);
+        let mut rights = rights_of(&granted);
+        if kind == "ClusterRoleBinding" {
+            rights.retain(|r| r != "create pods");
+        }
         if rights.is_empty() {
             continue;
         }
@@ -1046,11 +1090,7 @@ mod tests {
                     kind: "ClusterRoleBinding".to_owned(),
                     name: "ops-edit".to_owned(),
                     role: "ClusterRole/edit".to_owned(),
-                    rights: vec![
-                        "create pods".to_owned(),
-                        "create pods/exec".to_owned(),
-                        "get pods/exec".to_owned()
-                    ],
+                    rights: vec!["create pods/exec".to_owned(), "get pods/exec".to_owned()],
                     subjects: vec![Subject {
                         kind: "Group".to_owned(),
                         name: "ops".to_owned(),
@@ -1061,7 +1101,7 @@ mod tests {
                     kind: "RoleBinding".to_owned(),
                     name: "carol".to_owned(),
                     role: "Role/exec".to_owned(),
-                    rights: vec!["get pods/exec".to_owned()],
+                    rights: vec!["get pods/attach".to_owned(), "get pods/exec".to_owned()],
                     subjects: vec![Subject {
                         kind: "User".to_owned(),
                         name: "zeabur:carol".to_owned(),
@@ -1071,6 +1111,93 @@ mod tests {
             ]
         );
         assert_eq!(exposures(bindings.get(..4).unwrap(), &roles), []);
+    }
+
+    #[test]
+    fn a_shell_is_claimed_once_and_only_at_the_version_read() {
+        let mut body = pod_body(&request("vps-1"));
+        body["metadata"]["resourceVersion"] = json!("7");
+        let operations = claim(&body, "2026-10-23T05:00:00Z").unwrap();
+        assert_eq!(
+            operations.first(),
+            Some(&json!({"op": "test", "path": "/metadata/resourceVersion", "value": "7"}))
+        );
+        let mut claimed = body.clone();
+        claimed["metadata"]["annotations"][SESSION_ANNOTATION] = json!("2026-10-23T05:00:00Z");
+        assert_eq!(
+            crate::json::apply_patch(&body, &operations).unwrap(),
+            claimed
+        );
+        assert_eq!(claim(&claimed, "later"), None);
+        let mut moved = body.clone();
+        moved["metadata"]["resourceVersion"] = json!("8");
+        assert!(crate::json::apply_patch(&moved, &operations).is_err());
+        let mut bare = body;
+        bare["metadata"]
+            .as_object_mut()
+            .unwrap()
+            .remove("annotations");
+        let applied = crate::json::apply_patch(&bare, &claim(&bare, "now").unwrap()).unwrap();
+        assert_eq!(
+            applied["metadata"]["annotations"][SESSION_ANNOTATION],
+            "now"
+        );
+    }
+
+    #[test]
+    fn cluster_wide_create_pods_does_not_block_but_attach_and_namespaced_create_do() {
+        let roles = [
+            rbac(
+                "ClusterRole",
+                None,
+                "local-path-provisioner-role",
+                json!({"rules": [
+                {"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list", "watch", "create", "patch", "update", "delete"]},
+                {"apiGroups": [""], "resources": ["persistentvolumes"], "verbs": ["*"]}]}),
+            ),
+            rbac(
+                "ClusterRole",
+                None,
+                "attacher",
+                json!({"rules": [
+                {"apiGroups": [""], "resources": ["pods/attach"], "verbs": ["create"]}]}),
+            ),
+        ];
+        let provisioner = binding(
+            "ClusterRoleBinding",
+            None,
+            "local-path-provisioner-bind",
+            ("ClusterRole", "local-path-provisioner-role"),
+            &json!([{"kind": "ServiceAccount", "name": "local-path-provisioner-service-account",
+                     "namespace": "local-path-storage"}]),
+        );
+        assert_eq!(exposures(std::slice::from_ref(&provisioner), &roles), []);
+        let in_namespace = binding(
+            "RoleBinding",
+            Some(NAMESPACE),
+            "provisioner-here",
+            ("ClusterRole", "local-path-provisioner-role"),
+            &json!([{"kind": "User", "name": "zeabur:erin"}]),
+        );
+        let attach = binding(
+            "ClusterRoleBinding",
+            None,
+            "attach",
+            ("ClusterRole", "attacher"),
+            &json!([{"kind": "Group", "name": "ops"}]),
+        );
+        let found = exposures(&[provisioner, in_namespace, attach], &roles);
+        let rights: Vec<(&str, &[String])> = found
+            .iter()
+            .map(|e| (e.name.as_str(), e.rights.as_slice()))
+            .collect();
+        assert_eq!(
+            rights,
+            [
+                ("attach", ["create pods/attach".to_owned()].as_slice()),
+                ("provisioner-here", ["create pods".to_owned()].as_slice()),
+            ]
+        );
     }
 
     fn pod(status: &Value) -> Value {
