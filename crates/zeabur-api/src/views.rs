@@ -432,6 +432,17 @@ pub struct NodeView {
     /// absent when pods cannot be listed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limits: Option<Resources>,
+    /// The pods placed here that maintenance would move (all but a DaemonSet's, static pods'
+    /// mirrors, finished pods and those in `pinnedPods`); absent when pods cannot be listed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub movable_pods: Option<u64>,
+    /// How many of those are being deleted; absent when pods cannot be listed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub leaving_pods: Option<u64>,
+    /// Pods maintenance leaves here because a volume they use is only on this node, not counted
+    /// in `movablePods`; 0 as well when PersistentVolumes cannot be listed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pinned_pods: Option<u64>,
     /// What it uses now, from metrics-server (approximate, for autoscaling); absent without it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<Resources>,

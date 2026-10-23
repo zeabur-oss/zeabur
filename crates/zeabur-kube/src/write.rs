@@ -7,6 +7,8 @@
 //! - **A debug container** is the same `PATCH` of a Pod's `ephemeralcontainers` subresource
 //!   [k8s-ephemeral], the only way to add one.
 //! - **A new object** is a `POST` to its collection.
+//! - **An eviction** is a `POST` of an `Eviction` to a Pod's `eviction` subresource [k8s-evict],
+//!   which kube-apiserver refuses with `429` while a `PodDisruptionBudget` forbids it.
 //! - **A deletion** is kube's `Api::delete` with `DeleteOptions` in its body [k8s-delete-options]:
 //!   `propagationPolicy: Background`, as `kubectl delete` does by default, so kube-apiserver
 //!   removes the object at once and the garbage collector removes what it owns (a Deployment's
@@ -21,6 +23,7 @@
 //!
 //! [rfc6902]: https://www.rfc-editor.org/rfc/rfc6902
 //! [k8s-ephemeral]: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#update-ephemeralcontainers-of-the-specified-pod
+//! [k8s-evict]: https://kubernetes.io/docs/concepts/scheduling-eviction/api-eviction/
 //! [k8s-field-manager]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
 //! [k8s-validation]: https://kubernetes.io/docs/reference/using-api/api-concepts/#field-validation
 //! [k8s-dry-run]: https://kubernetes.io/docs/reference/using-api/api-concepts/#dry-run
@@ -122,6 +125,7 @@ pub(crate) async fn write(
         &request.target,
         !matches!(request.body, WriteBody::Create(_)),
     )?;
+    let eviction;
     let (builder, content_type, body) = match &request.body {
         WriteBody::Create(object) => (
             http::Request::post(format!(
@@ -150,6 +154,18 @@ pub(crate) async fn write(
             "application/json-patch+json",
             operations,
         ),
+        WriteBody::Evict(preconditions) => {
+            eviction = eviction_body(&request.target, preconditions);
+            let dry_run = if request.dry_run { "?dryRun=All" } else { "" };
+            (
+                http::Request::post(format!(
+                    "{}/eviction{dry_run}",
+                    object_path(&request.target)
+                )),
+                "application/json",
+                &eviction,
+            )
+        }
         WriteBody::Delete(preconditions) => {
             let target = &request.target;
             let (group, version) = target
@@ -188,6 +204,29 @@ pub(crate) async fn write(
     })
 }
 
+/// The `Eviction` of `target`, a pod, as `kubectl drain` posts it: `policy/v1`, with the
+/// preconditions in its `deleteOptions` [k8s-evict].
+///
+/// [k8s-evict]: https://kubernetes.io/docs/reference/kubernetes-api/workload-resources/pod-v1/#create-eviction-of-a-pod
+pub(crate) fn eviction_body(
+    target: &ObjectTarget,
+    preconditions: &Preconditions,
+) -> serde_json::Value {
+    let mut conditions = serde_json::Map::new();
+    if let Some(uid) = &preconditions.uid {
+        conditions.insert("uid".to_owned(), uid.clone().into());
+    }
+    if let Some(version) = &preconditions.resource_version {
+        conditions.insert("resourceVersion".to_owned(), version.clone().into());
+    }
+    serde_json::json!({
+        "apiVersion": "policy/v1",
+        "kind": "Eviction",
+        "metadata": {"name": target.name, "namespace": target.namespace},
+        "deleteOptions": {"preconditions": conditions},
+    })
+}
+
 /// The options of a deletion [k8s-delete-options], which kube sends as its body, the dry run
 /// included: kube-apiserver reads a deletion's options from its body when it has one and only
 /// otherwise from the query string [delete-handler], so a `dryRun=All` query beside a body would
@@ -219,6 +258,25 @@ mod tests {
             namespace: "shop".to_owned(),
             name: "web".to_owned(),
         }
+    }
+
+    #[test]
+    fn an_eviction_names_its_pod_and_the_uid_it_was_planned_for() {
+        let pod = ObjectTarget {
+            kind: "Pod".to_owned(),
+            ..target("v1", "pods")
+        };
+        let preconditions = Preconditions {
+            uid: Some("u-1".to_owned()),
+            resource_version: None,
+        };
+        assert_eq!(
+            eviction_body(&pod, &preconditions),
+            serde_json::json!({"apiVersion": "policy/v1", "kind": "Eviction",
+                "metadata": {"name": "web", "namespace": "shop"},
+                "deleteOptions": {"preconditions": {"uid": "u-1"}}})
+        );
+        assert_eq!(object_path(&pod), "/api/v1/namespaces/shop/pods/web");
     }
 
     #[test]

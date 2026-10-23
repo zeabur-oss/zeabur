@@ -57,12 +57,12 @@ use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::k8s_openapi::api::core::v1::{Node, PodSpec, ResourceQuota};
-use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod, ContainerResources};
+use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod};
 use zeabur_model::{WorkloadKind, WorkloadRef};
 use zeabur_plan::{Change, ObjectName, Plan, PlanRequest, PlannedObject, Warning, Write};
 
 use crate::cluster::WIDE_LIMIT;
-use crate::cluster::capacity::{Amount, bytes, millicores, pod_amounts};
+use crate::cluster::capacity::{Amount, bytes, millicores, pod_amounts, spec_amounts};
 use crate::error::ApiError;
 use crate::incidents::allowed;
 use crate::views::UnreadableView;
@@ -408,39 +408,7 @@ fn template_amounts(object: &Value) -> (Amount, Amount) {
     else {
         return (Amount::default(), Amount::default());
     };
-    let resources = |container: &zeabur_kube::k8s_openapi::api::core::v1::Container| {
-        let map = |pick: Option<
-            &BTreeMap<String, zeabur_kube::k8s_openapi::apimachinery::pkg::api::resource::Quantity>,
-        >| {
-            pick.into_iter()
-                .flatten()
-                .map(|(k, v)| (k.clone(), v.0.clone()))
-                .collect()
-        };
-        let r = container.resources.as_ref();
-        ContainerResources {
-            requests: map(r.and_then(|r| r.requests.as_ref())),
-            limits: map(r.and_then(|r| r.limits.as_ref())),
-            sidecar: container.restart_policy.as_deref() == Some("Always"),
-        }
-    };
-    let pod = ClusterPod {
-        containers: spec.containers.iter().map(resources).collect(),
-        init_containers: spec
-            .init_containers
-            .iter()
-            .flatten()
-            .map(resources)
-            .collect(),
-        overhead: spec
-            .overhead
-            .iter()
-            .flatten()
-            .map(|(k, v)| (k.clone(), v.0.clone()))
-            .collect(),
-        ..ClusterPod::default()
-    };
-    pod_amounts(&pod)
+    spec_amounts(&spec)
 }
 
 fn template_fields(object: &PlannedObject) -> Vec<String> {

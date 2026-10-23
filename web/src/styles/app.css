@@ -25,6 +25,8 @@
   --grid-template-columns-invitation-phone: minmax(0, 1fr) auto;
   --grid-template-columns-record: 4rem minmax(0, 1fr) minmax(0, 1fr);
   --grid-template-columns-record-phone: 4rem minmax(0, 1fr);
+  --grid-template-columns-drain: minmax(0, 10rem) minmax(0, 1fr);
+  --grid-template-columns-evicted: minmax(0, 1fr) auto;
   --translate-tooltip: calc(100% + 0.5rem);
   --height-palette: min(60vh, 420px);
   --height-frame: max(60vh, 420px);

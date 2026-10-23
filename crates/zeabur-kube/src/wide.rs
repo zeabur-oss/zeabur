@@ -25,6 +25,9 @@ use serde::de::DeserializeOwned;
 
 use crate::port::{ClusterError, ClusterEvents, ClusterPod, ClusterPods, ContainerResources};
 
+/// The annotation the kubelet puts on a static pod's mirror pod.
+pub(crate) const MIRROR: &str = "kubernetes.io/config.mirror";
+
 /// Items per page of a cluster-wide list.
 const PAGE: u32 = 500;
 
@@ -95,11 +98,26 @@ pub(crate) struct RawPod {
 }
 
 #[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 struct RawMeta {
     #[serde(default)]
     name: String,
     #[serde(default)]
     namespace: String,
+    #[serde(default)]
+    owner_references: Vec<RawOwner>,
+    #[serde(default)]
+    annotations: BTreeMap<String, String>,
+    #[serde(default)]
+    deletion_timestamp: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct RawOwner {
+    #[serde(default)]
+    kind: String,
+    #[serde(default)]
+    controller: Option<bool>,
 }
 
 #[derive(Deserialize, Default)]
@@ -115,6 +133,22 @@ struct RawPodSpec {
     overhead: BTreeMap<String, String>,
     #[serde(default)]
     resources: Option<RawResources>,
+    #[serde(default)]
+    volumes: Vec<RawVolume>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct RawVolume {
+    #[serde(default)]
+    persistent_volume_claim: Option<RawClaim>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct RawClaim {
+    #[serde(default)]
+    claim_name: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -147,7 +181,23 @@ impl From<RawPod> for ClusterPod {
             limits: c.resources.limits,
             sidecar: c.restart_policy.as_deref() == Some("Always"),
         };
+        let controller = raw
+            .metadata
+            .owner_references
+            .into_iter()
+            .find(|o| o.controller == Some(true))
+            .map(|o| o.kind);
         Self {
+            controller,
+            mirror: raw.metadata.annotations.contains_key(MIRROR),
+            terminating: raw.metadata.deletion_timestamp.is_some(),
+            claims: raw
+                .spec
+                .volumes
+                .into_iter()
+                .filter_map(|v| v.persistent_volume_claim)
+                .map(|c| c.claim_name)
+                .collect(),
             namespace: raw.metadata.namespace,
             name: raw.metadata.name,
             node_name: raw.spec.node_name.filter(|n| !n.is_empty()),
@@ -268,5 +318,31 @@ mod tests {
         assert!(!pod.init_containers[0].sidecar && pod.init_containers[1].sidecar);
         assert_eq!(pod.overhead["cpu"], "10m");
         assert_eq!(pod.pod_resources.unwrap().limits["memory"], "1Gi");
+        assert_eq!(
+            (pod.controller, pod.mirror, pod.terminating),
+            (None, false, false)
+        );
+    }
+
+    #[test]
+    fn a_pods_controller_mirror_deletion_and_claims_are_kept() {
+        let pod = slim_pod(serde_json::json!({
+            "metadata": {"name": "canal-x", "namespace": "kube-system",
+                "deletionTimestamp": "2026-10-23T10:00:00Z",
+                "annotations": {MIRROR: "abc"},
+                "ownerReferences": [
+                    {"apiVersion": "v1", "kind": "Node", "name": "n", "uid": "1"},
+                    {"apiVersion": "apps/v1", "kind": "DaemonSet", "name": "canal", "uid": "2",
+                     "controller": true}
+                ]},
+            "spec": {"containers": [], "volumes": [
+                {"name": "data", "persistentVolumeClaim": {"claimName": "data-0"}},
+                {"name": "tmp", "emptyDir": {}}
+            ]}
+        }))
+        .unwrap();
+        assert_eq!(pod.controller.as_deref(), Some("DaemonSet"));
+        assert!(pod.mirror && pod.terminating);
+        assert_eq!(pod.claims, ["data-0"]);
     }
 }

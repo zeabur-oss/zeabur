@@ -363,6 +363,16 @@ export const zhCN: Messages = {
   "node.word.cordoned": "已停止调度",
   "node.word.reservedMemory": "内存预留过量",
   "node.word.reservedCpu": "CPU 预留过量",
+  "node.word.maintenance": "维护中",
+  "node.word.draining": "正在迁出副本",
+  "node.drainingLeft": (n) => `正在迁出副本，剩 ${n} 个`,
+  "node.pinnedLeft": (n) => `${n} 个副本的数据只在这个节点上，留在原处`,
+  "node.maintenance": (n, node) => (n === 1 ? `${node} 维护中` : `${n} 个节点维护中`),
+  "node.maintenance.why": "上面已经没有要迁走的副本，也不会再放新的副本。",
+  "node.maintenance.fix": "维护完成后，从节点菜单恢复调度。",
+  "node.draining": (n, node) => (n === 1 ? `正在把副本迁出 ${node}` : `正在把副本迁出 ${n} 个节点`),
+  "node.draining.why": "这些副本会在其他节点重新启动。",
+  "node.draining.fix": "从节点菜单打开维护模式，就能看到还剩哪些。",
   "cluster.cores": (n) => `${n} 核`,
   "cluster.requestedOf": (requested, allocatable) => `已预留 ${requested}/${allocatable}`,
   "cluster.allocatable": (allocatable) => `可分配 ${allocatable}`,
@@ -463,6 +473,62 @@ export const zhCN: Messages = {
   "policies.planTitle": "更新网络策略",
   "policies.planLine": (namespaces) =>
     `让所有节点的流量进入 ${listZh("zh-CN", namespaces)}。每条策略只改节点地址，其他设置不变。`,
+  "maint.actions": (node) => `${node} 的操作`,
+  "maint.cordon": "停止调度",
+  "maint.drain": "维护模式",
+  "maint.continue": "继续维护",
+  "maint.uncordon": "恢复调度",
+  "maint.title.cordon": (node) => `停止 ${node} 的调度`,
+  "maint.title.drain": (node) => `让 ${node} 进入维护模式`,
+  "maint.title.uncordon": (node) => `恢复 ${node} 的调度`,
+  "maint.lead.cordon": (node) => `新的副本不会再放到 ${node}，上面正在运行的副本会继续运行。`,
+  "maint.lead.uncordon": (node) => `${node} 会重新开始接收新的副本。`,
+  "maint.lead.drain": (node, n) =>
+    n === 0
+      ? `${node} 会停止调度，上面没有需要迁走的副本。`
+      : `${node} 会停止调度，再把 ${n} 个副本迁到其他节点。`,
+  "maint.lead.continue": (node, n) =>
+    n === 0 ? `${node} 上已经没有要迁走的副本。` : `${node} 上还有 ${n} 个副本，会迁到其他节点。`,
+  "maint.amounts": (cpu, memory) => `${cpu} CPU 和 ${memory} 内存`,
+  "maint.fits": (needs, room) => `其他节点放得下：这些副本请求 ${needs}，目前还有 ${room} 可用。`,
+  "maint.short": (n) => `其他节点放不下其中 ${n} 个副本，要等到有空间或加了节点才会启动。`,
+  "maint.shortDetail": (needs, room) => `它们请求 ${needs}，其他节点只剩 ${room}。`,
+  "maint.unknownRoom": "Zeabur 无法读取所有 Pod，所以无法确认其他节点放不放得下。",
+  "maint.noOther": "没有其他节点能放新的副本，迁走的副本会一直等到有节点可用。",
+  "maint.controlPlane": (node) =>
+    `${node} 运行集群的控制平面。控制平面的组件会留在上面，但这个节点停机时，集群可能没有响应。`,
+  "maint.zeabur": "Zeabur 本身也在这个节点上。迁走时这个页面会断开一下，然后自动重新连接。",
+  "maint.moves": (n) => `迁到其他节点（${n}）`,
+  "maint.scratch": (n) => `其中 ${n} 个副本的临时空间会清空。`,
+  "maint.lose": "临时空间会清空",
+  "maint.budget": (name) => `受中断预算 ${name} 限制，可能要等一下`,
+  "maint.stuck": (n) => `无法迁走（${n}）`,
+  "maint.stuck.why": (node) =>
+    `它们的数据只放在 ${node} 上，换到其他节点会读不到，只能等 ${node} 回来。`,
+  "maint.stuck.include": (node) => `仍然迁走，${node} 回来前这些副本都无法使用`,
+  "maint.deleted": (n) => `不属于任何服务（${n}）`,
+  "maint.deleted.why": "没有东西会再启动它们，迁走就等于永久删除。",
+  "maint.deleted.confirm": "删除它们",
+  "maint.stays": (n) => `留在节点上（${n}）`,
+  "maint.stays.why": "每个节点都会运行一份，或由节点自己的文件启动。",
+  "maint.reason.daemonSet": "每个节点都有",
+  "maint.reason.static": "由节点启动",
+  "maint.kube.command": "命令",
+  "maint.kube.budgets": "中断预算",
+  "maint.progress": (node, left, total) =>
+    `正在把副本迁出 ${node}，还剩 ${left} 个（共 ${total} 个）。`,
+  "maint.done": (node, kept) =>
+    kept === 0
+      ? `${node} 已进入维护，副本都迁走了。`
+      : `${node} 已进入维护。有 ${kept} 个副本的数据只在 ${node} 上，所以留在原处。`,
+  "maint.stopped": "有些副本迁不走。",
+  "maint.outcome.waiting": (budget) => (budget ? `等待中断预算 ${budget}` : "等待中断预算"),
+  "maint.outcome.refused": "你没有权限迁走它",
+  "maint.outcome.failed": "迁不走",
+  "maint.leaveNote":
+    "可以先关掉这个窗口。节点会保持停止调度，要迁走剩下的副本时，再打开维护模式即可。",
+  "maint.retry": "再试一次",
+  "maint.unreadable": "有些数据无法读取，这份计划可能没算到中断预算，或存在这个节点本地的卷。",
   "warning.join.sameRegion":
     "所有节点都要在同一家云服务商的同一个区域。同一区域内的不同可用区没有问题；跨服务商或跨区域时，延迟会拖慢 etcd、Kubernetes API 和存储，甚至让集群不稳定。",
   "warning.join.ports":

@@ -55,6 +55,7 @@ pub(crate) mod disks;
 pub(crate) mod health;
 pub mod install;
 pub mod join;
+pub mod maintenance;
 pub mod modules;
 pub mod node_policies;
 pub mod node_shells;
@@ -229,7 +230,7 @@ fn resources(map: Option<&BTreeMap<String, Quantity>>) -> Resources {
 /// `control-plane`.
 ///
 /// [k8s-printers]: https://github.com/kubernetes/kubernetes/blob/master/pkg/printers/internalversion/printers.go
-fn roles(labels: Option<&BTreeMap<String, String>>) -> Vec<String> {
+pub(crate) fn roles(labels: Option<&BTreeMap<String, String>>) -> Vec<String> {
     let mut roles: Vec<String> = labels
         .into_iter()
         .flatten()
@@ -316,6 +317,9 @@ fn node_view(node: &Node) -> NodeView {
         capacity: resources(capacity_map),
         requests: None,
         limits: None,
+        movable_pods: None,
+        leaving_pods: None,
+        pinned_pods: None,
         usage: None,
         disk: None,
         created: node
@@ -429,6 +433,10 @@ pub(crate) async fn nodes(
         Err(_) => (None, MetricsState::Unavailable),
     };
 
+    let movable = match &pods {
+        Some(pods) => maintenance::node_pods(cluster.as_ref(), &nodes, &pods.pods).await,
+        None => BTreeMap::new(),
+    };
     let mut sums: BTreeMap<String, (Amount, Amount, u64)> = BTreeMap::new();
     let mut unscheduled = 0;
     if let Some(pods) = &pods {
@@ -465,6 +473,10 @@ pub(crate) async fn nodes(
                 memory_bytes: limits.memory,
                 pods: None,
             });
+            let counts = movable.get(&item.name).copied().unwrap_or_default();
+            item.movable_pods = Some(counts.moving);
+            item.leaving_pods = Some(counts.leaving);
+            item.pinned_pods = Some(counts.pinned);
         }
         item.usage = usage.as_ref().and_then(|u| u.get(&item.name).copied());
         totals.allocatable =

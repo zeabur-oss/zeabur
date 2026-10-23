@@ -363,6 +363,16 @@ export const zhTW: Messages = {
   "node.word.cordoned": "已停止排程",
   "node.word.reservedMemory": "記憶體保留過量",
   "node.word.reservedCpu": "CPU 保留過量",
+  "node.word.maintenance": "維護中",
+  "node.word.draining": "正在移出副本",
+  "node.drainingLeft": (n) => `正在移出副本，剩 ${n} 個`,
+  "node.pinnedLeft": (n) => `${n} 個副本的資料只在這個節點上，留在原地`,
+  "node.maintenance": (n, node) => (n === 1 ? `${node} 維護中` : `${n} 個節點維護中`),
+  "node.maintenance.why": "上面已經沒有要移走的副本，也不會再放新的副本。",
+  "node.maintenance.fix": "維護完成後，從節點選單恢復排程。",
+  "node.draining": (n, node) => (n === 1 ? `正在把副本移出 ${node}` : `正在把副本移出 ${n} 個節點`),
+  "node.draining.why": "這些副本會在其他節點重新啟動。",
+  "node.draining.fix": "從節點選單打開維護模式，就能看到還剩哪些。",
   "cluster.cores": (n) => `${n} 核`,
   "cluster.requestedOf": (requested, allocatable) => `已保留 ${requested}/${allocatable}`,
   "cluster.allocatable": (allocatable) => `可分配 ${allocatable}`,
@@ -463,6 +473,62 @@ export const zhTW: Messages = {
   "policies.planTitle": "更新網路政策",
   "policies.planLine": (namespaces) =>
     `讓所有節點的流量進入 ${listZh("zh-TW", namespaces)}。每條政策只改節點位址，其他設定不變。`,
+  "maint.actions": (node) => `${node} 的操作`,
+  "maint.cordon": "停止排程",
+  "maint.drain": "維護模式",
+  "maint.continue": "繼續維護",
+  "maint.uncordon": "恢復排程",
+  "maint.title.cordon": (node) => `停止 ${node} 的排程`,
+  "maint.title.drain": (node) => `讓 ${node} 進入維護模式`,
+  "maint.title.uncordon": (node) => `恢復 ${node} 的排程`,
+  "maint.lead.cordon": (node) => `新的副本不會再放到 ${node}，上面正在執行的副本會繼續執行。`,
+  "maint.lead.uncordon": (node) => `${node} 會再開始接收新的副本。`,
+  "maint.lead.drain": (node, n) =>
+    n === 0
+      ? `${node} 會停止排程，上面沒有需要移走的副本。`
+      : `${node} 會停止排程，再把 ${n} 個副本移到其他節點。`,
+  "maint.lead.continue": (node, n) =>
+    n === 0 ? `${node} 上已經沒有要移走的副本。` : `${node} 上還有 ${n} 個副本，會移到其他節點。`,
+  "maint.amounts": (cpu, memory) => `${cpu} CPU 和 ${memory} 記憶體`,
+  "maint.fits": (needs, room) => `其他節點放得下：這些副本要求 ${needs}，目前還有 ${room} 可用。`,
+  "maint.short": (n) => `其他節點放不下其中 ${n} 個副本，要等到有空間或加了節點才會啟動。`,
+  "maint.shortDetail": (needs, room) => `它們要求 ${needs}，其他節點只剩 ${room}。`,
+  "maint.unknownRoom": "Zeabur 沒辦法讀取所有 Pod，所以無法確認其他節點放不放得下。",
+  "maint.noOther": "沒有其他節點能放新的副本，移走的副本會一直等到有節點可用。",
+  "maint.controlPlane": (node) =>
+    `${node} 執行叢集的控制平面。控制平面的元件會留在上面，但這個節點停機時，叢集可能沒有回應。`,
+  "maint.zeabur": "Zeabur 本身也在這個節點上。移走時這個頁面會斷線一下，接著自動重新連上。",
+  "maint.moves": (n) => `移到其他節點（${n}）`,
+  "maint.scratch": (n) => `其中 ${n} 個副本的暫存空間會清空。`,
+  "maint.lose": "暫存空間會清空",
+  "maint.budget": (name) => `受中斷預算 ${name} 限制，可能要等一下`,
+  "maint.stuck": (n) => `無法移走（${n}）`,
+  "maint.stuck.why": (node) =>
+    `它們的資料只放在 ${node} 上，換到其他節點會讀不到，只能等 ${node} 回來。`,
+  "maint.stuck.include": (node) => `還是要移走，${node} 回來前這些副本都無法使用`,
+  "maint.deleted": (n) => `不屬於任何服務（${n}）`,
+  "maint.deleted.why": "沒有東西會再啟動它們，移走就等於永久刪除。",
+  "maint.deleted.confirm": "刪除它們",
+  "maint.stays": (n) => `留在節點上（${n}）`,
+  "maint.stays.why": "每個節點都會執行一份，或是由節點自己的檔案啟動。",
+  "maint.reason.daemonSet": "每個節點都有",
+  "maint.reason.static": "由節點啟動",
+  "maint.kube.command": "指令",
+  "maint.kube.budgets": "中斷預算",
+  "maint.progress": (node, left, total) =>
+    `正在把副本移出 ${node}，還剩 ${left} 個（共 ${total} 個）。`,
+  "maint.done": (node, kept) =>
+    kept === 0
+      ? `${node} 已進入維護，副本都移走了。`
+      : `${node} 已進入維護。有 ${kept} 個副本的資料只在 ${node} 上，所以留在原地。`,
+  "maint.stopped": "有些副本移不走。",
+  "maint.outcome.waiting": (budget) => (budget ? `等待中斷預算 ${budget}` : "等待中斷預算"),
+  "maint.outcome.refused": "你沒有權限移走它",
+  "maint.outcome.failed": "移不走",
+  "maint.leaveNote":
+    "可以先關掉這個視窗。節點會維持停止排程，要移走剩下的副本時，再打開維護模式就好。",
+  "maint.retry": "再試一次",
+  "maint.unreadable": "有些資料無法讀取，這份計畫可能沒算到中斷預算，或存在這個節點本機的磁碟區。",
   "warning.join.sameRegion":
     "所有節點都要在同一家主機服務商的同一個區域。同一區域內的不同可用區域沒有問題；跨服務商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存，甚至讓叢集不穩定。",
   "warning.join.ports":

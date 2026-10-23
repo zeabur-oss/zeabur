@@ -521,6 +521,133 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/nodes/{node}/maintenance/apply":
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Carries out a plan by its token: patches `spec.unschedulable` and, for maintenance, makes the
+        first eviction pass.
+      operationId: applyNodeMaintenance
+      parameters:
+      - name: node
+        in: path
+        description: The node's name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceApply"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DrainProgress"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/nodes/{node}/maintenance/evict":
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Evicts the pods of a maintenance plan that are still on the node, once; the browser calls it
+        again while it waits. Accepted for an hour after the plan expires, while the node stays
+        cordoned.
+      operationId: evictNodePods
+      parameters:
+      - name: node
+        in: path
+        description: The node's name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceApply"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DrainProgress"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/nodes/{node}/maintenance/plan":
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Works out what stopping scheduling, resuming it or maintenance does to the node and its pods,
+        and a token to apply it; writes nothing.
+      operationId: planNodeMaintenance
+      parameters:
+      - name: node
+        in: path
+        description: The node's name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaintenancePlan"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/upgrades:
     get:
       tags:
@@ -3210,6 +3337,13 @@ components:
           items:
             $ref: "#/components/schemas/Capability"
           description: "Each capability, sorted by name: existing (with evidence) or not (with what to install)."
+    CapacityStatus:
+      type: string
+      description: Whether the other nodes have room for the pods that move.
+      enum:
+      - fits
+      - short
+      - unknown
     CertificateCheck:
       type: object
       description: A domain's certificate, as cert-manager reports it.
@@ -5164,6 +5298,128 @@ components:
           description: |-
             The domain a new URL is suggested under, as `<service>-<project>.<suffix>`; a wildcard
             DNS record sends it to the cluster's ingress. `None`: people type the whole host.
+    DrainCapacity:
+      type: object
+      description: The moving pods against the room on the other nodes.
+      required:
+      - status
+      - needs
+      - unplaced
+      properties:
+        needs:
+          $ref: "#/components/schemas/Resources"
+          description: What the moving pods request, with their count.
+        room:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: |-
+              What the other ready, schedulable nodes have left, with how many pods they take; absent
+              when unknown.
+          - type: "null"
+        status:
+          $ref: "#/components/schemas/CapacityStatus"
+          description: The verdict.
+        unplaced:
+          type: array
+          items:
+            type: string
+          description: The moving pods that fit on no node, as `namespace/name`.
+    DrainPod:
+      type: object
+      description: A pod on the node, and what maintenance does to it.
+      required:
+      - namespace
+      - name
+      - fate
+      - scratch
+      - localClaims
+      - budgetBlocks
+      - zeabur
+      - terminating
+      - requests
+      properties:
+        budget:
+          type:
+          - string
+          - "null"
+          description: The `PodDisruptionBudget` that covers it.
+        budgetBlocks:
+          type: boolean
+          description: That budget allows no disruption now, so its eviction waits.
+        fate:
+          $ref: "#/components/schemas/PodFate"
+          description: What happens to it.
+        localClaims:
+          type: array
+          items:
+            type: string
+          description: Its claims bound to a volume kept on this node.
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type: string
+          description: Its namespace.
+        project:
+          type:
+          - string
+          - "null"
+          description: The project it is in, when its namespace is one.
+        projectName:
+          type:
+          - string
+          - "null"
+          description: The project's display name, when it has one.
+        requests:
+          $ref: "#/components/schemas/Resources"
+          description: What it requests.
+        scratch:
+          type: array
+          items:
+            type: string
+          description: Its `emptyDir` volumes, emptied when it is evicted.
+        stays:
+          oneOf:
+          - $ref: "#/components/schemas/StayReason"
+            description: Why it stays, when it does.
+          - type: "null"
+        terminating:
+          type: boolean
+          description: Already being deleted.
+        workload:
+          oneOf:
+          - $ref: "#/components/schemas/PodWorkload"
+            description: Its workload, when its controller says which.
+          - type: "null"
+        zeabur:
+          type: boolean
+          description: One of Zeabur's own pods.
+    DrainProgress:
+      type: object
+      description: The node after an apply or a pass.
+      required:
+      - cordoned
+      - pods
+      - remaining
+      - done
+      properties:
+        cordoned:
+          type: boolean
+          description: Whether the node is cordoned.
+        done:
+          type: boolean
+          description: None of them is left.
+        pods:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvictedPod"
+          description: >-
+            The pods being evicted, in the plan's order; empty for stop and resume
+            scheduling.
+        remaining:
+          type: integer
+          description: How many of them are still on the node.
+          minimum: 0
     ElevationState:
       type: string
       description: Whether administrator rights are offered and in use.
@@ -5354,6 +5610,49 @@ components:
         type:
           type: string
           description: "`Normal` or `Warning`."
+    EvictOutcome:
+      type: string
+      description: What a pass found or did for one pod.
+      enum:
+      - gone
+      - leaving
+      - waiting
+      - refused
+      - failed
+    EvictedPod:
+      type: object
+      description: One pod of a pass.
+      required:
+      - namespace
+      - name
+      - outcome
+      properties:
+        budget:
+          type:
+          - string
+          - "null"
+          description: The budget it waits on, when one was found.
+        detail:
+          type:
+          - string
+          - "null"
+          description: kube-apiserver's message, for a refusal or a failure.
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type: string
+          description: Its namespace.
+        outcome:
+          $ref: "#/components/schemas/EvictOutcome"
+          description: What happened.
+        retryAfterSeconds:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: How long kube-apiserver asked to wait before trying again.
+          minimum: 0
     EvidenceBundle:
       type: object
       description: A service's evidence, as Markdown.
@@ -6677,6 +6976,91 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The pod (and container, as `fieldPath`).
+    MaintenanceApply:
+      type: object
+      description: >-
+        The token of a plan, and what the person chose to evict besides the pods that
+        move.
+      required:
+      - token
+      properties:
+        includeDeleted:
+          type: boolean
+          description: Also evict (delete) the pods without a controller.
+        includeStuck:
+          type: boolean
+          description: Also evict the pods whose volume is kept on this node.
+        token:
+          type: string
+          description: The token `plan` returned.
+    MaintenancePlan:
+      type: object
+      description: What a plan changes, and the token that applies it.
+      required:
+      - token
+      - expiresAt
+      - node
+      - action
+      - cordoned
+      - roles
+      - otherSchedulable
+      - zeaburHere
+      - pods
+      - unreadable
+      properties:
+        action:
+          $ref: "#/components/schemas/NodeAction"
+          description: The action.
+        capacity:
+          oneOf:
+          - $ref: "#/components/schemas/DrainCapacity"
+            description: Whether the moving pods fit elsewhere; maintenance only.
+          - type: "null"
+        cordoned:
+          type: boolean
+          description: Whether the node is cordoned now.
+        expiresAt:
+          type: string
+          description: When the token stops working, RFC 3339.
+        node:
+          type: string
+          description: The node.
+        otherSchedulable:
+          type: integer
+          description: How many other nodes are ready and take new pods.
+          minimum: 0
+        pods:
+          type: array
+          items:
+            $ref: "#/components/schemas/DrainPod"
+          description: The pods on the node, those that move first, then by namespace and name.
+        roles:
+          type: array
+          items:
+            type: string
+          description: Its roles (`control-plane`, `etcd`).
+        token:
+          type: string
+          description: Send this to `apply` to carry out exactly this plan.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: |-
+            Reads that were refused and what they leave unchecked (`persistentvolumes`,
+            `poddisruptionbudgets.policy`, `pods`).
+        zeaburHere:
+          type: boolean
+          description: Zeabur itself runs on this node.
+    MaintenanceRequest:
+      type: object
+      description: The action to plan.
+      required:
+      - action
+      properties:
+        action:
+          $ref: "#/components/schemas/NodeAction"
+          description: What to do.
     ManagedBy:
       type: object
       description: |-
@@ -7340,6 +7724,13 @@ components:
         toOutside:
           $ref: "#/components/schemas/NetworkPolicyAccess"
           description: Addresses outside the cluster's pods.
+    NodeAction:
+      type: string
+      description: What a plan changes on a node.
+      enum:
+      - cordon
+      - uncordon
+      - drain
     NodeBehind:
       type: object
       description: A node some baseline policy drops traffic from.
@@ -7792,6 +8183,13 @@ components:
         kubeletVersion:
           type: string
           description: The kubelet's version.
+        leavingPods:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: How many of those are being deleted; absent when pods cannot be listed.
+          minimum: 0
         limits:
           oneOf:
           - $ref: "#/components/schemas/Resources"
@@ -7799,6 +8197,15 @@ components:
               What the pods placed here may use at most (containers without a limit add nothing);
               absent when pods cannot be listed.
           - type: "null"
+        movablePods:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: |-
+            The pods placed here that maintenance would move (all but a DaemonSet's, static pods'
+            mirrors, finished pods and those in `pinnedPods`); absent when pods cannot be listed.
+          minimum: 0
         name:
           type: string
           description: Its name.
@@ -7808,6 +8215,15 @@ components:
         osImage:
           type: string
           description: The operating system image.
+        pinnedPods:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: |-
+            Pods maintenance leaves here because a volume they use is only on this node, not counted
+            in `movablePods`; 0 as well when PersistentVolumes cannot be listed.
+          minimum: 0
         problems:
           type: array
           items:
@@ -8868,6 +9284,14 @@ components:
       description: |-
         How a planned write changes its object: a new object is created whole, an existing one is
         patched or deleted. Creations and patches go as the field manager `zeabur`.
+    PodFate:
+      type: string
+      description: What maintenance does to a pod.
+      enum:
+      - moves
+      - stays
+      - deleted
+      - stuck
     PodScan:
       type: string
       description: How much of the pods were read for the requests. An open set.
@@ -8971,6 +9395,19 @@ components:
         pod:
           type: string
           description: The pod.
+    PodWorkload:
+      type: object
+      description: The workload a pod belongs to, as the interface links it.
+      required:
+      - kind
+      - name
+      properties:
+        kind:
+          type: string
+          description: "`Deployment`, `StatefulSet`, `DaemonSet`, `Job`, or the controller's own kind."
+        name:
+          type: string
+          description: Its name.
     PolicyWrite:
       type: object
       description: One policy a plan rewrites.
@@ -11157,6 +11594,12 @@ components:
       - completed
       - unknown
       - building
+    StayReason:
+      type: string
+      description: Why a pod stays.
+      enum:
+      - daemonSet
+      - static
     StoreState:
       type: string
       description: Whether the metrics store answered, as the person. An open set.

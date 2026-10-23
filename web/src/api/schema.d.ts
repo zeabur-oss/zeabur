@@ -402,6 +402,67 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/nodes/{node}/maintenance/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Carries out a plan by its token: patches `spec.unschedulable` and, for maintenance, makes the
+     *     first eviction pass.
+     */
+    post: operations["applyNodeMaintenance"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/nodes/{node}/maintenance/evict": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Evicts the pods of a maintenance plan that are still on the node, once; the browser calls it
+     *     again while it waits. Accepted for an hour after the plan expires, while the node stays
+     *     cordoned.
+     */
+    post: operations["evictNodePods"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/nodes/{node}/maintenance/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out what stopping scheduling, resuming it or maintenance does to the node and its pods,
+     *     and a token to apply it; writes nothing.
+     */
+    post: operations["planNodeMaintenance"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/upgrades": {
     parameters: {
       query?: never
@@ -1728,6 +1789,11 @@ export interface components {
       /** @description Each capability, sorted by name: existing (with evidence) or not (with what to install). */
       items: components["schemas"]["Capability"][]
     }
+    /**
+     * @description Whether the other nodes have room for the pods that move.
+     * @enum {string}
+     */
+    CapacityStatus: "fits" | "short" | "unknown"
     /** @description A domain's certificate, as cert-manager reports it. */
     CertificateCheck: {
       /** @description cert-manager's own words, in English. */
@@ -2715,6 +2781,56 @@ export interface components {
        */
       suffix?: string | null
     }
+    /** @description The moving pods against the room on the other nodes. */
+    DrainCapacity: {
+      /** @description What the moving pods request, with their count. */
+      needs: components["schemas"]["Resources"]
+      room?: components["schemas"]["Resources"] | null
+      /** @description The verdict. */
+      status: components["schemas"]["CapacityStatus"]
+      /** @description The moving pods that fit on no node, as `namespace/name`. */
+      unplaced: string[]
+    }
+    /** @description A pod on the node, and what maintenance does to it. */
+    DrainPod: {
+      /** @description The `PodDisruptionBudget` that covers it. */
+      budget?: string | null
+      /** @description That budget allows no disruption now, so its eviction waits. */
+      budgetBlocks: boolean
+      /** @description What happens to it. */
+      fate: components["schemas"]["PodFate"]
+      /** @description Its claims bound to a volume kept on this node. */
+      localClaims: string[]
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace. */
+      namespace: string
+      /** @description The project it is in, when its namespace is one. */
+      project?: string | null
+      /** @description The project's display name, when it has one. */
+      projectName?: string | null
+      /** @description What it requests. */
+      requests: components["schemas"]["Resources"]
+      /** @description Its `emptyDir` volumes, emptied when it is evicted. */
+      scratch: string[]
+      stays?: components["schemas"]["StayReason"] | null
+      /** @description Already being deleted. */
+      terminating: boolean
+      workload?: components["schemas"]["PodWorkload"] | null
+      /** @description One of Zeabur's own pods. */
+      zeabur: boolean
+    }
+    /** @description The node after an apply or a pass. */
+    DrainProgress: {
+      /** @description Whether the node is cordoned. */
+      cordoned: boolean
+      /** @description None of them is left. */
+      done: boolean
+      /** @description The pods being evicted, in the plan's order; empty for stop and resume scheduling. */
+      pods: components["schemas"]["EvictedPod"][]
+      /** @description How many of them are still on the node. */
+      remaining: number
+    }
     /**
      * @description Whether administrator rights are offered and in use.
      * @enum {string}
@@ -2807,6 +2923,29 @@ export interface components {
       reporter?: string | null
       /** @description `Normal` or `Warning`. */
       type: string
+    }
+    /**
+     * @description What a pass found or did for one pod.
+     * @enum {string}
+     */
+    EvictOutcome: "gone" | "leaving" | "waiting" | "refused" | "failed"
+    /** @description One pod of a pass. */
+    EvictedPod: {
+      /** @description The budget it waits on, when one was found. */
+      budget?: string | null
+      /** @description kube-apiserver's message, for a refusal or a failure. */
+      detail?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace. */
+      namespace: string
+      /** @description What happened. */
+      outcome: components["schemas"]["EvictOutcome"]
+      /**
+       * Format: int32
+       * @description How long kube-apiserver asked to wait before trying again.
+       */
+      retryAfterSeconds?: number | null
     }
     /** @description A service's evidence, as Markdown. */
     EvidenceBundle: {
@@ -3531,6 +3670,47 @@ export interface components {
       /** @description The pod (and container, as `fieldPath`). */
       origin: components["schemas"]["Origin"]
     }
+    /** @description The token of a plan, and what the person chose to evict besides the pods that move. */
+    MaintenanceApply: {
+      /** @description Also evict (delete) the pods without a controller. */
+      includeDeleted?: boolean
+      /** @description Also evict the pods whose volume is kept on this node. */
+      includeStuck?: boolean
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description What a plan changes, and the token that applies it. */
+    MaintenancePlan: {
+      /** @description The action. */
+      action: components["schemas"]["NodeAction"]
+      capacity?: components["schemas"]["DrainCapacity"] | null
+      /** @description Whether the node is cordoned now. */
+      cordoned: boolean
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description The node. */
+      node: string
+      /** @description How many other nodes are ready and take new pods. */
+      otherSchedulable: number
+      /** @description The pods on the node, those that move first, then by namespace and name. */
+      pods: components["schemas"]["DrainPod"][]
+      /** @description Its roles (`control-plane`, `etcd`). */
+      roles: string[]
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /**
+       * @description Reads that were refused and what they leave unchecked (`persistentvolumes`,
+       *     `poddisruptionbudgets.policy`, `pods`).
+       */
+      unreadable: components["schemas"]["UnreadableView"][]
+      /** @description Zeabur itself runs on this node. */
+      zeaburHere: boolean
+    }
+    /** @description The action to plan. */
+    MaintenanceRequest: {
+      /** @description What to do. */
+      action: components["schemas"]["NodeAction"]
+    }
     /**
      * @description The custom resource whose operator controls a workload. Direct edits to the workload are
      *     reverted by that operator; the resource is what to change.
@@ -3879,6 +4059,11 @@ export interface components {
       /** @description Addresses outside the cluster's pods. */
       toOutside: components["schemas"]["NetworkPolicyAccess"]
     }
+    /**
+     * @description What a plan changes on a node.
+     * @enum {string}
+     */
+    NodeAction: "cordon" | "uncordon" | "drain"
     /** @description A node some baseline policy drops traffic from. */
     NodeBehind: {
       /** @description Its addresses a policy does not let in. */
@@ -4087,13 +4272,30 @@ export interface components {
       kernelVersion: string
       /** @description The kubelet's version. */
       kubeletVersion: string
+      /**
+       * Format: int64
+       * @description How many of those are being deleted; absent when pods cannot be listed.
+       */
+      leavingPods?: number | null
       limits?: components["schemas"]["Resources"] | null
+      /**
+       * Format: int64
+       * @description The pods placed here that maintenance would move (all but a DaemonSet's, static pods'
+       *     mirrors, finished pods and those in `pinnedPods`); absent when pods cannot be listed.
+       */
+      movablePods?: number | null
       /** @description Its name. */
       name: string
       /** @description The Node. */
       origin: components["schemas"]["Origin"]
       /** @description The operating system image. */
       osImage: string
+      /**
+       * Format: int64
+       * @description Pods maintenance leaves here because a volume they use is only on this node, not counted
+       *     in `movablePods`; 0 as well when PersistentVolumes cannot be listed.
+       */
+      pinnedPods?: number | null
       /** @description Conditions that are not as they should be. */
       problems: components["schemas"]["NodeCondition"][]
       /** @description The `Ready` condition: `True`, `False` or `Unknown`. */
@@ -4600,6 +4802,11 @@ export interface components {
           type: "ephemeralContainers"
         }
     /**
+     * @description What maintenance does to a pod.
+     * @enum {string}
+     */
+    PodFate: "moves" | "stays" | "deleted" | "stuck"
+    /**
      * @description How much of the pods were read for the requests. An open set.
      * @enum {string}
      */
@@ -4659,6 +4866,13 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description The pod. */
       pod: string
+    }
+    /** @description The workload a pod belongs to, as the interface links it. */
+    PodWorkload: {
+      /** @description `Deployment`, `StatefulSet`, `DaemonSet`, `Job`, or the controller's own kind. */
+      kind: string
+      /** @description Its name. */
+      name: string
     }
     /** @description One policy a plan rewrites. */
     PolicyWrite: {
@@ -5816,6 +6030,11 @@ export interface components {
       | "unknown"
       | "building"
     /**
+     * @description Why a pod stays.
+     * @enum {string}
+     */
+    StayReason: "daemonSet" | "static"
+    /**
      * @description Whether the metrics store answered, as the person. An open set.
      * @enum {string}
      */
@@ -6902,6 +7121,156 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyNodeMaintenance: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The node's name */
+        node: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MaintenanceApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["DrainProgress"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  evictNodePods: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The node's name */
+        node: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MaintenanceApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["DrainProgress"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planNodeMaintenance: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The node's name */
+        node: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MaintenanceRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["MaintenancePlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
         headers: {
           [name: string]: unknown
         }

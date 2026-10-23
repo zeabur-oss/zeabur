@@ -64,6 +64,9 @@
 //! | `POST /api/v1/cluster/node-policies/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/node-shells/plan` | what opening a shell on a node, or removing a shell pod, writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/node-shells/apply` | carries out that plan by its token |
+//! | `POST /api/v1/cluster/nodes/{node}/maintenance/plan` | what stopping scheduling, resuming it or maintenance does to a node's pods, and a token; writes nothing |
+//! | `POST /api/v1/cluster/nodes/{node}/maintenance/apply` | carries out that plan by its token: patches the node and makes the first eviction pass |
+//! | `POST /api/v1/cluster/nodes/{node}/maintenance/evict` | evicts that plan's pods still on the node, once more |
 //! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
 //! | `POST /api/v1/members/{username}/setup-links` | a new setup link for a member, optionally removing their passkeys first |
 //! | `DELETE /api/v1/members/{username}/credentials/{id}` | removes a member's passkey or linked account |
@@ -197,6 +200,9 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::node_shells::plan))
         .routes(routes!(cluster::node_shells::apply))
         .routes(routes!(cluster::node_shells::terminal))
+        .routes(routes!(cluster::maintenance::plan))
+        .routes(routes!(cluster::maintenance::apply))
+        .routes(routes!(cluster::maintenance::evict))
         .routes(routes!(cluster::nodes))
         .routes(routes!(cluster::health))
         .routes(routes!(cluster::upgrades))
