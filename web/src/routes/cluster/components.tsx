@@ -188,6 +188,7 @@ export function ComponentsPage() {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               aria-label={t("settings.searchComponents")}
+              placeholder={t("settings.searchComponents")}
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
           </label>

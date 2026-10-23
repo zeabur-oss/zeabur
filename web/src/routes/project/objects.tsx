@@ -273,6 +273,7 @@ function ObjectList({
             value={query}
             onChange={(event) => onQuery(event.target.value)}
             aria-label={t("objects.filter")}
+            placeholder={t("objects.filter")}
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </label>

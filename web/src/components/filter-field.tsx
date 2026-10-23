@@ -56,8 +56,9 @@ export function FilterField({
           }
         }}
         aria-label={label}
+        placeholder={label}
         aria-keyshortcuts={slash ? "/" : undefined}
-        className="w-full min-w-0 bg-transparent text-sm outline-none"
+        className="w-full min-w-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
       />
       {slash && !value ? <Kbd keys="/" aria-hidden="true" className="max-md:hidden" /> : null}
     </label>
