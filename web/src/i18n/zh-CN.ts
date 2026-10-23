@@ -722,6 +722,9 @@ export const zhCN: Messages = {
   "builds.word.sourceFailed": "无法获取源代码",
   "builds.word.builderMissing": "找不到构建器",
   "builds.word.retrying": "重试中",
+  "builds.refused.deployKey": "Git 主机不接受部署密钥。把它添加到仓库的部署密钥，不要给写入权限。",
+  "builds.refused.token": "Git 主机不接受访问令牌。确认令牌仍能读取仓库。",
+  "builds.showKey": "显示部署密钥",
   "builds.defaultBranch": "默认分支",
   "builds.since": (ago, commit) =>
     commit ? `最近一次构建于${ago}开始，来自 ${commit}` : `最近一次构建于${ago}开始`,
@@ -1883,6 +1886,7 @@ export const zhCN: Messages = {
   "add.access.tokenHint": "能读取仓库的令牌，通过 HTTPS 使用。",
   "add.access.noSecrets": "你的角色不能在这个项目新建 Secret，所以只能用公开仓库。",
   "add.deployKeyMake": "创建部署密钥",
+  "add.deployKeyPublic": "公钥",
   "add.deployKeyAdd": "把这把密钥加到仓库的部署密钥，不要给写入权限。",
   "add.deployKeyOpen": (host) => `到 ${host} 添加部署密钥`,
   "add.problem.deployKey": "请创建部署密钥，并加到仓库。",

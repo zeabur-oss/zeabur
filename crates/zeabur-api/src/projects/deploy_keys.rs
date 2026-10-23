@@ -24,8 +24,8 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_plan::{Change, PlanRequest};
 
-use crate::error::ApiError;
-use crate::handlers::{AppState, Everyday};
+use crate::error::{ApiError, get_read, read_problem};
+use crate::handlers::{AppState, Everyday, Person};
 use crate::plan_token::{self as token, PlanKey, TokenError};
 
 const PREFIX: &str = "k1.";
@@ -66,6 +66,14 @@ pub struct DeployKeyResponse {
     pub key: String,
     /// When the sealed key stops working, RFC 3339.
     pub expires_at: String,
+}
+
+/// The public half of a deploy key Zeabur made.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DeployKeyPublic {
+    /// One `ssh-ed25519 …` line, to add on the Git host again.
+    pub public_key: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -140,6 +148,35 @@ pub(crate) async fn create(
             .unwrap_or(zeabur_kube::k8s_openapi::jiff::Timestamp::UNIX_EPOCH)
             .to_string(),
     }))
+}
+
+/// The public key of the deploy key in Secret `name`, read as the person, for adding it to the
+/// Git host again. Only on the person's request: the Secret holds the private key too.
+#[utoipa::path(post, path = "/api/v1/projects/{project}/deploy-keys/{name}/public", tag = "projects",
+    operation_id = "deployKeyPublic",
+    params(("project" = String, Path, description = "The project's namespace"),
+           ("name" = String, Path, description = "The Secret holding the key")),
+    responses((status = 200, body = DeployKeyPublic),
+              (status = 400, body = Problem, content_type = PROBLEM),
+              (status = 403, body = Problem, content_type = PROBLEM),
+              (status = 404, body = Problem, content_type = PROBLEM)))]
+pub(crate) async fn public(
+    Person(cluster): Person,
+    Path((project, name)): Path<(String, String)>,
+) -> Result<Json<DeployKeyPublic>, ApiError> {
+    let values = cluster.reveal_secret(&project, &name).await.map_err(|e| {
+        read_problem(
+            e,
+            &format!("secret {name}"),
+            get_read("", "secrets", Some(&project), &name),
+        )
+    })?;
+    let public_key = values
+        .get("ssh-privatekey")
+        .and_then(|bytes| std::str::from_utf8(bytes).ok())
+        .and_then(zeabur_core::ssh::public_key)
+        .ok_or_else(|| refused(&format!("Secret {name} holds no SSH key Zeabur can read.")))?;
+    Ok(Json(DeployKeyPublic { public_key }))
 }
 
 fn random(_error: zeabur_core::crypto::RandomError) -> ApiError {

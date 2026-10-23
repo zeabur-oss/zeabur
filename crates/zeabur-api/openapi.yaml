@@ -1152,6 +1152,48 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/deploy-keys/{name}/public":
+    post:
+      tags:
+      - projects
+      summary: |-
+        The public key of the deploy key in Secret `name`, read as the person, for adding it to the
+        Git host again. Only on the person's request: the Secret holds the private key too.
+      operationId: deployKeyPublic
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        description: The Secret holding the key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployKeyPublic"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/events":
     get:
       tags:
@@ -5114,6 +5156,15 @@ components:
         verb:
           type: string
           description: The request verb (`create`, `patch`, …).
+    DeployKeyPublic:
+      type: object
+      description: The public half of a deploy key Zeabur made.
+      required:
+      - publicKey
+      properties:
+        publicKey:
+          type: string
+          description: One `ssh-ed25519 …` line, to add on the Git host again.
     DeployKeyRequest:
       type: object
       description: The Git host a deploy key is for.
@@ -12316,6 +12367,11 @@ components:
           - string
           - "null"
           description: The `ClusterBuilder`.
+        credentials:
+          type:
+          - string
+          - "null"
+          description: The Secret it reads the repository's credentials from.
         gitRef:
           type:
           - string

@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test"
 
 import { expect, test } from "../fixtures.ts"
+import { deleteService } from "./git.ts"
 import { invite, member, signInAsAdmin, toast } from "./members.ts"
 
 // Deploy from Git: a Developer deploys a small public repository with its Dockerfile from its
@@ -57,52 +58,61 @@ test("a Developer deploys a public repository from Git", async ({ page, browser 
     developerLink = await invite(page, "e2e-git-developer", [{ project, role: "developer" }])
   })
   const developer = await member(browser, developerLink, "e2e-git-developer", zeabur)
+  const made: string[] = []
+  try {
+    await test.step("a branch that does not exist fails at once, with the Builder's message", async () => {
+      const broken = `${name}-nobranch`
+      await deploy(developer, broken, "no-such-branch-e2e")
+      made.push(broken)
+      await developer.goto(servicePath(broken))
+      const status = developer.locator("main header").first()
+      await expect(status).toContainText("Build failed", { timeout: 120_000 })
+      const main = developer.getByRole("main")
+      const message = "no branch or tag `no-such-branch-e2e`"
+      await expect(main).toContainText(message, { timeout: 60_000 })
+      await main.getByRole("button", { name: "See the build" }).click()
+      await expect(main).toContainText("Can't get the source")
+      await expect(main).toContainText(message)
+    })
 
-  await test.step("a branch that does not exist fails at once, with the Builder's message", async () => {
-    const broken = `${name}-nobranch`
-    await deploy(developer, broken, "no-such-branch-e2e")
-    await developer.goto(servicePath(broken))
-    const status = developer.locator("main header").first()
-    await expect(status).toContainText("Build failed", { timeout: 120_000 })
-    const main = developer.getByRole("main")
-    const message = "no branch or tag `no-such-branch-e2e`"
-    await expect(main).toContainText(message, { timeout: 60_000 })
-    await main.getByRole("button", { name: "See the build" }).click()
-    await expect(main).toContainText("Can't get the source")
-    await expect(main).toContainText(message)
-  })
+    await test.step("the Developer fills in the repository and applies the plan", async () => {
+      await deploy(developer, name)
+      made.push(name)
+    })
 
-  await test.step("the Developer fills in the repository and applies the plan", async () => {
-    await deploy(developer, name)
-  })
+    const servicePage = servicePath(name)
+    await test.step("the service is building, not failing to pull its image", async () => {
+      await developer.goto(servicePage)
+      const status = developer.locator("main header").first()
+      await expect(status).toContainText(/Building|Ready/, { timeout: 60_000 })
+      await expect(status).not.toContainText("Failed")
+    })
 
-  const servicePage = servicePath(name)
-  await test.step("the service is building, not failing to pull its image", async () => {
-    await developer.goto(servicePage)
-    const status = developer.locator("main header").first()
-    await expect(status).toContainText(/Building|Ready/, { timeout: 60_000 })
-    await expect(status).not.toContainText("Failed")
-  })
-
-  await test.step("the first image arrives and the service runs", async () => {
-    await expect
-      .poll(
-        async () => {
-          const answer = await developer.request.get(
-            `/api/v1/projects/${encodeURIComponent(project)}`,
-          )
-          const body = (await answer.json()) as {
-            services: { name: string; status: { word: string }; pods: { ready: boolean }[] }[]
-          }
-          const service = body.services.find((s) => s.name === name)
-          expect(service?.status.word).not.toBe("failed")
-          return !!service && service.pods.length > 0 && service.pods.every((p) => p.ready)
-        },
-        { timeout: 900_000, intervals: [10_000] },
-      )
-      .toBe(true)
-    await developer.goto(`${servicePage}?tab=builds`)
-    await expect(developer.getByRole("main")).toContainText("Built")
-    if (whoami) await expect(developer.getByRole("main")).toContainText("whoami.git@master")
-  })
+    await test.step("the first image arrives and the service runs", async () => {
+      await expect
+        .poll(
+          async () => {
+            const answer = await developer.request.get(
+              `/api/v1/projects/${encodeURIComponent(project)}`,
+            )
+            const body = (await answer.json()) as {
+              services: { name: string; status: { word: string }; pods: { ready: boolean }[] }[]
+            }
+            const service = body.services.find((s) => s.name === name)
+            expect(service?.status.word).not.toBe("failed")
+            return !!service && service.pods.length > 0 && service.pods.every((p) => p.ready)
+          },
+          { timeout: 900_000, intervals: [10_000] },
+        )
+        .toBe(true)
+      await developer.goto(`${servicePage}?tab=builds`)
+      await expect(developer.getByRole("main")).toContainText("Built")
+      if (whoami) await expect(developer.getByRole("main")).toContainText("whoami.git@master")
+    })
+  } finally {
+    for (const service of made) {
+      await test.step(`the Developer deletes ${service} and its Build`, () =>
+        deleteService(developer, project, service))
+    }
+  }
 })

@@ -805,6 +805,11 @@ export const en = {
   "builds.word.sourceFailed": "Can't get the source",
   "builds.word.builderMissing": "Builder not found",
   "builds.word.retrying": "Retrying",
+  "builds.refused.deployKey":
+    "The Git host refused the deploy key. Add it to the repository's deploy keys, without write access.",
+  "builds.refused.token":
+    "The Git host refused the access token. Check that it can still read the repository.",
+  "builds.showKey": "Show deploy key",
   "builds.defaultBranch": "default branch",
   "builds.since": (ago: string, commit: string) =>
     commit ? `Latest build started ${ago}, from ${commit}` : `Latest build started ${ago}`,
@@ -2075,6 +2080,7 @@ export const en = {
   "add.access.noSecrets":
     "Your role can't add Secrets in this project, so only public repositories work.",
   "add.deployKeyMake": "Create deploy key",
+  "add.deployKeyPublic": "Public key",
   "add.deployKeyAdd": "Add this key to the repository's deploy keys, without write access.",
   "add.deployKeyOpen": (host: string) => `Open deploy keys on ${host}`,
   "add.problem.deployKey": "Create the deploy key and add it to the repository.",

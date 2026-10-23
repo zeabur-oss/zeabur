@@ -791,6 +791,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/deploy-keys/{name}/public": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * The public key of the deploy key in Secret `name`, read as the person, for adding it to the
+     *     Git host again. Only on the person's request: the Secret holds the private key too.
+     */
+    post: operations["deployKeyPublic"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/events": {
     parameters: {
       query?: never
@@ -2665,6 +2685,11 @@ export interface components {
       resource: string
       /** @description The request verb (`create`, `patch`, …). */
       verb: string
+    }
+    /** @description The public half of a deploy key Zeabur made. */
+    DeployKeyPublic: {
+      /** @description One `ssh-ed25519 …` line, to add on the Git host again. */
+      publicKey: string
     }
     /** @description The Git host a deploy key is for. */
     DeployKeyRequest: {
@@ -6410,6 +6435,8 @@ export interface components {
     ZeaburBuilderBuild: {
       /** @description The `ClusterBuilder`. */
       builder?: string | null
+      /** @description The Secret it reads the repository's credentials from. */
+      credentials?: string | null
       /** @description The branch or tag it follows; `HEAD` (or none) follows the repository's default branch. */
       gitRef?: string | null
       /** @description The Git repository. */
@@ -7894,6 +7921,54 @@ export interface operations {
         }
       }
       400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  deployKeyPublic: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+        /** @description The Secret holding the key */
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["DeployKeyPublic"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
         headers: {
           [name: string]: unknown
         }

@@ -81,10 +81,10 @@ pub(crate) async fn get(
         .map_err(|e| ApiError::from(e.into_problem(&format!("builds of {project}"))))
 }
 
-/// Gives each service still waiting for its first built image its build's status (see
-/// [`zeabur_builder::first_image`]). Without Zeabur Builder, or when its objects cannot be read,
+/// Gives each service that runs a built image its build's status (see
+/// [`zeabur_builder::built_image`]). Without Zeabur Builder, or when its objects cannot be read,
 /// the services stay as they are.
-pub(crate) async fn first_images(
+pub(crate) async fn built_images(
     cluster: &dyn Cluster,
     project: &str,
     services: &mut [zeabur_model::Service],
@@ -98,7 +98,7 @@ pub(crate) async fn first_images(
         return;
     };
     let builds = zeabur_builder::builds(&builds, Some(Timestamp::now()));
-    if builds.iter().all(|b| b.latest_image.is_some()) {
+    if builds.is_empty() {
         return;
     }
     let runs = match crate::cluster::modules::read_in(cluster, &BUILD_RUNS, Some(project)).await {
@@ -106,7 +106,7 @@ pub(crate) async fn first_images(
         _ => Vec::new(),
     };
     for service in services {
-        zeabur_builder::first_image(service, &builds, &runs);
+        zeabur_builder::built_image(service, &builds, &runs);
     }
 }
 

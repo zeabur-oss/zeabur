@@ -132,3 +132,37 @@ export function keelPolicy(builds: Builds, service: Service): string | undefined
 
 /** A commit's short form. */
 export const shortSha = (sha?: string | null) => (sha ? sha.slice(0, 7) : undefined)
+
+const BUILD_RESOURCE = { group: "builder.zeabur.com", version: "v1alpha1", resource: "builds" }
+const SECRET_RESOURCE = { version: "v1", resource: "secrets" }
+
+/**
+ * What deleting `service` deletes besides its workload: each Build whose image no other service
+ * runs, and the `<build>-git` Secret "Deploy from Git" made for it when no other Build reads it.
+ */
+export function buildDeletions(
+  service: Service,
+  services: readonly Service[],
+  builds: readonly Build[],
+): Schemas["Change"][] {
+  const others = services.filter((s) => s.kind !== service.kind || s.name !== service.name)
+  const gone = [...new Set(builtContainers(service, builds).map((b) => b.build))].filter((build) =>
+    others.every((s) => builtContainers(s, [build]).length === 0),
+  )
+  const kept = builds.filter((b) => !gone.includes(b))
+  return gone.flatMap((build) => [
+    { op: "delete" as const, resource: BUILD_RESOURCE, name: build.name },
+    ...(build.credentials === `${build.name}-git` &&
+    kept.every((b) => b.credentials !== build.credentials)
+      ? [{ op: "delete" as const, resource: SECRET_RESOURCE, name: build.credentials }]
+      : []),
+  ])
+}
+
+/** Which credentials the Git host refused, when it refused them: a deploy key over SSH or a
+ * token over HTTPS. */
+export function refusedCredentials(build: Build, latest: BuildRun | undefined) {
+  const problem = buildProblem(build, latest)
+  if (problem?.reason !== "AuthFailed" || !build.credentials) return undefined
+  return /^(ssh:\/\/|[\w.-]+@[^:/]+:)/.test(build.gitUrl ?? "") ? "deployKey" : "token"
+}

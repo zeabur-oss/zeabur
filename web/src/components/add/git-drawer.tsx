@@ -332,7 +332,9 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
             <div className="flex flex-col gap-2 pt-2">
               {key ? (
                 <>
-                  <CopyInput value={key.publicKey} copyLabel={t("common.copy")} />
+                  <FormField label={t("add.deployKeyPublic")}>
+                    <CopyInput value={key.publicKey} copyLabel={t("common.copy")} />
+                  </FormField>
                   <p className="flex flex-wrap items-baseline gap-x-2 type-meta text-muted-foreground">
                     {t("add.deployKeyAdd")}
                     {keyPage ? (

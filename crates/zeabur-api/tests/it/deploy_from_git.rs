@@ -1,7 +1,8 @@
 //! Deploying from Git, against an in-memory cluster: a deploy key's private half reaches only
 //! the Secret the apply creates, never an answer; a key works only for the person and project it
-//! was made for; and a service waiting for its first built image is building, or failed with the
-//! build, rather than failing to pull an image that does not exist yet.
+//! was made for; a service waiting for its first built image is building, or failed with the
+//! build, rather than failing to pull an image that does not exist yet; and a running service
+//! whose next build cannot happen says so.
 
 #[cfg(test)]
 mod tests {
@@ -334,5 +335,99 @@ mod tests {
         waiting_service_with(&slow, None, Some(&source_not_ready("ResolveFailed", &now)));
         let service = site(&slow).await;
         assert_eq!(service["status"]["word"], "building", "{service}");
+    }
+
+    /// A service that runs its built image fails with the build once the source cannot be read,
+    /// such as a deploy key taken off the repository, and keeps its replicas; a timeout that may
+    /// clear by itself changes nothing yet.
+    #[tokio::test]
+    async fn a_running_service_whose_source_fails_fails_with_the_build() {
+        const BUILT: &str = "zot.zot.svc:5000/shop/site:main-1-abc@sha256:00";
+        let running = |problem: Option<(&str, &str)>| {
+            let cluster = cluster();
+            let deployment: Deployment = serde_json::from_value(json!({
+                "metadata": {"name": "site", "namespace": "shop", "labels": {"app": "site"}},
+                "spec": {"replicas": 1, "selector": {"matchLabels": {"app": "site"}},
+                         "template": {"metadata": {"labels": {"app": "site"}},
+                                      "spec": {"containers": [{"name": "site", "image": BUILT}]}}},
+                "status": {"replicas": 1, "readyReplicas": 1, "availableReplicas": 1,
+                           "updatedReplicas": 1}
+            }))
+            .unwrap();
+            let pod: Pod = serde_json::from_value(json!({
+                "metadata": {"name": "site-1", "namespace": "shop", "labels": {"app": "site"}},
+                "spec": {"containers": [{"name": "site", "image": BUILT}]},
+                "status": {"phase": "Running", "conditions": [{"type": "Ready", "status": "True"}],
+                    "containerStatuses": [{"name": "site", "image": BUILT, "imageID": "",
+                        "ready": true, "restartCount": 0,
+                        "state": {"running": {"startedAt": "2026-10-23T08:00:00Z"}}}]}
+            }))
+            .unwrap();
+            let mut conditions = vec![json!({"type": "Ready", "status": "True", "reason": "Built"})];
+            if let Some((reason, since)) = problem {
+                conditions.push(json!({"type": "SourceReady", "status": "False", "reason": reason,
+                    "message": "github.com refused the key for `git`",
+                    "lastTransitionTime": since}));
+            }
+            cluster.update(|s| {
+                let objects = s.objects.get_mut("shop").unwrap();
+                objects.deployments.push(deployment);
+                objects.pods.push(pod);
+                let mut build = build();
+                build["metadata"]["namespace"] = json!("shop");
+                build["status"] = json!({"latestImage": BUILT, "conditions": conditions});
+                s.dynamic.push(serde_json::from_value(build).unwrap());
+            });
+            cluster
+        };
+
+        let service = site(&running(None)).await;
+        assert_eq!(service["status"]["health"], "ok", "{service}");
+
+        let refused = site(&running(Some(("AuthFailed", "2026-10-23T08:00:00Z")))).await;
+        assert_eq!(refused["status"]["health"], "fail", "{refused}");
+        assert_eq!(refused["status"]["reason"], "BuildFailed");
+        assert_eq!(refused["status"]["word"], "rolloutStuck");
+
+        let now = zeabur_kube::k8s_openapi::jiff::Timestamp::now().to_string();
+        let slow = site(&running(Some(("ResolveFailed", &now)))).await;
+        assert_eq!(slow["status"]["health"], "ok", "{slow}");
+    }
+
+    /// When the host refuses a key, the person can see its public half again, read from the
+    /// Secret as them; a Secret without an SSH key says so.
+    #[tokio::test]
+    async fn a_deploy_key_shows_its_public_half_again() {
+        let cluster = cluster();
+        let key = zeabur_core::ssh::deploy_key("zeabur shop").unwrap();
+        cluster.update(|s| {
+            s.secret_values.insert(
+                "shop/site-git".to_owned(),
+                BTreeMap::from([("ssh-privatekey".to_owned(), key.private.clone().into_bytes())]),
+            );
+            s.secret_values.insert(
+                "shop/site-token".to_owned(),
+                BTreeMap::from([("password".to_owned(), b"t".to_vec())]),
+            );
+        });
+        let app = app(&cluster);
+        let (status, answer) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/deploy-keys/site-git/public",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        assert!(key.public.starts_with(answer["publicKey"].as_str().unwrap()));
+        assert!(!answer.to_string().contains("PRIVATE"));
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/deploy-keys/site-token/public",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 }

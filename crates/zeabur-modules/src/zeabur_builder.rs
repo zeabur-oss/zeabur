@@ -59,6 +59,8 @@ pub struct ZeaburBuilderBuild {
     /// The ref the newest commit came from, such as `refs/heads/master`, when the controller
     /// reports it.
     pub resolved_ref: Option<String>,
+    /// The Secret it reads the repository's credentials from.
+    pub credentials: Option<String>,
     /// The `ClusterBuilder`.
     pub builder: Option<String>,
     /// Whether builds are paused.
@@ -202,6 +204,7 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                 git_url: text(b, "/spec/source/git/url"),
                 git_ref: text(b, "/spec/source/git/ref"),
                 resolved_ref: text(b, "/status/resolvedRef"),
+                credentials: text(b, "/spec/source/credentialsRef/name"),
                 builder: text(b, "/spec/builderRef"),
                 suspended: b
                     .data
@@ -269,33 +272,37 @@ pub fn runs(objects: &[DynamicObject]) -> Vec<ZeaburBuilderRun> {
     out
 }
 
-/// The reason a service waiting for its first image shows when the build failed.
+/// The reason a service shows when the build of its image failed.
 pub const BUILD_FAILED: &str = "BuildFailed";
 
-/// Gives a service whose image a `Build` has not pushed yet the build's status.
+/// Gives a service that runs a `Build`'s image the build's status when it matters.
 ///
-/// It is building, not failing to pull an image that does not exist. A container runs a `Build`'s
-/// image when the repositories match, the `Build`'s own (`spec.output.image`), as a service
-/// deployed from Git has. When the newest run failed, or nothing runs and the `Build` is not
-/// ready or has a lasting [`ZeaburBuilderProblem`], such as a branch that does not exist, the
-/// service has failed with [`BUILD_FAILED`]. Its diagnoses go: the missing image and the replicas
-/// it leaves unready both come from the build.
-pub fn first_image(
+/// A container runs a `Build`'s image when the repositories match, the `Build`'s own
+/// (`spec.output.image`), as a service deployed from Git has. The build has failed when the
+/// newest run failed, or nothing runs and the `Build` is not ready or has a lasting
+/// [`ZeaburBuilderProblem`], such as a branch that does not exist or a deploy key the host
+/// refuses.
+///
+/// Before the first image the service is building, not failing to pull an image that does not
+/// exist, or it has failed with [`BUILD_FAILED`]; its diagnoses go, since the missing image and
+/// the replicas it leaves unready both come from the build. After it, a failed build fails a
+/// service that is otherwise well with [`BUILD_FAILED`] too: what it serves stays, but no new
+/// commit reaches it until someone acts.
+pub fn built_image(
     service: &mut zeabur_model::Service,
     builds: &[ZeaburBuilderBuild],
     runs: &[ZeaburBuilderRun],
 ) {
-    let waiting = builds.iter().find(|build| {
-        build.latest_image.is_none()
-            && build.repository.as_deref().is_some_and(|wanted| {
-                service.containers.iter().any(|c| {
-                    c.image
-                        .as_deref()
-                        .is_some_and(|image| repository(image).eq_ignore_ascii_case(wanted))
-                })
+    let found = builds.iter().find(|build| {
+        build.repository.as_deref().is_some_and(|wanted| {
+            service.containers.iter().any(|c| {
+                c.image
+                    .as_deref()
+                    .is_some_and(|image| repository(image).eq_ignore_ascii_case(wanted))
             })
+        })
     });
-    let Some(build) = waiting else {
+    let Some(build) = found else {
         return;
     };
     let newest = runs.iter().find(|run| run.build == build.name);
@@ -309,12 +316,19 @@ pub fn first_image(
         || (!running
             && (build.ready.as_deref() == Some("False")
                 || build.problem.as_ref().is_some_and(|p| p.lasting)));
-    service.status = if failed {
-        zeabur_model::ServiceStatus {
-            health: zeabur_model::Health::Fail,
-            word: zeabur_model::StatusWord::Failed,
-            reason: Some(BUILD_FAILED.to_owned()),
+    let build_failed = |word| zeabur_model::ServiceStatus {
+        health: zeabur_model::Health::Fail,
+        word,
+        reason: Some(BUILD_FAILED.to_owned()),
+    };
+    if build.latest_image.is_some() {
+        if failed && service.status.health != zeabur_model::Health::Fail {
+            service.status = build_failed(zeabur_model::StatusWord::RolloutStuck);
         }
+        return;
+    }
+    service.status = if failed {
+        build_failed(zeabur_model::StatusWord::Failed)
     } else {
         zeabur_model::ServiceStatus {
             health: zeabur_model::Health::Progress,

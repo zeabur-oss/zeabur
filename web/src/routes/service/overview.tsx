@@ -49,7 +49,7 @@ import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
 import { alertsFor, folded } from "@/model/alerts"
-import { buildProblem, runsOf } from "@/model/builds"
+import { buildProblem, refusedCredentials, runsOf } from "@/model/builds"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
@@ -134,7 +134,7 @@ export function OverviewTab({
           }
         />
       ) : null}
-      {said.rollout.as === "card" && rollout.data && !waitsForFirstBuild(service) ? (
+      {said.rollout.as === "card" && rollout.data && !buildSays(service) ? (
         <Rollout project={project} service={service} data={rollout.data} />
       ) : null}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
@@ -351,11 +351,12 @@ function Rollout({
   )
 }
 
-const waitsForFirstBuild = (service: Service) =>
+const buildSays = (service: Service) =>
   statusOf(service).word === "building" || statusOf(service).reason === "BuildFailed"
 
-/** A service waiting for its first image: the build under way, or why it failed. */
-function FirstBuild({
+/** The build of a service waiting for its first image, under way or failed, or of one whose
+ * latest build failed: why. */
+function BuildLine({
   project,
   service,
   onTab,
@@ -370,8 +371,10 @@ function FirstBuild({
   const run = build ? runsOf(builds.data?.runs ?? [], build)[0] : undefined
   const failed = statusOf(service).reason === "BuildFailed"
   const problem = build ? buildProblem(build, run) : undefined
+  const refused = build ? refusedCredentials(build, run) : undefined
   const why = failed
-    ? (problem?.message ??
+    ? ((refused ? t(`builds.refused.${refused}`) : undefined) ??
+      problem?.message ??
       run?.message ??
       run?.reason ??
       build?.message ??
@@ -427,7 +430,7 @@ function Summary({
     .at(-1)
   const since = started ?? service.created ?? undefined
   const setup = verdict.reach ? reachSetup(verdict.reach) : undefined
-  const firstBuild = waitsForFirstBuild(service)
+  const buildSaid = buildSays(service)
   return (
     <SummaryCard aria-label={t("common.status")}>
       <SummaryCardMain>
@@ -452,14 +455,14 @@ function Summary({
             </Tooltip>
           </SummaryCardSince>
         ) : null}
-        {firstBuild ? <FirstBuild project={project} service={service} onTab={onTab} /> : null}
-        {(facts || term) && !isHealthy(status) && !firstBuild ? (
+        {buildSaid ? <BuildLine project={project} service={service} onTab={onTab} /> : null}
+        {(facts || term) && !isHealthy(status) && !buildSaid ? (
           <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-sm text-secondary">
             {facts}
             {term ? <TermDetail translate="no">{term}</TermDetail> : null}
           </p>
         ) : null}
-        {!isHealthy(status) && !explained && !firstBuild ? <Exceptions service={service} /> : null}
+        {!isHealthy(status) && !explained && !buildSaid ? <Exceptions service={service} /> : null}
         {status.unchecked ? (
           <p className="mt-2 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
             {t("status.uncheckedWhy")}

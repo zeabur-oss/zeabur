@@ -45,6 +45,11 @@ cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'   # every 
 - `e2e-l2-browser.sh [playwright args]` reruns only `web/e2e/l2` on that cluster once kept. It
   deletes the e2e users and their `zeabur.com/member` bindings and makes them again first, so
   every user comes from today's code; never reuse a user from an earlier run.
+- `e2e/l2/git-private.spec.ts` deploys a private GitHub repository with a deploy key and runs
+  only with `E2E_PRIVATE_GIT_REPO` set (e.g. `git@github.com:zeabur/oss-private-git-demo.git`).
+  With `E2E_GH_DEPLOY_KEY=1` it adds the key read-only and removes it with `gh repo deploy-key`
+  (gh signed in with admin on that repository); otherwise it prints `E2E_DEPLOY_KEY_ADD …` and
+  `E2E_DEPLOY_KEY_REMOVE …` lines and waits for someone to do each.
 
 ## Writing one
 - Start from `zeabur_test_support::sandbox::Sandbox::new(prefix, rules)` (dev-dependency with the
