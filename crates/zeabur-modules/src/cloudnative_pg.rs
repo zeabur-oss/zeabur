@@ -195,7 +195,7 @@ pub fn store_name(cluster: &str) -> String {
 fn app_user(name: &str, own: Option<&str>, username: &str, database: &str) -> Option<AppUser> {
     own.is_none().then(|| AppUser {
         username: username.to_owned(),
-        database: database.to_owned(),
+        database: Some(database.to_owned()),
         secret: format!("{name}-app"),
         password_key: "password".to_owned(),
     })
@@ -317,6 +317,7 @@ pub fn database(
             .map(|t| t.0.to_string()),
         object: databases::written(cluster),
         pods: Vec::new(),
+        restored: databases::restored(cluster),
         name,
     }
 }
@@ -379,6 +380,9 @@ fn findings_limited(
             started: text(backup, "/status/startedAt"),
             finished: text(backup, "/status/stoppedAt"),
             message: text(backup, "/status/error"),
+            restore_from: (outcome == Outcome::Succeeded)
+                .then(|| text(backup, "/status/backupId"))
+                .flatten(),
         });
     }
     newest(&mut out.runs, limit);
@@ -497,8 +501,8 @@ mod tests {
         assert_eq!(
             db.app
                 .as_ref()
-                .map(|a| (a.secret.as_str(), a.database.as_str())),
-            Some(("pg-app", "app"))
+                .map(|a| (a.secret.as_str(), a.database.as_deref())),
+            Some(("pg-app", Some("app")))
         );
         let store = db.backups.store.unwrap();
         assert!(store.in_use);

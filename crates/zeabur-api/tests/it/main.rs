@@ -11,6 +11,7 @@ mod cluster_tools;
 #[path = "../common/mod.rs"]
 mod common;
 mod creations;
+mod databases;
 mod deploy_from_git;
 mod durability;
 mod evidence;

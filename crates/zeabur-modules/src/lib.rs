@@ -7,9 +7,12 @@ pub mod alertmanager;
 pub mod backups;
 pub mod cloudnative_pg;
 pub mod databases;
+pub mod dragonfly;
 pub mod falco;
 pub mod k8up;
+pub mod mariadb_operator;
 pub mod metrics_server;
+pub mod moco;
 pub mod network_policy;
 pub mod percona_mongodb;
 pub mod prometheus_api;
@@ -122,6 +125,9 @@ pub fn modules() -> Vec<&'static Module> {
         &reloader::MODULE,
         &cloudnative_pg::BARMAN_CLOUD,
         &percona_mongodb::MODULE,
+        &moco::MODULE,
+        &mariadb_operator::MODULE,
+        &dragonfly::MODULE,
         &zeabur_builder::MODULE,
         &alertmanager::MODULE,
     ]

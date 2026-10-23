@@ -975,9 +975,27 @@ export interface paths {
     }
     /**
      * The databases of a project, read as the person, from every database operator this build
-     *     knows (CloudNativePG, the Percona Operator for MongoDB).
+     *     knows (CloudNativePG, the Percona Operator for MongoDB, MOCO, mariadb-operator, the Dragonfly
+     *     Operator).
      */
     get: operations["getProjectDatabases"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/databases/{engine}/{name}/export": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The database's dump, streamed as it is made. */
+    get: operations["exportDatabase"]
     put?: never
     post?: never
     delete?: never
@@ -2146,6 +2164,11 @@ export interface components {
       outcome: components["schemas"]["BackupOutcome"]
       /** @description The provider (module id). */
       provider: string
+      /**
+       * @description What a restore of this backup names: CloudNativePG's backup ID, Percona's destination, or
+       *     the time MOCO and mariadb-operator restore to. Absent when it cannot be restored yet.
+       */
+      restoreFrom?: string | null
       /** @description When it started, RFC 3339. */
       started?: string | null
       /** @description What it covered. */
@@ -3171,6 +3194,7 @@ export interface components {
       resource: string
       /** @description CPU and memory each member asks for and may use, as written. */
       resources?: Record<string, never> | null
+      restored?: components["schemas"]["DatabaseRestored"] | null
       /** @description How it is. */
       state: components["schemas"]["DatabaseState"]
       /** @description The size of each member's volume, as asked for. */
@@ -3185,8 +3209,11 @@ export interface components {
     }
     /** @description A database user for applications, and the Secret key holding its password. */
     DatabaseAppUser: {
-      /** @description The database it may use, and authenticates against. */
-      database: string
+      /**
+       * @description The database it may use, and authenticates against; absent when it may make its own
+       *     (MOCO's `moco-writable`).
+       */
+      database?: string | null
       /** @description The Secret's key holding the password. */
       passwordKey: string
       /** @description The Secret holding its password, in the project. */
@@ -3248,7 +3275,7 @@ export interface components {
      * @description A database engine.
      * @enum {string}
      */
-    DatabaseEngine: "postgresql" | "mongodb"
+    DatabaseEngine: "postgresql" | "mongodb" | "mysql" | "mariadb" | "dragonfly"
     /** @description Whether an engine's operator, and its backup component, could be read. */
     DatabaseOperator: {
       /**
@@ -3262,6 +3289,18 @@ export interface components {
       module: string
       /** @description Whether its objects could be read. */
       state: components["schemas"]["ProviderState"]
+    }
+    /**
+     * @description The backup a database was made from, as Zeabur noted it on the object when it planned the
+     *     restore.
+     */
+    DatabaseRestored: {
+      /** @description The backup's name. */
+      backup?: string | null
+      /** @description The database the backup is of. */
+      from: string
+      /** @description When the backup was taken, RFC 3339. */
+      time?: string | null
     }
     /**
      * @description How a database is, from its operator's status.
@@ -6080,13 +6119,13 @@ export interface components {
     }
     /** @description What the person may change in one project. */
     ProjectRights: {
-      /** @description Back up databases: `create` on either operator's backups. */
+      /** @description Back up databases: `create` on an operator's backups. */
       backUpDatabases: components["schemas"]["Permission"]
       /** @description Build again: `patch` on Zeabur Builder's builds. */
       build: components["schemas"]["Permission"]
       /** @description Create and change ConfigMaps: `create` and `patch` on configmaps. */
       changeConfig: components["schemas"]["Permission"]
-      /** @description Create, change and delete databases: CloudNativePG clusters or Percona MongoDB. */
+      /** @description Create, change and delete databases of any operator Zeabur knows. */
       changeDatabases: components["schemas"]["Permission"]
       /** @description Add, change and remove domains: `create`, `patch` and `delete` on ingresses or HTTPRoutes. */
       changeDomains: components["schemas"]["Permission"]
@@ -9341,6 +9380,57 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  exportDatabase: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+        /** @description `postgresql`, `mongodb`, `mysql` or `mariadb` */
+        engine: string
+        /** @description The database */
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The dump's bytes */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/octet-stream": unknown
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
         headers: {
           [name: string]: unknown
         }

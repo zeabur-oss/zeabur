@@ -416,7 +416,7 @@ pub(crate) fn exec_right(namespace: &str, pod: &str) -> Denied {
 
 /// R8: the one right a terminal needs, which an administrator can grant in this project alone;
 /// the web interface shows the Role and RoleBinding.
-fn exec_refusal(mut refusal: ApiError) -> ApiError {
+pub(crate) fn exec_refusal(mut refusal: ApiError) -> ApiError {
     if refusal.0.kind == Kind::Forbidden {
         refusal.0.fix_for_occasion(
             "Ask a cluster administrator for `get` and `create` on `pods/exec` in this \

@@ -61,7 +61,11 @@ use crate::rules::{
 /// - ready-made NetworkPolicy objects;
 /// - a database and its backups: CloudNativePG's `Cluster`, `ScheduledBackup` and `Backup`, the
 ///   Barman Cloud plugin's `ObjectStore`, the Percona Operator for MongoDB's `PerconaServerMongoDB`
-///   and `PerconaServerMongoDBBackup`, and the Secret holding the backup bucket's access keys;
+///   and `PerconaServerMongoDBBackup`, MOCO's `MySQLCluster` and `BackupPolicy`, mariadb-operator's
+///   `MariaDB` and `Backup`, the Dragonfly Operator's `Dragonfly`, and the Secret holding the
+///   backup bucket's access keys or the database's passwords;
+/// - a restore into a new database: Percona's `PerconaServerMongoDBRestore` (the other operators
+///   restore from fields of the new database);
 /// - a service from a container image: its Deployment, Service, Ingress, volume claim and Secrets;
 /// - a service from Git: the same, and Zeabur Builder's `Build`.
 ///
@@ -93,6 +97,16 @@ pub const CREATABLE: &[(&str, &str, &str)] = &[
         "PerconaServerMongoDBBackup",
         "perconaservermongodbbackups",
     ),
+    (
+        "psmdb.percona.com/v1",
+        "PerconaServerMongoDBRestore",
+        "perconaservermongodbrestores",
+    ),
+    ("moco.cybozu.com/v1beta2", "MySQLCluster", "mysqlclusters"),
+    ("moco.cybozu.com/v1beta2", "BackupPolicy", "backuppolicies"),
+    ("k8s.mariadb.com/v1alpha1", "MariaDB", "mariadbs"),
+    ("k8s.mariadb.com/v1alpha1", "Backup", "backups"),
+    ("dragonflydb.io/v1alpha1", "Dragonfly", "dragonflies"),
 ];
 
 /// The plural of a kind [`CREATABLE`] lists.

@@ -156,6 +156,7 @@ pub fn findings(
             started: text(backup, "/status/startTimestamp"),
             finished: text(backup, "/status/completionTimestamp"),
             message: errors.map(|n| format!("{n} errors")),
+            restore_from: None,
         });
     }
     newest(&mut out.runs, 10);

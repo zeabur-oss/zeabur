@@ -48,6 +48,7 @@
 //! | `GET /api/v1/projects/{p}/objects/{group}/{version}/{resource}/{name}` | one object as YAML (`core` for the empty group) |
 //! | `GET /api/v1/projects/{p}/configmaps` | the ConfigMaps, in full |
 //! | `POST /api/v1/projects/{p}/secrets/{name}/reveal` | a Secret's values |
+//! | `GET /api/v1/projects/{p}/databases/{engine}/{name}/export` | a database's dump, streamed from its own dump tool through your `pods/exec` |
 //! | `GET /api/v1/projects/{p}/events` | events, newest first, `limit` of them |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs` | a log snapshot |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs/follow` | a log as Server-Sent Events |
@@ -286,6 +287,7 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(notifications::project_apply))
         .routes(routes!(alerts::project))
         .routes(routes!(projects::databases::get))
+        .routes(routes!(projects::database_export::export))
         .routes(routes!(projects::builds::get))
         .routes(routes!(projects::deploy_keys::create))
         .routes(routes!(images::inspect))

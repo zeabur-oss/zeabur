@@ -80,6 +80,10 @@ pub struct Run {
     /// The provider's message, for a failure.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// What a restore of this backup names: CloudNativePG's backup ID, Percona's destination, or
+    /// the time MOCO and mariadb-operator restore to. Absent when it cannot be restored yet.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restore_from: Option<String>,
 }
 
 impl Run {

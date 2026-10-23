@@ -1436,7 +1436,8 @@ paths:
       - projects
       summary: |-
         The databases of a project, read as the person, from every database operator this build
-        knows (CloudNativePG, the Percona Operator for MongoDB).
+        knows (CloudNativePG, the Percona Operator for MongoDB, MOCO, mariadb-operator, the Dragonfly
+        Operator).
       operationId: getProjectDatabases
       parameters:
       - name: project
@@ -1452,6 +1453,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProjectDatabases"
         "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/databases/{engine}/{name}/export":
+    get:
+      tags:
+      - projects
+      summary: The database's dump, streamed as it is made.
+      operationId: exportDatabase
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      - name: engine
+        in: path
+        description: "`postgresql`, `mongodb`, `mysql` or `mariadb`"
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: path
+        description: The database
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The dump's bytes
+          content:
+            application/octet-stream: {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
           content:
             application/problem+json:
               schema:
@@ -3906,6 +3952,13 @@ components:
         provider:
           type: string
           description: The provider (module id).
+        restoreFrom:
+          type:
+          - string
+          - "null"
+          description: |-
+            What a restore of this backup names: CloudNativePG's backup ID, Percona's destination, or
+            the time MOCO and mariadb-operator restore to. Absent when it cannot be restored yet.
         started:
           type:
           - string
@@ -5978,6 +6031,11 @@ components:
           - object
           - "null"
           description: CPU and memory each member asks for and may use, as written.
+        restored:
+          oneOf:
+          - $ref: "#/components/schemas/DatabaseRestored"
+            description: The backup it was restored from, when Zeabur made it from one.
+          - type: "null"
         state:
           $ref: "#/components/schemas/DatabaseState"
           description: How it is.
@@ -6003,13 +6061,16 @@ components:
       description: A database user for applications, and the Secret key holding its password.
       required:
       - username
-      - database
       - secret
       - passwordKey
       properties:
         database:
-          type: string
-          description: The database it may use, and authenticates against.
+          type:
+          - string
+          - "null"
+          description: |-
+            The database it may use, and authenticates against; absent when it may make its own
+            (MOCO's `moco-writable`).
         passwordKey:
           type: string
           description: The Secret's key holding the password.
@@ -6129,6 +6190,9 @@ components:
       enum:
       - postgresql
       - mongodb
+      - mysql
+      - mariadb
+      - dragonfly
     DatabaseOperator:
       type: object
       description: Whether an engine's operator, and its backup component, could be read.
@@ -6152,6 +6216,27 @@ components:
         state:
           $ref: "#/components/schemas/ProviderState"
           description: Whether its objects could be read.
+    DatabaseRestored:
+      type: object
+      description: |-
+        The backup a database was made from, as Zeabur noted it on the object when it planned the
+        restore.
+      required:
+      - from
+      properties:
+        backup:
+          type:
+          - string
+          - "null"
+          description: The backup's name.
+        from:
+          type: string
+          description: The database the backup is of.
+        time:
+          type:
+          - string
+          - "null"
+          description: When the backup was taken, RFC 3339.
     DatabaseState:
       type: string
       description: How a database is, from its operator's status.
@@ -11701,7 +11786,7 @@ components:
       properties:
         backUpDatabases:
           $ref: "#/components/schemas/Permission"
-          description: "Back up databases: `create` on either operator's backups."
+          description: "Back up databases: `create` on an operator's backups."
         build:
           $ref: "#/components/schemas/Permission"
           description: "Build again: `patch` on Zeabur Builder's builds."
@@ -11710,7 +11795,7 @@ components:
           description: "Create and change ConfigMaps: `create` and `patch` on configmaps."
         changeDatabases:
           $ref: "#/components/schemas/Permission"
-          description: "Create, change and delete databases: CloudNativePG clusters or Percona MongoDB."
+          description: Create, change and delete databases of any operator Zeabur knows.
         changeDomains:
           $ref: "#/components/schemas/Permission"
           description: "Add, change and remove domains: `create`, `patch` and `delete` on ingresses or HTTPRoutes."

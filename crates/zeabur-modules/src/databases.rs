@@ -2,10 +2,11 @@
 //! how to connect, and their backups, whichever operator runs them.
 //!
 //! Each provider ([`crate::cloudnative_pg`] for PostgreSQL, [`crate::percona_mongodb`] for
-//! MongoDB) turns its own objects into the shared view below. What is shared is what a person
-//! asks of any database: is it up, how many members are ready, which one takes writes, which
-//! version, where to connect and as whom, and whether it is backed up. The rest (replication
-//! settings, extensions, sharding) stays with each provider's objects.
+//! MongoDB, [`crate::moco`] for MySQL, [`crate::mariadb_operator`] for MariaDB and
+//! [`crate::dragonfly`] for Dragonfly) turns its own objects into the shared view below. What is
+//! shared is what a person asks of any database: is it up, how many members are ready, which one
+//! takes writes, which version, where to connect and as whom, and whether it is backed up. The rest
+//! (replication settings, extensions, sharding) stays with each provider's objects.
 //!
 //! Connection details are read from the objects' spec and status, not from a Secret: a viewer
 //! may not read Secrets, and the host, port, database and user are not secret. The Secret that
@@ -15,7 +16,24 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 
-use crate::backups::{Run, Schedule};
+use crate::backups::{Outcome, Run, Schedule, Target, TargetKind};
+use crate::{Read, text};
+
+/// `batch/v1` `Job`, in the project's namespace: MOCO and mariadb-operator take each backup in a
+/// Job.
+pub const JOBS: Read = Read {
+    group: "batch",
+    version: "v1",
+    resource: "jobs",
+    kind: "Job",
+};
+
+/// The annotation naming the database a restored one was made from.
+pub const RESTORED_FROM: &str = "zeabur.com/restored-from";
+/// The annotation naming the backup a restored database was made from.
+pub const RESTORED_BACKUP: &str = "zeabur.com/restored-backup";
+/// The annotation holding when that backup was taken, RFC 3339.
+pub const RESTORED_TIME: &str = "zeabur.com/restored-time";
 
 /// A database engine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
@@ -26,6 +44,12 @@ pub enum Engine {
     Postgresql,
     /// MongoDB.
     Mongodb,
+    /// MySQL.
+    Mysql,
+    /// MariaDB.
+    Mariadb,
+    /// Dragonfly, which speaks the Redis protocol.
+    Dragonfly,
 }
 
 /// How a database is, from its operator's status.
@@ -81,8 +105,10 @@ pub struct Connection {
 pub struct AppUser {
     /// The user name.
     pub username: String,
-    /// The database it may use, and authenticates against.
-    pub database: String,
+    /// The database it may use, and authenticates against; absent when it may make its own
+    /// (MOCO's `moco-writable`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub database: Option<String>,
     /// The Secret holding its password, in the project.
     pub secret: String,
     /// The Secret's key holding the password.
@@ -127,6 +153,22 @@ pub struct Backups {
     /// A backup can start now: the database runs with its store. False between setting up
     /// backups and the operator restarting the members with them.
     pub ready: bool,
+}
+
+/// The backup a database was made from, as Zeabur noted it on the object when it planned the
+/// restore.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = DatabaseRestored)]
+pub struct Restored {
+    /// The database the backup is of.
+    pub from: String,
+    /// The backup's name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup: Option<String>,
+    /// When the backup was taken, RFC 3339.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<String>,
 }
 
 /// One database cluster.
@@ -198,13 +240,17 @@ pub struct Database {
     pub object: serde_json::Value,
     /// Its members' pods, by name; empty when they cannot be read.
     pub pods: Vec<zeabur_model::PodSummary>,
+    /// The backup it was restored from, when Zeabur made it from one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub restored: Option<Restored>,
 }
 
 impl Database {
     /// Whether a pod with `labels` is one of its members. CloudNativePG labels an instance with
     /// `cnpg.io/cluster` and `cnpg.io/instanceName` (its jobs have no instance name); the Percona
     /// Operator labels a replica set member with `app.kubernetes.io/instance` and
-    /// `app.kubernetes.io/component: mongod`.
+    /// `app.kubernetes.io/component: mongod`. MOCO, mariadb-operator and the Dragonfly Operator
+    /// label each member with `app.kubernetes.io/name` and `app.kubernetes.io/instance`.
     /// <https://cloudnative-pg.io/documentation/current/labels_annotations/>
     #[must_use]
     pub fn is_member(&self, labels: &std::collections::BTreeMap<String, String>) -> bool {
@@ -218,8 +264,103 @@ impl Database {
                 label("app.kubernetes.io/instance") == Some(&self.name)
                     && label("app.kubernetes.io/component") == Some("mongod")
             }
+            Engine::Mysql => labelled(labels, "mysql", &self.name),
+            Engine::Mariadb => labelled(labels, "mariadb", &self.name),
+            Engine::Dragonfly => labelled(labels, "dragonfly", &self.name),
         }
     }
+}
+
+/// The backup `object` was restored from, from Zeabur's annotations.
+pub(crate) fn restored(object: &DynamicObject) -> Option<Restored> {
+    let annotations = object.metadata.annotations.as_ref()?;
+    Some(Restored {
+        from: annotations.get(RESTORED_FROM)?.clone(),
+        backup: annotations.get(RESTORED_BACKUP).cloned(),
+        time: annotations.get(RESTORED_TIME).cloned(),
+    })
+}
+
+/// The runs of the backup Jobs whose owner (a `CronJob` or the backup object) is named in
+/// `owners`. The restore point is the time the Job finished.
+pub(crate) fn job_runs(
+    provider: &str,
+    target: &str,
+    jobs: &[DynamicObject],
+    owners: &[String],
+) -> Vec<Run> {
+    jobs.iter()
+        .filter(|job| {
+            job.metadata.owner_references.as_ref().is_some_and(|refs| {
+                refs.iter()
+                    .any(|r| r.controller == Some(true) && owners.contains(&r.name))
+            })
+        })
+        .map(|job| {
+            let finished = text(job, "/status/completionTime");
+            let failed = conditions_true(job, "Failed");
+            let outcome = if finished.is_some() {
+                Outcome::Succeeded
+            } else if failed {
+                Outcome::Failed
+            } else {
+                Outcome::Running
+            };
+            Run {
+                name: job.metadata.name.clone().unwrap_or_default(),
+                provider: provider.to_owned(),
+                targets: vec![Target {
+                    kind: TargetKind::Database,
+                    name: target.to_owned(),
+                }],
+                outcome,
+                started: text(job, "/status/startTime").or_else(|| {
+                    job.metadata
+                        .creation_timestamp
+                        .as_ref()
+                        .map(|t| t.0.to_string())
+                }),
+                message: failed.then(|| condition_message(job, "Failed")).flatten(),
+                restore_from: finished.clone(),
+                finished,
+            }
+        })
+        .collect()
+}
+
+/// Whether the condition `kind` is true.
+pub(crate) fn conditions_true(object: &DynamicObject, kind: &str) -> bool {
+    object
+        .data
+        .pointer("/status/conditions")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|all| {
+            all.iter()
+                .any(|c| c["type"] == kind && c["status"] == "True")
+        })
+}
+
+/// The message of the condition `kind`, when it has one.
+pub(crate) fn condition_message(object: &DynamicObject, kind: &str) -> Option<String> {
+    object
+        .data
+        .pointer("/status/conditions")?
+        .as_array()?
+        .iter()
+        .find(|c| c["type"] == kind)
+        .and_then(|c| c["message"].as_str())
+        .filter(|m| !m.is_empty())
+        .map(str::to_owned)
+}
+
+/// Whether `labels` name the operator's `app` and the database `instance`.
+fn labelled(
+    labels: &std::collections::BTreeMap<String, String>,
+    app: &str,
+    instance: &str,
+) -> bool {
+    labels.get("app.kubernetes.io/instance").map(String::as_str) == Some(instance)
+        && labels.get("app.kubernetes.io/name").map(String::as_str) == Some(app)
 }
 
 /// `object` without `status` and `managedFields`.

@@ -179,6 +179,9 @@ fn backups_of(
             }),
             finished: text(b, "/status/completed"),
             message: text(b, "/status/error"),
+            restore_from: (outcome(text(b, "/status/state").as_deref()) == Outcome::Succeeded)
+                .then(|| text(b, "/status/destination"))
+                .flatten(),
         })
         .collect();
     newest(&mut runs, 20);
@@ -210,7 +213,7 @@ fn backups_of(
 fn app_user(cluster: &DynamicObject, name: &str) -> Option<AppUser> {
     let user = cluster.data.pointer("/spec/users/0")?;
     let username = user["name"].as_str()?.to_owned();
-    let database = user["db"].as_str().unwrap_or("admin").to_owned();
+    let database = Some(user["db"].as_str().unwrap_or("admin").to_owned());
     let reference = user.get("passwordSecretRef");
     let secret = reference
         .and_then(|r| r["name"].as_str())
@@ -295,6 +298,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
             .map(|t| t.0.to_string()),
         object: databases::written(cluster),
         pods: Vec::new(),
+        restored: databases::restored(cluster),
         name,
     }
 }
@@ -420,8 +424,8 @@ mod tests {
             "roles": [{"name": "readWrite", "db": "app"}]}]))
         .unwrap();
         assert_eq!(
-            (app.username.as_str(), app.database.as_str()),
-            ("app", "app")
+            (app.username.as_str(), app.database.as_deref()),
+            ("app", Some("app"))
         );
         assert_eq!(
             (app.secret.as_str(), app.password_key.as_str()),

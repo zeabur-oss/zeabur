@@ -16,6 +16,10 @@ pub enum Engine {
     MongoDb,
     /// MySQL.
     MySql,
+    /// MariaDB.
+    MariaDb,
+    /// Dragonfly, a Redis-compatible store.
+    Dragonfly,
 }
 
 impl Engine {
@@ -26,6 +30,8 @@ impl Engine {
             Self::PostgreSql => "PostgreSQL",
             Self::MongoDb => "MongoDB",
             Self::MySql => "MySQL",
+            Self::MariaDb => "MariaDB",
+            Self::Dragonfly => "Dragonfly",
         }
     }
 }
@@ -47,7 +53,7 @@ struct DatabaseOwner {
 /// The Crunchy Data label on each StatefulSet holding a PostgreSQL instance's data.
 const CRUNCHY_DATA_LABEL: &str = "postgres-operator.crunchydata.com/data";
 
-const DATABASE_OWNERS: [DatabaseOwner; 6] = [
+const DATABASE_OWNERS: [DatabaseOwner; 9] = [
     // CloudNativePG's pods and Jobs belong to the `Cluster` itself, with no StatefulSet between.
     DatabaseOwner {
         group: "postgresql.cnpg.io",
@@ -91,6 +97,27 @@ const DATABASE_OWNERS: [DatabaseOwner; 6] = [
         engine: Engine::MySql,
         data_label: None,
     },
+    DatabaseOwner {
+        group: "moco.cybozu.com",
+        kind: "MySQLCluster",
+        shown_kind: "MySQLCluster",
+        engine: Engine::MySql,
+        data_label: None,
+    },
+    DatabaseOwner {
+        group: "k8s.mariadb.com",
+        kind: "MariaDB",
+        shown_kind: "MariaDB",
+        engine: Engine::MariaDb,
+        data_label: None,
+    },
+    DatabaseOwner {
+        group: "dragonflydb.io",
+        kind: "Dragonfly",
+        shown_kind: "Dragonfly",
+        engine: Engine::Dragonfly,
+        data_label: None,
+    },
 ];
 
 /// Labels on the controller Deployments of known database operators, whose charts set no
@@ -101,7 +128,7 @@ const OPERATOR_LABELS: [&str; 2] = [
 ];
 
 /// `app.kubernetes.io/name` values of known database operators.
-const OPERATOR_NAMES: [&str; 8] = [
+const OPERATOR_NAMES: [&str; 13] = [
     "cloudnative-pg",
     "plugin-barman-cloud",
     "psmdb-operator",
@@ -110,6 +137,11 @@ const OPERATOR_NAMES: [&str; 8] = [
     "percona-xtradb-cluster-operator",
     "pg-operator",
     "percona-postgresql-operator",
+    "moco",
+    "mariadb-operator",
+    "mariadb-operator-webhook",
+    "mariadb-operator-cert-controller",
+    "dragonfly-operator",
 ];
 
 /// The database cluster a workload belongs to.

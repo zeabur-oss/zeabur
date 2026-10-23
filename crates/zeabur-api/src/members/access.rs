@@ -520,7 +520,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn developers_create_and_back_up_databases_and_viewers_only_see_them_and_nobody_restores() {
+    fn developers_create_and_back_up_databases_and_viewers_only_see_them() {
         let roles = roles();
         let developer = &roles[ProjectRole::Developer.cluster_role()];
         let viewer = &roles[ProjectRole::Viewer.cluster_role()];
@@ -531,8 +531,14 @@ pub(crate) mod tests {
             "objectstores.barmancloud.cnpg.io",
             "perconaservermongodbs.psmdb.percona.com",
             "perconaservermongodbbackups.psmdb.percona.com",
+            "perconaservermongodbrestores.psmdb.percona.com",
+            "mysqlclusters.moco.cybozu.com",
+            "backuppolicies.moco.cybozu.com",
+            "mariadbs.k8s.mariadb.com",
+            "backups.k8s.mariadb.com",
+            "dragonflies.dragonflydb.io",
         ];
-        let restores = "perconaservermongodbrestores.psmdb.percona.com";
+        let restores = "restores.k8s.mariadb.com";
         for resource in changed.iter().chain([&restores]) {
             for verb in ["get", "list", "watch"] {
                 assert!(allows(viewer, verb, resource), "viewer {verb} {resource}");

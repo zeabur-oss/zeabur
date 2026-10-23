@@ -134,6 +134,7 @@ pub fn findings(
             message: completed
                 .filter(|_| outcome == Outcome::Failed)
                 .and_then(|c| c.2),
+            restore_from: None,
         });
     }
     newest(&mut out.runs, 10);

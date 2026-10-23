@@ -65,8 +65,9 @@ zeabur-project-viewer:
   - apiGroups: [metrics.k8s.io]
     resources: [pods]
     verbs: [get, list]
-  # Databases: CloudNativePG, its Barman Cloud plugin, and the Percona Operator for MongoDB.
-  # Granted whether or not they are installed; RBAC rules may name resources not yet served.
+  # Databases: CloudNativePG, its Barman Cloud plugin, the Percona Operator for MongoDB, MOCO,
+  # mariadb-operator and the Dragonfly Operator. Granted whether or not they are installed; RBAC
+  # rules may name resources not yet served.
   - apiGroups: [postgresql.cnpg.io]
     resources: [clusters, backups, scheduledbackups]
     verbs: [get, list, watch]
@@ -75,6 +76,15 @@ zeabur-project-viewer:
     verbs: [get, list, watch]
   - apiGroups: [psmdb.percona.com]
     resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
+    verbs: [get, list, watch]
+  - apiGroups: [moco.cybozu.com]
+    resources: [mysqlclusters, backuppolicies]
+    verbs: [get, list, watch]
+  - apiGroups: [k8s.mariadb.com]
+    resources: [mariadbs, backups, restores]
+    verbs: [get, list, watch]
+  - apiGroups: [dragonflydb.io]
+    resources: [dragonflies]
     verbs: [get, list, watch]
   # Notification channels: which events go where. Their URLs and tokens stay in Secrets.
   - apiGroups: [operator.victoriametrics.com]
@@ -157,7 +167,9 @@ zeabur-project-developer:
     verbs: [get, list]
   # Databases and their backups. A database's pods run the operator's image as the operator
   # configures them, under the namespace's Pod Security level like any pod the role may create.
-  # Restores are read only for now: a restore overwrites a running database.
+  # Zeabur restores a backup only into a new database. A Percona restore needs its own object,
+  # so developers may create one; they may delete the database anyway. mariadb-operator restores
+  # stay read only: `MariaDB.spec.bootstrapFrom` restores into a new server.
   - apiGroups: [postgresql.cnpg.io]
     resources: [clusters, backups, scheduledbackups]
     verbs: [get, list, watch, create, update, patch, delete]
@@ -165,11 +177,20 @@ zeabur-project-developer:
     resources: [objectstores]
     verbs: [get, list, watch, create, update, patch, delete]
   - apiGroups: [psmdb.percona.com]
-    resources: [perconaservermongodbs, perconaservermongodbbackups]
+    resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
     verbs: [get, list, watch, create, update, patch, delete]
-  - apiGroups: [psmdb.percona.com]
-    resources: [perconaservermongodbrestores]
+  - apiGroups: [moco.cybozu.com]
+    resources: [mysqlclusters, backuppolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [k8s.mariadb.com]
+    resources: [mariadbs, backups]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [k8s.mariadb.com]
+    resources: [restores]
     verbs: [get, list, watch]
+  - apiGroups: [dragonflydb.io]
+    resources: [dragonflies]
+    verbs: [get, list, watch, create, update, patch, delete]
   # Notification channels. A channel's receivers only see alerts of this namespace: the operator
   # adds that matcher to every config.
   - apiGroups: [operator.victoriametrics.com]

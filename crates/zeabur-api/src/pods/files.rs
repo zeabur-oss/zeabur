@@ -925,7 +925,7 @@ async fn readable_file(place: &Place, path: &FilePath) -> Result<FilePath, ApiEr
 }
 
 /// RFC 6266 `Content-Disposition` for `name`: an ASCII fallback and the UTF-8 name (RFC 8187).
-fn disposition(name: &str) -> HeaderValue {
+pub(crate) fn disposition(name: &str) -> HeaderValue {
     let fallback: String = name
         .chars()
         .map(|c| {

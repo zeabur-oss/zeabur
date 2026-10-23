@@ -38,6 +38,7 @@
 
 pub mod backups;
 pub mod builds;
+pub mod database_export;
 pub mod databases;
 pub mod deploy_keys;
 pub(crate) mod events;

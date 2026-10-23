@@ -54,12 +54,16 @@ reads) and `zeabur-adapters` (for label selectors). Only the crates that compose
 | `reloader` | config-reload | `apps/v1` deployments labelled `app.kubernetes.io/name: reloader`, cluster-wide |
 | `barman-cloud` | postgres | `barmancloud.cnpg.io/v1` objectstores |
 | `percona-server-mongodb` | mongodb | `psmdb.percona.com/v1` perconaservermongodbs, perconaservermongodbbackups |
+| `moco` | mysql | `moco.cybozu.com/v1beta2` mysqlclusters, backuppolicies |
+| `mariadb-operator` | mariadb | `k8s.mariadb.com/v1alpha1` mariadbs, backups |
+| `dragonfly-operator` | redis | `dragonflydb.io/v1alpha1` dragonflies |
 | `zeabur-builder` | builds | `builder.zeabur.com/v1alpha1` builds, buildruns |
 | `alertmanager` | notifications | `operator.victoriametrics.com/v1beta1` vmalertmanagerconfigs (the channels), vmrules (whether Zeabur's rules are installed) |
 
-The databases capability (`databases`) has two providers, CloudNativePG and the Percona
-Operator for MongoDB; like backups, they share only what a person asks of any database: whether
-it is up, its members, version, where to connect, and its backups.
+The databases capability (`databases`) has five providers: CloudNativePG, the Percona Operator
+for MongoDB, MOCO, mariadb-operator and the Dragonfly Operator. Like backups, they share only
+what a person asks of any database: whether it is up, its members, version, where to connect,
+and its backups.
 
 [inventory]: https://github.com/dtolnay/inventory
 [bevy-plugins]: https://docs.rs/bevy/latest/bevy/app/trait.Plugin.html

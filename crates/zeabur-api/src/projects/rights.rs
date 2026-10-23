@@ -33,9 +33,9 @@ pub struct ProjectRights {
     pub change_domains: Permission,
     /// Add and change volumes: `create` and `patch` on persistentvolumeclaims.
     pub change_storage: Permission,
-    /// Create, change and delete databases: CloudNativePG clusters or Percona MongoDB.
+    /// Create, change and delete databases of any operator Zeabur knows.
     pub change_databases: Permission,
-    /// Back up databases: `create` on either operator's backups.
+    /// Back up databases: `create` on an operator's backups.
     pub back_up_databases: Permission,
     /// Open a terminal in a container: `create` on `pods/exec`.
     pub open_terminal: Permission,
@@ -105,6 +105,9 @@ impl Ask<'_> {
 
 const CNPG: &str = "postgresql.cnpg.io";
 const PSMDB: &str = "psmdb.percona.com";
+const MOCO: &str = "moco.cybozu.com";
+const MARIADB: &str = "k8s.mariadb.com";
+const DRAGONFLY: &str = "dragonflydb.io";
 
 impl ProjectRights {
     /// Every right unknown: the review could not be made.
@@ -159,10 +162,15 @@ impl ProjectRights {
             change_databases: any([
                 ask.every(&change, CNPG, "clusters"),
                 ask.every(&change, PSMDB, "perconaservermongodbs"),
+                ask.every(&change, MOCO, "mysqlclusters"),
+                ask.every(&change, MARIADB, "mariadbs"),
+                ask.every(&change, DRAGONFLY, "dragonflies"),
             ]),
             back_up_databases: any([
                 ask.can("create", CNPG, "backups"),
                 ask.can("create", PSMDB, "perconaservermongodbbackups"),
+                ask.can("create", MOCO, "backuppolicies"),
+                ask.can("create", MARIADB, "backups"),
             ]),
             open_terminal: ask.can("create", "", "pods/exec"),
             read_logs: ask.can("get", "", "pods/log"),
