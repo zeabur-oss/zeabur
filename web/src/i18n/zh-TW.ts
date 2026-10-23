@@ -1742,8 +1742,9 @@ export const zhTW: Messages = {
   "connect.extras": (names) => `也加入 ${names}`,
   "connect.adds": "會加入的變數",
   "connect.note.postgresql": (secret) => `值留在機密 ${secret}，服務只寫參照。`,
-  "connect.note.mongodb": (secret) =>
-    `密碼留在機密 ${secret}；服務啟動時，MONGO_URL 從 MONGOPASSWORD 帶入密碼。`,
+  "connect.note.mongodb": (secret, url, password) =>
+    `密碼留在機密 ${secret}；服務啟動時，${url} 從 ${password} 帶入密碼。`,
+  "connect.taken": (name, service) => `${service} 已經有 ${name}。`,
   "connect.noApp": (database) =>
     `${database} 沒有自動產生密碼的應用程式使用者，無法在這裡接到服務。在 Zeabur 建立的資料庫都有。`,
   "connect.noDatabases": "這個專案沒有可以接上的資料庫。",

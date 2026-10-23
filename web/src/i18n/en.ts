@@ -1902,8 +1902,9 @@ export const en = {
   "connect.adds": "Variables added",
   "connect.note.postgresql": (secret: string) =>
     `The values stay in Secret ${secret}; the service only points to them.`,
-  "connect.note.mongodb": (secret: string) =>
-    `The password stays in Secret ${secret}; MONGO_URL takes it from MONGOPASSWORD when the service starts.`,
+  "connect.note.mongodb": (secret: string, url: string, password: string) =>
+    `The password stays in Secret ${secret}; ${url} takes it from ${password} when the service starts.`,
+  "connect.taken": (name: string, service: string) => `${service} already has ${name}.`,
   "connect.noApp": (database: string) =>
     `${database} has no app user with a generated password, so it cannot be connected here. Databases created in Zeabur have one.`,
   "connect.noDatabases": "No database in this project can be connected.",
