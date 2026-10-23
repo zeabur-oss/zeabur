@@ -220,10 +220,11 @@ function sentenceOf(
   }
 }
 
-type ServiceChange = Extract<
-  Change,
-  { op: "envImport" | "publicPort" | "buildOptions" | "labelVolume" }
->
+type ServiceChange =
+  | Extract<Change, { op: "envImport" | "publicPort" | "buildOptions" | "labelVolume" }>
+  | PagesChange
+
+type PagesChange = Extract<Change, { op: "errorPageHtml" | "errorPages" | "maintenance" }>
 
 function accessSentence(t: Translate, change: AccessChange | ServiceChange): string {
   switch (change.op) {
@@ -258,6 +259,23 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
       return t("confirm.buildOptions", change.build)
     case "labelVolume":
       return t("confirm.labelVolume", change.claim)
+    default:
+      return pagesSentence(t, change)
+  }
+}
+
+function pagesSentence(t: Translate, change: PagesChange): string {
+  switch (change.op) {
+    case "errorPageHtml":
+      return t("confirm.errorPageHtml")
+    case "errorPages":
+      return change.enabled
+        ? t("confirm.errorPages", change.route.name)
+        : t("confirm.errorPagesOff", change.route.name)
+    case "maintenance":
+      return change.enabled
+        ? t("confirm.maintenance", change.hostname)
+        : t("confirm.maintenanceOff", change.hostname)
   }
 }
 
@@ -798,6 +816,19 @@ function serviceAction(t: Translate, change: ServiceChange): string {
       return t("action.saveBuildOptions")
     case "labelVolume":
       return t("action.save")
+    default:
+      return pagesAction(t, change)
+  }
+}
+
+function pagesAction(t: Translate, change: PagesChange): string {
+  switch (change.op) {
+    case "errorPageHtml":
+      return t("action.savePages")
+    case "errorPages":
+      return change.enabled ? t("action.showErrorPages") : t("action.hideErrorPages")
+    case "maintenance":
+      return change.enabled ? t("action.startMaintenance") : t("action.endMaintenance")
   }
 }
 

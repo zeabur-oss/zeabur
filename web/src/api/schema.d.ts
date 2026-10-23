@@ -2527,6 +2527,18 @@ export interface components {
           /** @enum {string} */
           op: "basicAuth"
         })
+      | (components["schemas"]["ErrorPageHtml"] & {
+          /** @enum {string} */
+          op: "errorPageHtml"
+        })
+      | (components["schemas"]["ErrorPagesChange"] & {
+          /** @enum {string} */
+          op: "errorPages"
+        })
+      | (components["schemas"]["MaintenanceChange"] & {
+          /** @enum {string} */
+          op: "maintenance"
+        })
       | (components["schemas"]["EnvImportChange"] & {
           /** @enum {string} */
           op: "envImport"
@@ -3839,6 +3851,27 @@ export interface components {
       /** @description The value, for a literal only. */
       value?: string | null
     }
+    /**
+     * @description A [`Change::ErrorPageHtml`]: the HTML of each page. A page left out keeps its HTML; the first
+     *     change of a project gives all four.
+     */
+    ErrorPageHtml: {
+      /** @description `502.html`: the workload sent no valid answer. */
+      badGateway?: string | null
+      /** @description `504.html`: the workload did not answer in time. */
+      gatewayTimeout?: string | null
+      /** @description `maintenance.html`: what a hostname in maintenance shows. */
+      maintenance?: string | null
+      /** @description `503.html`: the workload cannot answer now. */
+      serviceUnavailable?: string | null
+    }
+    /** @description A [`Change::ErrorPages`]. */
+    ErrorPagesChange: {
+      /** @description Show the pages when true; stop when false. */
+      enabled: boolean
+      /** @description The Ingress. */
+      route: components["schemas"]["RouteRef"]
+    }
     /** @description Events of a project, the newest `limit` of them. */
     EventList: {
       /** @description Newest first (by `lastSeen`, events without one last), then by name. */
@@ -4758,6 +4791,15 @@ export interface components {
       includeStuck?: boolean
       /** @description The token `plan` returned. */
       token: string
+    }
+    /** @description A [`Change::Maintenance`]. */
+    MaintenanceChange: {
+      /** @description Show the maintenance page when true; send requests to the workload again when false. */
+      enabled: boolean
+      /** @description The hostname. */
+      hostname: string
+      /** @description The route. */
+      route: components["schemas"]["RouteRef"]
     }
     /** @description What a plan changes, and the token that applies it. */
     MaintenancePlan: {
@@ -6953,8 +6995,11 @@ export interface components {
        *     [k8s-ingress-class]: https://kubernetes.io/docs/concepts/services-networking/ingress/#deprecated-annotation
        */
       class?: string | null
+      errorPages?: components["schemas"]["RouteMiddleware"] | null
       /** @description The hosts its rules match. */
       hostnames: string[]
+      /** @description The hosts that show the maintenance page instead of their workload, sorted. */
+      maintenance?: string[]
       /** @description The Ingress's name. */
       name: string
       /** @description The Ingress object. */

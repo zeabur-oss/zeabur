@@ -1763,6 +1763,13 @@ export const en = {
   "confirm.basicAuth": (route: string) =>
     `Ask for a password on every domain of Ingress ${route}. The cluster keeps only a bcrypt hash of it.`,
   "confirm.basicAuthOff": (route: string) => `Stop asking for a password on Ingress ${route}.`,
+  "confirm.errorPageHtml": "Write the project's error pages to ConfigMap zeabur-error-pages.",
+  "confirm.errorPages": (route: string) =>
+    `Show the project's error pages on every domain of Ingress ${route}.`,
+  "confirm.errorPagesOff": (route: string) => `Stop showing the error pages on Ingress ${route}.`,
+  "confirm.maintenance": (host: string) =>
+    `Show the maintenance page on ${host}. The service keeps running.`,
+  "confirm.maintenanceOff": (host: string) => `Send visitors of ${host} to the service again.`,
   "confirm.deployKey": (name: string) => `Create Secret ${name} with the new deploy key.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
@@ -1808,6 +1815,11 @@ export const en = {
   "action.openPort": "Open port",
   "action.closePort": "Close port",
   "action.stopPassword": "Remove password",
+  "action.savePages": "Save pages",
+  "action.startMaintenance": "Start maintenance",
+  "action.endMaintenance": "End maintenance",
+  "action.showErrorPages": "Show error pages",
+  "action.hideErrorPages": "Remove error pages",
   "action.delete": "Delete",
   // Toasts
   "toast.region": "Notifications",
@@ -3420,6 +3432,46 @@ export const en = {
   "domainAccess.kube.users": "Users",
   "domainAccess.kube.usersValue": (name: string) =>
     `Secret ${name}, key users: one htpasswd line with a bcrypt hash`,
+  "domainPages.open": (host: string) => `Maintenance and error pages for ${host}`,
+  "domainPages.title": (host: string) => `Maintenance and error pages for ${host}`,
+  "domainPages.planTitle": (host: string) => `Change the pages of ${host}`,
+  "domainPages.lead":
+    "Show visitors a page of your own while the service is down or you are working on it.",
+  "domainPages.maintenance": "Maintenance mode",
+  "domainPages.maintenanceHint": (host: string, service: string) =>
+    `Visitors of ${host} see the maintenance page, with status 503. ${service} keeps running.`,
+  "domainPages.errorPages": "Show error pages",
+  "domainPages.errorPagesHint": (service: string) =>
+    `When ${service} doesn't answer (502, 503 or 504), visitors see your page instead of a bare error.`,
+  "domainPages.shared": (hosts: string) =>
+    `The error pages also cover ${hosts}, because they share this Ingress.`,
+  "domainPages.pages": "Pages",
+  "domainPages.pagesHint": "Every domain of the project shows the same pages.",
+  "domainPages.firstUse": "Zeabur adds a small server to the project to serve them.",
+  "domainPages.page": "Page to edit",
+  "domainPages.page.maintenance": "Maintenance",
+  "domainPages.page.badGateway": "502 Bad gateway",
+  "domainPages.page.serviceUnavailable": "503 Service unavailable",
+  "domainPages.page.gatewayTimeout": "504 Gateway timeout",
+  "domainPages.html": "HTML",
+  "domainPages.tooLarge": "Keep each page under 64 KiB.",
+  "domainPages.nothing": "Nothing changed.",
+  "domainPages.inMaintenance": "Maintenance",
+  "domainPages.withErrorPages": "Error pages",
+  "domainPages.default.lang": "en",
+  "domainPages.default.maintenance": (project: string) => `${project} is under maintenance`,
+  "domainPages.default.badGateway": (project: string) => `${project} isn't responding`,
+  "domainPages.default.serviceUnavailable": (project: string) =>
+    `${project} isn't available right now`,
+  "domainPages.default.gatewayTimeout": (project: string) => `${project} took too long to respond`,
+  "domainPages.default.later": "We'll be back soon.",
+  "domainPages.default.retry": "Please try again in a few minutes.",
+  "domainPages.kube.server": "Server",
+  "domainPages.kube.serverValue": (name: string) => `Deployment, Service and ConfigMap ${name}`,
+  "domainPages.kube.errors": "Error pages",
+  "domainPages.kube.maintenance": "Maintenance",
+  "domainPages.kube.maintenanceValue":
+    "The domain's backend becomes port 8081 of zeabur-error-pages; annotation zeabur.com/maintenance-backend keeps the one it had",
   "ports.title": "Public ports",
   "ports.about":
     "Clients outside the cluster connect straight to a port, without a domain. For services that don't speak HTTP, such as a database.",

@@ -139,7 +139,10 @@ function weighAccess(change: AccessChange | ServiceChange): { risk: Risk; reason
 }
 
 /** Changes to a service that only open a port can make riskier. */
-type ServiceChange = Extract<Change, { op: "buildOptions" | "labelVolume" }>
+type ServiceChange = Extract<
+  Change,
+  { op: "buildOptions" | "labelVolume" | "errorPageHtml" | "errorPages" | "maintenance" }
+>
 
 /** The changes of scheduled tasks, routes, shared variables and public ports. */
 export type AccessChange = Extract<
@@ -337,6 +340,8 @@ function accessTab(change: Change, service?: WorkloadRef): [WorkloadRef | undefi
     case "envImport":
       return [change.workload, "variables"]
     case "basicAuth":
+    case "errorPages":
+    case "maintenance":
       return [service, "networking"]
     case "redirect":
     case "publicPort":

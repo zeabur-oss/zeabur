@@ -8,6 +8,7 @@ import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretDownIcon from "~icons/ph/caret-down"
 import ClockIcon from "~icons/ph/clock"
 import GlobeIcon from "~icons/ph/globe"
+import HardHatIcon from "~icons/ph/hard-hat"
 import HourglassMediumIcon from "~icons/ph/hourglass-medium-bold"
 import LockKeyIcon from "~icons/ph/lock-key"
 import LockSimpleBoldIcon from "~icons/ph/lock-simple-bold"
@@ -63,6 +64,7 @@ import { PublicPorts } from "@/routes/service/public-ports"
 import { Reachability } from "@/routes/service/reachability"
 
 const DomainAccess = lazy(() => import("@/routes/service/domain-access"))
+const DomainPages = lazy(() => import("@/routes/service/domain-pages"))
 
 // RFC 1123 host names, with the leading wildcard label Ingress and HTTPRoute allow. A hint only:
 // the plan checks the name again.
@@ -290,7 +292,8 @@ export function NetworkingTab({
                       const more = folded ? "max-sm:hidden" : undefined
                       const check = edit ? undefined : checkOf(route.host)
                       const firstOfHost = shown.findIndex((r) => r.host === route.host) === i
-                      const traefik = traefikIngress(network, service, route)
+                      const ingress = ingressOf(network, service, route)
+                      const traefik = traefikOnly(ingress)
                       return (
                         <Fragment key={key}>
                           <tr
@@ -330,6 +333,7 @@ export function NetworkingTab({
                                 <span className="flex min-w-0 flex-col gap-1 max-sm:w-full">
                                   <span className="flex min-w-0 items-center gap-2">
                                     <Host route={route} certificate={check?.certificate} />
+                                    <PagesMarks route={ingress} host={route.host} />
                                     <AccessMarks route={traefik} host={route.host} />
                                     <span className="flex-1 sm:hidden" />
                                     {route.host && !route.https ? (
@@ -386,6 +390,14 @@ export function NetworkingTab({
                                 <span className="flex justify-end">{undo(edit)}</span>
                               ) : route.host ? (
                                 <span className="flex items-center justify-end gap-0.5">
+                                  <PagesButton
+                                    route={ingress}
+                                    host={route.host}
+                                    managed={managed}
+                                    gate={domainGate}
+                                    project={project}
+                                    service={service}
+                                  />
                                   <AccessButton
                                     route={traefik}
                                     host={route.host}
@@ -618,14 +630,40 @@ function ExposeHint({ project, command }: { project: string; command?: string })
  * domains. */
 // Redirects and passwords are Traefik middlewares, which only an Ingress that Traefik serves
 // can list.
-function traefikIngress(
+function traefikOnly(route?: Schemas["Route"]): Schemas["Route"] | undefined {
+  return route && servedByTraefik(route) ? route : undefined
+}
+
+const servedByTraefik = (route: Schemas["Route"]) => !route.class || route.class.includes("traefik")
+
+function ingressOf(
   network: Network,
   service: Service,
   publicRoute: PublicRoute,
 ): Schemas["Route"] | undefined {
   const route = routesOf(network, service).find((r) => r.name === publicRoute.ingress)
-  if (route?.origin.kind !== "Ingress") return undefined
-  return !route.class || route.class.includes("traefik") ? route : undefined
+  return route?.origin.kind === "Ingress" ? route : undefined
+}
+
+/** Maintenance first: the domain does not reach the service. */
+function PagesMarks({ route, host }: { route?: Schemas["Route"]; host?: string | null }) {
+  const t = useT()
+  if (!route) return null
+  return (
+    <>
+      {host && route.maintenance?.includes(host) ? (
+        <span className="flex shrink-0 items-center gap-1 type-meta text-warn-strong">
+          <HardHatIcon aria-hidden="true" />
+          {t("domainPages.inMaintenance")}
+        </span>
+      ) : null}
+      {route.errorPages ? (
+        <span className="shrink-0 type-meta text-muted-foreground max-sm:hidden">
+          {t("domainPages.withErrorPages")}
+        </span>
+      ) : null}
+    </>
+  )
 }
 
 function AccessMarks({ route, host }: { route?: Schemas["Route"]; host?: string | null }) {
@@ -650,24 +688,76 @@ function AccessMarks({ route, host }: { route?: Schemas["Route"]; host?: string 
 }
 
 /** Opens the redirect and password drawer of one domain. */
-function AccessButton({
-  route,
-  host,
-  managed,
-  gate,
-  project,
-  service,
-}: {
+function AccessButton({ route, host, ...rest }: RowDrawerProps) {
+  const t = useT()
+  if (!route || !host) return null
+  return (
+    <RowDrawer
+      {...rest}
+      label={t("domainAccess.open", host)}
+      icon={<SlidersHorizontalIcon aria-hidden="true" />}
+    >
+      {(onClose) => (
+        <DomainAccess
+          project={rest.project}
+          service={rest.service}
+          route={route}
+          host={host}
+          onClose={onClose}
+        />
+      )}
+    </RowDrawer>
+  )
+}
+
+/** Opens maintenance mode and the error pages of one domain. */
+function PagesButton({ route, host, ...rest }: RowDrawerProps) {
+  const t = useT()
+  if (!route || !host) return null
+  return (
+    <RowDrawer
+      {...rest}
+      label={t("domainPages.open", host)}
+      icon={<HardHatIcon aria-hidden="true" />}
+    >
+      {(onClose) => (
+        <DomainPages
+          project={rest.project}
+          service={rest.service}
+          route={route}
+          host={host}
+          traefik={servedByTraefik(route)}
+          onClose={onClose}
+        />
+      )}
+    </RowDrawer>
+  )
+}
+
+interface RowDrawerProps {
   route?: Schemas["Route"]
   host?: string | null
   managed?: string
   gate: Gate
   project: string
   service: Service
+}
+
+/** An icon button on a domain row that opens a lazy drawer. */
+function RowDrawer({
+  managed,
+  gate,
+  label,
+  icon,
+  children,
+}: {
+  managed?: string
+  gate: Gate
+  label: string
+  icon: ReactElement
+  children: (onClose: () => void) => ReactNode
 }) {
-  const t = useT()
   const [open, setOpen] = useState(false)
-  if (!route || !host) return null
   return (
     <>
       <Managed tool={managed} gate={gate}>
@@ -675,24 +765,14 @@ function AccessButton({
           variant="muted"
           size="icon-xs"
           disabled={Boolean(managed)}
-          aria-label={t("domainAccess.open", host)}
-          title={t("domainAccess.open", host)}
+          aria-label={label}
+          title={label}
           onClick={() => setOpen(true)}
         >
-          <SlidersHorizontalIcon aria-hidden="true" />
+          {icon}
         </Button>
       </Managed>
-      {open ? (
-        <Suspense fallback={null}>
-          <DomainAccess
-            project={project}
-            service={service}
-            route={route}
-            host={host}
-            onClose={() => setOpen(false)}
-          />
-        </Suspense>
-      ) : null}
+      {open ? <Suspense fallback={null}>{children(() => setOpen(false))}</Suspense> : null}
     </>
   )
 }
