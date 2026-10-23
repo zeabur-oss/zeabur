@@ -20,7 +20,7 @@ import { RouteLine } from "@/components/route-trace"
 import { ServiceIcon } from "@/components/service-icon"
 import { useBrowserChecks } from "@/components/browser-check"
 import { plainReason, StatusDot, useStatusFacts } from "@/components/status"
-import { ReachLine, useHeadline } from "@/components/verdict"
+import { ReachLine, reachSetup, useHeadline } from "@/components/verdict"
 import { Button } from "@zeabur/design-system/components/button"
 import { Container } from "@zeabur/design-system/components/container"
 import { Meter } from "@zeabur/design-system/components/meter"
@@ -387,6 +387,7 @@ function Summary({
     .toSorted()
     .at(-1)
   const since = started ?? service.created ?? undefined
+  const setup = verdict.reach ? reachSetup(verdict.reach) : undefined
   return (
     <SummaryCard aria-label={t("common.status")}>
       <SummaryCardMain>
@@ -398,7 +399,12 @@ function Summary({
             <Replicas project={project} service={service} onTab={onTab} />
           ) : null}
         </SummaryCardStatus>
-        {verdict.reach ? <ReachLine reach={verdict.reach} /> : null}
+        {verdict.reach ? (
+          <ReachLine
+            reach={verdict.reach}
+            more={setup ? <More onClick={() => onTab("networking")}>{t(setup)}</More> : undefined}
+          />
+        ) : null}
         {since ? (
           <SummaryCardSince>
             <Tooltip content={formatTime(since, locale)}>

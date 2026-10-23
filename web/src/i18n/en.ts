@@ -661,6 +661,11 @@ export const en = {
   "verdict.reach.unreachable": (list: string) => `${list} can't be reached`,
   "verdict.reach.browserUnreachable": (list: string) => `Your browser can't reach ${list}`,
   "verdict.reach.unknown": (list: string) => `Not confirmed yet whether ${list} can be reached`,
+  "verdict.reach.issuing": (list: string, n: number) =>
+    n === 1 ? `Waiting for ${list}'s certificate` : `Waiting for certificates for ${list}`,
+  "verdict.reach.domain": (list: string, state: string) => `${list}: ${state}`,
+  "verdict.reach.seeRecord": "See the record to add",
+  "verdict.reach.seeDetails": "See details",
   "verdict.more": (n: number) => `${n} more`,
   "domain.valid": "Valid configuration",
   "domain.invalid": "Invalid configuration",

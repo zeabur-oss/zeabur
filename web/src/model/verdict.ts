@@ -2,6 +2,7 @@
 // the diagnosis found, the rollout, each domain's trace and the browser's own check.
 import type { Schemas } from "@/api/client"
 import type { BrowserCheck } from "@/model/browser-check"
+import { configuration } from "@/model/domains"
 import type { Overview } from "@/model/overview"
 import { reasonWord, type Health, type ReasonWord, type Status } from "@/model/service"
 
@@ -24,12 +25,15 @@ export type Headline =
   /** A task's own word: completed, scheduled, paused. */
   | { as: "status"; word: Status["word"] }
 
-/** Whether people reach the public domains, from the cluster's trace or the person's browser. */
+/** Whether people reach the public domains, from the cluster's trace or the person's browser;
+ * a domain not set up yet says so in the words Networking uses. */
 export interface Reach {
-  as: "reachable" | "unreachable" | "unknown"
+  as: "reachable" | "unreachable" | "unknown" | "invalid" | "elsewhere" | "issuing"
   /** Only the browser saw it, so it holds for this network. */
   browser: boolean
   domains: string[]
+  /** Networking shows a DNS record to add for one of them. */
+  record?: boolean
 }
 
 export interface Verdict {
@@ -61,37 +65,52 @@ function troubleOf(status: Status, causes: Diagnosis[]): Trouble {
 
 const isPublic = (route: Route) => route.kind === "domain" && !route.address.includes("*")
 
+type Seen = { domain: string; as: Reach["as"]; browser: boolean; record: boolean }
+
+function seenOf(route: Route, checks: (address: string) => BrowserCheck | undefined): Seen {
+  const domain = route.address
+  const check = route.domain ?? undefined
+  const record = Boolean(check && check.dns !== "pointsHere" && check.target.length > 0)
+  const said = (as: Reach["as"], browser = false): Seen => ({ domain, as, browser, record })
+  if (route.status === "ok") return said("reachable")
+  const config = check ? configuration(check) : undefined
+  if (config === "invalid") return said("invalid")
+  if (config === "pending") return said("issuing")
+  if (route.status === "failed") return said("unreachable")
+  const browser = checks(domain)?.state
+  if (browser === "reachable") return said("reachable", true)
+  if (config === "elsewhere") return said("elsewhere")
+  return browser === "unreachable" ? said("unreachable", true) : said("unknown")
+}
+
+/** The worst first: a domain to set up, then one nobody reaches, then one still waiting. */
+const reachOrder: Reach["as"][] = [
+  "invalid",
+  "unreachable",
+  "elsewhere",
+  "issuing",
+  "unknown",
+  "reachable",
+]
+
 function reachOf(
   routes: Route[],
   waiting: Overview["waiting"],
   checks: (address: string) => BrowserCheck | undefined,
 ): Reach | undefined {
-  const domains = routes.filter((r) => isPublic(r) && !waiting.has(r.address))
-  if (domains.length === 0) return undefined
-  const seen = domains.map((route) => {
-    if (route.status !== "unknown")
-      return { domain: route.address, reached: route.status === "ok", browser: false }
-    const check = checks(route.address)?.state
-    return {
-      domain: route.address,
-      reached: check === "reachable" ? true : check === "unreachable" ? false : undefined,
-      browser: true,
-    }
-  })
-  const down = seen.filter((s) => s.reached === false)
-  if (down.length > 0)
-    return {
-      as: "unreachable",
-      browser: down.every((s) => s.browser),
-      domains: down.map((s) => s.domain),
-    }
-  const open = seen.filter((s) => s.reached === undefined)
-  if (open.length > 0) return { as: "unknown", browser: false, domains: open.map((s) => s.domain) }
-  return {
-    as: "reachable",
-    browser: seen.some((s) => s.browser),
-    domains: seen.map((s) => s.domain),
+  const seen = routes
+    .filter((r) => isPublic(r) && !waiting.has(r.address))
+    .map((r) => seenOf(r, checks))
+  const as = reachOrder.find((as) => seen.some((s) => s.as === as))
+  if (!as) return undefined
+  const these = seen.filter((s) => s.as === as)
+  const reach: Reach = {
+    as,
+    browser: as === "reachable" ? these.some((s) => s.browser) : these.every((s) => s.browser),
+    domains: these.map((s) => s.domain),
   }
+  if (as !== "reachable" && these.some((s) => s.record)) reach.record = true
+  return reach
 }
 
 export function verdictOf({

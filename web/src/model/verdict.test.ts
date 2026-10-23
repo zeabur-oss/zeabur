@@ -23,6 +23,16 @@ const route = (
   via: { kind: "Ingress", name: "web" },
 })
 
+type DomainCheck = Schemas["DomainCheck"]
+
+const withDomain = (r: Route, domain: DomainCheck): Route => ({ ...r, domain })
+
+const issuing: DomainCheck = {
+  dns: "pointsHere",
+  target: ["203.0.113.10"],
+  certificate: { state: "issuing", name: "shop-tls" },
+}
+
 const diagnosis = (kind: Diagnosis["kind"]): Diagnosis => ({
   kind,
   cause: { key: `diagnosis.${kind}.cause.x` },
@@ -164,5 +174,73 @@ describe("verdictOf", () => {
         checks: none,
       }).headline,
     ).toEqual({ as: "status", word: "scheduled" })
+  })
+
+  test("a certificate still issuing is waited for, not a domain the browser can't reach", () => {
+    const routes = [withDomain(route("shop.example.com", "unknown"), issuing)]
+    const verdict = verdictOf({
+      status: ready,
+      said: said(),
+      routes,
+      checks: browser("unreachable"),
+    })
+    expect(verdict.headline).toEqual({ as: "running" })
+    expect(verdict.reach).toEqual({ as: "issuing", browser: false, domains: ["shop.example.com"] })
+  })
+
+  test("a domain without its DNS record says so, as Networking does, with the record to add", () => {
+    const missing: DomainCheck = { dns: "missing", target: ["203.0.113.10"] }
+    const routes = [
+      withDomain(route("shop.example.com", "unknown"), missing),
+      route("www.example.com", "ok"),
+    ]
+    expect(verdictOf({ status: ready, said: said(), routes, checks: none }).reach).toEqual({
+      as: "invalid",
+      browser: false,
+      domains: ["shop.example.com"],
+      record: true,
+    })
+  })
+
+  test("a domain the cluster fails to reach names its setup when that is the trouble", () => {
+    const missing: DomainCheck = { dns: "missing", target: [] }
+    const verdict = verdictOf({
+      status: ready,
+      said: said(),
+      routes: [withDomain(route("shop.example.com", "failed"), missing)],
+      checks: none,
+    })
+    expect(verdict.headline).toEqual({
+      as: "problem",
+      trouble: { as: "unreachable", domain: "shop.example.com" },
+    })
+    expect(verdict.reach).toEqual({ as: "invalid", browser: false, domains: ["shop.example.com"] })
+  })
+
+  test("a domain pointing elsewhere is said so unless the browser reaches it", () => {
+    const elsewhere: DomainCheck = {
+      dns: "elsewhere",
+      target: ["203.0.113.10"],
+      resolved: ["198.51.100.7"],
+    }
+    const routes = [withDomain(route("shop.example.com", "unknown"), elsewhere)]
+    expect(verdictOf({ status: ready, said: said(), routes, checks: none }).reach).toEqual({
+      as: "elsewhere",
+      browser: false,
+      domains: ["shop.example.com"],
+      record: true,
+    })
+    expect(
+      verdictOf({ status: ready, said: said(), routes, checks: browser("reachable") }).reach,
+    ).toEqual({ as: "reachable", browser: true, domains: ["shop.example.com"] })
+  })
+
+  test("the cluster reaching a domain outweighs what its setup says", () => {
+    const routes = [withDomain(route("shop.example.com", "ok"), issuing)]
+    expect(verdictOf({ status: ready, said: said(), routes, checks: none }).reach).toEqual({
+      as: "reachable",
+      browser: false,
+      domains: ["shop.example.com"],
+    })
   })
 })
