@@ -60,7 +60,7 @@ pub enum Permission {
 
 impl Permission {
     /// Allowed when both are, denied when either is.
-    const fn and(self, other: Self) -> Self {
+    pub(crate) const fn and(self, other: Self) -> Self {
         match (self, other) {
             (Self::Allowed, Self::Allowed) => Self::Allowed,
             (Self::Denied, _) | (_, Self::Denied) => Self::Denied,

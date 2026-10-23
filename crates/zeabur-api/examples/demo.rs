@@ -24,6 +24,10 @@
 //! Velero runs with a location on R2, a daily schedule and a week of backups, the newest failed:
 //! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location.
 //!
+//! Alerting sends shop's deploy failures to Slack and the cluster's node alerts to Telegram; a
+//! second shop channel was rejected by Alertmanager. `ZEABUR_DEMO_ALERTING=none` leaves it
+//! uninstalled.
+//!
 //! `storageclasses.storage.k8s.io` and `persistentvolumes` in `ZEABUR_DEMO_FORBID` refuse
 //! reading the storage classes (local-path, the default, and Longhorn) and the volumes behind
 //! claims.
@@ -81,6 +85,7 @@ use zeabur_kube::memory::{MemoryCluster, State};
 use zeabur_kube::{
     Cluster, ClusterFacts, DynamicObject, Identity, NamespaceObjects, SecretSummary, ServedResource,
 };
+use zeabur_modules::alertmanager as am;
 
 fn from<T: serde::de::DeserializeOwned>(value: Value) -> T {
     serde_json::from_value(value).expect("valid example object")
@@ -1619,6 +1624,7 @@ fn state() -> State {
         ]
         .into_iter()
         .chain(velero_served())
+        .chain(alerting_served())
         .collect(),
         dynamic: [
             certificate(
@@ -1717,6 +1723,7 @@ fn state() -> State {
         .chain(people())
         .chain(member_roles())
         .chain(velero())
+        .chain(alerting())
         .collect(),
         // The metrics store where Zeabur's recommendation installs it.
         proxied: BTreeMap::from([(
@@ -1805,6 +1812,80 @@ const VERSION: &str = "v1.34.10+k3s1";
 
 /// `minutes` before now, as an event time.
 /// When a workload was created: a few weeks ago, a different day for each name.
+fn alerting_installed() -> bool {
+    std::env::var("ZEABUR_DEMO_ALERTING").as_deref() != Ok("none")
+}
+
+fn alerting_served() -> Vec<ServedResource> {
+    if !alerting_installed() {
+        return Vec::new();
+    }
+    [am::CONFIGS, am::RULES]
+        .into_iter()
+        .map(|r| ServedResource::readable(r.group, r.version, r.resource, r.kind, true))
+        .collect()
+}
+
+/// Channels of shop and of the cluster, and the rule set they route.
+fn alerting() -> Vec<DynamicObject> {
+    use zeabur_modules::alertmanager::{AlertmanagerChannelSettings as S, AlertmanagerEvent as E};
+    if !alerting_installed() {
+        return Vec::new();
+    }
+    let channel = |namespace: &str, name: &str, settings: &S, events: &[E], status: Value| {
+        let mut object: DynamicObject = from(am::config(namespace, name, settings, events));
+        object.metadata.resource_version = Some("4".to_owned());
+        if let Some(data) = object.data.as_object_mut() {
+            data.insert("status".to_owned(), status);
+        }
+        object
+    };
+    let operational = json!({"updateStatus": "operational"});
+    vec![
+        channel(
+            "shop",
+            "team-alerts",
+            &S::Slack {
+                webhook_url: "https://hooks.slack.com/services/demo".to_owned(),
+            },
+            &[
+                E::DeployFailed,
+                E::BuildFailed,
+                E::CrashLoop,
+                E::OutOfMemory,
+            ],
+            operational.clone(),
+        ),
+        channel(
+            "shop",
+            "on-call",
+            &S::Webhook {
+                url: "http://pager.internal/hook".to_owned(),
+                bearer_token: String::new(),
+            },
+            &[E::DatabaseUnhealthy, E::BackupFailed],
+            json!({"updateStatus": "failed",
+                   "reason": "unable to fetch secret=\"zeabur-notify-on-call\", ns=\"shop\": \
+                              secrets \"zeabur-notify-on-call\" not found"}),
+        ),
+        channel(
+            am::CLUSTER_NAMESPACE,
+            "admins",
+            &S::Telegram {
+                bot_token: "demo".to_owned(),
+                chat_id: -1_001_234_567,
+            },
+            &[E::NodeNotReady, E::RuntimeSecurity, E::BackupFailed],
+            operational,
+        ),
+        from(json!({
+            "apiVersion": am::RULES.resource().api_version(), "kind": am::RULES.kind,
+            "metadata": {"name": am::RULES_NAME, "namespace": am::CLUSTER_NAMESPACE},
+            "spec": {"groups": []}
+        })),
+    ]
+}
+
 /// Velero, unless `ZEABUR_DEMO_VELERO` is `none`; `location` has a location and nothing else.
 fn velero_mode() -> String {
     std::env::var("ZEABUR_DEMO_VELERO").unwrap_or_default()

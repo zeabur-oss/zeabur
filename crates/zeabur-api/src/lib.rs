@@ -38,6 +38,9 @@
 //! | `GET /api/v1/projects/{p}/usage` | what each pod uses now, from metrics-server |
 //! | `GET /api/v1/projects/{p}/volumes` | how full each claim's volume is, from the kubelets |
 //! | `GET /api/v1/projects/{p}/builds` | its Zeabur Builder builds and their runs, with each run's pod |
+//! | `GET /api/v1/projects/{p}/notifications` | where the project's alerts go: its channels and the events each receives, or that alerting is not installed |
+//! | `POST /api/v1/projects/{p}/notifications/plan` | what adding, changing, testing or removing a channel writes, and a token; writes nothing and never shows a secret |
+//! | `POST /api/v1/projects/{p}/notifications/apply` | carries out that plan by its token |
 //! | `GET /api/v1/projects/{p}/gaps` | what the project is missing, with citations and fixes |
 //! | `GET /api/v1/projects/{p}/timeline` | the same for every service of the project |
 //! | `GET /api/v1/projects/{p}/incidents` | the cluster incidents that reach the project, with the services they break |
@@ -67,6 +70,9 @@
 //! | `POST /api/v1/cluster/node-policies/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/backups/plan` | what setting the backup location or schedule, pausing it or backing up now writes, and a token; writes nothing and never shows the keys |
 //! | `POST /api/v1/cluster/backups/apply` | carries out that plan by its token |
+//! | `GET /api/v1/cluster/notifications` | the cluster's notification channels and whether the alert rules are installed, or that alerting is not installed |
+//! | `POST /api/v1/cluster/notifications/plan` | what adding, changing, testing or removing a cluster channel writes, and a token; writes nothing and never shows a secret |
+//! | `POST /api/v1/cluster/notifications/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/node-shells/plan` | what opening a shell on a node, or removing a shell pod, writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/node-shells/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/tools/plan` | what starting a kubectl terminal for the whole cluster writes, and a token; writes nothing |
@@ -122,6 +128,7 @@ pub mod images;
 pub mod incidents;
 pub mod local;
 pub mod members;
+pub mod notifications;
 pub mod plan_token;
 pub mod pods;
 pub mod projects;
@@ -208,6 +215,9 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::backups::get))
         .routes(routes!(cluster::backups::plan))
         .routes(routes!(cluster::backups::apply))
+        .routes(routes!(notifications::cluster_get))
+        .routes(routes!(notifications::cluster_plan))
+        .routes(routes!(notifications::cluster_apply))
         .routes(routes!(cluster::config_reload::get))
         .routes(routes!(cluster::install::guide_for))
         .routes(routes!(cluster::join::get))
@@ -271,6 +281,9 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(projects::writes::plan))
         .routes(routes!(projects::writes::apply))
         .routes(routes!(projects::backups::get))
+        .routes(routes!(notifications::project_get))
+        .routes(routes!(notifications::project_plan))
+        .routes(routes!(notifications::project_apply))
         .routes(routes!(alerts::project))
         .routes(routes!(projects::databases::get))
         .routes(routes!(projects::builds::get))

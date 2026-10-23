@@ -3,6 +3,7 @@
 use serde::Serialize;
 use zeabur_kube::{DynamicObject, ResourceRef};
 
+pub mod alertmanager;
 pub mod backups;
 pub mod cloudnative_pg;
 pub mod databases;
@@ -122,6 +123,7 @@ pub fn modules() -> Vec<&'static Module> {
         &cloudnative_pg::BARMAN_CLOUD,
         &percona_mongodb::MODULE,
         &zeabur_builder::MODULE,
+        &alertmanager::MODULE,
     ]
 }
 

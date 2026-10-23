@@ -742,6 +742,103 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/notifications:
+    get:
+      tags:
+      - cluster
+      summary: >-
+        The cluster's channels, in `observability`, and whether Zeabur's alert rules
+        are installed.
+      operationId: getClusterNotifications
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notifications"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/notifications/apply:
+    post:
+      tags:
+      - cluster
+      summary: Carries out the cluster's notifications plan by its token.
+      operationId: applyClusterNotifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationsApply"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsApplied"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/notifications/plan:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Works out what adding, changing, testing or removing one of the cluster's channels writes,
+        and a token to apply it; writes nothing. Secrets never appear in the answer.
+      operationId: planClusterNotifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationsPlanRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsPlan"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/tools:
     get:
       tags:
@@ -1626,6 +1723,127 @@ paths:
               schema:
                 $ref: "#/components/schemas/PresetList"
         "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/notifications":
+    get:
+      tags:
+      - projects
+      summary: |-
+        The channels of a project, the events each receives and whether Alertmanager took it. Read
+        as the person; the operator's API not served is `state: not-installed`. Secrets are never
+        read.
+      operationId: getProjectNotifications
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notifications"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/notifications/apply":
+    post:
+      tags:
+      - projects
+      summary: |-
+        Carries out a project's notifications plan by its token: checks it, dry-runs every write,
+        then writes.
+      operationId: applyProjectNotifications
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationsApply"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsApplied"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/notifications/plan":
+    post:
+      tags:
+      - projects
+      summary: |-
+        Works out what adding, changing, testing or removing one of a project's channels writes, and
+        a token to apply it; writes nothing. Secrets never appear in the answer.
+      operationId: planProjectNotifications
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationsPlanRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationsPlan"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
           content:
             application/problem+json:
               schema:
@@ -3341,6 +3559,206 @@ components:
           description: >-
             The kinds of its diagnoses this incident explains, sorted; empty when it shows
             none yet.
+    AlertmanagerChannel:
+      type: object
+      description: One channel, without its secrets.
+      required:
+      - name
+      - config
+      - kind
+      - events
+      - managed
+      - status
+      properties:
+        config:
+          type: string
+          description: The `VMAlertmanagerConfig`.
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertmanagerEvent"
+          description: The events it receives; empty for one Zeabur did not make.
+        kind:
+          $ref: "#/components/schemas/AlertmanagerChannelKind"
+          description: Where it sends.
+        managed:
+          type: boolean
+          description: Whether Zeabur made it, and so may change it.
+        name:
+          type: string
+          description: The channel's name; the config's for one Zeabur did not make.
+        reason:
+          type:
+          - string
+          - "null"
+          description: Why the operator refused it.
+        status:
+          $ref: "#/components/schemas/AlertmanagerChannelStatus"
+          description: Whether Alertmanager took it.
+        target:
+          type:
+          - string
+          - "null"
+          description: The address, chat or server it sends to, when it is not a secret.
+    AlertmanagerChannelKind:
+      type: string
+      description: Where a channel sends.
+      enum:
+      - slack
+      - discord
+      - telegram
+      - email
+      - webhook
+      - ntfy
+      - gotify
+      - other
+    AlertmanagerChannelSettings:
+      oneOf:
+      - type: object
+        description: A Slack incoming webhook.
+        required:
+        - webhookUrl
+        - kind
+        properties:
+          kind:
+            type: string
+            enum:
+            - slack
+          webhookUrl:
+            type: string
+            description: "`https://hooks.slack.com/services/…`."
+      - type: object
+        description: A Discord webhook.
+        required:
+        - webhookUrl
+        - kind
+        properties:
+          kind:
+            type: string
+            enum:
+            - discord
+          webhookUrl:
+            type: string
+            description: "`https://discord.com/api/webhooks/…`."
+      - type: object
+        description: A Telegram bot and chat.
+        required:
+        - botToken
+        - chatId
+        - kind
+        properties:
+          botToken:
+            type: string
+            description: The bot's token, from `@BotFather`.
+          chatId:
+            type: integer
+            format: int64
+            description: The chat to post in.
+          kind:
+            type: string
+            enum:
+            - telegram
+      - type: object
+        description: Email through an SMTP server.
+        required:
+        - to
+        - from
+        - smarthost
+        - kind
+        properties:
+          from:
+            type: string
+            description: The sender's address.
+          kind:
+            type: string
+            enum:
+            - email
+          password:
+            type: string
+            description: The SMTP password.
+          smarthost:
+            type: string
+            description: The SMTP server, `host:port`.
+          to:
+            type: string
+            description: The address to send to.
+          username:
+            type: string
+            description: The SMTP user; empty for none.
+      - type: object
+        description: Alertmanager's JSON, posted to a URL.
+        required:
+        - url
+        - kind
+        properties:
+          bearerToken:
+            type: string
+            description: "Sent as `Authorization: Bearer …`; empty for none."
+          kind:
+            type: string
+            enum:
+            - webhook
+          url:
+            type: string
+            description: The URL, `https://…` or `http://…`.
+      - type: object
+        description: An ntfy topic.
+        required:
+        - topic
+        - kind
+        properties:
+          accessToken:
+            type: string
+            description: An access token for a protected topic; empty for none.
+          kind:
+            type: string
+            enum:
+            - ntfy
+          server:
+            type: string
+            description: The ntfy server; `https://ntfy.sh` when empty.
+          topic:
+            type: string
+            description: The topic.
+      - type: object
+        description: A Gotify application, through the Gotify bridge.
+        required:
+        - appToken
+        - kind
+        properties:
+          appToken:
+            type: string
+            description: The application's token.
+          kind:
+            type: string
+            enum:
+            - gotify
+      description: |-
+        A channel's settings, secrets included. They go into the channel's Secret and spec; Zeabur
+        never shows them again.
+    AlertmanagerChannelStatus:
+      type: string
+      description: Whether Alertmanager took a channel.
+      enum:
+      - active
+      - rejected
+      - waiting
+    AlertmanagerEvent:
+      type: string
+      description: An event a channel can receive.
+      enum:
+      - build-failed
+      - build-succeeded
+      - deploy-failed
+      - deploy-succeeded
+      - crash-loop
+      - out-of-memory
+      - database-unhealthy
+      - backup-failed
+      - volume-almost-full
+      - certificate
+      - node-not-ready
+      - runtime-security
     Applied:
       type: object
       description: One object an apply wrote.
@@ -9091,6 +9509,200 @@ components:
               What it uses now, from metrics-server (approximate, for autoscaling); absent
               without it.
           - type: "null"
+    NotificationWrite:
+      type: object
+      description: One object a plan writes.
+      required:
+      - action
+      - kind
+      - name
+      - namespace
+      properties:
+        action:
+          $ref: "#/components/schemas/NotificationWriteAction"
+          description: What it does.
+        afterYaml:
+          type:
+          - string
+          - "null"
+          description: The object as it will be, YAML, a Secret's values hidden; absent for a deletion.
+        beforeYaml:
+          type:
+          - string
+          - "null"
+          description: The object as it is, YAML; absent for a creation and for a Secret.
+        kind:
+          type: string
+          description: The object's kind.
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type: string
+          description: Its namespace.
+    NotificationWriteAction:
+      type: string
+      description: What a write does.
+      enum:
+      - create
+      - patch
+      - delete
+    Notifications:
+      type: object
+      description: The channels of a project or of the cluster.
+      required:
+      - state
+      - namespace
+      - events
+      - channels
+      - canChange
+      - canTest
+      - unreadable
+      properties:
+        canChange:
+          $ref: "#/components/schemas/Permission"
+          description: Whether the person may add, change and remove channels.
+        canTest:
+          $ref: "#/components/schemas/Permission"
+          description: Whether the person may send a test.
+        channels:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertmanagerChannel"
+          description: The channels, Zeabur's first, by name.
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertmanagerEvent"
+          description: The events a channel here can receive.
+        namespace:
+          type: string
+          description: The namespace the channels are in.
+        rulesInstalled:
+          type:
+          - boolean
+          - "null"
+          description: |-
+            Whether the catalog's rule set is installed; for the cluster only, absent when it could
+            not be read.
+        state:
+          $ref: "#/components/schemas/ProviderState"
+          description: Whether the operator's API is served and the channels could be read.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
+    NotificationsApplied:
+      type: object
+      description: What an apply wrote.
+      required:
+      - written
+      properties:
+        written:
+          type: array
+          items:
+            type: string
+          description: The objects written, `Kind/name`.
+    NotificationsApply:
+      type: object
+      description: The token of a plan to apply.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token `plan` returned.
+    NotificationsPlan:
+      type: object
+      description: A plan, and the token that applies it.
+      required:
+      - token
+      - expiresAt
+      - writes
+      properties:
+        expiresAt:
+          type: string
+          description: When the token stops working, RFC 3339.
+        token:
+          type: string
+          description: Send this to `apply` to carry out exactly this plan.
+        writes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationWrite"
+          description: The writes, in order; empty when nothing changes.
+    NotificationsPlanRequest:
+      oneOf:
+      - type: object
+        description: Add a channel.
+        required:
+        - name
+        - events
+        - settings
+        - op
+        properties:
+          events:
+            type: array
+            items:
+              $ref: "#/components/schemas/AlertmanagerEvent"
+            description: The events it receives.
+          name:
+            type: string
+            description: Its name.
+          op:
+            type: string
+            enum:
+            - add
+          settings:
+            $ref: "#/components/schemas/AlertmanagerChannelSettings"
+            description: Where it sends, secrets included.
+      - type: object
+        description: Change which events a channel receives.
+        required:
+        - name
+        - events
+        - op
+        properties:
+          events:
+            type: array
+            items:
+              $ref: "#/components/schemas/AlertmanagerEvent"
+            description: The events it receives after the change.
+          name:
+            type: string
+            description: The channel.
+          op:
+            type: string
+            enum:
+            - events
+      - type: object
+        description: Remove a channel and its Secret.
+        required:
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: The channel.
+          op:
+            type: string
+            enum:
+            - remove
+      - type: object
+        description: Send a test to a channel.
+        required:
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: The channel.
+          op:
+            type: string
+            enum:
+            - test
+      description: What to plan.
     ObjectAccess:
       type: string
       description: |-

@@ -76,6 +76,10 @@ zeabur-project-viewer:
   - apiGroups: [psmdb.percona.com]
     resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
     verbs: [get, list, watch]
+  # Notification channels: which events go where. Their URLs and tokens stay in Secrets.
+  - apiGroups: [operator.victoriametrics.com]
+    resources: [vmalertmanagerconfigs]
+    verbs: [get, list, watch]
 
 # Run and change a project: the viewer's reads and logs, plus what deploying, variables, restarts and
 # terminals write. Narrower than the built-in `edit`: no ServiceAccount writes or impersonation,
@@ -166,6 +170,11 @@ zeabur-project-developer:
   - apiGroups: [psmdb.percona.com]
     resources: [perconaservermongodbrestores]
     verbs: [get, list, watch]
+  # Notification channels. A channel's receivers only see alerts of this namespace: the operator
+  # adds that matcher to every config.
+  - apiGroups: [operator.victoriametrics.com]
+    resources: [vmalertmanagerconfigs]
+    verbs: [get, list, watch, create, update, patch, delete]
   # The project's own Namespace, through the RoleBinding. templates/namespace-policy.yaml lets
   # this change only the project's details: name, description and icon.
   - apiGroups: [""]

@@ -55,6 +55,7 @@ reads) and `zeabur-adapters` (for label selectors). Only the crates that compose
 | `barman-cloud` | postgres | `barmancloud.cnpg.io/v1` objectstores |
 | `percona-server-mongodb` | mongodb | `psmdb.percona.com/v1` perconaservermongodbs, perconaservermongodbbackups |
 | `zeabur-builder` | builds | `builder.zeabur.com/v1alpha1` builds, buildruns |
+| `alertmanager` | notifications | `operator.victoriametrics.com/v1beta1` vmalertmanagerconfigs (the channels), vmrules (whether Zeabur's rules are installed) |
 
 The databases capability (`databases`) has two providers, CloudNativePG and the Percona
 Operator for MongoDB; like backups, they share only what a person asks of any database: whether
