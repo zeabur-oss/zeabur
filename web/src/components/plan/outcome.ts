@@ -1,7 +1,8 @@
 // Carrying out a confirmed plan, after its dialog has closed: one toast follows it from "Applying…"
 // to the outcome. Success names what changed and offers View (where to see it) or Undo (where the
-// change can be taken back, model/risk.ts); failure gives the reason in plain words and, when the
-// object moved on or the plan ran out, "Review again", which plans the same change afresh; when the
+// change can be taken back, model/risk.ts). When the project moved on since the review and nothing
+// was written, the change is planned again and shown with what is new (replan.ts). Other failures
+// give the reason in plain words and, when the plan ran out, "Review again"; when the
 // cluster refused it and the server offers admin rights, "Retry with admin rights", which applies
 // the same plan again after the passkey confirmation (auth/elevation.ts); when Helm would undo it,
 // the kubectl terminal with `helm list` typed in.
@@ -14,6 +15,7 @@ import { failureOf } from "@/components/plan/describe"
 import { markCreated } from "@/lib/created"
 import { openKubectl } from "@/lib/dock"
 import type { PlanAsk } from "@/components/plan/planner"
+import { replansOn, type Reviewed } from "@/components/plan/replan"
 import type { Locale, Translate } from "@/i18n"
 import { namespaceOps } from "@/model/project"
 
@@ -53,8 +55,11 @@ export interface Confirmed {
     applied: Schemas["Applied"][],
   ) => { changes: Schemas["Change"][]; title: string } | undefined
   navigate: (href: string) => void
-  /** Opens the plan dialog for the same change again. */
-  reopen: (ask: PlanAsk) => void
+  /** Opens the plan dialog for the same change again; with `reviewed`, after the apply was
+   * refused because the project moved on. */
+  reopen: (ask: PlanAsk, reviewed?: Reviewed) => void
+  /** The plan the person confirmed. */
+  reviewed?: Reviewed
   onApplied?: () => void
   /** The apply was refused after it created some of the objects. */
   onPartial?: (problem: Schemas["Problem"]) => void
@@ -96,6 +101,12 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
       toast.dismiss(id)
       void queryClient.invalidateQueries({ queryKey: ["project", project] })
       confirmed.onPartial(problem)
+      return
+    }
+    if (replansOn(problem)) {
+      toast.dismiss(id)
+      void queryClient.invalidateQueries({ queryKey: ["project", project] })
+      confirmed.reopen(ask, confirmed.reviewed ?? { objects: [] })
       return
     }
     void fail(

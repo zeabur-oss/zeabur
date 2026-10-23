@@ -1407,6 +1407,9 @@ export const en = {
   "plan.cancel": "Cancel",
   "plan.back": "Back",
   "plan.replan": "Review again",
+  "plan.replanned": "Something changed after you reviewed this. Please check it again.",
+  "plan.replannedAdded": (names: string) => `New this time: ${names}`,
+  "plan.replannedDropped": (names: string) => `No longer included: ${names}`,
   "plan.details": "Technical details",
   "plan.expiresIn": (time: string) => `Expires in ${time}`,
   "plan.expired": "Expired",
@@ -1545,8 +1548,8 @@ export const en = {
     `The volume's data is deleted (${claim}): its PersistentVolume ${volume} has reclaim policy Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
     `The volume's data stays (${claim}): PersistentVolume ${volume} keeps it (reclaim policy Retain) until an admin removes it`,
-  "warn.claimDataUnknown": (claim: string) =>
-    `The volume's data may be lost (${claim}): unable to read its reclaim policy`,
+  "warn.claimDataUnlessRetained": (claim: string) =>
+    `The volume's data is deleted with it (${claim}); if the cluster is set to keep it, an admin can still recover it`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} still read ${name}: their new replicas will not start without it`,
   "warn.claimStillMounted": (name: string, names: string) =>

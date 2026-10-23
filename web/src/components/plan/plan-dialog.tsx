@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
+import ArrowsClockwiseIcon from "~icons/ph/arrows-clockwise"
 import CaretLeftIcon from "~icons/ph/caret-left"
 import CaretRightIcon from "~icons/ph/caret-right"
 import WarningFillIcon from "~icons/ph/warning-fill"
@@ -12,6 +13,7 @@ import { projectQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import {
   actionOf,
+  claimDataSaid,
   describe,
   restartRuleApplies,
   undoTitle,
@@ -23,6 +25,7 @@ import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan
 import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk, PlanHooks } from "@/components/plan/planner"
 import { PlanPreview, useShortfall } from "@/components/plan/preview"
+import { changedSince, type Reviewed } from "@/components/plan/replan"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
@@ -58,18 +61,20 @@ interface Said {
 interface PlanProps {
   project: string
   ask: PlanAsk
+  /** The plan an apply refused because the project moved on since: this one is made afresh. */
+  reviewed?: Reviewed
   onClose: () => void
   /** After the apply starts; `onClose` when left out. */
   onConfirmed?: () => void
   onApplied?: () => void
-  reopen: (ask: PlanAsk) => void
+  reopen: (ask: PlanAsk, reviewed?: Reviewed) => void
   onRefused?: (problem: ProblemBody) => void
   hooks?: PlanHooks
 }
 
 /** The plan of an ask: what it says, and its buttons. */
 function usePlan(
-  { project, ask, onClose, onConfirmed, onApplied, reopen, onRefused, hooks }: PlanProps,
+  { project, ask, reviewed, onClose, onConfirmed, onApplied, reopen, onRefused, hooks }: PlanProps,
   bare = false,
 ) {
   const t = useT()
@@ -126,6 +131,7 @@ function usePlan(
       },
       navigate: (href) => void navigate({ href }),
       reopen,
+      reviewed: plan.data,
       onApplied,
       onPartial: hooks?.onPartial,
     })
@@ -141,6 +147,7 @@ function usePlan(
 
   const conclusion = ready ? (
     <Conclusion
+      replanned={reviewed ? <Replanned reviewed={reviewed} plan={plan.data} /> : undefined}
       description={description}
       short={short}
       high={weight.risk === "high"}
@@ -284,12 +291,14 @@ export function PlanStep({ footer, ...props }: PlanProps & { footer: HTMLElement
 /** What stays in view above the scrolling body: new pods that do not fit, what the plan puts at
  * risk and, for many changes, the summary and its cost. */
 function Conclusion({
+  replanned,
   description,
   short,
   high,
   grouped,
   bare,
 }: {
+  replanned?: ReactNode
   description: Description
   short?: ReturnType<typeof useShortfall>
   high: boolean
@@ -299,9 +308,10 @@ function Conclusion({
 }) {
   const t = useT()
   const risk = description.risk ?? (high && grouped ? description.consequence : undefined)
-  if (!short && !risk && !grouped) return null
+  if (!replanned && !short && !risk && !grouped) return null
   return (
     <div className={cn("flex flex-col gap-3", !bare && "border-b px-5 py-3")}>
+      {replanned}
       {short ? (
         <Alert variant="warn" role="note">
           <WarningFillIcon aria-hidden="true" />
@@ -343,6 +353,27 @@ function Conclusion({
         <p className="text-sm text-muted-foreground">{description.cost}</p>
       ) : null}
     </div>
+  )
+}
+
+/** The plan made again after an apply was refused because the project moved on: what it writes
+ * now that it did not, and what it no longer writes. */
+function Replanned({ reviewed, plan }: { reviewed: Reviewed; plan: Reviewed }) {
+  const t = useT()
+  const { added, dropped } = changedSince(reviewed, plan)
+  return (
+    <Alert variant="info" role="status">
+      <ArrowsClockwiseIcon aria-hidden="true" />
+      <AlertDescription>
+        <p>{t("plan.replanned")}</p>
+        {added.length > 0 ? (
+          <Line said={namedText(t, added, (list) => t("plan.replannedAdded", list))} />
+        ) : null}
+        {dropped.length > 0 ? (
+          <Line said={namedText(t, dropped, (list) => t("plan.replannedDropped", list))} />
+        ) : null}
+      </AlertDescription>
+    </Alert>
   )
 }
 
@@ -597,11 +628,10 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
       )
     case "stays":
       return { text: staysSentence(t, warning), health: "idle" }
-    case "claimDataMayBeLost":
-      return {
-        text: warningSentence(t, warning),
-        health: warning.reclaimPolicy === "Retain" ? "warn" : "fail",
-      }
+    case "claimDataMayBeLost": {
+      const said = claimDataSaid(t, warning)
+      return { text: said.text, health: said.kept ? "warn" : "fail" }
+    }
     case "rightsMissing":
       return namedText(
         t,
@@ -649,7 +679,9 @@ function warningSentence(
   t: Translate,
   warning: Exclude<
     Schemas["PlanWarning"],
-    { code: "deletesDependents" | "deletesOwned" | "stays" | "rightsMissing" }
+    {
+      code: "deletesDependents" | "deletesOwned" | "stays" | "rightsMissing" | "claimDataMayBeLost"
+    }
   >,
 ): string {
   switch (warning.code) {
@@ -683,12 +715,6 @@ function warningSentence(
       return t("warn.readWriteOncePodShared", warning.workload.name)
     case "podReplaced":
       return t("warn.podReplaced", warning.pod, `${warning.owner.kind} ${warning.owner.name}`)
-    case "claimDataMayBeLost":
-      return warning.reclaimPolicy === "Retain"
-        ? t("warn.claimDataRetained", warning.claim, warning.volume ?? "")
-        : warning.reclaimPolicy === "Delete"
-          ? t("warn.claimDataDeleted", warning.claim, warning.volume ?? "")
-          : t("warn.claimDataUnknown", warning.claim)
     case "stillUsed":
       return warning.target.kind === "PersistentVolumeClaim"
         ? t("warn.claimStillMounted", warning.target.name, names(t, warning.workloads))

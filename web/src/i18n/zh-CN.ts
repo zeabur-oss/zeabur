@@ -1273,6 +1273,9 @@ export const zhCN: Messages = {
   "plan.cancel": "取消",
   "plan.back": "返回",
   "plan.replan": "重新检查",
+  "plan.replanned": "检查之后有东西变了，请再看一次。",
+  "plan.replannedAdded": (names: string) => `这次多了：${names}`,
+  "plan.replannedDropped": (names: string) => `这次少了：${names}`,
   "plan.details": "技术细节",
   "plan.expiresIn": (time: string) => `${time} 后失效`,
   "plan.expired": "已失效",
@@ -1398,7 +1401,8 @@ export const zhCN: Messages = {
     `集群会删除卷（${claim}）的数据：它的 PersistentVolume ${volume} 回收策略是 Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
     `卷（${claim}）的数据会留在 PersistentVolume ${volume}（回收策略 Retain），直到管理员移除`,
-  "warn.claimDataUnknown": (claim: string) => `卷（${claim}）的数据可能丢失：无法读取它的回收策略`,
+  "warn.claimDataUnlessRetained": (claim: string) =>
+    `卷（${claim}）的数据会一起删除；集群设置为保留时，管理员还能恢复`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} 仍在读取 ${name}：少了它，新的副本无法启动`,
   "warn.claimStillMounted": (name: string, names: string) =>
