@@ -53,6 +53,12 @@ export function askerOf(
   }
 }
 
+/** Cluster administrators, and admins who may take admin rights: what only they may do (a node
+ * terminal, the cluster's kubectl terminal) is offered, and its plan offers the rights. */
+export function mayActAsClusterAdmin(clusterAdmin: boolean | undefined, asker: Asker): boolean {
+  return clusterAdmin === true || (asker.admin && asker.elevation === "available")
+}
+
 /** An action is open, or closed with the role (for a member) or the rule (for anyone else) that
  * would open it. */
 export type Gate =

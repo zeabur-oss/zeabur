@@ -6,8 +6,6 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import TerminalIcon from "~icons/ph/terminal"
 import WarningCircleIcon from "~icons/ph/warning-circle"
 
-import { sessionQuery, whoamiQuery } from "@/api/queries"
-import { accountQuery } from "@/api/members"
 import {
   applyNodeShell,
   nodeShellsQuery,
@@ -18,23 +16,15 @@ import {
   type NodeShellRequest,
 } from "@/api/node-shells"
 import { Ago, CopyButton } from "@/components/bits"
+import { PlanFooter, PlanWrites } from "@/components/cluster-plan"
+import { useMayActAsClusterAdmin } from "@/components/gate"
 import { Consequence, Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
-import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
-import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { openNodeShell } from "@/lib/dock"
-import {
-  enters,
-  mayOpenNodeShell,
-  shellHealth,
-  shellsOn,
-  shellWord,
-  subjectName,
-} from "@/model/node-shell"
-import { askerOf } from "@/model/rights"
+import { enters, shellHealth, shellsOn, shellWord, subjectName } from "@/model/node-shell"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import {
@@ -44,17 +34,10 @@ import {
 } from "@zeabur/design-system/components/collapsible"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
-export function useMayOpenNodeShell(): boolean {
-  const account = useQuery(accountQuery).data
-  const whoami = useQuery(whoamiQuery).data
-  const elevation = useQuery(sessionQuery).data?.elevation
-  return mayOpenNodeShell(account?.clusterAdmin, askerOf(whoami, elevation))
-}
-
 /** A node row's root shell: the action, then the shell pods on the node. */
 export function NodeShells({ node }: { node: string }) {
   const t = useT()
-  const allowed = useMayOpenNodeShell()
+  const allowed = useMayActAsClusterAdmin()
   const [opening, setOpening] = useState(false)
   if (!allowed) return null
   return (
@@ -177,10 +160,6 @@ export function NodeShellDialog({
     },
     onError: refreshNodeShells,
   })
-  const left = useSecondsLeft(plan.data?.expiresAt)
-  const expired = left !== undefined && left <= 0
-  const ready = plan.data && !plan.isFetching
-  const token = plan.data?.token ?? undefined
   const open = request.op === "open"
   return (
     <Frame
@@ -188,33 +167,17 @@ export function NodeShellDialog({
       wide
       onClose={onClose}
       footer={
-        <div className="flex w-full flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("plan.cancel")}
-          </Button>
-          {ready && token && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
-            <span className="type-meta text-muted-foreground tabular-nums">
-              {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
-            </span>
-          ) : null}
-          <span className="ml-auto">
-            {expired || (ready && !token) ? (
-              <Button size="sm" variant="outline" onClick={() => void plan.refetch()}>
-                {t("plan.replan")}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                variant={open ? "default" : "destructive"}
-                disabled={!ready || !token}
-                loading={apply.isPending}
-                onClick={() => token && apply.mutate(token)}
-              >
-                {open ? t("nodeShell.open") : t("nodeShell.remove")}
-              </Button>
-            )}
-          </span>
-        </div>
+        <PlanFooter
+          expiresAt={plan.data?.expiresAt}
+          ready={!!plan.data && !plan.isFetching}
+          token={plan.data?.token ?? undefined}
+          action={open ? t("nodeShell.open") : t("nodeShell.remove")}
+          destructive={!open}
+          applying={apply.isPending}
+          onCancel={onClose}
+          onReplan={() => void plan.refetch()}
+          onApply={(token) => apply.mutate(token)}
+        />
       }
     >
       {plan.isPending || plan.isFetching ? (
@@ -229,7 +192,7 @@ export function NodeShellDialog({
             {t("nodeShell.removeLine", plan.data.pod, plan.data.node)}
             {plan.data.person ? ` ${t("nodeShell.openedBy", plan.data.person)}` : ""}
           </p>
-          <Writes plan={plan.data} />
+          <PlanWrites writes={plan.data.writes} />
         </>
       )}
       {apply.isError ? <Problem error={apply.error} what={t("nodeShell.what")} /> : null}
@@ -249,7 +212,7 @@ function OpenPlan({ plan }: { plan: NodeShellPlan }) {
         <li>{t("nodeShell.recorded")}</li>
       </ul>
       {plan.exposed.length > 0 ? <Exposed plan={plan} /> : null}
-      <Writes plan={plan} />
+      <PlanWrites writes={plan.writes} />
       {plan.kubectl ? (
         <Collapsible>
           <CollapsibleTrigger variant="disclosure">
@@ -302,35 +265,5 @@ function Exposed({ plan }: { plan: NodeShellPlan }) {
         </ul>
       </AlertDescription>
     </Alert>
-  )
-}
-
-function Writes({ plan }: { plan: NodeShellPlan }) {
-  const t = useT()
-  return (
-    <Collapsible>
-      <CollapsibleTrigger variant="disclosure">
-        <CaretRightIcon aria-hidden="true" />
-        {t("plan.details")}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="flex flex-col gap-4 pt-3">
-          {plan.writes.map((write) => {
-            const label = `${write.kind}/${write.name}`
-            return (
-              <section key={label} aria-label={label} className="flex min-w-0 flex-col gap-2">
-                <span className="min-w-0 font-mono text-sm font-medium break-all" translate="no">
-                  {label}
-                  <span className="ml-2 font-sans font-normal type-meta text-muted-foreground">
-                    {t(`nodeShell.write.${write.action}`)}
-                  </span>
-                </span>
-                {write.yaml ? <YamlBlock yaml={write.yaml} label={label} /> : null}
-              </section>
-            )
-          })}
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
   )
 }

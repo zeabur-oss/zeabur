@@ -89,13 +89,16 @@ export function terminalUrl(
   return `${scheme}//${location.host}/api/v1/projects/${encodeURIComponent(project)}/pods/${encodeURIComponent(pod)}/exec${query}`
 }
 
+/** A tools pod's terminal: the project's, or the whole cluster's without a project. */
 export function toolsTerminalUrl(
   location: Pick<Location, "protocol" | "host">,
-  project: string,
+  project: string | undefined,
   name: string,
 ): string {
   const scheme = location.protocol === "https:" ? "wss:" : "ws:"
-  return `${scheme}//${location.host}/api/v1/projects/${encodeURIComponent(project)}/tools/${encodeURIComponent(name)}/terminal`
+  const base =
+    project === undefined ? "/api/v1/cluster" : `/api/v1/projects/${encodeURIComponent(project)}`
+  return `${scheme}//${location.host}${base}/tools/${encodeURIComponent(name)}/terminal`
 }
 
 /** The soonest of the credentials the open terminals were opened with: the first to close. */
@@ -124,6 +127,12 @@ export function isManifest(yaml: string): boolean {
  * marker is one no line of the YAML equals. */
 export function applyCommand(yaml: string): string {
   return withDocument("kubectl apply -f -", yaml)
+}
+
+/** A Components install text at a kubectl prompt: Helm's is shell already, the others are objects
+ * to apply. */
+export function installCommand(format: Schemas["InstallFormat"], text: string): string {
+  return format === "helm" ? typedCommand(text) : applyCommand(text)
 }
 
 /** `kubectl create` in the project's namespace, which refuses a name that exists as Create does. */

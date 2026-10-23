@@ -463,6 +463,107 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/tools": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The person's cluster tools pods, deleting those that are done with; cluster administrators
+     *     only.
+     */
+    get: operations["clusterTools"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/tools/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Carries out a plan by its token: checks it and the cluster again, dry-runs each write, then
+     *     writes it.
+     */
+    post: operations["applyClusterTools"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/tools/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out what starting the person's cluster tools pod writes, and a token to apply it; writes
+     *     nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do everything
+     *     everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over.
+     */
+    post: operations["planClusterTools"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/tools/{name}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Deletes a cluster tools pod of the person's, as long as it is the one they read. */
+    delete: operations["deleteClusterTools"]
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/tools/{name}/terminal": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * A terminal in a cluster tools pod of the person's, over a WebSocket: the project tools
+     *     terminal's protocol and credential (see the `tools` module), with `kubectl` starting in
+     *     namespace `default`. Failures arrive as an `error` frame, as there, and `403`
+     *     (`elevation-required` where admin rights are offered and not in use) for anyone who may not do
+     *     everything everywhere.
+     */
+    get: operations["clusterToolsTerminal"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/upgrades": {
     parameters: {
       query?: never
@@ -2216,6 +2317,36 @@ export interface components {
       changeNodes: components["schemas"]["Permission"]
       /** @description Install components with Zeabur: `create` on `helmcharts.helm.cattle.io` in `kube-system`. */
       installComponents: components["schemas"]["Permission"]
+    }
+    /** @description What an apply did. */
+    ClusterToolsApplied: {
+      /** @description Its namespace. */
+      namespace: string
+      /** @description The pod a terminal opens in. */
+      pod: string
+    }
+    /** @description The token of a plan to apply. */
+    ClusterToolsApply: {
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description A plan that starts the person's cluster tools pod, or uses the one that still runs. */
+    ClusterToolsPlan: {
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description The namespace of the pod. */
+      namespace: string
+      /** @description The pod it starts, or the one it uses. */
+      pod: string
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /**
+       * @description Who `kubectl` acts as and until when, or that a running pod is used; who else could use
+       *     the credential.
+       */
+      warnings: components["schemas"]["PlanWarning"][]
+      /** @description The writes, in order; none when it uses a running pod. */
+      writes: components["schemas"]["ShellWrite"][]
     }
     /** @description One component of the catalogue: an upstream project that provides a capability. */
     Component: {
@@ -6227,7 +6358,7 @@ export interface components {
       available: boolean
       /** @description The tools pods that had stopped or outlived their deadline and were deleted now. */
       deleted: string[]
-      /** @description The namespace tools pods of this project go in. */
+      /** @description The namespace these tools pods go in. */
       namespace: string
       /**
        * @description The person's tools pods there that have not stopped and are not being deleted, oldest
@@ -7337,6 +7468,203 @@ export interface operations {
         }
       }
       404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  clusterTools: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ToolsStatus"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyClusterTools: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ClusterToolsApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ClusterToolsApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planClusterTools: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ClusterToolsPlan"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  deleteClusterTools: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Deleted */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  clusterToolsTerminal: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        name: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Switched to the terminal's WebSocket */
+      101: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
         headers: {
           [name: string]: unknown
         }

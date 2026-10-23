@@ -6,12 +6,14 @@ import { cloneElement, type ReactElement, type ReactNode } from "react"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 
 import type { Schemas } from "@/api/client"
+import { accountQuery } from "@/api/members"
 import { clusterQuery, namespaceQuery, sessionQuery, whoamiQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import {
   askerOf,
   gate,
+  mayActAsClusterAdmin,
   type ClusterRights,
   type Gate,
   type ProjectRights,
@@ -56,6 +58,11 @@ export function useClusterGate(right: keyof ClusterRights): Gate {
   const asker = useAsker()
   const cluster = useQuery(clusterQuery)
   return gate(right, cluster.data?.can[right], asker)
+}
+
+export function useMayActAsClusterAdmin(): boolean {
+  const account = useQuery(accountQuery).data
+  return mayActAsClusterAdmin(account?.clusterAdmin, useAsker())
 }
 
 /** Why an action is closed, in a sentence; nothing when it is open. */

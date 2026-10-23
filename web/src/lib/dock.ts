@@ -16,7 +16,8 @@ export type DockTab =
   | {
       id: string
       kind: "kubectl"
-      project: string
+      /** The project it acts in; the whole cluster when absent. */
+      project?: string
       /** Bumped by each explicit ask, which attaches or plans a tools pod without another click. */
       asked: number
       /** The tools pod the last ask named. */
@@ -124,12 +125,25 @@ export const openDatabaseShell = (
 /** Opens the project's kubectl terminal, or shows it. An ask attaches to the tools pod named, or a
  * running one, or plans one; without, the tab lists the person's tools pods. A `command` is typed
  * in once the shell opens, and not run. */
-export function openKubectl(
-  project: string,
-  { ask = true, pod, command }: { ask?: boolean; pod?: string; command?: string } = {},
-) {
+export const openKubectl = (project: string, options?: KubectlOptions) =>
+  openTools(project, options)
+
+/** Opens the kubectl terminal for the whole cluster, as `openKubectl` does a project's. */
+export const openClusterKubectl = (options?: KubectlOptions) => openTools(undefined, options)
+
+interface KubectlOptions {
+  ask?: boolean
+  pod?: string
+  command?: string
+}
+
+/** `@` is in no namespace's name, so the cluster's never meets a project's. */
+const kubectlId = (project: string | undefined) =>
+  project === undefined ? "kubectl@cluster" : `kubectl:${project}`
+
+function openTools(project: string | undefined, { ask = true, pod, command }: KubectlOptions = {}) {
   const state = dock.get()
-  const id = `kubectl:${project}`
+  const id = kubectlId(project)
   const found = state.tabs.find((tab) => tab.id === id)
   const tabs = found
     ? state.tabs.map((tab) =>

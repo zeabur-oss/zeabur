@@ -916,6 +916,13 @@ export const zhTW: Messages = {
   "tools.stop": "停止",
   "tools.expired": "這個終端機裡的認證資訊已過期。重新開啟即可換上新的繼續使用。",
   "tools.reopen": "重新開啟",
+  "clusterTools.about":
+    "附有 kubectl 與 helm 的終端機，以你的身分操作整個叢集，kubectl 預設在 default 命名空間。它在一個暫時的容器裡執行，用完後 Zeabur 會刪除它。",
+  "clusterTools.tab": "叢集",
+  "clusterTools.title": "開啟叢集的 kubectl 終端機",
+  "clusterTools.what": "開啟叢集的 kubectl 終端機",
+  "clusterTools.starts": (namespace) =>
+    `在 ${namespace} 為你啟動一個暫時的容器，內含 kubectl 與 helm。kubectl 預設在 default 命名空間，你有權限的命名空間都能操作。`,
   "nodeShell.action": "節點終端機",
   "nodeShell.actionOn": (node) => `${node} 的節點終端機`,
   "nodeShell.what": "開啟節點終端機",

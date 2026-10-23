@@ -1013,6 +1013,13 @@ export const en = {
   "tools.expired":
     "The credential in this terminal has expired. Reopen it to continue with a fresh one.",
   "tools.reopen": "Reopen",
+  "clusterTools.about":
+    "A terminal with kubectl and helm for the whole cluster, acting as you. kubectl starts in the default namespace. It runs in a temporary container that Zeabur deletes once you're done.",
+  "clusterTools.tab": "cluster",
+  "clusterTools.title": "Open a kubectl terminal for the cluster",
+  "clusterTools.what": "Opening a kubectl terminal for the cluster",
+  "clusterTools.starts": (namespace: string) =>
+    `Starts a temporary container with kubectl and helm for you, in ${namespace}. kubectl starts in the default namespace and reaches every namespace you can.`,
   "nodeShell.action": "Node terminal",
   "nodeShell.actionOn": (node: string) => `Node terminal on ${node}`,
   "nodeShell.what": "Opening a node terminal",

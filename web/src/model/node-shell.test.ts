@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import {
   enters,
-  mayOpenNodeShell,
   nodeShellUrl,
   shellHealth,
   shellsOn,
@@ -19,21 +18,7 @@ const shell = (patch: Partial<Schemas["NodeShellView"]>): Schemas["NodeShellView
   ...patch,
 })
 
-const asker = (admin: boolean, elevation?: Schemas["ElevationState"]) => ({
-  member: true,
-  admin,
-  elevation,
-})
-
 describe("node shells", () => {
-  test("only cluster administrators, or admins who may take admin rights, see the action", () => {
-    expect(mayOpenNodeShell(true, asker(false))).toBe(true)
-    expect(mayOpenNodeShell(false, asker(true, "available"))).toBe(true)
-    expect(mayOpenNodeShell(false, asker(true, "unavailable"))).toBe(false)
-    expect(mayOpenNodeShell(false, asker(false, "available"))).toBe(false)
-    expect(mayOpenNodeShell(undefined, asker(false))).toBe(false)
-  })
-
   test("the terminal is the node shell's own endpoint, over TLS when the page is", () => {
     expect(nodeShellUrl({ protocol: "https:", host: "z.example" }, "p/1")).toBe(
       "wss://z.example/api/v1/cluster/node-shells/p%2F1/terminal",

@@ -5,6 +5,7 @@ import XIcon from "~icons/ph/x"
 
 import { installQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
+import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { GateTip, useClusterGate } from "@/components/gate"
 import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
@@ -21,6 +22,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
+import { installCommand } from "@/model/terminal"
 import { k3sPackagedNotes } from "@/routes/cluster/k3s-packaged"
 import type { profiles } from "@/routes/search"
 
@@ -61,6 +63,7 @@ export function InstallSheet({
   const objects = data && !data.here.blocked ? data.here.objects : []
   const mine = objects.length === 0 || who === "you"
   const blocked = data?.here.blocked
+  const shownFormat = data?.formats.find((f) => f.format === format)
   const install = () =>
     planner.plan({
       title: t("install.here.title", name),
@@ -234,13 +237,24 @@ export function InstallSheet({
                       {t("install.note")}
                     </p>
                     <Tabs value={format} onValueChange={(value) => setFormat(String(value))}>
-                      <TabsList>
-                        {data.formats.map((f) => (
-                          <TabsTrigger key={f.format} value={f.format}>
-                            {formatNames[f.format]}
-                          </TabsTrigger>
-                        ))}
-                      </TabsList>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <TabsList>
+                          {data.formats.map((f) => (
+                            <TabsTrigger key={f.format} value={f.format}>
+                              {formatNames[f.format]}
+                            </TabsTrigger>
+                          ))}
+                        </TabsList>
+                        {shownFormat ? (
+                          <OpenInTerminal
+                            command={installCommand(shownFormat.format, shownFormat.text)}
+                            label={t("action.openToolsTerminal")}
+                            variant="outline"
+                            className="ml-auto"
+                            onOpen={onClose}
+                          />
+                        ) : null}
+                      </div>
                       {data.formats.map((f) => (
                         <TabsContent key={f.format} value={f.format}>
                           <YamlBlock yaml={f.text} label={`${name} ${formatNames[f.format]}`} />
