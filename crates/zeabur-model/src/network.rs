@@ -93,6 +93,10 @@ pub struct Endpoint {
     pub cluster_ip: Option<String>,
     /// The ports.
     pub ports: Vec<Port>,
+    /// For a `LoadBalancer` Service, the addresses its load balancer reports in
+    /// `status.loadBalancer.ingress`, an IP or a hostname each; empty while it has none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub external_addresses: Vec<String>,
     /// The tool that manages the Service, if any.
     pub provenance: Provenance,
     /// The Service object.

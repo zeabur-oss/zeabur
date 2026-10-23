@@ -1,0 +1,9 @@
+description: "Opening a port of a Postgres StatefulSet makes a LoadBalancer Service with the selector and port of its Service, and warns that the database is open to the internet."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: publicPort
+        workload: {kind: StatefulSet, name: db}
+        service: db
+        port: 5432

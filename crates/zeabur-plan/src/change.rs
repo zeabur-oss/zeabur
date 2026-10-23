@@ -69,6 +69,9 @@ pub enum Change {
     /// Give a container every key of a ConfigMap or Secret as variables (`envFrom`), or stop
     /// (see the `shared` module).
     EnvImport(EnvImportChange),
+    /// Open a port of a workload to the internet with a `LoadBalancer` Service, or close it (see
+    /// the `public_port` module).
+    PublicPort(PublicPortChange),
     /// Replace a workload's pods, as `kubectl rollout restart` does.
     #[serde(rename_all = "camelCase")]
     Restart {
@@ -441,6 +444,22 @@ pub struct EnvImportChange {
     /// Its name.
     pub name: String,
     /// Stop importing it instead.
+    #[serde(default)]
+    pub remove: bool,
+}
+
+/// A [`Change::PublicPort`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct PublicPortChange {
+    /// The workload.
+    pub workload: WorkloadRef,
+    /// The workload's Service that has the port.
+    pub service: String,
+    /// The Service port. It is also the port on the internet.
+    pub port: i32,
+    /// Close the port instead: delete the `LoadBalancer` Service that opened it.
     #[serde(default)]
     pub remove: bool,
 }
@@ -982,6 +1001,18 @@ pub enum Warning {
     PermanentRedirect {
         /// The hostname that redirects.
         hostname: String,
+    },
+    /// Anyone on the internet can connect to the port: no password of Zeabur's stands in front
+    /// of it. For a data store, its own password is all that protects the data.
+    #[serde(rename_all = "camelCase")]
+    PublicPort {
+        /// The workload.
+        workload: WorkloadRef,
+        /// The port.
+        port: i32,
+        /// What kind of data store the workload is, when it is one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        data_store: Option<zeabur_model::DataStore>,
     },
     /// The Ingress serves these hostnames over plain HTTP, so the password crosses the network
     /// readable on them.

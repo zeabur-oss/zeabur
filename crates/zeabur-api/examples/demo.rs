@@ -601,6 +601,14 @@ fn shop() -> NamespaceObjects {
             service("api", 8080, "http"),
             service("db", 5432, "postgres"),
             service("redis", 6379, "redis"),
+            from(
+                json!({"metadata": {"name": "redis-public-6379", "namespace": "shop",
+                    "labels": {"app.kubernetes.io/name": "redis"}},
+                "spec": {"type": "LoadBalancer", "selector": {"app": "redis"},
+                    "ports": [{"name": "redis", "port": 6379, "targetPort": 6379,
+                        "protocol": "TCP", "nodePort": 31379}]},
+                "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}}),
+            ),
         ],
         config_maps: vec![
             from::<ConfigMap>(

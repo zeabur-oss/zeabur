@@ -231,6 +231,10 @@ function sentenceOf(
       return change.remove
         ? t("confirm.envImportOff", change.kind, change.name, change.workload.name)
         : t("confirm.envImport", change.kind, change.name, change.workload.name)
+    case "publicPort":
+      return change.remove
+        ? t("confirm.publicPortOff", change.port, change.workload.name)
+        : t("confirm.publicPort", change.port, change.workload.name)
   }
 }
 
@@ -306,6 +310,8 @@ function consequence(t: Translate, reason: Reason, service?: WorkloadRef): strin
       return undefined
     case "isolates":
       return t("confirm.isolates", service?.name ?? "")
+    case "opensPort":
+      return t("risk.opensPort")
     case "deletes":
       return undefined
   }
@@ -511,6 +517,8 @@ function riskOf(
         return t("risk.removesDomain")
       case "isolates":
         return t("confirm.isolates", ask.service?.name ?? "")
+      case "opensPort":
+        return t("risk.opensPort")
       case "deletes":
         return t("risk.deletes")
     }
@@ -749,6 +757,8 @@ export function actionOf(t: Translate, ask: Asked): string {
       return change.user ? t("action.askPassword") : t("action.stopPassword")
     case "envImport":
       return t("action.saveVariables")
+    case "publicPort":
+      return change.remove ? t("action.closePort") : t("action.openPort")
   }
 }
 

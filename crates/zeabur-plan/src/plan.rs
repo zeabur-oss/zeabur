@@ -405,6 +405,7 @@ impl<'a> Planner<'a> {
             ),
             Change::BasicAuth(auth) => self.basic_auth(&auth.route, auth.user.as_ref()),
             Change::EnvImport(import) => self.env_import(import),
+            Change::PublicPort(public) => self.public_port(public),
             Change::Create { .. } => self.create(change, index),
             Change::Restart { workload } => self.restart_workload(workload),
             Change::Rollback { workload, revision } => self.rollback(workload, *revision),

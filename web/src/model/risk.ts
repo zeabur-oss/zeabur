@@ -15,7 +15,7 @@
 //   scaling to zero; deleting a ConfigMap or Secret key; a rollback; any storage change (a claim
 //   cannot shrink, a new or moved mount replaces the pods); a YAML edit (written as typed);
 //   removing a domain; a NetworkPolicy that isolates its pods (limits what they send, or lets
-//   nothing in); deleting an object, which cannot be taken back and is confirmed by typing its
+//   nothing in); opening a port to the internet; deleting an object, which cannot be taken back and is confirmed by typing its
 //   name. Revoking a join token (a bootstrap token Secret in kube-system) is not typed: it only
 //   takes away access, and a node that has joined keeps working.
 // - normal: everything else (variables, values set, domains added or renamed, resources, health
@@ -46,6 +46,7 @@ export type Reason =
   | "yamlEdit"
   | "removesDomain"
   | "isolates"
+  | "opensPort"
   | "deletes"
 
 /** A workload's pods as the project document last reported them. */
@@ -131,6 +132,8 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "basicAuth":
     case "envImport":
       return { risk: "normal" }
+    case "publicPort":
+      return change.remove ? { risk: "normal" } : { risk: "high", reason: "opensPort" }
   }
 }
 
@@ -293,6 +296,7 @@ export function destinationOf(
     case "basicAuth":
       return tab(service, "networking")
     case "redirect":
+    case "publicPort":
       return tab(change.workload, "networking")
     case "addVolume":
     case "editMount":

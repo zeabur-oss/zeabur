@@ -74,6 +74,7 @@ pub(crate) async fn compute(
         | Change::RemoveDomain { .. }
         | Change::Redirect(_)
         | Change::EnvImport(_)
+        | Change::PublicPort(_)
         | Change::BasicAuth(_)
         | Change::Restart { .. }
         | Change::Rollback { .. }

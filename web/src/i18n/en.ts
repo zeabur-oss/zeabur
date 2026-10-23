@@ -1552,6 +1552,7 @@ export const en = {
   "risk.rollback": "Template changes made after that revision are undone.",
   "risk.storage": "A volume can't shrink, and a new or moved mount replaces the replicas.",
   "risk.removesDomain": "Requests to a removed domain no longer reach this project.",
+  "risk.opensPort": "Anyone on the internet can connect to it, without a password from Zeabur.",
   "risk.deletes": "Deleting can't be undone.",
   "warn.rightsMissing": (rights: string) => `The cluster may refuse this: you lack ${rights}.`,
   "warn.toolsCredentialExposed": (namespace: string) =>
@@ -1749,6 +1750,10 @@ export const en = {
     `Show ${service} on ${host} again, without the redirect.`,
   "confirm.envImport": (kind: string, name: string, service: string) =>
     `${service} reads every key of ${kind} ${name} as variables. Its pods restart.`,
+  "confirm.publicPort": (port: number, name: string) =>
+    `Open port ${port} of ${name} to the internet.`,
+  "confirm.publicPortOff": (port: number, name: string) =>
+    `Close port ${port} of ${name}. Clients outside the cluster can no longer connect to it.`,
   "confirm.envImportOff": (kind: string, name: string, service: string) =>
     `${service} stops reading the keys of ${kind} ${name}. Its pods restart.`,
   "confirm.basicAuth": (route: string) =>
@@ -1795,6 +1800,8 @@ export const en = {
   "action.redirect": "Redirect",
   "action.stopRedirect": "Remove redirect",
   "action.askPassword": "Ask for password",
+  "action.openPort": "Open port",
+  "action.closePort": "Close port",
   "action.stopPassword": "Remove password",
   "action.delete": "Delete",
   // Toasts
@@ -3243,6 +3250,32 @@ export const en = {
   "domainAccess.kube.users": "Users",
   "domainAccess.kube.usersValue": (name: string) =>
     `Secret ${name}, key users: one htpasswd line with a bcrypt hash`,
+  "ports.title": "Public ports",
+  "ports.about":
+    "Clients outside the cluster connect straight to a port, without a domain. For services that don't speak HTTP, such as a database.",
+  "ports.open": "Open a port",
+  "ports.none": "No port of this service is open to the internet.",
+  "ports.waiting": (port: number) => `Port ${port} waits for an address from the load balancer.`,
+  "ports.databaseOpen": "Database open to the internet",
+  "ports.close": (port: number) => `Close port ${port}`,
+  "ports.closeShort": "Close",
+  "ports.closeTitle": (port: number, name: string) => `Close port ${port} of ${name}`,
+  "ports.openTitle": (port: number, name: string) => `Open port ${port} of ${name} to the internet`,
+  "ports.openTitleShort": (name: string) => `Open a port of ${name}`,
+  "ports.databaseTitle": (name: string) =>
+    `${name} is a database. Anyone on the internet can connect to it.`,
+  "ports.databaseBody":
+    "Its own password is then all that protects the data, and bots try common passwords on open database ports within minutes. When you can, connect from a service in this project through its private address instead.",
+  "ports.anyoneTitle": "Anyone on the internet can connect to this port",
+  "ports.anyoneBody":
+    "Zeabur puts no password or HTTPS in front of it. The service must check who connects.",
+  "ports.allOpen": "Every port of this service is already open.",
+  "ports.port": "Port",
+  "ports.portHint": "The same number opens on the nodes' addresses.",
+  "ports.kube.object": "Kubernetes object",
+  "ports.kube.how": "How it opens",
+  "ports.kube.howValue":
+    "A LoadBalancer Service. On k3s and RKE2, ServiceLB listens on the port on every node.",
   "shared.title": "Shared variables",
   "shared.lead":
     "Variables that several services read. A service reads new values when it restarts.",
@@ -3296,6 +3329,10 @@ export const en = {
     `The task runs ${image}, ${service}'s image now; a later image change to ${service} doesn't reach it`,
   "warn.permanentRedirect": (host: string) =>
     `Browsers remember a permanent redirect: if you remove it later, earlier visitors of ${host} still go to the old target until they clear their cache`,
+  "warn.publicDatabase": (name: string) =>
+    `${name} is a database: its own password is all that protects its data from the internet`,
+  "warn.publicPort": (port: number) =>
+    `Port ${port} opens on the nodes' addresses. If another program there uses it, the port waits without an address`,
   "warn.passwordOverHttp": (hosts: string) =>
     `${hosts} has no HTTPS, so the password crosses the network readable there`,
   "form.healthHint":

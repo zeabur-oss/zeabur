@@ -1414,6 +1414,7 @@ export const zhTW: Messages = {
   "risk.rollback": "該版本之後的範本變更會被撤銷。",
   "risk.storage": "磁碟區無法縮小，新增或移動掛載點會替換副本。",
   "risk.removesDomain": "網域移除後，連到它的請求就不會再進到這個專案。",
+  "risk.opensPort": "網際網路上任何人都能連到它，Zeabur 不會要求密碼。",
   "risk.deletes": "刪除後無法復原。",
   "warn.rightsMissing": (rights: string) => `叢集可能會拒絕：你缺少 ${rights} 的權限。`,
   "warn.toolsCredentialExposed": (namespace: string) =>
@@ -1576,6 +1577,9 @@ export const zhTW: Messages = {
   "confirm.redirectOff": (host, service) => `取消轉址，${host} 重新顯示 ${service}。`,
   "confirm.envImport": (kind, name, service) =>
     `${service} 把 ${kind} ${name} 的每個鍵都當成變數讀取。它的 Pod 會重新啟動。`,
+  "confirm.publicPort": (port, name) => `把 ${name} 的連接埠 ${port} 開放到網際網路。`,
+  "confirm.publicPortOff": (port, name) =>
+    `關閉 ${name} 的連接埠 ${port}，叢集外的用戶端就連不到它了。`,
   "confirm.envImportOff": (kind, name, service) =>
     `${service} 不再讀取 ${kind} ${name} 的鍵。它的 Pod 會重新啟動。`,
   "confirm.basicAuth": (route) =>
@@ -1621,6 +1625,8 @@ export const zhTW: Messages = {
   "action.redirect": "轉址",
   "action.stopRedirect": "取消轉址",
   "action.askPassword": "要求密碼",
+  "action.openPort": "開放連接埠",
+  "action.closePort": "關閉連接埠",
   "action.stopPassword": "取消密碼",
   "action.delete": "刪除",
   // 通知
@@ -2964,6 +2970,29 @@ export const zhTW: Messages = {
   "domainAccess.kube.users": "使用者",
   "domainAccess.kube.usersValue": (name) =>
     `Secret ${name} 的 users 鍵：一行含 bcrypt 雜湊值的 htpasswd`,
+  "ports.title": "對外連接埠",
+  "ports.about": "叢集外的用戶端不經網域，直接連到連接埠。適合不走 HTTP 的服務，例如資料庫。",
+  "ports.open": "開放連接埠",
+  "ports.none": "這個服務沒有對網際網路開放的連接埠。",
+  "ports.waiting": (port) => `連接埠 ${port} 正在等負載平衡器分配位址。`,
+  "ports.databaseOpen": "資料庫對外開放",
+  "ports.close": (port) => `關閉連接埠 ${port}`,
+  "ports.closeShort": "關閉",
+  "ports.closeTitle": (port, name) => `關閉 ${name} 的連接埠 ${port}`,
+  "ports.openTitle": (port, name) => `把 ${name} 的連接埠 ${port} 開放到網際網路`,
+  "ports.openTitleShort": (name) => `開放 ${name} 的連接埠`,
+  "ports.databaseTitle": (name) => `${name} 是資料庫，網際網路上任何人都能連進來。`,
+  "ports.databaseBody":
+    "這時只剩資料庫自己的密碼保護資料，而機器人幾分鐘內就會對開放的資料庫連接埠嘗試常見密碼。可以的話，請改從這個專案裡的服務用私有位址連線。",
+  "ports.anyoneTitle": "網際網路上任何人都能連到這個連接埠",
+  "ports.anyoneBody": "Zeabur 不會在前面加上密碼或 HTTPS，服務要自己檢查連線的是誰。",
+  "ports.allOpen": "這個服務的連接埠都已經開放了。",
+  "ports.port": "連接埠",
+  "ports.portHint": "節點位址上會開放同一個號碼。",
+  "ports.kube.object": "Kubernetes 物件",
+  "ports.kube.how": "開放方式",
+  "ports.kube.howValue":
+    "LoadBalancer Service。在 k3s 和 RKE2 上，ServiceLB 會在每個節點監聽這個連接埠。",
   "shared.title": "共用變數",
   "shared.lead": "多個服務一起讀取的變數。服務重新啟動後才會讀到新的值。",
   "shared.secret": "Secret",
@@ -3015,6 +3044,9 @@ export const zhTW: Messages = {
     `任務使用 ${service} 目前的映像檔 ${image}；之後 ${service} 換映像檔，任務不會跟著換`,
   "warn.permanentRedirect": (host) =>
     `瀏覽器會記住永久轉址：之後就算取消，來過的訪客清除快取前，開啟 ${host} 仍會轉到舊的網域`,
+  "warn.publicDatabase": (name) => `${name} 是資料庫：面對網際網路，只剩它自己的密碼保護資料`,
+  "warn.publicPort": (port) =>
+    `連接埠 ${port} 開在節點位址上；如果節點上有其他程式占用這個號碼，它會一直等不到位址`,
   "warn.passwordOverHttp": (hosts) => `${hosts} 沒有 HTTPS，密碼會以明文在網路上傳送`,
   "form.healthHint":
     "叢集在每個副本上執行的檢查：能不能接收流量、要不要重新啟動，以及是否已經啟動。",

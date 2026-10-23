@@ -1,0 +1,10 @@
+description: "Closing a public port deletes the LoadBalancer Service that opened it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: publicPort
+        workload: {kind: Deployment, name: web}
+        service: web
+        port: 8080
+        remove: true

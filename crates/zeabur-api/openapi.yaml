@@ -4567,6 +4567,22 @@ components:
         description: |-
           Give a container every key of a ConfigMap or Secret as variables (`envFrom`), or stop
           (see the `shared` module).
+      - allOf:
+        - $ref: "#/components/schemas/PublicPortChange"
+          description: |-
+            Open a port of a workload to the internet with a `LoadBalancer` Service, or close it (see
+            the `public_port` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - publicPort
+        description: |-
+          Open a port of a workload to the internet with a `LoadBalancer` Service, or close it (see
+          the `public_port` module).
       - type: object
         description: Replace a workload's pods, as `kubectl rollout restart` does.
         required:
@@ -6849,6 +6865,13 @@ components:
           - string
           - "null"
           description: The cluster IP.
+        externalAddresses:
+          type: array
+          items:
+            type: string
+          description: |-
+            For a `LoadBalancer` Service, the addresses its load balancer reports in
+            `status.loadBalancer.ingress`, an IP or a hostname each; empty while it has none.
         name:
           type: string
           description: The Service's name.
@@ -10949,6 +10972,31 @@ components:
             description: The hostname that redirects.
       - type: object
         description: |-
+          Anyone on the internet can connect to the port: no password of Zeabur's stands in front
+          of it. For a data store, its own password is all that protects the data.
+        required:
+        - workload
+        - port
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - publicPort
+          dataStore:
+            oneOf:
+            - $ref: "#/components/schemas/DataStore"
+              description: What kind of data store the workload is, when it is one.
+            - type: "null"
+          port:
+            type: integer
+            format: int32
+            description: The port.
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
           The Ingress serves these hostnames over plain HTTP, so the password crosses the network
           readable on them.
         required:
@@ -12292,6 +12340,27 @@ components:
       - installed
       - not-installed
       - refused
+    PublicPortChange:
+      type: object
+      description: A [`Change::PublicPort`].
+      required:
+      - workload
+      - service
+      - port
+      properties:
+        port:
+          type: integer
+          format: int32
+          description: The Service port. It is also the port on the internet.
+        remove:
+          type: boolean
+          description: "Close the port instead: delete the `LoadBalancer` Service that opened it."
+        service:
+          type: string
+          description: The workload's Service that has the port.
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
     Quantities:
       type: object
       description: >-

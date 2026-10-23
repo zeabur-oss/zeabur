@@ -1412,6 +1412,7 @@ export const zhCN: Messages = {
   "risk.rollback": "该版本之后的模板变更会被撤销。",
   "risk.storage": "卷无法缩小，添加或移动挂载点会替换副本。",
   "risk.removesDomain": "发往已移除域名的请求将不再到达这个项目。",
+  "risk.opensPort": "互联网上任何人都能连到它，Zeabur 不会要求密码。",
   "risk.deletes": "删除后无法撤销。",
   "warn.rightsMissing": (rights: string) => `集群可能会拒绝：你缺少 ${rights} 的权限。`,
   "warn.toolsCredentialExposed": (namespace: string) =>
@@ -1574,6 +1575,9 @@ export const zhCN: Messages = {
   "confirm.redirectOff": (host, service) => `取消重定向，${host} 重新显示 ${service}。`,
   "confirm.envImport": (kind, name, service) =>
     `${service} 把 ${kind} ${name} 的每个键都当作变量读取。它的 Pod 会重启。`,
+  "confirm.publicPort": (port, name) => `把 ${name} 的端口 ${port} 开放到互联网。`,
+  "confirm.publicPortOff": (port, name) =>
+    `关闭 ${name} 的端口 ${port}，集群外的客户端就连不到它了。`,
   "confirm.envImportOff": (kind, name, service) =>
     `${service} 不再读取 ${kind} ${name} 的键。它的 Pod 会重启。`,
   "confirm.basicAuth": (route) =>
@@ -1619,6 +1623,8 @@ export const zhCN: Messages = {
   "action.redirect": "重定向",
   "action.stopRedirect": "取消重定向",
   "action.askPassword": "要求密码",
+  "action.openPort": "开放端口",
+  "action.closePort": "关闭端口",
   "action.stopPassword": "取消密码",
   "action.delete": "删除",
   // 通知
@@ -2957,6 +2963,29 @@ export const zhCN: Messages = {
   "domainAccess.kube.users": "用户",
   "domainAccess.kube.usersValue": (name) =>
     `Secret ${name} 的 users 键：一行含 bcrypt 哈希值的 htpasswd`,
+  "ports.title": "对外端口",
+  "ports.about": "集群外的客户端不经域名，直接连到端口。适合不走 HTTP 的服务，例如数据库。",
+  "ports.open": "开放端口",
+  "ports.none": "这个服务没有对互联网开放的端口。",
+  "ports.waiting": (port) => `端口 ${port} 正在等负载均衡器分配地址。`,
+  "ports.databaseOpen": "数据库对外开放",
+  "ports.close": (port) => `关闭端口 ${port}`,
+  "ports.closeShort": "关闭",
+  "ports.closeTitle": (port, name) => `关闭 ${name} 的端口 ${port}`,
+  "ports.openTitle": (port, name) => `把 ${name} 的端口 ${port} 开放到互联网`,
+  "ports.openTitleShort": (name) => `开放 ${name} 的端口`,
+  "ports.databaseTitle": (name) => `${name} 是数据库，互联网上任何人都能连进来。`,
+  "ports.databaseBody":
+    "这时只剩数据库自己的密码保护数据，而机器人几分钟内就会对开放的数据库端口尝试常见密码。可以的话，请改从这个项目里的服务用私有地址连接。",
+  "ports.anyoneTitle": "互联网上任何人都能连到这个端口",
+  "ports.anyoneBody": "Zeabur 不会在前面加上密码或 HTTPS，服务要自己检查连接的是谁。",
+  "ports.allOpen": "这个服务的端口都已经开放了。",
+  "ports.port": "端口",
+  "ports.portHint": "节点地址上会开放同一个号码。",
+  "ports.kube.object": "Kubernetes 对象",
+  "ports.kube.how": "开放方式",
+  "ports.kube.howValue":
+    "LoadBalancer Service。在 k3s 和 RKE2 上，ServiceLB 会在每个节点监听这个端口。",
   "shared.title": "共享变量",
   "shared.lead": "多个服务一起读取的变量。服务重启后才会读到新的值。",
   "shared.secret": "Secret",
@@ -3008,6 +3037,9 @@ export const zhCN: Messages = {
     `任务使用 ${service} 当前的镜像 ${image}；之后 ${service} 换镜像，任务不会跟着换`,
   "warn.permanentRedirect": (host) =>
     `浏览器会记住永久重定向：之后即使取消，来过的访客清除缓存前，打开 ${host} 仍会转到旧的域名`,
+  "warn.publicDatabase": (name) => `${name} 是数据库：面对互联网，只剩它自己的密码保护数据`,
+  "warn.publicPort": (port) =>
+    `端口 ${port} 开在节点地址上；如果节点上有其他程序占用这个号码，它会一直等不到地址`,
   "warn.passwordOverHttp": (hosts) => `${hosts} 没有 HTTPS，密码会以明文在网络上传输`,
   "form.healthHint": "集群在每个副本上运行的检查：能不能接收流量、要不要重启，以及是否已经启动。",
   "draft.add": "加入变更",

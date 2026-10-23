@@ -1,0 +1,9 @@
+description: "Opening a port the workload's Service does not have is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: publicPort
+        workload: {kind: Deployment, name: web}
+        service: web
+        port: 9999

@@ -157,6 +157,13 @@ pub fn endpoint(object: &KubeService) -> Endpoint {
             .as_ref()
             .and_then(|spec| spec.cluster_ip.clone()),
         ports: ports(object),
+        external_addresses: object
+            .status
+            .iter()
+            .filter_map(|status| status.load_balancer.as_ref())
+            .flat_map(|lb| lb.ingress.iter().flatten())
+            .filter_map(|i| i.ip.clone().or_else(|| i.hostname.clone()))
+            .collect(),
         provenance: provenance(&object.metadata),
         origin: Origin::object("Service", name),
     }

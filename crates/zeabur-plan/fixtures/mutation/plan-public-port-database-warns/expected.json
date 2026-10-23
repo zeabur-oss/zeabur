@@ -1,0 +1,28 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Service", "name": "db-public-5432"},
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "Service",
+          "metadata": {
+            "name": "db-public-5432",
+            "namespace": "demo",
+            "labels": {"app.kubernetes.io/name": "db"}
+          },
+          "spec": {
+            "type": "LoadBalancer",
+            "selector": {"app": "db"},
+            "ports": [{"name": "postgres", "port": 5432, "targetPort": "postgres", "protocol": "TCP"}]
+          }
+        }
+      }
+    }
+  ],
+  "impact": [{"kind": "StatefulSet", "name": "db"}],
+  "warnings": [
+    {"code": "publicPort", "workload": {"kind": "StatefulSet", "name": "db"}, "port": 5432, "dataStore": "postgres"}
+  ]
+}

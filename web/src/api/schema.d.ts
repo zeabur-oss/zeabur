@@ -2467,6 +2467,10 @@ export interface components {
           /** @enum {string} */
           op: "envImport"
         })
+      | (components["schemas"]["PublicPortChange"] & {
+          /** @enum {string} */
+          op: "publicPort"
+        })
       | {
           /** @enum {string} */
           op: "restart"
@@ -3615,6 +3619,11 @@ export interface components {
     Endpoint: {
       /** @description The cluster IP. */
       clusterIP?: string | null
+      /**
+       * @description For a `LoadBalancer` Service, the addresses its load balancer reports in
+       *     `status.loadBalancer.ingress`, an IP or a hostname each; empty while it has none.
+       */
+      externalAddresses?: string[]
       /** @description The Service's name. */
       name: string
       /** @description The Service object. */
@@ -5708,6 +5717,18 @@ export interface components {
         }
       | {
           /** @enum {string} */
+          code: "publicPort"
+          dataStore?: components["schemas"]["DataStore"] | null
+          /**
+           * Format: int32
+           * @description The port.
+           */
+          port: number
+          /** @description The workload. */
+          workload: components["schemas"]["WorkloadRef"]
+        }
+      | {
+          /** @enum {string} */
           code: "passwordOverHttp"
           /** @description Its hostnames without HTTPS. */
           hostnames: string[]
@@ -6371,6 +6392,20 @@ export interface components {
      * @enum {string}
      */
     ProviderState: "installed" | "not-installed" | "refused"
+    /** @description A [`Change::PublicPort`]. */
+    PublicPortChange: {
+      /**
+       * Format: int32
+       * @description The Service port. It is also the port on the internet.
+       */
+      port: number
+      /** @description Close the port instead: delete the `LoadBalancer` Service that opened it. */
+      remove?: boolean
+      /** @description The workload's Service that has the port. */
+      service: string
+      /** @description The workload. */
+      workload: components["schemas"]["WorkloadRef"]
+    }
     /** @description CPU and memory as Kubernetes quantity strings, such as `250m` and `512Mi`, and as numbers. */
     Quantities: {
       /** @description CPU. */

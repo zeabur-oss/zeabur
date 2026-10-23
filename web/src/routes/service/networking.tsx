@@ -59,6 +59,7 @@ import {
   type Service,
 } from "@/model/service"
 import { refusedPlaces } from "@/routes/project/data"
+import { PublicPorts } from "@/routes/service/public-ports"
 import { Reachability } from "@/routes/service/reachability"
 
 const DomainAccess = lazy(() => import("@/routes/service/domain-access"))
@@ -504,6 +505,13 @@ export function NetworkingTab({
               ])}
             />
           </section>
+
+          <PublicPorts
+            project={project}
+            service={service}
+            endpoints={endpoints}
+            plan={planner.plan}
+          />
 
           <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-private">
             <SectionHeader

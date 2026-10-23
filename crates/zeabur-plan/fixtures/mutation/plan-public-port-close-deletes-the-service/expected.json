@@ -1,0 +1,5 @@
+{
+  "objects": [
+    {"target": {"kind": "Service", "name": "web-public-8080"}, "write": {"type": "delete"}}
+  ]
+}

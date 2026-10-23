@@ -516,7 +516,14 @@ function PlanBody({
   return (
     <div className="flex flex-col gap-3">
       {alerted && first ? (
-        <Alert variant="warn" role="note">
+        <Alert
+          variant={
+            plan.warnings.some((w) => w.code === "publicPort" && w.dataStore)
+              ? "destructive"
+              : "warn"
+          }
+          role="note"
+        >
           <WarningFillIcon aria-hidden="true" />
           <AlertDescription>
             {first}
@@ -680,6 +687,8 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
       return { text: warningSentence(t, warning), health: "ok" }
     case "taskImageCopied":
       return { text: warningSentence(t, warning), health: "idle" }
+    case "publicPort":
+      return { text: warningSentence(t, warning), health: warning.dataStore ? "fail" : "warn" }
     default:
       return { text: warningSentence(t, warning) }
   }
@@ -782,6 +791,10 @@ function warningSentence(
       return t("warn.permanentRedirect", warning.hostname)
     case "passwordOverHttp":
       return t("warn.passwordOverHttp", t("common.list", warning.hostnames))
+    case "publicPort":
+      return warning.dataStore
+        ? t("warn.publicDatabase", warning.workload.name)
+        : t("warn.publicPort", warning.port)
     case "debugContainerStays":
     case "debugContainerReused":
     case "toolsPod":
