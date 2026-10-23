@@ -1,0 +1,4 @@
+description: A K8up Schedule covers only the claims annotated k8up.io/backup true, as the catalogue installs K8up; its latest Backup succeeded.
+operation: modules.backups
+params:
+  namespace: "shop"

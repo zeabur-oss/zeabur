@@ -125,6 +125,7 @@ pub fn findings(
                 .unwrap_or(false),
             targets,
             note: (!fs_backup && !volumes.is_empty()).then(|| VOLUMES_NEED_SNAPSHOTS.to_owned()),
+            ..Schedule::default()
         });
     }
     out.schedules.sort_by(|a, b| a.name.cmp(&b.name));

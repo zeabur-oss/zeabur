@@ -68,6 +68,8 @@ use crate::rules::{
 ///   `S3Credentials`, `S3Policy` and `S3PolicyBinding` that give services an access key;
 /// - a restore into a new database: Percona's `PerconaServerMongoDBRestore` (the other operators
 ///   restore from fields of the new database);
+/// - a volume's backups: K8up's `Schedule`, `Backup` and `PodConfig`, and the Secret with the
+///   bucket's keys and the repository password;
 /// - a service from a container image: its Deployment, Service, Ingress, volume claim and Secrets;
 /// - a service from Git: the same, and Zeabur Builder's `Build`.
 ///
@@ -120,6 +122,9 @@ pub const CREATABLE: &[(&str, &str, &str)] = &[
         "S3PolicyBinding",
         "s3policybindings",
     ),
+    ("k8up.io/v1", "Schedule", "schedules"),
+    ("k8up.io/v1", "Backup", "backups"),
+    ("k8up.io/v1", "PodConfig", "podconfigs"),
 ];
 
 /// The plural of a kind [`CREATABLE`] lists.
@@ -422,6 +427,9 @@ impl<'a> Planner<'a> {
             Change::Restart { workload } => self.restart_workload(workload),
             Change::Rollback { workload, revision } => self.rollback(workload, *revision),
             Change::ExpandVolume { claim, size } => self.expand_volume(claim, size),
+            Change::LabelVolume(change) => {
+                self.label_volume(&change.claim, &change.labels, &change.annotations)
+            }
             Change::AddVolume {
                 workload,
                 container,

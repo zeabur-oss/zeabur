@@ -571,6 +571,26 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn developers_schedule_volume_backups_and_nobody_restores_through_k8up() {
+        let roles = roles();
+        let developer = &roles[ProjectRole::Developer.cluster_role()];
+        let viewer = &roles[ProjectRole::Viewer.cluster_role()];
+        for resource in ["schedules.k8up.io", "backups.k8up.io", "podconfigs.k8up.io"] {
+            assert!(allows(viewer, "list", resource), "viewer lists {resource}");
+            assert!(
+                allows(developer, "create", resource),
+                "developer {resource}"
+            );
+            assert!(!allows(viewer, "create", resource), "viewer {resource}");
+        }
+        for resource in ["restores.k8up.io", "prebackuppods.k8up.io"] {
+            for role in [developer, viewer] {
+                assert!(!allows(role, "create", resource), "create {resource}");
+            }
+        }
+    }
+
+    #[test]
     fn both_project_roles_see_builds_and_developers_deploy_from_git_and_build_again() {
         let roles = roles();
         let developer = &roles[ProjectRole::Developer.cluster_role()];

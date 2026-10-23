@@ -5,6 +5,23 @@
 
 use serde::{Deserialize, Serialize};
 
+/// The user and groups a workload's pods run as: its first container's security context, else
+/// the pod's. An absent user or group is the image's.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct RunAs {
+    /// `runAsUser`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user: Option<i64>,
+    /// `runAsGroup`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<i64>,
+    /// The pod's `fsGroup`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fs_group: Option<i64>,
+}
+
 /// A Pod Security Standards level, from the least to the most restrictive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

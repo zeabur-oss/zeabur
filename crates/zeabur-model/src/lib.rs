@@ -37,7 +37,7 @@ pub use network::{
     Endpoint, InferredFrom, Port, PortProtocol, ProtocolInference, Route, RouteMiddleware,
     RouteRule,
 };
-pub use pod_security::PodSecurityLevel;
+pub use pod_security::{PodSecurityLevel, RunAs};
 pub use project::{
     Connection, ConnectionEvidence, DataStore, Project, Relation, RelationKind, Resource,
     ResourceKind, Service,

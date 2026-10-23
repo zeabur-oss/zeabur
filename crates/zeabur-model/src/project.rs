@@ -156,6 +156,9 @@ pub struct Service {
     /// none. Whether the namespace enforces a level is the namespace's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pod_security: Option<crate::PodSecurityLevel>,
+    /// The user and groups its pods run as; absent when its template sets none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_as: Option<crate::RunAs>,
     /// What is going wrong with it, in plain words, sorted by kind then container. The
     /// projection leaves this empty: diagnoses need the namespace's events and the time of the
     /// read, so the API fills it in when it serves the project document.

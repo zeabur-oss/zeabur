@@ -183,6 +183,7 @@ fn backups_of(
                 name: name.to_owned(),
             }],
             note: None,
+            ..Schedule::default()
         })
         .into_iter()
         .collect();

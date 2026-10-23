@@ -27,8 +27,9 @@ pub mod token;
 
 pub use change::{
     BasicAuthUser, BuildOptionsChange, Change, ConnectionRef, DataEdit, DataKind, EnvImportChange,
-    FieldOwners, HttpOnlyReason, KeptReason, ObjectName, Plan, PlanRequest, PlannedObject,
-    ProbeKind, PublicPortChange, RouteKind, RouteRef, Target, TaskConcurrency, Warning, Write,
+    FieldOwners, HttpOnlyReason, KeptReason, LabelVolumeChange, ObjectName, Plan, PlanRequest,
+    PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, Target, TaskConcurrency,
+    Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};

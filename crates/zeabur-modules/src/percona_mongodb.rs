@@ -143,6 +143,7 @@ fn backups_of(
                 paused: !enabled || task["enabled"] == false,
                 targets: vec![target.clone()],
                 note: None,
+                ..Schedule::default()
             })
         })
         .collect();

@@ -24,6 +24,9 @@
 //! Velero runs with a location on R2, a daily schedule and a week of backups, the newest failed:
 //! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location.
 //!
+//! K8up backs up shop's Redis volume nightly to R2; the newest run failed. `ZEABUR_DEMO_K8UP=none`
+//! leaves it uninstalled.
+//!
 //! Alerting sends shop's deploy failures to Slack and the cluster's node alerts to Telegram; a
 //! second shop channel was rejected by Alertmanager. `ZEABUR_DEMO_ALERTING=none` leaves it
 //! uninstalled.
@@ -647,7 +650,9 @@ fn shop() -> NamespaceObjects {
                 "status": {"phase": "Bound", "capacity": {"storage": "20Gi"}}}),
             ),
             from::<PersistentVolumeClaim>(
-                json!({"metadata": {"name": "data-redis-0", "namespace": "shop"},
+                json!({"metadata": {"name": "data-redis-0", "namespace": "shop",
+                    "labels": {"zeabur.com/backup-volume": "data-redis-0"},
+                    "annotations": {"k8up.io/backup": "true"}},
                 "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "2Gi"}}},
                 "status": {"phase": "Bound", "capacity": {"storage": "2Gi"}}}),
             ),
@@ -1846,6 +1851,7 @@ fn state() -> State {
         ]
         .into_iter()
         .chain(velero_served())
+        .chain(k8up_served())
         .chain(alerting_served())
         .collect(),
         dynamic: [
@@ -2091,6 +2097,7 @@ fn state() -> State {
         .chain(people())
         .chain(member_roles())
         .chain(velero())
+        .chain(k8up())
         .chain(alerting())
         .collect(),
         // The metrics store where Zeabur's recommendation installs it.
@@ -2263,6 +2270,71 @@ fn alerting() -> Vec<DynamicObject> {
             "metadata": {"name": am::RULES_NAME, "namespace": am::CLUSTER_NAMESPACE},
             "spec": {"groups": []}
         })),
+    ]
+}
+
+/// K8up, unless `ZEABUR_DEMO_K8UP` is `none`.
+fn k8up_installed() -> bool {
+    std::env::var("ZEABUR_DEMO_K8UP").unwrap_or_default() != "none"
+}
+
+fn k8up_served() -> Vec<ServedResource> {
+    if !k8up_installed() {
+        return Vec::new();
+    }
+    [("schedules", "Schedule"), ("backups", "Backup")]
+        .into_iter()
+        .map(|(resource, kind)| ServedResource::readable("k8up.io", "v1", resource, kind, true))
+        .collect()
+}
+
+/// A nightly schedule of shop's Redis volume, kept 7 days and 4 weeks; last night's backup
+/// failed, the one before succeeded.
+fn k8up() -> Vec<DynamicObject> {
+    if !k8up_installed() {
+        return Vec::new();
+    }
+    let backend = json!({
+        "repoPasswordSecretRef": {"name": "data-redis-0-backup", "key": "RESTIC_PASSWORD"},
+        "s3": {"endpoint": "https://4f1c.r2.cloudflarestorage.com", "bucket": "acme-backups/shop/data-redis-0",
+            "accessKeyIDSecretRef": {"name": "data-redis-0-backup", "key": "AWS_ACCESS_KEY_ID"},
+            "secretAccessKeySecretRef": {"name": "data-redis-0-backup", "key": "AWS_SECRET_ACCESS_KEY"}}
+    });
+    let selector = json!([{"matchLabels": {"zeabur.com/backup-volume": "data-redis-0"}}]);
+    let backup = |name: &str, minutes: i64, reason: &str, message: &str| {
+        from(json!({
+            "apiVersion": "k8up.io/v1", "kind": "Backup",
+            "metadata": {"name": name, "namespace": "shop", "resourceVersion": "30",
+                "creationTimestamp": minutes_ago(minutes)},
+            "spec": {"backend": backend, "labelSelectors": selector},
+            "status": {"conditions": [{"type": "Completed", "status": "True", "reason": reason,
+                "message": message, "lastTransitionTime": minutes_ago(minutes - 2)}]}
+        }))
+    };
+    vec![
+        from(json!({
+            "apiVersion": "k8up.io/v1", "kind": "Schedule",
+            "metadata": {"name": "data-redis-0-backup", "namespace": "shop", "resourceVersion": "21"},
+            "spec": {
+                "backend": backend,
+                "backup": {"schedule": "0 3 * * *", "labelSelectors": selector,
+                    "podSecurityContext": {"runAsUser": 0}},
+                "prune": {"schedule": "0 4 * * *",
+                    "retention": {"keepLast": 3, "keepDaily": 7, "keepWeekly": 4}}
+            }
+        })),
+        backup(
+            "data-redis-0-backup-nightly-2",
+            300,
+            "Failed",
+            "unable to open repository: 403 Forbidden",
+        ),
+        backup(
+            "data-redis-0-backup-nightly-1",
+            1740,
+            "Succeeded",
+            "the job succeeded",
+        ),
     ]
 }
 

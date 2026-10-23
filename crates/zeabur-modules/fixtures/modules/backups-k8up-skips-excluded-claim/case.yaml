@@ -1,4 +1,0 @@
-description: A K8up Schedule covers every claim of its namespace except one annotated k8up.io/backup false; its latest Backup succeeded.
-operation: modules.backups
-params:
-  namespace: "shop"

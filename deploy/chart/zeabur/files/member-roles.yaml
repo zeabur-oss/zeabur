@@ -91,6 +91,10 @@ zeabur-project-viewer:
   - apiGroups: [seaweed.seaweedfs.com]
     resources: [seaweeds, buckets, s3identities, s3credentials, s3policies, s3policybindings]
     verbs: [get, list, watch]
+  # Volume backups with K8up.
+  - apiGroups: [k8up.io]
+    resources: [schedules, backups, podconfigs, snapshots, restores]
+    verbs: [get, list, watch]
   # Notification channels: which events go where. Their URLs and tokens stay in Secrets.
   - apiGroups: [operator.victoriametrics.com]
     resources: [vmalertmanagerconfigs]
@@ -199,6 +203,15 @@ zeabur-project-developer:
   - apiGroups: [seaweed.seaweedfs.com]
     resources: [seaweeds, buckets, s3identities, s3credentials, s3policies, s3policybindings]
     verbs: [get, list, watch, create, update, patch, delete]
+  # Volume backups with K8up. Its backup and prune pods run under the namespace's Pod Security
+  # level like any pod the role may create; a PodConfig sets their security context. Restores and
+  # PreBackupPods stay read only or out: Zeabur does not make them.
+  - apiGroups: [k8up.io]
+    resources: [schedules, backups, podconfigs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [k8up.io]
+    resources: [snapshots, restores]
+    verbs: [get, list, watch]
   # Notification channels. A channel's receivers only see alerts of this namespace: the operator
   # adds that matcher to every config.
   - apiGroups: [operator.victoriametrics.com]

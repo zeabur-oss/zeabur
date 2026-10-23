@@ -536,7 +536,8 @@ mod tests {
             if let Some(objects) = s.objects.get_mut("shop") {
                 objects.persistent_volume_claims.push(
                     serde_json::from_value(json!({
-                        "metadata": {"name": "uploads", "namespace": "shop"},
+                        "metadata": {"name": "uploads", "namespace": "shop",
+                                     "annotations": {"k8up.io/backup": "true"}},
                         "spec": {"accessModes": ["ReadWriteOnce"]}
                     }))
                     .unwrap(),

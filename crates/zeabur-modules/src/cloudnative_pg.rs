@@ -361,6 +361,7 @@ fn findings_limited(
                 .unwrap_or(false),
             targets: vec![target],
             note: None,
+            ..Schedule::default()
         });
     }
     out.schedules.sort_by(|a, b| a.name.cmp(&b.name));

@@ -1,0 +1,34 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "name": "uploads",
+        "plural": "persistentvolumeclaims"
+      },
+      "changes": [
+        {
+          "after": "true",
+          "before": "false",
+          "path": "metadata.annotations.k8up.io/backup"
+        },
+        {
+          "after": "uploads",
+          "path": "metadata.labels.zeabur.com/backup-volume"
+        }
+      ],
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "12"},
+          {"op": "add", "path": "/metadata/labels", "value": {"zeabur.com/backup-volume": "uploads"}},
+          {"op": "test", "path": "/metadata/annotations/k8up.io~1backup", "value": "false"},
+          {"op": "replace", "path": "/metadata/annotations/k8up.io~1backup", "value": "true"}
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}

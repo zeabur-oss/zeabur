@@ -4071,6 +4071,13 @@ components:
           description: >-
             The cron expression, as the provider writes it (CloudNativePG's has a seconds
             field).
+        destination:
+          type:
+          - string
+          - "null"
+          description: >-
+            Where it writes, such as `s3:https://s3.example.com/backups/shop`, when the
+            provider says.
         name:
           type: string
           description: The provider's object, `<namespace>/<name>`.
@@ -4087,6 +4094,23 @@ components:
         provider:
           type: string
           description: The provider (module id).
+        retention:
+          type: object
+          description: |-
+            How many backups it keeps, by period (`last`, `hourly`, `daily`, `weekly`, `monthly`,
+            `yearly`), when the provider counts them.
+          additionalProperties:
+            type: integer
+            format: int64
+          propertyNames:
+            type: string
+        runNow:
+          type:
+          - object
+          - "null"
+          description: |-
+            The object that runs it once, without `metadata`: for K8up, a `Backup` with the schedule's
+            backup spec and backend.
         targets:
           type: array
           items:
@@ -4714,6 +4738,22 @@ components:
           size:
             type: string
             description: The new size, a Kubernetes quantity such as `20Gi`.
+      - allOf:
+        - $ref: "#/components/schemas/LabelVolumeChange"
+          description: |-
+            Add labels and annotations to a PersistentVolumeClaim, such as the ones a backup tool
+            selects claims by.
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - labelVolume
+        description: |-
+          Add labels and annotations to a PersistentVolumeClaim, such as the ones a backup tool
+          selects claims by.
       - type: object
         description: Create a PersistentVolumeClaim and mount it in a container of a workload.
         required:
@@ -8796,6 +8836,29 @@ components:
             How long kube-apiserver asked clients to wait before retrying
             (`details.retryAfterSeconds`).
           minimum: 0
+    LabelVolumeChange:
+      type: object
+      description: A [`Change::LabelVolume`]. A key the claim has already is set to the new value.
+      required:
+      - claim
+      properties:
+        annotations:
+          type: object
+          description: Annotations to set.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        claim:
+          type: string
+          description: The claim.
+        labels:
+          type: object
+          description: Labels to set.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
     LeaderLease:
       type: object
       description: A component's leader lease in `kube-system`.
@@ -12546,6 +12609,7 @@ components:
       - changeDatabases
       - backUpDatabases
       - changeObjectStorage
+      - backUpVolumes
       - openTerminal
       - readLogs
       - build
@@ -12556,6 +12620,9 @@ components:
         backUpDatabases:
           $ref: "#/components/schemas/Permission"
           description: "Back up databases: `create` on an operator's backups."
+        backUpVolumes:
+          $ref: "#/components/schemas/Permission"
+          description: "Back up volumes: `create` on K8up's schedules, backups and pod configs."
         build:
           $ref: "#/components/schemas/Permission"
           description: "Build again: `patch` on Zeabur Builder's builds."
@@ -13495,6 +13562,30 @@ components:
       description: >-
         One address's way, and the plan that fixes where it stops when Zeabur can write
         one.
+    RunAs:
+      type: object
+      description: |-
+        The user and groups a workload's pods run as: its first container's security context, else
+        the pod's. An absent user or group is the image's.
+      properties:
+        fsGroup:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: The pod's `fsGroup`.
+        group:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "`runAsGroup`."
+        user:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "`runAsUser`."
     RunStatus:
       type: string
       description: How a run stands.
@@ -13865,6 +13956,11 @@ components:
             description: |-
               The names of the Ingresses routing to those Services, sorted by name; each is in the
               document's `routes`.
+          runAs:
+            oneOf:
+            - $ref: "#/components/schemas/RunAs"
+              description: The user and groups its pods run as; absent when its template sets none.
+            - type: "null"
           status:
             $ref: "#/components/schemas/ServiceStatus"
             description: Its health and the word for it, from the workload and its pods.

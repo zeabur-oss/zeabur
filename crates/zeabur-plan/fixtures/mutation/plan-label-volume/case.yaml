@@ -1,0 +1,3 @@
+description: "Labelling a claim adds its labels map and sets an annotation it has with another value, testing the old value first."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "labelVolume", "claim": "uploads", "labels": {"zeabur.com/backup-volume": "uploads"}, "annotations": {"k8up.io/backup": "true"}}]}}

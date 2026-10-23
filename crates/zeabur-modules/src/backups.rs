@@ -95,7 +95,7 @@ impl Run {
 }
 
 /// One backup schedule.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = BackupSchedule)]
 pub struct Schedule {
@@ -112,6 +112,18 @@ pub struct Schedule {
     /// What else to know about the coverage (an i18n key), such as `velero.volumesNeedSnapshots`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub note: Option<String>,
+    /// Where it writes, such as `s3:https://s3.example.com/backups/shop`, when the provider says.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination: Option<String>,
+    /// How many backups it keeps, by period (`last`, `hourly`, `daily`, `weekly`, `monthly`,
+    /// `yearly`), when the provider counts them.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub retention: BTreeMap<String, i64>,
+    /// The object that runs it once, without `metadata`: for K8up, a `Backup` with the schedule's
+    /// backup spec and backend.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    pub run_now: Option<Value>,
 }
 
 /// What one provider found for a project.

@@ -40,6 +40,8 @@ pub struct ProjectRights {
     /// Create, change and delete object storage: `create`, `patch` and `delete` on the `SeaweedFS`
     /// Operator's seaweeds.
     pub change_object_storage: Permission,
+    /// Back up volumes: `create` on K8up's schedules, backups and pod configs.
+    pub back_up_volumes: Permission,
     /// Open a terminal in a container: `create` on `pods/exec`.
     pub open_terminal: Permission,
     /// Read the pods' logs: `get` on `pods/log`.
@@ -112,6 +114,7 @@ const MOCO: &str = "moco.cybozu.com";
 const MARIADB: &str = "k8s.mariadb.com";
 const DRAGONFLY: &str = "dragonflydb.io";
 const SEAWEED: &str = "seaweed.seaweedfs.com";
+const K8UP: &str = "k8up.io";
 
 impl ProjectRights {
     /// Every right unknown: the review could not be made.
@@ -131,6 +134,7 @@ impl ProjectRights {
             change_databases: u,
             back_up_databases: u,
             change_object_storage: u,
+            back_up_volumes: u,
             open_terminal: u,
             read_logs: u,
             build: u,
@@ -178,6 +182,11 @@ impl ProjectRights {
                 ask.can("create", MARIADB, "backups"),
             ]),
             change_object_storage: ask.every(&change, SEAWEED, "seaweeds"),
+            back_up_volumes: all([
+                ask.can("create", K8UP, "schedules"),
+                ask.can("create", K8UP, "backups"),
+                ask.can("create", K8UP, "podconfigs"),
+            ]),
             open_terminal: ask.can("create", "", "pods/exec"),
             read_logs: ask.can("get", "", "pods/log"),
             build: ask.can("patch", "builder.zeabur.com", "builds"),
@@ -250,6 +259,7 @@ mod tests {
                     change_databases: allowed,
                     back_up_databases: allowed,
                     change_object_storage: allowed,
+                    back_up_volumes: allowed,
                     open_terminal: allowed,
                     read_logs: allowed,
                     build: allowed,

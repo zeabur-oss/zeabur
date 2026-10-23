@@ -50,6 +50,7 @@ use crate::plan::{
     ErrorKind, PlanError, Planner, Working, error, pod_spec_steps, to_json, workload_json,
     workload_target,
 };
+use crate::project::{set_key, shown, steps};
 use crate::rules::{REDACTED, Refusal};
 
 /// A container of a workload: its name, position and spec.
@@ -356,6 +357,50 @@ impl<'a> Planner<'a> {
             .collect();
         self.impact.extend(readers);
         Ok(())
+    }
+
+    pub(crate) fn label_volume(
+        &mut self,
+        name: &str,
+        labels: &BTreeMap<String, String>,
+        annotations: &BTreeMap<String, String>,
+    ) -> Result<(), PlanError> {
+        let Some(claim) = self.input.snapshot.persistent_volume_claim(name).cloned() else {
+            return Err(error(
+                ErrorKind::NotFound,
+                "unknown_claim",
+                format!("There is no PersistentVolumeClaim named {name}."),
+            ));
+        };
+        Self::refuse_managed(&claim.metadata, "PersistentVolumeClaim", name)?;
+        let index = self.working(Target::of::<PersistentVolumeClaim>(name), to_json(&claim)?);
+        let mut changed = false;
+        for (map, entries) in [("labels", labels), ("annotations", annotations)] {
+            for (key, value) in entries {
+                let current = self.current(index);
+                let path = pointer(&["metadata", map, key]);
+                let before = current.pointer(&path).cloned();
+                if before.as_ref().and_then(Value::as_str) == Some(value.as_str()) {
+                    continue;
+                }
+                self.claim(index, &steps(map, key), &shown(map, key))?;
+                let operations = before.map_or_else(
+                    || set_key(&current, map, key, value),
+                    |before| vec![test(&path, before), replace(&path, json!(value))],
+                );
+                self.patch(index, operations)?;
+                changed = true;
+            }
+        }
+        if changed {
+            Ok(())
+        } else {
+            Err(error(
+                ErrorKind::BadRequest,
+                "unchanged",
+                format!("{name} has these labels and annotations already."),
+            ))
+        }
     }
 
     #[expect(clippy::too_many_lines, reason = "one change kind, read top to bottom")]

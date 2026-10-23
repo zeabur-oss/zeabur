@@ -1,4 +1,11 @@
 //! What a person asks to change, and what a plan says about it.
+#![cfg_attr(
+    feature = "openapi",
+    expect(
+        clippy::large_stack_frames,
+        reason = "the derived schema of `Change` builds every variant in one function"
+    )
+)]
 
 use std::collections::BTreeMap;
 
@@ -95,6 +102,9 @@ pub enum Change {
         /// The new size, a Kubernetes quantity such as `20Gi`.
         size: String,
     },
+    /// Add labels and annotations to a PersistentVolumeClaim, such as the ones a backup tool
+    /// selects claims by.
+    LabelVolume(LabelVolumeChange),
     /// Create a PersistentVolumeClaim and mount it in a container of a workload.
     #[serde(rename_all = "camelCase")]
     AddVolume {
@@ -410,6 +420,21 @@ const fn three() -> i32 {
 
 const fn one() -> i32 {
     1
+}
+
+/// A [`Change::LabelVolume`]. A key the claim has already is set to the new value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct LabelVolumeChange {
+    /// The claim.
+    pub claim: String,
+    /// Labels to set.
+    #[serde(default)]
+    pub labels: BTreeMap<String, String>,
+    /// Annotations to set.
+    #[serde(default)]
+    pub annotations: BTreeMap<String, String>,
 }
 
 /// A [`Change::Redirect`].

@@ -79,6 +79,7 @@ pub(crate) async fn compute(
         | Change::Restart { .. }
         | Change::Rollback { .. }
         | Change::ExpandVolume { .. }
+        | Change::LabelVolume(_)
         | Change::AddVolume { .. }
         | Change::EditMount { .. }
         | Change::RemoveVolume { .. }

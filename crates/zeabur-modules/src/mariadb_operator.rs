@@ -106,6 +106,7 @@ fn backups_of(
                 paused: b.data.pointer("/spec/schedule/suspend") == Some(&Value::Bool(true)),
                 targets: vec![target.clone()],
                 note: None,
+                ..Schedule::default()
             })
         })
         .collect();

@@ -11,7 +11,7 @@
 //! [k8s-pss]: https://kubernetes.io/docs/concepts/security/pod-security-standards/
 
 use k8s_openapi::api::core::v1::{Container, PodSpec, SeccompProfile, Volume};
-use zeabur_model::PodSecurityLevel;
+use zeabur_model::{PodSecurityLevel, RunAs};
 
 /// A control of the standards a pod spec breaks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -173,6 +173,26 @@ pub fn breaches(spec: &PodSpec) -> Vec<Breach> {
     out
 }
 
+/// The user and groups `spec`'s pods run as; `None` when it sets none.
+#[must_use]
+pub fn run_as(spec: &PodSpec) -> Option<RunAs> {
+    let pod = spec.security_context.as_ref();
+    let container = spec
+        .containers
+        .first()
+        .and_then(|c| c.security_context.as_ref());
+    let run_as = RunAs {
+        user: container
+            .and_then(|c| c.run_as_user)
+            .or_else(|| pod.and_then(|p| p.run_as_user)),
+        group: container
+            .and_then(|c| c.run_as_group)
+            .or_else(|| pod.and_then(|p| p.run_as_group)),
+        fs_group: pod.and_then(|p| p.fs_group),
+    };
+    (run_as != RunAs::default()).then_some(run_as)
+}
+
 /// The strictest level `spec` meets.
 #[must_use]
 pub fn level(spec: &PodSpec) -> PodSecurityLevel {
@@ -192,9 +212,9 @@ pub fn level(spec: &PodSpec) -> PodSecurityLevel {
 mod tests {
     use k8s_openapi::api::core::v1::PodSpec;
     use serde_json::json;
-    use zeabur_model::PodSecurityLevel;
+    use zeabur_model::{PodSecurityLevel, RunAs};
 
-    use super::{breaches, level};
+    use super::{breaches, level, run_as};
 
     fn spec(value: serde_json::Value) -> PodSpec {
         serde_json::from_value(value).unwrap()
@@ -274,5 +294,23 @@ mod tests {
         let mut nfs = restricted();
         nfs["volumes"] = json!([{"name": "n", "nfs": {"server": "s", "path": "/"}}]);
         assert_eq!(level(&spec(nfs)), PodSecurityLevel::Baseline);
+    }
+
+    #[test]
+    fn a_container_user_wins_over_the_pod_and_the_groups_come_along() {
+        let mut root = restricted();
+        root["securityContext"]["runAsUser"] = json!(1000);
+        root["securityContext"]["fsGroup"] = json!(1000);
+        root["containers"][0]["securityContext"]["runAsUser"] = json!(1001);
+        root["containers"][0]["securityContext"]["runAsGroup"] = json!(1002);
+        assert_eq!(
+            run_as(&spec(root)),
+            Some(RunAs {
+                user: Some(1001),
+                group: Some(1002),
+                fs_group: Some(1000)
+            })
+        );
+        assert_eq!(run_as(&spec(restricted())), None);
     }
 }

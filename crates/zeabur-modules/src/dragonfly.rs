@@ -90,6 +90,7 @@ fn backups_of(namespace: &str, store: &DynamicObject, name: &str) -> Backups {
                 name: name.to_owned(),
             }],
             note: None,
+            ..Schedule::default()
         })
         .into_iter()
         .collect();

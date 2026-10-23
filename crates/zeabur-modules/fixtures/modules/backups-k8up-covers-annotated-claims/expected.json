@@ -18,6 +18,14 @@
   {
     "target": {
       "kind": "volume",
+      "name": "plain"
+    },
+    "scheduledBy": [],
+    "lastRun": null
+  },
+  {
+    "target": {
+      "kind": "volume",
       "name": "scratch"
     },
     "scheduledBy": [],
