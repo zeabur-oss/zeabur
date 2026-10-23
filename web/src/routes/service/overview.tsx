@@ -134,7 +134,7 @@ export function OverviewTab({
           }
         />
       ) : null}
-      {said.rollout.as === "card" && rollout.data ? (
+      {said.rollout.as === "card" && rollout.data && !waitsForFirstBuild(service) ? (
         <Rollout project={project} service={service} data={rollout.data} />
       ) : null}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2 lg:gap-5">
@@ -351,6 +351,9 @@ function Rollout({
   )
 }
 
+const waitsForFirstBuild = (service: Service) =>
+  statusOf(service).word === "building" || statusOf(service).reason === "BuildFailed"
+
 /** A service waiting for its first image: the build under way, or why it failed. */
 function FirstBuild({
   project,
@@ -418,7 +421,7 @@ function Summary({
     .at(-1)
   const since = started ?? service.created ?? undefined
   const setup = verdict.reach ? reachSetup(verdict.reach) : undefined
-  const firstBuild = status.word === "building" || status.reason === "BuildFailed"
+  const firstBuild = waitsForFirstBuild(service)
   return (
     <SummaryCard aria-label={t("common.status")}>
       <SummaryCardMain>
