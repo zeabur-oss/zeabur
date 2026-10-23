@@ -1189,7 +1189,7 @@ export const zhCN: Messages = {
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 读取 ConfigMap 或 Secret：回滚不会改动它们的内容`,
   "warn.storageClassUnknown": (claim: string) =>
-    `无法读取 ${claim} 的 StorageClass：能否扩容由集群决定`,
+    `无法读取卷（${claim}）的 StorageClass：能否扩容由集群决定`,
   "warn.readWriteOnceShared": (workload: string) =>
     `${workload} 有多个副本：ReadWriteOnce 卷只能挂在一个节点上`,
   "warn.readWriteOncePodShared": (workload: string) =>
@@ -1198,14 +1198,14 @@ export const zhCN: Messages = {
     `也会删除 ${owner} 拥有的对象：${names}`,
   "warn.podReplaced": (pod: string, owner: string) => `${owner} 会启动新的副本替代 ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>
-    `集群会删除 ${claim} 的数据：卷 ${volume} 的回收策略是 Delete`,
+    `集群会删除卷（${claim}）的数据：它的 PersistentVolume ${volume} 回收策略是 Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
-    `卷 ${volume} 会保留 ${claim} 的数据（回收策略 Retain），直到管理员移除`,
-  "warn.claimDataUnknown": (claim: string) => `${claim} 的数据可能丢失：无法读取其卷的回收策略`,
+    `卷（${claim}）的数据会留在 PersistentVolume ${volume}（回收策略 Retain），直到管理员移除`,
+  "warn.claimDataUnknown": (claim: string) => `卷（${claim}）的数据可能丢失：无法读取它的回收策略`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} 仍在读取 ${name}：少了它，新的副本无法启动`,
   "warn.claimStillMounted": (name: string, names: string) =>
-    `${names} 仍挂载 ${name}：等到没有副本使用后，Kubernetes 才会移除它`,
+    `${names} 仍挂载卷（${name}）：等到没有副本使用后，Kubernetes 才会移除它`,
   "warn.ingressOpened": (names: string) => `不再隔离：${names} 会接受任何来源的流量`,
   "warn.egressOpened": (names: string) => `不再限制：${names} 可以把流量发送到任何地方`,
   "warn.connectionsOpened": (pairs: string) => `恢复允许：${pairs}`,
@@ -1257,7 +1257,7 @@ export const zhCN: Messages = {
   "confirm.writable": (path, service) => `把 ${service} 的 ${path} 设为可写。`,
   "confirm.mount": (service) => `修改 ${service} 的挂载。`,
   "confirm.removeVolume": (service, path) =>
-    `${service} 不再挂载 ${path}。它的 PVC 和里面的数据会保留；要释放空间，到“对象”删除这个 PVC。`,
+    `${service} 不再挂载 ${path}。卷和里面的数据会保留；要释放空间，到“对象”删除它的 PVC。`,
   "confirm.probeSet.readiness": (check, period) =>
     `${check}成功之前，副本不会收到流量（每 ${period} 秒检查一次）。`,
   "confirm.probeSet.liveness": (check, period, failures) =>

@@ -160,7 +160,7 @@ why. Add a row before introducing a new concept.
 | instance (a database's server: CNPG `spec.instances`, a replica set's `size`) | 執行個體 | 实例 | Never 成員, which names a person on the Members page |
 | container | 容器 | 容器 | |
 | image | 映像檔 | 镜像 | |
-| volume | 磁碟區 | 卷 | The dashboard also says 硬碟／硬盘; a claim is not a disk |
+| volume | 磁碟區 | 卷 | The dashboard also says 硬碟／硬盘; a claim is not a disk. A sentence says 磁碟區 with the claim's name in parentheses, never "claim"; the PersistentVolume behind it is named as one |
 | port | 連接埠 | 端口 | |
 | domain | 網域 | 域名 | |
 | environment variable; Variables tab | 環境變數 | 环境变量; tab 变量 | Tab names as on the dashboard |

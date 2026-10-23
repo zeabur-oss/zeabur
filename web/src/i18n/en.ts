@@ -1305,7 +1305,7 @@ export const en = {
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} reads ConfigMaps or Secrets: a rollback leaves their contents as they are`,
   "warn.storageClassUnknown": (claim: string) =>
-    `Unable to read the StorageClass of ${claim}: the cluster decides whether it can grow`,
+    `Unable to read the volume's StorageClass (${claim}): the cluster decides whether it can grow`,
   "warn.readWriteOnceShared": (workload: string) =>
     `${workload} runs several replicas: a ReadWriteOnce volume mounts on one node only`,
   "warn.readWriteOncePodShared": (workload: string) =>
@@ -1315,15 +1315,15 @@ export const en = {
   "warn.podReplaced": (pod: string, owner: string) =>
     `${owner} starts a new replica in place of ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>
-    `${claim}'s data is deleted: volume ${volume} has reclaim policy Delete`,
+    `The volume's data is deleted (${claim}): its PersistentVolume ${volume} has reclaim policy Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
-    `Volume ${volume} keeps ${claim}'s data (reclaim policy Retain) until an admin removes it`,
+    `The volume's data stays (${claim}): PersistentVolume ${volume} keeps it (reclaim policy Retain) until an admin removes it`,
   "warn.claimDataUnknown": (claim: string) =>
-    `${claim}'s data may be lost: unable to read its volume's reclaim policy`,
+    `The volume's data may be lost (${claim}): unable to read its reclaim policy`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} still read ${name}: their new replicas will not start without it`,
   "warn.claimStillMounted": (name: string, names: string) =>
-    `${names} still mount ${name}: Kubernetes removes it once no replica uses it`,
+    `${names} still mount the volume (${name}): Kubernetes removes it once no replica uses it`,
   "warn.ingressOpened": (names: string) =>
     `No longer isolated: ${names} accept traffic from anywhere`,
   "warn.egressOpened": (names: string) => `No longer limited: ${names} can send traffic anywhere`,
@@ -1394,7 +1394,7 @@ export const en = {
   "confirm.writable": (path: string, service: string) => `Make ${path} writable in ${service}.`,
   "confirm.mount": (service: string) => `Change a mount of ${service}.`,
   "confirm.removeVolume": (service: string, path: string) =>
-    `${service} stops mounting ${path}. Its claim and the data on it stay; delete the claim under Objects to free the space.`,
+    `${service} stops mounting ${path}. The volume and the data on it stay; to free the space, delete its PersistentVolumeClaim under Objects.`,
   "confirm.probeSet.readiness": (check: string, period: number, _failures: number) =>
     `A replica gets no traffic until ${check} succeeds (checked every ${period} s).`,
   "confirm.probeSet.liveness": (check: string, period: number, failures: number) =>

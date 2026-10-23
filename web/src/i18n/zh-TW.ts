@@ -1191,7 +1191,7 @@ export const zhTW: Messages = {
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 讀取 ConfigMap 或 Secret：回滾不會改動它們的內容`,
   "warn.storageClassUnknown": (claim: string) =>
-    `無法讀取 ${claim} 的 StorageClass：能否擴充由叢集決定`,
+    `無法讀取磁碟區（${claim}）的 StorageClass：能否擴充由叢集決定`,
   "warn.readWriteOnceShared": (workload: string) =>
     `${workload} 有多個副本：ReadWriteOnce 磁碟區只能掛在一個節點上`,
   "warn.readWriteOncePodShared": (workload: string) =>
@@ -1200,14 +1200,15 @@ export const zhTW: Messages = {
     `也會刪除 ${owner} 擁有的物件：${names}`,
   "warn.podReplaced": (pod: string, owner: string) => `${owner} 會啟動新的副本取代 ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>
-    `叢集會刪除 ${claim} 的資料：磁碟區 ${volume} 的回收政策是 Delete`,
+    `叢集會刪除磁碟區（${claim}）的資料：它的 PersistentVolume ${volume} 回收政策是 Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
-    `磁碟區 ${volume} 會保留 ${claim} 的資料（回收政策 Retain），直到管理員移除`,
-  "warn.claimDataUnknown": (claim: string) => `${claim} 的資料可能遺失：無法讀取其磁碟區的回收政策`,
+    `磁碟區（${claim}）的資料會留在 PersistentVolume ${volume}（回收政策 Retain），直到管理員移除`,
+  "warn.claimDataUnknown": (claim: string) =>
+    `磁碟區（${claim}）的資料可能遺失：無法讀取它的回收政策`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} 仍在讀取 ${name}：少了它，新的副本無法啟動`,
   "warn.claimStillMounted": (name: string, names: string) =>
-    `${names} 仍掛載 ${name}：等到沒有副本使用後，Kubernetes 才會移除它`,
+    `${names} 仍掛載磁碟區（${name}）：等到沒有副本使用後，Kubernetes 才會移除它`,
   "warn.ingressOpened": (names: string) => `不再隔離：${names} 會接受任何來源的流量`,
   "warn.egressOpened": (names: string) => `不再限制：${names} 可以把流量送到任何地方`,
   "warn.connectionsOpened": (pairs: string) => `恢復允許：${pairs}`,
@@ -1259,7 +1260,7 @@ export const zhTW: Messages = {
   "confirm.writable": (path, service) => `把 ${service} 的 ${path} 設為可寫入。`,
   "confirm.mount": (service) => `修改 ${service} 的掛載。`,
   "confirm.removeVolume": (service, path) =>
-    `${service} 不再掛載 ${path}。它的 PVC 和裡面的資料會保留；要釋放空間，到「物件」刪除這個 PVC。`,
+    `${service} 不再掛載 ${path}。磁碟區和裡面的資料會保留；要釋放空間，到「物件」刪除它的 PVC。`,
   "confirm.probeSet.readiness": (check, period) =>
     `${check}成功之前，副本不會收到流量（每 ${period} 秒檢查一次）。`,
   "confirm.probeSet.liveness": (check, period, failures) =>
