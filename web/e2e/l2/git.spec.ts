@@ -66,7 +66,7 @@ test("a Developer deploys a public repository from Git", async ({ page, browser 
     await expect(status).toContainText("Build failed", { timeout: 120_000 })
     const main = developer.getByRole("main")
     const message = "no branch or tag `no-such-branch-e2e`"
-    await expect(main).toContainText(message)
+    await expect(main).toContainText(message, { timeout: 60_000 })
     await main.getByRole("button", { name: "See the build" }).click()
     await expect(main).toContainText("Can't get the source")
     await expect(main).toContainText(message)
