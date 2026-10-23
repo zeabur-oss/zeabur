@@ -257,7 +257,7 @@ export const zhCN: Messages = {
   "cluster.attEolSoon.why": "之后就不再收到安全修复。",
   "cluster.attEol.fix": "升级到仍受支持的次版本。",
   "cluster.attSkewMany": (n) => `${n} 个节点的 kubelet 超出支持的版本差距`,
-  "cluster.attSkew.why": "Kubernetes 不支持这种组合，上面的 Pod 可能出错。",
+  "cluster.attSkew.why": "Kubernetes 不支持这种组合，上面的副本可能出错。",
   "cluster.attSkew.fix": "把 kubelet 升级到和控制平面相同的次版本。",
   "cluster.attComponents": (n) => `${n} 个组件比已测试的版本旧`,
   "cluster.attComponent.why": "仍在运行，但 Zeabur 是用较新的版本测试的。",
@@ -280,23 +280,23 @@ export const zhCN: Messages = {
   "cluster.leaseRenewed": "领导者最后续约",
   "cluster.leaseStale": "没有领导者：最后续约",
   "node.notReady": (n, node) => (n === 1 ? `${node} 未就绪` : `${n} 个节点未就绪`),
-  "node.notReady.why": "在上面有 Pod 的服务会停摆，直到节点恢复或 Pod 移走。",
+  "node.notReady.why": "在上面有副本的服务会停摆，直到节点恢复或副本移走。",
   "node.notReady.fix": "确认机器在运行，且 kubelet 连得上控制平面。",
   "node.memoryPressure": (n, node) => (n === 1 ? `${node} 内存不足` : `${n} 个节点内存不足`),
-  "node.memoryPressure.why": "kubelet 正在停掉 Pod 来释放内存。",
+  "node.memoryPressure.why": "kubelet 正在停掉副本来释放内存。",
   "node.memoryPressure.fix": "停掉或限制最耗内存的服务，或给服务器加内存。",
   "node.diskPressure": (n, node) =>
     n === 1 ? `${node} 磁盘空间快用完了` : `${n} 个节点磁盘空间快用完了`,
-  "node.diskPressure.why": "kubelet 正在删除没用到的镜像并停掉 Pod 来腾出空间，新的 Pod 无法启动。",
+  "node.diskPressure.why": "kubelet 正在删除没用到的镜像并停掉副本来腾出空间，新的副本无法启动。",
   "node.diskPressure.fix":
     "腾出空间：删除没用到的镜像（crictl rmi --prune）、旧日志或卷，或扩大磁盘。",
   "node.pidPressure": (n, node) =>
     n === 1 ? `${node} 的进程数快用完了` : `${n} 个节点的进程数快用完了`,
-  "node.pidPressure.why": "新的进程和 Pod 可能无法启动。",
+  "node.pidPressure.why": "新的进程和副本可能无法启动。",
   "node.pidPressure.fix": "找出开了太多进程的服务，重启或加上限制。",
   "node.networkUnavailable": (n, node) =>
     n === 1 ? `${node} 没有 Pod 网络` : `${n} 个节点没有 Pod 网络`,
-  "node.networkUnavailable.why": "上面的 Pod 连不上其他 Pod 或服务。",
+  "node.networkUnavailable.why": "上面的副本连不上其他副本或服务。",
   "node.networkUnavailable.fix": "检查节点上的网络插件。",
   "node.memoryFull": (n, node, share) =>
     n === 1 ? `${node}：内存已用 ${share}` : `${n} 个节点内存快满了（最高 ${share}）`,
@@ -305,20 +305,20 @@ export const zhCN: Messages = {
   "node.memoryFull.fix": "给最耗内存的服务设置内存上限、停掉用不到的服务，或加内存。",
   "node.diskFull": (n, node, share) =>
     n === 1 ? `${node}：磁盘已用 ${share}` : `${n} 个节点磁盘快满了（最高 ${share}）`,
-  "node.diskFull.warn": "到 90% 时 kubelet 会开始停掉 Pod 来腾出空间。",
-  "node.diskFull.fail": "kubelet 即将停掉 Pod 来腾出空间。",
+  "node.diskFull.warn": "到 90% 时 kubelet 会开始停掉副本来腾出空间。",
+  "node.diskFull.fail": "kubelet 即将停掉副本来腾出空间。",
   "node.diskFull.fix": "删除没用到的镜像（crictl rmi --prune）、旧日志或卷，或扩大磁盘。",
   "node.cordoned": (n, node) => (n === 1 ? `${node} 已停止调度` : `${n} 个节点已停止调度`),
-  "node.cordoned.why": "新的 Pod 不会放到上面，运行中的会留着。",
+  "node.cordoned.why": "新的副本不会放到上面，运行中的会留着。",
   "node.cordoned.fix": (n, node) =>
     n === 1 ? `维护完成后恢复调度（kubectl uncordon ${node}）。` : "维护完成后恢复这些节点的调度。",
   "node.reservedMemory": (n, node, share) =>
     n === 1 ? `${node}：内存已预留 ${share}` : `${n} 个节点的内存预留过量`,
-  "node.reservedMemory.why": "请求内存的新 Pod 可能要等到有空间。",
+  "node.reservedMemory.why": "请求内存的新副本可能要等到有空间。",
   "node.reservedMemory.fix": "调低上面服务的内存请求量，或加一个节点。",
   "node.reservedCpu": (n, node, share) =>
     n === 1 ? `${node}：CPU 已预留 ${share}` : `${n} 个节点的 CPU 预留过量`,
-  "node.reservedCpu.why": "请求 CPU 的新 Pod 可能要等到有空间。",
+  "node.reservedCpu.why": "请求 CPU 的新副本可能要等到有空间。",
   "node.reservedCpu.fix": "调低上面服务的 CPU 请求量，或加一个节点。",
   "unreachable.title": (name) => `连不上 ${name}`,
   "unreachable.zeabur": "Zeabur 没有响应",
@@ -1122,12 +1122,12 @@ export const zhCN: Messages = {
   "plan.short.title": "空间不足",
   "plan.short.nodes": (names, n) =>
     n === 0
-      ? "新的 Pod 会停在 Pending，等节点有空间才启动。旧的 Pod 会继续运行，服务不中断，但变更要到那时才完成。"
-      : `新的 Pod 会停在 Pending，等节点有空间才启动。在那之前，${names}${latinEnd(names)}不会运行。`,
+      ? "新的副本会停在 Pending，等节点有空间才启动。旧的副本会继续运行，服务不中断，但变更要到那时才完成。"
+      : `新的副本会停在 Pending，等节点有空间才启动。在那之前，${names}${latinEnd(names)}不会运行。`,
   "plan.short.quota": (names, n) =>
     n === 0
-      ? "配额会拒绝新的 Pod，直到配额有空间。旧的 Pod 会继续运行，服务不中断，但变更要到那时才完成。"
-      : `配额会拒绝新的 Pod，直到配额有空间。在那之前，${names}${latinEnd(names)}不会运行。`,
+      ? "配额会拒绝新的副本，直到配额有空间。旧的副本会继续运行，服务不中断，但变更要到那时才完成。"
+      : `配额会拒绝新的副本，直到配额有空间。在那之前，${names}${latinEnd(names)}不会运行。`,
   "plan.short.fix": (quota, nodes) =>
     quota && nodes
       ? "要完成变更，调高配额并腾出节点空间，或调低每个副本的预留量。"
@@ -1642,7 +1642,7 @@ export const zhCN: Messages = {
   "add.volumePath": "挂载路径",
   "add.volumeSize": "磁盘大小",
   "add.volumeRecreate":
-    "有磁盘时服务只运行一个 Pod，更新时先停旧的再启动新的：这个磁盘同时只能挂在一个节点上。",
+    "有磁盘时服务只运行一个副本，更新时先停旧的再启动新的：这个磁盘同时只能挂在一个节点上。",
   "add.problem.volumePath": "绝对路径，例如 /data。",
   "add.replicas": "副本数",
   "add.replicasFixed": "有磁盘时固定为 1。",
@@ -2407,16 +2407,16 @@ export const zhCN: Messages = {
   "preview.downtime": "会有短暂的时间没有副本提供服务。",
   "preview.cores": (n) => `${n} 核 CPU`,
   "preview.fits": (pods, cpu, memory) =>
-    `资源足够：峰值时会多出 ${pods} 个 Pod、${cpu} 和 ${memory}。`,
+    `资源足够：峰值时会多出 ${pods} 个副本、${cpu} 和 ${memory}。`,
   "preview.blockedQuota": (name, resource, need, left) =>
     resource === "pods"
-      ? `配额 ${name} 只允许再多 ${left} 个 Pod，这次需要 ${need} 个。`
+      ? `配额 ${name} 只允许再多 ${left} 个副本，这次需要 ${need} 个。`
       : `配额 ${name} 只剩 ${left}，这次需要 ${need}。`,
   "preview.blockedNodes": (_name, resource, need, left) =>
     resource === "pods"
-      ? `没有节点放得下 ${need} 个新的 Pod，最空的节点只能再放 ${left} 个。`
+      ? `没有节点放得下 ${need} 个新的副本，最空的节点只能再放 ${left} 个。`
       : `没有节点有 ${need} 的空间，最空的节点只有 ${left}。`,
-  "preview.fitUnknown": "Zeabur 无法确认新的 Pod 是否放得下。",
+  "preview.fitUnknown": "Zeabur 无法确认新的副本是否放得下。",
   "preview.dataLoss": "会丢失的数据",
   "preview.loss.claimDeleted": (claim, paths) =>
     `会删除磁盘 ${claim}${paths ? `，以及 ${paths} 里的数据` : ""}。`,

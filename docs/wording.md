@@ -156,7 +156,7 @@ why. Add a row before introducing a new concept.
 | cluster | 叢集 | 集群 | |
 | node | 節點 | 节点 | |
 | namespace | Namespace | Namespace | Kubernetes kind, as the dashboard writes it |
-| replica | 副本 | 副本 | |
+| replica | 副本 | 副本 | Also where a node's trouble stops or blocks them (kubelet stopping pods); Pod stays for the cluster's own counts and the pod network. The replicas list's Kubernetes details say Pod |
 | instance (a database's server: CNPG `spec.instances`, a replica set's `size`) | 執行個體 | 实例 | Never 成員, which names a person on the Members page |
 | container | 容器 | 容器 | |
 | image | 映像檔 | 镜像 | |

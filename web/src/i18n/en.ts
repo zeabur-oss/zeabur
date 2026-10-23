@@ -290,7 +290,7 @@ export const en = {
   "cluster.attEol.fix": "Upgrade to a supported minor version.",
   "cluster.attSkewMany": (n: number) =>
     `${n} nodes run a kubelet outside the supported version skew`,
-  "cluster.attSkew.why": "Kubernetes does not support it, so pods there may misbehave.",
+  "cluster.attSkew.why": "Kubernetes does not support it, so replicas there may misbehave.",
   "cluster.attSkew.fix": "Upgrade the kubelet to the control plane's minor version.",
   "cluster.attComponents": (n: number) => `${n} components are older than the tested versions`,
   "cluster.attComponent.why": "It still runs; Zeabur was tested with a newer version.",
@@ -316,28 +316,29 @@ export const en = {
   "cluster.leaseStale": "No leader: last renewed",
   "node.notReady": (n: number, node: string) =>
     n === 1 ? `${node} is not ready` : `${n} nodes are not ready`,
-  "node.notReady.why": "Services with pods there are down until it is back or the pods move.",
+  "node.notReady.why":
+    "Services with replicas there are down until it is back or the replicas move.",
   "node.notReady.fix":
     "Check that the machine is running and its kubelet can reach the control plane.",
   "node.memoryPressure": (n: number, node: string) =>
     n === 1 ? `${node} is out of memory` : `${n} nodes are out of memory`,
-  "node.memoryPressure.why": "The kubelet is stopping pods to free memory.",
+  "node.memoryPressure.why": "The kubelet is stopping replicas to free memory.",
   "node.memoryPressure.fix":
     "Stop or limit the services that use the most memory, or add memory to the server.",
   "node.diskPressure": (n: number, node: string) =>
     n === 1 ? `${node} is almost out of disk space` : `${n} nodes are almost out of disk space`,
   "node.diskPressure.why":
-    "The kubelet is removing unused images and stopping pods to free space; new pods cannot start.",
+    "The kubelet is removing unused images and stopping replicas to free space; new replicas cannot start.",
   "node.diskPressure.fix":
     "Free space: remove unused images (crictl rmi --prune), old logs or volumes, or grow the disk.",
   "node.pidPressure": (n: number, node: string) =>
     n === 1 ? `${node} is running out of processes` : `${n} nodes are running out of processes`,
-  "node.pidPressure.why": "New processes and pods may fail to start.",
+  "node.pidPressure.why": "New processes and replicas may fail to start.",
   "node.pidPressure.fix":
     "Find the service that starts too many processes, and restart or limit it.",
   "node.networkUnavailable": (n: number, node: string) =>
     n === 1 ? `${node} has no pod network` : `${n} nodes have no pod network`,
-  "node.networkUnavailable.why": "Pods there cannot reach other pods or services.",
+  "node.networkUnavailable.why": "Replicas there cannot reach other replicas or services.",
   "node.networkUnavailable.fix": "Check the network plugin on the node.",
   "node.memoryFull": (n: number, node: string, share: string) =>
     n === 1
@@ -349,24 +350,24 @@ export const en = {
     "Set memory limits on the services that use the most, stop one you do not need, or add memory.",
   "node.diskFull": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: disk ${share} full` : `${n} nodes have disks nearly full (up to ${share})`,
-  "node.diskFull.warn": "From 90% the kubelet stops pods to free space.",
-  "node.diskFull.fail": "The kubelet is about to stop pods to free space.",
+  "node.diskFull.warn": "From 90% the kubelet stops replicas to free space.",
+  "node.diskFull.fail": "The kubelet is about to stop replicas to free space.",
   "node.diskFull.fix":
     "Remove unused images (crictl rmi --prune), old logs or volumes, or grow the disk.",
   "node.cordoned": (n: number, node: string) =>
     n === 1 ? `${node} is cordoned` : `${n} nodes are cordoned`,
-  "node.cordoned.why": "New pods are not placed there; the running ones stay.",
+  "node.cordoned.why": "New replicas are not placed there; the running ones stay.",
   "node.cordoned.fix": (n: number, node: string) =>
     n === 1
       ? `When its maintenance is done, uncordon it (kubectl uncordon ${node}).`
       : "When their maintenance is done, uncordon them.",
   "node.reservedMemory": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: memory ${share} reserved` : `${n} nodes over-reserved on memory`,
-  "node.reservedMemory.why": "New pods that ask for memory may wait for room.",
+  "node.reservedMemory.why": "New replicas that ask for memory may wait for room.",
   "node.reservedMemory.fix": "Lower the memory requests of the services there, or add a node.",
   "node.reservedCpu": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: CPU ${share} reserved` : `${n} nodes over-reserved on CPU`,
-  "node.reservedCpu.why": "New pods that ask for CPU may wait for room.",
+  "node.reservedCpu.why": "New replicas that ask for CPU may wait for room.",
   "node.reservedCpu.fix": "Lower the CPU requests of the services there, or add a node.",
   "unreachable.title": (name: string) => `Cannot reach ${name}`,
   "unreachable.zeabur": "Zeabur does not respond",
@@ -1229,12 +1230,12 @@ export const en = {
   "plan.short.title": "Not enough room",
   "plan.short.nodes": (names: string, n: number) =>
     n === 0
-      ? "The new pods wait as Pending until a node has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
-      : `The new pods wait as Pending until a node has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
+      ? "The new replicas wait as Pending until a node has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
+      : `The new replicas wait as Pending until a node has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
   "plan.short.quota": (names: string, n: number) =>
     n === 0
-      ? "The quota refuses the new pods until it has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
-      : `The quota refuses the new pods until it has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
+      ? "The quota refuses the new replicas until it has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
+      : `The quota refuses the new replicas until it has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
   "plan.short.fix": (quota: boolean, nodes: boolean): string =>
     quota && nodes
       ? "To finish it, raise the quota and free up room on a node, or reserve less per replica."
@@ -1801,7 +1802,7 @@ export const en = {
   "add.volumePath": "Mount path",
   "add.volumeSize": "Volume size",
   "add.volumeRecreate":
-    "With a volume the service runs one pod, and an update stops the old pod before the new one starts: the volume mounts on one node at a time.",
+    "With a volume the service runs one replica, and an update stops the old replica before the new one starts: the volume mounts on one node at a time.",
   "add.problem.volumePath": "An absolute path, like /data.",
   "add.replicas": "Replicas",
   "add.replicasFixed": "One, because of the volume.",
@@ -2635,17 +2636,17 @@ export const en = {
   "preview.pendingRestart": (name: string) => `${name} keeps the old value until it restarts.`,
   "preview.downtime": "Nothing serves for a moment.",
   "preview.cores": (n: string) => `${n} CPU`,
-  "preview.fits": (pods: number, cpu: string, memory: string) =>
-    `Fits: it adds ${plural(pods, "pod", "pods")}, ${cpu} and ${memory} at its peak.`,
+  "preview.fits": (replicas: number, cpu: string, memory: string) =>
+    `Fits: it adds ${plural(replicas, "replica", "replicas")}, ${cpu} and ${memory} at its peak.`,
   "preview.blockedQuota": (name: string, resource: string, need: string, left: string) =>
     resource === "pods"
-      ? `Quota ${name} allows ${left} more pods; this needs ${need}.`
+      ? `Quota ${name} allows ${left} more replicas; this needs ${need}.`
       : `Quota ${name} allows ${left} more; this needs ${need}.`,
   "preview.blockedNodes": (_name: string, resource: string, need: string, left: string) =>
     resource === "pods"
-      ? `No node has room for ${need} more pods; the roomiest has room for ${left}.`
+      ? `No node has room for ${need} more replicas; the roomiest has room for ${left}.`
       : `No node has ${need} free; the roomiest has ${left}.`,
-  "preview.fitUnknown": "Zeabur could not check whether the new pods fit.",
+  "preview.fitUnknown": "Zeabur could not check whether the new replicas fit.",
   "preview.dataLoss": "Data this loses",
   "preview.loss.claimDeleted": (claim: string, paths: string) =>
     `Deletes the disk ${claim}${paths ? ` and what is in ${paths}` : ""}.`,
