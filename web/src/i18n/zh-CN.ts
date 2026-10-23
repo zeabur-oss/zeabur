@@ -1452,10 +1452,12 @@ export const zhCN: Messages = {
   "data.addKey": "添加键",
   "data.key": "键",
   "data.readers": "读取者",
-  "reload.switch": "它读取的 ConfigMap 或 Secret 变更时自动重启",
-  "reload.on": "它读取的 ConfigMap 或 Secret 一有变更就会重启，不论是谁改的。",
+  "reload.switch": "ConfigMap 或 Secret 变更时自动重启",
+  "reload.hint":
+    "改这个服务的变量、镜像或资源，会马上重新部署。改它用到的 ConfigMap 或 Secret，要重启才会生效；打开这个选项就会自动重启。",
+  "reload.on": "已开启：它用到的 ConfigMap 或 Secret 一变更就会重启，不管是谁改的。",
   "restart.rule":
-    "保存服务自己的变量、镜像、CPU 或内存，会立即替换它的副本；它读取的 ConfigMap 或 Secret 变更后，要等重启才生效，除非服务设置了变更时自动重启。",
+    "变量、镜像或资源的变更会马上重新部署。ConfigMap 或 Secret 的变更要等服务重启才生效，除非它开启了自动重启。",
   "reload.notInstalled":
     "这个集群没有安装 Reloader，所以还不会重启。请集群管理员安装 Stakater Reloader。",
   "reload.stopped": "Reloader 已安装但没有运行，恢复运行前不会重启。",

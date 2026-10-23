@@ -1598,10 +1598,13 @@ export const en = {
   "data.addKey": "Add key",
   "data.key": "Key",
   "data.readers": "Read by",
-  "reload.switch": "Restart when a ConfigMap or Secret it reads changes",
-  "reload.on": "A change to a ConfigMap or Secret it reads restarts it, whoever makes the change.",
+  "reload.switch": "Restart when its ConfigMaps or Secrets change",
+  "reload.hint":
+    "Changing this service's variables, image or resources redeploys it right away. A change to a ConfigMap or Secret it uses only takes effect after a restart; turn this on to restart automatically.",
+  "reload.on":
+    "On: a change to a ConfigMap or Secret it uses restarts it, whoever makes the change.",
   "restart.rule":
-    "Saving a service's own variables, image, CPU or memory replaces its replicas right away. A change to a ConfigMap or Secret it reads waits for a restart, unless the service restarts when they change.",
+    "Changes to variables, the image or resources redeploy right away. A change to a ConfigMap or Secret takes effect when the service restarts, unless it restarts on such changes automatically.",
   "reload.notInstalled":
     "Reloader isn't installed in this cluster, so nothing restarts yet. Ask a cluster administrator to install Stakater Reloader.",
   "reload.stopped":

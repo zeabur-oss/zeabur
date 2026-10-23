@@ -1455,10 +1455,12 @@ export const zhTW: Messages = {
   "data.addKey": "新增鍵",
   "data.key": "鍵",
   "data.readers": "讀取者",
-  "reload.switch": "它讀取的 ConfigMap 或 Secret 變更時自動重新啟動",
-  "reload.on": "它讀取的 ConfigMap 或 Secret 一有變更就會重新啟動，不論是誰改的。",
+  "reload.switch": "ConfigMap 或 Secret 變更時自動重新啟動",
+  "reload.hint":
+    "改這個服務的變數、映像檔或資源，會馬上重新部署。改它用到的 ConfigMap 或 Secret，要重新啟動才會生效；開啟這個選項就會自動重新啟動。",
+  "reload.on": "已開啟：它用到的 ConfigMap 或 Secret 一變更就會重新啟動，不管是誰改的。",
   "restart.rule":
-    "儲存服務自己的變數、映像檔、CPU 或記憶體，會立刻替換它的副本；它讀取的 ConfigMap 或 Secret 變更後，要等重新啟動才生效，除非服務設定了變更時自動重新啟動。",
+    "變數、映像檔或資源的變更會馬上重新部署。ConfigMap 或 Secret 的變更要等服務重新啟動才生效，除非它開啟了自動重新啟動。",
   "reload.notInstalled":
     "這個叢集沒有安裝 Reloader，所以還不會重新啟動。請叢集管理員安裝 Stakater Reloader。",
   "reload.stopped": "Reloader 已安裝但沒有在執行，恢復執行前不會重新啟動。",

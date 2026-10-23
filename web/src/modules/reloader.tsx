@@ -34,8 +34,9 @@ function ConfigReloadSetting({ service, plan }: ServiceSettingsProps) {
       <div className="flex items-start gap-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <Label htmlFor={id}>{t("reload.switch")}</Label>
-          <p className="type-meta text-muted-foreground">{t("restart.rule")}</p>
-          {on ? <p className="type-meta text-muted-foreground">{t("reload.on")}</p> : null}
+          <p className="type-meta text-muted-foreground">
+            {on ? t("reload.on") : t("reload.hint")}
+          </p>
           {on && (state === "notInstalled" || state === "stopped") ? (
             <p className="type-meta text-warn-strong">
               {state === "notInstalled" ? t("reload.notInstalled") : t("reload.stopped")}
