@@ -55,6 +55,7 @@ import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
 import { openShell } from "@/lib/dock"
 import { serviceLink } from "@/lib/place"
+import { buildDeletions } from "@/model/builds"
 import { writeBundle } from "@/model/bundle"
 import { eventsFor, isTask, serviceId, statusOf, type Project, type Service } from "@/model/service"
 import { inServiceTabs, refusedPlaces, useProjectEvents } from "@/routes/project/data"
@@ -201,10 +202,14 @@ function ServiceView({
   // A form keeps what was typed while another tab is shown, until the draft is applied or dropped.
   const [opened, setOpened] = useState<readonly Page[]>([tab])
   if (!opened.includes(tab)) setOpened([...opened, tab])
+  const serviceBuilds = useServiceBuilds(project, service)
   const planDeletion = () =>
     deleter.plan({
       title: t("title.delete", service.kind, service.name),
-      changes: [{ op: "delete", resource: workloadResource[service.kind], name: service.name }],
+      changes: [
+        { op: "delete", resource: workloadResource[service.kind], name: service.name },
+        ...buildDeletions(service, data.services, serviceBuilds.builds.data?.builds ?? []),
+      ],
     })
   const restart = restartable
     ? () =>
@@ -215,7 +220,7 @@ function ServiceView({
     : undefined
   const id = `${service.kind}/${service.name}`
   // Builds shows only for a service a Zeabur Builder Build makes an image of.
-  const built = useServiceBuilds(project, service).built.length > 0
+  const built = serviceBuilds.built.length > 0
   const shown = serviceTabs.filter(
     (value) => (value !== "builds" || built || tab === "builds") && (value !== "logs" || logs),
   )
