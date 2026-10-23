@@ -22,6 +22,14 @@ const zeabur = env("ZEABUR_L2_URL")
 const servicePage = (project: string) =>
   `/projects/${encodeURIComponent(project)}/services/Deployment/${service}`
 
+// A project card shows the project's display name, or its namespace when it has none.
+const shownName = async (page: Page, project: string) => {
+  const namespace = (await (
+    await page.request.get(`/api/v1/projects/${encodeURIComponent(project)}/namespace`)
+  ).json()) as { displayName?: string }
+  return namespace.displayName ?? project
+}
+
 test.beforeAll(() => {
   if (!adminLink) throw new Error("ZEABUR_L2_ADMIN_LINK is not set")
   if (!first) throw new Error("ZEABUR_L2_NAMESPACE is not set")
@@ -50,8 +58,14 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
     developer = await member(browser, developerLink, "e2e-developer", zeabur)
     await developer.goto("/projects")
     const main = developer.getByRole("main")
-    await expect(main.getByText(first, { exact: true }).first()).toBeVisible({ timeout: 30_000 })
-    await expect(main.getByText(second, { exact: true }).first()).toBeVisible()
+    await expect(
+      main.getByText(await shownName(developer, first), { exact: true }).first(),
+    ).toBeVisible({
+      timeout: 30_000,
+    })
+    await expect(
+      main.getByText(await shownName(developer, second), { exact: true }).first(),
+    ).toBeVisible()
 
     await developer.goto(servicePage(first))
     await expect(developer.getByRole("heading", { level: 1, name: service })).toBeVisible()
