@@ -505,6 +505,7 @@ export const zhTW: Messages = {
   "edge.sharedConfig": (name) => `都讀取設定檔 ${name}`,
   "edge.shared": (kind, name) => `都讀取 ${kind} ${name}`,
   "edge.env": (variable) => `寫在變數 ${variable} 裡`,
+  "edge.reasons": (phrases) => phrases.join("，"),
   "canvas.zoomIn": "放大",
   "canvas.zoomOut": "縮小",
   "canvas.fit": "符合畫面大小",

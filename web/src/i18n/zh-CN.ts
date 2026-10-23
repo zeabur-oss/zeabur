@@ -504,6 +504,7 @@ export const zhCN: Messages = {
   "edge.sharedConfig": (name) => `都读取配置文件 ${name}`,
   "edge.shared": (kind, name) => `都读取 ${kind} ${name}`,
   "edge.env": (variable) => `写在变量 ${variable} 中`,
+  "edge.reasons": (phrases) => phrases.join("，"),
   "canvas.zoomIn": "放大",
   "canvas.zoomOut": "缩小",
   "canvas.fit": "适应画面",

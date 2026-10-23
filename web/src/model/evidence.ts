@@ -1,5 +1,4 @@
-// An edge's evidence in words: "Its public domain", "Both read the secret db-credentials",
-// "Named in the variable API_URL".
+// An edge's evidence in words: "Both read the secret db-credentials, named in the variable API_URL".
 import type { Translate } from "@/i18n"
 import type { Edge, Evidence } from "@/model/connections"
 
@@ -19,4 +18,7 @@ function evidenceText(evidence: Evidence, t: Translate): string {
 }
 
 export const edgeText = (edge: Edge, t: Translate) =>
-  edge.evidence.map((e) => evidenceText(e, t)).join(t("common.sep"))
+  t(
+    "edge.reasons",
+    edge.evidence.map((e) => evidenceText(e, t)),
+  )
