@@ -4,11 +4,18 @@ import { cloneElement } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 import PlusIcon from "~icons/ph/plus"
 
-import { creatableQuery, databasesQuery } from "@/api/queries"
+import {
+  buildsQuery,
+  capabilitiesQuery,
+  clusterQuery,
+  creatableQuery,
+  databasesQuery,
+} from "@/api/queries"
 import { GatedMenuItem, GateTip, useGates } from "@/components/gate"
 import { useT } from "@/i18n"
 import { openAdd } from "@/lib/adding"
 import { engineName, engines, type Engine } from "@/model/databases"
+import { gitMissing, type GitMissing } from "@/model/git-service"
 import type { Gate } from "@/model/rights"
 import { Button } from "@zeabur/design-system/components/button"
 import {
@@ -24,6 +31,8 @@ export interface AddChoices {
   image: boolean
   /** Offered engines; `installed` false points at Components instead. */
   databases: { engine: Engine; installed: boolean }[]
+  /** "Deploy from Git": open, or closed by the person's role or by what the cluster lacks. */
+  git: { open: boolean; gate: Gate; missing?: GitMissing }
   yaml: boolean
   /** Nothing to offer: the person may only look. */
   none: boolean
@@ -36,8 +45,22 @@ export interface AddChoices {
 export function useAddChoices(project: string | undefined): AddChoices | undefined {
   const creatable = useQuery({ ...creatableQuery(project ?? ""), enabled: !!project })
   const databases = useQuery({ ...databasesQuery(project ?? ""), enabled: !!project })
+  const builds = useQuery({
+    ...buildsQuery(project ?? ""),
+    enabled: !!project,
+    refetchInterval: false,
+  })
+  // Readable by cluster administrators only; for anyone else what is installed stays unknown.
+  const capabilities = useQuery({ ...capabilitiesQuery, retry: false })
+  const cluster = useQuery(clusterQuery).data
   const gates = useGates(project)
   if (!project || creatable.isPending) return undefined
+  const gitGate = gates("deployFromGit")
+  const missing = gitMissing({
+    builds: builds.data?.state,
+    capabilities: capabilities.data?.items,
+    registry: cluster ? (cluster.builds.registry ?? "") : undefined,
+  })
   const operators = databases.data?.operators ?? []
   const imageGate = gates("deploy")
   const databaseGate = gates("changeDatabases")
@@ -52,6 +75,7 @@ export function useAddChoices(project: string | undefined): AddChoices | undefin
   const yaml = (creatable.data?.items ?? []).some((k) => k.access !== "denied")
   return {
     image: imageGate.open,
+    git: { open: gitGate.open && !missing, gate: gitGate, missing },
     databases: offered,
     yaml,
     none: !imageGate.open && offered.length === 0 && !yaml,
@@ -91,6 +115,7 @@ export function AddMenu({ project, compact = false }: { project: string; compact
         <GatedMenuItem gate={choices.gates.image} onClick={() => openAdd(project, "image")}>
           {t("add.image")}
         </GatedMenuItem>
+        <GitItem project={project} git={choices.git} />
         {!choices.gates.database.open ? (
           <>
             <MenuSeparator />
@@ -129,5 +154,29 @@ export function AddMenu({ project, compact = false }: { project: string; compact
         ) : null}
       </MenuContent>
     </Menu>
+  )
+}
+
+/** "Deploy from Git"; what the cluster lacks closes it, with where to install it when Components
+ * has it. */
+function GitItem({ project, git }: { project: string; git: AddChoices["git"] }) {
+  const t = useT()
+  if (!git.gate.open || !git.missing)
+    return (
+      <GatedMenuItem gate={git.gate} onClick={() => openAdd(project, "git")}>
+        {t("add.git")}
+      </GatedMenuItem>
+    )
+  const why = t(`add.gitMissing.${git.missing}`)
+  const label = (
+    <span className="flex min-w-0 flex-col gap-0.5">
+      <span className="text-muted-foreground">{t("add.git")}</span>
+      <span className="type-meta text-muted-foreground">{why}</span>
+    </span>
+  )
+  return git.missing === "registry" || git.missing === "keel" ? (
+    <MenuItem render={<Link to="/cluster/components" />}>{label}</MenuItem>
+  ) : (
+    <MenuItem disabled>{label}</MenuItem>
   )
 }

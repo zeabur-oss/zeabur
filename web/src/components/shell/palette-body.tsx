@@ -10,6 +10,7 @@ import CubeIcon from "~icons/ph/cube"
 import DatabaseIcon from "~icons/ph/database"
 import FileTextIcon from "~icons/ph/file-text"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
+import GitBranchIcon from "~icons/ph/git-branch"
 import GlobeIcon from "~icons/ph/globe"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import MoonIcon from "~icons/ph/moon"
@@ -174,6 +175,15 @@ export function PaletteBody() {
       label: t("add.palette.image", project),
       icon: PackageIcon,
       run: () => openAdd(project, "image"),
+    })
+  if (project && adds?.git.open)
+    items.push({
+      id: "action:add-git",
+      keywords: "git github gitlab repository build deploy service new",
+      group: g.actions,
+      label: t("add.palette.git", project),
+      icon: GitBranchIcon,
+      run: () => openAdd(project, "git"),
     })
   for (const { engine } of adds?.databases.filter((d) => d.installed) ?? [])
     if (project)
