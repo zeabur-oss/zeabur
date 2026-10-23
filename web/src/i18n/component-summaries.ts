@@ -41,9 +41,9 @@ export const summaries: Record<string, Summary> = {
     "zh-CN": "运行与 MySQL 兼容的 MariaDB 数据库，并备份到 S3。",
   },
   "databases/moco#ad806183": {
-    en: "Runs MySQL 8 databases with replicas and point-in-time recovery from S3.",
-    "zh-TW": "執行 MySQL 8 資料庫，支援副本，並能從 S3 還原到任一時間點。",
-    "zh-CN": "运行 MySQL 8 数据库，支持副本，并能从 S3 恢复到任一时间点。",
+    en: "Runs MySQL 8 databases with replicas and backups to S3.",
+    "zh-TW": "執行 MySQL 8 資料庫，支援副本，並能備份到 S3。",
+    "zh-CN": "运行 MySQL 8 数据库，支持副本，并能备份到 S3。",
   },
   "databases/percona-mongodb#925d1dee": {
     en: "Runs MongoDB databases with backups to S3, under the SSPL licence.",
