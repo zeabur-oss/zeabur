@@ -6103,6 +6103,11 @@ components:
         name:
           type: string
           description: "The object naming the target: an `ObjectStore`, or a storage of the database object."
+        region:
+          type:
+          - string
+          - "null"
+          description: The bucket's region, when the store names one.
         retention:
           type:
           - string

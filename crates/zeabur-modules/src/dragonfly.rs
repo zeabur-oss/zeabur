@@ -100,6 +100,7 @@ fn backups_of(namespace: &str, store: &DynamicObject, name: &str) -> Backups {
             endpoint: arg(store, "s3_endpoint")
                 .map(|host| format!("{}://{host}", if https { "https" } else { "http" })),
             secret,
+            region: None,
             retention: None,
             in_use: true,
         }),

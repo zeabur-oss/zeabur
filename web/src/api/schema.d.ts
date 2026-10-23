@@ -3231,6 +3231,8 @@ export interface components {
       inUse: boolean
       /** @description The object naming the target: an `ObjectStore`, or a storage of the database object. */
       name: string
+      /** @description The bucket's region, when the store names one. */
+      region?: string | null
       /** @description How long backups are kept, as the provider writes it (`30d`, or a count). */
       retention?: string | null
       /** @description The Secret holding the access keys. */

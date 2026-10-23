@@ -102,6 +102,7 @@ fn s3_store(name: &str, storage: &Value, enabled: bool, retention: Option<String
         destination,
         endpoint: s3("endpointUrl"),
         secret: s3("credentialsSecret"),
+        region: s3("region"),
         retention,
         in_use: enabled,
     }

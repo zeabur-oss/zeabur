@@ -180,6 +180,7 @@ fn store(object: &DynamicObject, in_use: bool) -> Store {
             object,
             "/spec/configuration/s3Credentials/secretAccessKey/name",
         ),
+        region: None,
         retention: text(object, "/spec/retentionPolicy"),
         in_use,
     }
@@ -251,6 +252,7 @@ pub fn database(
                     destination: None,
                     endpoint: None,
                     secret: None,
+                    region: None,
                     retention: None,
                     in_use: true,
                 },

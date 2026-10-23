@@ -115,6 +115,7 @@ fn backups_of(
             .map(|bucket| format!("s3://{bucket}/moco/{namespace}/{name}")),
         endpoint: config("/bucketConfig/endpointURL"),
         secret: config("/envFrom/0/secretRef/name"),
+        region: None,
         retention: None,
         in_use: policy.is_some(),
     };

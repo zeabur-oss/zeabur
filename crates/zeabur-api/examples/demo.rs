@@ -765,6 +765,14 @@ fn lab() -> NamespaceObjects {
             "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": size}}},
             "status": {"phase": "Bound", "capacity": {"storage": size}}}))
     };
+    let member = |name: &str, labels: Value, owner: Value, container: &str| -> Pod {
+        from(json!({
+            "metadata": {"name": name, "namespace": ns, "labels": labels,
+                "ownerReferences": owner, "creationTimestamp": minutes_ago(600)},
+            "spec": {"containers": [{"name": container, "image": "example"}]},
+            "status": running(container, 0)
+        }))
+    };
     NamespaceObjects {
         namespace: ns.to_owned(),
         deployments: vec![
@@ -786,6 +794,18 @@ fn lab() -> NamespaceObjects {
             ),
             editor,
             deployment_in(ns, "hello", "nginx:1.29", 1, 1, &json!([])),
+            deployment_in(
+                ns,
+                "storefront",
+                "ghcr.io/example/storefront:1.0.0",
+                1,
+                1,
+                &json!([
+                    {"name": "MYSQLPASSWORD", "valueFrom": secret("moco-mysql-mvjrswvl", "WRITABLE_PASSWORD")},
+                    {"name": "DATABASE_URL",
+                        "value": "mysql://moco-writable:$(MYSQLPASSWORD)@moco-mysql-mvjrswvl-primary.lab.svc:3306/shop"}
+                ]),
+            ),
         ],
         stateful_sets: vec![mongo],
         pods: vec![
@@ -823,6 +843,43 @@ fn lab() -> NamespaceObjects {
                 Some(("StatefulSet", "mongo-mvjrswvl-rs0")),
                 &running("mongod", 0),
             ),
+            pod_in(
+                ns,
+                "storefront-6d8f7c9b5-r4t6y",
+                "storefront",
+                None,
+                &running("storefront", 0),
+            ),
+            member(
+                "moco-mysql-mvjrswvl-0",
+                json!({"app.kubernetes.io/name": "mysql", "app.kubernetes.io/instance": "mysql-mvjrswvl"}),
+                operated("moco.cybozu.com/v1beta2", "MySQLCluster", "mysql-mvjrswvl"),
+                "mysqld",
+            ),
+            member(
+                "moco-mysql-mvjrswvl-restored-1022-0",
+                json!({"app.kubernetes.io/name": "mysql",
+                    "app.kubernetes.io/instance": "mysql-mvjrswvl-restored-1022"}),
+                operated(
+                    "moco.cybozu.com/v1beta2",
+                    "MySQLCluster",
+                    "mysql-mvjrswvl-restored-1022",
+                ),
+                "mysqld",
+            ),
+            member(
+                "mariadb-mvjrswvl-0",
+                json!({"app.kubernetes.io/name": "mariadb", "app.kubernetes.io/instance": "mariadb-mvjrswvl"}),
+                operated("k8s.mariadb.com/v1alpha1", "MariaDB", "mariadb-mvjrswvl"),
+                "mariadb",
+            ),
+            member(
+                "dragonfly-mvjrswvl-0",
+                json!({"app.kubernetes.io/name": "dragonfly",
+                    "app.kubernetes.io/instance": "dragonfly-mvjrswvl", "role": "master"}),
+                operated("dragonflydb.io/v1alpha1", "Dragonfly", "dragonfly-mvjrswvl"),
+                "dragonfly",
+            ),
             from(json!({
                 "metadata": {"name": "pg-mvjrswvl-1", "namespace": ns,
                     "labels": {"cnpg.io/cluster": "pg-mvjrswvl", "cnpg.io/instanceRole": "primary"},
@@ -837,17 +894,24 @@ fn lab() -> NamespaceObjects {
             service_in(ns, "talker", 80, "http"),
             service_in(ns, "hello", 80, "http"),
         ],
-        secrets: ["pg-mvjrswvl-app", "mongo-mvjrswvl-custom-user-secret"]
-            .into_iter()
-            .map(|name| SecretSummary {
-                secret: Secret {
-                    metadata: from(json!({"name": name, "namespace": ns})),
-                    type_: Some("Opaque".to_owned()),
-                    ..Secret::default()
-                },
-                key_count: 3,
-            })
-            .collect(),
+        secrets: [
+            "pg-mvjrswvl-app",
+            "mongo-mvjrswvl-custom-user-secret",
+            "moco-mysql-mvjrswvl",
+            "moco-mysql-mvjrswvl-restored-1022",
+            "mariadb-mvjrswvl-app",
+            "dragonfly-mvjrswvl-auth",
+        ]
+        .into_iter()
+        .map(|name| SecretSummary {
+            secret: Secret {
+                metadata: from(json!({"name": name, "namespace": ns})),
+                type_: Some("Opaque".to_owned()),
+                ..Secret::default()
+            },
+            key_count: 3,
+        })
+        .collect(),
         persistent_volume_claims: vec![
             claim("mongod-data-mongo-mvjrswvl-rs0-0", "10Gi", json!([])),
             claim(
@@ -1555,6 +1619,30 @@ fn state() -> State {
             ),
             ServedResource::readable("postgresql.cnpg.io", "v1", "clusters", "Cluster", true),
             ServedResource::readable(
+                "moco.cybozu.com",
+                "v1beta2",
+                "mysqlclusters",
+                "MySQLCluster",
+                true,
+            ),
+            ServedResource::readable(
+                "moco.cybozu.com",
+                "v1beta2",
+                "backuppolicies",
+                "BackupPolicy",
+                true,
+            ),
+            ServedResource::readable("k8s.mariadb.com", "v1alpha1", "mariadbs", "MariaDB", true),
+            ServedResource::readable("k8s.mariadb.com", "v1alpha1", "backups", "Backup", true),
+            ServedResource::readable(
+                "dragonflydb.io",
+                "v1alpha1",
+                "dragonflies",
+                "Dragonfly",
+                true,
+            ),
+            ServedResource::readable("batch", "v1", "jobs", "Job", true),
+            ServedResource::readable(
                 "postgresql.cnpg.io",
                 "v1",
                 "scheduledbackups",
@@ -1709,6 +1797,83 @@ fn state() -> State {
                     "users": [{"name": "app", "db": "app", "roles": [{"name": "readWrite", "db": "app"}]}]},
                 "status": {"state": "ready", "mongoVersion": "7.0.43-23",
                     "replsets": {"rs0": {"ready": 1, "size": 1, "status": "ready"}}}
+            })),
+            // Lab's MySQL, backed up nightly and restored into a copy; a MariaDB and a Dragonfly.
+            from(json!({
+                "apiVersion": "moco.cybozu.com/v1beta2", "kind": "MySQLCluster",
+                "metadata": {"name": "mysql-mvjrswvl", "namespace": "lab",
+                    "creationTimestamp": created("mysql-mvjrswvl")},
+                "spec": {"replicas": 1, "backupPolicyName": "mysql-mvjrswvl-backups",
+                    "podTemplate": {"spec": {"containers": [{"name": "mysqld",
+                        "image": "ghcr.io/cybozu-go/moco/mysql:8.4.10",
+                        "resources": {"requests": {"cpu": "100m", "memory": "512Mi"}, "limits": {"memory": "1Gi"}}}]}},
+                    "volumeClaimTemplates": [{"metadata": {"name": "mysql-data"},
+                        "spec": {"accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                            "resources": {"requests": {"storage": "10Gi"}}}}]},
+                "status": {"conditions": [{"type": "Initialized", "status": "True"},
+                    {"type": "Available", "status": "True"}, {"type": "Healthy", "status": "True"}],
+                    "currentPrimaryIndex": 0, "syncedReplicas": 1,
+                    "backup": {"time": "2026-10-22T03:00:00Z", "elapsed": "41s", "sourceIndex": 0,
+                        "sourceUUID": "x", "uuidSet": {}, "binlogFilename": "binlog.000003",
+                        "gtidSet": "", "dumpSize": 1, "binlogSize": 1, "workDirUsage": 1, "warnings": []}}
+            })),
+            from(json!({
+                "apiVersion": "moco.cybozu.com/v1beta2", "kind": "BackupPolicy",
+                "metadata": {"name": "mysql-mvjrswvl-backups", "namespace": "lab"},
+                "spec": {"schedule": "0 3 * * *", "jobConfig": {"serviceAccountName": "default",
+                    "bucketConfig": {"bucketName": "lab-backups", "endpointURL": "https://s3.example.com", "usePathStyle": true},
+                    "envFrom": [{"secretRef": {"name": "mysql-mvjrswvl-backups-s3"}}],
+                    "workVolume": {"emptyDir": {}}}}
+            })),
+            from(json!({
+                "apiVersion": "batch/v1", "kind": "Job",
+                "metadata": {"name": "moco-backup-mysql-mvjrswvl-29350260", "namespace": "lab",
+                    "ownerReferences": [{"apiVersion": "batch/v1", "kind": "CronJob",
+                        "name": "moco-backup-mysql-mvjrswvl", "uid": "00000000-0000-0000-0000-000000000002",
+                        "controller": true}]},
+                "status": {"startTime": "2026-10-22T03:00:00Z", "completionTime": "2026-10-22T03:00:41Z"}
+            })),
+            from(json!({
+                "apiVersion": "moco.cybozu.com/v1beta2", "kind": "MySQLCluster",
+                "metadata": {"name": "mysql-mvjrswvl-restored-1022", "namespace": "lab",
+                    "creationTimestamp": created("mysql-mvjrswvl-restored-1022"),
+                    "annotations": {"zeabur.com/restored-from": "mysql-mvjrswvl",
+                        "zeabur.com/restored-backup": "moco-backup-mysql-mvjrswvl-29350260",
+                        "zeabur.com/restored-time": "2026-10-22T03:00:41Z"}},
+                "spec": {"replicas": 1,
+                    "podTemplate": {"spec": {"containers": [{"name": "mysqld",
+                        "image": "ghcr.io/cybozu-go/moco/mysql:8.4.10",
+                        "resources": {"requests": {"cpu": "100m", "memory": "512Mi"}, "limits": {"memory": "1Gi"}}}]}},
+                    "volumeClaimTemplates": [{"metadata": {"name": "mysql-data"},
+                        "spec": {"accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                            "resources": {"requests": {"storage": "10Gi"}}}}]},
+                "status": {"conditions": [{"type": "Initialized", "status": "True"},
+                    {"type": "Available", "status": "True"}, {"type": "Healthy", "status": "True"}],
+                    "currentPrimaryIndex": 0, "syncedReplicas": 1}
+            })),
+            from(json!({
+                "apiVersion": "k8s.mariadb.com/v1alpha1", "kind": "MariaDB",
+                "metadata": {"name": "mariadb-mvjrswvl", "namespace": "lab",
+                    "creationTimestamp": created("mariadb-mvjrswvl")},
+                "spec": {"image": "mariadb:11.8.3", "replicas": 1, "database": "app", "username": "app",
+                    "passwordSecretKeyRef": {"name": "mariadb-mvjrswvl-app", "key": "password"},
+                    "rootPasswordSecretKeyRef": {"name": "mariadb-mvjrswvl-root", "key": "password"},
+                    "storage": {"size": "10Gi", "storageClassName": "local-path"},
+                    "resources": {"requests": {"cpu": "100m", "memory": "256Mi"}, "limits": {"memory": "512Mi"}}},
+                "status": {"conditions": [{"type": "Ready", "status": "True", "reason": "StatefulSetReady"}],
+                    "currentPrimary": "mariadb-mvjrswvl-0"}
+            })),
+            from(json!({
+                "apiVersion": "dragonflydb.io/v1alpha1", "kind": "Dragonfly",
+                "metadata": {"name": "dragonfly-mvjrswvl", "namespace": "lab",
+                    "creationTimestamp": created("dragonfly-mvjrswvl")},
+                "spec": {"image": "docker.dragonflydb.io/dragonflydb/dragonfly:v1.34.1", "replicas": 1,
+                    "authentication": {"passwordFromSecret": {"name": "dragonfly-mvjrswvl-auth", "key": "password"}},
+                    "resources": {"requests": {"cpu": "100m", "memory": "256Mi"}, "limits": {"memory": "512Mi"}},
+                    "snapshot": {"cron": "0 * * * *", "persistentVolumeClaimSpec": {
+                        "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                        "resources": {"requests": {"storage": "2Gi"}}}}},
+                "status": {"phase": "Ready"}
             })),
             from(json!({
                 "apiVersion": "upgrade.cattle.io/v1", "kind": "Plan",

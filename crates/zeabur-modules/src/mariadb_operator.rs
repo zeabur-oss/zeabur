@@ -125,8 +125,13 @@ fn backups_of(
                         |prefix| format!("s3://{bucket}/{prefix}"),
                     )
                 }),
-                endpoint: s3("endpoint"),
+                endpoint: s3("endpoint").map(|host| {
+                    let tls =
+                        b.data.pointer("/spec/storage/s3/tls/enabled") == Some(&Value::Bool(true));
+                    format!("{}://{host}", if tls { "https" } else { "http" })
+                }),
                 secret: s3("secretAccessKeySecretKeyRef/name"),
+                region: s3("region"),
                 retention: text(b, "/spec/maxRetention"),
                 in_use: true,
             }
@@ -274,6 +279,7 @@ mod tests {
             let mut spec = serde_json::json!({"mariaDbRef": {"name": "maria"},
                 "maxRetention": "168h",
                 "storage": {"s3": {"bucket": "b", "prefix": "maria", "endpoint": "s3.example.com",
+                    "region": "auto", "tls": {"enabled": true},
                     "secretAccessKeySecretKeyRef": {"name": "maria-backups-s3", "key": "k"}}}});
             if let Some(cron) = schedule {
                 spec["schedule"] = serde_json::json!({"cron": cron});
@@ -313,6 +319,8 @@ mod tests {
         assert_eq!(store.name, "maria-scheduled");
         assert_eq!(store.destination.as_deref(), Some("s3://b/maria"));
         assert_eq!(store.retention.as_deref(), Some("168h"));
+        assert_eq!(store.endpoint.as_deref(), Some("https://s3.example.com"));
+        assert_eq!(store.region.as_deref(), Some("auto"));
         assert_eq!(db.backups.schedules.len(), 1);
         assert_eq!(db.backups.runs.len(), 2);
         assert_eq!(db.backups.runs[0].outcome, Outcome::Succeeded);

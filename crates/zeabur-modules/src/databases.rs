@@ -131,6 +131,9 @@ pub struct Store {
     /// The Secret holding the access keys.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secret: Option<String>,
+    /// The bucket's region, when the store names one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
     /// How long backups are kept, as the provider writes it (`30d`, or a count).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub retention: Option<String>,
