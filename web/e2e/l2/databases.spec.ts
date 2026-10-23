@@ -75,6 +75,21 @@ const engines = [
 const databasePage = (path: string, name: string) =>
   `/projects/${encodeURIComponent(project)}/databases/${path}/${name}`
 
+/** The project's claims whose names start with `prefix`. */
+async function claimsOf(page: Page, prefix: string): Promise<string[]> {
+  const response = await page.request.get(
+    `/api/v1/projects/${encodeURIComponent(project)}/objects?kinds=core/persistentvolumeclaims`,
+  )
+  expect(response.status()).toBe(200)
+  const list = (await response.json()) as {
+    items: { resource: string; group: string; items: { name: string }[] }[]
+  }
+  return list.items
+    .filter((k) => k.group === "" && k.resource === "persistentvolumeclaims")
+    .flatMap((k) => k.items.map((i) => i.name))
+    .filter((name) => name.startsWith(prefix))
+}
+
 /** Confirms the plan dialog titled `title` with its last button, which names the change. A
  * drawer's plan step loads first with only Close, so its Back (a dialog's Cancel) comes first. */
 async function apply(page: Page, title: string) {
@@ -223,6 +238,10 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
         { op: "delete", resource: db.resource, name: db.name },
       ])
       expect(deleted.status, JSON.stringify(deleted.body)).toBe(200)
+      if (db.path === "mongodb")
+        await expect
+          .poll(() => claimsOf(developer, `mongod-data-${db.name}-`), { timeout: 300_000 })
+          .toEqual([])
     }
     await developer.context().close()
   })
