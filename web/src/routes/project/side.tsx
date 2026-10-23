@@ -9,7 +9,7 @@ import LockSimpleIcon from "~icons/ph/lock-simple"
 import LockSimpleOpenIcon from "~icons/ph/lock-simple-open"
 
 import type { Schemas } from "@/api/client"
-import { projectAlertsQuery, projectTimelineQuery } from "@/api/queries"
+import { projectAlertsQuery, projectQuery, projectTimelineQuery } from "@/api/queries"
 import { AlertList, AlertsRefused, RecentNote } from "@/components/alerts"
 import { Ago, Segmented } from "@/components/bits"
 import { KubeDetails } from "@/components/kube-details"
@@ -38,7 +38,8 @@ import {
   OperatorNotes,
   useDatabases,
 } from "@/components/databases"
-import type { Database } from "@/model/databases"
+import { storageRows, type StorageRow } from "@/model/database-parts"
+import { engineName } from "@/model/databases"
 import { useSentence, useT, type Translate } from "@/i18n"
 import { databaseLink, podEventsLink, serviceLink } from "@/lib/place"
 import { useQuantityFormat } from "@/lib/quantity"
@@ -51,7 +52,6 @@ import {
   serviceId,
   statusOf,
   summarise,
-  type Claim,
   type Domain,
   type Event,
   type Project,
@@ -567,39 +567,35 @@ export function Domains({
 const METER_PARTS = 3
 
 interface Sized {
-  claim: Claim
+  row: StorageRow
   bytes?: number
   /** Its part of the meter. */
   part: number
-  /** The database whose members use it, when no workload does (CloudNativePG's pods). */
-  database?: Database
 }
 
-const unusedVolume = (v: Sized) => v.claim.services.length === 0 && !v.database
+const unusedVolume = (v: Sized) =>
+  !v.row.database && v.row.claims.every((claim) => claim.services.length === 0)
 
 function useVolumes(project: string, data: Project) {
   const databases = useDatabases(project).data?.items ?? []
-  const claims = claimsOf(data)
-  const largest = claims
-    .filter((c) => c.sizeBytes)
-    .toSorted((a, b) => (b.sizeBytes ?? 0) - (a.sizeBytes ?? 0))
-    .map((c) => c.name)
-  const sized: Sized[] = claims
-    .map((claim) => {
-      const rank = largest.indexOf(claim.name)
-      return {
-        claim,
-        bytes: claim.sizeBytes ?? undefined,
-        part: rank < 0 ? -1 : Math.min(rank, METER_PARTS),
-        database: databases.find((d) => d.claims.includes(claim.name)),
-      }
+  // Claims from the whole project, so a database's volumes keep the size its workload mounts.
+  const whole = useQuery(projectQuery(project)).data ?? data
+  const rows = storageRows(claimsOf(whole), databases)
+  const largest = rows
+    .filter((r) => r.bytes)
+    .toSorted((a, b) => (b.bytes ?? 0) - (a.bytes ?? 0))
+    .map((r) => r.key)
+  const sized: Sized[] = rows
+    .map((row) => {
+      const rank = largest.indexOf(row.key)
+      return { row, bytes: row.bytes, part: rank < 0 ? -1 : Math.min(rank, METER_PARTS) }
     })
     // Unused first, then the largest.
     .toSorted(
       (a, b) =>
         Number(unusedVolume(b)) - Number(unusedVolume(a)) ||
         (b.bytes ?? 0) - (a.bytes ?? 0) ||
-        a.claim.name.localeCompare(b.claim.name),
+        a.row.key.localeCompare(b.row.key),
     )
   const parts = Array.from({ length: METER_PARTS + 1 }, (_, part) =>
     sized.filter((s) => s.part === part).reduce((sum, s) => sum + (s.bytes ?? 0), 0),
@@ -610,13 +606,18 @@ function useVolumes(project: string, data: Project) {
     total: sized.reduce((sum, c) => sum + (c.bytes ?? 0), 0),
     known: sized.some((c) => c.bytes !== undefined),
     unused: sized.filter(unusedVolume).length,
+    count: rows.reduce((sum, r) => sum + r.claims.length, 0),
   }
 }
+
+const volumeNames = (row: StorageRow) => row.claims.map((claim) => claim.name).join(", ")
 
 function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
   const t = useT()
   const { memoryParts } = useQuantityFormat()
-  const { claim, bytes, part } = volume
+  const { row, bytes, part } = volume
+  const [claim] = row.claims
+  const services = row.claims.flatMap((c) => c.services)
   const [value, unit] = bytes !== undefined ? memoryParts(bytes) : [undefined, undefined]
   return (
     <li className={sideRow}>
@@ -628,35 +629,43 @@ function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
         )}
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate type-mono" translate="no">
-          {claim.name}
-        </span>
-        {claim.services.length > 0 ? (
-          <span className="truncate type-meta text-muted-foreground">
-            {claim.services.map((service, j) => (
-              <span key={serviceId(service)}>
-                {j > 0 ? ", " : ""}
-                <Link
-                  {...serviceLink(project, service, { tab: "storage" })}
-                  className="hover:text-foreground hover:underline"
-                  translate="no"
-                >
-                  {service.name}
-                </Link>
-              </span>
-            ))}
-          </span>
-        ) : volume.database ? (
-          <span className="truncate type-meta text-muted-foreground">
+        {row.database ? (
+          <>
             <Link
-              {...databaseLink(project, volume.database)}
-              className="hover:text-foreground hover:underline"
+              {...databaseLink(project, row.database)}
+              className="truncate hover:underline"
               translate="no"
             >
-              {volume.database.name}
+              <span className="type-mono">{row.database.name}</span>{" "}
+              <span className="text-muted-foreground">({engineName(row.database.engine)})</span>
             </Link>
-          </span>
-        ) : null}
+            <span className="truncate type-meta type-mono text-muted-foreground" translate="no">
+              {volumeNames(row)}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="truncate type-mono" translate="no">
+              {claim?.name}
+            </span>
+            {services.length > 0 ? (
+              <span className="truncate type-meta text-muted-foreground">
+                {services.map((service, j) => (
+                  <span key={serviceId(service)}>
+                    {j > 0 ? ", " : ""}
+                    <Link
+                      {...serviceLink(project, service, { tab: "storage" })}
+                      className="hover:text-foreground hover:underline"
+                      translate="no"
+                    >
+                      {service.name}
+                    </Link>
+                  </span>
+                ))}
+              </span>
+            ) : null}
+          </>
+        )}
       </div>
       {unusedVolume(volume) ? (
         <Tooltip content={t("storage.notMounted")}>
@@ -671,7 +680,7 @@ function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
           {value} <span className="type-meta text-muted-foreground">{unit}</span>
         </span>
       ) : (
-        <span className="shrink-0 text-muted-foreground">{claim.size ?? "—"}</span>
+        <span className="shrink-0 text-muted-foreground">{claim?.size ?? "—"}</span>
       )}
     </li>
   )
@@ -690,7 +699,10 @@ function VolumeList({
   const rows = volumes.filter(
     (v) =>
       !needle ||
-      [v.claim.name, ...v.claim.services.map((s) => s.name)]
+      [
+        v.row.database?.name ?? "",
+        ...v.row.claims.flatMap((c) => [c.name, ...c.services.map((s) => s.name)]),
+      ]
         .join(" ")
         .toLowerCase()
         .includes(needle),
@@ -700,7 +712,7 @@ function VolumeList({
   return (
     <ul className="flex flex-col">
       {rows.map((volume) => (
-        <VolumeRow key={volume.claim.name} project={project} volume={volume} />
+        <VolumeRow key={volume.row.key} project={project} volume={volume} />
       ))}
     </ul>
   )

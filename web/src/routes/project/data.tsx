@@ -1,12 +1,13 @@
 // Loads one project and its events for the project pages, with one loading and one error state.
 import { useQuery } from "@tanstack/react-query"
-import type { ReactNode } from "react"
+import { useMemo, type ReactNode } from "react"
 
 import { toProblem, type Schemas } from "@/api/client"
 import { eventsQuery, projectQuery, projectsQuery, whoamiQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
+import { foldDatabases } from "@/model/database-parts"
 import { lacksProjectRole } from "@/model/members"
 import { projectTitle } from "@/model/project"
 import type { Event, Project } from "@/model/service"
@@ -35,6 +36,7 @@ export function ProjectData({
 }) {
   const t = useT()
   const view = useQuery(projectQuery(project))
+  const folded = useMemo(() => view.data && foldDatabases(view.data), [view.data])
   if (view.isPending)
     return (
       <PageColumn className="my-6">
@@ -42,13 +44,14 @@ export function ProjectData({
       </PageColumn>
     )
   // A failed refresh keeps what was read; the header's freshness says it failed.
-  if (!view.data)
+  if (!view.data || !folded)
     return (
       <PageColumn className="my-6">
         <Unread project={project} error={view.error} />
       </PageColumn>
     )
-  return children(view.data, view.data.unreadable)
+  // A database's own workloads show as the database (model/database-parts).
+  return children(folded, view.data.unreadable)
 }
 
 function Unread({ project, error }: { project: string; error: unknown }) {

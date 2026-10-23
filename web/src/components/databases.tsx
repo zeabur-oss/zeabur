@@ -14,7 +14,9 @@ import { usePlanStep } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { GateTip, useGate } from "@/components/gate"
 import { useT } from "@/i18n"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { databaseLink } from "@/lib/place"
+import { engineVersion } from "@/model/database-parts"
 import { connectChanges, pendingDatabase, variableProblem } from "@/model/connect"
 import {
   createDatabase,
@@ -62,6 +64,17 @@ export function DatabaseState({
   )
 }
 
+/** `MongoDB 7.0`, with the image's own tag (`7.0.43-23`) on hover. */
+export function EngineVersion({ database }: { database: Database }) {
+  const label = engineVersion(database)
+  if (!database.version || label.endsWith(` ${database.version}`)) return <>{label}</>
+  return (
+    <Tooltip content={<span className="type-mono">{database.version}</span>}>
+      <span>{label}</span>
+    </Tooltip>
+  )
+}
+
 export function DatabaseRow({ project, database }: { project: string; database: Database }) {
   const t = useT()
   const run = lastRun(database)
@@ -76,8 +89,7 @@ export function DatabaseRow({ project, database }: { project: string; database: 
           {database.name}
         </Link>
         <span className="truncate type-meta text-muted-foreground">
-          {engineName(database.engine)}
-          {database.version ? ` ${database.version}` : ""}
+          <EngineVersion database={database} />
           {t("common.sep")}
           {run ? (
             <>

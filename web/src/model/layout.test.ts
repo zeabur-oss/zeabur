@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
+import { databaseNodes } from "@/model/database-parts"
+import type { Database } from "@/model/databases"
 import { fittedZoom, layout, mapReadable } from "@/model/layout"
 import type { Service } from "@/model/service"
 
@@ -37,6 +39,21 @@ describe("the map's layout", () => {
     expect(columns(many(5))).toBe(2)
     expect(columns(many(9))).toBe(3)
     expect(columns(many(30))).toBe(3)
+  })
+
+  test("puts a database in the data lane, taller by its volumes", () => {
+    const mongo = {
+      engine: "mongodb",
+      name: "mongo",
+      state: "ready",
+      claims: ["a", "b"],
+    } as unknown as Database
+    const laid = layout([service("api")], [], databaseNodes([mongo]))
+    const node = laid.nodes.find((n) => n.database)
+    const card = laid.nodes.find((n) => n.service)
+    expect(node?.id).toBe("database:mongodb/mongo")
+    expect(laid.frames.map((f) => f.lane)).toStrictEqual(["workers", "data"])
+    expect(node && card && node.h > card.h).toBe(true)
   })
 
   test("never puts two cards on one spot", () => {
