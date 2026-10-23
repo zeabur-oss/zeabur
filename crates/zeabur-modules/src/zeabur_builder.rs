@@ -220,8 +220,8 @@ pub const BUILD_FAILED: &str = "BuildFailed";
 /// It is building, not failing to pull an image that does not exist. A container runs a `Build`'s
 /// image when the repositories match, the `Build`'s own (`spec.output.image`), as a service
 /// deployed from Git has. When the newest run failed, or the `Build` is not ready and nothing runs,
-/// the service has failed with [`BUILD_FAILED`]. Diagnoses of the image pull go: the build is the
-/// cause.
+/// the service has failed with [`BUILD_FAILED`]. Its diagnoses go: the missing image and the
+/// replicas it leaves unready both come from the build.
 pub fn first_image(
     service: &mut zeabur_model::Service,
     builds: &[ZeaburBuilderBuild],
@@ -262,9 +262,7 @@ pub fn first_image(
             reason: None,
         }
     };
-    service
-        .diagnoses
-        .retain(|d| d.kind != zeabur_model::DiagnosisKind::ImagePull);
+    service.diagnoses.clear();
 }
 
 #[cfg(test)]

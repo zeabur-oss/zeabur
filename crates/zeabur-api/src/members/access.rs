@@ -564,7 +564,10 @@ pub(crate) mod tests {
             );
         }
         for verb in ["create", "patch", "delete"] {
-            assert!(allows(developer, verb, "builds.builder.zeabur.com"), "{verb}");
+            assert!(
+                allows(developer, verb, "builds.builder.zeabur.com"),
+                "{verb}"
+            );
             assert!(!allows(viewer, verb, "builds.builder.zeabur.com"), "{verb}");
         }
         assert!(!allows(developer, "create", "buildruns.builder.zeabur.com"));

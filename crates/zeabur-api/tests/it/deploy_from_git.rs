@@ -261,8 +261,8 @@ mod tests {
             .unwrap()
     }
 
-    /// Before its first image, a service built from Git is building, and the image pull it waits
-    /// for is not diagnosed; when the build fails, the service fails with the build.
+    /// Before its first image, a service built from Git is building, with nothing else diagnosed;
+    /// when the build fails, the service fails with the build.
     #[tokio::test]
     async fn a_service_waiting_for_its_first_image_is_building_or_failed_with_the_build() {
         let cluster = cluster();
@@ -270,10 +270,7 @@ mod tests {
         let service = site(&cluster).await;
         assert_eq!(service["status"]["word"], "building", "{service}");
         assert_eq!(service["status"]["health"], "progress");
-        assert!(
-            !service["diagnoses"].to_string().contains("imagePull"),
-            "{service}"
-        );
+        assert_eq!(service["diagnoses"], json!([]), "{service}");
 
         let cluster = cluster_failed();
         let service = site(&cluster).await;
