@@ -140,6 +140,10 @@ pub struct State {
     /// Every cluster-wide `SelfSubjectAccessReview` (one without a namespace) answers no, and
     /// creating a Namespace is refused.
     pub cluster_wide_denied: bool,
+    /// Rights every `SelfSubjectAccessReview` answers no to, as `verb resource` (`create
+    /// pods/exec`); the calls themselves are not refused, as on a cluster that checks fewer
+    /// verbs.
+    pub refused_rights: BTreeSet<String>,
 }
 
 /// A command [`Cluster::run`] ran.
@@ -703,7 +707,8 @@ impl Cluster for MemoryCluster {
     /// An echo shell: it echoes what is typed, as a TTY does, answers each line with the line,
     /// and exits on `exit [code]` or end of input. Any command but `/bin/sh` or `sh`, or any
     /// command in a container of a pod of [`State::without_shell`] that is not an ephemeral
-    /// container, is not found.
+    /// container, is not found; `nsenter … sh …` is a root shell on the pod's node, prompting
+    /// `root@<node>:~# `.
     fn exec<'a>(
         &'a self,
         namespace: &'a str,
@@ -731,20 +736,32 @@ impl Cluster for MemoryCluster {
                     .as_ref()
                     .and_then(|s| s.ephemeral_containers.as_ref())
                     .is_some_and(|list| list.iter().any(|c| c.name == request.container));
-                (ephemeral || !state.without_shell.contains(&key))
+                let host = found
+                    .spec
+                    .as_ref()
+                    .and_then(|s| s.node_name.clone())
+                    .filter(|_| {
+                        request.command.first().map(String::as_str) == Some("nsenter")
+                            && request.command.iter().any(|a| a == "sh")
+                    });
+                let shell = (ephemeral || !state.without_shell.contains(&key))
                     && matches!(
                         request.command.first().map(String::as_str),
                         Some("/bin/sh" | "sh")
-                    )
+                    );
+                drop(state);
+                host.map_or_else(
+                    || shell.then(|| "$ ".to_owned()),
+                    |node| Some(format!("root@{node}:~# ")),
+                )
             };
             let (input, shell_input) = tokio::io::duplex(4096);
             let (mut shell_output, output) = tokio::io::duplex(4096);
             let (exited, exit) = tokio::sync::oneshot::channel();
             tokio::spawn(async move {
-                let status = if has_shell {
-                    echo_shell(shell_input, &mut shell_output).await
-                } else {
-                    ExitStatus::CommandNotFound
+                let status = match has_shell {
+                    Some(prompt) => echo_shell(shell_input, &mut shell_output, &prompt).await,
+                    None => ExitStatus::CommandNotFound,
                 };
                 drop(shell_output);
                 let _receiver_gone = exited.send(status);
@@ -1231,8 +1248,9 @@ impl Cluster for MemoryCluster {
     // ── Reads for releases, storage and YAML edits ───────────────────────────────────────────
 
     /// Allowed unless every call is refused, the namespace is, the request is cluster-wide and
-    /// [`State::cluster_wide_denied`], or it names an object whose writes are refused
-    /// ([`State::forbidden_writes`]); admission refusals are allowed, as on a cluster.
+    /// [`State::cluster_wide_denied`], it is among [`State::refused_rights`], or it names an
+    /// object whose writes are refused ([`State::forbidden_writes`]); admission refusals are
+    /// allowed, as on a cluster.
     fn review_access<'a>(&'a self, request: &'a Denied) -> Answer<'a, bool> {
         Box::pin(async move {
             let state = self.lock()?;
@@ -1243,7 +1261,11 @@ impl Cluster for MemoryCluster {
                         .is_some_and(|(_, refused)| refused == name)
                 })
             });
+            let refused_right = state
+                .refused_rights
+                .contains(&format!("{} {}", request.verb, request.resource));
             Ok(!(state.forbid_everything
+                || refused_right
                 || (namespace.is_none() && state.cluster_wide_denied)
                 || namespace.is_some_and(|n| state.forbidden_namespaces.contains(n))
                 || refused_object))
@@ -1289,11 +1311,12 @@ const GENERATION_KINDS: [&str; 6] = [
 async fn echo_shell(
     mut input: impl tokio::io::AsyncRead + Unpin,
     output: &mut (impl tokio::io::AsyncWrite + Unpin),
+    prompt: &str,
 ) -> ExitStatus {
     use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
     let mut line = Vec::new();
     let mut buffer = [0_u8; 1024];
-    if output.write_all(b"$ ").await.is_err() {
+    if output.write_all(prompt.as_bytes()).await.is_err() {
         return ExitStatus::Exited(0);
     }
     loop {
@@ -1316,9 +1339,9 @@ async fn echo_shell(
                 return ExitStatus::Exited(code.trim().parse().unwrap_or(0));
             }
             if text.is_empty() {
-                echo.extend_from_slice(b"\r\n$ ");
+                echo.extend_from_slice(format!("\r\n{prompt}").as_bytes());
             } else {
-                echo.extend_from_slice(format!("\r\n{text}\r\n$ ").as_bytes());
+                echo.extend_from_slice(format!("\r\n{text}\r\n{prompt}").as_bytes());
             }
         }
         if output.write_all(&echo).await.is_err() {

@@ -291,6 +291,90 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/node-shells": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The node shell pods, oldest first; cluster administrators only. */
+    get: operations["nodeShells"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/node-shells/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Carries out a plan by its token: checks it and the cluster again, dry-runs every write, then
+     *     writes.
+     */
+    post: operations["applyNodeShell"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/node-shells/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Works out what opening a shell on a node, or removing a shell pod, writes, and a token to
+     *     apply it; writes nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do
+     *     everything everywhere; without a token while `exposed` lists bindings that let others into
+     *     node shells.
+     */
+    post: operations["planNodeShell"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/node-shells/{pod}/terminal": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The shell in a node shell pod the person opened, over a WebSocket.
+     * @description The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
+     *     and `4001`); `ready` names the container `shell`. Failures arrive as an `error` frame: someone
+     *     who may not do everything everywhere, or may not `create` `pods/exec` in the namespace
+     *     (`403`, `elevation-required` where admin rights are offered and not in use), a pod that is not
+     *     a node shell the person opened (`404`), one not running or already open in another terminal
+     *     (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
+     */
+    get: operations["nodeShellTerminal"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/nodes": {
     parameters: {
       query?: never
@@ -835,7 +919,7 @@ export interface paths {
      * A terminal in a container, over a WebSocket.
      * @description Binary messages carry terminal bytes both ways; text messages are JSON control frames,
      *     `ClientFrame` to the server and `ServerFrame` to the browser. The handshake answers `101
-     *     Switching Protocols`; every later failure (`403` with `denied` naming `get` on
+     *     Switching Protocols`; every later failure (`403` with `denied` naming `create` on
      *     `pods/exec`, `elevation-required` where admin rights are offered and not in use; a pod or
      *     container that does not exist, a container that is not running) arrives as an `error` frame,
      *     which a browser can read where it cannot read a refused handshake. After `exit` or `error` the
@@ -3869,6 +3953,101 @@ export interface components {
       /** @description The policies it rewrites; empty when all are current. */
       writes: components["schemas"]["PolicyWrite"][]
     }
+    /** @description What an apply did. */
+    NodeShellApplied: {
+      /** @description Its namespace. */
+      namespace: string
+      /** @description Its node. */
+      node: string
+      /** @description The pod. */
+      pod: string
+    }
+    /** @description The token of a plan to apply. */
+    NodeShellApply: {
+      /** @description The token `plan` returned. */
+      token: string
+    }
+    /** @description A plan that opens a shell on a node or removes a shell pod. */
+    NodeShellPlan: {
+      /**
+       * Format: int64
+       * @description How long it runs at most, in seconds.
+       */
+      deadlineSeconds: number
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description Bindings that let others into node shells; the plan cannot be applied while there is one. */
+      exposed: components["schemas"]["ShellExposure"][]
+      /**
+       * Format: int32
+       * @description How long it waits for its first session, in seconds.
+       */
+      firstSessionSeconds: number
+      /** @description The image it runs. */
+      image: string
+      /** @description The `kubectl` command that opens the same shell. */
+      kubectl?: string | null
+      /** @description Its namespace. */
+      namespace: string
+      /** @description The node. */
+      node: string
+      /** @description `open` or `remove`. */
+      op: string
+      /** @description Who opens it (opened it, for a removal). */
+      person?: string | null
+      /** @description The pod. */
+      pod: string
+      /**
+       * @description Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
+       *     bindings.
+       */
+      token?: string | null
+      /** @description The writes, in order. */
+      writes: components["schemas"]["ShellWrite"][]
+    }
+    /** @description What to plan. */
+    NodeShellPlanRequest:
+      | {
+          /** @description The node. */
+          node: string
+          /** @enum {string} */
+          op: "open"
+        }
+      | {
+          /** @enum {string} */
+          op: "remove"
+          /** @description The pod. */
+          pod: string
+        }
+    /** @description A node shell pod. */
+    NodeShellView: {
+      /** @description When it was created, RFC 3339. */
+      createdAt?: string | null
+      /** @description The kubelet's message while starting. */
+      message?: string | null
+      /** @description Whether the person asking opened it, so may enter it. */
+      mine: boolean
+      /** @description The pod. */
+      name: string
+      /** @description The node it runs on. */
+      node: string
+      /** @description Who opened it. */
+      person?: string | null
+      /** @description How it is doing. */
+      phase: components["schemas"]["ShellPhase"]
+      /**
+       * @description The kubelet's reason: `ErrImagePull` while starting, `DeadlineExceeded` or `Completed`
+       *     when ended.
+       */
+      reason?: string | null
+      /** @description When its deadline stops it, RFC 3339. */
+      stopsAt?: string | null
+    }
+    /** @description The node shell pods. */
+    NodeShells: {
+      /** @description Oldest first. */
+      shells: components["schemas"]["NodeShellView"][]
+    }
     /** @description A node whose kubelet minor differs from kube-apiserver's. */
     NodeSkew: {
       /** @description Its kubelet's version. */
@@ -5560,6 +5739,57 @@ export interface components {
      */
     Severity: "none" | "info" | "warning" | "danger"
     /**
+     * @description A binding that lets someone other than cluster administrators create pods in the node shell
+     *     namespace or run commands in them.
+     */
+    ShellExposure: {
+      /** @description `RoleBinding` or `ClusterRoleBinding`. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /**
+       * @description What the role grants: `create pods` (bound in the namespace), `create` or `get` on
+       *     `pods/exec` and `pods/attach`.
+       */
+      rights: string[]
+      /** @description The role it binds, `Role/name` or `ClusterRole/name`. */
+      role: string
+      /** @description Who it lets in. */
+      subjects: components["schemas"]["ShellSubject"][]
+    }
+    /**
+     * @description How a node shell pod is doing.
+     * @enum {string}
+     */
+    ShellPhase: "starting" | "running" | "ended"
+    /** @description Someone a binding lets into node shells. */
+    ShellSubject: {
+      /** @description `User`, `Group` or `ServiceAccount`. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description A service account's namespace. */
+      namespace?: string | null
+    }
+    /** @description One object a plan writes. */
+    ShellWrite: {
+      /** @description What it does. */
+      action: components["schemas"]["ShellWriteAction"]
+      /** @description The object's kind. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace, for a namespaced object. */
+      namespace?: string | null
+      /** @description The object as it will be (as it is, for a deletion), YAML. */
+      yaml?: string | null
+    }
+    /**
+     * @description What a write does.
+     * @enum {string}
+     */
+    ShellWriteAction: "create" | "patch" | "delete"
+    /**
      * @description What an environment variable's value is read from.
      *
      *     This is the *value's* source, which is what a client needs to show or change it: a literal is
@@ -6485,6 +6715,163 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["NodePoliciesPlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  nodeShells: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NodeShells"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyNodeShell: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NodeShellApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NodeShellApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planNodeShell: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NodeShellPlanRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["NodeShellPlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  nodeShellTerminal: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        pod: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Switched to the terminal's WebSocket */
+      101: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
         }
       }
       403: {

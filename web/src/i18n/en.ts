@@ -923,6 +923,42 @@ export const en = {
   "tools.expired":
     "The credential in this terminal has expired. Reopen it to continue with a fresh one.",
   "tools.reopen": "Reopen",
+  "nodeShell.action": "Node terminal",
+  "nodeShell.actionOn": (node: string) => `Node terminal on ${node}`,
+  "nodeShell.what": "Opening a node terminal",
+  "nodeShell.pods": (node: string) => `Terminal pods on ${node}`,
+  "nodeShell.byYou": "opened by you",
+  "nodeShell.by": (person: string) => `opened by ${person}`,
+  "nodeShell.word.starting": "Starting",
+  "nodeShell.word.stuck": "Not starting",
+  "nodeShell.word.running": "Running",
+  "nodeShell.word.deadline": "Ended at its time limit",
+  "nodeShell.word.ended": "Ended",
+  "nodeShell.openTitle": (node: string) => `Open a node terminal on ${node}`,
+  "nodeShell.removeTitle": "Remove terminal pod",
+  "nodeShell.open": "Open terminal",
+  "nodeShell.remove": "Remove terminal pod",
+  "nodeShell.removeLine": (pod: string, node: string) =>
+    `Deletes ${pod} from ${node} right away. A terminal still open in it ends.`,
+  "nodeShell.openedBy": (person: string) => `${person} opened it.`,
+  "nodeShell.root": (node: string) =>
+    `This is full root on ${node}'s host: every file, process and network interface. What you do there bypasses Zeabur and Kubernetes permissions, and nothing undoes it.`,
+  "nodeShell.lasts": (minutes: number) =>
+    `The terminal pod is removed when you close the terminal, and after ${minutes} minutes at most.`,
+  "nodeShell.firstSession": (minutes: number) =>
+    `If no terminal connects within ${minutes} minutes, the pod ends on its own.`,
+  "nodeShell.recorded": "The node records an event with who opened it and when.",
+  "nodeShell.exposedTitle": "Others could enter this terminal",
+  "nodeShell.exposed": (namespace: string) =>
+    `These role bindings let someone other than a cluster administrator create pods or open terminals in ${namespace}. Remove them, then check again.`,
+  "nodeShell.kubectl": "The same with kubectl",
+  "nodeShell.write.create": "add",
+  "nodeShell.write.patch": "change",
+  "nodeShell.write.delete": "delete",
+  "nodeShell.starting": (node: string) => `Starting the terminal pod on ${node}…`,
+  "nodeShell.ended": "The session ended.",
+  "nodeShell.left": "The session ended, but its terminal pod is still on the node.",
+  "nodeShell.gone": "The session ended and its terminal pod was removed.",
 
   // Variables
   "vars.title": "Environment variables",

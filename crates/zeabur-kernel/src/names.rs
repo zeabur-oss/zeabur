@@ -36,6 +36,10 @@ pub const ANNOTATION_ICON: &str = "zeabur.com/icon";
 /// (`cluster-admin`) covers it.
 pub const MANAGE_VERB: &str = "zeabur-manage";
 
+/// The namespace of node shells: privileged pods in the host's namespaces, which only cluster
+/// administrators may run or enter. It is never a project, so no member role is bound in it.
+pub const NODE_SHELL_NAMESPACE: &str = "zeabur-node-shell";
+
 /// The name of every debug container Zeabur adds starts with this.
 pub const DEBUG_PREFIX: &str = "zeabur-debug-";
 

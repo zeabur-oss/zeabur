@@ -531,6 +531,7 @@ pub(crate) fn write_request(
             } => WriteBody::Delete(Preconditions {
                 uid: uid.clone(),
                 resource_version: Some(resource_version.clone()),
+                grace_period_seconds: None,
             }),
         },
         dry_run: false,

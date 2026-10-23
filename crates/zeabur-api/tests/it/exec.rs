@@ -317,11 +317,45 @@ mod tests {
             assert_eq!(error["problem"]["kubernetes"]["code"], 403);
             assert_eq!(
                 error["problem"]["denied"],
-                json!({"verb": "get", "group": "", "resource": "pods/exec",
+                json!({"verb": "create", "group": "", "resource": "pods/exec",
                        "name": "web-1", "namespace": "shop"})
             );
             assert_eq!(close_code(&mut socket).await.0, CloseCode::Normal);
         }
+    }
+
+    /// `get` on `pods/exec` is enough for kube-apiserver before 1.31 to open a WebSocket exec;
+    /// Zeabur asks for `create` first, so the terminal never opens on `get` alone.
+    #[tokio::test]
+    async fn a_terminal_takes_create_on_pods_exec_not_just_get() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.refused_rights.insert("create pods/exec".to_owned());
+        });
+        let mut socket = connect(app(&cluster), "").await;
+        let error = frame(&mut socket).await;
+        assert_eq!(error["type"], "error");
+        assert_eq!(error["problem"]["status"], 403);
+        assert_eq!(
+            error["problem"]["denied"],
+            json!({"verb": "create", "group": "", "resource": "pods/exec",
+                   "name": "web-1", "namespace": "shop"})
+        );
+        assert_eq!(close_code(&mut socket).await.0, CloseCode::Normal);
+
+        let refused: Arc<dyn Cluster> = Arc::new(cluster.clone());
+        let elevating = zeabur_api::router_at(
+            Arc::new(Elevating {
+                everyday: refused,
+                admin: None,
+            }),
+            now,
+        );
+        let mut socket = connect(elevating, "").await;
+        assert_eq!(
+            frame(&mut socket).await["problem"]["kind"],
+            "elevation-required"
+        );
     }
 
     #[tokio::test]

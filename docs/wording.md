@@ -236,6 +236,7 @@ why. Add a row before introducing a new concept.
 | storage class | 儲存類別 | 存储类 | `StorageClass` |
 | debug container (a shell added beside a container that has none) | 除錯容器 | 调试容器 | An ephemeral container; it stays until the replica is replaced |
 | kubectl terminal (a shell with kubectl and helm in the cluster) | kubectl 終端機 | kubectl 终端 | Runs as the signed-in user |
+| node terminal (a root shell on a node's host); terminal pod (the privileged pod it runs in) | 節點終端機；終端機 Pod | 节点终端；终端 Pod | For cluster administrators only. Say plainly that it is full root on the host and bypasses Zeabur |
 | scratch space (an `emptyDir`) | 暫存空間 | 临时空间 | Emptied when the replica is replaced |
 | Details for Kubernetes users (the one disclosure of a section) | 給 Kubernetes 使用者的細節 | 给 Kubernetes 用户的细节 | Holds the section's kinds and fields |
 

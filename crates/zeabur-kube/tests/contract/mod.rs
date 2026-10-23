@@ -398,6 +398,7 @@ pub(crate) async fn a_deletion_keeps_to_its_preconditions(cluster: &impl Cluster
             WriteBody::Delete(Preconditions {
                 uid: Some(uid.to_owned()),
                 resource_version: Some(version.to_owned()),
+                grace_period_seconds: None,
             }),
             dry_run,
         )

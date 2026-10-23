@@ -8,6 +8,7 @@ mod delete;
 pub mod edit;
 pub mod fields;
 pub mod json;
+pub mod node_shell;
 mod plan;
 mod project;
 pub mod releases;

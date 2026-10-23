@@ -41,6 +41,8 @@ export function Session({
   toolbar,
   noShell,
   command,
+  ended,
+  grant = true,
   onTyped,
   onReconnect,
 }: {
@@ -59,6 +61,10 @@ export function Session({
   noShell?: ReactNode
   /** Typed at the shell's prompt, not run. */
   command?: string
+  /** Shown once the shell has ended or closed, in place of reconnecting. */
+  ended?: ReactNode
+  /** A refusal to exec offers a Role that grants it. */
+  grant?: boolean
   onTyped?: () => void
   onReconnect: () => void
 }) {
@@ -159,6 +165,9 @@ export function Session({
     noShell !== undefined && state.phase === "exited" && state.reason === "command-not-found"
   // Hidden, not unmounted: the screen lives in this element until the tab closes.
   const hidden = state.phase === "error" || noShellShown
+  const over =
+    ended !== undefined &&
+    (state.phase === "closed" || (state.phase === "exited" && state.reason !== "command-not-found"))
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-control-lg shrink-0 flex-wrap items-center gap-2 px-3 py-1.5 text-xs text-secondary">
@@ -169,24 +178,31 @@ export function Session({
           ) : null}
           {state.phase === "open" && debug ? t("terminal.debugOpen") : statusText(state, t)}
         </output>
-        <Button
-          variant="ghost"
-          size="xs"
-          className="ml-auto"
-          onClick={onReconnect}
-          disabled={state.phase === "connecting"}
-        >
-          <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-          {t("terminal.reconnect")}
-        </Button>
+        {over ? null : (
+          <Button
+            variant="ghost"
+            size="xs"
+            className="ml-auto"
+            onClick={onReconnect}
+            disabled={state.phase === "connecting"}
+          >
+            <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+            {t("terminal.reconnect")}
+          </Button>
+        )}
       </div>
-      <Notice
-        state={state}
-        project={project}
-        asAdmin={asAdmin}
-        noShell={noShell}
-        onReconnect={onReconnect}
-      />
+      {over ? (
+        ended
+      ) : (
+        <Notice
+          state={state}
+          project={project}
+          asAdmin={asAdmin}
+          noShell={noShell}
+          grant={grant}
+          onReconnect={onReconnect}
+        />
+      )}
       <div
         ref={host}
         role="group"
@@ -218,17 +234,19 @@ function Notice({
   project,
   asAdmin,
   noShell,
+  grant,
   onReconnect,
 }: {
   state: TerminalState
   project: string
   asAdmin: boolean
   noShell?: ReactNode
+  grant: boolean
   onReconnect: () => void
 }) {
   const t = useT()
   const problem = state.phase === "error" ? state.problem : undefined
-  const exec = problem?.denied?.resource === "pods/exec"
+  const exec = grant && problem?.denied?.resource === "pods/exec"
   const whoami = useQuery({ ...whoamiQuery, enabled: exec })
   const box = (child: ReactNode) => (
     <div className="flex max-h-full shrink-0 flex-col gap-3 overflow-y-auto px-3 pb-3">{child}</div>

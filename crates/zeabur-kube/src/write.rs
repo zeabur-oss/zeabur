@@ -202,6 +202,7 @@ pub(crate) fn delete_params(preconditions: &Preconditions, dry_run: bool) -> Del
             uid: preconditions.uid.clone(),
             resource_version: preconditions.resource_version.clone(),
         }),
+        grace_period_seconds: preconditions.grace_period_seconds,
         ..DeleteParams::background()
     }
 }
@@ -313,6 +314,7 @@ mod tests {
         let preconditions = Preconditions {
             uid: Some("u-1".to_owned()),
             resource_version: Some("42".to_owned()),
+            grace_period_seconds: None,
         };
         let body = |dry_run| serde_json::to_value(delete_params(&preconditions, dry_run)).unwrap();
         let options = body(false);

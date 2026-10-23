@@ -104,6 +104,7 @@ pub(crate) async fn read_pod(
     namespace: &str,
     pod: &str,
 ) -> Result<Value, ApiError> {
+    crate::pods::exec::outside_node_shells(namespace)?;
     let found = cluster
         .find_object(&ResourceRef::of::<Pod>(), Some(namespace), pod)
         .await

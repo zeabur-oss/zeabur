@@ -138,8 +138,8 @@ function withDocument(command: string, yaml: string): string {
   return [`${command} <<'${end}'`, ...lines, end].join("\n")
 }
 
-/** Both verbs on `pods/exec`: a WebSocket handshake is a GET (RFC 6455 §4.1), so RBAC checks `get`
- * where `kubectl exec` over SPDY needs `create`
+/** Both verbs on `pods/exec`: a WebSocket handshake is a GET (RFC 6455 §4.1), so RBAC checks `get`;
+ * Zeabur, `kubectl exec` and kube-apiserver from 1.31 also require `create`
  * (https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb). */
 export function execRole(namespace: string, user: string): string {
   return roleYaml({

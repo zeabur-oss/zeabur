@@ -374,6 +374,127 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/node-shells:
+    get:
+      tags:
+      - cluster
+      summary: The node shell pods, oldest first; cluster administrators only.
+      operationId: nodeShells
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeShells"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/node-shells/apply:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Carries out a plan by its token: checks it and the cluster again, dry-runs every write, then
+        writes.
+      operationId: applyNodeShell
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeShellApply"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeShellApplied"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/node-shells/plan:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Works out what opening a shell on a node, or removing a shell pod, writes, and a token to
+        apply it; writes nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do
+        everything everywhere; without a token while `exposed` lists bindings that let others into
+        node shells.
+      operationId: planNodeShell
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeShellPlanRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NodeShellPlan"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/node-shells/{pod}/terminal":
+    get:
+      tags:
+      - cluster
+      summary: The shell in a node shell pod the person opened, over a WebSocket.
+      description: |-
+        The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
+        and `4001`); `ready` names the container `shell`. Failures arrive as an `error` frame: someone
+        who may not do everything everywhere, or may not `create` `pods/exec` in the namespace
+        (`403`, `elevation-required` where admin rights are offered and not in use), a pod that is not
+        a node shell the person opened (`404`), one not running or already open in another terminal
+        (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
+      operationId: nodeShellTerminal
+      parameters:
+      - name: pod
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "101":
+          description: Switched to the terminal's WebSocket
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/nodes:
     get:
       tags:
@@ -1262,7 +1383,7 @@ paths:
       description: |-
         Binary messages carry terminal bytes both ways; text messages are JSON control frames,
         `ClientFrame` to the server and `ServerFrame` to the browser. The handshake answers `101
-        Switching Protocols`; every later failure (`403` with `denied` naming `get` on
+        Switching Protocols`; every later failure (`403` with `denied` naming `create` on
         `pods/exec`, `elevation-required` where admin rights are offered and not in use; a pod or
         container that does not exist, a container that is not running) arrives as an `error` frame,
         which a browser can read where it cannot read a refused handshake. After `exit` or `error` the
@@ -7384,6 +7505,191 @@ components:
           items:
             $ref: "#/components/schemas/PolicyWrite"
           description: The policies it rewrites; empty when all are current.
+    NodeShellApplied:
+      type: object
+      description: What an apply did.
+      required:
+      - pod
+      - namespace
+      - node
+      properties:
+        namespace:
+          type: string
+          description: Its namespace.
+        node:
+          type: string
+          description: Its node.
+        pod:
+          type: string
+          description: The pod.
+    NodeShellApply:
+      type: object
+      description: The token of a plan to apply.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token `plan` returned.
+    NodeShellPlan:
+      type: object
+      description: A plan that opens a shell on a node or removes a shell pod.
+      required:
+      - expiresAt
+      - op
+      - node
+      - pod
+      - namespace
+      - image
+      - deadlineSeconds
+      - firstSessionSeconds
+      - writes
+      - exposed
+      properties:
+        deadlineSeconds:
+          type: integer
+          format: int64
+          description: How long it runs at most, in seconds.
+        expiresAt:
+          type: string
+          description: When the token stops working, RFC 3339.
+        exposed:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShellExposure"
+          description: >-
+            Bindings that let others into node shells; the plan cannot be applied while
+            there is one.
+        firstSessionSeconds:
+          type: integer
+          format: int32
+          description: How long it waits for its first session, in seconds.
+          minimum: 0
+        image:
+          type: string
+          description: The image it runs.
+        kubectl:
+          type:
+          - string
+          - "null"
+          description: The `kubectl` command that opens the same shell.
+        namespace:
+          type: string
+          description: Its namespace.
+        node:
+          type: string
+          description: The node.
+        op:
+          type: string
+          description: "`open` or `remove`."
+        person:
+          type:
+          - string
+          - "null"
+          description: Who opens it (opened it, for a removal).
+        pod:
+          type: string
+          description: The pod.
+        token:
+          type:
+          - string
+          - "null"
+          description: |-
+            Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
+            bindings.
+        writes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShellWrite"
+          description: The writes, in order.
+    NodeShellPlanRequest:
+      oneOf:
+      - type: object
+        description: Open a shell on `node`.
+        required:
+        - node
+        - op
+        properties:
+          node:
+            type: string
+            description: The node.
+          op:
+            type: string
+            enum:
+            - open
+      - type: object
+        description: Remove the shell pod `pod`.
+        required:
+        - pod
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - remove
+          pod:
+            type: string
+            description: The pod.
+      description: What to plan.
+    NodeShellView:
+      type: object
+      description: A node shell pod.
+      required:
+      - name
+      - node
+      - mine
+      - phase
+      properties:
+        createdAt:
+          type:
+          - string
+          - "null"
+          description: When it was created, RFC 3339.
+        message:
+          type:
+          - string
+          - "null"
+          description: The kubelet's message while starting.
+        mine:
+          type: boolean
+          description: Whether the person asking opened it, so may enter it.
+        name:
+          type: string
+          description: The pod.
+        node:
+          type: string
+          description: The node it runs on.
+        person:
+          type:
+          - string
+          - "null"
+          description: Who opened it.
+        phase:
+          $ref: "#/components/schemas/ShellPhase"
+          description: How it is doing.
+        reason:
+          type:
+          - string
+          - "null"
+          description: |-
+            The kubelet's reason: `ErrImagePull` while starting, `DeadlineExceeded` or `Completed`
+            when ended.
+        stopsAt:
+          type:
+          - string
+          - "null"
+          description: When its deadline stops it, RFC 3339.
+    NodeShells:
+      type: object
+      description: The node shell pods.
+      required:
+      - shells
+      properties:
+        shells:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeShellView"
+          description: Oldest first.
     NodeSkew:
       type: object
       description: A node whose kubelet minor differs from kube-apiserver's.
@@ -10727,6 +11033,98 @@ components:
       - info
       - warning
       - danger
+    ShellExposure:
+      type: object
+      description: |-
+        A binding that lets someone other than cluster administrators create pods in the node shell
+        namespace or run commands in them.
+      required:
+      - kind
+      - name
+      - role
+      - rights
+      - subjects
+      properties:
+        kind:
+          type: string
+          description: "`RoleBinding` or `ClusterRoleBinding`."
+        name:
+          type: string
+          description: Its name.
+        rights:
+          type: array
+          items:
+            type: string
+          description: |-
+            What the role grants: `create pods` (bound in the namespace), `create` or `get` on
+            `pods/exec` and `pods/attach`.
+        role:
+          type: string
+          description: The role it binds, `Role/name` or `ClusterRole/name`.
+        subjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShellSubject"
+          description: Who it lets in.
+    ShellPhase:
+      type: string
+      description: How a node shell pod is doing.
+      enum:
+      - starting
+      - running
+      - ended
+    ShellSubject:
+      type: object
+      description: Someone a binding lets into node shells.
+      required:
+      - kind
+      - name
+      properties:
+        kind:
+          type: string
+          description: "`User`, `Group` or `ServiceAccount`."
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type:
+          - string
+          - "null"
+          description: A service account's namespace.
+    ShellWrite:
+      type: object
+      description: One object a plan writes.
+      required:
+      - action
+      - kind
+      - name
+      properties:
+        action:
+          $ref: "#/components/schemas/ShellWriteAction"
+          description: What it does.
+        kind:
+          type: string
+          description: The object's kind.
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type:
+          - string
+          - "null"
+          description: Its namespace, for a namespaced object.
+        yaml:
+          type:
+          - string
+          - "null"
+          description: The object as it will be (as it is, for a deletion), YAML.
+    ShellWriteAction:
+      type: string
+      description: What a write does.
+      enum:
+      - create
+      - patch
+      - delete
     SourceKind:
       type: string
       description: |-

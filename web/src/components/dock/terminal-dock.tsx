@@ -5,6 +5,7 @@ import CaretUpIcon from "~icons/ph/caret-up"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
 
 import { projectQuery, toolsQuery } from "@/api/queries"
+import { NodeShellTab } from "@/components/dock/node-shell-tab"
 import { KubectlTab, ShellTab, ToolsPods } from "@/components/dock/tabs"
 import { useI18n, useT } from "@/i18n"
 import {
@@ -172,6 +173,8 @@ export function TerminalDock() {
                 <DockPanel key={tab.id} value={tab.id}>
                   {tab.kind === "shell" ? (
                     <ShellTab tab={tab} shown={on} focus={state.focus} />
+                  ) : tab.kind === "node" ? (
+                    <NodeShellTab tab={tab} shown={on} focus={state.focus} />
                   ) : (
                     <KubectlTab tab={tab} shown={on} focus={state.focus} />
                   )}
@@ -207,6 +210,7 @@ export function TerminalDock() {
 }
 
 function tabName(tab: Tab): string {
+  if (tab.kind === "node") return `root@${tab.node}`
   return tab.kind === "kubectl"
     ? `kubectl ${tab.project}`
     : [tab.service.name, tab.container].filter(Boolean).join(" ")
@@ -214,7 +218,11 @@ function tabName(tab: Tab): string {
 
 function TabLabel({ tab }: { tab: Tab }) {
   const [main, detail] =
-    tab.kind === "kubectl" ? ["kubectl", tab.project] : [tab.service.name, tab.container]
+    tab.kind === "node"
+      ? [tab.node, "root"]
+      : tab.kind === "kubectl"
+        ? ["kubectl", tab.project]
+        : [tab.service.name, tab.container]
   return (
     <span className="flex min-w-0 items-baseline gap-1.5" translate="no">
       <span className="truncate">{main}</span>

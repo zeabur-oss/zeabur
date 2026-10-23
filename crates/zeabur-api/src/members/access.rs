@@ -223,6 +223,12 @@ pub(crate) fn check(projects: &[ProjectGrant]) -> Result<Vec<ProjectGrant>, Stri
         if !zeabur_plan::checks::is_dns_label(&grant.project) {
             return Err(format!("{:?} is not a project's name.", grant.project));
         }
+        if grant.project == zeabur_core::names::NODE_SHELL_NAMESPACE {
+            return Err(format!(
+                "{} holds node shells, which only cluster administrators may use.",
+                grant.project
+            ));
+        }
         if seen.insert(grant.project.clone(), grant.role).is_some() {
             return Err(format!("{} is named twice.", grant.project));
         }
@@ -359,6 +365,7 @@ pub(crate) mod tests {
     #[test]
     fn projects_are_names_each_given_once() {
         assert!(check(&[grant("Shop", ProjectRole::Viewer)]).is_err());
+        assert!(check(&[grant("zeabur-node-shell", ProjectRole::Viewer)]).is_err());
         assert!(
             check(&[
                 grant("shop", ProjectRole::Viewer),

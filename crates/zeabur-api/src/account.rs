@@ -40,7 +40,7 @@ use axum::extract::State;
 use futures_util::StreamExt as _;
 use serde::Serialize;
 use utoipa::ToSchema;
-use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
+use zeabur_core::names::{LABEL_PROJECT, NODE_SHELL_NAMESPACE, is_system_namespace};
 use zeabur_core::problem::{Denied, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Access, AccessRules, Cluster, ResourceRef};
 use zeabur_model::ProjectDetails;
@@ -158,7 +158,7 @@ pub fn role(rules: &AccessRules) -> AccountRole {
 }
 
 /// Whether the person may do every verb on every resource, cluster-wide.
-async fn cluster_admin(cluster: &dyn Cluster) -> bool {
+pub(crate) async fn cluster_admin(cluster: &dyn Cluster) -> bool {
     let everything = Denied {
         verb: "*".to_owned(),
         group: "*".to_owned(),
@@ -184,7 +184,7 @@ async fn adopted(cluster: &dyn Cluster) -> Option<Vec<(String, ProjectDetails)>>
             let details = ProjectDetails::from_annotations(n.metadata.annotations.as_ref());
             n.metadata
                 .name
-                .filter(|name| !is_system_namespace(name))
+                .filter(|name| !is_system_namespace(name) && name != NODE_SHELL_NAMESPACE)
                 .map(|name| (name, details))
         })
         .collect();

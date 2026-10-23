@@ -35,6 +35,13 @@ export type DockTab =
       /** A database's members instead of a service's replicas: `service` is its object. */
       database?: DatabaseRef
     }
+  | {
+      id: string
+      kind: "node"
+      node: string
+      /** The shell pod, which only lives as long as its terminal. */
+      pod: string
+    }
 
 export interface DockState {
   open: boolean
@@ -131,6 +138,16 @@ export function openKubectl(
           : tab,
       )
     : [...state.tabs, { id, kind: "kubectl" as const, project, asked: ask ? 1 : 0, pod, command }]
+  dock.set({ tabs, active: id, open: true, focus: state.focus + 1 })
+}
+
+/** Opens the root shell in a node shell pod, or shows it. */
+export function openNodeShell(node: string, pod: string) {
+  const state = dock.get()
+  const id = `node:${pod}`
+  const tabs = state.tabs.some((tab) => tab.id === id)
+    ? state.tabs
+    : [...state.tabs, { id, kind: "node" as const, node, pod }]
   dock.set({ tabs, active: id, open: true, focus: state.focus + 1 })
 }
 
