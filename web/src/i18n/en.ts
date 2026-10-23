@@ -2457,8 +2457,6 @@ export const en = {
   "add.composeManaged": (engine: string) => `Create ${engine} run by its operator`,
   "add.composeManagedHint": (image: string) =>
     `Instead of ${image}. It starts empty: data in a Compose volume isn't copied. Other services' connection variables point at it.`,
-  "add.composeKept.noOperator": (image: string) =>
-    `Runs ${image} as it is: an import doesn't create SeaweedFS object storage yet.`,
   "add.composeKept.notInstalled": (image: string, engine: string) =>
     `Runs ${image} as it is: the ${engine} operator isn't installed. Install it in Components to have it run by the operator.`,
   "add.composeKept.unknown": (image: string, engine: string) =>
@@ -2664,6 +2662,58 @@ export const en = {
     `${services} switch to the new version once ${database} is ready; the old version keeps running until then.`,
   "connect.readBy": (services: string) => `Connected to ${services}.`,
   "connect.none": "Not connected to a service yet.",
+  "connect.bucket": "Bucket",
+  "connect.note.s3": (secret: string) =>
+    `The keys stay in Secret ${secret}; the service only points to them.`,
+  "connect.noKey": (store: string) =>
+    `${store} has no access key that Zeabur made, so it cannot be connected here. Object storage created in Zeabur has one.`,
+  "s3.title": "Object storage",
+  "s3.engine": "SeaweedFS",
+  "s3.tabs": "Object storage sections",
+  "s3.new": "New object storage",
+  "s3.newBody":
+    "Zeabur creates the SeaweedFS Operator's objects in this project, as you; the operator runs an S3-compatible store.",
+  "s3.planCreate": (name: string) => `Create object storage ${name}`,
+  "s3.name.empty": "Give it a name.",
+  "s3.name.invalid": "Lowercase letters, digits and hyphens, starting with a letter.",
+  "s3.name.long": "At most 30 characters.",
+  "s3.name.taken": "Object storage of this name exists.",
+  "s3.field.storage": "Storage",
+  "s3.field.bucket": "Bucket",
+  "s3.bucketHint": "Optional. Add more later.",
+  "s3.bucketRule": "3 to 63 lowercase letters, digits and hyphens.",
+  "s3.bucket.empty": "Give it a name.",
+  "s3.bucket.invalid":
+    "3 to 63 lowercase letters, digits and hyphens, starting and ending with a letter or digit.",
+  "s3.bucket.taken": "This store already has a bucket of this name.",
+  "s3.oneCopy":
+    "One copy: each part runs once and the files are on one volume. Nothing takes over if its node fails.",
+  "s3.noOperator": "To create object storage, install the SeaweedFS Operator.",
+  "s3.refused": "You don't have permission to read object storage.",
+  "s3.empty": "No object storage yet.",
+  "s3.notFound": "This object storage is not in the project.",
+  "s3.bucketCount": (count: number) => (count === 1 ? "1 bucket" : `${count} buckets`),
+  "s3.delete": "Delete object storage",
+  "s3.fact.parts": "Parts",
+  "s3.fact.buckets": "Buckets",
+  "s3.fact.user": "Access",
+  "s3.endpoint": "Endpoint",
+  "s3.region": "Region",
+  "s3.accessKey": "Access key ID",
+  "s3.secretKey": "Secret access key",
+  "s3.buckets": "Buckets",
+  "s3.newBucket": "New bucket",
+  "s3.noBuckets": "No buckets yet.",
+  "s3.usage": (size: string, objects: number) =>
+    objects === 1 ? `${size}, 1 object` : `${size}, ${objects} objects`,
+  "s3.noUsage": "Not counted yet",
+  "s3.planBucket": (bucket: string, store: string) => `Create bucket ${bucket} in ${store}`,
+  "s3.deleteBucket": (bucket: string) => `Delete bucket ${bucket}`,
+  "s3.deletesFiles": (bucket: string) => `The files in ${bucket} are deleted with it.`,
+  "s3.keepsFiles": (bucket: string) =>
+    `The files in ${bucket} stay in the store; only the object goes.`,
+  "add.composeKept.roleObjectStorage": (image: string) =>
+    `Runs ${image} as it is: your role can't create object storage in this project.`,
   "db.host": "Host",
   "db.port": "Port",
   "db.database": "Database",

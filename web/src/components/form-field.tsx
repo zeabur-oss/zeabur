@@ -7,6 +7,7 @@ import {
   FieldError,
   FieldLabel,
 } from "@zeabur/design-system/components/field"
+import { Input } from "@zeabur/design-system/components/input"
 
 const firstMessage = (errors: unknown[]) =>
   errors.find((e): e is string => typeof e === "string" && e !== "")
@@ -40,4 +41,33 @@ export function FormField({
 }
 
 /** An instant hint only; the plan checks it again. */
+/** A Kubernetes or S3 name: monospace, trimmed, never autocompleted. */
+export function NameField({
+  label,
+  hint,
+  error,
+  value,
+  onChange,
+}: {
+  label: ReactNode
+  hint?: ReactNode
+  /** Shown once there is one. */
+  error?: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <FormField label={label} hint={hint} errors={error ? [error] : []}>
+      <Input
+        size="sm"
+        mono
+        value={value}
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(event) => onChange(event.target.value.trim())}
+      />
+    </FormField>
+  )
+}
+
 export const quantity = /^\+?(\d+(\.\d*)?|\.\d+)(m|k|Ki|M|Mi|G|Gi|T|Ti|P|Pi|E|Ei|[eE][-+]?\d+)?$/

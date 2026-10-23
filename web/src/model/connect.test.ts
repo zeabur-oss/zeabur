@@ -15,6 +15,7 @@ import {
   type Target,
 } from "@/model/connect"
 import { newDatabase, type Database } from "@/model/databases"
+import { newObjectStorage, pendingObjectStorage } from "@/model/object-storage"
 import type { Service } from "@/model/service"
 
 const postgres = {
@@ -296,6 +297,40 @@ describe("connecting MySQL, MariaDB and Dragonfly", () => {
         name: "CACHE_REDIS_URL",
         value: "redis://:$(CACHE_REDIS_PASSWORD)@dragonfly.shop.svc:6379",
       },
+    ])
+  })
+})
+
+describe("connecting object storage", () => {
+  const store = pendingObjectStorage({ ...newObjectStorage(), buckets: ["uploads"] }, "shop")
+  const app = web()
+
+  test("gives the endpoint, both keys from the Secret, the region and the bucket", () => {
+    expect(variablesFor(store, app, { bucket: "uploads" })).toEqual([
+      { op: "set", name: "S3_ENDPOINT", value: "http://files-s3.shop.svc:8333" },
+      {
+        op: "set",
+        name: "S3_ACCESS_KEY_ID",
+        valueFrom: { secretName: "files-app", key: "accessKey" },
+      },
+      {
+        op: "set",
+        name: "S3_SECRET_ACCESS_KEY",
+        valueFrom: { secretName: "files-app", key: "secretKey" },
+      },
+      { op: "set", name: "S3_REGION", value: "us-east-1" },
+      { op: "set", name: "S3_BUCKET", value: "uploads" },
+    ])
+  })
+
+  test("a taken endpoint name gets the store's prefix, the keys too", () => {
+    const taken = web([literal("S3_BUCKET", "x")])
+    const name = suggestedName(store, [taken])
+    expect(name).toBe("FILES_S3_ENDPOINT")
+    expect(namesOf(store, name).extras).toEqual([
+      "FILES_S3_ACCESS_KEY_ID",
+      "FILES_S3_REGION",
+      "FILES_S3_BUCKET",
     ])
   })
 })

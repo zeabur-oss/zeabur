@@ -13,6 +13,7 @@ import {
   type ProjectStorage,
   type StorageClass,
 } from "@/model/storage"
+import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
 
 const CLASSES = "storageclasses.storage.k8s.io"
@@ -141,5 +142,33 @@ export function StorageClassField({
       </FormField>
       {details ? <KubeDetails facts={classFacts(t, chosen)} /> : null}
     </div>
+  )
+}
+
+/** A volume's size, with what its class allows later. */
+export function StorageSizeField({
+  label,
+  storage,
+  storageClass,
+  value,
+  bad,
+  onChange,
+}: {
+  label: string
+  storage: ProjectStorage | undefined
+  storageClass?: string
+  value: string
+  bad: boolean
+  onChange: (value: string) => void
+}) {
+  const t = useT()
+  return (
+    <FormField
+      label={label}
+      hint={growthWords(t, storage, storageClass)}
+      errors={bad ? [t("storage.problem.badSize")] : []}
+    >
+      <Input size="sm" mono value={value} onChange={(event) => onChange(event.target.value)} />
+    </FormField>
   )
 }

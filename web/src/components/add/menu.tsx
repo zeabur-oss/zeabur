@@ -10,6 +10,7 @@ import {
   clusterQuery,
   creatableQuery,
   databasesQuery,
+  objectStorageQuery,
 } from "@/api/queries"
 import { GatedMenuItem, GateTip, useGates } from "@/components/gate"
 import { useT } from "@/i18n"
@@ -31,6 +32,9 @@ export interface AddChoices {
   image: boolean
   /** Offered engines; `installed` false points at Components instead. */
   databases: { engine: Engine; installed: boolean }[]
+  /** Object storage, when the person may create it and whether its operator is installed is
+   * known. */
+  objectStorage?: { installed: boolean }
   /** "Deploy from Git": open, or closed by the person's role or by what the cluster lacks. */
   git: { open: boolean; gate: Gate; missing?: GitMissing }
   yaml: boolean
@@ -38,6 +42,25 @@ export interface AddChoices {
   none: boolean
   /** Why a service, or a database, cannot be added. */
   gates: { image: Gate; database: Gate }
+}
+
+/** Engines whose operator is known to be installed or not. An operator whose databases can't be
+ * read is left out. */
+function knownEngines(operators: { engine: Engine; state: string }[]) {
+  return engines.flatMap((engine) => {
+    const state = operators.find((o) => o.engine === engine)?.state
+    return state === "installed" || state === "not-installed"
+      ? [{ engine, installed: state === "installed" }]
+      : []
+  })
+}
+
+/** Object storage, when the role allows it and whether the operator is installed is known. */
+function useObjectStorageChoice(project: string | undefined) {
+  const gate = useGates(project)("changeObjectStorage")
+  const state = useQuery({ ...objectStorageQuery(project ?? ""), enabled: !!project }).data?.state
+  if (!gate.open || (state !== "installed" && state !== "not-installed")) return undefined
+  return { installed: state === "installed" }
 }
 
 /** What "New" offers in the project: a kind the person's role cannot add is closed, one unknown
@@ -54,6 +77,7 @@ export function useAddChoices(project: string | undefined): AddChoices | undefin
   const capabilities = useQuery({ ...capabilitiesQuery, retry: false })
   const cluster = useQuery(clusterQuery).data
   const gates = useGates(project)
+  const store = useObjectStorageChoice(project)
   if (!project || creatable.isPending) return undefined
   const gitGate = gates("deployFromGit")
   const missing = gitMissing({
@@ -64,21 +88,15 @@ export function useAddChoices(project: string | undefined): AddChoices | undefin
   const operators = databases.data?.operators ?? []
   const imageGate = gates("deploy")
   const databaseGate = gates("changeDatabases")
-  // An operator whose databases can't be read is left out: whether it is installed is unknown.
-  const known = engines.flatMap((engine) => {
-    const state = operators.find((o) => o.engine === engine)?.state
-    return state === "installed" || state === "not-installed"
-      ? [{ engine, installed: state === "installed" }]
-      : []
-  })
-  const offered = databaseGate.open ? known : []
+  const offered = databaseGate.open ? knownEngines(operators) : []
   const yaml = (creatable.data?.items ?? []).some((k) => k.access !== "denied")
   return {
     image: imageGate.open,
     git: { open: gitGate.open && !missing, gate: gitGate, missing },
     databases: offered,
+    objectStorage: store,
     yaml,
-    none: !imageGate.open && offered.length === 0 && !yaml,
+    none: !imageGate.open && offered.length === 0 && !store && !yaml,
     gates: { image: imageGate, database: databaseGate },
   }
 }
@@ -143,6 +161,21 @@ export function AddMenu({ project, compact = false }: { project: string; compact
                   </span>
                 </MenuItem>
               ),
+            )}
+          </>
+        ) : null}
+        {choices.objectStorage ? (
+          <>
+            <MenuSeparator />
+            {choices.objectStorage.installed ? (
+              <MenuItem onClick={() => openAdd(project, "objectStorage")}>{t("s3.title")}</MenuItem>
+            ) : (
+              <MenuItem render={<Link to="/cluster/components" />}>
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-muted-foreground">{t("s3.title")}</span>
+                  <span className="type-meta text-muted-foreground">{t("add.needsComponent")}</span>
+                </span>
+              </MenuItem>
             )}
           </>
         ) : null}

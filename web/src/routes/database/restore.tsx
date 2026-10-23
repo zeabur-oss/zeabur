@@ -5,7 +5,7 @@ import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 
 import { databasesQuery } from "@/api/queries"
 import { useTargets } from "@/components/connect"
-import { FormField } from "@/components/form-field"
+import { FormField, NameField } from "@/components/form-field"
 import { GateTip, useGate } from "@/components/gate"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanner, usePlanStep } from "@/components/plan/planner"
@@ -22,7 +22,6 @@ import {
 import { nameProblem, type Database } from "@/model/databases"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
 
 /** "Restore into a new database", under the backups. */
@@ -118,19 +117,12 @@ function RestoreDrawer({
             items={points.map((p) => ({ value: p.backup, label: label(p) }))}
           />
         </FormField>
-        <FormField
+        <NameField
           label={t("db.restore.name")}
-          errors={tried && problem ? [t(`db.name.${problem}`)] : []}
-        >
-          <Input
-            size="sm"
-            mono
-            value={name}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => setName(event.target.value.trim())}
-          />
-        </FormField>
+          error={tried && problem ? t(`db.name.${problem}`) : undefined}
+          value={name}
+          onChange={setName}
+        />
         <p className="type-meta text-muted-foreground">{t("db.restore.asOf")}</p>
       </ReviewForm>
     </PlanDrawer>

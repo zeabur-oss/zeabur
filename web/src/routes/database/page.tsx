@@ -1,48 +1,43 @@
 // One database an operator runs, with a service's tabs: how it is and how to reach it, its
 // members' logs, backups, events, and its settings with the operator's object as YAML.
 import { useQuery } from "@tanstack/react-query"
-import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
+import { getRouteApi, Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
-import { toast } from "sonner"
 import ArchiveIcon from "~icons/ph/archive"
-import CaretRightIcon from "~icons/ph/caret-right"
-import CopyIcon from "~icons/ph/copy"
 import DatabaseIcon from "~icons/ph/database"
-import DotsThreeIcon from "~icons/ph/dots-three"
 import DownloadSimpleIcon from "~icons/ph/download-simple"
-import EyeIcon from "~icons/ph/eye"
-import EyeSlashIcon from "~icons/ph/eye-slash"
 import GearSixIcon from "~icons/ph/gear-six"
 import InfoIcon from "~icons/ph/info"
 import ListBulletsIcon from "~icons/ph/list-bullets"
-import PlugsConnectedIcon from "~icons/ph/plugs-connected"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
-import TrashIcon from "~icons/ph/trash"
 import WarningIcon from "~icons/ph/warning"
 
-import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
-import { useLogsReadable } from "@/api/logs-access"
+import type { Schemas } from "@/api/client"
 import { databasesQuery, projectQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
-import { ConnectDrawer, useTargets } from "@/components/connect"
+import { ConnectServices } from "@/components/connect"
 import { CopyText } from "@/components/copy-text"
 import { DatabaseState } from "@/components/databases"
+import {
+  CardRow,
+  CardRows,
+  RevealRow,
+  Section,
+  useReveal,
+  Warnings,
+} from "@/components/store-detail"
 import { Diagnoses } from "@/components/diagnoses"
-import { EventList } from "@/components/events"
 import { FormField } from "@/components/form-field"
-import { Freshness } from "@/components/freshness"
-import { GatedMenuItem, GateTip, useGate, useGates } from "@/components/gate"
+import { GatedMenuItem, GateTip, useGate } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Schedule } from "@/components/schedule"
 import { StatusPill } from "@/components/status"
-import { useI18n, useT } from "@/i18n"
+import { useT } from "@/i18n"
 import { openDatabaseShell } from "@/lib/dock"
 import type { Icon } from "@/lib/icon"
-import { formatDate } from "@/lib/format"
-import { cn } from "@/lib/utils"
 import { partsOf } from "@/model/database-parts"
 import {
   APP_DATABASE,
@@ -68,25 +63,16 @@ import {
   type Database,
   type Frequency,
 } from "@/model/databases"
-import { connected } from "@/model/connect"
-import { isWarning, type Event, type Health } from "@/model/service"
+import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
 import { Restore, Restored } from "@/routes/database/restore"
 import { DatabaseSettings } from "@/routes/database/settings"
 import { databaseTabs, type DatabaseTab, type ServiceMode } from "@/routes/search"
-import { TabRow } from "@/routes/service/tab-row"
+import { StoreMenu, StoreShell, useStorePage } from "@/routes/store/shell"
 import { Events, MemberLogs } from "@/routes/service/views"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
-import { Container } from "@zeabur/design-system/components/container"
 import { Input } from "@zeabur/design-system/components/input"
-import {
-  Menu,
-  MenuContent,
-  MenuItem,
-  MenuSeparator,
-  MenuTrigger,
-} from "@zeabur/design-system/components/menu"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { Select } from "@zeabur/design-system/components/select"
 import {
@@ -98,7 +84,7 @@ import {
   SummaryCardStatus,
   SummaryCardWord,
 } from "@zeabur/design-system/components/summary-card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
+import { TabsContent } from "@zeabur/design-system/components/tabs"
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
 
@@ -181,196 +167,124 @@ function Body({
   failed: boolean
 }) {
   const t = useT()
-  const { locale } = useI18n()
   const search = route.useSearch()
   const navigate = route.useNavigate()
-  const leave = useNavigate()
-  const logs = useLogsReadable(project)
-  const gates = useGates(project)
+  const { tab, shown, gates, unreadable, deleter, setTab, setPod } = useStorePage(
+    project,
+    search.tab,
+    databaseTabs,
+  )
   const events = eventsOf(useProjectEvents(project), database)
-  const unreadable = useQuery(projectQuery(project)).data?.unreadable ?? []
-  const tab: DatabaseTab = search.tab === "logs" && !logs ? "overview" : (search.tab ?? "overview")
-  const shown = databaseTabs.filter((value) => value !== "logs" || logs)
-  const wide = tab === "logs"
-  const setTab = (next: DatabaseTab) =>
-    void navigate({
-      search: (previous) => ({
-        tab: next === "overview" ? undefined : next,
-        pod: next === "logs" || next === "events" ? previous.pod : undefined,
-      }),
-      hash: "",
-    })
   const setMode = (next?: ServiceMode) =>
     void navigate({
       search: (previous) => ({ ...previous, mode: next === "yaml" ? "yaml" : undefined }),
       hash: "",
     })
-  const setPod = (pod?: string) =>
-    void navigate({ search: (previous) => ({ ...previous, pod: pod || undefined }), replace: true })
-  const deleter = usePlanner(
-    project,
-    () => void leave({ to: "/projects/$project", params: { project }, search: {} }),
-  )
   const shell = (pod?: string) => openDatabaseShell(project, database, pod)
-  const copyName = () =>
-    navigator.clipboard.writeText(`${database.resource}/${database.name}`).then(
-      () => toast.success(t("common.copied")),
-      () => undefined,
-    )
   const terminalGate = gates("openTerminal")
 
   return (
-    <Tabs
-      value={tab}
-      onValueChange={(value) => setTab(value as DatabaseTab)}
-      variant="page"
-      className={cn("flex flex-1 flex-col", wide && "min-h-0")}
+    <StoreShell
+      project={project}
+      icon={DatabaseIcon}
+      name={database.name}
+      state={<DatabaseState database={database} size="md" />}
+      kind={`${engineName(database.engine)}${database.version ? ` ${database.version}` : ""}`}
+      created={database.created}
+      updatedAt={updatedAt}
+      failed={failed}
+      tab={tab}
+      tabs={shown.map((value) => ({ value, icon: tabIcons[value], label: t(tabLabel[value]) }))}
+      tabsLabel={t("db.tabs")}
+      onTab={setTab}
+      actions={
+        <>
+          {backupsOn(database) ? <BackUpNow project={project} database={database} /> : null}
+          <GateTip gate={terminalGate} className="max-sm:hidden">
+            <Button
+              variant="outline"
+              size="sm"
+              className="max-sm:hidden"
+              onClick={() => shell(search.pod)}
+            >
+              <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+              {t("tab.terminal")}
+            </Button>
+          </GateTip>
+          <GateTip gate={terminalGate} className="sm:hidden">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="sm:hidden"
+              aria-label={t("tab.terminal")}
+              onClick={() => shell(search.pod)}
+            >
+              <TerminalWindowIcon aria-hidden="true" />
+            </Button>
+          </GateTip>
+          <StoreMenu
+            copy={`${database.resource}/${database.name}`}
+            deleteGate={gates("changeDatabases")}
+            deleteLabel={t("db.delete")}
+            onDelete={() =>
+              deleter.plan({
+                title: t("title.delete", database.kind, database.name),
+                changes: deleteDatabase(database),
+              })
+            }
+          >
+            <ExportItem project={project} database={database} />
+          </StoreMenu>
+        </>
+      }
     >
-      <header className="shrink-0">
-        <PageColumn width="content">
-          <div className="flex flex-wrap items-start gap-x-3 gap-y-3 py-4 md:py-6">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-main bg-card">
-              <DatabaseIcon aria-hidden="true" className="size-5" />
-            </span>
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-                <h1 className="min-w-0 truncate type-name" translate="no">
-                  {database.name}
-                </h1>
-                <DatabaseState database={database} size="md" />
-              </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-secondary">
-                <span className="whitespace-nowrap">
-                  {engineName(database.engine)}
-                  {database.version ? ` ${database.version}` : ""}
-                </span>
-                {database.created ? (
-                  <span className="whitespace-nowrap">
-                    {t("service.created", formatDate(database.created, locale))}
-                  </span>
-                ) : null}
-                <Freshness project={project} updatedAt={updatedAt} failed={failed} />
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:pl-13">
-              {backupsOn(database) ? <BackUpNow project={project} database={database} /> : null}
-              <GateTip gate={terminalGate} className="max-sm:hidden">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="max-sm:hidden"
-                  onClick={() => shell(search.pod)}
-                >
-                  <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
-                  {t("tab.terminal")}
-                </Button>
-              </GateTip>
-              <GateTip gate={terminalGate} className="sm:hidden">
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  className="sm:hidden"
-                  aria-label={t("tab.terminal")}
-                  onClick={() => shell(search.pod)}
-                >
-                  <TerminalWindowIcon aria-hidden="true" />
-                </Button>
-              </GateTip>
-              <Menu>
-                <MenuTrigger
-                  render={
-                    <Button variant="outline" size="icon-sm" aria-label={t("service.more")} />
-                  }
-                >
-                  <DotsThreeIcon aria-hidden="true" />
-                </MenuTrigger>
-                <MenuContent align="end" className="w-72">
-                  <MenuItem onClick={() => void copyName()}>
-                    <CopyIcon aria-hidden="true" />
-                    {t("service.copyName")}
-                  </MenuItem>
-                  <ExportItem project={project} database={database} />
-                  <MenuSeparator />
-                  <GatedMenuItem
-                    gate={gates("changeDatabases")}
-                    onClick={() =>
-                      deleter.plan({
-                        title: t("title.delete", database.kind, database.name),
-                        changes: deleteDatabase(database),
-                      })
-                    }
-                  >
-                    <TrashIcon aria-hidden="true" />
-                    {t("db.delete")}
-                  </GatedMenuItem>
-                </MenuContent>
-              </Menu>
-            </div>
-          </div>
-          <TabRow>
-            <TabsList aria-label={t("db.tabs")} className="w-full">
-              {shown.map((value) => {
-                const TabIcon = tabIcons[value]
-                return (
-                  <TabsTrigger key={value} value={value} className="flex-1">
-                    <TabIcon aria-hidden="true" className="max-sm:hidden" />
-                    {t(tabLabel[value])}
-                  </TabsTrigger>
-                )
-              })}
-            </TabsList>
-          </TabRow>
-        </PageColumn>
-      </header>
-      <PageColumn width="content" className={cn("mt-3", wide ? "mb-4 min-h-0 flex-1" : "mb-16")}>
-        <TabsContent value="overview">
-          {tab === "overview" ? (
-            <Overview
-              project={project}
-              database={database}
-              events={events}
-              onEvents={() => setTab("events")}
-            />
-          ) : null}
-        </TabsContent>
-        <TabsContent value="logs" className={tab === "logs" ? "flex min-h-0 flex-col" : undefined}>
-          {tab === "logs" ? (
-            <MemberLogs
-              project={project}
-              source={{
-                name: database.name,
-                pods: database.pods,
-                containers: [serverContainer[database.engine]],
-                shell,
-              }}
-              pod={search.pod}
-              onPodChange={setPod}
-            />
-          ) : null}
-        </TabsContent>
-        <TabsContent value="backups">
-          {tab === "backups" ? (
-            <Backups project={project} database={database} readable={backupsReadable} />
-          ) : null}
-        </TabsContent>
-        <TabsContent value="events">
-          {tab === "events" ? (
-            <Events events={events} pod={search.pod} unreadable={unreadable} onPod={setPod} />
-          ) : null}
-        </TabsContent>
-        <TabsContent value="settings">
-          {tab === "settings" ? (
-            <DatabaseSettings
-              project={project}
-              database={database}
-              mode={search.mode}
-              onMode={setMode}
-            />
-          ) : null}
-        </TabsContent>
-      </PageColumn>
+      <TabsContent value="overview">
+        {tab === "overview" ? (
+          <Overview
+            project={project}
+            database={database}
+            events={events}
+            onEvents={() => setTab("events")}
+          />
+        ) : null}
+      </TabsContent>
+      <TabsContent value="logs" className={tab === "logs" ? "flex min-h-0 flex-col" : undefined}>
+        {tab === "logs" ? (
+          <MemberLogs
+            project={project}
+            source={{
+              name: database.name,
+              pods: database.pods,
+              containers: [serverContainer[database.engine]],
+              shell,
+            }}
+            pod={search.pod}
+            onPodChange={setPod}
+          />
+        ) : null}
+      </TabsContent>
+      <TabsContent value="backups">
+        {tab === "backups" ? (
+          <Backups project={project} database={database} readable={backupsReadable} />
+        ) : null}
+      </TabsContent>
+      <TabsContent value="events">
+        {tab === "events" ? (
+          <Events events={events} pod={search.pod} unreadable={unreadable} onPod={setPod} />
+        ) : null}
+      </TabsContent>
+      <TabsContent value="settings">
+        {tab === "settings" ? (
+          <DatabaseSettings
+            project={project}
+            database={database}
+            mode={search.mode}
+            onMode={setMode}
+          />
+        ) : null}
+      </TabsContent>
       {deleter.dialog}
-    </Tabs>
+    </StoreShell>
   )
 }
 
@@ -444,43 +358,6 @@ function BackUpNow({ project, database }: { project: string; database: Database 
 }
 
 /** The newest warnings, as a service's overview shows them, and the way to all events. */
-function Warnings({ events, onEvents }: { events: Event[]; onEvents: () => void }) {
-  const t = useT()
-  const warnings = events.filter(isWarning)
-  if (warnings.length === 0) return null
-  return (
-    <Container
-      title={t("overview.warnings")}
-      titleAction={
-        <button
-          type="button"
-          onClick={onEvents}
-          className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary outline-none hover:text-main"
-        >
-          {t("common.all")}
-          <CaretRightIcon className="size-3.5" aria-hidden="true" />
-        </button>
-      }
-      variant="list"
-    >
-      <div className="px-4">
-        <EventList events={warnings} limit={3} compact plain />
-      </div>
-    </Container>
-  )
-}
-
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
-  return (
-    <section aria-labelledby={id} className="flex flex-col gap-2">
-      <h2 id={id} className="type-heading">
-        {title}
-      </h2>
-      {children}
-    </section>
-  )
-}
-
 function Overview({
   project,
   database,
@@ -606,51 +483,14 @@ const membersField: Record<Database["engine"], string> = {
   dragonfly: "spec.replicas",
 }
 
-/** Rows in a card, labels and values at the summary card's facts' x. */
-function Rows({ children }: { children: ReactNode }) {
-  return (
-    <dl className="flex flex-col divide-y divide-main rounded-lg border border-main bg-card">
-      {children}
-    </dl>
-  )
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex min-w-0 items-center gap-x-4 px-4 py-1.5">
-      <dt className="w-fact-label shrink-0 type-meta text-muted-foreground">{label}</dt>
-      <dd className="flex min-h-8 min-w-0 flex-1 items-center gap-2">{children}</dd>
-    </div>
-  )
-}
-
 function Connection({ project, database }: { project: string; database: Database }) {
   const t = useT()
   const c = database.connection
-  const revealGate = useGate(project, "readSecrets")
-  const [secret, setSecret] = useState<{
-    pending?: boolean
-    values?: Schemas["RevealedSecret"]["values"]
-    problem?: ProblemBody
-  }>()
-  const reveal = async () => {
-    setSecret({ pending: true })
-    try {
-      const answer = unwrap(
-        await api.POST("/api/v1/projects/{project}/secrets/{name}/reveal", {
-          params: { path: { project, name: c.secret } },
-          cache: "no-store",
-        }),
-      )
-      setSecret({ values: answer.values })
-    } catch (error) {
-      setSecret({ problem: toProblem(error) })
-    }
-  }
+  const revealed = useReveal(project, c.secret)
+  const secret = revealed.secret
   const password = secret?.values?.[c.passwordKey]?.value
   const username =
     c.username ?? (c.usernameKey ? secret?.values?.[c.usernameKey]?.value : undefined)
-  const shown = password !== undefined
   const uri = connectionUri({ ...database, connection: { ...c, username } }, password)
   const mono = (text: string) => (
     <span className="min-w-0 truncate type-mono" translate="no">
@@ -662,45 +502,22 @@ function Connection({ project, database }: { project: string; database: Database
       <ConnectServices project={project} database={database} />
       <p className="type-meta text-muted-foreground">{t("db.inCluster")}</p>
       <NoAppDatabase database={database} />
-      <Rows>
-        <Row label={t("db.host")}>
+      <CardRows>
+        <CardRow label={t("db.host")}>
           {mono(c.host)}
           <CopyText value={() => c.host} label={t("common.copy")} />
-        </Row>
-        <Row label={t("db.port")}>{mono(String(c.port))}</Row>
-        {c.database ? <Row label={t("db.database")}>{mono(c.database)}</Row> : null}
+        </CardRow>
+        <CardRow label={t("db.port")}>{mono(String(c.port))}</CardRow>
+        {c.database ? <CardRow label={t("db.database")}>{mono(c.database)}</CardRow> : null}
         <UsernameRow connection={c}>
           {username ? mono(username) : <InSecret secret={c.secret} />}
         </UsernameRow>
-        <Row label={t("db.password")}>
-          {shown ? mono(password) : mono("••••••••")}
-          {shown ? (
-            <>
-              <CopyText value={() => password} label={t("common.copy")} />
-              <Button variant="ghost" size="xs" onClick={() => setSecret(undefined)}>
-                <EyeSlashIcon aria-hidden="true" data-icon="inline-start" />
-                {t("db.hide")}
-              </Button>
-            </>
-          ) : (
-            <GateTip gate={revealGate}>
-              <Button
-                variant="ghost"
-                size="xs"
-                loading={secret?.pending}
-                onClick={() => void reveal()}
-              >
-                <EyeIcon aria-hidden="true" data-icon="inline-start" />
-                {t("db.reveal")}
-              </Button>
-            </GateTip>
-          )}
-        </Row>
-        <Row label={t("db.uri")}>
+        <RevealRow label={t("db.password")} value={password} reveal={revealed} />
+        <CardRow label={t("db.uri")}>
           {mono(uri)}
           <CopyText value={() => uri} label={t("common.copy")} />
-        </Row>
-      </Rows>
+        </CardRow>
+      </CardRows>
       {secret?.problem ? <Problem problem={secret.problem} what={c.secret} /> : null}
     </Section>
   )
@@ -728,42 +545,12 @@ function UsernameRow({
 }) {
   const t = useT()
   if (!connection.username && !connection.usernameKey) return null
-  return <Row label={t("db.username")}>{children}</Row>
+  return <CardRow label={t("db.username")}>{children}</CardRow>
 }
 
 function InSecret({ secret }: { secret: string }) {
   const t = useT()
   return <span className="type-meta text-muted-foreground">{t("db.inSecret", secret)}</span>
-}
-
-/** Which services read the database, and connecting another. */
-function ConnectServices({ project, database }: { project: string; database: Database }) {
-  const t = useT()
-  const [open, setOpen] = useState(false)
-  const services = useQuery(projectQuery(project)).data?.services ?? []
-  const targets = useTargets(project)
-  const connectGate = useGate(project, "changeServices")
-  const readers = services.filter((s) => connected(s, database)).map((s) => s.name)
-  if (!database.app)
-    return <p className="type-meta text-muted-foreground">{t("connect.noApp", database.name)}</p>
-  return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <p className="min-w-0 flex-1 text-sm">
-        {readers.length > 0 ? t("connect.readBy", t("common.list", readers)) : t("connect.none")}
-      </p>
-      {targets.some((s) => !connected(s, database)) ? (
-        <GateTip gate={connectGate}>
-          <Button variant="outline" size="xs" onClick={() => setOpen(true)}>
-            <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
-            {t("connect.action")}
-          </Button>
-        </GateTip>
-      ) : null}
-      {open ? (
-        <ConnectDrawer project={project} database={database} onClose={() => setOpen(false)} />
-      ) : null}
-    </div>
-  )
 }
 
 function Backups({
@@ -841,20 +628,20 @@ function Target({ database }: { database: Database }) {
   const note = targetNote[database.engine]
   return (
     <Section id="db-target" title={t("db.backup.destination")}>
-      <Rows>
-        <Row label={t("db.backup.destination")}>
+      <CardRows>
+        <CardRow label={t("db.backup.destination")}>
           <span className="min-w-0 truncate type-mono" translate="no">
             {store.destination ?? store.name}
           </span>
-        </Row>
+        </CardRow>
         {store.endpoint ? (
-          <Row label={t("db.backup.endpointFact")}>
+          <CardRow label={t("db.backup.endpointFact")}>
             <span className="min-w-0 truncate type-mono" translate="no">
               {store.endpoint}
             </span>
-          </Row>
+          </CardRow>
         ) : null}
-        <Row label={t("db.backup.schedule")}>
+        <CardRow label={t("db.backup.schedule")}>
           {database.backups.schedules.length === 0 ? (
             <span className="text-muted-foreground">{t("db.backup.unscheduled")}</span>
           ) : (
@@ -869,9 +656,9 @@ function Target({ database }: { database: Database }) {
               </span>
             ))
           )}
-        </Row>
-        <Row label={t("db.backup.retention")}>{retention}</Row>
-      </Rows>
+        </CardRow>
+        <CardRow label={t("db.backup.retention")}>{retention}</CardRow>
+      </CardRows>
       {note ? <p className="type-meta text-muted-foreground">{t(note)}</p> : null}
     </Section>
   )

@@ -1,16 +1,12 @@
-import { useQuery } from "@tanstack/react-query"
 import { useState, type ReactNode } from "react"
 
-import { objectQuery } from "@/api/queries"
 import { CopyText } from "@/components/copy-text"
 import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { FormField } from "@/components/form-field"
+import { ObjectYaml } from "@/components/store-detail"
 import { GateNote, GateTip, useGate } from "@/components/gate"
-import { LoadingRows } from "@/components/page"
 import { kindWord, useStorage } from "@/components/storage-class"
 import { usePlanner } from "@/components/plan/planner"
-import { Problem } from "@/components/problem"
-import { YamlView } from "@/components/yaml-view"
 import { useT } from "@/i18n"
 import {
   commands,
@@ -259,19 +255,7 @@ function Part({
 
 /** The operator's object as YAML, as a service's workload shows in its YAML view. */
 function DatabaseYaml({ project, database }: { project: string; database: Database }) {
-  const t = useT()
-  const address = databaseAddress(database)
-  const object = useQuery(objectQuery(project, address))
-  if (object.isPending) return <LoadingRows label={t("common.loading")} rows={8} />
-  if (object.isError) return <Problem error={object.error} />
-  return (
-    <YamlView
-      project={project}
-      address={address}
-      yaml={object.data.yaml}
-      managedBy={object.data.provenance.tool}
-    />
-  )
+  return <ObjectYaml project={project} address={databaseAddress(database)} />
 }
 
 function Commands({ project, database }: { project: string; database: Database }) {

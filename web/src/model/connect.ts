@@ -7,28 +7,41 @@ type EnvEdit = Schemas["EnvEdit"]
 type Env = Schemas["EnvVar"]
 
 export type Target = Pick<Service, "kind" | "name" | "containers">
-/** A database as far as connecting to it goes; also one not created yet. */
-export type Connectable = Pick<Database, "engine" | "name" | "connection" | "app">
+/** What a service connects to: a database engine, or S3 object storage. */
+export type ConnectEngine = Engine | "s3"
+/** A database or object store as far as connecting to it goes; also one not created yet. */
+export type Connectable = Pick<Database, "name" | "connection" | "app"> & {
+  engine: ConnectEngine
+  /** S3 bucket names, for object storage. */
+  buckets?: string[]
+}
 
 /** The variable a service reads the database from, as Railway names it. */
-const MAIN: Record<Engine, string> = {
+const MAIN: Record<ConnectEngine, string> = {
   postgresql: "DATABASE_URL",
   mongodb: "MONGO_URL",
   mysql: "DATABASE_URL",
   mariadb: "DATABASE_URL",
   dragonfly: "REDIS_URL",
+  s3: "S3_ENDPOINT",
 }
 
 /** The variable the password goes in, where the URL is a literal that reads it. */
-const PASSWORD: Record<Engine, string | undefined> = {
+const PASSWORD: Record<ConnectEngine, string | undefined> = {
   postgresql: undefined,
   mongodb: "MONGOPASSWORD",
   mysql: "MYSQLPASSWORD",
   mariadb: "MYSQLPASSWORD",
   dragonfly: "REDIS_PASSWORD",
+  s3: "S3_SECRET_ACCESS_KEY",
 }
 
-const mainVariable = (database: Pick<Database, "engine">) => MAIN[database.engine]
+/** The other variables of an S3 connection, after its stem. */
+const S3_EXTRAS = ["S3_ACCESS_KEY_ID", "S3_REGION", "S3_BUCKET"] as const
+
+type HasEngine = Pick<Connectable, "engine">
+
+const mainVariable = (database: HasEngine) => MAIN[database.engine]
 
 const PG_EXTRAS = [
   ["PGHOST", "host"],
@@ -59,23 +72,31 @@ export interface Naming {
   /** The main variable; the suggested one when absent. */
   name?: string
   extras?: boolean
+  /** The S3 bucket `S3_BUCKET` names. */
+  bucket?: string
 }
 
 /** What goes before the companions' standard names: `ORDERS_` for `ORDERS_DATABASE_URL`,
  * nothing for `DATABASE_URL`. */
-function stemOf(database: Pick<Database, "engine">, name: string) {
-  const stem = name.replace(new RegExp(`_?(${mainVariable(database)}|URL|URI)$`), "")
+function stemOf(database: HasEngine, name: string) {
+  const stem = name.replace(new RegExp(`_?(${mainVariable(database)}|URL|URI|ENDPOINT)$`), "")
   return stem ? `${stem}_` : ""
 }
 
-/** Every variable a connection under `name` sets: the main one, the password, PG*. */
-export function namesOf(database: Pick<Database, "engine">, name: string, extras = false) {
+/** Every variable a connection under `name` sets: the main one, the password, PG* or S3_*. */
+export function namesOf(database: HasEngine, name: string, extras = false) {
   const stem = stemOf(database, name)
   const password = PASSWORD[database.engine]
+  const more =
+    database.engine === "s3"
+      ? S3_EXTRAS
+      : database.engine === "postgresql" && extras
+        ? pgExtras
+        : []
   return {
     main: name,
     password: password ? `${stem}${password}` : undefined,
-    extras: database.engine === "postgresql" && extras ? pgExtras.map((e) => `${stem}${e}`) : [],
+    extras: more.map((e) => `${stem}${e}`),
   }
 }
 
@@ -88,7 +109,7 @@ const allNames = (names: ReturnType<typeof namesOf>) => [
 /** The first of the database's variable names, then the same under its prefix, that none of
  * the services has yet. */
 export function suggestedName(
-  database: Pick<Database, "engine" | "name">,
+  database: Pick<Connectable, "engine" | "name">,
   targets: Target[],
   extras = false,
 ): string {
@@ -117,7 +138,7 @@ export type NameProblem = { kind: "invalid" } | { kind: "taken"; name: string; s
 
 /** Why the connection cannot use `name` in these services. */
 export function nameProblem(
-  database: Pick<Database, "engine">,
+  database: HasEngine,
   targets: Target[],
   name: string,
   extras = false,
@@ -142,6 +163,8 @@ function urlOf(database: Connectable, app: NonNullable<Connectable["app"]>, pass
     case "mysql":
     case "mariadb":
       return `mysql://${app.username}:$(${password})@${host}:${port}/${app.database ?? ""}`
+    case "s3":
+      return `http://${host}:${port}`
   }
 }
 
@@ -150,7 +173,7 @@ function urlOf(database: Connectable, app: NonNullable<Connectable["app"]>, pass
 export function variablesFor(
   database: Connectable,
   target: Target,
-  { name, extras = false }: Naming = {},
+  { name, extras = false, bucket }: Naming = {},
 ): EnvEdit[] {
   const app = database.app
   if (!app) return []
@@ -166,6 +189,16 @@ export function variablesFor(
       ...(extras ? PG_EXTRAS.map(([, key], i) => secret(names.extras[i] ?? "", key)) : []),
     ]
   const password = names.password ?? PASSWORD[database.engine] ?? "PASSWORD"
+  if (database.engine === "s3") {
+    const [accessKey = "", region = "", bucketName = ""] = names.extras
+    return [
+      { op: "set", name: names.main, value: urlOf(database, app, password) },
+      secret(accessKey, database.connection.usernameKey ?? "accessKey"),
+      secret(password, app.passwordKey),
+      { op: "set", name: region, value: "us-east-1" },
+      ...(bucket ? [{ op: "set" as const, name: bucketName, value: bucket }] : []),
+    ]
+  }
   return [
     secret(password, app.passwordKey),
     { op: "set", name: names.main, value: urlOf(database, app, password) },

@@ -63,6 +63,7 @@ import {
   Alerts,
   Backups,
   Databases,
+  ObjectStorageSection,
   Domains,
   SectionChips,
   Storage,
@@ -396,6 +397,7 @@ function ListView({
       <Domains project={project} data={data} refused={refused(refusedPlaces.routes)} />
       <Storage project={project} data={data} refused={refused(refusedPlaces.claims)} />
       <Databases project={project} />
+      <ObjectStorageSection project={project} />
       <Backups project={project} />
     </>
   )
@@ -543,6 +545,7 @@ function NextStep({ project }: { project: string }) {
         </EmptyContent>
       </Empty>
       <Databases project={project} />
+      <ObjectStorageSection project={project} />
     </PageColumn>
   )
 }

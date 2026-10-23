@@ -172,6 +172,23 @@ export function validateDatabaseSearch(search: Record<string, unknown>): Databas
   }
 }
 
+export const objectStorageTabs = ["overview", "logs", "events", "settings"] as const
+export type ObjectStorageTab = (typeof objectStorageTabs)[number]
+
+export interface ObjectStorageSearch {
+  /** Overview when absent. */
+  tab?: ObjectStorageTab
+  pod?: string
+}
+
+export function validateObjectStorageSearch(search: Record<string, unknown>): ObjectStorageSearch {
+  const tab = oneOf(objectStorageTabs, search.tab)
+  return {
+    tab: tab === "overview" ? undefined : tab,
+    pod: tab === "logs" || tab === "events" ? str(search.pod) : undefined,
+  }
+}
+
 export interface ObjectsSearch {
   q?: string
   /** `group/version/resource/name` of the object whose YAML is open. */
@@ -252,3 +269,16 @@ export function validateProjectSearch(search: Record<string, unknown>): ProjectS
     desc: search.desc === true || search.desc === "true" ? true : undefined,
   }
 }
+
+/** The search of a page with a service's tabs once `next` is open: the pod stays on Logs and
+ * Events. */
+export const tabSearch =
+  <Tab extends string>(next: Tab) =>
+  (previous: { pod?: string }) => ({
+    tab: next === "overview" ? undefined : next,
+    pod: next === "logs" || next === "events" ? previous.pod : undefined,
+  })
+
+export const podSearch =
+  (pod?: string) =>
+  <S extends { pod?: string }>(previous: S) => ({ ...previous, pod: pod || undefined })

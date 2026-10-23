@@ -19,6 +19,8 @@ export interface Place {
   tab?: ServicePlace
   /** `engine/name` of the database on its page. */
   database?: string
+  /** The object store on its page. */
+  objectStorage?: string
 }
 
 const entries: Partial<Record<RouteId, ProjectEntry>> = {
@@ -43,6 +45,10 @@ export function usePlace(): Place {
       if (match.routeId === "/projects/$project/databases/$engine/$name") {
         const { project, engine, name } = match.params
         return { route, project, database: `${engine}/${name}` }
+      }
+      if (match.routeId === "/projects/$project/object-storage/$name") {
+        const { project, name } = match.params
+        return { route, project, objectStorage: name }
       }
       const entry = entries[route]
       if (!entry || !("project" in match.params)) return { route }
@@ -82,6 +88,12 @@ export function databaseLink(
     search: { tab },
   }
 }
+
+export const objectStorageLink = (project: string, store: { name: string }) => ({
+  to: "/projects/$project/object-storage/$name" as const,
+  params: { project, name: store.name },
+  search: {},
+})
 
 /** The service's logs with one replica chosen. */
 export const podLogsLink = (

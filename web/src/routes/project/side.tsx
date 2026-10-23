@@ -32,6 +32,12 @@ import {
   useBackups,
 } from "@/components/backups"
 import {
+  NewObjectStorageButton,
+  ObjectStorageNotes,
+  ObjectStorageRow,
+  useObjectStorage,
+} from "@/components/object-storage"
+import {
   DatabaseRow,
   installedEngines,
   NewDatabaseButton,
@@ -780,6 +786,37 @@ export function Storage({
           ) : null}
         </>
       )}
+    </section>
+  )
+}
+
+/** The project's object storage, when there is some or the operator is installed to make it. */
+export function ObjectStorageSection({ project }: { project: string }) {
+  const t = useT()
+  const data = useObjectStorage(project).data
+  if (!data) return null
+  if (data.items.length === 0 && data.state !== "installed" && data.state !== "refused") return null
+  return (
+    <section aria-labelledby="project-object-storage" className="flex flex-col gap-1">
+      <Heading
+        id="project-object-storage"
+        title={t("s3.title")}
+        count={data.items.length || undefined}
+      >
+        <NewObjectStorageButton project={project} data={data} />
+      </Heading>
+      {data.items.length === 0 && data.state === "installed" ? (
+        <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
+          {t("s3.empty")}
+        </p>
+      ) : (
+        <ul className="flex flex-col">
+          {data.items.map((store) => (
+            <ObjectStorageRow key={store.name} project={project} store={store} />
+          ))}
+        </ul>
+      )}
+      <ObjectStorageNotes data={data} />
     </section>
   )
 }

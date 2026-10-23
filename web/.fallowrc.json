@@ -14,6 +14,7 @@
     { "file": "src/routes/database/page.tsx", "exports": ["DatabasePage"] },
     { "file": "src/routes/home.tsx", "exports": ["HomePage"] },
     { "file": "src/routes/members.tsx", "exports": ["MembersPage"] },
+    { "file": "src/routes/object-storage/page.tsx", "exports": ["ObjectStoragePage"] },
     { "file": "src/routes/problem.tsx", "exports": ["ProblemPage"] },
     { "file": "src/routes/project/create.tsx", "exports": ["CreatePage"] },
     { "file": "src/routes/project/objects.tsx", "exports": ["ObjectsPage"] },

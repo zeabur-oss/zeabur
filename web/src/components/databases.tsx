@@ -1,24 +1,24 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState } from "react"
-import PlusIcon from "~icons/ph/plus"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
 import { databasesQuery, nodesQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
-import { FormField, quantity } from "@/components/form-field"
-import { ConnectFields, namingOf, newChoice, useTargets, type Choice } from "@/components/connect"
+import { FormField, NameField, quantity } from "@/components/form-field"
+import { ConnectFields, useNewConnections } from "@/components/connect"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
-import { growthWords, StorageClassField, useStorage } from "@/components/storage-class"
-import { GateTip, useGate } from "@/components/gate"
+import { StorageClassField, StorageSizeField, useStorage } from "@/components/storage-class"
+import { useGate } from "@/components/gate"
+import { OpenButton } from "@/components/store-detail"
 import { useT } from "@/i18n"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { databaseLink } from "@/lib/place"
 import { engineVersion } from "@/model/database-parts"
-import { connectChanges, pendingDatabase } from "@/model/connect"
+import { pendingDatabase } from "@/model/connect"
 import { chosenClass } from "@/model/storage"
 import {
   createDatabase,
@@ -40,8 +40,6 @@ import {
   type NewDatabase,
 } from "@/model/databases"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
 
 export const useDatabases = (project: string) => useQuery(databasesQuery(project))
@@ -145,27 +143,23 @@ export function NewDatabaseButton({
   size?: "xs" | "sm"
 }) {
   const t = useT()
-  const [open, setOpen] = useState(false)
   const gate = useGate(project, "changeDatabases")
   const available = installedEngines(data)
   if (available.length === 0) return null
   return (
-    <>
-      <GateTip gate={gate}>
-        <Button variant="outline" size={size} onClick={() => setOpen(true)}>
-          <PlusIcon aria-hidden="true" data-icon="inline-start" />
-          {t("db.new")}
-        </Button>
-      </GateTip>
-      {open ? (
+    <OpenButton
+      gate={gate}
+      label={t("db.new")}
+      size={size}
+      form={(close) => (
         <NewDatabaseDrawer
           project={project}
           engines={available}
           taken={data.items.map((d) => d.name)}
-          onClose={() => setOpen(false)}
+          onClose={close}
         />
-      ) : null}
-    </>
+      )}
+    />
   )
 }
 
@@ -217,28 +211,21 @@ export function NewDatabaseDrawer({
   const [tried, setTried] = useState(false)
   const step = usePlanStep(project, onClose)
   const storage = useStorage(project)
-  const targets = useTargets(project)
-  const [choice, setChoice] = useState<Choice>(() => newChoice())
+  const connections = useNewConnections(project, pendingDatabase(form, project))
   const set = (patch: Partial<NewDatabase>) => setForm((f) => ({ ...f, ...patch }))
   const nameIssue = nameProblem(form.name, taken)
   const storageBad = !quantity.test(form.storage.trim())
   const resources = presetResources[form.engine][form.size]
-  const pending = pendingDatabase(form, project)
-  const { fresh: picked, name: variable, problem } = namingOf(pending, targets, choice)
   const review = () => {
     setTried(true)
-    if (nameIssue || storageBad || (picked.length > 0 && problem)) return
-    const names = t(
-      "common.list",
-      picked.map((s) => s.name),
-    )
+    if (nameIssue || storageBad || connections.problem) return
     step.plan({
       title: t("db.planCreate", form.name),
       changes: [
         ...createDatabase({ ...form, storage: form.storage.trim() }),
-        ...connectChanges(pending, picked, { ...choice, name: variable }),
+        ...connections.changes(),
       ],
-      notes: picked.length > 0 ? [t("connect.waitsReady", names, form.name)] : undefined,
+      notes: connections.notes(),
     })
   }
   return (
@@ -265,25 +252,18 @@ export function NewDatabaseDrawer({
                   name: form.name,
                 })
                 setMembersPicked(false)
-                setChoice((c) => newChoice(c.picked))
+                connections.reset()
               }}
               items={available.map((e) => ({ value: e, label: t(`db.engine.${e}`) }))}
             />
           </FormField>
         ) : null}
-        <FormField
+        <NameField
           label={t("db.field.name")}
-          errors={tried && nameIssue ? [t(`db.name.${nameIssue}`)] : []}
-        >
-          <Input
-            size="sm"
-            mono
-            value={form.name}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => set({ name: event.target.value.trim() })}
-          />
-        </FormField>
+          error={tried && nameIssue ? t(`db.name.${nameIssue}`) : undefined}
+          value={form.name}
+          onChange={(name) => set({ name })}
+        />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             label={t("db.field.version")}
@@ -329,18 +309,14 @@ export function NewDatabaseDrawer({
               }))}
             />
           </FormField>
-          <FormField
+          <StorageSizeField
             label={t("db.field.storage")}
-            hint={growthWords(t, storage, form.storageClass)}
-            errors={tried && storageBad ? [t("storage.problem.badSize")] : []}
-          >
-            <Input
-              size="sm"
-              mono
-              value={form.storage}
-              onChange={(event) => set({ storage: event.target.value })}
-            />
-          </FormField>
+            storage={storage}
+            storageClass={form.storageClass}
+            value={form.storage}
+            bad={tried && storageBad}
+            onChange={(value) => set({ storage: value })}
+          />
           <FormField
             label={t("db.field.size")}
             hint={t(
@@ -371,14 +347,7 @@ export function NewDatabaseDrawer({
             <AlertDescription>{t("db.noRedundancy", false)}</AlertDescription>
           </Alert>
         ) : null}
-        <ConnectFields
-          database={pending}
-          targets={targets}
-          choice={choice}
-          onChange={setChoice}
-          optional
-          tried={tried}
-        />
+        <ConnectFields {...connections.fieldProps} optional tried={tried} />
       </ReviewForm>
     </PlanDrawer>
   )

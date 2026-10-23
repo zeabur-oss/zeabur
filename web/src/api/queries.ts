@@ -804,3 +804,17 @@ export const imageInspectionQuery = (project: string, body: Schemas["InspectRequ
     staleTime: 5 * 60_000,
     retry: false,
   })
+
+export const objectStorageQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "object-storage"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/object-storage", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  })

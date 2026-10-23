@@ -10,6 +10,13 @@ import {
   type NewDatabase,
 } from "@/model/databases"
 import {
+  bucketProblem,
+  createObjectStorage,
+  newObjectStorage,
+  pendingObjectStorage,
+  type NewObjectStorage,
+} from "@/model/object-storage"
+import {
   imageObjects,
   newImageService,
   projectLevel,
@@ -24,13 +31,16 @@ export type Conversion = Schemas["Conversion"]
 export type ComposeService = Schemas["ComposeService"]
 type Counterpart = Schemas["Counterpart"]
 
-const ENGINE: Record<Counterpart, Engine | undefined> = {
+/** What an operator makes for a Compose service: a database engine, or object storage. */
+export type Managed = Engine | "objectStorage"
+
+const ENGINE: Record<Counterpart, Managed> = {
   postgresql: "postgresql",
   mysql: "mysql",
   mariadb: "mariadb",
   mongodb: "mongodb",
   dragonfly: "dragonfly",
-  objectStorage: undefined,
+  objectStorage: "objectStorage",
 }
 
 /** The port a database image listens on when the Compose file names none. */
@@ -46,18 +56,17 @@ const DEFAULT_PORT: Record<Counterpart, number> = {
 const VOLUME_SIZE = "1Gi"
 
 /** Why a database image stays a plain image. */
-export type KeptReason = "noOperator" | "notInstalled" | "unknown" | "role"
+export type KeptReason = "notInstalled" | "unknown" | "role"
 
-/** For each service with a counterpart: the engine Zeabur can create, or why not. */
+/** For each service with a counterpart: what Zeabur can create, or why not. */
 export function managedOffer(
   service: ComposeService,
-  operators: Partial<Record<Engine, Schemas["DatabaseOperator"]["state"]>>,
-  mayCreate: boolean,
-): { engine: Engine } | { kept: KeptReason } | undefined {
+  operators: Partial<Record<Managed, Schemas["ProviderState"]>>,
+  mayCreate: (engine: Managed) => boolean,
+): { engine: Managed } | { kept: KeptReason } | undefined {
   if (!service.counterpart || !service.image) return undefined
   const engine = ENGINE[service.counterpart]
-  if (!engine) return { kept: "noOperator" }
-  if (!mayCreate) return { kept: "role" }
+  if (!mayCreate(engine)) return { kept: "role" }
   const state = operators[engine]
   if (state === "installed") return { engine }
   return { kept: state === "not-installed" ? "notInstalled" : "unknown" }
@@ -107,20 +116,35 @@ const urlVariables = (v: Variable, database: Connectable): ServiceVariable[] =>
         : { name: edit.name, value: edit.value ?? "", expands: true },
   )
 
-const withPort = (host: string, value: string) => {
-  const port = value.split(":")[1]
-  return port ? `${host}:${port}` : host
+/** The host, with the port when the value has one: the value's own, or object storage's. */
+const withPort = (database: Connectable, value: string) => {
+  const { host, port } = database.connection
+  const own = value.split(":")[1]
+  if (!own) return host
+  return `${host}:${database.engine === "s3" ? port : own}`
 }
+
+const s3Url = (v: Variable, database: Connectable): ServiceVariable[] => [
+  { name: v.name, value: `http://${database.connection.host}:${database.connection.port}` },
+]
 
 /** A variable rewritten for a database an operator makes, by what it holds. */
 const REWRITE: Record<
   Schemas["Part"],
   (v: Variable, database: Connectable, app: App) => ServiceVariable[]
 > = {
-  url: urlVariables,
-  host: (v, database) => [{ name: v.name, value: withPort(database.connection.host, v.value) }],
+  url: (v, database) => (database.engine === "s3" ? s3Url : urlVariables)(v, database),
+  host: (v, database) => [{ name: v.name, value: withPort(database, v.value) }],
   password: (v, _, app) => [{ name: v.name, from: { secret: app.secret, key: app.passwordKey } }],
-  user: (v, _, app) => [{ name: v.name, value: app.username ?? v.value }],
+  user: (v, database, app) =>
+    database.engine === "s3"
+      ? [
+          {
+            name: v.name,
+            from: { secret: app.secret, key: database.connection.usernameKey ?? "accessKey" },
+          },
+        ]
+      : [{ name: v.name, value: app.username ?? v.value }],
   database: (v, _, app) => [{ name: v.name, value: app.database ?? v.value }],
   mention: kept,
 }
@@ -140,18 +164,48 @@ function firstOfEach(variables: ServiceVariable[]): ServiceVariable[] {
 export const imageServices = (conversion: Conversion, choices: ComposeChoices) =>
   conversion.services.filter((s) => s.image && !choices.managed.has(s.name))
 
+/** The buckets a MinIO service's users name: its `MINIO_DEFAULT_BUCKETS`, and the `*BUCKET*`
+ * variables of the services that reach it. */
+function bucketsOf(conversion: Conversion, store: ComposeService): string[] {
+  const own = store.variables
+    .filter((v) => v.name === "MINIO_DEFAULT_BUCKETS")
+    .flatMap((v) => v.value.split(/[,;\s]+/).map((b) => b.split(":")[0] ?? ""))
+  const users = conversion.services.filter((s) =>
+    s.variables.some((v) => v.refers?.service === store.name),
+  )
+  const named = users.flatMap((s) =>
+    s.variables.filter((v) => /BUCKET/.test(v.name) && !v.refers).map((v) => v.value.trim()),
+  )
+  return [...new Set([...own, ...named])].filter((b) => !bucketProblem(b, []))
+}
+
+function storeForm(conversion: Conversion, service: ComposeService): NewObjectStorage {
+  return { ...newObjectStorage(), name: service.name, buckets: bucketsOf(conversion, service) }
+}
+
 /** Every create of the import, databases first, and the project's level once. */
 export function composeChanges(
   conversion: Conversion,
   choices: ComposeChoices,
   context: ComposeContext,
 ): Change[] {
-  const databases = new Map<string, { form: NewDatabase; connection: Connectable }>()
+  const databases = new Map<string, { changes: Change[]; connection: Connectable }>()
   for (const service of conversion.services) {
     const engine = service.counterpart ? ENGINE[service.counterpart] : undefined
     if (!engine || !choices.managed.has(service.name)) continue
+    if (engine === "objectStorage") {
+      const form = storeForm(conversion, service)
+      databases.set(service.name, {
+        changes: createObjectStorage(form),
+        connection: pendingObjectStorage(form, context.project),
+      })
+      continue
+    }
     const form = managedForm(service, engine, context.nodes)
-    databases.set(service.name, { form, connection: pendingDatabase(form, context.project) })
+    databases.set(service.name, {
+      changes: createDatabase(form),
+      connection: pendingDatabase(form, context.project),
+    })
   }
   const byName = new Map(conversion.services.map((s) => [s.name, s]))
   const reach = (name: string) => {
@@ -161,7 +215,7 @@ export function composeChanges(
     const port = target ? portsOf(target)[0] : undefined
     return port ? { host: name, port } : undefined
   }
-  const changes: Change[] = [...databases.values()].flatMap(({ form }) => createDatabase(form))
+  const changes: Change[] = [...databases.values()].flatMap((d) => d.changes)
   for (const service of imageServices(conversion, choices)) {
     const form = imageService(service, choices, context, (variable) =>
       rewrite(variable, databases.get(variable.refers?.service ?? "")?.connection),

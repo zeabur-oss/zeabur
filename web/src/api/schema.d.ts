@@ -1238,6 +1238,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/object-storage": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The object storage of a project, read as the person. */
+    get: operations["getProjectObjectStorage"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/objects": {
     parameters: {
       query?: never
@@ -6449,6 +6466,17 @@ export interface components {
        */
       workloadPatch: components["schemas"]["WorkloadPatch"][]
     }
+    /** @description A project's object storage. */
+    ProjectObjectStorage: {
+      /** @description The stores, by name. */
+      items: components["schemas"]["SeaweedObjectStorage"][]
+      /** @description The operator's module (`seaweedfs-operator`). */
+      module: string
+      /** @description Whether its objects could be read. */
+      state: components["schemas"]["ProviderState"]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /** @description What the person may change in one project. */
     ProjectRights: {
       /** @description Back up databases: `create` on an operator's backups. */
@@ -6465,6 +6493,11 @@ export interface components {
       changeMembers: components["schemas"]["Permission"]
       /** @description Change network policies: `create` and `patch` on networkpolicies. */
       changeNetworkPolicies: components["schemas"]["Permission"]
+      /**
+       * @description Create, change and delete object storage: `create`, `patch` and `delete` on the `SeaweedFS`
+       *     Operator's seaweeds.
+       */
+      changeObjectStorage: components["schemas"]["Permission"]
       /** @description Create and change Secrets: `create` and `patch` on secrets. */
       changeSecrets: components["schemas"]["Permission"]
       /** @description Change, restart and redeploy services: `patch` on a workload kind. */
@@ -6980,6 +7013,83 @@ export interface components {
       state: components["schemas"]["ProviderState"]
       /** @description What could not be read. */
       unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description The access key services use, from an `S3Credentials` of the store. */
+    SeaweedAccessKey: {
+      /** @description The access key ID, once the operator made it; it is not secret. */
+      id?: string | null
+      /** @description The `S3Credentials` object's name. */
+      name: string
+      /** @description `Pending`, `Ready`, `Failed` or `Terminating`, as the operator says. */
+      phase?: string | null
+      /** @description The IAM user it belongs to. */
+      user: string
+    }
+    /** @description One bucket. */
+    SeaweedBucket: {
+      /** @description Deleting the object deletes the bucket and its contents. */
+      deletesContents: boolean
+      /** @description The message of a condition that is not true, when there is one. */
+      message?: string | null
+      /** @description The object's name. */
+      name: string
+      /**
+       * Format: int64
+       * @description The objects stored, as last counted.
+       */
+      objects?: number | null
+      /** @description The `Bucket` object. */
+      origin: components["schemas"]["Origin"]
+      /** @description `Pending`, `Ready`, `Failed` or `Terminating`, as the operator says. */
+      phase?: string | null
+      /** @description The S3 bucket name. */
+      s3Name: string
+      /**
+       * Format: int64
+       * @description The bytes stored, as last counted.
+       */
+      usedBytes?: number | null
+    }
+    /** @description One object store. */
+    SeaweedObjectStorage: {
+      accessKey?: components["schemas"]["SeaweedAccessKey"] | null
+      /** @description Its buckets, by name. */
+      buckets: components["schemas"]["SeaweedBucket"][]
+      connection?: components["schemas"]["DatabaseConnection"] | null
+      /** @description When it was created, RFC 3339. */
+      created?: string | null
+      /** @description Its IAM objects: identities, credentials, policies and policy bindings, by kind and name. */
+      iam: components["schemas"]["Origin"][]
+      /** @description The `SeaweedFS` image. */
+      image?: string | null
+      /**
+       * Format: int64
+       * @description Pods asked for, over the master, volume servers, filer and S3 gateway.
+       */
+      members: number
+      /** @description The operator's message, when it is not ready. */
+      message?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description The object as written, without `status` and `managedFields`. */
+      object: Record<string, never>
+      /** @description The `Seaweed` object. */
+      origin: components["schemas"]["Origin"]
+      /** @description Its pods, by name; empty when they cannot be read. */
+      pods: components["schemas"]["PodSummary"][]
+      /**
+       * Format: int64
+       * @description Pods ready.
+       */
+      ready: number
+      /** @description How it is. */
+      state: components["schemas"]["DatabaseState"]
+      /** @description The size of each volume server's disk, as asked for. */
+      storage?: string | null
+      /** @description The `StorageClass` of the volume servers' disks; absent for the cluster's default. */
+      storageClass?: string | null
+      /** @description The `SeaweedFS` version, from the image tag. */
+      version?: string | null
     }
     /** @description One value of a revealed Secret. */
     SecretValue: {
@@ -10357,6 +10467,36 @@ export interface operations {
         }
       }
       422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getProjectObjectStorage: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ProjectObjectStorage"]
+        }
+      }
+      403: {
         headers: {
           [name: string]: unknown
         }

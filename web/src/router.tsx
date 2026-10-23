@@ -17,6 +17,7 @@ import {
   clusterQuery,
   clusterWarningsQuery,
   databasesQuery,
+  objectStorageQuery,
   eventsQuery,
   namespaceQuery,
   nodesQuery,
@@ -44,6 +45,7 @@ import {
   validateProjectSearch,
   validateProjectsSearch,
   validateDatabaseSearch,
+  validateObjectStorageSearch,
   validateServiceSearch,
 } from "@/routes/search"
 
@@ -77,6 +79,7 @@ import {
 //   /projects/$project/databases/$engine/$name one database an operator runs: ?tab=logs|backups|
 //                                              events|settings (Overview when absent), and
 //                                              Settings' YAML view (?mode=yaml)
+//   /projects/$project/object-storage/$name    one object store: ?tab=logs|events|settings
 //   /settings                                  preferences, the signed-in person, About
 //   /account                                   your account: who you are, your role in each
 //                                              project, a link to manage how you sign in
@@ -291,6 +294,15 @@ const databaseRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/database/page"), "DatabasePage"),
 })
 
+const objectStorageRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/projects/$project/object-storage/$name",
+  validateSearch: validateObjectStorageSearch,
+  loader: ({ params }) => load(ensure(objectStorageQuery(params.project))),
+  remountDeps: ({ params }) => `${params.project}/${params.name}`,
+  component: lazyRouteComponent(() => import("@/routes/object-storage/page"), "ObjectStoragePage"),
+})
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
@@ -366,6 +378,7 @@ export const router = createRouter({
     toolsTerminalRoute,
     serviceRoute,
     databaseRoute,
+    objectStorageRoute,
     settingsRoute,
     accountRoute,
     membersRoute,

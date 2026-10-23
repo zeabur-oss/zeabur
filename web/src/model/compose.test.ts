@@ -138,15 +138,95 @@ describe("composeChanges", () => {
 
 describe("managedOffer", () => {
   const [cache, db] = conversion.services
+  const yes = () => true
   test("says why a database stays an image", () => {
-    expect(managedOffer(db!, { postgresql: "installed" }, true)).toEqual({ engine: "postgresql" })
-    expect(managedOffer(db!, { postgresql: "not-installed" }, true)).toEqual({
+    expect(managedOffer(db!, { postgresql: "installed" }, yes)).toEqual({ engine: "postgresql" })
+    expect(managedOffer(db!, { postgresql: "not-installed" }, yes)).toEqual({
       kept: "notInstalled",
     })
-    expect(managedOffer(cache!, {}, true)).toEqual({ kept: "unknown" })
-    expect(managedOffer(db!, { postgresql: "installed" }, false)).toEqual({ kept: "role" })
+    expect(managedOffer(cache!, {}, yes)).toEqual({ kept: "unknown" })
+    expect(managedOffer(db!, { postgresql: "installed" }, () => false)).toEqual({ kept: "role" })
+    const minio = { ...db!, image: "minio/minio", counterpart: "objectStorage" as const }
+    expect(managedOffer(minio, { objectStorage: "installed" }, yes)).toEqual({
+      engine: "objectStorage",
+    })
     expect(
-      managedOffer({ ...db!, image: "minio/minio", counterpart: "objectStorage" }, {}, true),
-    ).toEqual({ kept: "noOperator" })
+      managedOffer(minio, { objectStorage: "installed" }, (e) => e !== "objectStorage"),
+    ).toEqual({ kept: "role" })
+  })
+})
+
+describe("MinIO", () => {
+  const minio: Conversion = {
+    waitImage: "busybox:1.37.0",
+    missingEnvFiles: [],
+    unset: [],
+    services: [
+      {
+        name: "minio",
+        composeName: "minio",
+        image: "minio/minio:latest",
+        counterpart: "objectStorage",
+        ports: [9000],
+        published: false,
+        variables: [{ name: "MINIO_ROOT_PASSWORD", value: "s3cret" }],
+        volumes: [],
+        dependsOn: [],
+        replicas: 1,
+        findings: [],
+      },
+      {
+        name: "app",
+        composeName: "app",
+        image: "ghcr.io/acme/app:1",
+        ports: [],
+        published: false,
+        variables: [
+          {
+            name: "S3_ENDPOINT",
+            value: "http://minio:9000",
+            refers: { service: "minio", part: "url" },
+          },
+          { name: "S3_ACCESS_KEY_ID", value: "admin", refers: { service: "minio", part: "user" } },
+          {
+            name: "S3_SECRET_ACCESS_KEY",
+            value: "s3cret",
+            refers: { service: "minio", part: "password" },
+          },
+          { name: "S3_BUCKET", value: "uploads" },
+        ],
+        volumes: [],
+        dependsOn: ["minio"],
+        replicas: 1,
+        findings: [],
+      },
+    ],
+  }
+
+  test("becomes SeaweedFS object storage with the bucket its users name", () => {
+    const changes = composeChanges(
+      minio,
+      { managed: new Set(["minio"]), published: new Map() },
+      context,
+    )
+    const made = changes.flatMap((c) => (c.op === "create" ? [c.object as unknown as Object] : []))
+    expect(named(made, "Seaweed", "minio")).toBeDefined()
+    expect(named(made, "Bucket", "minio-uploads")?.spec.name).toBe("uploads")
+    expect(named(made, "Deployment", "minio")).toBeUndefined()
+    const container = named(made, "Deployment", "app")?.spec.template.spec.containers[0]
+    expect(container.env).toEqual([
+      {
+        name: "S3_ACCESS_KEY_ID",
+        valueFrom: { secretKeyRef: { name: "minio-app", key: "accessKey" } },
+      },
+      {
+        name: "S3_SECRET_ACCESS_KEY",
+        valueFrom: { secretKeyRef: { name: "minio-app", key: "secretKey" } },
+      },
+    ])
+    expect(named(made, "Secret", "app-env")?.stringData).toEqual({
+      S3_ENDPOINT: "http://minio-s3.shop.svc:8333",
+      S3_BUCKET: "uploads",
+    })
   })
 })

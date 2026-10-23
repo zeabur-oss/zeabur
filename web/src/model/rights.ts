@@ -25,6 +25,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   changeDomains: { role: "developer", rule: "create ingresses.networking.k8s.io" },
   changeStorage: { role: "developer", rule: "create persistentvolumeclaims" },
   changeDatabases: { role: "developer", rule: "create clusters.postgresql.cnpg.io" },
+  changeObjectStorage: { role: "developer", rule: "create seaweeds.seaweed.seaweedfs.com" },
   backUpDatabases: { role: "developer", rule: "create backups.postgresql.cnpg.io" },
   openTerminal: { role: "developer", rule: "create pods/exec" },
   readLogs: { role: "developer", rule: "get pods/log" },
@@ -137,6 +138,8 @@ export function rightOfResource(
     mysqlclusters: "changeDatabases",
     mariadbs: "changeDatabases",
     dragonflies: "changeDatabases",
+    seaweeds: "changeObjectStorage",
+    buckets: "changeObjectStorage",
   }
   return rights[resource]
 }

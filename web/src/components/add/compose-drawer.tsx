@@ -3,7 +3,13 @@ import { useNavigate } from "@tanstack/react-router"
 import { useId, useRef, useState, type ChangeEvent, type ReactNode } from "react"
 
 import { api, toProblem, unwrap } from "@/api/client"
-import { clusterQuery, creatableQuery, databasesQuery, nodesQuery } from "@/api/queries"
+import {
+  clusterQuery,
+  creatableQuery,
+  databasesQuery,
+  nodesQuery,
+  objectStorageQuery,
+} from "@/api/queries"
 import { useTakenNames } from "@/components/add/taken"
 import { FormField } from "@/components/form-field"
 import { useGates } from "@/components/gate"
@@ -20,8 +26,9 @@ import {
   type ComposeService,
   type Conversion,
   type KeptReason,
+  type Managed,
 } from "@/model/compose"
-import { engineName, type Engine } from "@/model/databases"
+import { engineName } from "@/model/databases"
 import {
   hostProblem,
   imageOptions,
@@ -46,12 +53,17 @@ function useComposeContext(project: string) {
   const domains = useQuery(clusterQuery).data?.domains ?? {}
   const options = imageOptions(rightsOf(useQuery(creatableQuery(project)).data))
   const operators = useQuery(databasesQuery(project)).data?.operators ?? []
+  const store = useQuery(objectStorageQuery(project)).data?.state
   const nodes = useQuery(nodesQuery).data?.items.length || 1
-  const mayCreate = useGates(project)("changeDatabases").open
+  const gates = useGates(project)
+  const databases = gates("changeDatabases").open
+  const objectStorage = gates("changeObjectStorage").open
+  const mayCreate = (engine: Managed) => (engine === "objectStorage" ? objectStorage : databases)
   const { enforced } = useProjectSecurity(project)
   const taken = useTakenNames(project)
-  const states: Partial<Record<Engine, (typeof operators)[number]["state"]>> = {}
+  const states: Partial<Record<Managed, (typeof operators)[number]["state"]>> = {}
   for (const o of operators) states[o.engine] = o.state
+  if (store) states.objectStorage = store
   return { domains, options, nodes, enforced, states, mayCreate, taken }
 }
 
@@ -206,7 +218,7 @@ const ReadError = ({ error }: { error: Error | null }) =>
     </Alert>
   ) : null
 
-const offersEngine = (offer: Offer): offer is { engine: Engine } =>
+const offersEngine = (offer: Offer): offer is { engine: Managed } =>
   offer !== undefined && "engine" in offer
 
 const keptOf = (offer: Offer): KeptReason | undefined =>
@@ -453,7 +465,7 @@ function Counterpart({
   return (
     <>
       <Toggle checked={managed} onChange={onManaged}>
-        {t("add.composeManaged", engineName(offer.engine))}
+        {t("add.composeManaged", managedName(t, offer.engine))}
       </Toggle>
       {managed ? <span>{t("add.composeManagedHint", image)}</span> : null}
     </>
@@ -529,8 +541,10 @@ function ServiceFacts({ service }: { service: ComposeService }) {
   ))
 }
 
+const managedName = (t: Translate, engine: Managed) =>
+  engine === "objectStorage" ? t("s3.engine") : engineName(engine)
+
 const KEPT: Record<KeptReason, (t: Translate, image: string, engine: string) => string> = {
-  noOperator: (t, image) => t("add.composeKept.noOperator", image),
   notInstalled: (t, image, engine) => t("add.composeKept.notInstalled", image, engine),
   unknown: (t, image, engine) => t("add.composeKept.unknown", image, engine),
   role: (t, image) => t("add.composeKept.role", image),
@@ -538,8 +552,9 @@ const KEPT: Record<KeptReason, (t: Translate, image: string, engine: string) => 
 
 function keptText(t: Translate, kept: KeptReason, image: string, service: ComposeService) {
   const counterpart = service.counterpart
-  const engine = counterpart && counterpart !== "objectStorage" ? engineName(counterpart) : ""
-  return KEPT[kept](t, image, engine)
+  if (kept === "role" && counterpart === "objectStorage")
+    return t("add.composeKept.roleObjectStorage", image)
+  return KEPT[kept](t, image, counterpart ? managedName(t, counterpart) : "")
 }
 
 type Of<C extends Finding["code"]> = Extract<Finding, { code: C }>
