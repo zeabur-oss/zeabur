@@ -12,6 +12,7 @@ type Preview = Schemas["Preview"]
 type Rollout = Schemas["Rollout"]
 
 const starts = (rollout: Rollout) => rollout.actions.every((a) => a === "start")
+const stops = (rollout: Rollout) => rollout.actions.every((a) => a === "stop")
 
 function rolloutText(t: Translate, rollout: Rollout): string {
   const name = rollout.workload.name
@@ -117,7 +118,8 @@ export function PlanPreview({
       {(
         [
           ["preview.starts", rollouts.filter(starts)],
-          ["preview.restarts", rollouts.filter((r) => !starts(r))],
+          ["preview.restarts", rollouts.filter((r) => !starts(r) && !stops(r))],
+          ["preview.stops", rollouts.filter(stops)],
         ] as const
       ).map(([heading, list]) =>
         list.length > 0 ? (
@@ -130,7 +132,7 @@ export function PlanPreview({
                   health={rollout.downtime ? "warn" : "idle"}
                 >
                   {rolloutText(t, rollout)}
-                  {rollout.downtime ? (
+                  {rollout.downtime && !stops(rollout) ? (
                     <span className="text-warn-strong"> {t("preview.downtime")}</span>
                   ) : null}
                 </Line>

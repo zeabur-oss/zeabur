@@ -2667,6 +2667,7 @@ export const zhCN: Messages = {
   // ia:start
   "preview.starts": "会启动的服务",
   "preview.restarts": "会重新启动的服务",
+  "preview.stops": "会停止的服务",
   "preview.roll.rolling": (name) => `${name} 会逐一替换副本。`,
   "preview.roll.recreate": (name) => `${name} 会先停止所有副本，再启动新的。`,
   "preview.roll.onDelete": (name) => `${name} 要等你删除旧副本后才会应用新设置。`,

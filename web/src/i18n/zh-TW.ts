@@ -2673,6 +2673,7 @@ export const zhTW: Messages = {
   // ia:start
   "preview.starts": "會啟動的服務",
   "preview.restarts": "會重新啟動的服務",
+  "preview.stops": "會停止的服務",
   "preview.roll.rolling": (name) => `${name} 會逐一替換副本。`,
   "preview.roll.recreate": (name) => `${name} 會先停止所有副本，再啟動新的。`,
   "preview.roll.onDelete": (name) => `${name} 要等你刪除舊副本後才會套用新設定。`,

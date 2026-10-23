@@ -2936,6 +2936,7 @@ export const en = {
   // ia:start
   "preview.starts": "What starts",
   "preview.restarts": "What restarts",
+  "preview.stops": "What stops",
   "preview.roll.rolling": (name: string) => `${name} replaces its replicas one at a time.`,
   "preview.roll.recreate": (name: string) => `${name} stops every replica, then starts new ones.`,
   "preview.roll.onDelete": (name: string) =>
