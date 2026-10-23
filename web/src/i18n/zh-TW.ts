@@ -63,7 +63,7 @@ export const zhTW: Messages = {
   "column.label": "服務",
   "column.other": "其他物件",
   "column.advanced": "進階",
-  "column.namespace": "Namespace",
+  "column.namespace": "Kubernetes Namespace",
 
   "theme.system": "跟隨系統",
   "theme.light": "淺色",
@@ -104,7 +104,7 @@ export const zhTW: Messages = {
   "problem.title.conflict": "這段期間已有其他變更",
   "problem.title.managed": "由其他工具管理",
   "problem.title.plan-expired": "這份變更已過期",
-  "problem.title.system-namespace": "這是 Kubernetes 自用的 Namespace",
+  "problem.title.system-namespace": "這個名稱是 Kubernetes 自用的",
   "problem.title.invalid": "叢集拒絕了這項變更",
   "problem.title.too-many-requests": "叢集忙碌中",
   "problem.title.unavailable": "無法連上叢集",
@@ -122,7 +122,7 @@ export const zhTW: Messages = {
   "problem.fix.managed":
     "到管理工具讀取設定的地方變更，例如 Helm values 或 Git 儲存庫。這裡仍然可以重新啟動。",
   "problem.fix.plan-expired": "重新檢查變更。",
-  "problem.fix.system-namespace": "改為使用你自己的 Namespace。",
+  "problem.fix.system-namespace": "改用不是 kube- 開頭的名稱。",
   "problem.fix.invalid": "修正細節中叢集指出的欄位，再試一次。",
   "problem.fix.too-many-requests": "稍等一下再試一次。",
   "problem.fix.unavailable": "確認叢集正在運作，而且這台機器連得到它。",
@@ -157,7 +157,7 @@ export const zhTW: Messages = {
   "problemPage.rule.plan-expired":
     "你檢查過的變更，就是 Zeabur 將要寫入的內容。它只在幾分鐘內有效，這樣套用時，內容仍符合叢集現況。",
   "problemPage.rule.system-namespace":
-    "Kubernetes 保留了幾個 Namespace 給自己的元件使用（kube-system、kube-public、kube-node-lease），它們不能成為專案。",
+    "kube- 開頭的名稱是 Kubernetes 元件專用的（kube-system、kube-public、kube-node-lease），不能成為專案。",
   "problemPage.rule.invalid":
     "叢集儲存物件之前，會依照它的結構描述與規則檢查。叢集拒絕了這個物件，並指出哪些欄位無效。",
   "problemPage.rule.too-many-requests":
@@ -2152,7 +2152,7 @@ export const zhTW: Messages = {
     p.name ? `${p.name} 由其他工具管理。` : "這由其他工具管理。",
   "sentence.problem.summary.plan-expired": () => "這份變更已過期。",
   "sentence.problem.summary.system-namespace": (p) =>
-    p.name ? `${p.name} 是 Kubernetes 自用的 Namespace。` : "這是 Kubernetes 自用的 Namespace。",
+    p.name ? `${p.name} 是 Kubernetes 自用的名稱。` : "這是 Kubernetes 自用的名稱。",
   "sentence.problem.summary.invalid": (p) =>
     p.name ? `叢集拒絕了對 ${p.name} 的變更。` : "叢集拒絕了這項變更。",
   "sentence.problem.summary.too-many-requests": () => "叢集正忙。",

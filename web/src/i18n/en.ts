@@ -75,7 +75,7 @@ export const en = {
   "column.label": "Services",
   "column.other": "Other objects",
   "column.advanced": "Advanced",
-  "column.namespace": "Namespace",
+  "column.namespace": "Kubernetes namespace",
 
   "theme.system": "System theme",
   "theme.light": "Light",
@@ -119,7 +119,7 @@ export const en = {
   "problem.title.conflict": "It changed in the meantime",
   "problem.title.managed": "Another tool manages it",
   "problem.title.plan-expired": "These changes expired",
-  "problem.title.system-namespace": "Kubernetes keeps this namespace for itself",
+  "problem.title.system-namespace": "Kubernetes keeps this name for itself",
   "problem.title.invalid": "The cluster rejected the change",
   "problem.title.too-many-requests": "The cluster is busy",
   "problem.title.unavailable": "The cluster cannot be reached",
@@ -140,7 +140,7 @@ export const en = {
   "problem.fix.managed":
     "Change it where the managing tool reads it, such as Helm values or a Git repository. Restarting still works here.",
   "problem.fix.plan-expired": "Review the changes again.",
-  "problem.fix.system-namespace": "Use a namespace of your own instead.",
+  "problem.fix.system-namespace": "Choose a name that doesn't start with kube-.",
   "problem.fix.invalid": "Correct the fields the cluster names in the details, then try again.",
   "problem.fix.too-many-requests": "Wait a moment and try again.",
   "problem.fix.unavailable":
@@ -178,7 +178,7 @@ export const en = {
   "problemPage.rule.plan-expired":
     "Reviewed changes are what Zeabur will write, as you saw them. They hold for a few minutes only, so what is applied still matches the cluster as it is.",
   "problemPage.rule.system-namespace":
-    "Kubernetes keeps some namespaces for its own components (kube-system, kube-public, kube-node-lease). They cannot become projects.",
+    "Kubernetes keeps names starting with kube- (kube-system, kube-public, kube-node-lease) for its own components. They cannot become projects.",
   "problemPage.rule.invalid":
     "The cluster checks each object against its schema and rules before it stores it. It refused this one, and named the fields that are not valid.",
   "problemPage.rule.too-many-requests":
@@ -2343,7 +2343,7 @@ export const en = {
     p.name ? `Another tool manages ${p.name}.` : "Another tool manages this.",
   "sentence.problem.summary.plan-expired": () => "These changes expired.",
   "sentence.problem.summary.system-namespace": (p: P) =>
-    `${p.name ?? "This namespace"} belongs to Kubernetes itself.`,
+    `${p.name ?? "This name"} belongs to Kubernetes itself.`,
   "sentence.problem.summary.invalid": (p: P) =>
     p.name ? `The cluster refused the change to ${p.name}.` : "The cluster refused the change.",
   "sentence.problem.summary.too-many-requests": () => "The cluster is busy.",

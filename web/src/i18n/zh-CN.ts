@@ -63,7 +63,7 @@ export const zhCN: Messages = {
   "column.label": "服务",
   "column.other": "其他对象",
   "column.advanced": "高级",
-  "column.namespace": "Namespace",
+  "column.namespace": "Kubernetes Namespace",
 
   "theme.system": "跟随系统",
   "theme.light": "亮色",
@@ -104,7 +104,7 @@ export const zhCN: Messages = {
   "problem.title.conflict": "在此期间已有其他更改",
   "problem.title.managed": "由其他工具管理",
   "problem.title.plan-expired": "这份变更已过期",
-  "problem.title.system-namespace": "这是 Kubernetes 自用的 Namespace",
+  "problem.title.system-namespace": "这个名称是 Kubernetes 自用的",
   "problem.title.invalid": "集群拒绝了这项更改",
   "problem.title.too-many-requests": "集群繁忙",
   "problem.title.unavailable": "无法连接集群",
@@ -122,7 +122,7 @@ export const zhCN: Messages = {
   "problem.fix.managed":
     "到管理工具读取配置的地方更改，例如 Helm values 或 Git 仓库。这里仍然可以重启。",
   "problem.fix.plan-expired": "重新检查变更。",
-  "problem.fix.system-namespace": "改为使用你自己的 Namespace。",
+  "problem.fix.system-namespace": "改用不以 kube- 开头的名称。",
   "problem.fix.invalid": "修正详细信息中集群指出的字段，然后重试。",
   "problem.fix.too-many-requests": "稍等片刻再重试。",
   "problem.fix.unavailable": "确认集群正在运行，并且这台机器能连接到它。",
@@ -157,7 +157,7 @@ export const zhCN: Messages = {
   "problemPage.rule.plan-expired":
     "你检查过的变更，就是 Zeabur 将要写入的内容。它只在几分钟内有效，确保应用时内容仍然符合集群当前的状态。",
   "problemPage.rule.system-namespace":
-    "Kubernetes 保留了几个 Namespace 给自己的组件使用（kube-system、kube-public、kube-node-lease），它们不能成为项目。",
+    "以 kube- 开头的名称是 Kubernetes 组件专用的（kube-system、kube-public、kube-node-lease），不能成为项目。",
   "problemPage.rule.invalid":
     "集群存储对象之前，会按照它的模式与规则检查。集群拒绝了这个对象，并指出了哪些字段无效。",
   "problemPage.rule.too-many-requests":
@@ -2148,7 +2148,7 @@ export const zhCN: Messages = {
     p.name ? `${p.name} 由其他工具管理。` : "这由其他工具管理。",
   "sentence.problem.summary.plan-expired": () => "这份变更已过期。",
   "sentence.problem.summary.system-namespace": (p) =>
-    p.name ? `${p.name} 是 Kubernetes 自用的 Namespace。` : "这是 Kubernetes 自用的 Namespace。",
+    p.name ? `${p.name} 是 Kubernetes 自用的名称。` : "这是 Kubernetes 自用的名称。",
   "sentence.problem.summary.invalid": (p) =>
     p.name ? `集群拒绝了对 ${p.name} 的更改。` : "集群拒绝了这项更改。",
   "sentence.problem.summary.too-many-requests": () => "集群正忙。",

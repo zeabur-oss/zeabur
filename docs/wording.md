@@ -151,11 +151,11 @@ why. Add a row before introducing a new concept.
 
 | English | zh-TW | zh-CN | Note |
 |---|---|---|---|
-| project | 專案 | 项目 | |
+| project | 專案 | 项目 | A project card or row names the project; its namespace, when the name differs, is in the Kubernetes details (Kubernetes Namespace) |
 | service | 服務 | 服务 | |
 | cluster | 叢集 | 集群 | |
 | node | 節點 | 节点 | |
-| namespace | Namespace | Namespace | Kubernetes kind, as the dashboard writes it |
+| namespace | Namespace | Namespace | Kubernetes kind, as the dashboard writes it. Only where the namespace is what's chosen (use an existing namespace); a name kept by Kubernetes is a name, not a namespace |
 | replica | 副本 | 副本 | Also where a node's trouble stops or blocks them (kubelet stopping pods); Pod stays for the cluster's own counts and the pod network. The replicas list's Kubernetes details say Pod |
 | instance (a database's server: CNPG `spec.instances`, a replica set's `size`) | 執行個體 | 实例 | Never 成員, which names a person on the Members page |
 | container | 容器 | 容器 | |
