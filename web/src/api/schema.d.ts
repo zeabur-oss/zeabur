@@ -4102,7 +4102,7 @@ export interface components {
       /**
        * Format: int64
        * @description The pods placed here that maintenance would move (all but a DaemonSet's, static pods'
-       *     mirrors and finished pods); absent when pods cannot be listed.
+       *     mirrors, finished pods and those in `pinnedPods`); absent when pods cannot be listed.
        */
       movablePods?: number | null
       /** @description Its name. */
@@ -4111,6 +4111,12 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description The operating system image. */
       osImage: string
+      /**
+       * Format: int64
+       * @description Pods maintenance leaves here because a volume they use is only on this node, not counted
+       *     in `movablePods`; 0 as well when PersistentVolumes cannot be listed.
+       */
+      pinnedPods?: number | null
       /** @description Conditions that are not as they should be. */
       problems: components["schemas"]["NodeCondition"][]
       /** @description The `Ready` condition: `True`, `False` or `Unknown`. */

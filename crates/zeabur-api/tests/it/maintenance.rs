@@ -9,7 +9,7 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_kube::k8s_openapi::api::core::v1::{Node, Pod};
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Identity, NamespaceObjects};
+    use zeabur_kube::{DynamicObject, Identity, NamespaceObjects, ServedResource};
 
     use crate::common::{app, send};
 
@@ -185,6 +185,62 @@ mod tests {
         assert_eq!(
             (&vps3["movablePods"], &vps3["leavingPods"]),
             (&json!(1), &json!(1))
+        );
+    }
+
+    async fn vps3_counts(app: &axum::Router) -> (Value, Value) {
+        let (status, nodes) = send(app, "GET", "/api/v1/cluster/nodes", None).await;
+        assert_eq!(status, StatusCode::OK, "{nodes}");
+        let vps3 = nodes["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|n| n["name"] == "vps-3")
+            .unwrap();
+        (vps3["movablePods"].clone(), vps3["pinnedPods"].clone())
+    }
+
+    #[tokio::test]
+    async fn a_pod_whose_volume_only_this_node_has_is_pinned_not_movable() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            let mut db = pod("db", Some("StatefulSet"));
+            db.spec.as_mut().unwrap().volumes = Some(vec![
+                serde_json::from_value(
+                    json!({"name": "data", "persistentVolumeClaim": {"claimName": "data-db-0"}}),
+                )
+                .unwrap(),
+            ]);
+            s.objects.get_mut("shop").unwrap().pods.push(db);
+            s.served.push(ServedResource::readable(
+                "",
+                "v1",
+                "persistentvolumes",
+                "PersistentVolume",
+                false,
+            ));
+            s.dynamic.push(
+                serde_json::from_value::<DynamicObject>(json!({
+                    "apiVersion": "v1", "kind": "PersistentVolume",
+                    "metadata": {"name": "pvc-1"},
+                    "spec": {"claimRef": {"namespace": "shop", "name": "data-db-0"},
+                             "nodeAffinity": {"required": {"nodeSelectorTerms": [
+                                 {"matchExpressions": [{"key": "kubernetes.io/hostname",
+                                     "operator": "In", "values": ["vps-3"]}]}]}}}
+                }))
+                .unwrap(),
+            );
+        });
+        let app = app(&cluster);
+        assert_eq!(vps3_counts(&app).await, (json!(2), json!(1)));
+
+        cluster.update(|s| {
+            s.forbidden_resources.insert("persistentvolumes".to_owned());
+        });
+        assert_eq!(
+            vps3_counts(&app).await,
+            (json!(3), json!(0)),
+            "without PersistentVolumes every pod counts as movable"
         );
     }
 

@@ -443,6 +443,8 @@ pub struct ClusterPod {
     pub mirror: bool,
     /// Being deleted (`metadata.deletionTimestamp` is set).
     pub terminating: bool,
+    /// The `PersistentVolumeClaim`s its volumes name.
+    pub claims: Vec<String>,
 }
 
 /// The requests and limits of one container, as Kubernetes quantities (`250m`, `512Mi`).

@@ -537,6 +537,10 @@ fn classify(node: &Node, pods: &[Pod], context: &Context) -> Vec<DrainPod> {
 
 /// Places the moving pods on `room` (each node's CPU, memory and pods left), largest memory
 /// first, each on the node with the least memory left that still takes it.
+///
+/// Requests only: taints, tolerations, node selectors, affinity, topology spread and host ports
+/// are not weighed, so a pod counted as placed can still stay Pending, and a budget can slow the
+/// moves but not change where they land.
 fn place(moving: &[&DrainPod], room: Option<Vec<(Amount, u64)>>) -> DrainCapacity {
     let mut needs = Resources {
         pods: Some(0),
@@ -1153,12 +1157,86 @@ async fn pass(
     })
 }
 
+/// A node's pods as maintenance sees them.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct NodePods {
+    /// Would move, including those leaving.
+    pub(crate) moving: u64,
+    /// Being deleted.
+    pub(crate) leaving: u64,
+    /// Kept by a volume only this node can use; maintenance leaves them unless asked.
+    pub(crate) pinned: u64,
+}
+
+/// Each node's pods as maintenance sees them, by node name. PersistentVolumes are listed once,
+/// and only when a pod has a claim.
+pub(crate) async fn node_pods(
+    cluster: &dyn Cluster,
+    nodes: &[Node],
+    pods: &[zeabur_kube::ClusterPod],
+) -> BTreeMap<String, NodePods> {
+    let volumes = if pods.iter().any(|p| !p.claims.is_empty()) {
+        bound_volumes(cluster).await
+    } else {
+        BTreeMap::new()
+    };
+    let hosts: BTreeMap<&str, String> = nodes
+        .iter()
+        .filter_map(|n| Some((n.metadata.name.as_deref()?, hostname(n))))
+        .collect();
+    let mut out: BTreeMap<String, NodePods> = BTreeMap::new();
+    for pod in pods.iter().filter(|p| movable(p)) {
+        let Some(node) = &pod.node_name else {
+            continue;
+        };
+        let host = hosts.get(node.as_str()).map_or(node.as_str(), String::as_str);
+        let entry = out.entry(node.clone()).or_default();
+        if !pod.terminating && pinned(pod, host, &volumes) {
+            entry.pinned += 1;
+        } else {
+            entry.moving += 1;
+            entry.leaving += u64::from(pod.terminating);
+        }
+    }
+    out
+}
+
 /// Whether maintenance would move a pod listed across the cluster: every unfinished pod but a
 /// DaemonSet's and a static pod's mirror.
 pub(crate) fn movable(pod: &zeabur_kube::ClusterPod) -> bool {
     !pod.mirror
         && pod.controller.as_deref() != Some("DaemonSet")
         && !matches!(pod.phase.as_deref(), Some("Succeeded" | "Failed"))
+}
+
+/// The cluster's PersistentVolumes by the claim bound to them (`namespace/name`, from
+/// `spec.claimRef`), in one list; empty when the person may not list them, so no pod counts as
+/// pinned.
+async fn bound_volumes(cluster: &dyn Cluster) -> BTreeMap<String, Value> {
+    let resource = ResourceRef::new("", "v1", "persistentvolumes", "PersistentVolume");
+    let listed = cluster.list_objects(&resource, None).await.ok().flatten();
+    values(listed)
+        .into_iter()
+        .filter_map(|volume| {
+            let namespace = volume.pointer("/spec/claimRef/namespace")?.as_str()?;
+            let claim = volume.pointer("/spec/claimRef/name")?.as_str()?;
+            Some((format!("{namespace}/{claim}"), volume))
+        })
+        .collect()
+}
+
+/// Whether a pod listed across the cluster has a claim bound to a volume only the node called
+/// `host` can use: maintenance leaves it there unless the person opts in.
+fn pinned(
+    pod: &zeabur_kube::ClusterPod,
+    host: &str,
+    volumes: &BTreeMap<String, Value>,
+) -> bool {
+    pod.claims.iter().any(|claim| {
+        volumes
+            .get(&format!("{}/{claim}", pod.namespace))
+            .is_some_and(|volume| kept_on(volume, host))
+    })
 }
 
 #[cfg(test)]

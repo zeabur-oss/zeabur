@@ -415,6 +415,10 @@ export const en = {
   "node.word.maintenance": "In maintenance",
   "node.word.draining": "Moving replicas off",
   "node.drainingLeft": (n: number) => `Moving replicas off, ${n} left`,
+  "node.pinnedLeft": (n: number) =>
+    n === 1
+      ? "1 replica stays: its data is only on this node"
+      : `${n} replicas stay: their data is only on this node`,
   "node.maintenance": (n: number, node: string) =>
     n === 1 ? `${node} is in maintenance` : `${n} nodes are in maintenance`,
   "node.maintenance.why": "No replica is left to move there, and no new one is placed there.",

@@ -133,6 +133,22 @@ struct RawPodSpec {
     overhead: BTreeMap<String, String>,
     #[serde(default)]
     resources: Option<RawResources>,
+    #[serde(default)]
+    volumes: Vec<RawVolume>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct RawVolume {
+    #[serde(default)]
+    persistent_volume_claim: Option<RawClaim>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct RawClaim {
+    #[serde(default)]
+    claim_name: String,
 }
 
 #[derive(Deserialize, Default)]
@@ -175,6 +191,13 @@ impl From<RawPod> for ClusterPod {
             controller,
             mirror: raw.metadata.annotations.contains_key(MIRROR),
             terminating: raw.metadata.deletion_timestamp.is_some(),
+            claims: raw
+                .spec
+                .volumes
+                .into_iter()
+                .filter_map(|v| v.persistent_volume_claim)
+                .map(|c| c.claim_name)
+                .collect(),
             namespace: raw.metadata.namespace,
             name: raw.metadata.name,
             node_name: raw.spec.node_name.filter(|n| !n.is_empty()),
@@ -302,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn a_pods_controller_mirror_and_deletion_are_kept() {
+    fn a_pods_controller_mirror_deletion_and_claims_are_kept() {
         let pod = slim_pod(serde_json::json!({
             "metadata": {"name": "canal-x", "namespace": "kube-system",
                 "deletionTimestamp": "2026-10-23T10:00:00Z",
@@ -312,10 +335,14 @@ mod tests {
                     {"apiVersion": "apps/v1", "kind": "DaemonSet", "name": "canal", "uid": "2",
                      "controller": true}
                 ]},
-            "spec": {"containers": []}
+            "spec": {"containers": [], "volumes": [
+                {"name": "data", "persistentVolumeClaim": {"claimName": "data-0"}},
+                {"name": "tmp", "emptyDir": {}}
+            ]}
         }))
         .unwrap();
         assert_eq!(pod.controller.as_deref(), Some("DaemonSet"));
         assert!(pod.mirror && pod.terminating);
+        assert_eq!(pod.claims, ["data-0"]);
     }
 }

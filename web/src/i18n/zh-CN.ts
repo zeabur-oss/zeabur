@@ -366,6 +366,7 @@ export const zhCN: Messages = {
   "node.word.maintenance": "维护中",
   "node.word.draining": "正在迁出副本",
   "node.drainingLeft": (n) => `正在迁出副本，剩 ${n} 个`,
+  "node.pinnedLeft": (n) => `${n} 个副本的数据只在这个节点上，留在原处`,
   "node.maintenance": (n, node) => (n === 1 ? `${node} 维护中` : `${n} 个节点维护中`),
   "node.maintenance.why": "上面已经没有要迁走的副本，也不会再放新的副本。",
   "node.maintenance.fix": "维护完成后，从节点菜单恢复调度。",

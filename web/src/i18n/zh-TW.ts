@@ -366,6 +366,7 @@ export const zhTW: Messages = {
   "node.word.maintenance": "維護中",
   "node.word.draining": "正在移出副本",
   "node.drainingLeft": (n) => `正在移出副本，剩 ${n} 個`,
+  "node.pinnedLeft": (n) => `${n} 個副本的資料只在這個節點上，留在原地`,
   "node.maintenance": (n, node) => (n === 1 ? `${node} 維護中` : `${n} 個節點維護中`),
   "node.maintenance.why": "上面已經沒有要移走的副本，也不會再放新的副本。",
   "node.maintenance.fix": "維護完成後，從節點選單恢復排程。",

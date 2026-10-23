@@ -178,6 +178,9 @@ describe("nodes, worst first", () => {
       nodeIssues(node("a", { cordoned: true, ...more })).map((i) => [i.kind, i.health])
     expect(kind({ movablePods: 3, leavingPods: 1 })).toEqual([["draining", "progress"]])
     expect(kind({ movablePods: 0, leavingPods: 0 })).toEqual([["maintenance", "idle"]])
+    expect(kind({ movablePods: 0, leavingPods: 0, pinnedPods: 1 })).toEqual([
+      ["maintenance", "idle"],
+    ])
     expect(kind({ movablePods: 3, leavingPods: 0 })).toEqual([["cordoned", "warn"]])
     expect(kind({})).toEqual([["cordoned", "warn"]])
     expect(kind({ movablePods: 0 }).map(([k]) => k)).not.toContain("cordoned")

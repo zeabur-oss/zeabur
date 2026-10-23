@@ -502,6 +502,11 @@ function NodeRow({
             <span translate="no">{node.architecture}</span>
           </Tooltip>
         </div>
+        {node.cordoned && (node.pinnedPods ?? 0) > 0 ? (
+          <p className="type-meta text-muted-foreground">
+            {t("node.pinnedLeft", node.pinnedPods ?? 0)}
+          </p>
+        ) : null}
       </div>
       <NodeMenu node={node} className="-my-1 self-start sm:order-last sm:self-center" />
       <div className="grid w-full grid-cols-2 items-start gap-x-4 gap-y-3 sm:flex sm:w-auto sm:gap-x-6">
