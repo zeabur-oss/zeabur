@@ -1,0 +1,3 @@
+description: "A new volume on a StorageClass the cluster does not have is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "addVolume", "workload": {"kind": "Deployment", "name": "web"}, "volume": {"name": "uploads", "size": "5Gi", "mountPath": "/srv/uploads", "storageClass": "ceph-rbd"}}]}, "storageClasses": [{"name": "local-path", "allowVolumeExpansion": false, "default": true}, {"name": "longhorn", "allowVolumeExpansion": true}]}

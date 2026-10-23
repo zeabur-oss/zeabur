@@ -24,6 +24,10 @@
 //! Velero runs with a location on R2, a daily schedule and a week of backups, the newest failed:
 //! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location.
 //!
+//! `storageclasses.storage.k8s.io` and `persistentvolumes` in `ZEABUR_DEMO_FORBID` refuse
+//! reading the StorageClasses (local-path, the default, and Longhorn) and the volumes behind
+//! claims.
+//!
 //! `namespaces` in `ZEABUR_DEMO_FORBID` refuses creating projects. New public URLs are suggested
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
 //! `ZEABUR_DEMO_NO_DOMAINS=1` leaves both unset.
@@ -71,6 +75,7 @@ use zeabur_kube::k8s_openapi::api::core::v1::{
 };
 use zeabur_kube::k8s_openapi::api::events::v1::Event;
 use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
+use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_kube::memory::{MemoryCluster, State};
 use zeabur_kube::{
@@ -2893,6 +2898,104 @@ fn maintenance(s: &mut State) {
     }
 }
 
+/// k3s's local-path as the default class and Longhorn beside it. Every claim gets a
+/// PersistentVolume; a local-path one is pinned to the node of the pod that mounts it.
+fn storage(s: &mut State) {
+    let class = |name: &str, provisioner: &str, expands: bool, default: bool, binding: &str| {
+        from::<StorageClass>(json!({"metadata": {"name": name, "annotations": {
+                "storageclass.kubernetes.io/is-default-class": default.to_string()}},
+            "provisioner": provisioner, "allowVolumeExpansion": expands,
+            "reclaimPolicy": "Delete", "volumeBindingMode": binding}))
+    };
+    let refused = s
+        .forbidden_resources
+        .contains("storageclasses.storage.k8s.io");
+    s.storage_classes = (!refused).then(|| {
+        vec![
+            class(
+                "local-path",
+                "rancher.io/local-path",
+                false,
+                true,
+                "WaitForFirstConsumer",
+            ),
+            class("longhorn", "driver.longhorn.io", true, false, "Immediate"),
+        ]
+    });
+    let first = s
+        .nodes
+        .first()
+        .and_then(|n| n.metadata.name.clone())
+        .unwrap_or_default();
+    let mut volumes = Vec::new();
+    for (namespace, objects) in &mut s.objects {
+        let node_of = |claim: &str| {
+            objects
+                .pods
+                .iter()
+                .find(|pod| {
+                    let name = pod.metadata.name.as_deref().unwrap_or_default();
+                    claim == name
+                        || claim == format!("data-{name}")
+                        || pod
+                            .spec
+                            .iter()
+                            .flat_map(|s| s.volumes.iter().flatten())
+                            .any(|v| {
+                                v.persistent_volume_claim
+                                    .as_ref()
+                                    .is_some_and(|c| c.claim_name == claim)
+                            })
+                })
+                .and_then(|pod| pod.spec.as_ref()?.node_name.clone())
+                .unwrap_or_else(|| first.clone())
+        };
+        let nodes: Vec<String> = objects
+            .persistent_volume_claims
+            .iter()
+            .map(|c| node_of(c.metadata.name.as_deref().unwrap_or_default()))
+            .collect();
+        for (claim, node) in objects.persistent_volume_claims.iter_mut().zip(nodes) {
+            let name = claim.metadata.name.clone().unwrap_or_default();
+            let class = if namespace == "shop" && name == "data-redis-0" {
+                "longhorn"
+            } else {
+                "local-path"
+            };
+            let spec = claim.spec.get_or_insert_with(Default::default);
+            spec.storage_class_name
+                .get_or_insert_with(|| class.to_owned());
+            if spec.volume_name.is_some() {
+                continue;
+            }
+            let volume = format!("pvc-{:016x}", hash(&format!("{namespace}/{name}")));
+            spec.volume_name = Some(volume.clone());
+            let size = spec
+                .resources
+                .as_ref()
+                .and_then(|r| r.requests.as_ref())
+                .and_then(|r| r.get("storage"))
+                .map_or_else(String::new, |q| q.0.clone());
+            let source = if class == "local-path" {
+                json!({"hostPath": {"path": format!("/var/lib/rancher/k3s/storage/{volume}_{namespace}_{name}")},
+                    "nodeAffinity": {"required": {"nodeSelectorTerms": [{"matchExpressions": [
+                        {"key": "kubernetes.io/hostname", "operator": "In", "values": [node]}]}]}}})
+            } else {
+                json!({"csi": {"driver": "driver.longhorn.io", "volumeHandle": volume}})
+            };
+            let mut spec = json!({"capacity": {"storage": size}, "accessModes": ["ReadWriteOnce"],
+                "storageClassName": class, "persistentVolumeReclaimPolicy": "Delete",
+                "claimRef": {"namespace": namespace, "name": name}});
+            if let (Some(spec), Some(source)) = (spec.as_object_mut(), source.as_object()) {
+                spec.extend(source.clone());
+            }
+            volumes.push(from(json!({"apiVersion": "v1", "kind": "PersistentVolume",
+                "metadata": {"name": volume}, "spec": spec, "status": {"phase": "Bound"}})));
+        }
+    }
+    s.dynamic.extend(volumes);
+}
+
 /// The node of the volume `claim` in `namespace` is bound to, when local-path keeps it on one.
 fn pinned(s: &State, namespace: &str, claim: &str) -> Option<String> {
     let volume = s
@@ -3116,6 +3219,7 @@ async fn main() -> std::io::Result<()> {
     }
     cluster.update(|s| {
         maintenance(s);
+        storage(s);
         // A debug container's patch tests the pod's uid.
         for (namespace, objects) in &mut s.objects {
             for pod in &mut objects.pods {

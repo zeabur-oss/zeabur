@@ -1,0 +1,141 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "v1",
+          "path": "apiVersion"
+        },
+        {
+          "after": "PersistentVolumeClaim",
+          "path": "kind"
+        },
+        {
+          "after": "web-uploads",
+          "path": "metadata.name"
+        },
+        {
+          "after": "demo",
+          "path": "metadata.namespace"
+        },
+        {
+          "after": "ReadWriteOnce",
+          "path": "spec.accessModes[0]"
+        },
+        {
+          "after": "5Gi",
+          "path": "spec.resources.requests.storage"
+        },
+        {
+          "after": "longhorn",
+          "path": "spec.storageClassName"
+        }
+      ],
+      "owners": [],
+      "target": {
+        "apiVersion": "v1",
+        "kind": "PersistentVolumeClaim",
+        "name": "web-uploads",
+        "plural": "persistentvolumeclaims"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "PersistentVolumeClaim",
+          "metadata": {
+            "name": "web-uploads",
+            "namespace": "demo"
+          },
+          "spec": {
+            "accessModes": [
+              "ReadWriteOnce"
+            ],
+            "resources": {
+              "requests": {
+                "storage": "5Gi"
+              }
+            },
+            "storageClassName": "longhorn"
+          }
+        }
+      }
+    },
+    {
+      "changes": [
+        {
+          "after": "/srv/uploads",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=uploads].mountPath"
+        },
+        {
+          "after": "uploads",
+          "path": "spec.template.spec.containers[name=app].volumeMounts[name=uploads].name"
+        },
+        {
+          "after": "uploads",
+          "path": "spec.template.spec.volumes[name=uploads].name"
+        },
+        {
+          "after": "web-uploads",
+          "path": "spec.template.spec.volumes[name=uploads].persistentVolumeClaim.claimName"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/name",
+            "value": "app"
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/volumes/-",
+            "value": {
+              "name": "uploads",
+              "persistentVolumeClaim": {
+                "claimName": "web-uploads"
+              }
+            }
+          },
+          {
+            "op": "add",
+            "path": "/spec/template/spec/containers/0/volumeMounts/-",
+            "value": {
+              "mountPath": "/srv/uploads",
+              "name": "uploads"
+            }
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "readWriteOnceShared",
+      "workload": {
+        "kind": "Deployment",
+        "name": "web"
+      }
+    }
+  ]
+}

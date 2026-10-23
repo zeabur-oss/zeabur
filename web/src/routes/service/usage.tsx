@@ -38,6 +38,8 @@ import {
 import type { Guide } from "@/routes/service/history-chart"
 import { Meter } from "@zeabur/design-system/components/meter"
 import { SummaryCardAside } from "@zeabur/design-system/components/summary-card"
+import { useStorage } from "@/components/storage-class"
+import { canGrow } from "@/model/storage"
 
 const HistoryChart = lazy(() => import("@/routes/service/history-chart"))
 
@@ -153,6 +155,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
 function VolumesBlock({ project, service }: { project: string; service: Service }) {
   const t = useT()
   const mounts = claimMounts(service)
+  const storage = useStorage(project)
   const volumes = useVolumeFills(
     project,
     service,
@@ -160,7 +163,9 @@ function VolumesBlock({ project, service }: { project: string; service: Service 
   )
   const filled = mounts.flatMap(({ mount }) => {
     const fill = volumes.fill(claimOf(mount))
-    return fill ? [{ path: mount.mountPath, fill }] : []
+    return fill
+      ? [{ path: mount.mountPath, fill, grows: canGrow(storage, mount.storageClass) }]
+      : []
   })
   if (filled.length === 0 && !volumes.missing) return null
   return (
@@ -168,13 +173,13 @@ function VolumesBlock({ project, service }: { project: string; service: Service 
       <span className="type-meta text-muted-foreground">{t("storage.title")}</span>
       {filled.length > 0 ? (
         <ul className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
-          {filled.map(({ path, fill }) => (
+          {filled.map(({ path, fill, grows }) => (
             <li key={path} className="flex min-w-0 flex-col gap-1">
               <span className="truncate font-mono type-body" translate="no" title={path}>
                 {path}
               </span>
               <VolumeUse fill={fill} />
-              <VolumeFullNote fill={fill} />
+              <VolumeFullNote fill={fill} grows={grows} />
             </li>
           ))}
         </ul>

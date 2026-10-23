@@ -271,6 +271,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::network_policy::presets))
         .routes(routes!(projects::usage::get))
         .routes(routes!(projects::usage::volumes))
+        .routes(routes!(projects::storage::get))
         .routes(routes!(services::history::get))
         .routes(routes!(services::logs::history))
         .routes(routes!(settings::store::get_setting, settings::store::set))

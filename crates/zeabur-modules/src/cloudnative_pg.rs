@@ -207,6 +207,10 @@ fn app_user(name: &str, own: Option<&str>, username: &str, database: &str) -> Op
 /// The store is the `ObjectStore` the `Cluster` names; else the one Zeabur names for it
 /// ([`store_name`]), not yet in use, so a half-applied setup shows as such.
 #[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one object's fields, read top to bottom"
+)]
 pub fn database(
     namespace: &str,
     cluster: &DynamicObject,
@@ -284,6 +288,7 @@ pub fn database(
         version,
         image,
         storage: text(cluster, "/spec/storage/size"),
+        storage_class: text(cluster, "/spec/storage/storageClass"),
         claims: strings(cluster, "/status/instanceNames"),
         resources: cluster.data.pointer("/spec/resources").cloned(),
         connection: Connection {
@@ -446,7 +451,7 @@ mod tests {
             "metadata": {"name": "pg", "namespace": "shop"},
             "spec": {
                 "instances": 2,
-                "storage": {"size": "5Gi"},
+                "storage": {"size": "5Gi", "storageClass": "longhorn"},
                 "plugins": [{"name": "barman-cloud.cloudnative-pg.io", "isWALArchiver": true,
                              "parameters": {"barmanObjectName": "pg-backups"}}]
             },
@@ -485,6 +490,7 @@ mod tests {
         assert_eq!(db.object["spec"]["instances"], 2);
         assert_eq!(db.primary.as_deref(), Some("pg-1"));
         assert_eq!(db.claims, ["pg-1", "pg-2"]);
+        assert_eq!(db.storage_class.as_deref(), Some("longhorn"));
         assert_eq!(db.connection.host, "pg-rw.shop.svc");
         assert_eq!(db.connection.secret, "pg-app");
         assert_eq!(db.connection.username.as_deref(), Some("app"));

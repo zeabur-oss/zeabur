@@ -1549,6 +1549,28 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/storage": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The `StorageClasses` a new volume of the project can use, and what each of its claims is
+     *     on: the class, and the node its PersistentVolume is pinned to. Read as you: listing
+     *     `StorageClasses` and getting PersistentVolumes are cluster-wide rights, and a refusal is named
+     *     in `unreadable` instead of failing the answer.
+     */
+    get: operations["getProjectStorage"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/timeline": {
     parameters: {
       query?: never
@@ -2385,6 +2407,26 @@ export interface components {
       /** @description Where to read it. */
       url: string
     }
+    /** @description Where one claim's data is. */
+    ClaimStorage: {
+      /** @description The size it has (`status.capacity.storage`), once bound. */
+      capacity?: string | null
+      /** @description Its name. */
+      claim: string
+      /** @description The one node the PersistentVolume's node affinity names, by `kubernetes.io/hostname`. */
+      node?: string | null
+      /** @description The PersistentVolumeClaim. */
+      origin: components["schemas"]["Origin"]
+      /**
+       * @description Whether the PersistentVolume may be used only on some nodes (a required node affinity);
+       *     absent when it could not be read or there is none yet.
+       */
+      pinned?: boolean | null
+      /** @description `spec.storageClassName`; absent when it names none. */
+      storageClass?: string | null
+      /** @description Its PersistentVolume (`spec.volumeName`), once bound. */
+      volume?: string | null
+    }
     /** @description Where a workload is listed and under which name. */
     Classification: {
       /**
@@ -2898,6 +2940,11 @@ export interface components {
       state: components["schemas"]["DatabaseState"]
       /** @description The size of each member's volume, as asked for. */
       storage?: string | null
+      /**
+       * @description The `StorageClass` of each member's volume, as asked for; absent for the cluster's
+       *     default.
+       */
+      storageClass?: string | null
       /** @description The server version, as reported, else from the image tag. */
       version?: string | null
     }
@@ -5745,6 +5792,20 @@ export interface components {
      * @enum {string}
      */
     ProjectRole: "developer" | "viewer"
+    /** @description A project's storage. */
+    ProjectStorage: {
+      /** @description The project's PersistentVolumeClaims, by name. */
+      claims: components["schemas"]["ClaimStorage"][]
+      /** @description The cluster's `StorageClasses`, the default first; empty when they may not be listed. */
+      classes: components["schemas"]["StorageClassView"][]
+      /** @description `projects/{project}/storage`. */
+      id: string
+      /**
+       * @description What could not be read: `storageclasses.storage.k8s.io`, `persistentvolumeclaims`,
+       *     `persistentvolumes`.
+       */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /** @description A project in the list. */
     ProjectSummary: components["schemas"]["ProjectDetails"] & {
       /**
@@ -6508,6 +6569,33 @@ export interface components {
      * @enum {string}
      */
     StayReason: "daemonSet" | "static"
+    /** @description A `StorageClass`. */
+    StorageClassView: {
+      /** @description `allowVolumeExpansion`: its claims may grow. */
+      allowExpansion: boolean
+      /**
+       * @description `volumeBindingMode`: `WaitForFirstConsumer` makes the volume where its first pod runs,
+       *     `Immediate` when the claim is made.
+       */
+      bindingMode: string
+      /** @description The cluster's default (`storageclass.kubernetes.io/is-default-class`). */
+      default: boolean
+      /** @description What kind of disk it gives. */
+      kind: components["schemas"]["StorageKind"]
+      /** @description Its name. */
+      name: string
+      /** @description The `StorageClass`. */
+      origin: components["schemas"]["Origin"]
+      /** @description `provisioner`. */
+      provisioner: string
+      /** @description `reclaimPolicy`: what becomes of a volume when its claim is deleted (`Delete`, `Retain`). */
+      reclaimPolicy: string
+    }
+    /**
+     * @description What kind of disk a `StorageClass` gives, from its provisioner.
+     * @enum {string}
+     */
+    StorageKind: "local" | "replicated" | "other"
     /**
      * @description Whether the metrics store answered, as the person. An open set.
      * @enum {string}
@@ -10172,6 +10260,36 @@ export interface operations {
         }
       }
       404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getProjectStorage: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ProjectStorage"]
+        }
+      }
+      400: {
         headers: {
           [name: string]: unknown
         }

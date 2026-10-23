@@ -55,14 +55,14 @@ export function VolumeUse({ fill, className }: { fill: VolumeFill; className?: s
 }
 
 /** What a nearly full volume does, and what to do. */
-export function VolumeFullNote({ fill }: { fill: VolumeFill }) {
+export function VolumeFullNote({ fill, grows }: { fill: VolumeFill; grows?: boolean }) {
   const t = useT()
   if (fill.health !== "warn" && fill.health !== "fail") return null
   return (
     <p
       className={cn("type-meta", fill.health === "fail" ? "text-fail-strong" : "text-warn-strong")}
     >
-      {t("volume.full")}
+      {t("volume.full", grows !== false)}
     </p>
   )
 }

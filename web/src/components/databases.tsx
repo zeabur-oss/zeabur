@@ -12,12 +12,14 @@ import { ConnectFields, namingOf, newChoice, useTargets, type Choice } from "@/c
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
+import { growthWords, StorageClassField, useStorage } from "@/components/storage-class"
 import { GateTip, useGate } from "@/components/gate"
 import { useT } from "@/i18n"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { databaseLink } from "@/lib/place"
 import { engineVersion } from "@/model/database-parts"
 import { connectChanges, pendingDatabase } from "@/model/connect"
+import { chosenClass } from "@/model/storage"
 import {
   createDatabase,
   engineName,
@@ -201,6 +203,7 @@ export function NewDatabaseDrawer({
   }
   const [tried, setTried] = useState(false)
   const step = usePlanStep(project, onClose)
+  const storage = useStorage(project)
   const targets = useTargets(project)
   const [choice, setChoice] = useState<Choice>(() => newChoice())
   const set = (patch: Partial<NewDatabase>) => setForm((f) => ({ ...f, ...patch }))
@@ -330,7 +333,7 @@ export function NewDatabaseDrawer({
           </FormField>
           <FormField
             label={t("db.field.storage")}
-            hint={t("db.storageHint")}
+            hint={growthWords(t, storage, form.storageClass)}
             errors={tried && storageBad ? [t("storage.problem.badSize")] : []}
           >
             <Input
@@ -357,6 +360,12 @@ export function NewDatabaseDrawer({
             />
           </FormField>
         </div>
+        <StorageClassField
+          storage={storage}
+          value={form.storageClass}
+          engine={engineName(form.engine)}
+          onChange={(name) => set({ storageClass: chosenClass(storage, name) })}
+        />
         {form.members === 1 ? (
           <Alert variant="warn">
             <WarningIcon aria-hidden="true" />

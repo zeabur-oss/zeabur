@@ -1018,7 +1018,10 @@ export const zhTW: Messages = {
 
   "storage.title": "磁碟區",
   "volume.fullestOf": (used, n) => `${used}，${n} 個副本中最滿的`,
-  "volume.full": "用滿後應用程式會寫入失敗。請清出空間，或設定更大的容量後套用。",
+  "volume.full": (grows: boolean) =>
+    grows
+      ? "用滿後應用程式會寫入失敗。請清出空間，或設定更大的容量後套用。"
+      : "用滿後應用程式會寫入失敗。請清出空間：它的儲存類別不能擴充容量。",
   "volume.state.not-configured": "未顯示磁碟區用量：沒有 metrics 儲存服務。",
   "volume.state.unreadable": "未顯示磁碟區用量：讀取 metrics 儲存服務的權限被拒絕。",
   "volume.state.unavailable": "未顯示磁碟區用量：metrics 儲存服務沒有回應。",
@@ -1056,6 +1059,36 @@ export const zhTW: Messages = {
   "storage.problem.badName": "只能用小寫字母、數字和 -。",
   "storage.problem.nameTaken": "另一個新磁碟區已經用了這個名稱。",
   "storage.problem.badClaimName": "只能用小寫字母、數字、- 和 .，最多 253 個字元。",
+  "storage.class": "儲存類別",
+  "storage.kind.local": "本機磁碟",
+  "storage.kind.replicated": "複寫磁碟",
+  "storage.kind.other": (provisioner: string) => `${provisioner} 提供的磁碟`,
+  "storage.option": (kind: string, name: string, isDefault: boolean) =>
+    `${kind}（${name}${isDefault ? "，預設" : ""}）`,
+  "storage.about.local": "最快，但固定在一個節點上：用到它的副本只能在那裡執行。",
+  "storage.about.replicated": "資料複寫到多個節點，副本換節點時會跟著移動。",
+  "storage.about.other": "行為由它的驅動程式決定。",
+  "storage.grows": "之後可以擴充，不能縮小。",
+  "storage.fixedSize": "之後不能擴充，請一次選好需要的大小。",
+  "storage.growUnknown": "之後能否擴充，由叢集的儲存類別決定。",
+  "storage.selfReplicating": (engine: string) =>
+    `${engine} 會自己把資料複寫到其他執行個體，所以適合用本機磁碟。`,
+  "storage.choosing": "選擇儲存類別",
+  "storage.onDefault": "新磁碟區會放在叢集的預設儲存類別上。",
+  "storage.on.node": (node: string) => `固定在節點 ${node}`,
+  "storage.on.pinned": "只能在部分節點使用",
+  "storage.on.firstUse": "固定在第一個副本執行的節點",
+  "storage.on.moves": "可在節點間移動",
+  "storage.canGrow": "可以擴充",
+  "storage.cannotGrow": "不能擴充",
+  "storage.fixed": (name: string, elsewhere: boolean) =>
+    elsewhere
+      ? `${name} 不能擴充磁碟區。需要更多空間時，先在可擴充的儲存類別上建立新磁碟區，把資料複製過去，再移除這一個。`
+      : `${name} 不能擴充磁碟區，這個叢集也沒有可擴充的儲存類別。需要更多空間時，請叢集管理員加一個，例如 Longhorn。`,
+  "storage.reclaim.Delete": "刪除磁碟區時，資料也會刪除",
+  "storage.reclaim.Retain": "刪除磁碟區後，資料仍會保留",
+  "storage.binding.WaitForFirstConsumer": "在第一個副本執行的節點上建立",
+  "storage.binding.Immediate": "一要求就建立",
 
   "palette.title": "指令面板",
   "palette.search": "前往專案、服務、副本或網域",
@@ -2116,7 +2149,6 @@ export const zhTW: Messages = {
   "db.name.invalid": "只能用小寫字母、數字和連字號，並以字母開頭。",
   "db.name.long": "最多 30 個字元。",
   "db.name.taken": "已經有同名的資料庫。",
-  "db.storageHint": "之後可以擴充，不能縮小。",
   "db.noRedundancy": (backedUp: boolean) =>
     `只有一個執行個體：它故障時沒有其他執行個體接手，資料也只在一個磁碟區上。${backedUp ? "" : "請設定備份。"}`,
   "db.replicaSetHint": "副本集有三個執行個體時，壞掉一個也能繼續運作。",

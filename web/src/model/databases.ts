@@ -83,6 +83,8 @@ export interface NewDatabase {
   version: string
   members: number
   storage: string
+  /** The StorageClass its volumes ask for; none for the cluster's default. */
+  storageClass?: string
   size: SizePreset
 }
 
@@ -154,7 +156,10 @@ function databaseObject(form: NewDatabase): Manifest {
       spec: {
         instances: form.members,
         imageName: imageOf("postgresql", form.version),
-        storage: { size: form.storage },
+        storage: {
+          size: form.storage,
+          ...(form.storageClass ? { storageClass: form.storageClass } : {}),
+        },
         resources,
       },
     }
@@ -175,7 +180,10 @@ function databaseObject(form: NewDatabase): Manifest {
           size: form.members,
           resources,
           volumeSpec: {
-            persistentVolumeClaim: { resources: { requests: { storage: form.storage } } },
+            persistentVolumeClaim: {
+              ...(form.storageClass ? { storageClassName: form.storageClass } : {}),
+              resources: { requests: { storage: form.storage } },
+            },
           },
         },
       ],

@@ -644,6 +644,20 @@ export const usageQuery = (project: string) =>
     refetchIntervalInBackground: false,
   })
 
+/** The StorageClasses a new volume can use, and what each claim of the project is on. */
+export const storageQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "storage"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/storage", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    staleTime: 30_000,
+  })
+
 /** How full the project's volumes are; each read asks the kubelets of the nodes they are on. */
 export const volumesQuery = (project: string) =>
   queryOptions({

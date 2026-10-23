@@ -1,0 +1,3 @@
+description: "A claim that names no StorageClass grows only when the cluster's default allows it."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "expandVolume", "claim": "data-postgresql-0", "size": "20Gi"}]}, "storageClasses": [{"name": "local-path", "allowVolumeExpansion": false, "default": true}, {"name": "longhorn", "allowVolumeExpansion": true}]}

@@ -55,9 +55,9 @@ than you have, and keeps no state of its own: no database, no custom resources.
   what a project is missing (resource requests and limits, readiness probes, Ingresses that can
   move to Gateway API). A refusal by RBAC is told apart from a component that is not installed.
 - **Changes as plan, confirm, apply.** Environment variables, ConfigMap and Secret keys,
-  hostnames, restarts, scaling, probes, resources, volumes and mounts, an object's YAML,
-  deleting an object, ready-made NetworkPolicies, adopting a namespace as a project and its
-  details. A plan shows the fields it writes and who owns them now; the apply writes only those
+  hostnames, restarts, scaling, probes, resources, volumes and mounts (on a chosen storage
+  class, grown only where the class allows), an object's YAML, deleting an object, ready-made
+  NetworkPolicies, adopting a namespace as a project and its details. A plan shows the fields it writes and who owns them now; the apply writes only those
   fields, and is refused if anything changed since the plan.
 - **Releases and rollback** of a workload's pod template, through the same plans.
 - **Cluster backups** with [Velero](https://velero.io): where they go (S3-compatible storage,

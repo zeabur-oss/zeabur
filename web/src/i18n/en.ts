@@ -1132,8 +1132,10 @@ export const en = {
   // Storage
   "storage.title": "Volumes",
   "volume.fullestOf": (used: string, n: number) => `${used}, fullest of ${n} replicas`,
-  "volume.full":
-    "When it is full, the app's writes fail. Free space in it, or set a larger size and apply.",
+  "volume.full": (grows: boolean): string =>
+    grows
+      ? "When it is full, the app's writes fail. Free space in it, or set a larger size and apply."
+      : "When it is full, the app's writes fail. Free space in it: its storage class can't grow it.",
   "volume.state.not-configured": "Volume use is not shown: there is no metrics store.",
   "volume.state.unreadable": "Volume use is not shown: reading the metrics store was refused.",
   "volume.state.unavailable": "Volume use is not shown: the metrics store did not respond.",
@@ -1170,6 +1172,36 @@ export const en = {
   "storage.problem.badName": "Use lowercase letters, digits and -.",
   "storage.problem.nameTaken": "Another new volume has this name.",
   "storage.problem.badClaimName": "Use lowercase letters, digits, - and ., at most 253 characters.",
+  "storage.class": "Storage class",
+  "storage.kind.local": "Local disk",
+  "storage.kind.replicated": "Replicated disk",
+  "storage.kind.other": (provisioner: string) => `Disk by ${provisioner}`,
+  "storage.option": (kind: string, name: string, isDefault: boolean) =>
+    `${kind} (${name}${isDefault ? ", default" : ""})`,
+  "storage.about.local": "Fastest, but kept on one node: replicas that use it run only there.",
+  "storage.about.replicated": "Copied to several nodes, so it moves with its replicas.",
+  "storage.about.other": "How it behaves is up to its driver.",
+  "storage.grows": "It can grow later, not shrink.",
+  "storage.fixedSize": "It can't grow later, so choose the size it needs.",
+  "storage.growUnknown": "Whether it can grow later is up to the cluster's storage class.",
+  "storage.selfReplicating": (engine: string) =>
+    `${engine} copies its data to its other instances itself, so local disks suit it.`,
+  "storage.choosing": "Choosing a storage class",
+  "storage.onDefault": "New volumes go on the cluster's default storage class.",
+  "storage.on.node": (node: string) => `Kept on node ${node}`,
+  "storage.on.pinned": "Kept on some nodes only",
+  "storage.on.firstUse": "Kept on the node its first replica runs on",
+  "storage.on.moves": "Moves between nodes",
+  "storage.canGrow": "Can grow",
+  "storage.cannotGrow": "Can't grow",
+  "storage.fixed": (name: string, elsewhere: boolean) =>
+    elsewhere
+      ? `${name} can't grow a volume. For more room, copy the data to a new volume on a storage class that can grow, then remove this one.`
+      : `${name} can't grow a volume, and no storage class in this cluster can. For more room, ask a cluster administrator for one that can, such as Longhorn.`,
+  "storage.reclaim.Delete": "Deleting the volume deletes its data",
+  "storage.reclaim.Retain": "Data stays after the volume is deleted",
+  "storage.binding.WaitForFirstConsumer": "Made where its first replica runs",
+  "storage.binding.Immediate": "Made as soon as it is asked for",
 
   // Palette
   "palette.title": "Command palette",
@@ -2323,7 +2355,6 @@ export const en = {
   "db.name.invalid": "Lowercase letters, digits and hyphens, starting with a letter.",
   "db.name.long": "At most 30 characters.",
   "db.name.taken": "A database of this name exists.",
-  "db.storageHint": "It can grow later, not shrink.",
   "db.noRedundancy": (backedUp: boolean) =>
     `One instance: nothing takes over if it fails, and its data is on one volume.${backedUp ? "" : " Set up backups."}`,
   "db.replicaSetHint": "A replica set keeps running through one failure with three instances.",

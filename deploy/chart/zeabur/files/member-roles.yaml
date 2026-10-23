@@ -7,11 +7,19 @@
 # own rights or reach a kubelet.
 # https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks
 
-# Everyone signed in: node names and status, and the names of every project.
+# Everyone signed in: node names and status, the names of every project, the StorageClasses a
+# new volume can use, and the PersistentVolume behind a claim (where its data is). `get` without
+# `list`: a provisioned volume is named after its claim's uid, which only readers of the claim see.
 zeabur-member:
   - apiGroups: [""]
     resources: [nodes, namespaces]
     verbs: [get, list]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [persistentvolumes]
+    verbs: [get]
 
 # Read what a project runs. Like the built-in `view`, without Secrets (a list returns their
 # values) or logs (they often carry what Secrets hold).

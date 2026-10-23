@@ -1017,7 +1017,10 @@ export const zhCN: Messages = {
 
   "storage.title": "卷",
   "volume.fullestOf": (used, n) => `${used}，${n} 个副本中最满的`,
-  "volume.full": "用满后应用写入会失败。请腾出空间，或设置更大的容量后应用。",
+  "volume.full": (grows: boolean) =>
+    grows
+      ? "用满后应用写入会失败。请腾出空间，或设置更大的容量后应用。"
+      : "用满后应用写入会失败。请腾出空间：它的存储类不能扩容。",
   "volume.state.not-configured": "未显示卷用量：没有 metrics 存储服务。",
   "volume.state.unreadable": "未显示卷用量：读取 metrics 存储服务的权限被拒绝。",
   "volume.state.unavailable": "未显示卷用量：metrics 存储服务没有响应。",
@@ -1054,6 +1057,36 @@ export const zhCN: Messages = {
   "storage.problem.badName": "只能用小写字母、数字和 -。",
   "storage.problem.nameTaken": "另一个新卷已经用了这个名称。",
   "storage.problem.badClaimName": "只能用小写字母、数字、- 和 .，最多 253 个字符。",
+  "storage.class": "存储类",
+  "storage.kind.local": "本地磁盘",
+  "storage.kind.replicated": "多副本磁盘",
+  "storage.kind.other": (provisioner: string) => `${provisioner} 提供的磁盘`,
+  "storage.option": (kind: string, name: string, isDefault: boolean) =>
+    `${kind}（${name}${isDefault ? "，默认" : ""}）`,
+  "storage.about.local": "最快，但固定在一个节点上：用到它的副本只能在那里运行。",
+  "storage.about.replicated": "数据复制到多个节点，副本换节点时会跟着移动。",
+  "storage.about.other": "行为由它的驱动决定。",
+  "storage.grows": "之后可以扩容，不能缩小。",
+  "storage.fixedSize": "之后不能扩容，请一次选好需要的大小。",
+  "storage.growUnknown": "之后能否扩容，由集群的存储类决定。",
+  "storage.selfReplicating": (engine: string) =>
+    `${engine} 会自己把数据复制到其他实例，所以适合用本地磁盘。`,
+  "storage.choosing": "选择存储类",
+  "storage.onDefault": "新卷会放在集群的默认存储类上。",
+  "storage.on.node": (node: string) => `固定在节点 ${node}`,
+  "storage.on.pinned": "只能在部分节点使用",
+  "storage.on.firstUse": "固定在第一个副本运行的节点",
+  "storage.on.moves": "可在节点间移动",
+  "storage.canGrow": "可以扩容",
+  "storage.cannotGrow": "不能扩容",
+  "storage.fixed": (name: string, elsewhere: boolean) =>
+    elsewhere
+      ? `${name} 不能扩容卷。需要更多空间时，先在可扩容的存储类上新建一个卷，把数据复制过去，再删除这个卷。`
+      : `${name} 不能扩容卷，这个集群也没有可扩容的存储类。需要更多空间时，请集群管理员添加一个，例如 Longhorn。`,
+  "storage.reclaim.Delete": "删除卷时，数据也会删除",
+  "storage.reclaim.Retain": "删除卷后，数据仍会保留",
+  "storage.binding.WaitForFirstConsumer": "在第一个副本运行的节点上创建",
+  "storage.binding.Immediate": "一请求就创建",
 
   "palette.title": "命令面板",
   "palette.search": "跳转到项目、服务、副本或域名",
@@ -2111,7 +2144,6 @@ export const zhCN: Messages = {
   "db.name.invalid": "只能用小写字母、数字和连字符，并以字母开头。",
   "db.name.long": "最多 30 个字符。",
   "db.name.taken": "已经有同名的数据库。",
-  "db.storageHint": "之后可以扩容，不能缩小。",
   "db.noRedundancy": (backedUp: boolean) =>
     `只有一个实例：它故障时没有其他实例接手，数据也只在一个卷上。${backedUp ? "" : "请设置备份。"}`,
   "db.replicaSetHint": "副本集有三个实例时，坏掉一个也能继续运行。",

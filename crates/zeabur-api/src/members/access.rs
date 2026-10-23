@@ -634,7 +634,10 @@ pub(crate) mod tests {
         for verb in ["get", "list"] {
             assert!(allows(baseline, verb, "nodes"));
             assert!(allows(baseline, verb, "namespaces"));
+            assert!(allows(baseline, verb, "storageclasses.storage.k8s.io"));
         }
+        assert!(allows(baseline, "get", "persistentvolumes"));
+        assert!(!allows(baseline, "list", "persistentvolumes"));
         assert!(!allows(baseline, "list", "pods"));
     }
 

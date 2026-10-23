@@ -44,6 +44,7 @@ pub(crate) mod events;
 pub mod namespace;
 pub mod network_policy;
 pub mod rights;
+pub mod storage;
 pub mod usage;
 pub mod writes;
 

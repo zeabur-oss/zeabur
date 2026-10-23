@@ -18,6 +18,13 @@ import {
 import { ManagedTip, Panel } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
+import {
+  classFacts,
+  kindWord,
+  placementWords,
+  StorageClassField,
+  useStorage,
+} from "@/components/storage-class"
 import { useGate } from "@/components/gate"
 import { useDraft, useHold } from "@/components/plan/draft"
 import { StatusPill } from "@/components/status"
@@ -45,6 +52,14 @@ import { cn } from "@/lib/utils"
 import { claimOf, type Service } from "@/model/service"
 import { claimMounts } from "@/model/volume-use"
 import {
+  canGrow,
+  chosenClass,
+  claimStorage,
+  classNamed,
+  placementOf,
+  type ProjectStorage,
+} from "@/model/storage"
+import {
   changesOf,
   claimNameOf,
   editedCount,
@@ -68,6 +83,13 @@ export function StorageTab({ project, service }: { project: string; service: Ser
     mounts.map(({ mount }) => claimOf(mount)),
   )
   const workload = { kind: service.kind, name: service.name }
+  const storage = useStorage(project)
+  const growable = storage?.classes.some((c) => c.allowExpansion) ?? false
+  // Every replica of a Deployment mounts its claims; a StatefulSet's replicas each have their own.
+  const podNode =
+    service.kind === "StatefulSet"
+      ? undefined
+      : (service.pods.find((p) => p.node)?.node ?? undefined)
   const containers = service.containers.filter((c) => !c.init)
   const multi = containers.length > 1
   const managed = service.provenance.tool ?? undefined
@@ -225,6 +247,8 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                       key={row.id}
                       row={row}
                       workload={service.name}
+                      storage={storage}
+                      growable={growable}
                       status={mounts.find((m) => m.mount.mountPath === row.was?.mountPath)?.mount}
                       problem={problems.get(row.id)}
                       focus={focus === row.id}
@@ -257,8 +281,14 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                               </span>
                             ) : null}
                           </span>
+                          <StorageLine mount={mount} storage={storage} podNode={podNode} />
                           {fill ? <VolumeUse fill={fill} className="max-w-64" /> : null}
-                          {fill ? <VolumeFullNote fill={fill} /> : null}
+                          {fill ? (
+                            <VolumeFullNote
+                              fill={fill}
+                              grows={canGrow(storage, mount.storageClass)}
+                            />
+                          ) : null}
                         </span>
                         <span className="font-mono type-body tabular-nums" translate="no">
                           {mount.size ?? "—"}
@@ -323,10 +353,16 @@ export function StorageTab({ project, service }: { project: string; service: Ser
               m.status,
               m.accessModes?.join(","),
               m.storageClass ? `storageClassName: ${m.storageClass}` : undefined,
+              claimStorage(storage, claimOf(m))?.volume
+                ? `PersistentVolume/${claimStorage(storage, claimOf(m))?.volume}`
+                : undefined,
             ]
               .filter(Boolean)
               .join(" "),
           ]),
+          ...[...new Set(mounts.map(({ mount: m }) => classNamed(storage, m.storageClass)))]
+            .filter((c) => c !== undefined)
+            .flatMap((c) => classFacts(t, c)),
           ...other.map(({ mount }): [string, string] => [
             mount.mountPath,
             mount.object
@@ -349,9 +385,36 @@ function Phase({ mount }: { mount?: Mount }) {
   )
 }
 
+function StorageLine({
+  mount,
+  storage,
+  podNode,
+}: {
+  mount: Mount
+  storage: ProjectStorage | undefined
+  podNode?: string
+}) {
+  const t = useT()
+  const storageClass = classNamed(storage, mount.storageClass)
+  const placement = placementOf(claimStorage(storage, claimOf(mount)), storageClass, podNode)
+  const parts = [
+    storageClass
+      ? t("storage.option", kindWord(t, storageClass), storageClass.name, false)
+      : (mount.storageClass ?? undefined),
+    placement ? placementWords(t, placement) : undefined,
+    storageClass
+      ? t(storageClass.allowExpansion ? "storage.canGrow" : "storage.cannotGrow")
+      : undefined,
+  ].filter((part) => part !== undefined)
+  if (parts.length === 0) return null
+  return <span className="type-meta text-secondary">{parts.join(t("common.sep"))}</span>
+}
+
 function EditRow({
   row,
   workload,
+  storage,
+  growable,
   status,
   problem,
   focus,
@@ -360,6 +423,8 @@ function EditRow({
 }: {
   row: VolumeRow
   workload: string
+  storage: ProjectStorage | undefined
+  growable: boolean
   status?: Mount
   problem?: VolumeProblem
   focus: boolean
@@ -398,6 +463,8 @@ function EditRow({
       </li>
     )
   const describedBy = problem ? problemId : undefined
+  const fixed = row.was && status ? classNamed(storage, status.storageClass) : undefined
+  const fixedSize = fixed?.allowExpansion === false ? fixed : undefined
   const fields = (
     <>
       <Input
@@ -419,6 +486,7 @@ function EditRow({
         aria-label={t("storage.sizeOf", label)}
         aria-invalid={invalid("badSize", "shrinks")}
         aria-describedby={describedBy}
+        disabled={fixedSize !== undefined}
         value={row.size}
         onChange={(event) => onChange((r) => ({ ...r, size: event.target.value }))}
       />
@@ -460,6 +528,10 @@ function EditRow({
     <p id={problemId} className="col-span-full type-meta text-fail-strong">
       {t(`storage.problem.${problem}`)}
     </p>
+  ) : fixedSize ? (
+    <p className="col-span-full type-meta text-secondary">
+      {t("storage.fixed", fixedSize.name, growable)}
+    </p>
   ) : row.was?.size !== undefined && row.size.trim() !== row.was.size ? (
     <p className="col-span-full type-meta text-secondary">{t("form.sizeHint")}</p>
   ) : null
@@ -474,6 +546,15 @@ function EditRow({
     <li className="grid grid-cols-2 items-center gap-x-3 gap-y-1.5 px-5 py-2.5 sm:grid-cols-volume">
       {fields}
       {message}
+      <div className="col-span-full">
+        <StorageClassField
+          storage={storage}
+          value={row.storageClass}
+          details={false}
+          growth
+          onChange={(name) => onChange((r) => ({ ...r, storageClass: chosenClass(storage, name) }))}
+        />
+      </div>
       <Collapsible className="col-span-full">
         <CollapsibleTrigger variant="disclosure">
           <CaretRightIcon aria-hidden="true" />

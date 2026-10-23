@@ -9,6 +9,7 @@ import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { PortNoteHint, useImageInspection } from "@/components/add/image-port"
 import { usePlanStep } from "@/components/plan/planner"
 import { SecurityProfileField, useProjectSecurity } from "@/components/security-profile"
+import { growthWords, useStorage } from "@/components/storage-class"
 import { useT } from "@/i18n"
 import { handOff } from "@/lib/adding"
 import { serviceLink } from "@/lib/place"
@@ -74,6 +75,7 @@ const newExtras = (): Extras => ({
  * one plan. */
 export function ImageDrawer({ project, onClose }: { project: string; onClose: () => void }) {
   const t = useT()
+  const storage = useStorage(project)
   const navigate = useNavigate()
   const domains = useQuery(clusterQuery).data?.domains ?? {}
   const options = imageOptions(rightsOf(useQuery(creatableQuery(project)).data))
@@ -357,7 +359,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                         </FormField>
                         <FormField
                           label={t("add.volumeSize")}
-                          hint={t("db.storageHint")}
+                          hint={growthWords(t, storage)}
                           errors={shown(problems.volumeSize, () => t("storage.problem.badSize"))}
                         >
                           <Input

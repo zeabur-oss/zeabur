@@ -171,6 +171,10 @@ pub struct Database {
     /// The size of each member's volume, as asked for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage: Option<String>,
+    /// The `StorageClass` of each member's volume, as asked for; absent for the cluster's
+    /// default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_class: Option<String>,
     /// The members' PersistentVolumeClaims, as named by the operator's convention.
     pub claims: Vec<String>,
     /// CPU and memory each member asks for and may use, as written.

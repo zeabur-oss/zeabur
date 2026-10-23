@@ -20,6 +20,8 @@ export interface VolumeRow {
   /** An added row's claim name; `null` while it follows the volume name. */
   claimName: string | null
   accessMode: Schemas["AccessMode"]
+  /** An added row's StorageClass; absent for the cluster's default. */
+  storageClass?: string
 }
 
 export type RowState = "same" | "changed" | "added" | "removed"
@@ -161,6 +163,7 @@ export function changesOf(rows: readonly VolumeRow[], workload: Schemas["Workloa
           size: row.size,
           claimName: row.claimName,
           accessMode: row.accessMode,
+          storageClass: row.storageClass,
         }),
       })
   }

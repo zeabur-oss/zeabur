@@ -132,4 +132,9 @@ describe("volume rows", () => {
       },
     ])
   })
+
+  test("a new volume asks for the storage class chosen for it", () => {
+    const [change] = changesOf([{ ...added("n", "/files"), storageClass: "longhorn" }], workload)
+    expect(change).toMatchObject({ op: "addVolume", volume: { storageClass: "longhorn" } })
+  })
 })
