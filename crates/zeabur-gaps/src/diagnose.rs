@@ -984,7 +984,8 @@ fn volume_missing(
 /// What the scheduler says is short, from its message ("0/3 nodes are available: 3 Insufficient
 /// cpu."): `claimMissing` or `claimUnbound` (a volume claim the pod mounts), `cpu`, `memory`,
 /// `placement` (taints, affinity, selectors), or `other`.
-fn shortage(message: &str) -> &'static str {
+#[must_use]
+pub fn shortage(message: &str) -> &'static str {
     if missing_claim(message).is_some() {
         "claimMissing"
     } else if message.contains("unbound immediate PersistentVolumeClaims") {
@@ -1004,7 +1005,8 @@ fn shortage(message: &str) -> &'static str {
 }
 
 /// The claim a scheduler message says does not exist (`persistentvolumeclaim "data" not found`).
-fn missing_claim(message: &str) -> Option<&str> {
+#[must_use]
+pub fn missing_claim(message: &str) -> Option<&str> {
     let (_, rest) = message.split_once("persistentvolumeclaim \"")?;
     let (name, rest) = rest.split_once('"')?;
     rest.trim_start().starts_with("not found").then_some(name)

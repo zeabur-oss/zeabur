@@ -5424,8 +5424,10 @@ export interface components {
       kind: components["schemas"]["EntryKind"]
       /**
        * @description What happened, in one sentence: `timeline.release`, `timeline.write.<tool>`,
-       *     `timeline.warning.<crashLoop|evicted|unschedulable|imagePull|probe|quota|other>`,
-       *     `timeline.termination.<oomKilled|exited>`.
+       *     `timeline.warning.<crashLoop|evicted|imagePull|probe|quota|other>`,
+       *     `timeline.warning.unschedulable.<claimMissing|claimUnbound|cpu|memory|placement|other>`,
+       *     `timeline.termination.<oomKilled|exited>`. A warning names the service and, when it is
+       *     about a pod, the replica; the component's own words are in `note`, not in the sentence.
        */
       message: components["schemas"]["Message"]
       release?: components["schemas"]["ReleaseRef"] | null
