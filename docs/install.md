@@ -208,6 +208,9 @@ the project's namespace, and only for people who may `get` `logs.proxy.zeabur.co
 The chart's `zeabur-proxy-logs-reader` gives that to project Developers and to Kubernetes'
 `view`, `edit` and `admin`, who already read the pods' logs. Viewers read no logs.
 
+Gateway API has no roles for Kubernetes' `view`, so the chart's `zeabur-gateway-routes-reader`
+adds reading HTTPRoutes to it, as `view` already reads Ingresses.
+
 Zeabur reaches the proxy over TLS with a certificate the chart makes and keeps across upgrades.
 To use your own, for example a cert-manager Certificate, name its Secret in
 `proxy.tls.existingSecret`; it needs `ca.crt`. The proxy picks up a renewed certificate on its

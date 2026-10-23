@@ -58,4 +58,18 @@ rules:
   - apiGroups: [proxy.zeabur.com]
     resources: [logs]
     verbs: [get]
+---
+# Gateway API ships no aggregated roles, so Kubernetes' view (and through it edit and admin)
+# cannot read routes; whoever may read a project's Ingresses may read its HTTPRoutes too.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zeabur-gateway-routes-reader
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [httproutes]
+    verbs: [get, list, watch]
 {{- end }}
