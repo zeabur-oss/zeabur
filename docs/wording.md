@@ -186,6 +186,7 @@ why. Add a row before introducing a new concept.
 | policy | 政策 | 策略 | |
 | permission, rights | 權限 | 权限 | |
 | admin rights | 管理員權限 | 管理员权限 | |
+| use admin rights for a few minutes (the offer to elevate) | 暫時使用管理員權限 | 临时使用管理员权限 | Never 以管理員身分檢視: it changes rights, not the view. The time is Zeabur Identity's setting, so no number is promised |
 | Admin / Developer / Viewer (a role in a project) | 管理員／開發者／檢視者 | 管理员／开发者／查看者 | |
 | session | 工作階段 | 会话 | |
 | credential | 認證資訊 | 凭证 | zh-TW 憑證 is a certificate |

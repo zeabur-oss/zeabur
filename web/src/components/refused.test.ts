@@ -93,19 +93,19 @@ describe("A refusal", () => {
   test("offers one action when admin rights are offered, and none otherwise", () => {
     const offered = render(createElement(Refused, { refusal: "unreadable" }), "available")
     expect(offered.match(/<button/g)?.length).toBe(1)
-    expect(offered).toMatch(/View as admin/)
+    expect(offered).toMatch(/Use admin rights for a few minutes/)
     expect(offered).not.toMatch(/Ask a cluster administrator/)
 
     const retry = render(
       createElement(Refused, { refusal: problem("elevation-required", true), retry: () => {} }),
       "available",
     )
-    expect(retry).toMatch(/Retry as admin/)
-    expect(retry).not.toMatch(/View as admin/)
+    expect(retry).toMatch(/Retry with admin rights/)
+    expect(retry).not.toMatch(/Use admin rights/)
 
     for (const elevation of ["unavailable", "active"] as const) {
       const html = render(createElement(Refused, { refusal: "unreadable" }), elevation)
-      expect(html).not.toMatch(/as admin/)
+      expect(html).not.toMatch(/with admin rights|Use admin rights/)
       expect(html).toMatch(/needs more rights\. Ask a cluster administrator\./)
     }
   })
@@ -144,7 +144,7 @@ describe("A permission hint that says no", () => {
       expect(hintOffersElevation(hint, "available"), String(hint)).toBe(false)
   })
 
-  test("is the Refused line with Use admin rights, or View as admin for a read", () => {
+  test("is the Refused line with Use admin rights, for a change or a read", () => {
     const change = render(
       createElement(RefusedHint, {
         hint: "denied",
@@ -155,14 +155,14 @@ describe("A permission hint that says no", () => {
     )
     expect(change).toMatch(/data-refused/)
     expect(change).toMatch(/Changing this project&#x27;s details needs admin rights\./)
-    expect(change).toMatch(/Use admin rights/)
-    expect(change).not.toMatch(/Retry as admin/)
+    expect(change).toMatch(/Use admin rights for a few minutes/)
+    expect(change).not.toMatch(/Retry with admin rights/)
 
     const read = render(
       createElement(RefusedHint, { hint: "denied", what: "Seeing Secret", read: true }),
       "available",
     )
-    expect(read).toMatch(/View as admin/)
+    expect(read).toMatch(/Use admin rights for a few minutes/)
   })
 
   test("leaves the page its own line when no rights are offered or the hint allows it", () => {
@@ -197,7 +197,7 @@ describe("A problem that is not a refusal", () => {
     expect(html).toMatch(/The change to web would go over the project&#x27;s limit\./)
     expect(html).toMatch(/allows 4 of requests\.cpu, and 3500m is already used/)
     expect(html).toMatch(/What to do/)
-    expect(html).not.toMatch(/as admin/)
+    expect(html).not.toMatch(/admin rights/)
   })
 
   test("folds its evidence and the raw answer", () => {

@@ -104,7 +104,7 @@ test("a project's limit says what happened, why with its numbers, and what to do
     "The project's limit compute allows 4 of requests.cpu, and 3500m is already used.",
   )
   await expect(problem).toContainText(`What to do: Run fewer replicas of ${service}`)
-  await expect(problem).not.toContainText("as admin")
+  await expect(problem).not.toContainText("admin rights")
   await expect(problem).not.toContainText("ResourceQuota/compute")
   await problem.getByRole("button", { name: "Evidence" }).click()
   await expect(problem).toContainText("ResourceQuota/compute status.used.requests.cpu")
@@ -175,7 +175,9 @@ test("the account menu offers admin rights while they are offered, and dropping 
     .getByRole("button", { name: /^Cluster .*, signed in as / })
     .first()
     .click()
-  await expect(page.getByRole("menuitem", { name: "Use admin rights" })).toBeVisible()
+  await expect(
+    page.getByRole("menuitem", { name: "Use admin rights for a few minutes" }),
+  ).toBeVisible()
   await expect(page.getByRole("menuitem", { name: "Drop admin rights" })).toHaveCount(0)
 
   await page.unroute(sessionPath)
@@ -186,7 +188,9 @@ test("the account menu offers admin rights while they are offered, and dropping 
     .first()
     .click()
   await expect(page.getByRole("menuitem", { name: "Drop admin rights" })).toBeVisible()
-  await expect(page.getByRole("menuitem", { name: "Use admin rights" })).toHaveCount(0)
+  await expect(
+    page.getByRole("menuitem", { name: "Use admin rights for a few minutes" }),
+  ).toHaveCount(0)
 })
 
 test("project settings offer admin rights where the hint says no, and say who to ask otherwise", async ({
@@ -202,14 +206,18 @@ test("project settings offer admin rights where the hint says no, and say who to
   await stub(page, sessionPath, session("available"))
   await page.goto(`${project}/settings`)
   await expect(page.getByText("Changing this project's details needs admin rights.")).toBeVisible()
-  await expect(page.getByRole("button", { name: "Use admin rights" })).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Use admin rights for a few minutes" }),
+  ).toBeVisible()
   await expect(page.getByText("You can see these but not change them.")).toHaveCount(0)
 
   await page.unroute(sessionPath)
   await stub(page, sessionPath, session("unavailable"))
   await page.reload()
   await expect(page.getByText("You can see these but not change them.")).toBeVisible()
-  await expect(page.getByRole("button", { name: "Use admin rights" })).toHaveCount(0)
+  await expect(
+    page.getByRole("button", { name: "Use admin rights for a few minutes" }),
+  ).toHaveCount(0)
 })
 
 test("each problem type has a page that explains its rule", async ({ page }) => {

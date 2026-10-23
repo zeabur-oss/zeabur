@@ -15,7 +15,7 @@ function refused(overrides: Partial<Problem> = {}): Problem {
     title: "This needs admin rights",
     status: 403,
     detail: "You do not have permission to read the cluster's nodes.",
-    fix: "Retry as admin, or ask a cluster administrator for access.",
+    fix: "Retry with admin rights, or ask a cluster administrator for access.",
     kind: "elevation-required",
     summary: {
       key: "problem.summary.elevation-required",

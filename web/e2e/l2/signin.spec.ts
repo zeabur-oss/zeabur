@@ -47,14 +47,16 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     await expect(page.getByRole("button", { name: /, signed in as admin$/ })).toContainText("admin")
   })
 
-  await test.step("before elevating, the cluster's nodes are refused with View as admin", async () => {
+  await test.step("before elevating, the cluster's nodes are refused with Use admin rights", async () => {
     // Without elevation the admins group has `view`, which does not list nodes.
     await page.goto("/cluster")
     const nodes = page.getByRole("region", { name: "Nodes" })
     await expect(nodes.getByText("Seeing the nodes needs admin rights.")).toBeVisible({
       timeout: 30_000,
     })
-    await expect(nodes.getByRole("button", { name: "View as admin" })).toBeVisible()
+    await expect(
+      nodes.getByRole("button", { name: "Use admin rights for a few minutes" }),
+    ).toBeVisible()
   })
 
   await test.step("the terminal asks for the passkey, then runs a command in the pod", async () => {
@@ -75,7 +77,7 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
     await expect(panel.getByText("Opening a terminal needs admin rights.")).toBeVisible({
       timeout: 30_000,
     })
-    const retry = panel.getByRole("button", { name: "Retry as admin" })
+    const retry = panel.getByRole("button", { name: "Retry with admin rights" })
     await expect(retry).toBeVisible()
     const opened = page.waitForEvent("popup")
     await retry.click()

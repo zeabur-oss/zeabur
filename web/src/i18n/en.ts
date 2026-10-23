@@ -59,7 +59,7 @@ export const en = {
   "shell.signOut": "Sign out",
   "shell.theme": "Theme",
   // Admin rights
-  "elevate.retry": "Retry as admin",
+  "elevate.retry": "Retry with admin rights",
   "elevate.title": "Admin rights",
   "elevate.waiting": "Confirm with your passkey in the new window.",
   "elevate.notAllowed": "This Zeabur may not ask for admin rights. Ask your cluster administrator.",
@@ -70,7 +70,7 @@ export const en = {
   "elevate.until": (time: string) => `Admin until ${time}`,
   "elevate.activeDetail": "Everything you do uses your admin rights until then.",
   "elevate.drop": "Drop admin rights",
-  "elevate.use": "Use admin rights",
+  "elevate.use": "Use admin rights for a few minutes",
   "shell.switchProject": "Switch project",
   "column.label": "Services",
   "column.other": "Other objects",
@@ -128,7 +128,8 @@ export const en = {
   "problem.fix.unauthenticated": "Sign in again.",
   "problem.fix.signed-out": "Sign in again.",
   "problem.fix.forbidden": "Ask a cluster administrator for access, or use an account that has it.",
-  "problem.fix.elevation-required": "Retry as admin, or ask a cluster administrator for access.",
+  "problem.fix.elevation-required":
+    "Retry with admin rights, or ask a cluster administrator for access.",
   "problem.fix.quota-exceeded":
     "Ask for less, free some of what the project uses, or ask a cluster administrator to raise the limit.",
   "problem.fix.policy-denied":
@@ -191,7 +192,7 @@ export const en = {
   "refused.rights": "This needs more rights.",
   "refused.rightsFor": (what: string) => `${what} needs more rights.`,
   "refused.ask": "Ask a cluster administrator.",
-  "refused.view": "View as admin",
+  "refused.view": "Use admin rights for a few minutes",
   "refused.details": "Details",
   "refused.missing": "Missing",
   "refused.see": (what: string) => `Seeing ${what}`,
@@ -2293,7 +2294,7 @@ export const en = {
   // above); `writeSentence` finds them under `sentence.<key>`.
   "sentence.problem.forbidden.fix.askForRule": (p: P) =>
     `Ask a cluster administrator for ${p.rule}, for example with a ClusterRole granting it and a ClusterRoleBinding to you.`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "Ask an admin, or retry as admin.",
+  "sentence.problem.forbidden.fix.askOrRetry": () => "Ask an admin, or retry with admin rights.",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "Send this to an admin. It grants only that permission, and only in this project.",
   "sentence.problem.planExpired.fix.again": (p: P) =>

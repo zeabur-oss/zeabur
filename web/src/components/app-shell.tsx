@@ -27,7 +27,7 @@ import { TooltipProvider } from "@zeabur/design-system/components/tooltip"
 const Toaster = lazy(() =>
   import("@zeabur/design-system/components/sonner").then((m) => ({ default: m.Toaster })),
 )
-// "Retry as admin" starts from a failure toast, so its dialog loads only then.
+// "Retry with admin rights" starts from a failure toast, so its dialog loads only then.
 const ElevationDialog = lazy(() =>
   import("@/components/elevation-dialog").then((m) => ({ default: m.ElevationDialog })),
 )

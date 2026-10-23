@@ -47,7 +47,7 @@ export const zhCN: Messages = {
   "shell.whoamiUnknown": "未知用户",
   "shell.signOut": "退出登录",
   "shell.theme": "主题",
-  "elevate.retry": "以管理员身份重试",
+  "elevate.retry": "临时用管理员权限重试",
   "elevate.title": "管理员权限",
   "elevate.waiting": "在新窗口用通行密钥确认。",
   "elevate.notAllowed": "这个 Zeabur 不能请求管理员权限，请联系集群管理员。",
@@ -58,7 +58,7 @@ export const zhCN: Messages = {
   "elevate.until": (time) => `管理员权限至 ${time}`,
   "elevate.activeDetail": "在此之前，你的所有操作都会使用管理员权限。",
   "elevate.drop": "放弃管理员权限",
-  "elevate.use": "使用管理员权限",
+  "elevate.use": "临时使用管理员权限",
   "shell.switchProject": "切换项目",
   "column.label": "服务",
   "column.other": "其他对象",
@@ -113,7 +113,7 @@ export const zhCN: Messages = {
   "problem.fix.unauthenticated": "重新登录。",
   "problem.fix.signed-out": "重新登录。",
   "problem.fix.forbidden": "向集群管理员申请权限，或改用有权限的账号。",
-  "problem.fix.elevation-required": "以管理员身份重试，或向集群管理员申请权限。",
+  "problem.fix.elevation-required": "临时用管理员权限重试，或向集群管理员申请权限。",
   "problem.fix.quota-exceeded": "减少请求的量、释放项目已占用的资源，或请集群管理员调高上限。",
   "problem.fix.policy-denied": "按策略指出的地方修改，或向集群管理员询问这项策略。",
   "problem.fix.not-found": "刷新页面，查看集群当前有什么。",
@@ -170,7 +170,7 @@ export const zhCN: Messages = {
   "refused.rights": "这需要更多权限。",
   "refused.rightsFor": (what) => `${what}${latinEnd(what)}需要更多权限。`,
   "refused.ask": "请联系集群管理员。",
-  "refused.view": "以管理员身份查看",
+  "refused.view": "临时使用管理员权限",
   "refused.details": "详情",
   "refused.missing": "缺少的权限",
   "refused.see": (what) => `查看${latinStart(what)}${what}`,
@@ -2102,7 +2102,7 @@ export const zhCN: Messages = {
   // 账号与成员结束
   "sentence.problem.forbidden.fix.askForRule": (p) =>
     `向集群管理员申请 ${p.rule} 的权限，例如创建授予该权限的 ClusterRole，以及绑定到你的 ClusterRoleBinding。`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "联系管理员，或以管理员身份重试。",
+  "sentence.problem.forbidden.fix.askOrRetry": () => "联系管理员，或临时用管理员权限重试。",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "把下面的配置交给管理员。它只授予这项权限，而且只在这个项目有效。",
   "sentence.problem.planExpired.fix.again": (p) =>

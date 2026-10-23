@@ -451,7 +451,7 @@ group("failureOf", () => {
       }),
     )
     expect(f.title).toBe("Your everyday rights can't change api.")
-    expect(f.description).toBe("Ask an admin, or retry as admin.")
+    expect(f.description).toBe("Ask an admin, or retry with admin rights.")
     expect(f.review).toBe(false)
   })
 

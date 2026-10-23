@@ -47,7 +47,7 @@ export const zhTW: Messages = {
   "shell.whoamiUnknown": "不明使用者",
   "shell.signOut": "登出",
   "shell.theme": "主題",
-  "elevate.retry": "以管理員身分重試",
+  "elevate.retry": "暫時用管理員權限重試",
   "elevate.title": "管理員權限",
   "elevate.waiting": "在新視窗用通行密鑰確認。",
   "elevate.notAllowed": "這個 Zeabur 不能要求管理員權限，請洽叢集管理員。",
@@ -58,7 +58,7 @@ export const zhTW: Messages = {
   "elevate.until": (time) => `管理員權限至 ${time}`,
   "elevate.activeDetail": "在此之前，你的所有操作都會使用管理員權限。",
   "elevate.drop": "放棄管理員權限",
-  "elevate.use": "使用管理員權限",
+  "elevate.use": "暫時使用管理員權限",
   "shell.switchProject": "切換專案",
   "column.label": "服務",
   "column.other": "其他物件",
@@ -113,7 +113,7 @@ export const zhTW: Messages = {
   "problem.fix.unauthenticated": "重新登入。",
   "problem.fix.signed-out": "重新登入。",
   "problem.fix.forbidden": "向叢集管理員要求權限，或改用有權限的帳號。",
-  "problem.fix.elevation-required": "以管理員身分重試，或向叢集管理員要求權限。",
+  "problem.fix.elevation-required": "暫時用管理員權限重試，或向叢集管理員要求權限。",
   "problem.fix.quota-exceeded": "減少要求的量、釋出專案已用的資源，或請叢集管理員調高上限。",
   "problem.fix.policy-denied": "依政策指出的地方修改，或向叢集管理員詢問這項政策。",
   "problem.fix.not-found": "重新載入頁面，看看叢集目前有什麼。",
@@ -170,7 +170,7 @@ export const zhTW: Messages = {
   "refused.rights": "這需要更多權限。",
   "refused.rightsFor": (what) => `${what}${latinEnd(what)}需要更多權限。`,
   "refused.ask": "請洽叢集管理員。",
-  "refused.view": "以管理員身分檢視",
+  "refused.view": "暫時使用管理員權限",
   "refused.details": "細節",
   "refused.missing": "缺少的權限",
   "refused.see": (what) => `檢視${latinStart(what)}${what}`,
@@ -2106,7 +2106,7 @@ export const zhTW: Messages = {
   // 帳號與成員結束
   "sentence.problem.forbidden.fix.askForRule": (p) =>
     `向叢集管理員要求 ${p.rule} 的權限，例如建立授予這項權限的 ClusterRole，以及綁定到你的 ClusterRoleBinding。`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "洽詢管理員，或以管理員身分重試。",
+  "sentence.problem.forbidden.fix.askOrRetry": () => "洽詢管理員，或暫時用管理員權限重試。",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "把下面的設定交給管理員。它只授予這項權限，而且只在這個專案有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
