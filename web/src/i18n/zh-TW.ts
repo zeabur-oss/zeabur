@@ -656,6 +656,9 @@ export const zhTW: Messages = {
   "builds.word.sourceFailed": "無法取得程式碼",
   "builds.word.builderMissing": "找不到建置器",
   "builds.word.retrying": "重試中",
+  "builds.refused.deployKey": "Git 主機不接受部署金鑰。把它加到儲存庫的部署金鑰，不要給寫入權限。",
+  "builds.refused.token": "Git 主機不接受存取權杖。確認權杖還能讀取儲存庫。",
+  "builds.showKey": "顯示部署金鑰",
   "builds.defaultBranch": "預設分支",
   "builds.since": (ago, commit) =>
     commit ? `最近一次建置在${ago}開始，來自 ${commit}` : `最近一次建置在${ago}開始`,
@@ -1789,6 +1792,7 @@ export const zhTW: Messages = {
   "add.access.tokenHint": "能讀取儲存庫的權杖，經由 HTTPS 使用。",
   "add.access.noSecrets": "你的角色不能在這個專案新增 Secret，所以只能用公開儲存庫。",
   "add.deployKeyMake": "建立部署金鑰",
+  "add.deployKeyPublic": "公開金鑰",
   "add.deployKeyAdd": "把這把金鑰加到儲存庫的部署金鑰，不要給寫入權限。",
   "add.deployKeyOpen": (host) => `到 ${host} 新增部署金鑰`,
   "add.problem.deployKey": "請建立部署金鑰，並加到儲存庫。",

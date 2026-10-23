@@ -1,20 +1,23 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { lazy, Suspense, useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
+import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CubeIcon from "~icons/ph/cube"
 import GitBranchIcon from "~icons/ph/git-branch"
 import RocketLaunchIcon from "~icons/ph/rocket-launch"
 
-import { toProblem } from "@/api/client"
+import { api, toProblem, unwrap } from "@/api/client"
 import { buildsQuery, capabilitiesQuery, logsQuery } from "@/api/queries"
 import { Ago, CopyButton, Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { GateTip, useHereGate } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
+import { FormField } from "@/components/form-field"
 import { Problem } from "@/components/problem"
 import { Alert, AlertAction, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
+import { CopyInput } from "@zeabur/design-system/components/copy-input"
 import {
   Collapsible,
   CollapsibleContent,
@@ -46,6 +49,7 @@ import {
   durationOf,
   KEEL_WEBHOOK,
   keelPolicy,
+  refusedCredentials,
   runsLatest,
   runsOf,
   runTone,
@@ -55,6 +59,7 @@ import {
   type Builds,
   type Built,
 } from "@/model/builds"
+import { deployKeyPage, parseRepository } from "@/model/git-service"
 import { imageTag, isTask, type Service } from "@/model/service"
 
 const InstallSheet = lazy(() =>
@@ -144,6 +149,7 @@ function BuildView({
   return (
     <>
       <Summary
+        project={project}
         service={service}
         built={built}
         latest={latest}
@@ -176,7 +182,70 @@ function phaseWord(t: ReturnType<typeof useT>, run?: BuildRun) {
 
 const tones = { ok: "ok", fail: "fail", progress: "progress", neutral: "idle" } as const
 
+/** What to do when the Git host refuses the Build's credentials; for a deploy key, the key to add
+ * again, read from its Secret only when asked. */
+function Refused({
+  project,
+  build,
+  kind,
+}: {
+  project: string
+  build: Build
+  kind: "deployKey" | "token"
+}) {
+  const t = useT()
+  const show = useMutation({
+    mutationFn: async () =>
+      unwrap(
+        await api.POST("/api/v1/projects/{project}/deploy-keys/{name}/public", {
+          params: { path: { project, name: build.credentials ?? "" } },
+        }),
+      ),
+  })
+  const repo = parseRepository(build.gitUrl ?? "")
+  const keyPage = repo ? deployKeyPage(repo) : undefined
+  return (
+    <div className="mt-1 flex max-w-prose flex-col gap-2">
+      <p className="text-sm text-fail-strong">{t(`builds.refused.${kind}`)}</p>
+      {kind === "deployKey" ? (
+        show.data ? (
+          <FormField label={t("add.deployKeyPublic")}>
+            <CopyInput value={show.data.publicKey} copyLabel={t("common.copy")} />
+          </FormField>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            className="self-start"
+            disabled={show.isPending}
+            onClick={() => show.mutate()}
+          >
+            {t("builds.showKey")}
+          </Button>
+        )
+      ) : null}
+      {kind === "deployKey" && keyPage && repo ? (
+        <a
+          href={keyPage}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 self-start text-sm text-foreground hover:underline"
+        >
+          {t("add.deployKeyOpen", repo.host === "github.com" ? "GitHub" : "GitLab")}
+          <ArrowSquareOutIcon aria-hidden="true" className="size-3.5" />
+        </a>
+      ) : null}
+      {show.isError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{toProblem(show.error).detail}</AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
+  )
+}
+
 function Summary({
+  project,
   service,
   built,
   latest,
@@ -185,6 +254,7 @@ function Summary({
   onDeploy,
   onRebuild,
 }: {
+  project: string
   service: Service
   built: Built
   latest?: BuildRun
@@ -201,6 +271,7 @@ function Summary({
   const problem = buildProblem(build, latest)
   const branch = branchOf(build)
   const failure = problem?.message ?? (build.ready === "False" ? build.message : undefined)
+  const refused = refusedCredentials(build, latest)
   const deployGate = useHereGate("changeServices")
   const rebuildGate = useHereGate("build")
   const deployButton = (
@@ -254,7 +325,7 @@ function Summary({
         </p>
         {failure ? (
           <p
-            className={`mt-1 max-w-prose text-sm break-words ${problem && !problem.lasting ? "text-secondary" : "text-fail-strong"}`}
+            className={`mt-1 max-w-prose text-sm break-words ${(problem && !problem.lasting) || refused ? "text-secondary" : "text-fail-strong"}`}
             lang="en"
             translate="no"
           >
@@ -269,6 +340,7 @@ function Summary({
             {latest.message}
           </p>
         ) : null}
+        {refused ? <Refused project={project} build={build} kind={refused} /> : null}
         {build.suspended ? (
           <p className="mt-1 text-sm text-warn-strong">{t("builds.suspended")}</p>
         ) : null}
