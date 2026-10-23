@@ -557,18 +557,54 @@ fn shop() -> NamespaceObjects {
 }
 
 /// A blog whose new image cannot be pulled, and its database.
+/// Blog's docs, deployed from Git: its first image is still being built
+/// (`ZEABUR_DEMO_BUILD_FAILED=1`: the build failed).
+const DOCS_IMAGE: &str = "zot.zot.svc:5000/blog/docs:pending";
+
+fn docs_build() -> [DynamicObject; 2] {
+    let failed = std::env::var_os("ZEABUR_DEMO_BUILD_FAILED").is_some();
+    let build = json!({
+        "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+        "metadata": {"name": "docs", "namespace": "blog"},
+        "spec": {"builderRef": "railpack",
+            "source": {"git": {"url": "https://github.com/example/docs.git", "ref": "main"}},
+            "output": {"image": "zot.zot.svc:5000/blog/docs"},
+            "notify": [{"type": "keel",
+                "url": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"}]},
+        "status": if failed {
+            json!({"conditions": [{"type": "Ready", "status": "False", "reason": "BuildFailed",
+                "message": "railpack: no start command found"}]})
+        } else {
+            json!({})
+        }
+    });
+    let run = json!({
+        "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "BuildRun",
+        "metadata": {"name": "docs-x7k2p", "namespace": "blog",
+            "creationTimestamp": "2026-10-23T08:00:00Z"},
+        "spec": {"buildRef": "docs", "revision": "3f9a1c2b7d4e5f60718293a4b5c6d7e8f9012345",
+            "trigger": "poll"},
+        "status": if failed {
+            json!({"phase": "Failed", "reason": "PlanFailed",
+                "message": "railpack: no start command found. Add a start script to package.json."})
+        } else {
+            json!({"phase": "Building", "startTime": "2026-10-23T08:00:05Z"})
+        }
+    });
+    [
+        serde_json::from_value(build).expect("a Build"),
+        serde_json::from_value(run).expect("a BuildRun"),
+    ]
+}
+
 fn blog() -> NamespaceObjects {
     let ns = "blog";
     NamespaceObjects {
         namespace: ns.to_owned(),
-        deployments: vec![deployment_in(
-            ns,
-            "web",
-            "ghcr.io/example/blog:2.4.1",
-            1,
-            0,
-            &json!([]),
-        )],
+        deployments: vec![
+            deployment_in(ns, "web", "ghcr.io/example/blog:2.4.1", 1, 0, &json!([])),
+            deployment_in(ns, "docs", DOCS_IMAGE, 1, 0, &json!([])),
+        ],
         stateful_sets: vec![stateful_set_in(ns, "db", "postgres:18", "10Gi", &json!([]))],
         pods: vec![
             pod_in(
@@ -585,9 +621,17 @@ fn blog() -> NamespaceObjects {
                 Some(("StatefulSet", "db")),
                 &running("db", 0),
             ),
+            pod_in(
+                ns,
+                "docs-5b7c9d8f6-m2x4q",
+                "docs",
+                None,
+                &waiting("docs", "ImagePullBackOff", 0),
+            ),
         ],
         services: vec![
             service_in(ns, "web", 80, "http"),
+            service_in(ns, "docs", 3000, "http"),
             service_in(ns, "db", 5432, "postgres"),
         ],
         ingresses: vec![ingress(ns, "blog.example.com", "web")],
@@ -1263,6 +1307,14 @@ fn state() -> State {
                 "PerconaServerMongoDBBackup",
                 true,
             ),
+            ServedResource::readable("builder.zeabur.com", "v1alpha1", "builds", "Build", true),
+            ServedResource::readable(
+                "builder.zeabur.com",
+                "v1alpha1",
+                "buildruns",
+                "BuildRun",
+                true,
+            ),
             ServedResource::readable("identity.zeabur.com", "v1alpha1", "users", "User", true),
             ServedResource::readable(
                 "identity.zeabur.com",
@@ -1367,6 +1419,7 @@ fn state() -> State {
         ]
         .into_iter()
         .chain(live)
+        .chain(docs_build())
         .chain(people())
         .chain(member_roles())
         .collect(),
@@ -2149,6 +2202,9 @@ async fn main() -> std::io::Result<()> {
                 suffix: Some("apps.example.com".to_owned()),
                 cluster_issuer: Some("letsencrypt".to_owned()),
             }
+        },
+        builds: zeabur_api::settings::BuildSettings {
+            registry: Some("zot.zot.svc:5000".to_owned()),
         },
         ..zeabur_api::Settings::default()
     };
