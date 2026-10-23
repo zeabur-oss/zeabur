@@ -67,6 +67,7 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, Preconditions, WriteBody, WriteRequest};
 use zeabur_plan::{Change, ErrorKind, GatewayRef, Input, Plan, PlanError, PlanRequest, Write};
 
+use crate::cluster::s3_destinations;
 use crate::error::{ApiError, project_read, read_problem};
 use crate::handlers::{AppState, Credential, Everyday, Person};
 use crate::plan_token::{self as token, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
@@ -290,6 +291,7 @@ pub(crate) async fn plan(
         handoff: handoff.as_ref(),
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &request)?;
+    let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
     let plan = compute_any(
         &planner,
         cluster.as_ref(),
@@ -418,6 +420,7 @@ pub(crate) async fn apply(
         handoff: handoff.as_ref(),
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &claims.request)?;
+    let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
     let plan = compute_any(
         &planner,
         cluster.as_ref(),

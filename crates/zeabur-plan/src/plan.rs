@@ -553,6 +553,11 @@ impl<'a> Planner<'a> {
                 "unopened_deploy_key",
                 "A deploy key is planned by the server that sealed it.",
             )),
+            Change::CopyS3Keys(_) => Err(error(
+                ErrorKind::BadRequest,
+                "unopened_s3_keys",
+                "The keys of an S3 destination are planned by the server that reads them.",
+            )),
             Change::DebugContainer { .. } | Change::ClusterTools => Err(error(
                 ErrorKind::BadRequest,
                 "terminal_change_alone",

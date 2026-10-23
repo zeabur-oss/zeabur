@@ -927,6 +927,98 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/s3-destinations:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The destinations, without their keys, and what the person may do with them. Readable by
+        everyone signed in where Zeabur's chart is installed.
+      operationId: getS3Destinations
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/S3Destinations"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/s3-destinations/apply:
+    post:
+      tags:
+      - cluster
+      summary: "Carries out a destinations plan by its token: checks it, dry-runs every write, then writes."
+      operationId: applyS3Destinations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/S3DestinationsApply"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/S3DestinationsApplied"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/s3-destinations/plan:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Works out what saving or removing a destination writes, and a token to apply it; writes
+        nothing. The keys never appear in the answer.
+      operationId: planS3Destinations
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/S3DestinationsPlanRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/S3DestinationsPlan"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/tools:
     get:
       tags:
@@ -4384,6 +4476,13 @@ components:
           bucket:
             type: string
             description: The bucket.
+          destination:
+            type:
+            - string
+            - "null"
+            description: |-
+              An S3 destination of the cluster's list to copy the keys from, instead of the keys
+              given.
           endpoint:
             type: string
             description: The S3-compatible endpoint, `https://…`; empty for AWS S3.
@@ -5392,6 +5491,26 @@ components:
             type: string
             enum:
             - deployKey
+      - allOf:
+        - $ref: "#/components/schemas/CopyS3KeysChange"
+          description: |-
+            Create a Secret with the keys of an S3 destination from the cluster's list. The API reads
+            the destination's Secret as the person and plans the Secret as a `create`, so the keys
+            never travel through the browser. The new Secret does not change when the destination's
+            keys change.
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - copyS3Keys
+        description: |-
+          Create a Secret with the keys of an S3 destination from the cluster's list. The API reads
+          the destination's Secret as the person and plans the Secret as a `create`, so the keys
+          never travel through the browser. The new Secret does not change when the destination's
+          keys change.
       - type: object
         description: |-
           Delete one object of the project, as `kubectl delete` does: what it owns goes after it
@@ -5750,6 +5869,11 @@ components:
         canChange:
           $ref: "#/components/schemas/Permission"
           description: Whether the person may create schedules in Velero's namespace.
+        keysFrom:
+          type:
+          - string
+          - "null"
+          description: The S3 destination the main location's keys were copied from.
         locations:
           type: array
           items:
@@ -6581,6 +6705,27 @@ components:
         waitImage:
           type: string
           description: The image of the init containers that wait for a dependency (`depends_on`).
+    CopyS3KeysChange:
+      type: object
+      description: The Secret of a [`Change::CopyS3Keys`].
+      required:
+      - destination
+      - object
+      - accessKeyId
+      - secretAccessKey
+      properties:
+        accessKeyId:
+          type: string
+          description: The key the access key ID goes under.
+        destination:
+          type: string
+          description: The destination's name.
+        object:
+          type: object
+          description: The Secret to create, as for `create`; `stringData` holds its other keys.
+        secretAccessKey:
+          type: string
+          description: The key the secret access key goes under.
     Counterpart:
       type: string
       description: The operator-managed counterpart of a database or object-storage image.
@@ -12883,6 +13028,7 @@ components:
       - schedules
       - runs
       - providers
+      - keysFrom
       - unreadable
       properties:
         coverage:
@@ -12890,6 +13036,15 @@ components:
           items:
             $ref: "#/components/schemas/BackupCoverage"
           description: One row per claim, then per database, then the namespace.
+        keysFrom:
+          type: object
+          description: |-
+            The S3 destination each Secret's keys were copied from, by the Secret's name; empty
+            where the person may not list Secrets.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
         providers:
           type: array
           items:
@@ -14302,6 +14457,194 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
+    S3Destination:
+      type: object
+      description: One S3 destination, without its keys.
+      required:
+      - name
+      - endpoint
+      - bucket
+      - region
+      - prefix
+      - origin
+      properties:
+        bucket:
+          type: string
+          description: The bucket.
+        endpoint:
+          type: string
+          description: The S3-compatible endpoint, `https://…`.
+        name:
+          type: string
+          description: Its name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The ConfigMap.
+        prefix:
+          type: string
+          description: A folder in the bucket that backups go under; empty for the bucket's root.
+        region:
+          type: string
+          description: The region; empty when the service takes any.
+    S3DestinationFields:
+      type: object
+      description: A destination's fields, and its keys.
+      required:
+      - name
+      - endpoint
+      - bucket
+      properties:
+        accessKeyId:
+          type: string
+          description: The access key ID; empty with the secret to keep the keys the destination has.
+        bucket:
+          type: string
+          description: The bucket.
+        endpoint:
+          type: string
+          description: The S3-compatible endpoint, `https://…`.
+        name:
+          type: string
+          description: "Its name: lower-case letters, digits and `-`, at most 63."
+        prefix:
+          type: string
+          description: A folder in the bucket.
+        region:
+          type: string
+          description: The region.
+        secretAccessKey:
+          type: string
+          description: The secret access key.
+    S3DestinationWrite:
+      type: object
+      description: One object a plan writes.
+      required:
+      - action
+      - kind
+      - name
+      properties:
+        action:
+          $ref: "#/components/schemas/S3DestinationWriteAction"
+          description: What it does.
+        afterYaml:
+          type:
+          - string
+          - "null"
+          description: The object as it will be, YAML, a Secret's values hidden; absent for a deletion.
+        beforeYaml:
+          type:
+          - string
+          - "null"
+          description: The object as it is, YAML; absent for a creation and for a Secret.
+        kind:
+          type: string
+          description: The object's kind.
+        name:
+          type: string
+          description: Its name.
+    S3DestinationWriteAction:
+      type: string
+      description: What a write does.
+      enum:
+      - create
+      - patch
+      - delete
+    S3Destinations:
+      type: object
+      description: The cluster's S3 destinations.
+      required:
+      - namespace
+      - items
+      - canChange
+      - canUseKeys
+      - unreadable
+      properties:
+        canChange:
+          $ref: "#/components/schemas/Permission"
+          description: Whether the person may add, change and remove destinations.
+        canUseKeys:
+          $ref: "#/components/schemas/Permission"
+          description: Whether the person may read the keys, which copying them into a project needs.
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/S3Destination"
+          description: The destinations, by name.
+        namespace:
+          type: string
+          description: The namespace they are kept in.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
+    S3DestinationsApplied:
+      type: object
+      description: What an apply wrote.
+      required:
+      - written
+      properties:
+        written:
+          type: array
+          items:
+            type: string
+          description: The objects written, `Kind/name`.
+    S3DestinationsApply:
+      type: object
+      description: The token of a plan to apply.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token `plan` returned.
+    S3DestinationsPlan:
+      type: object
+      description: A plan, and the token that applies it.
+      required:
+      - token
+      - expiresAt
+      - writes
+      properties:
+        expiresAt:
+          type: string
+          description: When the token stops working, RFC 3339.
+        token:
+          type: string
+          description: Send this to `apply` to carry out exactly this plan.
+        writes:
+          type: array
+          items:
+            $ref: "#/components/schemas/S3DestinationWrite"
+          description: The writes, in order; empty when nothing changes.
+    S3DestinationsPlanRequest:
+      oneOf:
+      - allOf:
+        - $ref: "#/components/schemas/S3DestinationFields"
+          description: Add a destination, or change one.
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - save
+        description: Add a destination, or change one.
+      - type: object
+        description: Remove a destination. Secrets its keys were copied into stay.
+        required:
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: The destination.
+          op:
+            type: string
+            enum:
+            - remove
+      description: What to plan.
     SeaweedAccessKey:
       type: object
       description: The access key services use, from an `S3Credentials` of the store.

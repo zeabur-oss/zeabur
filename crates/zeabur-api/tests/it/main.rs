@@ -33,6 +33,7 @@ mod preview;
 mod releases;
 mod reloader;
 mod rollout;
+mod s3_destinations;
 mod storage;
 mod terminal;
 mod timeline;

@@ -25,7 +25,7 @@
 //! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location.
 //!
 //! K8up backs up shop's Redis volume nightly to R2; the newest run failed. `ZEABUR_DEMO_K8UP=none`
-//! leaves it uninstalled.
+//! leaves it uninstalled. The cluster lists one S3 destination, `r2-backups`.
 //!
 //! Alerting sends shop's deploy failures to Slack and the cluster's node alerts to Telegram; a
 //! second shop channel was rejected by Alertmanager. `ZEABUR_DEMO_ALERTING=none` leaves it
@@ -3355,6 +3355,45 @@ fn joining(cluster: MemoryCluster) {
 /// ReplicaSets, a DaemonSet's pod on each node, Zeabur's own pod and a pod without a controller on
 /// `vps-3`, a `worker` with scratch space, the `db` whose volume local-path keeps on `vps-3`, and
 /// a budget that holds a `web` pod for a few seconds once eviction starts.
+/// One S3 destination on the cluster's list, `r2-backups`.
+fn s3_destinations(s: &mut State) {
+    let namespace = "zeabur-s3-destinations";
+    let labels = json!({"zeabur.com/s3-destination": "r2-backups"});
+    s.namespaces
+        .push(from(json!({"metadata": {"name": namespace}})));
+    s.objects.insert(
+        namespace.to_owned(),
+        NamespaceObjects {
+            namespace: namespace.to_owned(),
+            config_maps: vec![from(json!({
+                "metadata": {"name": "r2-backups", "namespace": namespace, "labels": labels,
+                             "resourceVersion": "1"},
+                "data": {"endpoint": "https://4f1c.r2.cloudflarestorage.com",
+                         "bucket": "acme-backups", "region": "auto", "prefix": "zeabur"}
+            }))],
+            secrets: vec![SecretSummary {
+                secret: from(json!({
+                    "metadata": {"name": "r2-backups", "namespace": namespace, "labels": labels,
+                                 "resourceVersion": "1"},
+                    "type": "Opaque"
+                })),
+                key_count: 2,
+            }],
+            ..NamespaceObjects::default()
+        },
+    );
+    s.secret_values.insert(
+        format!("{namespace}/r2-backups"),
+        [
+            ("AWS_ACCESS_KEY_ID", "demo-access-key"),
+            ("AWS_SECRET_ACCESS_KEY", "demo-secret-key"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.as_bytes().to_vec()))
+        .collect(),
+    );
+}
+
 fn maintenance(s: &mut State) {
     for objects in s.objects.values_mut() {
         let deployments: Vec<(String, BTreeMap<String, String>)> = objects
@@ -3857,6 +3896,7 @@ async fn main() -> std::io::Result<()> {
     cluster.update(|s| {
         maintenance(s);
         storage(s);
+        s3_destinations(s);
         // A debug container's patch tests the pod's uid.
         for (namespace, objects) in &mut s.objects {
             for pod in &mut objects.pods {

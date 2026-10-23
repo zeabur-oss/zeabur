@@ -9,6 +9,8 @@
 //! This is its own route, not part of the project document, so that pages which do not show
 //! backups do not pay for up to seven more LISTs on every refresh.
 
+use std::collections::BTreeMap;
+
 use axum::Json;
 use axum::extract::Path;
 use serde::Serialize;
@@ -19,6 +21,7 @@ use zeabur_kube::{Cluster, ClusterError, DynamicObject, ResourceRef};
 use zeabur_modules::backups::{self, Coverage, Findings, Run, Schedule, Target};
 use zeabur_modules::{Module, Reading};
 
+use crate::cluster::s3_destinations;
 use crate::error::{ApiError, list_read, read_problem};
 use crate::handlers::Person;
 use crate::views::UnreadableView;
@@ -59,6 +62,9 @@ pub struct ProjectBackups {
     pub runs: Vec<Run>,
     /// The providers this build has.
     pub providers: Vec<BackupProvider>,
+    /// The S3 destination each Secret's keys were copied from, by the Secret's name; empty
+    /// where the person may not list Secrets.
+    pub keys_from: BTreeMap<String, String>,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
 }
@@ -237,12 +243,25 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
     schedules.sort_by(|a, b| (&a.provider, &a.name).cmp(&(&b.provider, &b.name)));
     let mut runs: Vec<Run> = findings.into_iter().flat_map(|f| f.runs).collect();
     backups::newest(&mut runs, 10);
+    let keys_from = cluster
+        .list_metadata(
+            &ResourceRef::new("", "v1", "secrets", "Secret"),
+            Some(&project),
+        )
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|meta| Some((meta.name.clone()?, s3_destinations::copied_from(meta)?)))
+        .collect();
     Ok(ProjectBackups {
         coverage,
         unscheduled,
         schedules,
         runs,
         providers,
+        keys_from,
         unreadable,
     })
 }

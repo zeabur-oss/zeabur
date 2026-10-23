@@ -30,9 +30,9 @@ pub mod token;
 pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{
     AddDomainChange, BasicAuthUser, BuildOptionsChange, CertificateChange, CertificateSource,
-    Change, ConnectionRef, DataEdit, DataKind, EnvImportChange, FieldOwners, HttpOnlyReason,
-    KeptReason, LabelVolumeChange, ObjectName, Plan, PlanRequest, PlannedObject, ProbeKind,
-    PublicPortChange, RouteKind, RouteRef, Target, TaskConcurrency, Warning, Write,
+    Change, ConnectionRef, CopyS3KeysChange, DataEdit, DataKind, EnvImportChange, FieldOwners,
+    HttpOnlyReason, KeptReason, LabelVolumeChange, ObjectName, Plan, PlanRequest, PlannedObject,
+    ProbeKind, PublicPortChange, RouteKind, RouteRef, Target, TaskConcurrency, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};

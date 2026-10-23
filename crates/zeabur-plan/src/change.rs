@@ -293,6 +293,11 @@ pub enum Change {
         /// The sealed key, as `POST /projects/{p}/deploy-keys` returned it.
         key: String,
     },
+    /// Create a Secret with the keys of an S3 destination from the cluster's list. The API reads
+    /// the destination's Secret as the person and plans the Secret as a `create`, so the keys
+    /// never travel through the browser. The new Secret does not change when the destination's
+    /// keys change.
+    CopyS3Keys(CopyS3KeysChange),
     /// Delete one object of the project, as `kubectl delete` does: what it owns goes after it
     /// (background propagation). Refused for an object Helm, Argo CD or Flux manages, and for one
     /// a controller owns, except a Pod, which its owner replaces (see the `delete` module).
@@ -412,6 +417,22 @@ impl Change {
             Self::CreateProject { .. } | Self::Adopt | Self::Unadopt | Self::Details { .. }
         )
     }
+}
+
+/// The Secret of a [`Change::CopyS3Keys`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct CopyS3KeysChange {
+    /// The destination's name.
+    pub destination: String,
+    /// The Secret to create, as for `create`; `stringData` holds its other keys.
+    #[cfg_attr(feature = "openapi", schema(value_type = Object))]
+    pub object: Value,
+    /// The key the access key ID goes under.
+    pub access_key_id: String,
+    /// The key the secret access key goes under.
+    pub secret_access_key: String,
 }
 
 const fn yes() -> bool {

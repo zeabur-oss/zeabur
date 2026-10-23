@@ -1,0 +1,43 @@
+# The S3 destinations administrators register on the cluster's Backups page: a ConfigMap and a
+# Secret each, in this namespace. Everyone signed in may read the ConfigMaps, so backup forms can
+# offer the destinations. Nobody gets the Secrets from the chart: whoever may read one may copy
+# its keys into a project. The namespace stays on uninstall, so the list is not lost; backups
+# never read it.
+# https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-subjects (system:authenticated)
+# https://helm.sh/docs/howto/charts_tips_and_tricks/#tell-helm-not-to-uninstall-a-resource
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zeabur-s3-destinations
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "zeabur.fullname" . }}-s3-destinations-reader
+  namespace: zeabur-s3-destinations
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "zeabur.fullname" . }}-s3-destinations-reader
+  namespace: zeabur-s3-destinations
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "zeabur.fullname" . }}-s3-destinations-reader
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated

@@ -100,6 +100,7 @@ pub(crate) async fn compute(
         | Change::Edit { .. }
         | Change::Create { .. }
         | Change::DeployKey { .. }
+        | Change::CopyS3Keys(_)
         | Change::Delete { .. }
         | Change::CreateProject { .. }
         | Change::Adopt

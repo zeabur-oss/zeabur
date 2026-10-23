@@ -30,6 +30,7 @@ use zeabur_kube::{
 use zeabur_modules::Reading;
 use zeabur_modules::velero::{self, cluster as v};
 
+use crate::cluster::s3_destinations;
 use crate::error::{ApiError, get_read, list_read, read_problem};
 use crate::handlers::{AppState, Everyday, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
@@ -64,6 +65,9 @@ pub struct ClusterBackups {
     pub total_backups: usize,
     /// Whether the person may create schedules in Velero's namespace.
     pub can_change: Permission,
+    /// The S3 destination the main location's keys were copied from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keys_from: Option<String>,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
 }
@@ -91,6 +95,10 @@ pub enum BackupsPlanRequest {
         /// The secret access key.
         #[serde(default, rename = "secretAccessKey")]
         secret_access_key: String,
+        /// An S3 destination of the cluster's list to copy the keys from, instead of the keys
+        /// given.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        destination: Option<String>,
     },
     /// Set Zeabur's schedule.
     Schedule {
@@ -276,6 +284,7 @@ fn empty(state: ProviderState, unreadable: Vec<UnreadableView>) -> ClusterBackup
         backups: Vec::new(),
         total_backups: 0,
         can_change: Permission::Unknown,
+        keys_from: None,
         unreadable,
     }
 }
@@ -313,6 +322,7 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
     listed.truncate(SHOWN);
     let mut locations: Vec<v::Location> = locations.iter().map(v::location).collect();
     locations.sort_by(|a, b| (!a.default, &a.name).cmp(&(!b.default, &b.name)));
+    let keys_from = keys_from(cluster, &namespace, &locations).await;
     let mut schedules: Vec<v::ScheduleView> = schedules.iter().map(v::schedule).collect();
     schedules.sort_by(|a, b| (!a.zeabur, &a.name).cmp(&(!b.zeabur, &b.name)));
     let can_change = match cluster
@@ -331,8 +341,49 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
         backups: listed,
         total_backups,
         can_change,
+        keys_from,
         unreadable,
     }))
+}
+
+/// The S3 destination the main location's keys were copied from; `None` when unknown.
+async fn keys_from(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    locations: &[v::Location],
+) -> Option<String> {
+    let main = locations
+        .iter()
+        .find(|l| l.default)
+        .or_else(|| locations.iter().find(|l| l.name == v::LOCATION))?;
+    let secret = cluster
+        .find_object(&secrets(), Some(namespace), main.credential.as_deref()?)
+        .await
+        .ok()??;
+    s3_destinations::copied_from(&secret.metadata)
+}
+
+fn secrets() -> ResourceRef {
+    ResourceRef::new("", "v1", "secrets", "Secret")
+}
+
+/// The JSON Patch operations that set the credentials Secret's [`s3_destinations::LABEL`]
+/// annotation to `destination`, or remove it.
+fn annotation_ops(existing: &Value, destination: Option<&str>) -> Vec<Value> {
+    let annotations = existing.pointer("/metadata/annotations");
+    let path = format!(
+        "/metadata/annotations/{}",
+        s3_destinations::LABEL.replace('/', "~1")
+    );
+    match (destination, annotations) {
+        (Some(name), Some(_)) => vec![json!({"op": "add", "path": path, "value": name})],
+        (Some(name), None) => vec![json!({"op": "add", "path": "/metadata/annotations",
+                                          "value": {s3_destinations::LABEL: name}})],
+        (None, Some(a)) if a.get(s3_destinations::LABEL).is_some() => {
+            vec![json!({"op": "remove", "path": path})]
+        }
+        (None, _) => Vec::new(),
+    }
 }
 
 fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Denied {
@@ -467,6 +518,7 @@ async fn location_writes(
     objects: &Objects,
     request: &v::LocationRequest,
     keys: Option<(&str, &str)>,
+    destination: Option<&str>,
     versions: &mut BTreeMap<String, String>,
 ) -> Result<Vec<Planned>, ApiError> {
     if let Some(problem) = v::location_problem(request) {
@@ -481,9 +533,8 @@ async fn location_writes(
     }
     let mut writes = Vec::new();
     if let Some((access, secret)) = keys {
-        let secrets = ResourceRef::new("", "v1", "secrets", "Secret");
         let existing = cluster
-            .find_object(&secrets, Some(namespace), v::CREDENTIALS)
+            .find_object(&secrets(), Some(namespace), v::CREDENTIALS)
             .await
             .map_err(|e| {
                 read_problem(
@@ -499,21 +550,34 @@ async fn location_writes(
             version(existing.as_ref()),
         );
         let file = v::credentials_file(access, secret);
-        let shown = v::credentials_secret(namespace, HIDDEN);
+        let annotated = |mut secret: Value| {
+            if let Some(name) = destination {
+                s3_destinations::set(
+                    &mut secret,
+                    &["metadata", "annotations", s3_destinations::LABEL],
+                    name.to_owned(),
+                );
+            }
+            secret
+        };
+        let shown = annotated(v::credentials_secret(namespace, HIDDEN));
         let (body, action) = existing.as_ref().map_or_else(
             || {
                 (
-                    WriteBody::Create(v::credentials_secret(namespace, &file)),
+                    WriteBody::Create(annotated(v::credentials_secret(namespace, &file))),
                     BackupWriteAction::Create,
                 )
             },
             |existing| {
+                let mut operations = vec![
+                    json!({"op": "test", "path": "/metadata/resourceVersion",
+                           "value": version(Some(existing))}),
+                    json!({"op": "add", "path": "/stringData",
+                           "value": { v::CREDENTIALS_KEY: &file }}),
+                ];
+                operations.extend(annotation_ops(existing, destination));
                 (
-                    WriteBody::JsonPatch(json!([
-                        {"op": "test", "path": "/metadata/resourceVersion",
-                         "value": version(Some(existing))},
-                        {"op": "add", "path": "/stringData", "value": { v::CREDENTIALS_KEY: &file }},
-                    ])),
+                    WriteBody::JsonPatch(Value::Array(operations)),
                     BackupWriteAction::Patch,
                 )
             },
@@ -565,8 +629,14 @@ async fn compute(
             endpoint,
             access_key_id,
             secret_access_key,
+            destination,
         } => {
+            let copied = match destination {
+                Some(name) => Some(s3_destinations::keys(cluster, name).await?),
+                None => None,
+            };
             let keys = match (access_key_id.trim(), secret_access_key.trim()) {
+                _ if copied.is_some() => copied.as_ref().map(|(a, s)| (a.as_str(), s.as_str())),
                 ("", "") => None,
                 ("", _) | (_, "") => {
                     return Err(invalid(
@@ -583,7 +653,15 @@ async fn compute(
                 region: region.clone(),
                 endpoint: endpoint.clone(),
             };
-            location_writes(cluster, objects, &location, keys, &mut versions).await?
+            location_writes(
+                cluster,
+                objects,
+                &location,
+                keys,
+                destination.as_deref(),
+                &mut versions,
+            )
+            .await?
         }
         BackupsPlanRequest::Schedule {
             cron,
