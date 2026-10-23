@@ -1151,6 +1151,12 @@ export const zhCN: Messages = {
   "warn.reloaderMayRestart": (names: string) => `如果这个集群运行着 Reloader，会重启 ${names}`,
   "warn.tlsHostChanged": (host: string, route: string) =>
     `${route} 的 HTTPS 配置仍是旧域名；${host} 需要新的证书`,
+  "warn.httpsCertificate": (host: string, issuer: string) =>
+    `${host} 会使用 HTTPS：应用后由 cert-manager（${issuer}）签发证书`,
+  "warn.httpOnlyNoIssuer": (host: string) =>
+    `${host} 只有 HTTP。管理员指定 cert-manager 的签发者后，新域名会使用 HTTPS`,
+  "warn.httpOnlyElsewhere": (host: string, route: string) =>
+    `${host} 只有 HTTP：${route} 的证书不是由 cert-manager 签发的，请到生成证书的地方加入 ${host}`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
     `连接到 Gateway ${gateway}（共找到 ${of} 个）`,
   "warn.gatewaysUnreadable": "无法读取 Gateway：Zeabur 改用 Ingress",

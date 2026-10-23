@@ -1154,6 +1154,12 @@ export const zhTW: Messages = {
   "warn.reloaderMayRestart": (names: string) => `若這個叢集有執行 Reloader，會重新啟動 ${names}`,
   "warn.tlsHostChanged": (host: string, route: string) =>
     `${route} 的 HTTPS 設定仍是舊網域；${host} 需要新的憑證`,
+  "warn.httpsCertificate": (host: string, issuer: string) =>
+    `${host} 會使用 HTTPS：套用後由 cert-manager（${issuer}）簽發憑證`,
+  "warn.httpOnlyNoIssuer": (host: string) =>
+    `${host} 只有 HTTP。管理員指定 cert-manager 的簽發者後，新網域會使用 HTTPS`,
+  "warn.httpOnlyElsewhere": (host: string, route: string) =>
+    `${host} 只有 HTTP：${route} 的憑證不是 cert-manager 簽發的，請到產生憑證的地方加入 ${host}`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
     `掛接到 Gateway ${gateway}（共找到 ${of} 個）`,
   "warn.gatewaysUnreadable": "無法讀取 Gateway：Zeabur 改用 Ingress",

@@ -45,11 +45,14 @@ import { useI18n, useT, writeSentence, type Translate } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { toolNotes, type Skipped, type ToolNote } from "@/model/managed"
 import { awaitsName, destinationOf, typedName, undoOf, weigh, type PodsOf } from "@/model/risk"
+import type { Health } from "@/model/service"
 
 /** A sentence, and the full names behind its "and N more". */
 interface Said {
   text: string
   names?: string[]
+  /** A plan line's dot; warn when left out. */
+  health?: Health
 }
 
 interface PlanProps {
@@ -439,7 +442,7 @@ function PlanBody({
   const t = useT()
   const { lines, more } = description
   const [first, ...rest] = lines
-  const warnings = [
+  const warnings: Said[] = [
     ...plan.warnings.filter((w) => !sentenced.has(w.code)).map((w) => warningText(t, w)),
     ...(plan.gaps ?? []).flatMap((gap) => {
       const text = writeSentence(t, gap.message)
@@ -492,7 +495,7 @@ function PlanBody({
         <ul className="flex flex-col gap-1.5" aria-label={t("plan.warnings")}>
           {warnings.map((warning) => (
             <li key={warning.text} className="flex items-start gap-2 text-sm">
-              <StatusDot health="warn" className="mt-1.5" />
+              <StatusDot health={warning.health ?? "warn"} className="mt-1.5" />
               <Line said={warning} className="min-w-0" />
             </li>
           ))}
@@ -599,6 +602,8 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
       const cut = bounded(t, all).rest.length > 0
       return { text: warningSentence(t, warning), names: cut ? all : undefined }
     }
+    case "httpsCertificate":
+      return { text: warningSentence(t, warning), health: "ok" }
     default:
       return { text: warningSentence(t, warning) }
   }
@@ -617,6 +622,12 @@ function warningSentence(
         : t("warn.reloaderMayRestart", names(t, warning.workloads))
     case "tlsHostChanged":
       return t("warn.tlsHostChanged", warning.hostname, warning.route)
+    case "httpsCertificate":
+      return t("warn.httpsCertificate", warning.hostname, warning.issuer)
+    case "httpOnly":
+      return warning.reason === "certificatesElsewhere"
+        ? t("warn.httpOnlyElsewhere", warning.hostname, warning.route ?? "")
+        : t("warn.httpOnlyNoIssuer", warning.hostname)
     case "gatewayChosen":
       return t("warn.gatewayChosen", `${warning.namespace}/${warning.name}`, warning.of)
     case "gatewaysUnreadable":

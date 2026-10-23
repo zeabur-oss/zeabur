@@ -1263,6 +1263,12 @@ export const en = {
     `Reloader restarts ${names}, if it runs in this cluster`,
   "warn.tlsHostChanged": (host: string, route: string) =>
     `${route} lists the old host for HTTPS; ${host} needs a new certificate`,
+  "warn.httpsCertificate": (host: string, issuer: string) =>
+    `${host} uses HTTPS: cert-manager (${issuer}) issues its certificate after you apply`,
+  "warn.httpOnlyNoIssuer": (host: string) =>
+    `${host} is HTTP only. An administrator can name a cert-manager issuer to make new domains HTTPS`,
+  "warn.httpOnlyElsewhere": (host: string, route: string) =>
+    `${host} is HTTP only: ${route}'s certificates don't come from cert-manager, so add ${host} where they're made`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
     `Attaches to Gateway ${gateway} (${of} found)`,
   "warn.gatewaysUnreadable": "Unable to read Gateways: Zeabur uses an Ingress",
