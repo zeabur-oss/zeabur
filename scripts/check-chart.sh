@@ -42,14 +42,17 @@ for values in "$chart"/ci/*-values.yaml; do
   # reader.
   expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "ClusterRole") | .metadata.name] | sort | join(",")' \
-    zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader
+    zeabur-gateway-routes-reader,zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader
   # A project role is exactly what its own label selects: nothing else of the chart's widens it.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole" and .aggregationRule) | .metadata.name + "=" + (.aggregationRule.clusterRoleSelectors[].matchLabels | keys | join("+")) + (.rules | length | tostring)] | join(",")' \
     "zeabur-project-developer=zeabur.com/aggregate-to-zeabur-project-developer0,zeabur-project-viewer=zeabur.com/aggregate-to-zeabur-project-viewer0"
   expect "$name" "$out" \
     "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .metadata.labels | keys | .[] | select(test(\"aggregate-to\")) | \$n + \">\" + sub(\".*aggregate-to-\"; \"\")] | join(\",\")" \
-    "zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view"
+    "zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view,zeabur-gateway-routes-reader>view"
+  expect "$name" "$out" \
+    'select(.kind == "ClusterRole" and .metadata.name == "zeabur-gateway-routes-reader") | .rules[] | [.apiGroups, .resources, .verbs] | map(join(",")) | join("|")' \
+    'gateway.networking.k8s.io|httproutes|get,list,watch'
   expect "$name" "$out" \
     'select(.kind == "ClusterRole" and .metadata.name == "zeabur-proxy-logs-reader") | .rules[] | [.apiGroups, .resources, .verbs] | map(join(",")) | join("|")' \
     'proxy.zeabur.com|logs|get'
