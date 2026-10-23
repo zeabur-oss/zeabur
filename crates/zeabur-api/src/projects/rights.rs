@@ -43,6 +43,8 @@ pub struct ProjectRights {
     pub read_logs: Permission,
     /// Build again: `patch` on Zeabur Builder's builds.
     pub build: Permission,
+    /// Deploy a service from Git: `create` on deployments, services and Zeabur Builder's builds.
+    pub deploy_from_git: Permission,
     /// Change network policies: `create` and `patch` on networkpolicies.
     pub change_network_policies: Permission,
     /// Give people access to the project: `create` on rolebindings.
@@ -121,6 +123,7 @@ impl ProjectRights {
             open_terminal: u,
             read_logs: u,
             build: u,
+            deploy_from_git: u,
             change_network_policies: u,
             change_members: u,
         }
@@ -161,6 +164,11 @@ impl ProjectRights {
             open_terminal: ask.can("create", "", "pods/exec"),
             read_logs: ask.can("get", "", "pods/log"),
             build: ask.can("patch", "builder.zeabur.com", "builds"),
+            deploy_from_git: all([
+                ask.can("create", "apps", "deployments"),
+                ask.can("create", "", "services"),
+                ask.can("create", "builder.zeabur.com", "builds"),
+            ]),
             change_network_policies: ask.every(
                 &["create", "patch"],
                 "networking.k8s.io",
@@ -225,6 +233,7 @@ mod tests {
                     open_terminal: allowed,
                     read_logs: allowed,
                     build: allowed,
+                    deploy_from_git: allowed,
                     change_network_policies: allowed,
                     change_members: allowed,
                 }

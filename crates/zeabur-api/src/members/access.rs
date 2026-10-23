@@ -552,7 +552,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn both_project_roles_see_builds_and_developers_build_again() {
+    fn both_project_roles_see_builds_and_developers_deploy_from_git_and_build_again() {
         let roles = roles();
         let developer = &roles[ProjectRole::Developer.cluster_role()];
         let viewer = &roles[ProjectRole::Viewer.cluster_role()];
@@ -563,10 +563,11 @@ pub(crate) mod tests {
                 "developer lists {resource}"
             );
         }
-        assert!(allows(developer, "patch", "builds.builder.zeabur.com"));
-        assert!(!allows(viewer, "patch", "builds.builder.zeabur.com"));
+        for verb in ["create", "patch", "delete"] {
+            assert!(allows(developer, verb, "builds.builder.zeabur.com"), "{verb}");
+            assert!(!allows(viewer, verb, "builds.builder.zeabur.com"), "{verb}");
+        }
         assert!(!allows(developer, "create", "buildruns.builder.zeabur.com"));
-        assert!(!allows(developer, "delete", "builds.builder.zeabur.com"));
     }
 
     #[test]
