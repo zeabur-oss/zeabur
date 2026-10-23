@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, type ReactNode } from "react"
 
 import type { Schemas } from "@/api/client"
 import { LoadingRows } from "@/components/page"
+import { cn } from "@/lib/utils"
 import { useDraft } from "@/components/plan/draft"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { useT } from "@/i18n"
@@ -114,10 +115,10 @@ function Part({ id, children }: { id: SettingsPart; children: ReactNode }) {
 }
 
 /** A pending edit's mark, beside a part's link or a tab. */
-export function PendingMark() {
+export function PendingMark({ className }: { className?: string }) {
   const t = useT()
   return (
-    <span className="flex items-center">
+    <span className={cn("flex items-center", className)}>
       <span aria-hidden="true" className="size-1.5 rounded-full bg-progress" />
       <span className="sr-only">{t("draft.pendingHere")}</span>
     </span>

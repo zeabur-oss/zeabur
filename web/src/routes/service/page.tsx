@@ -378,8 +378,12 @@ function ServiceView({
                   return (
                     <TabsTrigger key={value} value={value} className="flex-1">
                       <TabIcon aria-hidden="true" className="max-sm:hidden" />
-                      {t(`tab.${value}`)}
-                      {pendingIn.has(value) ? <PendingMark /> : null}
+                      <span className="relative">
+                        {t(`tab.${value}`)}
+                        {pendingIn.has(value) ? (
+                          <PendingMark className="absolute top-1/2 left-full ml-1 -translate-y-1/2" />
+                        ) : null}
+                      </span>
                     </TabsTrigger>
                   )
                 })}

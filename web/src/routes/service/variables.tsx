@@ -968,7 +968,7 @@ function EditRow({
   const label = row.was?.name || row.name
   if (state === "removed")
     return (
-      <li className="grid grid-cols-2 items-center gap-x-3 gap-y-1 py-2 sm:grid-cols-variable-edit">
+      <li className="grid grid-cols-2 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-edit">
         <span
           className="col-span-2 truncate font-mono text-xs text-tertiary line-through sm:col-span-1"
           translate="no"
@@ -995,7 +995,7 @@ function EditRow({
     )
   const problemId = `${row.id}-problem`
   return (
-    <li className="grid grid-cols-2 items-start gap-x-3 gap-y-1 py-2 sm:grid-cols-variable-edit">
+    <li className="grid grid-cols-2 items-start gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-edit">
       <span className="col-span-2 flex min-w-0 flex-col gap-1 sm:col-span-1">
         {containers && !row.was ? (
           <Select
@@ -1009,6 +1009,7 @@ function EditRow({
         <Input
           size="sm"
           mono
+          className="-ml-2.25"
           placeholder={t("vars.namePlaceholder")}
           aria-label={t("vars.name")}
           aria-invalid={problem !== undefined}
@@ -1032,7 +1033,7 @@ function EditRow({
       <Input
         size="sm"
         mono
-        className="col-span-2 sm:col-span-1"
+        className="col-span-2 -ml-2.25 sm:col-span-1"
         aria-label={t("vars.valueOf", label || t("vars.name"))}
         value={row.value}
         onChange={(event) => onChange({ ...row, value: event.target.value })}
@@ -1104,7 +1105,7 @@ function VarGroup({
           ) : null}
         </h3>
         {hint}
-        {action ? <span className="ml-auto">{action}</span> : null}
+        {action ? <span className="ml-auto flex">{action}</span> : null}
       </div>
       {children}
     </section>
