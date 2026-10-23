@@ -101,12 +101,13 @@ data:
   DATADOGLOGS_MINIMUMPRIORITY: ""
 
   # AlertManager Output
-  ALERTMANAGER_HOSTPORT: ""
-  ALERTMANAGER_ENDPOINT: "L2FwaS92MS9hbGVydHM="
-  ALERTMANAGER_EXPIRESAFTER: ""
+  ALERTMANAGER_HOSTPORT: "aHR0cDovL3ZtYWxlcnRtYW5hZ2VyLXZtLXZpY3RvcmlhLW1ldHJpY3MtazhzLXN0YWNrLm9ic2VydmFiaWxpdHkuc3ZjOjkwOTM="
+  ALERTMANAGER_ENDPOINT: "L2FwaS92Mi9hbGVydHM="
+  ALERTMANAGER_EXPIRESAFTER: "NjAw"
+  ALERTMANAGER_EXTRALABELS: "bmFtZXNwYWNlOm9ic2VydmFiaWxpdHksemVhYnVyX2V2ZW50OnJ1bnRpbWUtc2VjdXJpdHksemVhYnVyX2tpbmQ6ZXZlbnQ="
   ALERTMANAGER_DROPEVENTDEFAULTPRIORITY: "Y3JpdGljYWw="
   ALERTMANAGER_DROPEVENTTHRESHOLDS: "MTAwMDA6Y3JpdGljYWwsIDEwMDA6Y3JpdGljYWwsIDEwMDpjcml0aWNhbCwgMTA6d2FybmluZywgMTp3YXJuaW5n"
-  ALERTMANAGER_MINIMUMPRIORITY: ""
+  ALERTMANAGER_MINIMUMPRIORITY: "d2FybmluZw=="
   ALERTMANAGER_MUTUALTLS: "ZmFsc2U="
   ALERTMANAGER_CHECKCERT: "dHJ1ZQ=="
 
@@ -1102,7 +1103,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: core
       annotations:
-        checksum/config: 731e0d5df54a12ecce367991eddbf717f4c8ecf294ab16e7c229b3248f150c83
+        checksum/config: a8d03545be392b778fc5f293ee4963f646ae2e400e13e594a62f6c23e0de3e02
     spec:
       serviceAccountName: falco-falcosidekick
       securityContext:

@@ -3,9 +3,12 @@ import { useT } from "@/i18n"
 
 const knownCapabilities = [
   "certificates",
+  "config-reload",
   "container-registry",
+  "databases",
   "dns",
   "event-autoscaling",
+  "gotify-notifications",
   "image-updates",
   "ingress",
   "intrusion-prevention",
@@ -15,6 +18,8 @@ const knownCapabilities = [
   "object-storage",
   "observability-operator",
   "postgres",
+  "remote-access",
+  "replicated-storage",
   "resource-recommendations",
   "runtime-security",
   "uptime-probes",

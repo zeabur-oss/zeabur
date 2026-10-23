@@ -1,0 +1,163 @@
+displayName: Longhorn
+homepage: https://longhorn.io
+license: Apache-2.0
+maturity: cncf-incubating
+rationale: >
+  Block storage replicated across nodes: a volume survives losing its node,
+  follows its pod to another node, and can be expanded in place. Recommended
+  on multi-node, where it becomes the default storage class. Optional on
+  single-node, where a replica has nowhere else to go; it still gives
+  expandable volumes and snapshots there.
+alternatives:
+  local-path: >
+    What the cluster has without it. Faster, but a volume stays on the node
+    that created it. Still the better class for databases that replicate
+    themselves (CloudNativePG, MongoDB): a second layer of copies costs
+    write latency and disk for nothing.
+defaults:
+  single-node: optional
+  multi-node: recommended
+persistsData: true
+disruptsTraffic: true
+
+# Every node needs, before install: open-iscsi with iscsid running and the
+# iscsi_tcp module loaded (volumes attach over iSCSI on the node), an NFSv4
+# client for ReadWriteMany volumes and NFS backups, and bash, curl, findmnt,
+# grep, awk, blkid and lsblk. multipathd claims Longhorn's iSCSI disks unless
+# they are blacklisted (https://longhorn.io/kb/troubleshooting-volume-with-multipath/).
+# `longhornctl check preflight` checks a node; each Node object's conditions
+# (kubectl get nodes.longhorn.io) show the same after install.
+#
+# Backups: Velero's file-system backups (as volume-backup/velero is set up)
+# read Longhorn volumes like any other. CSI snapshots need the snapshot
+# CRDs and controller (RKE2 ships them) and a VolumeSnapshotClass for
+# driver.longhorn.io; type "snap" stays on the cluster's own disks, type
+# "bak" needs Longhorn's own backup target, which is left unset here.
+releases:
+  - name: longhorn
+    namespace: longhorn-system
+    repo: https://charts.longhorn.io
+    chart: longhorn
+    version: 1.12.1
+    values: |
+      persistence:
+        # One copy per node, up to three: losing a node leaves two while the
+        # third rebuilds. Two nodes give two copies; with one down, volumes
+        # run on a single copy until it is back.
+        defaultClassReplicaCount: 3
+        # Volumes outlive their claims only when a person asks for it, as with local-path.
+        reclaimPolicy: Delete
+      defaultSettings:
+        # With fewer nodes than replicas, volumes still attach (degraded) and gain
+        # their missing replicas as nodes join, so a class asking for 3 gives
+        # min(3, nodes) copies.
+        allowVolumeCreationWithDegradedAvailability: true
+        # Spread existing replicas onto nodes that join later.
+        replicaAutoBalance: best-effort
+        # No calls to Longhorn's upgrade server; versions change with the catalog.
+        upgradeChecker: false
+        allowCollectingLonghornUsageMetrics: false
+        # After a Longhorn upgrade, move attached volumes to the new engine one
+        # node at a time; otherwise they stay on the old one until done by hand.
+        concurrentAutomaticEngineUpgradePerNodeLimit: 1
+      longhornUI:
+        # No login: it acts as Longhorn's admin. ClusterIP only (the chart's
+        # default, no Ingress); reach it with kubectl port-forward.
+        replicas: 1
+      longhornManager:
+        resources:
+          # The chart sets none. No limit: killing the manager stalls attach
+          # and detach on its node.
+          requests: {cpu: 25m, memory: 128Mi}
+    profiles:
+      single-node: |
+        persistence:
+          # local-path stays the default: on one node it is faster, and
+          # Longhorn is for volumes that need to grow.
+          defaultClass: false
+          # One node: a second replica would sit on the same disk.
+          defaultClassReplicaCount: 1
+        csi:
+          # One node: the chart's three replicas of each sidecar gain nothing.
+          attacherReplicaCount: 1
+          provisionerReplicaCount: 1
+          resizerReplicaCount: 1
+          snapshotterReplicaCount: 1
+      multi-node: |
+        persistence:
+          # New volumes without a class survive losing a node. local-path stays
+          # available for databases that replicate themselves.
+          defaultClass: true
+        defaultSettings:
+          # A pod on a dead node otherwise holds its volume until someone
+          # force-deletes it; this lets it start elsewhere.
+          nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod
+
+  # The UI has no login and the chart's own policies leave it open to every
+  # pod. kubectl port-forward does not pass through NetworkPolicies, so it
+  # still works.
+  - name: ui-policy
+    namespace: longhorn-system
+    manifests: |
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: longhorn-ui-port-forward-only
+        namespace: longhorn-system
+      spec:
+        podSelector:
+          matchLabels: {app: longhorn-ui}
+        policyTypes: [Ingress]
+
+detection:
+  crds: [volumes.longhorn.io, engines.longhorn.io]
+  helmCharts: [longhorn]
+  workloads:
+    - kind: DaemonSet
+      labels: {app: longhorn-manager}
+
+security:
+  summary: >
+    Privileged pods on every node: they mount /dev, /proc, /boot, /etc and
+    /var/lib/longhorn from the host, run iscsiadm and mount in the host's
+    namespaces, and manage pods, PVs and storage classes cluster-wide.
+  clusterWide: true
+  privileged: true
+  egress: [docker.io]
+  tenants: admin-only
+  risks:
+    - risk: The UI and the manager API have no authentication; either can delete any volume.
+      mitigation: >
+        The chart's policies (restrictInternalTraffic) admit only Longhorn's own pods
+        to the manager; the ui-policy release closes the UI to every pod.
+    - risk: Replicas are plain files under /var/lib/longhorn on each node, readable by root there.
+      mitigation: Put /var/lib/longhorn on an encrypted disk, or use Longhorn's encrypted volumes (cryptsetup on every node).
+    - risk: Uninstalling deletes every Longhorn volume and its data.
+      mitigation: The chart refuses to uninstall until the deleting-confirmation-flag setting is set to true by hand.
+
+leftovers: [customresourcedefinitions]
+
+smoke:
+  - name: driver
+    wait: ["-n longhorn-system deployment/longhorn-driver-deployer --for=condition=Available"]
+  - name: provision
+    manifest: |
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata: {name: smoke, namespace: catalog-smoke}
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: longhorn
+        resources:
+          requests: {storage: 1Gi}
+    wait:
+      # The manager creates the class and the CSI driver after install.
+      - "-n catalog-smoke pvc/smoke --for=jsonpath={.status.phase}=Bound"
+      - "storageclass/longhorn --for=jsonpath={.allowVolumeExpansion}=true"
+    timeout: 600s
+
+upgradeNotes:
+  - versions: "*"
+    note: >
+      Upgrade one minor version at a time (1.12 to 1.13, never 1.11 to 1.13); the
+      chart's pre-upgrade job refuses a skip. 1.13 needs Kubernetes 1.34 or later.

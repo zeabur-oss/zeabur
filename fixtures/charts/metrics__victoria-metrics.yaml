@@ -69,6 +69,244 @@ stringData:
     - /etc/vm/templates/**/*.tmpl
 
 ---
+# Source: victoria-metrics-k8s-stack/charts/kube-state-metrics/templates/crs-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vm-kube-state-metrics-customresourcestate-config
+  namespace: observability
+  labels:    
+    helm.sh/chart: kube-state-metrics-8.6.0
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/component: metrics
+    app.kubernetes.io/part-of: kube-state-metrics
+    app.kubernetes.io/name: kube-state-metrics
+    app.kubernetes.io/instance: vm
+    app.kubernetes.io/version: "2.20.0"
+data:
+  config.yaml: |
+    kind: CustomResourceStateMetrics
+    spec:
+      resources:
+      - groupVersionKind:
+          group: builder.zeabur.com
+          kind: BuildRun
+          version: v1alpha1
+        labelsFromPath:
+          build:
+          - spec
+          - buildRef
+          buildrun:
+          - metadata
+          - name
+          namespace:
+          - metadata
+          - namespace
+          phase:
+          - status
+          - phase
+          reason:
+          - status
+          - reason
+        metricNamePrefix: zeabur_builder_buildrun
+        metrics:
+        - each:
+            gauge:
+              path:
+              - status
+              - completionTime
+            type: Gauge
+          errorLogV: 5
+          help: When the BuildRun finished; absent while it runs.
+          name: completion_time
+      - groupVersionKind:
+          group: postgresql.cnpg.io
+          kind: Cluster
+          version: v1
+        labelsFromPath:
+          cluster:
+          - metadata
+          - name
+          namespace:
+          - metadata
+          - namespace
+        metricNamePrefix: zeabur_cnpg_cluster
+        metrics:
+        - each:
+            info:
+              labelsFromPath:
+                phase:
+                - status
+                - phase
+            type: Info
+          help: The CloudNativePG cluster's phase.
+          name: phase
+      - groupVersionKind:
+          group: postgresql.cnpg.io
+          kind: Backup
+          version: v1
+        labelsFromPath:
+          backup:
+          - metadata
+          - name
+          cluster:
+          - spec
+          - cluster
+          - name
+          namespace:
+          - metadata
+          - namespace
+          phase:
+          - status
+          - phase
+        metricNamePrefix: zeabur_cnpg_backup
+        metrics:
+        - each:
+            gauge:
+              path:
+              - metadata
+              - creationTimestamp
+            type: Gauge
+          help: When the Backup was created, by its phase.
+          name: created
+      - groupVersionKind:
+          group: psmdb.percona.com
+          kind: PerconaServerMongoDB
+          version: v1
+        labelsFromPath:
+          cluster:
+          - metadata
+          - name
+          namespace:
+          - metadata
+          - namespace
+        metricNamePrefix: zeabur_psmdb
+        metrics:
+        - each:
+            info:
+              labelsFromPath:
+                state:
+                - status
+                - state
+            type: Info
+          help: The MongoDB cluster's state.
+          name: state
+      - groupVersionKind:
+          group: psmdb.percona.com
+          kind: PerconaServerMongoDBBackup
+          version: v1
+        labelsFromPath:
+          backup:
+          - metadata
+          - name
+          cluster:
+          - spec
+          - clusterName
+          namespace:
+          - metadata
+          - namespace
+          state:
+          - status
+          - state
+        metricNamePrefix: zeabur_psmdb_backup
+        metrics:
+        - each:
+            gauge:
+              path:
+              - metadata
+              - creationTimestamp
+            type: Gauge
+          help: When the backup was created, by its state.
+          name: created
+      - groupVersionKind:
+          group: k8up.io
+          kind: Backup
+          version: v1
+        labelsFromPath:
+          backup:
+          - metadata
+          - name
+          namespace:
+          - metadata
+          - namespace
+        metricNamePrefix: zeabur_k8up_backup
+        metrics:
+        - each:
+            gauge:
+              labelsFromPath:
+                reason:
+                - reason
+                type:
+                - type
+              path:
+              - status
+              - conditions
+              valueFrom:
+              - lastTransitionTime
+            type: Gauge
+          help: When each condition of the Backup last changed, by type and reason.
+          name: condition_time
+      - groupVersionKind:
+          group: velero.io
+          kind: Backup
+          version: v1
+        labelsFromPath:
+          backup:
+          - metadata
+          - name
+          namespace:
+          - metadata
+          - namespace
+          phase:
+          - status
+          - phase
+        metricNamePrefix: zeabur_velero_backup
+        metrics:
+        - each:
+            gauge:
+              path:
+              - metadata
+              - creationTimestamp
+            type: Gauge
+          help: When the Velero backup was created, by its phase.
+          name: created
+      - groupVersionKind:
+          group: cert-manager.io
+          kind: Certificate
+          version: v1
+        labelsFromPath:
+          certificate:
+          - metadata
+          - name
+          namespace:
+          - metadata
+          - namespace
+        metricNamePrefix: zeabur_certmanager_certificate
+        metrics:
+        - each:
+            gauge:
+              path:
+              - status
+              - notAfter
+            type: Gauge
+          errorLogV: 5
+          help: When the issued certificate expires.
+          name: not_after
+        - each:
+            gauge:
+              labelsFromPath:
+                type:
+                - type
+              path:
+              - status
+              - conditions
+              valueFrom:
+              - status
+            type: Gauge
+          help: The Certificate's conditions, 1 when true.
+          name: condition
+
+---
 # Source: victoria-metrics-k8s-stack/templates/sync-job/config.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -350,6 +588,55 @@ rules:
   - statefulsets
   verbs: ["list", "watch"]
 
+- apiGroups: ["apiextensions.k8s.io"]
+  resources:
+    - customresourcedefinitions
+  verbs: ["list", "watch"]
+
+- apiGroups:
+  - builder.zeabur.com
+  resources:
+  - buildruns
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - postgresql.cnpg.io
+  resources:
+  - clusters
+  - backups
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - psmdb.percona.com
+  resources:
+  - perconaservermongodbs
+  - perconaservermongodbbackups
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - k8up.io
+  resources:
+  - backups
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - velero.io
+  resources:
+  - backups
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - cert-manager.io
+  resources:
+  - certificates
+  verbs:
+  - list
+  - watch
 
 ---
 # Source: victoria-metrics-k8s-stack/charts/kube-state-metrics/templates/clusterrolebinding.yaml
@@ -701,7 +988,12 @@ spec:
         args:
         - --port=8080
         - --resources=pods,replicasets,deployments,statefulsets,daemonsets,jobs,cronjobs,nodes,persistentvolumeclaims,namespaces
-        - --metric-labels-allowlist=pods=[app.kubernetes.io/name,app.kubernetes.io/component]
+        - --metric-labels-allowlist=pods=[app.kubernetes.io/name,app.kubernetes.io/component],jobs=[zeabur.com/notification-test],namespaces=[zeabur.com/project]
+        - --custom-resource-state-config-file=/etc/customresourcestate/config.yaml
+        volumeMounts:
+        - name: customresourcestate-config
+          mountPath: /etc/customresourcestate
+          readOnly: true
         imagePullPolicy: IfNotPresent
         image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0
         ports:
@@ -737,6 +1029,10 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
+      volumes:
+        - name: customresourcestate-config
+          configMap:
+            name: vm-kube-state-metrics-customresourcestate-config
 
 ---
 # Source: victoria-metrics-k8s-stack/templates/victoria-metrics-operator/vmagent/vmagent.yaml
@@ -825,7 +1121,10 @@ metadata:
     app.kubernetes.io/version: v1.153.0
     helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
 spec: 
+  arbitraryFSAccessThroughSMs:
+    deny: true
   configSecret: vmalertmanager-vm-victoria-metrics-k8s-stack
+  disableNamespaceMatcher: false
   externalURL: ""
   image:
     tag: v0.34.0
@@ -1190,3 +1489,305 @@ spec:
           configMap:
             name: vm-victoria-metrics-k8s-stack-sync-job-config
 
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: zeabur-notifications
+  namespace: observability
+spec:
+  groups:
+    - name: zeabur-project
+      interval: 30s
+      rules:
+        - alert: ZeaburBuildFailed
+          expr: |
+            max by (namespace, build, buildrun, reason) (
+              zeabur_builder_buildrun_completion_time{phase="Failed"}
+            ) > time() - 900
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: build-failed, zeabur_kind: event, severity: warning}
+          annotations:
+            summary: "Build {{ $labels.build }} failed ({{ $labels.reason }})."
+            description: "BuildRun {{ $labels.buildrun }} in {{ $labels.namespace }} failed with reason {{ $labels.reason }}."
+        - alert: ZeaburBuildSucceeded
+          expr: |
+            max by (namespace, build, buildrun) (
+              zeabur_builder_buildrun_completion_time{phase="Succeeded"}
+            ) > time() - 900
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: build-succeeded, zeabur_kind: event, severity: info}
+          annotations:
+            summary: "Build {{ $labels.build }} succeeded."
+            description: "BuildRun {{ $labels.buildrun }} in {{ $labels.namespace }} succeeded."
+        # The Deployment controller gives up on a rollout after
+        # progressDeadlineSeconds (600 by default).
+        - alert: ZeaburDeployFailed
+          expr: |
+            max by (namespace, deployment) (
+              kube_deployment_status_condition{condition="Progressing", status="false"}
+            ) == 1
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: deploy-failed, zeabur_kind: state, severity: warning}
+          annotations:
+            summary: "Deployment of {{ $labels.deployment }} failed."
+            description: "The rollout of {{ $labels.deployment }} in {{ $labels.namespace }} passed its progress deadline."
+        # A rollout makes a new ReplicaSet. It succeeded when the
+        # Deployment then runs only up-to-date, available replicas. A
+        # rollback to an earlier ReplicaSet does not count.
+        - alert: ZeaburDeploySucceeded
+          expr: |
+            max by (namespace, deployment) (
+              label_replace(
+                (time() - kube_replicaset_created < 1800)
+                * on (namespace, replicaset) group_left (owner_name)
+                kube_replicaset_owner{owner_kind="Deployment"},
+                "deployment", "$1", "owner_name", "(.+)"
+              )
+            )
+            and on (namespace, deployment) (kube_deployment_status_observed_generation == kube_deployment_metadata_generation)
+            and on (namespace, deployment) (kube_deployment_status_replicas_updated == kube_deployment_spec_replicas)
+            and on (namespace, deployment) (kube_deployment_status_replicas_available == kube_deployment_spec_replicas)
+            and on (namespace, deployment) (kube_deployment_status_replicas == kube_deployment_spec_replicas)
+            and on (namespace, deployment) (kube_deployment_spec_replicas > 0)
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: deploy-succeeded, zeabur_kind: event, severity: info}
+          annotations:
+            summary: "{{ $labels.deployment }} is deployed."
+            description: "All replicas of {{ $labels.deployment }} in {{ $labels.namespace }} run the new version."
+        - alert: ZeaburCrashLooping
+          expr: |
+            max by (namespace, pod, container) (
+              kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}
+            ) == 1
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          for: 5m
+          labels: {zeabur_event: crash-loop, zeabur_kind: state, severity: warning}
+          annotations:
+            summary: "{{ $labels.pod }} keeps crashing."
+            description: "Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.namespace }} has been in CrashLoopBackOff for 5 minutes."
+        - alert: ZeaburOutOfMemory
+          expr: |
+            max by (namespace, pod, container) (
+              kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}
+            ) == 1
+            and on (namespace, pod, container) (
+              max by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[10m])) > 0
+            )
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: out-of-memory, zeabur_kind: event, severity: warning}
+          annotations:
+            summary: "{{ $labels.pod }} ran out of memory."
+            description: "Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.namespace }} used its memory limit and restarted."
+        # Without the phase in the grouping, a move from one unhealthy
+        # phase to another does not restart the 15 minutes.
+        - alert: ZeaburPostgresUnhealthy
+          expr: |
+            max by (namespace, cluster) (
+              zeabur_cnpg_cluster_phase{phase!="Cluster in healthy state"}
+            ) == 1
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          for: 15m
+          labels: {zeabur_event: database-unhealthy, zeabur_kind: state, severity: critical}
+          annotations:
+            summary: "PostgreSQL {{ $labels.cluster }} is not healthy."
+            description: "PostgreSQL cluster {{ $labels.cluster }} in {{ $labels.namespace }} has not been healthy for 15 minutes."
+        - alert: ZeaburMongoDBUnhealthy
+          expr: |
+            max by (namespace, cluster) (zeabur_psmdb_state{state="error"}) == 1
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          for: 10m
+          labels: {zeabur_event: database-unhealthy, zeabur_kind: state, severity: critical}
+          annotations:
+            summary: "MongoDB {{ $labels.cluster }} is in error."
+            description: "MongoDB cluster {{ $labels.cluster }} in {{ $labels.namespace }} has been in error for 10 minutes."
+        - alert: ZeaburPostgresBackupFailed
+          expr: |
+            max by (namespace, cluster, backup) (
+              zeabur_cnpg_backup_created{phase=~"failed|walArchivingFailing"}
+            ) > time() - 21600
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}
+          annotations:
+            summary: "Backup {{ $labels.backup }} of PostgreSQL {{ $labels.cluster }} failed."
+            description: "Backup {{ $labels.backup }} in {{ $labels.namespace }} failed."
+        - alert: ZeaburMongoDBBackupFailed
+          expr: |
+            max by (namespace, cluster, backup) (
+              zeabur_psmdb_backup_created{state=~"error|rejected"}
+            ) > time() - 21600
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}
+          annotations:
+            summary: "Backup {{ $labels.backup }} of MongoDB {{ $labels.cluster }} failed."
+            description: "Backup {{ $labels.backup }} in {{ $labels.namespace }} failed."
+        - alert: ZeaburVolumeBackupFailed
+          expr: |
+            max by (namespace, backup) (
+              zeabur_k8up_backup_condition_time{type="Completed", reason="Failed"}
+            ) > time() - 21600
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}
+          annotations:
+            summary: "Volume backup {{ $labels.backup }} failed."
+            description: "K8up backup {{ $labels.backup }} in {{ $labels.namespace }} failed."
+        # Volumes on local-path report no usage; this covers the others.
+        - alert: ZeaburVolumeAlmostFull
+          expr: |
+            max by (namespace, persistentvolumeclaim) (
+              kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes
+            ) < 0.1
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          for: 10m
+          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}
+          annotations:
+            summary: "Volume {{ $labels.persistentvolumeclaim }} is almost full."
+            description: "Less than 10% of volume {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is free."
+        # cert-manager renews 30 days before expiry, so 14 days left
+        # means renewal keeps failing.
+        - alert: ZeaburCertificateExpiring
+          expr: |
+            max by (namespace, certificate) (zeabur_certmanager_certificate_not_after) - time() < 14 * 86400
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}
+          annotations:
+            summary: "Certificate {{ $labels.certificate }} expires soon."
+            description: "Certificate {{ $labels.certificate }} in {{ $labels.namespace }} expires in less than 14 days and was not renewed."
+        - alert: ZeaburCertificateNotReady
+          expr: |
+            max by (namespace, certificate) (zeabur_certmanager_certificate_condition{type="Ready"}) == 0
+            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
+          for: 1h
+          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}
+          annotations:
+            summary: "Certificate {{ $labels.certificate }} is not ready."
+            description: "Certificate {{ $labels.certificate }} in {{ $labels.namespace }} has not been issued for an hour."
+        # Zeabur creates a short-lived Job with this label to test a
+        # channel. The namespace comes from the Job, so a person can
+        # only test the channels of a namespace where they create Jobs.
+        - alert: ZeaburNotificationTest
+          expr: |
+            label_replace(
+              max by (namespace, label_zeabur_com_notification_test) (
+                kube_job_labels{label_zeabur_com_notification_test!=""}
+              ),
+              "zeabur_channel", "$1", "label_zeabur_com_notification_test", "(.+)"
+            )
+          labels: {zeabur_event: test, zeabur_kind: event, severity: info}
+          annotations:
+            summary: "Test notification from Zeabur."
+            description: "This channel receives notifications from {{ $labels.namespace }}."
+    - name: zeabur-cluster
+      interval: 30s
+      # The cluster's channels are in observability.
+      labels: {namespace: observability}
+      rules:
+        - alert: ZeaburNodeNotReady
+          expr: |
+            max by (node) (kube_node_status_condition{condition="Ready", status="true"}) == 0
+          for: 5m
+          labels: {zeabur_event: node-not-ready, zeabur_kind: state, severity: critical}
+          annotations:
+            summary: "Node {{ $labels.node }} is not ready."
+            description: "Node {{ $labels.node }} has not been ready for 5 minutes."
+        - alert: ZeaburNodeDiskAlmostFull
+          expr: |
+            max by (instance, mountpoint) (
+              node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|ramfs"}
+            ) < 0.1
+          for: 10m
+          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}
+          annotations:
+            summary: "Disk {{ $labels.mountpoint }} on {{ $labels.instance }} is almost full."
+            description: "Less than 10% of {{ $labels.mountpoint }} on {{ $labels.instance }} is free."
+        - alert: ZeaburSystemCrashLooping
+          expr: |
+            label_move(
+              max by (namespace, pod, container) (
+                kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}
+              ) == 1
+              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=""},
+              "namespace", "object_namespace"
+            )
+          for: 5m
+          labels: {zeabur_event: crash-loop, zeabur_kind: state, severity: critical}
+          annotations:
+            summary: "System pod {{ $labels.pod }} keeps crashing."
+            description: "Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.object_namespace }} has been in CrashLoopBackOff for 5 minutes."
+        - alert: ZeaburSystemVolumeAlmostFull
+          expr: |
+            label_move(
+              max by (namespace, persistentvolumeclaim) (
+                kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes
+              ) < 0.1
+              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=""},
+              "namespace", "object_namespace"
+            )
+          for: 10m
+          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}
+          annotations:
+            summary: "Volume {{ $labels.persistentvolumeclaim }} is almost full."
+            description: "Less than 10% of volume {{ $labels.persistentvolumeclaim }} in {{ $labels.object_namespace }} is free."
+        - alert: ZeaburSystemCertificateExpiring
+          expr: |
+            label_move(
+              max by (namespace, certificate) (zeabur_certmanager_certificate_not_after) - time() < 14 * 86400
+              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=""},
+              "namespace", "object_namespace"
+            )
+          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}
+          annotations:
+            summary: "Certificate {{ $labels.certificate }} expires soon."
+            description: "Certificate {{ $labels.certificate }} in {{ $labels.object_namespace }} expires in less than 14 days and was not renewed."
+        - alert: ZeaburClusterBackupFailed
+          expr: |
+            label_move(
+              max by (namespace, backup) (
+                zeabur_velero_backup_created{phase=~"Failed|PartiallyFailed|FailedValidation"}
+              ) > time() - 21600,
+              "namespace", "object_namespace"
+            )
+          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}
+          annotations:
+            summary: "Cluster backup {{ $labels.backup }} failed."
+            description: "Velero backup {{ $labels.backup }} did not complete."
+---
+# Only the alert senders and the scraper reach Alertmanager. Without
+# this, any pod could post alerts with another project's namespace, or
+# silence them. kubectl port-forward does not pass through
+# NetworkPolicies, so it still works.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vmalertmanager-senders-only
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: vmalertmanager}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: vmalert}
+      ports:
+        - {port: 9093, protocol: TCP}
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: falco}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: falcosidekick}
+      ports:
+        - {port: 9093, protocol: TCP}
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: vmagent}
+      ports:
+        - {port: 9093, protocol: TCP}
+        - {port: 8435, protocol: TCP}
+    # Replicas gossip silences and notification state.
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: vmalertmanager}
+      ports:
+        - {port: 9094, protocol: TCP}
+        - {port: 9094, protocol: UDP}

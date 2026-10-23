@@ -1,0 +1,581 @@
+---
+# Source: dragonfly-operator/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: dragonfly-operator-controller-manager
+  namespace: dragonfly-operator-system
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: rbac
+automountServiceAccountToken: true
+---
+# Source: dragonfly-operator/templates/aggregateroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dragonfly-operator-aggregate-to-view
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+rules:
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies/status
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+# Source: dragonfly-operator/templates/aggregateroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dragonfly-operator-aggregate-to-edit
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+rules:
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies
+    verbs:
+      - create
+      - delete
+      - deletecollection
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies/status
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+# Source: dragonfly-operator/templates/aggregateroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dragonfly-operator-aggregate-to-admin
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+rules:
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies
+    verbs:
+      - create
+      - delete
+      - deletecollection
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies/status
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+# Source: dragonfly-operator/templates/clusterroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dragonfly-operator-manager-role
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - dragonflydb.io
+    resources:
+      - dragonflies/status
+    verbs:
+      - get
+      - patch
+      - update
+
+---
+# Source: dragonfly-operator/templates/clusterroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dragonfly-operator-metrics-reader
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: kube-rbac-proxy
+rules:
+  - nonResourceURLs:
+      - /metrics
+    verbs:
+      - get
+
+---
+# Source: dragonfly-operator/templates/clusterroles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dragonfly-operator-proxy-role
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: kube-rbac-proxy
+rules:
+  - apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+  - apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
+
+---
+# Source: dragonfly-operator/templates/clusterrolebindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dragonfly-operator-manager-clusterrolebinding
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dragonfly-operator-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: dragonfly-operator-controller-manager
+    namespace: dragonfly-operator-system
+
+---
+# Source: dragonfly-operator/templates/clusterrolebindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dragonfly-operator-proxy-clusterrolebinding
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: kube-rbac-proxy
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dragonfly-operator-proxy-role
+subjects:
+  - kind: ServiceAccount
+    name: dragonfly-operator-controller-manager
+    namespace: dragonfly-operator-system
+---
+# Source: dragonfly-operator/templates/roles.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: dragonfly-operator-leader-election-role
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: rbac
+  namespace: dragonfly-operator-system
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+
+
+---
+# Source: dragonfly-operator/templates/rolebindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: dragonfly-operator-leader-election-rolebinding
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: rbac
+  namespace: dragonfly-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: dragonfly-operator-leader-election-role
+subjects:
+  - kind: ServiceAccount
+    name: dragonfly-operator-controller-manager
+    namespace: dragonfly-operator-system
+---
+# Source: dragonfly-operator/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: dragonfly-operator-controller-svc
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: kube-rbac-proxy
+  namespace: dragonfly-operator-system
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8443
+      targetPort: https
+      protocol: TCP
+      name: https
+    - port: 8080
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    control-plane: controller-manager
+
+---
+# Source: dragonfly-operator/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dragonfly-operator
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/component: controller
+    control-plane: controller-manager
+  namespace: dragonfly-operator-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly-operator
+      app.kubernetes.io/instance: dragonfly-operator
+      control-plane: controller-manager
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+      labels:
+        helm.sh/chart: dragonfly-operator-v1.7.1
+        app.kubernetes.io/name: dragonfly-operator
+        app.kubernetes.io/instance: dragonfly-operator
+        app.kubernetes.io/version: "v1.7.1"
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/created-by: dragonfly-operator
+        app.kubernetes.io/part-of: dragonfly-operator
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: dragonfly-operator-controller-manager
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - args:
+            - --secure-listen-address=0.0.0.0:8443
+            - --upstream=http://127.0.0.1:8080/
+            - --logtostderr=true
+            - --v=0
+          image: "quay.io/brancz/kube-rbac-proxy:v0.20.2"
+          imagePullPolicy: IfNotPresent
+          name: kube-rbac-proxy
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          ports:
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 5m
+              memory: 32Mi
+        - name: manager
+          args:
+            - --leader-elect
+            - --metrics-bind-address=127.0.0.1:8080
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - /manager
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          image: "docker.dragonflydb.io/dragonflydb/operator:v1.7.1"
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          ports:
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+---
+# Source: dragonfly-operator/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "dragonfly-operator-test-connection"
+  namespace: dragonfly-operator-system
+  labels:
+    helm.sh/chart: dragonfly-operator-v1.7.1
+    app.kubernetes.io/name: dragonfly-operator
+    app.kubernetes.io/instance: dragonfly-operator
+    app.kubernetes.io/version: "v1.7.1"
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/created-by: dragonfly-operator
+    app.kubernetes.io/part-of: dragonfly-operator
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['dragonfly-operator:8443']
+  restartPolicy: Never
+

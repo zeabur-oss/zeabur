@@ -1,0 +1,74 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gotify-bridge
+  namespace: observability
+  labels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+spec:
+  # Alertmanager retries a failed webhook, so one replica is enough.
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        # The image does not set a user.
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: bridge
+          image: docker.io/druggeri/alertmanager_gotify_bridge:2.3.2
+          env:
+            - name: GOTIFY_ENDPOINT
+              valueFrom:
+                secretKeyRef: {name: gotify-bridge, key: endpoint}
+            # The bridge does not start without a default token. Every
+            # channel sets its own with ?token= in the webhook URL, so
+            # a request without one fails at Gotify.
+            - name: GOTIFY_TOKEN
+              value: none
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            tcpSocket: {port: http}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 5m, memory: 16Mi}
+            limits: {memory: 64Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gotify-bridge
+  namespace: observability
+spec:
+  selector: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+---
+# Tokens travel in the request URL, so only Alertmanager may call the
+# bridge.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gotify-bridge-alertmanager-only
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: vmalertmanager}
+      ports:
+        - {port: 8080, protocol: TCP}

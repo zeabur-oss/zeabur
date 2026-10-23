@@ -88,11 +88,19 @@ licence() {
     echo "tls: $recs; zot: [Apache-2.0]($gh/project-zot/helm-charts/blob/main/LICENSE)"
     ;;
   databases/cloudnative-pg) echo "[Apache-2.0]($gh/cloudnative-pg/charts/blob/main/LICENSE)" ;;
+  databases/dragonfly-operator)
+    echo "[Apache-2.0]($gh/dragonflydb/dragonfly-operator/blob/main/LICENSE)"
+    ;;
+  databases/mariadb-operator)
+    echo "[MIT]($gh/mariadb-operator/mariadb-operator/blob/main/LICENSE), notice in \`LICENSE-mariadb-operator.txt\`"
+    ;;
+  databases/moco) echo "[Apache-2.0]($gh/cybozu-go/moco/blob/main/LICENSE)" ;;
   databases/percona-mongodb) echo "[Apache-2.0]($gh/percona/percona-helm-charts/blob/main/LICENSE)" ;;
   dns/external-dns) echo "[Apache-2.0]($gh/kubernetes-sigs/external-dns/blob/master/LICENSE.md)" ;;
   event-autoscaling/keda | event-autoscaling/keda-http-add-on)
     echo "[Apache-2.0]($gh/kedacore/charts/blob/main/LICENSE)"
     ;;
+  gotify-notifications/alertmanager-gotify-bridge) echo "$recs" ;;
   image-updates/keel) echo "[MPL-2.0]($gh/keel-hq/keel/blob/master/LICENSE)" ;;
   ingress/traefik)
     echo "gateway-api-crds: [Apache-2.0]($gh/kubernetes-sigs/gateway-api/blob/main/LICENSE); traefik: [Apache-2.0]($gh/traefik/traefik-helm-chart/blob/master/LICENSE)"
@@ -108,7 +116,13 @@ licence() {
   node-updates/system-upgrade-controller)
     echo "[Apache-2.0]($gh/rancher/system-upgrade-controller/blob/master/LICENSE)"
     ;;
+  object-storage/seaweedfs-operator)
+    echo "[Apache-2.0]($gh/seaweedfs/seaweedfs-operator/blob/master/LICENSE)"
+    ;;
   remote-access/tailscale-operator) echo "[BSD-3-Clause]($gh/tailscale/tailscale/blob/main/LICENSE)" ;;
+  replicated-storage/longhorn)
+    echo "longhorn: [Apache-2.0]($gh/longhorn/charts/blob/v1.13.x/LICENSE); ui-policy: $recs"
+    ;;
   resource-recommendations/vertical-pod-autoscaler)
     echo "[Apache-2.0]($gh/kubernetes/autoscaler/blob/master/LICENSE)"
     ;;
@@ -186,9 +200,10 @@ order as one multi-document YAML stream.
   it too), so no value had to be replaced.
 
 Each file keeps the licence of the chart or manifests it was rendered from, named in the table
-with the licence file of their repository. The MIT notice of CrowdSec's charts is in
-\`LICENSE-crowdsec-helm-charts.txt\`, Trivy Operator's NOTICE (Apache-2.0, section 4(d)) in
-\`LICENSE-trivy-operator-NOTICE.txt\`; the Apache-2.0 text is in the \`LICENSE\` at the root.
+with the licence file of their repository. The MIT notices of CrowdSec's charts and the MariaDB
+operator are in \`LICENSE-crowdsec-helm-charts.txt\` and \`LICENSE-mariadb-operator.txt\`,
+Trivy Operator's NOTICE (Apache-2.0, section 4(d)) in \`LICENSE-trivy-operator-NOTICE.txt\`;
+the Apache-2.0 text is in the \`LICENSE\` at the root.
 
 Regenerate with Nix and network access to the chart registries:
 

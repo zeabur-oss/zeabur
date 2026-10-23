@@ -4,6 +4,7 @@ import { lazy, Suspense, useState } from "react"
 import ArchiveIcon from "~icons/ph/archive"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import ArrowsClockwiseIcon from "~icons/ph/arrows-clockwise"
+import BellIcon from "~icons/ph/bell"
 import CertificateIcon from "~icons/ph/certificate"
 import ChartLineIcon from "~icons/ph/chart-line"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
@@ -11,6 +12,7 @@ import CloudArrowUpIcon from "~icons/ph/cloud-arrow-up"
 import DatabaseIcon from "~icons/ph/database"
 import GaugeIcon from "~icons/ph/gauge"
 import GlobeIcon from "~icons/ph/globe"
+import HardDriveIcon from "~icons/ph/hard-drive"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 import HeartbeatIcon from "~icons/ph/heartbeat"
 import LightningIcon from "~icons/ph/lightning"
@@ -51,13 +53,16 @@ const categories: {
   names: string[]
 }[] = [
   { key: "traffic", names: ["ingress", "certificates", "dns"] },
-  { key: "observability", names: ["metrics", "logs", "observability-operator", "uptime-probes"] },
+  {
+    key: "observability",
+    names: ["metrics", "logs", "observability-operator", "uptime-probes", "gotify-notifications"],
+  },
   { key: "scaling", names: ["event-autoscaling", "resource-recommendations"] },
   {
     key: "security",
     names: ["intrusion-prevention", "runtime-security", "vulnerability-scanning"],
   },
-  { key: "data", names: ["postgres", "object-storage"] },
+  { key: "data", names: ["databases", "postgres", "object-storage", "replicated-storage"] },
   {
     key: "operations",
     names: ["node-updates", "volume-backup", "container-registry", "image-updates"],
@@ -79,7 +84,10 @@ const icons: Record<string, Icon> = {
   "vulnerability-scanning": MagnifyingGlassIcon,
   "node-updates": CloudArrowUpIcon,
   "volume-backup": ClockCounterClockwiseIcon,
+  "gotify-notifications": BellIcon,
+  databases: DatabaseIcon,
   postgres: DatabaseIcon,
+  "replicated-storage": HardDriveIcon,
   "object-storage": ArchiveIcon,
   "container-registry": PackageIcon,
   "image-updates": ArrowsClockwiseIcon,

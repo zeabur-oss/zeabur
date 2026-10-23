@@ -1,4 +1,2 @@
-# Zeabur Catalog (https://github.com/zeabur/catalog), vendored at one commit.
-# scripts/check-catalog.sh compares bundle/ with it; change it only by moving the pin.
 release = integration (unreleased)
-commit = c679f838d28a08206facc5cfea70edb18e1a0bbe
+commit = f25f8c18dfd81216fd3d86121719324dc00f1668

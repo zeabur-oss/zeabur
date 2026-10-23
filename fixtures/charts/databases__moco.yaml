@@ -1,0 +1,747 @@
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-controller-manager
+  namespace: 'moco-system'
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+  name: moco-backuppolicy-editor-role
+rules:
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - backuppolicies
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - backuppolicies/status
+    verbs:
+      - get
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  name: moco-backuppolicy-viewer-role
+rules:
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - backuppolicies
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - backuppolicies/status
+    verbs:
+      - get
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-manager-role
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - secrets
+      - serviceaccounts
+      - services
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps/status
+      - pods/status
+      - secrets/status
+      - serviceaccounts/status
+      - services/status
+    verbs:
+      - get
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+      - pods
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - statefulsets/status
+    verbs:
+      - get
+  - apiGroups:
+      - batch
+    resources:
+      - cronjobs
+      - jobs
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - cert-manager.io
+    resources:
+      - certificates
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - backuppolicies
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - mysqlclusters
+    verbs:
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - mysqlclusters/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - mysqlclusters/status
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - policy
+    resources:
+      - poddisruptionbudgets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - rolebindings
+      - roles
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - storage.k8s.io
+    resources:
+      - storageclasses
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+    rbac.authorization.k8s.io/aggregate-to-admin: "true"
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+  name: moco-mysqlcluster-editor-role
+rules:
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - mysqlclusters
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - mysqlclusters/status
+    verbs:
+      - get
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+  name: moco-mysqlcluster-viewer-role
+rules:
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - mysqlclusters
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - moco.cybozu.com
+    resources:
+      - mysqlclusters/status
+    verbs:
+      - get
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: moco-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: moco-controller-manager
+    namespace: 'moco-system'
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-leader-election-role
+  namespace: 'moco-system'
+rules:
+  - apiGroups:
+      - ""
+      - coordination.k8s.io
+    resources:
+      - configmaps
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-leader-election-rolebinding
+  namespace: 'moco-system'
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: moco-leader-election-role
+subjects:
+  - kind: ServiceAccount
+    name: moco-controller-manager
+    namespace: 'moco-system'
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-webhook-service
+  namespace: 'moco-system'
+spec:
+  ports:
+    - port: 443
+      targetPort: webhook-server
+  selector:
+    app.kubernetes.io/component: moco-controller
+    app.kubernetes.io/name: 'moco'
+
+---
+# Source: moco/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moco-controller
+  namespace: moco-system
+  labels:
+    app.kubernetes.io/component: moco-controller
+    helm.sh/chart: moco-0.27.0
+    app.kubernetes.io/name: moco
+    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: moco-controller
+      app.kubernetes.io/name: moco
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: moco-controller
+      labels:
+        app.kubernetes.io/component: moco-controller
+        app.kubernetes.io/name: moco
+    spec:
+      containers:
+        - env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          image: "ghcr.io/cybozu-go/moco:0.37.0"
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: moco-controller
+          args:
+            - --agent-image
+            - "ghcr.io/cybozu-go/moco-agent:0.16.0"
+            - --fluent-bit-image
+            - "ghcr.io/cybozu-go/moco/fluent-bit:5.0.2.1"
+            - --mysqld-exporter-image
+            - "ghcr.io/cybozu-go/moco/mysqld_exporter:0.19.0.1"
+          ports:
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+            - containerPort: 8081
+              name: health
+              protocol: TCP
+            - containerPort: 8080
+              name: metrics
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+            - mountPath: /grpc-cert
+              name: grpc-cert
+              readOnly: true
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: moco-controller-manager
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: moco-controller-cert
+        - name: grpc-cert
+          secret:
+            defaultMode: 420
+            secretName: moco-controller-grpc
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: 'moco-system/moco-serving-cert'
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-mutating-webhook-configuration
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: moco-webhook-service
+        namespace: 'moco-system'
+        path: /mutate-apps-v1-statefulset
+    failurePolicy: Fail
+    name: statefulset.kb.io
+    objectSelector:
+      matchLabels:
+        app.kubernetes.io/created-by: moco
+    rules:
+      - apiGroups:
+          - apps
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - statefulsets
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: moco-webhook-service
+        namespace: 'moco-system'
+        path: /mutate-moco-cybozu-com-v1beta2-mysqlcluster
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: mmysqlcluster.kb.io
+    rules:
+      - apiGroups:
+          - moco.cybozu.com
+        apiVersions:
+          - v1beta2
+        operations:
+          - CREATE
+        resources:
+          - mysqlclusters
+    sideEffects: None
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: 'moco-system/moco-serving-cert'
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-validating-webhook-configuration
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: moco-webhook-service
+        namespace: 'moco-system'
+        path: /validate-moco-cybozu-com-v1beta2-backuppolicy
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: vbackuppolicy.kb.io
+    rules:
+      - apiGroups:
+          - moco.cybozu.com
+        apiVersions:
+          - v1beta2
+        operations:
+          - CREATE
+          - UPDATE
+          - DELETE
+        resources:
+          - backuppolicies
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: moco-webhook-service
+        namespace: 'moco-system'
+        path: /validate-moco-cybozu-com-v1beta2-mysqlcluster
+    failurePolicy: Fail
+    matchPolicy: Equivalent
+    name: vmysqlcluster.kb.io
+    rules:
+      - apiGroups:
+          - moco.cybozu.com
+        apiVersions:
+          - v1beta2
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - mysqlclusters
+    sideEffects: None
+
+---
+# Source: moco/templates/certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: moco-controller-grpc
+  namespace: moco-system
+  labels:
+    helm.sh/chart: moco-0.27.0
+    app.kubernetes.io/name: moco
+    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  commonName: moco-controller
+  issuerRef:
+    kind: Issuer
+    name: moco-grpc-issuer
+  secretName: moco-controller-grpc
+  usages:
+    - digital signature
+    - key encipherment
+    - client auth
+
+---
+# Source: moco/templates/certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: moco-grpc-ca
+  namespace: moco-system
+  labels:
+    helm.sh/chart: moco-0.27.0
+    app.kubernetes.io/name: moco
+    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  commonName: MOCO gRPC CA
+  duration: 87600h0m0s
+  isCA: true
+  issuerRef:
+    kind: Issuer
+    name: moco-selfsigned-issuer
+  renewBefore: 720h0m0s
+  secretName: moco-grpc-ca
+
+---
+# Source: moco/templates/certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: moco-serving-cert
+  namespace: moco-system
+  labels:
+    helm.sh/chart: moco-0.27.0
+    app.kubernetes.io/name: moco
+    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  dnsNames:
+    - moco-webhook-service.moco-system.svc
+    - moco-webhook-service.moco-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: moco-selfsigned-issuer
+  secretName: moco-controller-cert
+
+---
+# Source: moco/templates/issuer.yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: moco-grpc-issuer
+  namespace: moco-system
+  labels:
+    helm.sh/chart: moco-0.27.0
+    app.kubernetes.io/name: moco
+    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  ca:
+    secretName: moco-grpc-ca
+
+---
+# Source: moco/templates/issuer.yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: moco-selfsigned-issuer
+  namespace: moco-system
+  labels:
+    helm.sh/chart: moco-0.27.0
+    app.kubernetes.io/name: moco
+    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selfSigned: {}
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-delete-validator
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - '*'
+        operations:
+          - DELETE
+        resources:
+          - pods
+  validations:
+    - expression: |
+        !has(oldObject.metadata.annotations) ||
+        !("moco.cybozu.com/prevent-delete" in oldObject.metadata.annotations) ||
+        !(oldObject.metadata.annotations["moco.cybozu.com/prevent-delete"] == "true")
+      messageExpression: oldObject.metadata.name + ' is protected from deletion'
+
+---
+# Source: moco/templates/generated/generated.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: 'Helm'
+    app.kubernetes.io/name: 'moco'
+    app.kubernetes.io/version: '0.37.0'
+    helm.sh/chart: 'moco-0.27.0'
+  name: moco-delete-validator
+spec:
+  policyName: moco-delete-validator
+  validationActions:
+    - Deny

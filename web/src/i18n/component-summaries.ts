@@ -30,6 +30,21 @@ export const summaries: Record<string, Summary> = {
     "zh-TW": "執行 PostgreSQL 資料庫，支援故障切換和備份到 S3。",
     "zh-CN": "运行 PostgreSQL 数据库，支持故障切换和备份到 S3。",
   },
+  "databases/dragonfly-operator#49e3a8b9": {
+    en: "Runs Dragonfly, a Redis-compatible store, with replicas and snapshots, under a licence that is not open source.",
+    "zh-TW": "執行與 Redis 相容的 Dragonfly，支援副本和快照；採用的不是開放原始碼授權。",
+    "zh-CN": "运行与 Redis 兼容的 Dragonfly，支持副本和快照；采用的不是开源许可。",
+  },
+  "databases/mariadb-operator#9ef81ade": {
+    en: "Runs MariaDB databases, a MySQL-compatible choice, with backups to S3.",
+    "zh-TW": "執行與 MySQL 相容的 MariaDB 資料庫，並備份到 S3。",
+    "zh-CN": "运行与 MySQL 兼容的 MariaDB 数据库，并备份到 S3。",
+  },
+  "databases/moco#ad806183": {
+    en: "Runs MySQL 8 databases with replicas and point-in-time recovery from S3.",
+    "zh-TW": "執行 MySQL 8 資料庫，支援副本，並能從 S3 還原到任一時間點。",
+    "zh-CN": "运行 MySQL 8 数据库，支持副本，并能从 S3 恢复到任一时间点。",
+  },
   "databases/percona-mongodb#925d1dee": {
     en: "Runs MongoDB databases with backups to S3, under the SSPL licence.",
     "zh-TW": "執行 MongoDB 資料庫並備份到 S3，採 SSPL 授權。",
@@ -49,6 +64,11 @@ export const summaries: Record<string, Summary> = {
     en: "Scales web services with their traffic, down to zero when idle.",
     "zh-TW": "依流量調整網頁服務的副本數，閒置時可降到零。",
     "zh-CN": "按流量调整 Web 服务的副本数，空闲时可缩到零。",
+  },
+  "gotify-notifications/alertmanager-gotify-bridge#15013f81": {
+    en: "Lets notification channels send alerts to a Gotify server.",
+    "zh-TW": "讓通知管道把警示送到 Gotify 伺服器。",
+    "zh-CN": "让通知渠道把告警发到 Gotify 服务器。",
   },
   "image-updates/keel#9ece2498": {
     en: "Deploys each new image to the services you turn auto-deploy on for.",
@@ -75,15 +95,20 @@ export const summaries: Record<string, Summary> = {
     "zh-TW": "顯示每個 Pod 目前用了多少 CPU 與記憶體。",
     "zh-CN": "显示每个 Pod 当前用了多少 CPU 和内存。",
   },
-  "metrics/victoria-metrics#819600ce": {
-    en: "Keeps metrics history and sends alerts.",
-    "zh-TW": "保存指標歷史並送出警示。",
-    "zh-CN": "保存指标历史并发出告警。",
+  "metrics/victoria-metrics#80ed83f2": {
+    en: "Keeps metrics history and sends alerts to each project's notification channels.",
+    "zh-TW": "保存指標歷史，並把警示送到各專案的通知管道。",
+    "zh-CN": "保存指标历史，并把告警发到各项目的通知渠道。",
   },
   "node-updates/system-upgrade-controller#47de8b0b": {
     en: "Upgrades Kubernetes on the nodes, one node at a time.",
     "zh-TW": "逐一升級各節點上的 Kubernetes。",
     "zh-CN": "逐个升级各节点上的 Kubernetes。",
+  },
+  "object-storage/seaweedfs-operator#1c0622e6": {
+    en: "Runs SeaweedFS object storage with an S3 API, in beta.",
+    "zh-TW": "執行提供 S3 API 的 SeaweedFS 物件儲存，目前為 Beta。",
+    "zh-CN": "运行提供 S3 API 的 SeaweedFS 对象存储，目前为 Beta。",
   },
   "observability-operator/victoria-metrics-operator#c028706b": {
     en: "Runs the metrics and log stores.",
@@ -94,6 +119,11 @@ export const summaries: Record<string, Summary> = {
     en: "Puts services on your tailnet with trusted HTTPS and no port open to the internet.",
     "zh-TW": "把服務放上你的 tailnet，提供受信任的 HTTPS，不必對網際網路開放連接埠。",
     "zh-CN": "把服务放到你的 tailnet 上，提供受信任的 HTTPS，无需对互联网开放端口。",
+  },
+  "replicated-storage/longhorn#18291cd6": {
+    en: "Keeps copies of each volume on other nodes, so it survives losing a node.",
+    "zh-TW": "把每個磁碟區的副本存在其他節點上，節點故障時資料仍在。",
+    "zh-CN": "把每个卷的副本存在其他节点上，节点故障时数据仍在。",
   },
   "resource-recommendations/vertical-pod-autoscaler#e6592278": {
     en: "Suggests CPU and memory requests from actual use.",

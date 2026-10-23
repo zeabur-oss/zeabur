@@ -1,0 +1,567 @@
+---
+# Source: seaweedfs-operator/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: seaweedfs-operator
+  namespace: seaweedfs-operator
+  labels:
+    helm.sh/chart: seaweedfs-operator-0.1.43
+    app.kubernetes.io/name: seaweedfs-operator
+    app.kubernetes.io/instance: seaweedfs-operator
+    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/managed-by: Helm
+automountServiceAccountToken: true
+
+---
+# Source: seaweedfs-operator/templates/rbac/role.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: seaweedfs-operator-manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - secrets
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - daemonsets
+  - deployments
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cert-manager.io
+  resources:
+  - certificates
+  - issuers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - extensions
+  - networking.k8s.io
+  resources:
+  - ingresses
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - seaweed.seaweedfs.com
+  resources:
+  - adminscripts
+  - bucketlifecyclepolicies
+  - buckets
+  - s3credentials
+  - s3identities
+  - s3oidcproviders
+  - s3policies
+  - s3policybindings
+  - seaweedbackups
+  - seaweedrestores
+  - seaweeds
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - seaweed.seaweedfs.com
+  resources:
+  - adminscripts/finalizers
+  - bucketlifecyclepolicies/finalizers
+  - buckets/finalizers
+  - s3credentials/finalizers
+  - s3identities/finalizers
+  - s3oidcproviders/finalizers
+  - s3policies/finalizers
+  - s3policybindings/finalizers
+  - seaweedbackups/finalizers
+  - seaweedrestores/finalizers
+  - seaweeds/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - seaweed.seaweedfs.com
+  resources:
+  - adminscripts/status
+  - bucketlifecyclepolicies/status
+  - buckets/status
+  - s3credentials/status
+  - s3identities/status
+  - s3oidcproviders/status
+  - s3policies/status
+  - s3policybindings/status
+  - seaweedbackups/status
+  - seaweedrestores/status
+  - seaweeds/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - seaweed.seaweedfs.com
+  resources:
+  - resourcereferencegrants
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - get
+  - list
+  - watch
+
+---
+# Source: seaweedfs-operator/templates/rbac/seaweed_editor_role.yaml
+# permissions for end users to edit seaweeds.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: seaweed-editor-role
+rules:
+- apiGroups:
+  - seaweed.seaweedfs.com
+  resources:
+  - seaweeds
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - seaweed.seaweedfs.com
+  resources:
+  - seaweeds/status
+  verbs:
+  - get
+
+---
+# Source: seaweedfs-operator/templates/rbac/seaweed_viewer_role.yaml
+# permissions for end users to view seaweeds.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: seaweed-viewer-role
+rules:
+- apiGroups:
+  - seaweed.seaweedfs.com
+  resources:
+  - seaweeds
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - seaweed.seaweedfs.com
+  resources:
+  - seaweeds/status
+  verbs:
+  - get
+
+---
+# Source: seaweedfs-operator/templates/rbac/role_binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: seaweedfs-operator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: seaweedfs-operator-manager-role
+subjects:
+- kind: ServiceAccount
+  name: seaweedfs-operator
+  namespace: seaweedfs-operator
+
+---
+# Source: seaweedfs-operator/templates/rbac/leader_election_role.yaml
+# permissions to do leader election.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: seaweedfs-operator-leader-election-role
+  namespace: seaweedfs-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - configmaps/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - list
+  - update
+
+---
+# Source: seaweedfs-operator/templates/rbac/leader_election_role_binding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: seaweedfs-operator-leader-election-rolebinding
+  namespace: seaweedfs-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: seaweedfs-operator-leader-election-role
+subjects:
+- kind: ServiceAccount
+  name: seaweedfs-operator
+  namespace: seaweedfs-operator
+
+---
+# Source: seaweedfs-operator/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-operator
+  namespace: seaweedfs-operator
+  labels:
+    app: seaweedfs-operator
+    app.kubernetes.io/component: metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  selector:
+    app.kubernetes.io/name: seaweedfs-operator
+    app.kubernetes.io/instance: seaweedfs-operator
+
+---
+# Source: seaweedfs-operator/templates/webhook/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: seaweedfs-operator-webhook
+  namespace: seaweedfs-operator
+  labels:
+    app: seaweedfs-operator
+spec:
+  type: ClusterIP
+  ports:
+    - name: https
+      port: 443
+      targetPort: 9443
+  selector:
+    app.kubernetes.io/name: seaweedfs-operator
+    app.kubernetes.io/instance: seaweedfs-operator
+
+---
+# Source: seaweedfs-operator/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: seaweedfs-operator
+  namespace: seaweedfs-operator
+  labels:
+    helm.sh/chart: seaweedfs-operator-0.1.43
+    app.kubernetes.io/name: seaweedfs-operator
+    app.kubernetes.io/instance: seaweedfs-operator
+    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: seaweedfs-operator
+      app.kubernetes.io/instance: seaweedfs-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: seaweedfs-operator
+        app.kubernetes.io/instance: seaweedfs-operator
+    spec:
+      
+      serviceAccountName: seaweedfs-operator
+      securityContext:
+        fsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      
+      containers:
+      - name: seaweedfs-operator
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+        image: "chrislusf/seaweedfs-operator:1.0.40"
+        imagePullPolicy: IfNotPresent
+        command:
+        - /manager
+        args:
+        - --leader-elect
+        - --metrics-bind-address=:8080
+        env:
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: https
+          containerPort: 443
+          protocol: TCP
+        resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: seaweedfs-operator-webhook-server-cert
+          items:
+          - key: tls.crt
+            path: tls.crt
+          - key: tls.key
+            path: tls.key
+
+---
+# Source: seaweedfs-operator/templates/webhook/mutating-webhook.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: seaweedfs-operator-mutating-webhook-configuration
+  labels:
+    helm.sh/chart: seaweedfs-operator-0.1.43
+    app.kubernetes.io/name: seaweedfs-operator
+    app.kubernetes.io/instance: seaweedfs-operator
+    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    cert-manager.io/inject-ca-from: seaweedfs-operator/seaweedfs-operator-webhook-cert
+webhooks:
+- clientConfig:
+    service:
+      name: seaweedfs-operator-webhook
+      namespace: seaweedfs-operator
+      port: 443
+      path: /mutate-seaweed-seaweedfs-com-v1-seaweed
+  name: mseaweed.kb.io
+  failurePolicy: Fail
+  sideEffects: None
+  admissionReviewVersions:
+  - v1
+  rules:
+  - apiGroups:
+    - seaweed.seaweedfs.com
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - seaweeds
+
+---
+# Source: seaweedfs-operator/templates/webhook/validating-webhook.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: seaweedfs-operator-validating-webhook-configuration
+  labels:
+    helm.sh/chart: seaweedfs-operator-0.1.43
+    app.kubernetes.io/name: seaweedfs-operator
+    app.kubernetes.io/instance: seaweedfs-operator
+    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    cert-manager.io/inject-ca-from: seaweedfs-operator/seaweedfs-operator-webhook-cert
+webhooks:
+- clientConfig:
+    service:
+      name: seaweedfs-operator-webhook
+      namespace: seaweedfs-operator
+      port: 443
+      path: /validate-seaweed-seaweedfs-com-v1-seaweed
+  name: vseaweed.kb.io
+  failurePolicy: Fail
+  sideEffects: None
+  admissionReviewVersions:
+  - v1
+  rules:
+  - apiGroups:
+    - seaweed.seaweedfs.com
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - seaweeds
+
+---
+# Source: seaweedfs-operator/templates/webhook/certificate.yaml
+# Serving Certificate — mounted by the operator pod for TLS on the webhook endpoint.
+# cert-manager injects the CA bundle into the webhook configurations via the
+# cert-manager.io/inject-ca-from annotation on those resources.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: seaweedfs-operator-webhook-cert
+  namespace: seaweedfs-operator
+  labels:
+    helm.sh/chart: seaweedfs-operator-0.1.43
+    app.kubernetes.io/name: seaweedfs-operator
+    app.kubernetes.io/instance: seaweedfs-operator
+    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  dnsNames:
+    - seaweedfs-operator-webhook
+    - seaweedfs-operator-webhook.seaweedfs-operator.svc
+    - seaweedfs-operator-webhook.seaweedfs-operator.svc.cluster.local
+  secretName: seaweedfs-operator-webhook-server-cert
+  issuerRef:
+    name: seaweedfs-operator-webhook-selfsigned-issuer
+    kind: Issuer
+    group: cert-manager.io
+---
+# Source: seaweedfs-operator/templates/webhook/certificate.yaml
+# Self-signed Issuer — signs the webhook serving certificate directly.
+# Created automatically when no issuerRef is provided.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: seaweedfs-operator-webhook-selfsigned-issuer
+  namespace: seaweedfs-operator
+  labels:
+    helm.sh/chart: seaweedfs-operator-0.1.43
+    app.kubernetes.io/name: seaweedfs-operator
+    app.kubernetes.io/instance: seaweedfs-operator
+    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selfSigned: {}

@@ -1,0 +1,868 @@
+---
+# Source: mariadb-operator/templates/operator/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mariadb-operator
+  labels:
+    helm.sh/chart: mariadb-operator-26.10.1
+    app.kubernetes.io/name: mariadb-operator
+    app.kubernetes.io/instance: mariadb-operator
+    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: mariadb-operator/templates/webhook/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mariadb-operator-webhook
+  labels:
+    helm.sh/chart: mariadb-operator-26.10.1
+    app.kubernetes.io/name: mariadb-operator-webhook
+    app.kubernetes.io/instance: mariadb-operator
+    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: mariadb-operator/templates/operator/configmap.yaml
+apiVersion: v1
+data:
+  MARIADB_OPERATOR_IMAGE: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1"
+  MARIADB_GALERA_LIB_PATH: "/usr/lib/galera/libgalera_smm.so"
+  MARIADB_DEFAULT_VERSION: "12.3"
+  RELATED_IMAGE_MARIADB: "mariadb:12.3.3"
+  RELATED_IMAGE_MARIADB_NAME: "mariadb"
+  RELATED_IMAGE_MAXSCALE: "mariadb/maxscale:23.08.13-2"
+  RELATED_IMAGE_EXPORTER: "prom/mysqld-exporter:v0.15.1"
+  RELATED_IMAGE_EXPORTER_MAXSCALE: "mariadb/maxscale-prometheus-exporter-ubi:v0.0.1"
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: mariadb-operator-env
+
+---
+# Source: mariadb-operator/templates/operator/rbac-user.yaml
+# the mariadb-view ClusterRole allows viewing all k8s.mariadb.com resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mariadb-operator-view
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+- apiGroups: ["k8s.mariadb.com"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+
+---
+# Source: mariadb-operator/templates/operator/rbac-user.yaml
+# the mariadb-edit ClusterRole allows editing k8s.mariadb.com resources
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mariadb-operator-edit
+  labels:
+    rbac.authorization.k8s.io/aggregate-to-edit: "true"
+rules:
+- apiGroups: ["k8s.mariadb.com"]
+  resources: ["*"]
+  verbs: ["create", "update", "patch", "delete"]
+
+---
+# Source: mariadb-operator/templates/operator/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: mariadb-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  - secrets
+  - serviceaccounts
+  - services
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - create
+  - delete
+  - deletecollection
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
+- apiGroups:
+  - apps
+  resources:
+  - deployments
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - authentication.k8s.io
+  resources:
+  - tokenreviews
+  verbs:
+  - create
+- apiGroups:
+  - authorization.k8s.io
+  resources:
+  - subjectaccessreviews
+  verbs:
+  - create
+- apiGroups:
+  - batch
+  resources:
+  - cronjobs
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - cert-manager.io
+  resources:
+  - certificates
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
+  - endpointslices/restricted
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - events.k8s.io
+  resources:
+  - events
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - backups
+  - connections
+  - databases
+  - externalmariadbs
+  - grants
+  - mariadbs
+  - maxscales
+  - physicalbackups
+  - restores
+  - sqljobs
+  - users
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - backups/finalizers
+  - connections/finalizers
+  - databases/finalizers
+  - externalmariadbs/finalizers
+  - grants/finalizers
+  - mariadbs/finalizers
+  - maxscales/finalizers
+  - physicalbackups/finalizers
+  - restores/finalizers
+  - sqljobs/finalizers
+  - users/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - backups/status
+  - connections/status
+  - databases/status
+  - externalmariadbs/status
+  - grants/status
+  - mariadbs/status
+  - maxscales/status
+  - physicalbackups/status
+  - pointintimerecoveries/status
+  - restores/status
+  - sqljobs/status
+  - users/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - maxscale
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - k8s.mariadb.com
+  resources:
+  - pointintimerecoveries
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - monitoring.coreos.com
+  resources:
+  - servicemonitors
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - rbac.authorization.k8s.io
+  resources:
+  - clusterrolebindings
+  - rolebindings
+  - roles
+  verbs:
+  - create
+  - list
+  - patch
+  - watch
+- apiGroups:
+  - snapshot.storage.k8s.io
+  resources:
+  - volumesnapshots
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - watch
+
+---
+# Source: mariadb-operator/templates/operator/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mariadb-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: mariadb-operator
+subjects:
+- kind: ServiceAccount
+  name: mariadb-operator
+  namespace: mariadb-operator
+
+---
+# Source: mariadb-operator/templates/operator/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: mariadb-operator:auth-delegator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+- kind: ServiceAccount
+  name: mariadb-operator
+  namespace: mariadb-operator
+
+---
+# Source: mariadb-operator/templates/operator/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mariadb-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+
+---
+# Source: mariadb-operator/templates/operator/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mariadb-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mariadb-operator
+subjects:
+- kind: ServiceAccount
+  name: mariadb-operator
+  namespace: mariadb-operator
+
+---
+# Source: mariadb-operator/templates/webhook/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mariadb-operator-webhook
+  labels:
+    helm.sh/chart: mariadb-operator-26.10.1
+    app.kubernetes.io/name: mariadb-operator-webhook
+    app.kubernetes.io/instance: mariadb-operator
+    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 9443
+  selector:
+    app.kubernetes.io/name: mariadb-operator-webhook
+    app.kubernetes.io/instance: mariadb-operator
+---
+# Source: mariadb-operator/templates/operator/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb-operator
+  labels:
+    helm.sh/chart: mariadb-operator-26.10.1
+    app.kubernetes.io/name: mariadb-operator
+    app.kubernetes.io/instance: mariadb-operator
+    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mariadb-operator
+      app.kubernetes.io/instance: mariadb-operator
+  template:
+    metadata:
+      annotations:
+        checksum/config: 30a21b2086bb1fc70b4df960f56275d2bb11233df1aaa0a10beb416485ebe631
+      labels:
+        app.kubernetes.io/name: mariadb-operator
+        app.kubernetes.io/instance: mariadb-operator
+    spec:
+      serviceAccountName: mariadb-operator
+      automountServiceAccountToken: true
+      terminationGracePeriodSeconds: 10
+      securityContext:
+        
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - image: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1"
+          imagePullPolicy: IfNotPresent
+          name: controller
+          args:
+            - --metrics-addr=:8080
+            - --log-level=INFO
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+              name: metrics
+          envFrom:
+            - configMapRef:
+                name: mariadb-operator-env
+          env:
+            - name: CLUSTER_NAME
+              value: cluster.local
+            - name: MARIADB_OPERATOR_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.serviceAccountName
+            - name: MARIADB_OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: MARIADB_OPERATOR_SA_PATH
+              value: /var/run/secrets/kubernetes.io/serviceaccount/token
+          
+          resources:
+            
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          
+          
+          securityContext:
+            
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          
+
+---
+# Source: mariadb-operator/templates/webhook/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb-operator-webhook
+  labels:
+    helm.sh/chart: mariadb-operator-26.10.1
+    app.kubernetes.io/name: mariadb-operator-webhook
+    app.kubernetes.io/instance: mariadb-operator
+    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mariadb-operator-webhook
+      app.kubernetes.io/instance: mariadb-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mariadb-operator-webhook
+        app.kubernetes.io/instance: mariadb-operator
+    spec:
+      serviceAccountName: mariadb-operator-webhook
+      automountServiceAccountToken: true
+      securityContext:
+        
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      hostNetwork: false
+      containers:
+        - image: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1"
+          imagePullPolicy: IfNotPresent
+          name: webhook
+          args:
+            - webhook
+            - --ca-cert-path=/tmp/k8s-webhook-server/serving-certs/ca.crt
+            - --cert-dir=/tmp/k8s-webhook-server/serving-certs
+            - --dns-name=mariadb-operator-webhook.mariadb-operator.svc
+            - --port=9443
+            - --metrics-addr=:8080
+            - --health-addr=:8081
+            - --log-level=INFO
+          ports:
+            - containerPort: 9443
+              protocol: TCP
+              name: https
+            - containerPort: 8080
+              protocol: TCP
+              name: metrics
+            - containerPort: 8081
+              protocol: TCP
+              name: health
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs
+              name: cert
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 5
+          resources:
+            
+            limits:
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+          securityContext:
+            
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: cert
+          secret:
+            defaultMode: 420
+            secretName: mariadb-operator-webhook-cert
+
+---
+# Source: mariadb-operator/templates/webhook/config.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: mariadb-operator-webhook
+  labels:
+    helm.sh/chart: mariadb-operator-26.10.1
+    app.kubernetes.io/name: mariadb-operator-webhook
+    app.kubernetes.io/instance: mariadb-operator
+    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    cert-manager.io/inject-ca-from: mariadb-operator/mariadb-operator-webhook-cert
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-backup
+    failurePolicy: Fail
+    name: vbackup-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - backups
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-physicalbackup
+    failurePolicy: Fail
+    name: vphysicalbackup-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - physicalbackups
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-pointintimerecovery
+    failurePolicy: Fail
+    name: vpointintimerecovery-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - pointintimerecoveries
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-connection
+    failurePolicy: Fail
+    name: vconnection-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - connections
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-database
+    failurePolicy: Fail
+    name: vdatabase-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - databases
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-grant
+    failurePolicy: Fail
+    name: vgrant-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - grants
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-mariadb
+    failurePolicy: Fail
+    name: vmariadb-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - mariadbs
+    sideEffects: None
+  - admissionReviewVersions:
+    - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-maxscale
+    failurePolicy: Fail
+    name: vmaxscale-v1alpha1.kb.io
+    rules:
+    - apiGroups:
+      - k8s.mariadb.com
+      apiVersions:
+      - v1alpha1
+      operations:
+      - CREATE
+      - UPDATE
+      resources:
+      - maxscales
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-restore
+    failurePolicy: Fail
+    name: vrestore-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - restores
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-sqljob
+    failurePolicy: Fail
+    name: vsqljob-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - sqljobs
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: mariadb-operator-webhook
+        namespace: mariadb-operator
+        path: /validate-k8s-mariadb-com-v1alpha1-user
+    failurePolicy: Fail
+    name: vuser-v1alpha1.kb.io
+    rules:
+      - apiGroups:
+          - k8s.mariadb.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - users
+    sideEffects: None
+
+---
+# Source: mariadb-operator/templates/webhook/certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: mariadb-operator-webhook-cert
+  labels:
+    
+    helm.sh/chart: mariadb-operator-26.10.1
+    app.kubernetes.io/name: mariadb-operator-webhook
+    app.kubernetes.io/instance: mariadb-operator
+    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  commonName: mariadb-operator-webhook.mariadb-operator.svc
+  dnsNames:
+    - mariadb-operator-webhook.mariadb-operator.svc.cluster.local
+    - mariadb-operator-webhook.mariadb-operator.svc
+    - mariadb-operator-webhook.mariadb-operator
+    - mariadb-operator-webhook
+  issuerRef:
+    kind: Issuer
+    name: mariadb-operator-selfsigned-issuer
+  revisionHistoryLimit: 3
+  secretName: mariadb-operator-webhook-cert
+
+---
+# Source: mariadb-operator/templates/webhook/certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: mariadb-operator-selfsigned-issuer
+  labels:
+    
+    helm.sh/chart: mariadb-operator-26.10.1
+    app.kubernetes.io/name: mariadb-operator-webhook
+    app.kubernetes.io/instance: mariadb-operator
+    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  selfSigned: {}
