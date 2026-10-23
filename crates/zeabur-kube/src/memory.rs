@@ -404,6 +404,9 @@ impl State {
         if target.kind == "Namespace" {
             return put(&mut self.namespaces, &target.name, object);
         }
+        if target.kind == "Secret" {
+            keep_string_data(self, target, &object);
+        }
         let namespace = target.namespace.clone();
         let objects = self
             .objects
@@ -1399,6 +1402,22 @@ fn created(target: &ObjectTarget, body: &Value) -> Result<Value, ClusterError> {
         }
     }
     Ok(object)
+}
+
+/// A written Secret's `stringData`, kept as its values for [`Cluster::reveal_secret`].
+fn keep_string_data(state: &mut State, target: &ObjectTarget, object: &Value) {
+    let values: BTreeMap<String, Vec<u8>> = object
+        .get("stringData")
+        .and_then(Value::as_object)
+        .into_iter()
+        .flatten()
+        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.as_bytes().to_vec())))
+        .collect();
+    if !values.is_empty() {
+        state
+            .secret_values
+            .insert(format!("{}/{}", target.namespace, target.name), values);
+    }
 }
 
 /// `current` after the JSON Patch `operations`, with the next generation when its `spec`
