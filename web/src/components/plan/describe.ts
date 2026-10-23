@@ -13,7 +13,7 @@ import {
 } from "@/components/plan/groups"
 import { editCount, partOf } from "@/model/draft"
 import { problemText } from "@/model/problem"
-import { isolates, undoOf, type PodsOf, type Reason } from "@/model/risk"
+import { isolates, undoOf, type AccessChange, type PodsOf, type Reason } from "@/model/risk"
 import { imageTag } from "@/model/service"
 
 type Change = Schemas["Change"]
@@ -215,6 +215,15 @@ function sentenceOf(
       return t("confirm.debugContainer", change.pod)
     case "clusterTools":
       return t("confirm.clusterTools")
+    default:
+      return accessSentence(t, change)
+  }
+}
+
+type ImportOrPort = Extract<Change, { op: "envImport" | "publicPort" }>
+
+function accessSentence(t: Translate, change: AccessChange): string {
+  switch (change.op) {
     case "scheduleTask":
       return t("confirm.scheduleTask", change.name, change.from.name)
     case "runTask":
@@ -227,6 +236,13 @@ function sentenceOf(
       return change.user
         ? t("confirm.basicAuth", change.route.name)
         : t("confirm.basicAuthOff", change.route.name)
+    default:
+      return importOrPortSentence(t, change)
+  }
+}
+
+function importOrPortSentence(t: Translate, change: ImportOrPort): string {
+  switch (change.op) {
     case "envImport":
       return change.remove
         ? t("confirm.envImportOff", change.kind, change.name, change.workload.name)
@@ -297,24 +313,22 @@ function resourcesSentence(
 }
 
 /** `undefined` where the sentence of what happens already says it. */
-function consequence(t: Translate, reason: Reason, service?: WorkloadRef): string | undefined {
-  switch (reason) {
-    case "fewPods":
-    case "scaleToZero":
-    case "deletesKeys":
-    case "rollback":
-      return undefined
-    case "storage":
-    case "yamlEdit":
-    case "removesDomain":
-      return undefined
-    case "isolates":
-      return t("confirm.isolates", service?.name ?? "")
-    case "opensPort":
-      return t("risk.opensPort")
-    case "deletes":
-      return undefined
+const consequences: Record<Reason, ((t: Translate, service?: WorkloadRef) => string) | undefined> =
+  {
+    fewPods: undefined,
+    scaleToZero: undefined,
+    deletesKeys: undefined,
+    rollback: undefined,
+    storage: undefined,
+    yamlEdit: undefined,
+    removesDomain: undefined,
+    isolates: (t, service) => t("confirm.isolates", service?.name ?? ""),
+    opensPort: (t) => t("risk.opensPort"),
+    deletes: undefined,
   }
+
+function consequence(t: Translate, reason: Reason, service?: WorkloadRef): string | undefined {
+  return consequences[reason]?.(t, service)
 }
 
 interface Fact {
@@ -483,6 +497,20 @@ function describeWritten(t: Translate, plan: Plan): Description {
 
 type Named = (names: string[], sentence: (list: string) => string) => string
 
+const risks: Record<
+  Exclude<Reason, "fewPods" | "scaleToZero">,
+  (t: Translate, ask: Asked) => string
+> = {
+  deletesKeys: (t) => t("risk.deletesKeys"),
+  rollback: (t) => t("risk.rollback"),
+  storage: (t) => t("risk.storage"),
+  yamlEdit: (t) => t("confirm.yamlAsIs"),
+  removesDomain: (t) => t("risk.removesDomain"),
+  isolates: (t, ask) => t("confirm.isolates", ask.service?.name ?? ""),
+  opensPort: (t) => t("risk.opensPort"),
+  deletes: (t) => t("risk.deletes"),
+}
+
 /** What several high-risk changes put at risk, one sentence per reason. */
 function riskOf(
   t: Translate,
@@ -505,22 +533,8 @@ function riskOf(
         )
         return named(stopped, (names) => t("risk.scaleToZero", names, stopped.length))
       }
-      case "deletesKeys":
-        return t("risk.deletesKeys")
-      case "rollback":
-        return t("risk.rollback")
-      case "storage":
-        return t("risk.storage")
-      case "yamlEdit":
-        return t("confirm.yamlAsIs")
-      case "removesDomain":
-        return t("risk.removesDomain")
-      case "isolates":
-        return t("confirm.isolates", ask.service?.name ?? "")
-      case "opensPort":
-        return t("risk.opensPort")
-      case "deletes":
-        return t("risk.deletes")
+      default:
+        return risks[reason](t, ask)
     }
   })
   return sentences.length > 0 ? sentences.join(" ") : undefined
@@ -747,6 +761,13 @@ export function actionOf(t: Translate, ask: Asked): string {
       return change.profile === "restricted" ? t("action.makeStrict") : t("action.makeCompatible")
     case "podSecurity":
       return change.level === "restricted" ? t("action.makeStrict") : t("action.save")
+    default:
+      return accessAction(t, change)
+  }
+}
+
+function accessAction(t: Translate, change: AccessChange): string {
+  switch (change.op) {
     case "scheduleTask":
       return t("action.create")
     case "runTask":
@@ -755,6 +776,13 @@ export function actionOf(t: Translate, ask: Asked): string {
       return change.to ? t("action.redirect") : t("action.stopRedirect")
     case "basicAuth":
       return change.user ? t("action.askPassword") : t("action.stopPassword")
+    default:
+      return importOrPortAction(t, change)
+  }
+}
+
+function importOrPortAction(t: Translate, change: ImportOrPort): string {
+  switch (change.op) {
     case "envImport":
       return t("action.saveVariables")
     case "publicPort":

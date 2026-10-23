@@ -55,21 +55,26 @@ export function ReviewForm({ onReview, children }: { onReview: () => void; child
   )
 }
 
-/** A plan drawer's footer: cancel, or review the changes. */
+/** A plan drawer's footer: cancel, or review the changes. `note` goes on the left. */
 export function ReviewFooter({
   onCancel,
   onReview,
+  disabled,
+  note,
 }: {
   onCancel: () => void
   onReview: () => void
+  disabled?: boolean
+  note?: ReactNode
 }) {
   const t = useT()
   return (
-    <div className="flex justify-end gap-2">
+    <div className="flex items-center justify-end gap-2">
+      {note ? <span className="mr-auto type-meta text-muted-foreground">{note}</span> : null}
       <Button variant="ghost" size="sm" onClick={onCancel}>
         {t("edit.cancel")}
       </Button>
-      <Button size="sm" onClick={onReview}>
+      <Button size="sm" disabled={disabled} onClick={onReview}>
         {t("edit.review")}
       </Button>
     </div>

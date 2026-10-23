@@ -12,15 +12,16 @@ import { FormField } from "@/components/form-field"
 import { GateNote, GateTip, useGate } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
 import { LoadingRows } from "@/components/page"
-import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanner, usePlanStep } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Schedule } from "@/components/schedule"
 import { StatusDot } from "@/components/status"
-import { useT } from "@/i18n"
+import { useT, type Translate } from "@/i18n"
 import { describeCron } from "@/lib/cron"
 import { podLogsLink, serviceLink } from "@/lib/place"
 import type { Service } from "@/model/service"
+import { ContainerField } from "@/routes/service/container-field"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
 import { Card, CardRow } from "@zeabur/design-system/components/card"
@@ -105,6 +106,26 @@ function TaskWhen({ schedule }: { schedule: Schemas["TaskSchedule"] }) {
   )
 }
 
+function taskProblems(
+  t: Translate,
+  form: {
+    name: string
+    command: string
+    schedule: string
+    keepSucceeded: string
+    keepFailed: string
+  },
+) {
+  const nameFits = NAME.test(form.name) && form.name.length <= NAME_MAX
+  return {
+    name: nameFits ? undefined : t("tasks.badName", NAME_MAX),
+    command: form.command.trim() ? undefined : t("tasks.needCommand"),
+    schedule: form.schedule.trim() ? undefined : t("tasks.needSchedule"),
+    keepSucceeded: keepable(form.keepSucceeded) ? undefined : t("tasks.badKeep"),
+    keepFailed: keepable(form.keepFailed) ? undefined : t("tasks.badKeep"),
+  }
+}
+
 function ScheduleTaskDrawer({
   project,
   service,
@@ -127,13 +148,7 @@ function ScheduleTaskDrawer({
   const [keepFailed, setKeepFailed] = useState("1")
   const [tried, setTried] = useState(false)
   const words = describeCron(t, zoned(schedule.trim(), zone.trim()))
-  const problems = {
-    name: NAME.test(name) && name.length <= NAME_MAX ? undefined : t("tasks.badName", NAME_MAX),
-    command: command.trim() ? undefined : t("tasks.needCommand"),
-    schedule: schedule.trim() ? undefined : t("tasks.needSchedule"),
-    keepSucceeded: keepable(keepSucceeded) ? undefined : t("tasks.badKeep"),
-    keepFailed: keepable(keepFailed) ? undefined : t("tasks.badKeep"),
-  }
+  const problems = taskProblems(t, { name, command, schedule, keepSucceeded, keepFailed })
   const review = () => {
     setTried(true)
     if (Object.values(problems).some(Boolean)) return
@@ -162,24 +177,9 @@ function ScheduleTaskDrawer({
       onClose={onClose}
       title={t("tasks.addTitle", service.name)}
       description={t("tasks.addHint", service.name)}
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("edit.cancel")}
-          </Button>
-          <Button size="sm" onClick={review}>
-            {t("edit.review")}
-          </Button>
-        </div>
-      }
+      footer={<ReviewFooter onCancel={onClose} onReview={review} />}
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          review()
-        }}
-      >
+      <ReviewForm onReview={review}>
         <FormField
           label={t("tasks.command")}
           hint={t("tasks.commandHint")}
@@ -226,17 +226,7 @@ function ScheduleTaskDrawer({
             onChange={(event) => setName(event.target.value.trim())}
           />
         </FormField>
-        {containers.length > 1 ? (
-          <FormField label={t("tasks.container")}>
-            <Select
-              size="sm"
-              translate="no"
-              value={container}
-              onValueChange={setContainer}
-              items={containers.map((c) => ({ value: c.name, label: c.name }))}
-            />
-          </FormField>
-        ) : null}
+        <ContainerField containers={containers} value={container} onChange={setContainer} />
         <FormField label={t("tasks.overlap")}>
           <Select
             size="sm"
@@ -273,7 +263,7 @@ function ScheduleTaskDrawer({
             [t("tasks.kube.copied"), t("tasks.kube.copiedValue")],
           ]}
         />
-      </form>
+      </ReviewForm>
     </PlanDrawer>
   )
 }
@@ -284,23 +274,15 @@ const RUNS_SHOWN = 10
 export function TaskRunsCard({ project, service }: { project: string; service: Service }) {
   const t = useT()
   const gate = useGate(project, "changeServices")
-  const logs = useLogsReadable(project)
   const planner = usePlanner(project, undefined, true)
   const runs = useQuery(taskRunsQuery(project, service.name))
-  const [all, setAll] = useState(false)
-  const list = runs.data?.runs ?? []
-  const shown = all ? list : list.slice(0, RUNS_SHOWN)
   return (
     <Container
       title={
-        service.schedule ? (
-          <span className="flex min-w-0 items-center gap-3">
-            {t("tasks.runs")}
-            <TaskWhen schedule={service.schedule} />
-          </span>
-        ) : (
-          t("tasks.runs")
-        )
+        <span className="flex min-w-0 items-center gap-3">
+          {t("tasks.runs")}
+          {service.schedule ? <TaskWhen schedule={service.schedule} /> : null}
+        </span>
       }
       titleAction={
         <GateTip gate={gate}>
@@ -331,47 +313,72 @@ export function TaskRunsCard({ project, service }: { project: string; service: S
         <div className="px-4 py-3">
           <Problem error={runs.error} />
         </div>
-      ) : list.length === 0 ? (
-        <p className="px-4 py-3 type-body text-secondary">{t("tasks.noRuns")}</p>
       ) : (
-        <ul className="flex max-h-96 flex-col divide-y divide-main overflow-y-auto">
-          {shown.map((run) => {
-            const pod = run.pods.at(-1)
-            return (
-              <li key={run.name} className="flex min-w-0 items-center gap-2.5 px-4 py-2.5">
-                <StatusDot health={runHealth(run)} />
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex min-w-0 items-center gap-2 type-body">
-                    <span className="font-medium">{t(`tasks.run.${run.status}`)}</span>
-                    {run.manual ? <Badge variant="secondary">{t("tasks.manual")}</Badge> : null}
-                  </span>
-                  <span className="truncate type-meta text-muted-foreground" translate="no">
-                    {run.name}
-                  </span>
-                </span>
-                <Ago iso={run.started} className="shrink-0 type-meta text-muted-foreground" />
-                {pod && logs ? (
-                  <Link
-                    {...podLogsLink(project, service, pod)}
-                    className="shrink-0 type-meta text-secondary outline-none hover:text-main focus-visible:underline"
-                    aria-label={t("pod.logsOf", pod)}
-                  >
-                    {t("tab.logs")}
-                  </Link>
-                ) : null}
-              </li>
-            )
-          })}
-          {list.length > RUNS_SHOWN && !all ? (
-            <li className="px-4 py-2">
-              <Button variant="ghost" size="sm" onClick={() => setAll(true)}>
-                {t("tasks.allRuns", list.length)}
-              </Button>
-            </li>
-          ) : null}
-        </ul>
+        <RunList project={project} service={service} runs={runs.data.runs} />
       )}
       {planner.dialog}
     </Container>
+  )
+}
+
+function RunList({ project, service, runs }: { project: string; service: Service; runs: Run[] }) {
+  const t = useT()
+  const logs = useLogsReadable(project)
+  const [all, setAll] = useState(false)
+  if (runs.length === 0)
+    return <p className="px-4 py-3 type-body text-secondary">{t("tasks.noRuns")}</p>
+  const shown = all ? runs : runs.slice(0, RUNS_SHOWN)
+  return (
+    <ul className="flex max-h-96 flex-col divide-y divide-main overflow-y-auto">
+      {shown.map((run) => (
+        <RunRow key={run.name} project={project} service={service} run={run} logs={logs} />
+      ))}
+      {runs.length > RUNS_SHOWN && !all ? (
+        <li className="px-4 py-2">
+          <Button variant="ghost" size="sm" onClick={() => setAll(true)}>
+            {t("tasks.allRuns", runs.length)}
+          </Button>
+        </li>
+      ) : null}
+    </ul>
+  )
+}
+
+function RunRow({
+  project,
+  service,
+  run,
+  logs,
+}: {
+  project: string
+  service: Service
+  run: Run
+  logs: boolean
+}) {
+  const t = useT()
+  const pod = run.pods.at(-1)
+  return (
+    <li className="flex min-w-0 items-center gap-2.5 px-4 py-2.5">
+      <StatusDot health={runHealth(run)} />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 items-center gap-2 type-body">
+          <span className="font-medium">{t(`tasks.run.${run.status}`)}</span>
+          {run.manual ? <Badge variant="secondary">{t("tasks.manual")}</Badge> : null}
+        </span>
+        <span className="truncate type-meta text-muted-foreground" translate="no">
+          {run.name}
+        </span>
+      </span>
+      <Ago iso={run.started} className="shrink-0 type-meta text-muted-foreground" />
+      {pod && logs ? (
+        <Link
+          {...podLogsLink(project, service, pod)}
+          className="shrink-0 type-meta text-secondary outline-none hover:text-main focus-visible:underline"
+          aria-label={t("pod.logsOf", pod)}
+        >
+          {t("tab.logs")}
+        </Link>
+      ) : null}
+    </li>
   )
 }

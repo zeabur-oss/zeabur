@@ -139,10 +139,6 @@ export function VariablesTab({
 
   const databases = useQuery(databasesQuery(project)).data?.items ?? []
   const [connecting, setConnecting] = useState(false)
-  const [sharing, setSharing] = useState(false)
-  const shared = (useQuery(projectQuery(project)).data?.resources ?? []).some(
-    (r) => r.sharedVariables,
-  )
   const targets = useTargets(project)
   const mayConnect =
     databases.some((d) => d.app) &&
@@ -598,34 +594,16 @@ export function VariablesTab({
               whole
               onOpen={(kind, n) => setEditor({ kind, name: n })}
             />
-            {editing || managed || i.readOnly || !i.source.name ? null : (
-              <GateTip gate={gates("changeServices")}>
-                <Button
-                  variant="muted"
-                  size="icon-xs"
-                  aria-label={t("useShared.stop", i.source.name)}
-                  title={t("useShared.stop", i.source.name)}
-                  onClick={() =>
-                    planner.plan({
-                      title: t("useShared.stop", i.source.name ?? ""),
-                      service: workload,
-                      changes: [
-                        {
-                          op: "envImport",
-                          workload,
-                          container: multi ? container : undefined,
-                          kind: i.source.kind === "Secret" ? "Secret" : "ConfigMap",
-                          name: i.source.name ?? "",
-                          remove: true,
-                        },
-                      ],
-                    })
-                  }
-                >
-                  <TrashIcon aria-hidden="true" />
-                </Button>
-              </GateTip>
-            )}
+            <StopImport
+              imported={i}
+              container={container}
+              multi={multi}
+              editing={Boolean(editing)}
+              managed={managed}
+              gate={gates("changeServices")}
+              planner={planner}
+              workload={workload}
+            />
           </span>
         </li>
         {Object.entries(revealed ?? {}).map(([k, v]) => (
@@ -751,12 +729,7 @@ export function VariablesTab({
               />
             ) : null}
             {editing || !mayConnect || managed ? null : (
-              <GateTip gate={gates("changeServices")}>
-                <Button variant="outline" size="sm" onClick={() => setConnecting(true)}>
-                  <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
-                  {t("connect.addToService")}
-                </Button>
-              </GateTip>
+              <ConnectButton gate={gates("changeServices")} onClick={() => setConnecting(true)} />
             )}
             {editing || !draft
               ? null
@@ -1082,21 +1055,13 @@ export function VariablesTab({
           </div>
         </>
       )}
-      {editing || !shared || managed ? null : (
-        <div>
-          <GateTip gate={gates("changeServices")}>
-            <Button variant="outline" size="sm" onClick={() => setSharing(true)}>
-              <StackIcon aria-hidden="true" data-icon="inline-start" />
-              {t("useShared.open")}
-            </Button>
-          </GateTip>
-        </div>
-      )}
-      {sharing ? (
-        <Suspense fallback={null}>
-          <UseShared project={project} service={service} onClose={() => setSharing(false)} />
-        </Suspense>
-      ) : null}
+      <UseSharedEntry
+        project={project}
+        service={service}
+        editing={Boolean(editing)}
+        managed={managed}
+        gate={gates("changeServices")}
+      />
       <KubeDetails facts={kubeFacts} />
       {editor ? (
         <Suspense fallback={null}>
@@ -1112,6 +1077,120 @@ export function VariablesTab({
       ) : null}
       {planner.dialog}
       {disconnector.dialog}
+    </div>
+  )
+}
+
+/** At phone width the label does not fit next to the other header actions. */
+function ConnectButton({ gate, onClick }: { gate: Gate; onClick: () => void }) {
+  const t = useT()
+  return (
+    <>
+      <GateTip gate={gate} className="max-sm:hidden">
+        <Button variant="outline" size="sm" className="max-sm:hidden" onClick={onClick}>
+          <PlugsConnectedIcon aria-hidden="true" data-icon="inline-start" />
+          {t("connect.addToService")}
+        </Button>
+      </GateTip>
+      <GateTip gate={gate} className="sm:hidden">
+        <Button
+          variant="outline"
+          size="icon-sm"
+          className="sm:hidden"
+          aria-label={t("connect.addToService")}
+          onClick={onClick}
+        >
+          <PlugsConnectedIcon aria-hidden="true" />
+        </Button>
+      </GateTip>
+    </>
+  )
+}
+
+function StopImport({
+  imported,
+  container,
+  multi,
+  editing,
+  managed,
+  gate,
+  planner,
+  workload,
+}: {
+  imported: Schemas["ImportedEnv"]
+  container: string
+  multi: boolean
+  editing: boolean
+  managed: string | undefined
+  gate: Gate
+  planner: ReturnType<typeof usePlanner>
+  workload: Schemas["WorkloadRef"]
+}) {
+  const t = useT()
+  const name = imported.source.name
+  if (editing || managed || imported.readOnly || !name) return null
+  const stop = () =>
+    planner.plan({
+      title: t("useShared.stop", name),
+      service: workload,
+      changes: [
+        {
+          op: "envImport",
+          workload,
+          container: multi ? container : undefined,
+          kind: imported.source.kind === "Secret" ? "Secret" : "ConfigMap",
+          name,
+          remove: true,
+        },
+      ],
+    })
+  return (
+    <GateTip gate={gate}>
+      <Button
+        variant="muted"
+        size="icon-xs"
+        aria-label={t("useShared.stop", name)}
+        title={t("useShared.stop", name)}
+        onClick={stop}
+      >
+        <TrashIcon aria-hidden="true" />
+      </Button>
+    </GateTip>
+  )
+}
+
+function UseSharedEntry({
+  project,
+  service,
+  editing,
+  managed,
+  gate,
+}: {
+  project: string
+  service: Service
+  editing: boolean
+  managed: string | undefined
+  gate: Gate
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const shared = (useQuery(projectQuery(project)).data?.resources ?? []).some(
+    (r) => r.sharedVariables,
+  )
+  if (editing || managed || !shared) return null
+  return (
+    <div>
+      <GateTip gate={gate}>
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          <StackIcon aria-hidden="true" data-icon="inline-start" />
+          {t("useShared.open")}
+        </Button>
+      </GateTip>
+      {open ? (
+        <Suspense fallback={null}>
+          <UseShared project={project} service={service} onClose={() => setOpen(false)} />
+        </Suspense>
+      ) : null}
     </div>
   )
 }

@@ -15,8 +15,8 @@
 //   scaling to zero; deleting a ConfigMap or Secret key; a rollback; any storage change (a claim
 //   cannot shrink, a new or moved mount replaces the pods); a YAML edit (written as typed);
 //   removing a domain; a NetworkPolicy that isolates its pods (limits what they send, or lets
-//   nothing in); opening a port to the internet; deleting an object, which cannot be taken back and is confirmed by typing its
-//   name. Revoking a join token (a bootstrap token Secret in kube-system) is not typed: it only
+//   nothing in); opening a port to the internet; deleting an object, which cannot be taken back
+//   and is confirmed by typing its name. Revoking a join token (a bootstrap token Secret in kube-system) is not typed: it only
 //   takes away access, and a node that has joined keeps working.
 // - normal: everything else (variables, values set, domains added or renamed, resources, health
 //   checks, other created objects, letting a namespace go).
@@ -126,16 +126,23 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
     case "rebuild":
       return { risk: "low" }
     case "deployKey":
-    case "scheduleTask":
-    case "runTask":
-    case "redirect":
-    case "basicAuth":
-    case "envImport":
       return { risk: "normal" }
-    case "publicPort":
-      return change.remove ? { risk: "normal" } : { risk: "high", reason: "opensPort" }
+    default:
+      return weighAccess(change)
   }
 }
+
+function weighAccess(change: AccessChange): { risk: Risk; reason?: Reason } {
+  return change.op === "publicPort" && !change.remove
+    ? { risk: "high", reason: "opensPort" }
+    : { risk: "normal" }
+}
+
+/** The changes of scheduled tasks, routes, shared variables and public ports. */
+export type AccessChange = Extract<
+  Change,
+  { op: "scheduleTask" | "runTask" | "redirect" | "basicAuth" | "envImport" | "publicPort" }
+>
 
 /** Whether an object is a NetworkPolicy that shuts its pods off: it limits what they send
  * (`Egress`), or it covers ingress and lets nothing in. Once it exists, only what policies allow
@@ -281,7 +288,6 @@ export function destinationOf(
     case "rollback":
       return tab(change.workload, "deployments")
     case "env":
-    case "envImport":
       return tab(change.workload, "variables")
     case "scale":
     case "resources":
@@ -293,11 +299,7 @@ export function destinationOf(
       return tab(change.workload, "networking")
     case "renameDomain":
     case "removeDomain":
-    case "basicAuth":
       return tab(service, "networking")
-    case "redirect":
-    case "publicPort":
-      return tab(change.workload, "networking")
     case "addVolume":
     case "editMount":
     case "removeVolume":
@@ -321,5 +323,22 @@ export function destinationOf(
       return "/projects"
     case "details":
       return `/projects/${encodeURIComponent(project)}/settings`
+    default:
+      return tab(...accessTab(change, service))
+  }
+}
+
+/** No workload where the change has no tab of its own. */
+function accessTab(change: Change, service?: WorkloadRef): [WorkloadRef | undefined, Tab] {
+  switch (change.op) {
+    case "envImport":
+      return [change.workload, "variables"]
+    case "basicAuth":
+      return [service, "networking"]
+    case "redirect":
+    case "publicPort":
+      return [change.workload, "networking"]
+    default:
+      return [undefined, "networking"]
   }
 }

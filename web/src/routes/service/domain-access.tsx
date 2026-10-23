@@ -5,9 +5,10 @@ import { objectQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
-import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { useT } from "@/i18n"
+import type { Translate } from "@/i18n"
 import type { Service } from "@/model/service"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
@@ -35,6 +36,97 @@ const middlewareAddress = (name: string) => ({
   name,
 })
 
+type Mode = "serve" | "redirect"
+
+interface RedirectForm {
+  mode: Mode
+  /** Unset until typed: the target Zeabur wrote, once it loads. */
+  to?: string
+  permanent?: boolean
+}
+
+interface PasswordForm {
+  on: boolean
+  /** A password already set stays until Change is chosen. */
+  changing: boolean
+  username: string
+  password: string
+}
+
+function redirectProblem(t: Translate, target: string, host: string): string | undefined {
+  if (!HOST.test(target)) return t("domainAccess.badTo")
+  return target === host ? t("domainAccess.sameTo") : undefined
+}
+
+/** Traefik reads `user:hash` lines; bcrypt reads at most 72 bytes. */
+function userProblems(t: Translate, form: PasswordForm) {
+  return {
+    username: /^[^\s:]+$/.test(form.username) ? undefined : t("domainAccess.badUser"),
+    password:
+      form.password.length < 8 || new TextEncoder().encode(form.password).length > 72
+        ? t("domainAccess.badPassword")
+        : undefined,
+  }
+}
+
+/** The redirect Zeabur wrote for `host`, with its target once the Middleware loads. */
+function useExisting(project: string, route: Schemas["Route"], host: string) {
+  const redirect = route.redirects?.find((r) => r.host === host)
+  const current = useQuery({
+    ...objectQuery(project, middlewareAddress(redirect?.middleware ?? "")),
+    enabled: redirect !== undefined,
+  })
+  const was = redirectOf(current.data?.yaml)
+  return redirect && { middleware: redirect.middleware, to: was?.to, permanent: was?.permanent }
+}
+
+type Existing = ReturnType<typeof useExisting>
+
+/** The form's target and kind, or the existing redirect's until they are changed. */
+function resolved(form: RedirectForm, existing: Existing) {
+  const shown = form.to ?? existing?.to ?? ""
+  return {
+    shown,
+    to: shown.trim().toLowerCase(),
+    permanent: form.permanent ?? existing?.permanent ?? true,
+  }
+}
+
+function redirectChanges(
+  route: Schemas["RouteRef"],
+  workload: Schemas["WorkloadRef"],
+  host: string,
+  existing: Existing,
+  next: { mode: Mode; to: string; permanent: boolean },
+): Change[] {
+  const base = { op: "redirect", route, workload, hostname: host } as const
+  if (next.mode === "serve") return existing ? [{ ...base, permanent: true }] : []
+  const same = existing && next.to === existing.to && next.permanent === existing.permanent
+  return same ? [] : [{ ...base, to: next.to, permanent: next.permanent }]
+}
+
+function passwordChanges(
+  route: Schemas["RouteRef"],
+  form: PasswordForm,
+  protectedNow: boolean,
+): Change[] {
+  if (form.on && form.changing)
+    return [{ op: "basicAuth", route, user: { username: form.username, password: form.password } }]
+  return !form.on && protectedNow ? [{ op: "basicAuth", route }] : []
+}
+
+function problemsOf(
+  t: Translate,
+  host: string,
+  redirect: { mode: Mode; to: string },
+  password: PasswordForm,
+) {
+  return {
+    to: redirect.mode === "redirect" ? redirectProblem(t, redirect.to, host) : undefined,
+    ...(password.on && password.changing ? userProblems(t, password) : {}),
+  }
+}
+
 /** Redirect one domain of an Ingress, or ask for a password on all of its domains. */
 export default function DomainAccessDrawer({
   project,
@@ -50,67 +142,36 @@ export default function DomainAccessDrawer({
   onClose: () => void
 }) {
   const t = useT()
-  const ids = { auth: useId() }
   const step = usePlanStep(project, onClose)
-  const redirect = route.redirects?.find((r) => r.host === host)
-  const current = useQuery({
-    ...objectQuery(project, middlewareAddress(redirect?.middleware ?? "")),
-    enabled: redirect !== undefined,
+  const existing = useExisting(project, route, host)
+  const [redirectForm, setRedirectForm] = useState<RedirectForm>({
+    mode: existing ? "redirect" : "serve",
   })
-  const was = redirectOf(current.data?.yaml)
-  const [mode, setMode] = useState<"serve" | "redirect">(redirect ? "redirect" : "serve")
-  const [to, setTo] = useState<string>()
-  const [permanent, setPermanent] = useState<boolean>()
-  const target = (to ?? was?.to ?? "").trim().toLowerCase()
-  const keep = permanent ?? was?.permanent ?? true
+  const target = { mode: redirectForm.mode, ...resolved(redirectForm, existing) }
   const protectedNow = route.basicAuth != null
-  const [auth, setAuth] = useState(protectedNow)
-  const [changing, setChanging] = useState(!protectedNow)
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
+  const [passwordForm, setPasswordForm] = useState<PasswordForm>({
+    on: protectedNow,
+    changing: !protectedNow,
+    username: "",
+    password: "",
+  })
   const [tried, setTried] = useState(false)
-  const others = route.hostnames.filter((h) => h !== host)
   const routeRef = { kind: "Ingress", name: route.name } as const
   const workload = { kind: service.kind, name: service.name }
+  const others = route.hostnames.filter((h) => h !== host)
 
-  const wantsUser = auth && changing
-  const problems = {
-    to:
-      mode !== "redirect"
-        ? undefined
-        : !HOST.test(target)
-          ? t("domainAccess.badTo")
-          : target === host
-            ? t("domainAccess.sameTo")
-            : undefined,
-    username: wantsUser && !/^[^\s:]+$/.test(username) ? t("domainAccess.badUser") : undefined,
-    password:
-      wantsUser && (password.length < 8 || new TextEncoder().encode(password).length > 72)
-        ? t("domainAccess.badPassword")
-        : undefined,
-  }
-  const changes: Change[] = []
-  if (mode === "redirect" && (!redirect || target !== was?.to || keep !== was?.permanent))
-    changes.push({
-      op: "redirect",
-      route: routeRef,
-      workload,
-      hostname: host,
-      to: target,
-      permanent: keep,
-    })
-  if (mode === "serve" && redirect)
-    changes.push({ op: "redirect", route: routeRef, workload, hostname: host, permanent: true })
-  if (wantsUser) changes.push({ op: "basicAuth", route: routeRef, user: { username, password } })
-  if (!auth && protectedNow) changes.push({ op: "basicAuth", route: routeRef })
-
+  const problems = problemsOf(t, host, target, passwordForm)
+  const changes = [
+    ...redirectChanges(routeRef, workload, host, existing, target),
+    ...passwordChanges(routeRef, passwordForm, protectedNow),
+  ]
+  const nothing = tried && changes.length === 0
   const review = () => {
     setTried(true)
     if (Object.values(problems).some(Boolean) || changes.length === 0) return
     step.plan({ title: t("domainAccess.planTitle", host), service: workload, changes })
   }
   const shown = (message?: string) => (tried && message ? [message] : [])
-  const basicAuthName = route.basicAuth?.middleware ?? `${route.name}-basic-auth`
   return (
     <PlanDrawer
       step={step}
@@ -118,122 +179,179 @@ export default function DomainAccessDrawer({
       title={t("domainAccess.title", host)}
       description={t("domainAccess.lead")}
       footer={
-        <div className="flex items-center justify-end gap-2">
-          {tried && changes.length === 0 ? (
-            <span className="mr-auto type-meta text-muted-foreground">
-              {t("domainAccess.nothing")}
-            </span>
-          ) : null}
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("edit.cancel")}
-          </Button>
-          <Button size="sm" onClick={review}>
-            {t("edit.review")}
-          </Button>
-        </div>
+        <ReviewFooter
+          onCancel={onClose}
+          onReview={review}
+          note={nothing ? t("domainAccess.nothing") : undefined}
+        />
       }
     >
-      <form
-        className="flex flex-col gap-6"
-        onSubmit={(event) => {
-          event.preventDefault()
-          review()
-        }}
-      >
-        <fieldset className="flex flex-col gap-3">
-          <legend className="mb-1.5 text-sm font-medium">{t("domainAccess.goes", host)}</legend>
-          <RadioGroup value={mode} onValueChange={(value) => setMode(value as typeof mode)}>
-            <RadioOption value="serve" label={t("domainAccess.serve", service.name)} />
-            <RadioOption value="redirect" label={t("domainAccess.redirect")} />
-          </RadioGroup>
-          {mode === "redirect" ? (
-            <div className="flex flex-col gap-4">
-              <FormField
-                label={t("domainAccess.to")}
-                hint={t("domainAccess.toHint")}
-                errors={shown(problems.to)}
-              >
-                <Input
-                  size="sm"
-                  mono
-                  value={to ?? was?.to ?? ""}
-                  placeholder={others[0] ?? "example.com"}
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(event) => setTo(event.target.value)}
-                />
-              </FormField>
-              <FormField label={t("domainAccess.kind")} hint={t("domainAccess.permanentHint")}>
-                <Select
-                  size="sm"
-                  value={keep ? "permanent" : "temporary"}
-                  onValueChange={(value) => setPermanent(value === "permanent")}
-                  items={[
-                    { value: "permanent", label: t("domainAccess.permanent") },
-                    { value: "temporary", label: t("domainAccess.temporary") },
-                  ]}
-                />
-              </FormField>
-            </div>
-          ) : null}
-        </fieldset>
-        <fieldset className="flex flex-col gap-3">
-          <legend className="sr-only">{t("domainAccess.password")}</legend>
-          <div className="flex items-center gap-2">
-            <Switch id={ids.auth} size="sm" checked={auth} onCheckedChange={setAuth} />
-            <Label htmlFor={ids.auth}>{t("domainAccess.password")}</Label>
-          </div>
-          <p className="type-meta text-muted-foreground">
-            {t("domainAccess.passwordHint")}
-            {others.length > 0
-              ? ` ${t("domainAccess.passwordShared", t("common.list", others))}`
-              : ""}
-          </p>
-          {auth && !changing ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="type-meta text-muted-foreground">
-                {t("domainAccess.passwordSet")}
-              </span>
-              <Button variant="outline" size="xs" onClick={() => setChanging(true)}>
-                {t("domainAccess.change")}
-              </Button>
-            </div>
-          ) : null}
-          {wantsUser ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <FormField label={t("domainAccess.username")} errors={shown(problems.username)}>
-                <Input
-                  size="sm"
-                  value={username}
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(event) => setUsername(event.target.value)}
-                />
-              </FormField>
-              <FormField label={t("domainAccess.newPassword")} errors={shown(problems.password)}>
-                <Input
-                  size="sm"
-                  type="password"
-                  value={password}
-                  autoComplete="new-password"
-                  onChange={(event) => setPassword(event.target.value)}
-                />
-              </FormField>
-            </div>
-          ) : null}
-        </fieldset>
-        <KubeDetails
-          facts={[
-            [t("domainAccess.kube.annotation"), `Ingress/${route.name} ${MIDDLEWARES}`],
-            [
-              t("domainAccess.kube.redirect"),
-              `Middleware/${redirect?.middleware ?? `${route.name}-redirect-${host.replaceAll(".", "-")}`} redirectRegex`,
-            ],
-            [t("domainAccess.kube.password"), `Middleware/${basicAuthName} basicAuth`],
-            [t("domainAccess.kube.users"), t("domainAccess.kube.usersValue", basicAuthName)],
-          ]}
+      <ReviewForm onReview={review}>
+        <RedirectFields
+          service={service}
+          host={host}
+          others={others}
+          form={redirectForm}
+          onChange={setRedirectForm}
+          shownTo={target.shown}
+          permanent={target.permanent}
+          errors={shown(problems.to)}
         />
-      </form>
+        <PasswordFields
+          others={others}
+          form={passwordForm}
+          onChange={setPasswordForm}
+          errors={{ username: shown(problems.username), password: shown(problems.password) }}
+        />
+        <AccessDetails route={route} host={host} redirect={existing?.middleware} />
+      </ReviewForm>
     </PlanDrawer>
+  )
+}
+
+function RedirectFields({
+  service,
+  host,
+  others,
+  form,
+  onChange,
+  shownTo,
+  permanent,
+  errors,
+}: {
+  service: Service
+  host: string
+  others: string[]
+  form: RedirectForm
+  onChange: (form: RedirectForm) => void
+  shownTo: string
+  permanent: boolean
+  errors: string[]
+}) {
+  const t = useT()
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="mb-1.5 text-sm font-medium">{t("domainAccess.goes", host)}</legend>
+      <RadioGroup
+        value={form.mode}
+        onValueChange={(value) => onChange({ ...form, mode: value as Mode })}
+      >
+        <RadioOption value="serve" label={t("domainAccess.serve", service.name)} />
+        <RadioOption value="redirect" label={t("domainAccess.redirect")} />
+      </RadioGroup>
+      {form.mode === "redirect" ? (
+        <div className="flex flex-col gap-4">
+          <FormField label={t("domainAccess.to")} hint={t("domainAccess.toHint")} errors={errors}>
+            <Input
+              size="sm"
+              mono
+              value={shownTo}
+              placeholder={others[0] ?? "example.com"}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(event) => onChange({ ...form, to: event.target.value })}
+            />
+          </FormField>
+          <FormField label={t("domainAccess.kind")} hint={t("domainAccess.permanentHint")}>
+            <Select
+              size="sm"
+              value={permanent ? "permanent" : "temporary"}
+              onValueChange={(value) => onChange({ ...form, permanent: value === "permanent" })}
+              items={[
+                { value: "permanent", label: t("domainAccess.permanent") },
+                { value: "temporary", label: t("domainAccess.temporary") },
+              ]}
+            />
+          </FormField>
+        </div>
+      ) : null}
+    </fieldset>
+  )
+}
+
+function PasswordFields({
+  others,
+  form,
+  onChange,
+  errors,
+}: {
+  others: string[]
+  form: PasswordForm
+  onChange: (form: PasswordForm) => void
+  errors: { username: string[]; password: string[] }
+}) {
+  const t = useT()
+  const id = useId()
+  return (
+    <fieldset className="flex flex-col gap-3">
+      <legend className="sr-only">{t("domainAccess.password")}</legend>
+      <div className="flex items-center gap-2">
+        <Switch
+          id={id}
+          size="sm"
+          checked={form.on}
+          onCheckedChange={(on) => onChange({ ...form, on })}
+        />
+        <Label htmlFor={id}>{t("domainAccess.password")}</Label>
+      </div>
+      <p className="type-meta text-muted-foreground">
+        {t("domainAccess.passwordHint")}
+        {others.length > 0 ? ` ${t("domainAccess.passwordShared", t("common.list", others))}` : ""}
+      </p>
+      {form.on && !form.changing ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="type-meta text-muted-foreground">{t("domainAccess.passwordSet")}</span>
+          <Button variant="outline" size="xs" onClick={() => onChange({ ...form, changing: true })}>
+            {t("domainAccess.change")}
+          </Button>
+        </div>
+      ) : null}
+      {form.on && form.changing ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label={t("domainAccess.username")} errors={errors.username}>
+            <Input
+              size="sm"
+              value={form.username}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(event) => onChange({ ...form, username: event.target.value })}
+            />
+          </FormField>
+          <FormField label={t("domainAccess.newPassword")} errors={errors.password}>
+            <Input
+              size="sm"
+              type="password"
+              value={form.password}
+              autoComplete="new-password"
+              onChange={(event) => onChange({ ...form, password: event.target.value })}
+            />
+          </FormField>
+        </div>
+      ) : null}
+    </fieldset>
+  )
+}
+
+function AccessDetails({
+  route,
+  host,
+  redirect,
+}: {
+  route: Schemas["Route"]
+  host: string
+  redirect?: string
+}) {
+  const t = useT()
+  const basicAuthName = route.basicAuth?.middleware ?? `${route.name}-basic-auth`
+  const redirectName = redirect ?? `${route.name}-redirect-${host.replaceAll(".", "-")}`
+  return (
+    <KubeDetails
+      facts={[
+        [t("domainAccess.kube.annotation"), `Ingress/${route.name} ${MIDDLEWARES}`],
+        [t("domainAccess.kube.redirect"), `Middleware/${redirectName} redirectRegex`],
+        [t("domainAccess.kube.password"), `Middleware/${basicAuthName} basicAuth`],
+        [t("domainAccess.kube.users"), t("domainAccess.kube.usersValue", basicAuthName)],
+      ]}
+    />
   )
 }

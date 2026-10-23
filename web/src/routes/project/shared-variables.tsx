@@ -9,7 +9,7 @@ import { projectQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { GateNote, GateTip, useGates } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
-import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
@@ -209,24 +209,9 @@ function AddDrawer({
       onClose={onClose}
       title={t("shared.addTitle")}
       description={t("shared.addLead")}
-      footer={
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("edit.cancel")}
-          </Button>
-          <Button size="sm" onClick={review}>
-            {t("edit.review")}
-          </Button>
-        </div>
-      }
+      footer={<ReviewFooter onCancel={onClose} onReview={review} />}
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          review()
-        }}
-      >
+      <ReviewForm onReview={review}>
         <FormField label={t("shared.name")} errors={shown(problems.name)}>
           <Input
             size="sm"
@@ -273,7 +258,7 @@ function AddDrawer({
             [t("shared.kube.read"), t("shared.kube.readValue")],
           ]}
         />
-      </form>
+      </ReviewForm>
     </PlanDrawer>
   )
 }
