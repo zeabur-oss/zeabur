@@ -388,7 +388,11 @@ function NodeRow({
         <div className="flex items-baseline justify-between gap-2 type-meta">
           <span className="text-muted-foreground">{title}</span>
           <span className={figureTone(bar.health)}>
-            {bar.lead !== undefined ? percent(bar.lead) : "—"}
+            {bar.lead !== undefined ? (
+              percent(bar.lead)
+            ) : (
+              <span className="text-muted-foreground">—</span>
+            )}
           </span>
         </div>
         <Meter
@@ -517,7 +521,7 @@ function NodeRow({
         <div className="flex flex-col gap-1 type-meta sm:w-16">
           <span className="text-muted-foreground">{t("pod.pods")}</span>
           <span>
-            {node.requests?.pods ?? "—"}
+            {node.requests?.pods ?? <span className="text-muted-foreground">—</span>}
             <span className="text-muted-foreground">/{node.allocatable.pods ?? "—"}</span>
           </span>
         </div>

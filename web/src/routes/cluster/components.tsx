@@ -437,7 +437,7 @@ function InstalledSection() {
               </span>
               <span className="flex min-w-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-4">
                 <span className="max-w-40 truncate type-mono sm:w-40" translate="no">
-                  {i.version ?? "—"}
+                  {i.version ?? <span className="text-muted-foreground">—</span>}
                 </span>
                 <span className="flex justify-end gap-1.5 sm:w-44">
                   {isDown(capability, i.component) ? (
