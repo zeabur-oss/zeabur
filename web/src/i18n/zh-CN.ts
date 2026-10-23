@@ -457,7 +457,8 @@ export const zhCN: Messages = {
   "join.byInstaller": "由 zeabur-installer 创建",
   "join.revoke": "撤销",
   "join.revokeTitle": (id) => `撤销加入令牌 ${id}`,
-  "join.revokeNote": "已加入的节点会保留，重启后也会用自己的证书连回集群。之后不能再用这个令牌加入新机器；节点从集群删除后，要用新的令牌才能再加入。",
+  "join.revokeNote":
+    "已加入的节点会保留，重启后也会用自己的证书连回集群。之后不能再用这个令牌加入新机器；节点从集群删除后，要用新的令牌才能再加入。",
 
   "projects.title": "项目",
   "projects.adopted": "项目",

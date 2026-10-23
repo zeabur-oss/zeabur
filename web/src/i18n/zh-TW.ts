@@ -457,7 +457,8 @@ export const zhTW: Messages = {
   "join.byInstaller": "由 zeabur-installer 建立",
   "join.revoke": "撤銷",
   "join.revokeTitle": (id) => `撤銷加入權杖 ${id}`,
-  "join.revokeNote": "已加入的節點會留著，重新開機後也會用自己的憑證連回叢集。之後不能再用這個權杖加入新機器；節點從叢集刪除後，要用新的權杖才能再加入。",
+  "join.revokeNote":
+    "已加入的節點會留著，重新開機後也會用自己的憑證連回叢集。之後不能再用這個權杖加入新機器；節點從叢集刪除後，要用新的權杖才能再加入。",
 
   "projects.title": "專案",
   "projects.adopted": "專案",
