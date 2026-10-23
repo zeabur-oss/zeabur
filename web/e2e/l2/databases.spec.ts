@@ -34,6 +34,8 @@ test.use({ actionTimeout: 30_000 })
 const suffix = Date.now().toString(36)
 const postgres = `pg-${suffix}`
 const mongo = `mongo-${suffix}`
+// Names of the run's own, so a run that stopped halfway leaves nothing in the next one's way.
+const prefix = `E2E_${suffix.toUpperCase()}`
 const engines = [
   {
     engine: "PostgreSQL",
@@ -42,8 +44,8 @@ const engines = [
     kind: "Cluster",
     secret: `${postgres}-app`,
     // A name of the Developer's own; the companions follow it.
-    variable: "E2E_DATABASE_URL",
-    variables: ["E2E_DATABASE_URL"],
+    variable: `${prefix}_DATABASE_URL`,
+    variables: [`${prefix}_DATABASE_URL`],
     resource: { group: "postgresql.cnpg.io", version: "v1", resource: "clusters" },
     backup: {
       apiVersion: "postgresql.cnpg.io/v1",
@@ -60,8 +62,8 @@ const engines = [
           name: mongo,
           kind: "PerconaServerMongoDB",
           secret: `${mongo}-secrets`,
-          variable: "E2E_MONGO_URL",
-          variables: ["E2E_MONGOPASSWORD", "E2E_MONGO_URL"],
+          variable: `${prefix}_MONGO_URL`,
+          variables: [`${prefix}_MONGOPASSWORD`, `${prefix}_MONGO_URL`],
           resource: {
             group: "psmdb.percona.com",
             version: "v1",
