@@ -974,11 +974,17 @@ fn part_of(variable: &ComposeVariable, hosts: &[String], creds: &Credentials) ->
         return Some(Part::Host);
     }
     let same = |wanted: &Option<String>| wanted.as_deref() == Some(value);
+    // The user and the password can have the same value, for example `minioadmin`.
+    // Then the variable name selects the part.
+    let secret = upper.contains("PASS") || upper.contains("SECRET");
+    if same(&creds.user)
+        && !secret
+        && (upper.contains("USER") || (creds.http && upper.contains("ACCESS")))
+    {
+        return Some(Part::User);
+    }
     if same(&creds.password) {
         return Some(Part::Password);
-    }
-    if same(&creds.user) && (upper.contains("USER") || (creds.http && upper.contains("ACCESS"))) {
-        return Some(Part::User);
     }
     if same(&creds.database)
         && (upper.contains("DB") || upper.contains("DATABASE") || upper.contains("NAME"))
@@ -1149,6 +1155,32 @@ services:
             Some(("minio".into(), Part::Password))
         );
         assert_eq!(refers(app, "S3_BUCKET"), None);
+
+        let same = convert_yaml(
+            r"
+services:
+  app:
+    image: ghcr.io/acme/app:1
+    environment:
+      S3_ACCESS_KEY_ID: minioadmin
+      S3_SECRET_ACCESS_KEY: minioadmin
+  minio:
+    image: minio/minio:RELEASE.2025-01-01T00-00-00Z
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+",
+            &[],
+        );
+        let app = find(&same, "app");
+        assert_eq!(
+            refers(app, "S3_ACCESS_KEY_ID"),
+            Some(("minio".into(), Part::User))
+        );
+        assert_eq!(
+            refers(app, "S3_SECRET_ACCESS_KEY"),
+            Some(("minio".into(), Part::Password))
+        );
     }
 
     #[test]
