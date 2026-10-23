@@ -20,6 +20,8 @@ pub enum Engine {
     MariaDb,
     /// Dragonfly, a Redis-compatible store.
     Dragonfly,
+    /// `SeaweedFS`, an S3-compatible object store.
+    SeaweedFs,
 }
 
 impl Engine {
@@ -32,6 +34,7 @@ impl Engine {
             Self::MySql => "MySQL",
             Self::MariaDb => "MariaDB",
             Self::Dragonfly => "Dragonfly",
+            Self::SeaweedFs => "SeaweedFS",
         }
     }
 }
@@ -53,7 +56,7 @@ struct DatabaseOwner {
 /// The Crunchy Data label on each StatefulSet holding a PostgreSQL instance's data.
 const CRUNCHY_DATA_LABEL: &str = "postgres-operator.crunchydata.com/data";
 
-const DATABASE_OWNERS: [DatabaseOwner; 9] = [
+const DATABASE_OWNERS: [DatabaseOwner; 10] = [
     // CloudNativePG's pods and Jobs belong to the `Cluster` itself, with no StatefulSet between.
     DatabaseOwner {
         group: "postgresql.cnpg.io",
@@ -118,6 +121,13 @@ const DATABASE_OWNERS: [DatabaseOwner; 9] = [
         engine: Engine::Dragonfly,
         data_label: None,
     },
+    DatabaseOwner {
+        group: "seaweed.seaweedfs.com",
+        kind: "Seaweed",
+        shown_kind: "Seaweed",
+        engine: Engine::SeaweedFs,
+        data_label: None,
+    },
 ];
 
 /// Labels on the controller Deployments of known database operators, whose charts set no
@@ -128,7 +138,7 @@ const OPERATOR_LABELS: [&str; 2] = [
 ];
 
 /// `app.kubernetes.io/name` values of known database operators.
-const OPERATOR_NAMES: [&str; 13] = [
+const OPERATOR_NAMES: [&str; 14] = [
     "cloudnative-pg",
     "plugin-barman-cloud",
     "psmdb-operator",
@@ -142,6 +152,7 @@ const OPERATOR_NAMES: [&str; 13] = [
     "mariadb-operator-webhook",
     "mariadb-operator-cert-controller",
     "dragonfly-operator",
+    "seaweedfs-operator",
 ];
 
 /// The database cluster a workload belongs to.

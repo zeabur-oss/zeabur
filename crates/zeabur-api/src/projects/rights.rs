@@ -37,6 +37,9 @@ pub struct ProjectRights {
     pub change_databases: Permission,
     /// Back up databases: `create` on an operator's backups.
     pub back_up_databases: Permission,
+    /// Create, change and delete object storage: `create`, `patch` and `delete` on the `SeaweedFS`
+    /// Operator's seaweeds.
+    pub change_object_storage: Permission,
     /// Open a terminal in a container: `create` on `pods/exec`.
     pub open_terminal: Permission,
     /// Read the pods' logs: `get` on `pods/log`.
@@ -108,6 +111,7 @@ const PSMDB: &str = "psmdb.percona.com";
 const MOCO: &str = "moco.cybozu.com";
 const MARIADB: &str = "k8s.mariadb.com";
 const DRAGONFLY: &str = "dragonflydb.io";
+const SEAWEED: &str = "seaweed.seaweedfs.com";
 
 impl ProjectRights {
     /// Every right unknown: the review could not be made.
@@ -126,6 +130,7 @@ impl ProjectRights {
             change_storage: u,
             change_databases: u,
             back_up_databases: u,
+            change_object_storage: u,
             open_terminal: u,
             read_logs: u,
             build: u,
@@ -172,6 +177,7 @@ impl ProjectRights {
                 ask.can("create", MOCO, "backuppolicies"),
                 ask.can("create", MARIADB, "backups"),
             ]),
+            change_object_storage: ask.every(&change, SEAWEED, "seaweeds"),
             open_terminal: ask.can("create", "", "pods/exec"),
             read_logs: ask.can("get", "", "pods/log"),
             build: ask.can("patch", "builder.zeabur.com", "builds"),
@@ -243,6 +249,7 @@ mod tests {
                     change_storage: allowed,
                     change_databases: allowed,
                     back_up_databases: allowed,
+                    change_object_storage: allowed,
                     open_terminal: allowed,
                     read_logs: allowed,
                     build: allowed,

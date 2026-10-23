@@ -86,6 +86,11 @@ zeabur-project-viewer:
   - apiGroups: [dragonflydb.io]
     resources: [dragonflies]
     verbs: [get, list, watch]
+  # Object storage: the SeaweedFS Operator's stores, buckets and access keys. The keys themselves
+  # are in Secrets.
+  - apiGroups: [seaweed.seaweedfs.com]
+    resources: [seaweeds, buckets, s3identities, s3credentials, s3policies, s3policybindings]
+    verbs: [get, list, watch]
   # Notification channels: which events go where. Their URLs and tokens stay in Secrets.
   - apiGroups: [operator.victoriametrics.com]
     resources: [vmalertmanagerconfigs]
@@ -190,6 +195,9 @@ zeabur-project-developer:
     verbs: [get, list, watch]
   - apiGroups: [dragonflydb.io]
     resources: [dragonflies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [seaweed.seaweedfs.com]
+    resources: [seaweeds, buckets, s3identities, s3credentials, s3policies, s3policybindings]
     verbs: [get, list, watch, create, update, patch, delete]
   # Notification channels. A channel's receivers only see alerts of this namespace: the operator
   # adds that matcher to every config.

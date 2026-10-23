@@ -45,6 +45,7 @@ pub mod deploy_keys;
 pub(crate) mod events;
 pub mod namespace;
 pub mod network_policy;
+pub mod object_storage;
 pub mod rights;
 pub mod storage;
 pub mod usage;

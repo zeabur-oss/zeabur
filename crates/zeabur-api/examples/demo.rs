@@ -939,6 +939,13 @@ fn lab() -> NamespaceObjects {
                 operated("dragonflydb.io/v1alpha1", "Dragonfly", "dragonfly-mvjrswvl"),
                 "dragonfly",
             ),
+            member(
+                "files-mvjrswvl-s3-7d9f6c5b8-x2k4p",
+                json!({"app.kubernetes.io/name": "seaweedfs",
+                    "app.kubernetes.io/instance": "files-mvjrswvl", "app.kubernetes.io/component": "s3"}),
+                operated("seaweed.seaweedfs.com/v1", "Seaweed", "files-mvjrswvl"),
+                "s3",
+            ),
             from(json!({
                 "metadata": {"name": "pg-mvjrswvl-1", "namespace": ns,
                     "labels": {"cnpg.io/cluster": "pg-mvjrswvl", "cnpg.io/instanceRole": "primary"},
@@ -961,6 +968,7 @@ fn lab() -> NamespaceObjects {
             "mysql-mvjrswvl-app",
             "mariadb-mvjrswvl-app",
             "dragonfly-mvjrswvl-auth",
+            "files-mvjrswvl-app",
         ]
         .into_iter()
         .map(|name| SecretSummary {
@@ -1725,6 +1733,48 @@ fn state() -> State {
                 "Dragonfly",
                 true,
             ),
+            ServedResource::readable(
+                "seaweed.seaweedfs.com",
+                "v1",
+                "seaweeds",
+                "Seaweed",
+                true,
+            ),
+            ServedResource::readable(
+                "seaweed.seaweedfs.com",
+                "v1",
+                "buckets",
+                "Bucket",
+                true,
+            ),
+            ServedResource::readable(
+                "seaweed.seaweedfs.com",
+                "v1",
+                "s3identities",
+                "S3Identity",
+                true,
+            ),
+            ServedResource::readable(
+                "seaweed.seaweedfs.com",
+                "v1",
+                "s3credentials",
+                "S3Credentials",
+                true,
+            ),
+            ServedResource::readable(
+                "seaweed.seaweedfs.com",
+                "v1",
+                "s3policies",
+                "S3Policy",
+                true,
+            ),
+            ServedResource::readable(
+                "seaweed.seaweedfs.com",
+                "v1",
+                "s3policybindings",
+                "S3PolicyBinding",
+                true,
+            ),
             ServedResource::readable("batch", "v1", "jobs", "Job", true),
             ServedResource::readable(
                 "postgresql.cnpg.io",
@@ -1978,6 +2028,37 @@ fn state() -> State {
                         "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
                         "resources": {"requests": {"storage": "2Gi"}}}}},
                 "status": {"phase": "Ready"}
+            })),
+            from(json!({
+                "apiVersion": "seaweed.seaweedfs.com/v1", "kind": "Seaweed",
+                "metadata": {"name": "files-mvjrswvl", "namespace": "lab",
+                    "creationTimestamp": created("files-mvjrswvl")},
+                "spec": {"image": "chrislusf/seaweedfs:4.48", "volumeServerDiskCount": 1,
+                    "master": {"replicas": 1, "persistence": {"enabled": true}},
+                    "volume": {"replicas": 1, "requests": {"storage": "10Gi"}},
+                    "filer": {"replicas": 1, "persistence": {"enabled": true}},
+                    "s3": {"replicas": 1}},
+                "status": {"conditions": [{"type": "Ready", "status": "True", "reason": "Ready",
+                        "message": "Seaweed cluster is ready"}],
+                    "master": {"replicas": 1, "readyReplicas": 1},
+                    "volume": {"replicas": 1, "readyReplicas": 1},
+                    "filer": {"replicas": 1, "readyReplicas": 1},
+                    "s3": {"replicas": 1, "readyReplicas": 1}}
+            })),
+            from(json!({
+                "apiVersion": "seaweed.seaweedfs.com/v1", "kind": "S3Credentials",
+                "metadata": {"name": "files-mvjrswvl-app", "namespace": "lab"},
+                "spec": {"seaweedRef": {"name": "files-mvjrswvl"},
+                    "identityRef": {"name": "files-mvjrswvl-app"}},
+                "status": {"phase": "Ready", "accessKey": "ZK4Q8N2M7RXW", "identityName": "files-mvjrswvl-app",
+                    "secretName": "files-mvjrswvl-app"}
+            })),
+            from(json!({
+                "apiVersion": "seaweed.seaweedfs.com/v1", "kind": "Bucket",
+                "metadata": {"name": "uploads", "namespace": "lab"},
+                "spec": {"clusterRef": {"name": "files-mvjrswvl"}, "reclaimPolicy": "Delete"},
+                "status": {"phase": "Ready", "bucketName": "uploads",
+                    "usage": {"sizeBytes": 734003200, "objectCount": 1284}}
             })),
             from(json!({
                 "apiVersion": "upgrade.cattle.io/v1", "kind": "Plan",

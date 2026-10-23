@@ -64,6 +64,8 @@ use crate::rules::{
 ///   and `PerconaServerMongoDBBackup`, MOCO's `MySQLCluster` and `BackupPolicy`, mariadb-operator's
 ///   `MariaDB` and `Backup`, the Dragonfly Operator's `Dragonfly`, and the Secret holding the
 ///   backup bucket's access keys or the database's passwords;
+/// - object storage: the `SeaweedFS` Operator's `Seaweed`, `Bucket`, and the `S3Identity`,
+///   `S3Credentials`, `S3Policy` and `S3PolicyBinding` that give services an access key;
 /// - a restore into a new database: Percona's `PerconaServerMongoDBRestore` (the other operators
 ///   restore from fields of the new database);
 /// - a service from a container image: its Deployment, Service, Ingress, volume claim and Secrets;
@@ -108,6 +110,16 @@ pub const CREATABLE: &[(&str, &str, &str)] = &[
     ("k8s.mariadb.com/v1alpha1", "MariaDB", "mariadbs"),
     ("k8s.mariadb.com/v1alpha1", "Backup", "backups"),
     ("dragonflydb.io/v1alpha1", "Dragonfly", "dragonflies"),
+    ("seaweed.seaweedfs.com/v1", "Seaweed", "seaweeds"),
+    ("seaweed.seaweedfs.com/v1", "Bucket", "buckets"),
+    ("seaweed.seaweedfs.com/v1", "S3Identity", "s3identities"),
+    ("seaweed.seaweedfs.com/v1", "S3Credentials", "s3credentials"),
+    ("seaweed.seaweedfs.com/v1", "S3Policy", "s3policies"),
+    (
+        "seaweed.seaweedfs.com/v1",
+        "S3PolicyBinding",
+        "s3policybindings",
+    ),
 ];
 
 /// The plural of a kind [`CREATABLE`] lists.

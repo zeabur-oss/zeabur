@@ -1923,6 +1923,30 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage":
+    get:
+      tags:
+      - projects
+      summary: The object storage of a project, read as the person.
+      operationId: getProjectObjectStorage
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectObjectStorage"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/objects":
     get:
       tags:
@@ -12481,6 +12505,31 @@ components:
               Which Deployments, StatefulSets and DaemonSets the person may patch (change their
               variables).
       description: A project's Namespace.
+    ProjectObjectStorage:
+      type: object
+      description: A project's object storage.
+      required:
+      - module
+      - state
+      - items
+      - unreadable
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeaweedObjectStorage"
+          description: The stores, by name.
+        module:
+          type: string
+          description: The operator's module (`seaweedfs-operator`).
+        state:
+          $ref: "#/components/schemas/ProviderState"
+          description: Whether its objects could be read.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
     ProjectRights:
       type: object
       description: What the person may change in one project.
@@ -12496,6 +12545,7 @@ components:
       - changeStorage
       - changeDatabases
       - backUpDatabases
+      - changeObjectStorage
       - openTerminal
       - readLogs
       - build
@@ -12524,6 +12574,11 @@ components:
         changeNetworkPolicies:
           $ref: "#/components/schemas/Permission"
           description: "Change network policies: `create` and `patch` on networkpolicies."
+        changeObjectStorage:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Create, change and delete object storage: `create`, `patch` and `delete` on the `SeaweedFS`
+            Operator's seaweeds.
         changeSecrets:
           $ref: "#/components/schemas/Permission"
           description: "Create and change Secrets: `create` and `patch` on secrets."
@@ -13470,6 +13525,167 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
+    SeaweedAccessKey:
+      type: object
+      description: The access key services use, from an `S3Credentials` of the store.
+      required:
+      - name
+      - user
+      properties:
+        accessKey:
+          type:
+          - string
+          - "null"
+          description: The access key ID, once the operator made it; it is not secret.
+        name:
+          type: string
+          description: The `S3Credentials` object's name.
+        phase:
+          type:
+          - string
+          - "null"
+          description: "`Pending`, `Ready`, `Failed` or `Terminating`, as the operator says."
+        user:
+          type: string
+          description: The IAM user it belongs to.
+    SeaweedBucket:
+      type: object
+      description: One bucket.
+      required:
+      - origin
+      - name
+      - bucket
+      - deletesContents
+      properties:
+        bucket:
+          type: string
+          description: The S3 bucket name.
+        deletesContents:
+          type: boolean
+          description: Deleting the object deletes the bucket and its contents.
+        message:
+          type:
+          - string
+          - "null"
+          description: The message of a condition that is not true, when there is one.
+        name:
+          type: string
+          description: The object's name.
+        objects:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: The objects stored, as last counted.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `Bucket` object.
+        phase:
+          type:
+          - string
+          - "null"
+          description: "`Pending`, `Ready`, `Failed` or `Terminating`, as the operator says."
+        usedBytes:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: The bytes stored, as last counted.
+    SeaweedObjectStorage:
+      type: object
+      description: One object store.
+      required:
+      - origin
+      - name
+      - state
+      - members
+      - ready
+      - claims
+      - buckets
+      - object
+      - pods
+      properties:
+        accessKey:
+          oneOf:
+          - $ref: "#/components/schemas/SeaweedAccessKey"
+            description: The access key services use; absent when the store has none.
+          - type: "null"
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeaweedBucket"
+          description: Its buckets, by name.
+        claims:
+          type: array
+          items:
+            type: string
+          description: |-
+            Its PersistentVolumeClaims, as the operator names them. The operator keeps them when the
+            store is deleted.
+        connection:
+          oneOf:
+          - $ref: "#/components/schemas/DatabaseConnection"
+            description: |-
+              Where to connect, inside the cluster, and the Secret with the access key. Absent until the
+              store has an access key.
+          - type: "null"
+        created:
+          type:
+          - string
+          - "null"
+          description: When it was created, RFC 3339.
+        image:
+          type:
+          - string
+          - "null"
+          description: The `SeaweedFS` image.
+        members:
+          type: integer
+          format: int64
+          description: Pods asked for, over the master, volume servers, filer and S3 gateway.
+        message:
+          type:
+          - string
+          - "null"
+          description: The operator's message, when it is not ready.
+        name:
+          type: string
+          description: Its name.
+        object:
+          type: object
+          description: The object as written, without `status` and `managedFields`.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `Seaweed` object.
+        pods:
+          type: array
+          items:
+            $ref: "#/components/schemas/PodSummary"
+          description: Its pods, by name; empty when they cannot be read.
+        ready:
+          type: integer
+          format: int64
+          description: Pods ready.
+        state:
+          $ref: "#/components/schemas/DatabaseState"
+          description: How it is.
+        storage:
+          type:
+          - string
+          - "null"
+          description: The size of each volume server's disk, as asked for.
+        storageClass:
+          type:
+          - string
+          - "null"
+          description: >-
+            The `StorageClass` of the volume servers' disks; absent for the cluster's
+            default.
+        version:
+          type:
+          - string
+          - "null"
+          description: The `SeaweedFS` version, from the image tag.
     SecretValue:
       type: object
       description: One value of a revealed Secret.

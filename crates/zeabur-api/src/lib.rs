@@ -290,6 +290,7 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(notifications::project_apply))
         .routes(routes!(alerts::project))
         .routes(routes!(projects::databases::get))
+        .routes(routes!(projects::object_storage::get))
         .routes(routes!(projects::database_export::export))
         .routes(routes!(projects::builds::get))
         .routes(routes!(projects::deploy_keys::create))

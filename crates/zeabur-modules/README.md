@@ -57,6 +57,7 @@ reads) and `zeabur-adapters` (for label selectors). Only the crates that compose
 | `moco` | mysql | `moco.cybozu.com/v1beta2` mysqlclusters, backuppolicies |
 | `mariadb-operator` | mariadb | `k8s.mariadb.com/v1alpha1` mariadbs, backups |
 | `dragonfly-operator` | redis | `dragonflydb.io/v1alpha1` dragonflies |
+| `seaweedfs-operator` | object-storage | `seaweed.seaweedfs.com/v1` seaweeds, buckets, s3credentials |
 | `zeabur-builder` | builds | `builder.zeabur.com/v1alpha1` builds, buildruns |
 | `alertmanager` | notifications | `operator.victoriametrics.com/v1beta1` vmalertmanagerconfigs (the channels), vmrules (whether Zeabur's rules are installed) |
 

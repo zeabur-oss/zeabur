@@ -17,6 +17,7 @@ pub mod network_policy;
 pub mod percona_mongodb;
 pub mod prometheus_api;
 pub mod reloader;
+pub mod seaweedfs;
 pub mod system_upgrade_controller;
 pub mod velero;
 pub mod zeabur_builder;
@@ -128,6 +129,7 @@ pub fn modules() -> Vec<&'static Module> {
         &moco::MODULE,
         &mariadb_operator::MODULE,
         &dragonfly::MODULE,
+        &seaweedfs::MODULE,
         &zeabur_builder::MODULE,
         &alertmanager::MODULE,
     ]
