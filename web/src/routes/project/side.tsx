@@ -57,6 +57,7 @@ import {
   type Service,
 } from "@/model/service"
 import { folded, serviceOf, type Alert } from "@/model/alerts"
+import { entryTone, severity } from "@/model/severity"
 import { refusedPlaces } from "@/routes/project/data"
 import { FilterBox } from "@/routes/project/filter-box"
 import { MeterStack, meterPartTone } from "@zeabur/design-system/components/meter"
@@ -93,13 +94,6 @@ function Heading({
 const ACTIVITY_SHOWN = 12
 
 type Entry = Schemas["TimelineEntry"]
-
-export const entryTone = {
-  release: "brand",
-  write: "neutral",
-  warning: "warn",
-  termination: "fail",
-} as const
 
 /** Who wrote it: the tool by name, or the field manager when no tool is known. */
 export const writerOf = (t: Translate, writer: Entry["writer"]) =>
@@ -312,7 +306,7 @@ function EventEntries({
       {events.map((event) => (
         <TimelineItem
           key={event.id}
-          tone={isWarning(event) ? "warn" : "neutral"}
+          tone={isWarning(event) ? severity.warningEvent : "neutral"}
           time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
           title={
             <span>

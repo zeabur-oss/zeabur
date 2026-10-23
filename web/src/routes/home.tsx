@@ -43,6 +43,7 @@ import {
   type Health,
   type Service,
 } from "@/model/service"
+import { severity } from "@/model/severity"
 import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { AttentionRow, useAttention, type ClusterItem } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
@@ -603,7 +604,7 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
                     className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 border-t border-rule py-2.5 md:grid md:grid-cols-warning"
                   >
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <StatusDot health="warn" className="shrink-0" />
+                      <StatusDot health={severity.warningEvent} className="shrink-0" />
                       {row.namespace ? (
                         <>
                           <Link

@@ -10,6 +10,7 @@ import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { eventWord } from "@/model/overview"
 import { isWarning, newestFirst, type Event } from "@/model/service"
+import { severity } from "@/model/severity"
 
 export function EventList({
   events,
@@ -61,7 +62,7 @@ export function EventList({
           place && "absolute inset-x-0 top-0 translate-y-(--y)",
         )}
       >
-        <StatusDot health={warning ? "warn" : "idle"} className="mt-1.5" />
+        <StatusDot health={warning ? severity.warningEvent : "idle"} className="mt-1.5" />
         <div className="flex min-w-0 flex-col gap-0.5">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 text-sm">
             <span className="font-semibold">

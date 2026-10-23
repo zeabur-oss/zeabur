@@ -41,7 +41,8 @@ import {
   weekOf,
   type ChangeEntry,
 } from "@/model/changes"
-import { entryTone, writerOf } from "@/routes/project/side"
+import { entryTone, severity } from "@/model/severity"
+import { writerOf } from "@/routes/project/side"
 import { imageTag, isTask, type Event, type Service } from "@/model/service"
 
 type Release = Schemas["WorkloadRelease"]
@@ -206,7 +207,7 @@ function Entry({
   if (entry.kind === "warning")
     return (
       <TimelineItem
-        tone="warn"
+        tone={severity.warningEvent}
         time={time}
         title={
           <span translate="no">
