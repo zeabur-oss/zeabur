@@ -20,6 +20,7 @@ import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { FormField } from "@/components/form-field"
 import { Freshness } from "@/components/freshness"
 import { GateTip, useGate } from "@/components/gate"
+import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
@@ -302,6 +303,16 @@ function Overview({ project, database }: { project: string; database: Database }
           </AlertDescription>
         </Alert>
       ) : null}
+      <KubeDetails
+        facts={[
+          [
+            t("db.fact.members"),
+            `${database.kind}/${database.name} ${
+              database.engine === "postgresql" ? "spec.instances" : "spec.replsets[].size"
+            }`,
+          ],
+        ]}
+      />
       <Connection project={project} database={database} />
       <Commands project={project} database={database} />
     </div>

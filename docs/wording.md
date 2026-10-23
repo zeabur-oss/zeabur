@@ -157,6 +157,7 @@ why. Add a row before introducing a new concept.
 | node | 節點 | 节点 | |
 | namespace | Namespace | Namespace | Kubernetes kind, as the dashboard writes it |
 | replica | 副本 | 副本 | |
+| instance (a database's server: CNPG `spec.instances`, a replica set's `size`) | 執行個體 | 实例 | Never 成員, which names a person on the Members page |
 | container | 容器 | 容器 | |
 | image | 映像檔 | 镜像 | |
 | volume | 磁碟區 | 卷 | The dashboard also says 硬碟／硬盘; a claim is not a disk |
