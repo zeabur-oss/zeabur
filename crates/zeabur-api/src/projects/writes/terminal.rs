@@ -85,6 +85,7 @@ pub(crate) async fn compute(
         | Change::Probe { .. }
         | Change::Image { .. }
         | Change::Rebuild { .. }
+        | Change::BuildOptions(_)
         | Change::AutoUpdate { .. }
         | Change::Scale { .. }
         | Change::ConfigReload { .. }

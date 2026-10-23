@@ -1,0 +1,6 @@
+description: "A directory with a segment that starts with a dot could climb out of the repository; the plan refuses it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: buildOptions, build: web, contextDir: apps/../../etc}

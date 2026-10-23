@@ -2364,6 +2364,23 @@ export interface components {
      * @enum {string}
      */
     BlockerKind: "quota" | "node"
+    /** @description A [`Change::BuildOptions`]. A field left out stays as it is. */
+    BuildOptionsChange: {
+      /** @description The `Build`. */
+      build: string
+      /**
+       * @description The build context inside the repository, `spec.source.git.contextDir`. Empty: the
+       *     repository's root.
+       */
+      contextDir?: string | null
+      /** @description The Dockerfile, relative to the context, `spec.source.git.dockerfile`. Empty: `Dockerfile`. */
+      dockerfile?: string | null
+      /**
+       * @description The build variables to set or remove, `spec.env`. A value from a Secret names only
+       *     `secretName` and `key`.
+       */
+      env?: components["schemas"]["EnvEdit"][]
+    }
     /**
      * @description Where a service deployed from Git keeps its images, as an administrator installed Zeabur (the
      *     chart's `builds`).
@@ -2581,6 +2598,10 @@ export interface components {
           /** @enum {string} */
           op: "rebuild"
         }
+      | (components["schemas"]["BuildOptionsChange"] & {
+          /** @enum {string} */
+          op: "buildOptions"
+        })
       | {
           /** @description The `Build` whose new images Keel is told of, when turning it on. */
           build?: string | null
@@ -7880,8 +7901,14 @@ export interface components {
     ZeaburBuilderBuild: {
       /** @description The `ClusterBuilder`. */
       builder?: string | null
+      /** @description The build context inside the repository; none for its root. */
+      contextDir?: string | null
       /** @description The Secret it reads the repository's credentials from. */
       credentials?: string | null
+      /** @description The Dockerfile, relative to the context; none for `Dockerfile`. */
+      dockerfile?: string | null
+      /** @description The build variables, by name. A literal value is left out. */
+      env: components["schemas"]["ZeaburBuilderEnv"][]
       /** @description The branch or tag it follows; `HEAD` (or none) follows the repository's default branch. */
       gitRef?: string | null
       /** @description The Git repository. */
@@ -7917,6 +7944,15 @@ export interface components {
       resolvedRef?: string | null
       /** @description Whether builds are paused. */
       suspended: boolean
+    }
+    /** @description A build variable of a `Build`. */
+    ZeaburBuilderEnv: {
+      /** @description The key in that Secret. */
+      key?: string | null
+      /** @description The name. */
+      name: string
+      /** @description The Secret the value comes from; none for a literal value. */
+      secret?: string | null
     }
     /**
      * @description A `Build` that cannot build: the ref cannot be resolved (`SourceReady`) or its

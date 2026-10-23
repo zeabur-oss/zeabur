@@ -4335,6 +4335,34 @@ components:
       enum:
       - quota
       - node
+    BuildOptionsChange:
+      type: object
+      description: A [`Change::BuildOptions`]. A field left out stays as it is.
+      required:
+      - build
+      properties:
+        build:
+          type: string
+          description: The `Build`.
+        contextDir:
+          type:
+          - string
+          - "null"
+          description: |-
+            The build context inside the repository, `spec.source.git.contextDir`. Empty: the
+            repository's root.
+        dockerfile:
+          type:
+          - string
+          - "null"
+          description: "The Dockerfile, relative to the context, `spec.source.git.dockerfile`. Empty: `Dockerfile`."
+        env:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvEdit"
+          description: |-
+            The build variables to set or remove, `spec.env`. A value from a Secret names only
+            `secretName` and `key`.
     BuildSettings:
       type: object
       description: |-
@@ -4822,6 +4850,22 @@ components:
             type: string
             enum:
             - rebuild
+      - allOf:
+        - $ref: "#/components/schemas/BuildOptionsChange"
+          description: |-
+            Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
+            variables (see the `builds` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - buildOptions
+        description: |-
+          Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
+          variables (see the `builds` module).
       - type: object
         description: >-
           Have Keel move a workload to each new image, or stop it (see the `builds`
@@ -15126,6 +15170,7 @@ components:
       description: A `Build`.
       required:
       - name
+      - env
       - suspended
       - keelWebhooks
       properties:
@@ -15134,11 +15179,26 @@ components:
           - string
           - "null"
           description: The `ClusterBuilder`.
+        contextDir:
+          type:
+          - string
+          - "null"
+          description: The build context inside the repository; none for its root.
         credentials:
           type:
           - string
           - "null"
           description: The Secret it reads the repository's credentials from.
+        dockerfile:
+          type:
+          - string
+          - "null"
+          description: The Dockerfile, relative to the context; none for `Dockerfile`.
+        env:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZeaburBuilderEnv"
+          description: The build variables, by name. A literal value is left out.
         gitRef:
           type:
           - string
@@ -15216,6 +15276,25 @@ components:
         suspended:
           type: boolean
           description: Whether builds are paused.
+    ZeaburBuilderEnv:
+      type: object
+      description: A build variable of a `Build`.
+      required:
+      - name
+      properties:
+        key:
+          type:
+          - string
+          - "null"
+          description: The key in that Secret.
+        name:
+          type: string
+          description: The name.
+        secret:
+          type:
+          - string
+          - "null"
+          description: The Secret the value comes from; none for a literal value.
     ZeaburBuilderProblem:
       type: object
       description: |-

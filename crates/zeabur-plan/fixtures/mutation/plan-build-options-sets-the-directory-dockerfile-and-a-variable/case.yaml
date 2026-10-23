@@ -1,0 +1,11 @@
+description: "Build options replace the directory, keep an unchanged Dockerfile and add a variable read from a Secret key."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: buildOptions
+        build: web
+        contextDir: apps/site
+        dockerfile: Dockerfile.prod
+        env:
+          - {op: set, name: SENTRY_TOKEN, valueFrom: {secretName: web-build-env, key: SENTRY_TOKEN}}

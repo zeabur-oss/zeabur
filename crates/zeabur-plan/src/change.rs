@@ -176,6 +176,9 @@ pub enum Change {
         /// The `Build`.
         build: String,
     },
+    /// Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
+    /// variables (see the `builds` module).
+    BuildOptions(BuildOptionsChange),
     /// Have Keel move a workload to each new image, or stop it (see the `builds` module).
     #[serde(rename_all = "camelCase")]
     AutoUpdate {
@@ -446,6 +449,26 @@ pub struct EnvImportChange {
     /// Stop importing it instead.
     #[serde(default)]
     pub remove: bool,
+}
+
+/// A [`Change::BuildOptions`]. A field left out stays as it is.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct BuildOptionsChange {
+    /// The `Build`.
+    pub build: String,
+    /// The build context inside the repository, `spec.source.git.contextDir`. Empty: the
+    /// repository's root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_dir: Option<String>,
+    /// The Dockerfile, relative to the context, `spec.source.git.dockerfile`. Empty: `Dockerfile`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dockerfile: Option<String>,
+    /// The build variables to set or remove, `spec.env`. A value from a Secret names only
+    /// `secretName` and `key`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub env: Vec<EnvEdit>,
 }
 
 /// A [`Change::PublicPort`].

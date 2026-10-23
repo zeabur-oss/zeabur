@@ -1,0 +1,6 @@
+description: "An empty Dockerfile removes the field, so the builder takes Dockerfile; a removed variable leaves the Build."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: buildOptions, build: web, dockerfile: "", env: [{op: remove, name: NPM_TOKEN}]}

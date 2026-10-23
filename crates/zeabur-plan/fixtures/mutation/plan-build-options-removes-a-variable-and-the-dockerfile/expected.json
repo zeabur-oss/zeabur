@@ -1,0 +1,17 @@
+{
+  "objects": [
+    {
+      "target": {"apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build", "name": "web", "plural": "builds"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/generation", "value": 2},
+          {"op": "test", "path": "/spec/source/git/dockerfile", "value": "Dockerfile.prod"},
+          {"op": "remove", "path": "/spec/source/git/dockerfile"},
+          {"op": "test", "path": "/spec/env/0/name", "value": "NPM_TOKEN"},
+          {"op": "remove", "path": "/spec/env/0"}
+        ]
+      }
+    }
+  ]
+}

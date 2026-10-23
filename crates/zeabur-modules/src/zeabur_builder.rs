@@ -61,6 +61,12 @@ pub struct ZeaburBuilderBuild {
     pub resolved_ref: Option<String>,
     /// The Secret it reads the repository's credentials from.
     pub credentials: Option<String>,
+    /// The build context inside the repository; none for its root.
+    pub context_dir: Option<String>,
+    /// The Dockerfile, relative to the context; none for `Dockerfile`.
+    pub dockerfile: Option<String>,
+    /// The build variables, by name. A literal value is left out.
+    pub env: Vec<ZeaburBuilderEnv>,
     /// The `ClusterBuilder`.
     pub builder: Option<String>,
     /// Whether builds are paused.
@@ -83,6 +89,37 @@ pub struct ZeaburBuilderBuild {
     pub keel_webhooks: Vec<String>,
     /// The value of the rebuild annotation, when set.
     pub rebuild_requested: Option<String>,
+}
+
+/// A build variable of a `Build`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ZeaburBuilderEnv {
+    /// The name.
+    pub name: String,
+    /// The Secret the value comes from; none for a literal value.
+    pub secret: Option<String>,
+    /// The key in that Secret.
+    pub key: Option<String>,
+}
+
+fn env(object: &DynamicObject) -> Vec<ZeaburBuilderEnv> {
+    object
+        .data
+        .pointer("/spec/env")
+        .and_then(serde_json::Value::as_array)
+        .map_or_else(Vec::new, |env| {
+            env.iter()
+                .filter_map(|e| {
+                    let from = e.pointer("/valueFrom/secretKeyRef");
+                    Some(ZeaburBuilderEnv {
+                        name: e["name"].as_str()?.to_owned(),
+                        secret: field(from, "name"),
+                        key: field(from, "key"),
+                    })
+                })
+                .collect()
+        })
 }
 
 /// A `Build` that cannot build: the ref cannot be resolved (`SourceReady`) or its
@@ -205,6 +242,9 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                 git_ref: text(b, "/spec/source/git/ref"),
                 resolved_ref: text(b, "/status/resolvedRef"),
                 credentials: text(b, "/spec/source/credentialsRef/name"),
+                context_dir: text(b, "/spec/source/git/contextDir"),
+                dockerfile: text(b, "/spec/source/git/dockerfile"),
+                env: env(b),
                 builder: text(b, "/spec/builderRef"),
                 suspended: b
                     .data
@@ -359,6 +399,43 @@ mod tests {
         );
         assert_eq!(repository("nginx:1.27"), "nginx");
         assert_eq!(repository("nginx@sha256:00"), "nginx");
+    }
+
+    #[test]
+    fn build_options_show_variable_names_but_never_a_literal_value() {
+        let build = object(serde_json::json!({
+            "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+            "metadata": {"name": "web", "namespace": "demo"},
+            "spec": {"builderRef": "dockerfile",
+                "source": {"git": {"url": "https://example.com/acme/web",
+                    "contextDir": "apps/web", "dockerfile": "Dockerfile.prod"}},
+                "env": [{"name": "NODE_ENV", "value": "production"},
+                        {"name": "NPM_TOKEN", "valueFrom": {"secretKeyRef":
+                            {"name": "web-build-env", "key": "NPM_TOKEN"}}}]}
+        }));
+        let found = builds(&[build], None);
+        assert_eq!(found[0].context_dir.as_deref(), Some("apps/web"));
+        assert_eq!(found[0].dockerfile.as_deref(), Some("Dockerfile.prod"));
+        assert_eq!(
+            found[0].env,
+            [
+                ZeaburBuilderEnv {
+                    name: "NODE_ENV".to_owned(),
+                    secret: None,
+                    key: None
+                },
+                ZeaburBuilderEnv {
+                    name: "NPM_TOKEN".to_owned(),
+                    secret: Some("web-build-env".to_owned()),
+                    key: Some("NPM_TOKEN".to_owned()),
+                },
+            ]
+        );
+        assert!(
+            !serde_json::to_string(&found[0])
+                .unwrap()
+                .contains("production")
+        );
     }
 
     #[test]

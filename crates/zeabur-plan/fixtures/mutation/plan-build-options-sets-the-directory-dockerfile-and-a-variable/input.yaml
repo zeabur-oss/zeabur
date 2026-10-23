@@ -1,0 +1,14 @@
+apiVersion: builder.zeabur.com/v1alpha1
+kind: Build
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "7"
+  generation: 2
+spec:
+  source:
+    git: {url: https://example.com/acme/web, ref: main, contextDir: apps/web, dockerfile: Dockerfile.prod}
+  builderRef: dockerfile
+  env:
+    - name: NPM_TOKEN
+      valueFrom: {secretKeyRef: {name: web-build-env, key: NPM_TOKEN}}
