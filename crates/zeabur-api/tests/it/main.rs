@@ -14,6 +14,7 @@ mod durability;
 mod evidence;
 mod exec;
 mod files;
+mod images;
 mod incidents;
 mod join;
 mod log_history;

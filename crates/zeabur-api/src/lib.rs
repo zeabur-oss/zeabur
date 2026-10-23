@@ -70,6 +70,7 @@
 //! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
 //! | `POST /api/v1/members/{username}/setup-links` | a new setup link for a member, optionally removing their passkeys first |
 //! | `DELETE /api/v1/members/{username}/credentials/{id}` | removes a member's passkey or linked account |
+//! | `POST /api/v1/projects/{p}/images/inspect` | an image's declared ports and user, read from its registry anonymously or with the project's pull Secret, read as you; `unreadable` when the registry cannot be read |
 //! | `POST /api/v1/projects/{p}/plan` | the writes a change needs, what they do (pods replaced, fit, data and fields removed), and a token; writes nothing |
 //! | `POST /api/v1/projects/{p}/apply` | carries out a plan by its token |
 //!
@@ -109,6 +110,7 @@ mod error;
 pub mod gaps;
 mod handlers;
 pub mod identity;
+pub mod images;
 pub mod incidents;
 pub mod local;
 pub mod members;
@@ -248,6 +250,7 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(projects::databases::get))
         .routes(routes!(projects::builds::get))
         .routes(routes!(projects::deploy_keys::create))
+        .routes(routes!(images::inspect))
         .routes(routes!(projects::deploy_keys::public))
         .routes(routes!(projects::network_policy::presets))
         .routes(routes!(projects::usage::get))
@@ -287,6 +290,7 @@ pub fn router_with_key(
     sign_in: Arc<dyn account::SignInPage>,
     log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
 ) -> Router {
+    let images = inspector(images::https::Reach::Public, &settings);
     build_with(
         access,
         zeabur_kube::k8s_openapi::jiff::Timestamp::now,
@@ -296,7 +300,30 @@ pub fn router_with_key(
         Arc::new(resolve::System),
         sign_in,
         log_proxy,
+        images,
     )
+}
+
+/// [`router`], reading images' configurations with `images`; for tests.
+pub fn router_with_images(access: Arc<dyn ClusterAccess>, images: images::Inspector) -> Router {
+    build_with(
+        access,
+        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
+        PlanKey::random().ok().map(Arc::new),
+        pods::exec::IDLE,
+        Settings::default(),
+        Arc::new(resolve::System),
+        Arc::new(account::Fixed(None)),
+        None,
+        Arc::new(images),
+    )
+}
+
+fn inspector(reach: images::https::Reach, settings: &Settings) -> Arc<images::Inspector> {
+    Arc::new(images::Inspector::connected(
+        reach,
+        settings.builds.registry.as_deref(),
+    ))
 }
 
 /// [`router_at`], reaching Zeabur Proxy through `log_proxy`; for tests.
@@ -314,6 +341,7 @@ pub fn router_with_log_proxy(
         Arc::new(resolve::System),
         Arc::new(account::Fixed(None)),
         Some(log_proxy),
+        inspector(images::https::Reach::Any, &Settings::default()),
     )
 }
 
@@ -372,6 +400,7 @@ pub fn router_with_settings_and_resolver(
     settings: Settings,
     resolver: Arc<dyn resolve::Resolve>,
 ) -> Router {
+    let images = inspector(images::https::Reach::Any, &settings);
     build_with(
         access,
         zeabur_kube::k8s_openapi::jiff::Timestamp::now,
@@ -381,6 +410,7 @@ pub fn router_with_settings_and_resolver(
         resolver,
         Arc::new(account::Fixed(None)),
         None,
+        images,
     )
 }
 
@@ -391,6 +421,7 @@ fn build(
     terminal_idle: std::time::Duration,
     settings: Settings,
 ) -> Router {
+    let images = inspector(images::https::Reach::Any, &settings);
     build_with(
         access,
         clock,
@@ -400,6 +431,7 @@ fn build(
         Arc::new(resolve::System),
         Arc::new(account::Fixed(None)),
         None,
+        images,
     )
 }
 
@@ -416,6 +448,7 @@ fn build_with(
     resolver: Arc<dyn resolve::Resolve>,
     sign_in: Arc<dyn account::SignInPage>,
     log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
+    images: Arc<images::Inspector>,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let state = AppState {
@@ -429,6 +462,7 @@ fn build_with(
         tools: Arc::new(tools::Sessions::default()),
         sign_in,
         log_proxy,
+        images,
     };
     let (router, api) = routes().split_for_parts();
     let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());

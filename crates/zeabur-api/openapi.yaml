@@ -1271,6 +1271,38 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/images/inspect":
+    post:
+      tags:
+      - projects
+      summary: |-
+        Reads an image's configuration from its registry: the ports it declares and the user it runs
+        as. A registry that cannot be read answers `200` with `unreadable`.
+      operationId: inspectImage
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InspectRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageInspection"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/incidents":
     get:
       tags:
@@ -5748,6 +5780,21 @@ components:
       enum:
       - command-not-found
       - failed
+    ExposedPort:
+      type: object
+      description: A port the image declares (`EXPOSE`).
+      required:
+      - port
+      - protocol
+      properties:
+        port:
+          type: integer
+          format: int32
+          description: The port number.
+          minimum: 0
+        protocol:
+          type: string
+          description: "`TCP`, `UDP` or `SCTP`, as a container port names it."
     FailingCheck:
       type: object
       description: A readiness check that failed.
@@ -6384,6 +6431,55 @@ components:
       enum:
       - noIssuer
       - certificatesElsewhere
+    ImageInspection:
+      type: object
+      description: What the image's configuration says, or why it could not be read.
+      required:
+      - image
+      - exposedPorts
+      properties:
+        detail:
+          type:
+          - string
+          - "null"
+          description: |-
+            The registry's or the network's own words for `unreadable`, or the platforms the image
+            has for `no-platform`.
+        digest:
+          type:
+          - string
+          - "null"
+          description: The digest of the platform's manifest.
+        exposedPorts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExposedPort"
+          description: "`config.ExposedPorts`, sorted by port; empty when the image declares none or was not read."
+        image:
+          type: string
+          description: The image as asked.
+        platform:
+          type:
+          - string
+          - "null"
+          description: The platform read, such as `linux/amd64`; absent when nothing was read.
+        runsAsRoot:
+          type:
+          - boolean
+          - "null"
+          description: "Whether the image runs as root: no user, `root` or UID `0`."
+        unreadable:
+          oneOf:
+          - $ref: "#/components/schemas/UnreadableReason"
+            description: Why nothing was read; absent when it was.
+          - type: "null"
+        user:
+          type:
+          - string
+          - "null"
+          description: |-
+            `config.User` as written (`nginx`, `1000:1000`); empty when the image sets none and runs
+            as root. Kubernetes' `runAsNonRoot` cannot check a name, only a number.
     ImportedEnv:
       type: object
       description: |-
@@ -6520,6 +6616,27 @@ components:
       - appProtocol
       - name
       - protocol
+    InspectRequest:
+      type: object
+      description: The image to read.
+      required:
+      - image
+      properties:
+        image:
+          type: string
+          description: The image reference, as a container's `image`.
+        pullSecret:
+          type:
+          - string
+          - "null"
+          description: |-
+            A `kubernetes.io/dockerconfigjson` or `kubernetes.io/dockercfg` Secret of the project,
+            read as the person, whose entry for the image's registry is used.
+        registry:
+          oneOf:
+          - $ref: "#/components/schemas/RegistryLogin"
+            description: Credentials typed in, used instead of `pullSecret`.
+          - type: "null"
     InstallAnswer:
       allOf:
       - $ref: "#/components/schemas/InstallGuide"
@@ -10588,6 +10705,23 @@ components:
       description: |-
         Why an `envFrom` entry is read-only. Either way the way out is the same: override one
         variable with a same-named `env` entry, which takes precedence and leaves the import alone.
+    RegistryLogin:
+      type: object
+      description: Credentials for the image's registry.
+      required:
+      - server
+      - username
+      - password
+      properties:
+        password:
+          type: string
+          description: The password or access token.
+        server:
+          type: string
+          description: The registry, such as `ghcr.io`; used only when it is the image's.
+        username:
+          type: string
+          description: The username.
     Release:
       type: object
       description: One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`.
@@ -11996,6 +12130,16 @@ components:
       - no-previous-run
       - not-started
       - removed
+    UnreadableReason:
+      type: string
+      description: Why an image's configuration could not be read.
+      enum:
+      - not-found
+      - unauthorized
+      - no-platform
+      - credentials
+      - unreachable
+      - unexpected
     UnreadableView:
       type: object
       description: A kind the person could not read, and kube-apiserver's answer.
