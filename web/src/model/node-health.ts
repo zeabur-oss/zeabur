@@ -3,6 +3,7 @@
 // against allocatable when metrics exist; reservations (requests) only say whether new pods fit.
 import type { Schemas } from "@/api/client"
 import { healthRank, type Health } from "@/model/service"
+import { severity } from "@/model/severity"
 
 type NodeView = Schemas["NodeView"]
 type DiskUsage = Schemas["DiskUsage"]
@@ -86,7 +87,8 @@ export function memoryUsed(node: NodeView): number | undefined {
 /** Every issue of a node, worst first. A node that is down has only that one. */
 export function nodeIssues(node: NodeView): NodeIssue[] {
   const name = node.name
-  if (node.ready !== "True") return [{ kind: "notReady", node: name, health: "fail" }]
+  if (node.ready !== "True")
+    return [{ kind: "notReady", node: name, health: severity.nodeNotReady }]
   const issues: NodeIssue[] = []
   for (const condition of node.problems) {
     const pressure = pressures[condition.type]
@@ -105,10 +107,20 @@ export function nodeIssues(node: NodeView): NodeIssue[] {
   if (node.requests) {
     const memoryReserved = share(node.requests.memoryBytes, node.allocatable.memoryBytes)
     if (memoryReserved !== undefined && memoryReserved >= TIGHT)
-      issues.push({ kind: "reservedMemory", node: name, health: "warn", share: memoryReserved })
+      issues.push({
+        kind: "reservedMemory",
+        node: name,
+        health: severity.overReservation,
+        share: memoryReserved,
+      })
     const cpuReserved = share(node.requests.cpuMillicores, node.allocatable.cpuMillicores)
     if (cpuReserved !== undefined && cpuReserved >= TIGHT)
-      issues.push({ kind: "reservedCpu", node: name, health: "warn", share: cpuReserved })
+      issues.push({
+        kind: "reservedCpu",
+        node: name,
+        health: severity.overReservation,
+        share: cpuReserved,
+      })
   }
   return issues.toSorted(byIssue)
 }

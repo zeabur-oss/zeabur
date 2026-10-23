@@ -12,14 +12,15 @@ import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { configuration, dnsSetup, recordsFor, wildcardFor, type DnsRecord } from "@/model/domains"
+import { severity } from "@/model/severity"
 
 type DomainCheck = Schemas["DomainCheck"]
 
 const configHealth = {
   valid: "ok",
-  invalid: "fail",
-  pending: "progress",
-  elsewhere: "warn",
+  invalid: severity.unreachable,
+  pending: severity.issuingCertificate,
+  elsewhere: severity.dnsElsewhere,
   unknown: "idle",
 } as const
 
@@ -104,7 +105,13 @@ export function DomainSetup({
       {certTrouble ? (
         <div className="flex flex-col gap-1">
           <p className="flex items-center gap-1.5 font-medium">
-            <StatusDot health={certTrouble.state === "failed" ? "fail" : "progress"} />
+            <StatusDot
+              health={
+                certTrouble.state === "failed"
+                  ? severity.certificateFailed
+                  : severity.issuingCertificate
+              }
+            />
             {certTrouble.state === "failed" ? t("domain.cert.failed") : t("domain.cert.issuing")}
             {certTrouble.state === "failed" ? (
               <span className="font-normal text-secondary">{t("domain.cert.retries")}</span>

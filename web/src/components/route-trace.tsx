@@ -19,6 +19,7 @@ import {
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { needsSetup } from "@/model/domains"
+import { severity } from "@/model/severity"
 
 type Route = Schemas["RouteTraceView"]
 type HopStatus = Schemas["HopStatus"]
@@ -37,7 +38,7 @@ const statusTone: Record<HopStatus, string> = {
 
 const verdict = {
   ok: { health: "ok", key: "trace.reachable", tone: "text-secondary" },
-  failed: { health: "fail", key: "trace.unreachable", tone: "text-fail-strong" },
+  failed: { health: severity.unreachable, key: "trace.unreachable", tone: "text-fail-strong" },
   unknown: { health: "idle", key: "trace.unverified", tone: "text-secondary" },
 } as const
 
