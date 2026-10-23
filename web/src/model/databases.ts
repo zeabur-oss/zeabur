@@ -160,7 +160,9 @@ function databaseObject(form: NewDatabase): Manifest {
   return {
     apiVersion: "psmdb.percona.com/v1",
     kind: "PerconaServerMongoDB",
-    metadata: { name: form.name },
+    // The operator deletes the data claims with the cluster, as CloudNativePG does.
+    // https://docs.percona.com/percona-operator-for-mongodb/operator.html#metadata
+    metadata: { name: form.name, finalizers: ["percona.com/delete-psmdb-pvc"] },
     spec: {
       image: imageOf("mongodb", form.version),
       // Fewer than three members is allowed only when asked for by name: it has no redundancy.
