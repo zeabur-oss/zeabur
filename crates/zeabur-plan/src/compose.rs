@@ -844,6 +844,8 @@ struct Credentials {
     user: Option<String>,
     password: Option<String>,
     database: Option<String>,
+    /// The service speaks HTTP: an `http://` or `https://` URL to it is its URL.
+    http: bool,
 }
 
 fn credentials(service: &ComposeService) -> Credentials {
@@ -863,6 +865,7 @@ fn credentials(service: &ComposeService) -> Credentials {
                 password: get(&["POSTGRES_PASSWORD"]),
                 database: get(&["POSTGRES_DB"]).or_else(|| Some(user.clone())),
                 user: Some(user),
+                http: false,
             }
         }
         Some(Counterpart::Mysql | Counterpart::Mariadb) => Credentials {
@@ -874,11 +877,13 @@ fn credentials(service: &ComposeService) -> Credentials {
                 "MARIADB_ROOT_PASSWORD",
             ]),
             database: get(&["MYSQL_DATABASE", "MARIADB_DATABASE"]),
+            http: false,
         },
         Some(Counterpart::Mongodb) => Credentials {
             user: get(&["MONGO_INITDB_ROOT_USERNAME"]),
             password: get(&["MONGO_INITDB_ROOT_PASSWORD"]),
             database: get(&["MONGO_INITDB_DATABASE"]),
+            http: false,
         },
         Some(Counterpart::Dragonfly) => Credentials {
             password: get(&["REDIS_PASSWORD", "VALKEY_PASSWORD"]).or_else(|| {
@@ -889,7 +894,14 @@ fn credentials(service: &ComposeService) -> Credentials {
             }),
             ..Credentials::default()
         },
-        Some(Counterpart::ObjectStorage) | None => Credentials::default(),
+        // The root user and password, or their older names.
+        Some(Counterpart::ObjectStorage) => Credentials {
+            user: get(&["MINIO_ROOT_USER", "MINIO_ACCESS_KEY"]),
+            password: get(&["MINIO_ROOT_PASSWORD", "MINIO_SECRET_KEY"]),
+            database: None,
+            http: true,
+        },
+        None => Credentials::default(),
     }
 }
 
@@ -909,10 +921,7 @@ fn link_databases(out: &mut [ComposeService], services: &Map<String, Value>, rea
     let databases: Vec<(String, Vec<String>, Credentials)> = out
         .iter()
         .zip(services)
-        .filter(|(s, _)| {
-            s.counterpart
-                .is_some_and(|c| c != Counterpart::ObjectStorage)
-        })
+        .filter(|(s, _)| s.counterpart.is_some())
         .map(|(s, (compose_name, spec))| {
             let mut hosts = vec![s.name.clone(), compose_name.clone()];
             if let Some(container) = spec.get("container_name").and_then(Value::as_str) {
@@ -944,11 +953,15 @@ fn part_of(variable: &ComposeVariable, hosts: &[String], creds: &Credentials) ->
         let host_port = authority.rsplit('@').next().unwrap_or(authority);
         let host = host_port.split(':').next().unwrap_or(host_port);
         if hosts.iter().any(|h| h == host) {
-            return Some(if URL_SCHEMES.contains(&scheme) {
-                Part::Url
-            } else {
-                Part::Mention
-            });
+            return Some(
+                if URL_SCHEMES.contains(&scheme)
+                    || (creds.http && matches!(scheme, "http" | "https"))
+                {
+                    Part::Url
+                } else {
+                    Part::Mention
+                },
+            );
         }
     }
     let host = value.split(':').next().unwrap_or(value);
@@ -964,7 +977,7 @@ fn part_of(variable: &ComposeVariable, hosts: &[String], creds: &Credentials) ->
     if same(&creds.password) {
         return Some(Part::Password);
     }
-    if same(&creds.user) && upper.contains("USER") {
+    if same(&creds.user) && (upper.contains("USER") || (creds.http && upper.contains("ACCESS"))) {
         return Some(Part::User);
     }
     if same(&creds.database)
@@ -1095,6 +1108,47 @@ volumes:
         assert_eq!(db.findings, [Finding::Healthcheck]);
         assert_eq!(find(&c, "cache").counterpart, Some(Counterpart::Dragonfly));
         assert_eq!(find(&c, "cache").ports, [6379]);
+    }
+
+    #[test]
+    fn minio_clients_point_at_its_url_and_keys() {
+        let c = convert_yaml(
+            r#"
+services:
+  app:
+    image: ghcr.io/acme/app:1
+    environment:
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY_ID: acme
+      S3_SECRET_ACCESS_KEY: s3cret
+      S3_BUCKET: uploads
+  minio:
+    image: minio/minio:RELEASE.2025-01-01T00-00-00Z
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: acme
+      MINIO_ROOT_PASSWORD: s3cret
+"#,
+            &[],
+        );
+        let app = find(&c, "app");
+        assert_eq!(
+            find(&c, "minio").counterpart,
+            Some(Counterpart::ObjectStorage)
+        );
+        assert_eq!(
+            refers(app, "S3_ENDPOINT"),
+            Some(("minio".into(), Part::Url))
+        );
+        assert_eq!(
+            refers(app, "S3_ACCESS_KEY_ID"),
+            Some(("minio".into(), Part::User))
+        );
+        assert_eq!(
+            refers(app, "S3_SECRET_ACCESS_KEY"),
+            Some(("minio".into(), Part::Password))
+        );
+        assert_eq!(refers(app, "S3_BUCKET"), None);
     }
 
     #[test]
