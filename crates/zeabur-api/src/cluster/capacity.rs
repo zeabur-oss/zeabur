@@ -32,6 +32,8 @@
 use std::collections::BTreeMap;
 
 pub(crate) use zeabur_core::quantity::{bytes, millicores};
+use zeabur_kube::k8s_openapi::api::core::v1::{Container, PodSpec};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use zeabur_kube::{ClusterPod, ContainerResources};
 
 /// CPU and memory together.
@@ -112,6 +114,41 @@ pub(crate) fn pod_amounts(pod: &ClusterPod) -> (Amount, Amount) {
         limits.memory = limits.memory.saturating_add(overhead.memory);
     }
     (requests, limits)
+}
+
+/// What a pod with `spec` requests and limits, by the same rules.
+pub(crate) fn spec_amounts(spec: &PodSpec) -> (Amount, Amount) {
+    let resources = |container: &Container| {
+        let map = |pick: Option<&BTreeMap<String, Quantity>>| {
+            pick.into_iter()
+                .flatten()
+                .map(|(k, v)| (k.clone(), v.0.clone()))
+                .collect()
+        };
+        let r = container.resources.as_ref();
+        ContainerResources {
+            requests: map(r.and_then(|r| r.requests.as_ref())),
+            limits: map(r.and_then(|r| r.limits.as_ref())),
+            sidecar: container.restart_policy.as_deref() == Some("Always"),
+        }
+    };
+    let pod = ClusterPod {
+        containers: spec.containers.iter().map(resources).collect(),
+        init_containers: spec
+            .init_containers
+            .iter()
+            .flatten()
+            .map(resources)
+            .collect(),
+        overhead: spec
+            .overhead
+            .iter()
+            .flatten()
+            .map(|(k, v)| (k.clone(), v.0.clone()))
+            .collect(),
+        ..ClusterPod::default()
+    };
+    pod_amounts(&pod)
 }
 
 #[cfg(test)]

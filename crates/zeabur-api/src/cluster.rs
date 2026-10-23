@@ -55,6 +55,7 @@ pub(crate) mod disks;
 pub(crate) mod health;
 pub mod install;
 pub mod join;
+pub mod maintenance;
 pub mod modules;
 pub mod node_policies;
 
@@ -228,7 +229,7 @@ fn resources(map: Option<&BTreeMap<String, Quantity>>) -> Resources {
 /// `control-plane`.
 ///
 /// [k8s-printers]: https://github.com/kubernetes/kubernetes/blob/master/pkg/printers/internalversion/printers.go
-fn roles(labels: Option<&BTreeMap<String, String>>) -> Vec<String> {
+pub(crate) fn roles(labels: Option<&BTreeMap<String, String>>) -> Vec<String> {
     let mut roles: Vec<String> = labels
         .into_iter()
         .flatten()
@@ -315,6 +316,8 @@ fn node_view(node: &Node) -> NodeView {
         capacity: resources(capacity_map),
         requests: None,
         limits: None,
+        movable_pods: None,
+        leaving_pods: None,
         usage: None,
         disk: None,
         created: node
@@ -429,6 +432,7 @@ pub(crate) async fn nodes(
     };
 
     let mut sums: BTreeMap<String, (Amount, Amount, u64)> = BTreeMap::new();
+    let mut movable: BTreeMap<String, (u64, u64)> = BTreeMap::new();
     let mut unscheduled = 0;
     if let Some(pods) = &pods {
         for pod in &pods.pods {
@@ -436,6 +440,11 @@ pub(crate) async fn nodes(
                 unscheduled += 1;
                 continue;
             };
+            if maintenance::movable(pod) {
+                let entry = movable.entry(node.clone()).or_default();
+                entry.0 += 1;
+                entry.1 += u64::from(pod.terminating);
+            }
             let (requests, limits) = capacity::pod_amounts(pod);
             let entry = sums.entry(node.clone()).or_default();
             entry.0.add(requests);
@@ -464,6 +473,9 @@ pub(crate) async fn nodes(
                 memory_bytes: limits.memory,
                 pods: None,
             });
+            let (moving, leaving) = movable.get(&item.name).copied().unwrap_or_default();
+            item.movable_pods = Some(moving);
+            item.leaving_pods = Some(leaving);
         }
         item.usage = usage.as_ref().and_then(|u| u.get(&item.name).copied());
         totals.allocatable =

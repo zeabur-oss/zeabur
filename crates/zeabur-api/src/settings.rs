@@ -425,9 +425,10 @@ pub(crate) mod store {
         };
         let verb = match &body {
             WriteBody::Create(_) => "create",
-            WriteBody::JsonPatch(_) | WriteBody::Delete(_) | WriteBody::EphemeralContainers(_) => {
-                "patch"
-            }
+            WriteBody::JsonPatch(_)
+            | WriteBody::Delete(_)
+            | WriteBody::EphemeralContainers(_)
+            | WriteBody::Evict(_) => "patch",
         };
         let request = WriteRequest {
             target: config_map(namespace),

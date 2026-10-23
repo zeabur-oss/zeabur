@@ -35,6 +35,11 @@
 //! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
 //! after it is added, as do tools pods. `ZEABUR_DEMO_TOOLS=1` hands the session a made-up token,
 //! so the kubectl terminal is offered.
+//!
+//! Node maintenance: `vps-3` holds Zeabur itself, a bare pod (`lab/debug-toolbox`), `shop`'s
+//! `db-0` on a local-path volume pinned to it, and a `web` replica that the disruption budget
+//! `web` holds back for about 8 s after the first eviction. Evicted pods go 2 s later and come back
+//! on another node, or stay Pending when their volume is pinned to the old one.
 
 #![expect(
     clippy::expect_used,
@@ -2278,8 +2283,14 @@ fn nodes() -> Vec<Node> {
 /// k3s's own pods in kube-system.
 fn kube_system() -> NamespaceObjects {
     let pod = |name: &str, cpu: &str, memory: &str| -> Pod {
+        let replica_set = name.rsplit_once('-').map_or(name, |(set, _)| set);
+        let hash = replica_set.rsplit_once('-').map_or("", |(_, hash)| hash);
         from(
-            json!({"metadata": {"name": name, "namespace": "kube-system", "labels": {"app": name}},
+            json!({"metadata": {"name": name, "namespace": "kube-system",
+                "labels": {"app": name, "pod-template-hash": hash},
+                "ownerReferences": [{"apiVersion": "apps/v1", "kind": "ReplicaSet",
+                    "name": replica_set, "uid": "00000000-0000-0000-0000-000000000000",
+                    "controller": true}]},
             "spec": {"containers": [{"name": "main", "image": "example",
                 "resources": {"requests": {"cpu": cpu, "memory": memory}}}]},
             "status": {"phase": "Running", "containerStatuses": [{"name": "main", "ready": true,
@@ -2411,6 +2422,23 @@ fn rke2(s: &mut State) {
             namespace: "kube-system".to_owned(),
             ..NamespaceObjects::default()
         });
+    // RKE2 runs the control plane as static pods; kube-apiserver shows each as a mirror pod.
+    for component in ["etcd", "kube-apiserver"] {
+        system.pods.push(from(json!({
+            "metadata": {"name": format!("{component}-vps-1"), "namespace": "kube-system",
+                "uid": format!("kube-system-{component}-vps-1"),
+                "labels": {"component": component, "tier": "control-plane"},
+                "annotations": {"kubernetes.io/config.mirror": "2b6f0c1d9e8a7f65",
+                                "kubernetes.io/config.source": "file"},
+                "ownerReferences": [{"apiVersion": "v1", "kind": "Node", "name": "vps-1",
+                    "uid": "node-vps-1", "controller": true}]},
+            "spec": {"nodeName": "vps-1", "containers": [{"name": component, "image": "example",
+                "resources": {"requests": {"cpu": "200m", "memory": "512Mi"}}}]},
+            "status": {"phase": "Running", "containerStatuses": [{"name": component,
+                "ready": true, "restartCount": 0, "image": "example", "imageID": "",
+                "state": {"running": {}}}]}
+        })));
+    }
     system.config_maps.push(from(json!({
         "metadata": {"name": "kube-root-ca.crt", "namespace": "kube-system"},
         "data": {"ca.crt": include_str!("../tests/fixtures/join/root.pem")}
@@ -2495,6 +2523,7 @@ fn joining(cluster: MemoryCluster) {
                     return;
                 };
                 node.metadata.name = Some("vps-4".to_owned());
+                node.metadata.uid = Some("node-vps-4".to_owned());
                 node.metadata.creation_timestamp = None;
                 if let Some(labels) = node.metadata.labels.as_mut() {
                     labels.insert("kubernetes.io/hostname".to_owned(), "vps-4".to_owned());
@@ -2515,6 +2544,321 @@ fn joining(cluster: MemoryCluster) {
                 s.nodes
                     .retain(|n| n.metadata.name.as_deref() != Some("vps-4"));
                 s.nodes.push(node);
+            });
+        }
+    });
+}
+
+/// What node maintenance has to say something about: Deployment pods owned by their
+/// ReplicaSets, a DaemonSet's pod on each node, Zeabur's own pod and a pod without a controller on
+/// `vps-3`, a `worker` with scratch space, the `db` whose volume local-path keeps on `vps-3`, and
+/// a budget that holds a `web` pod for a few seconds once eviction starts.
+fn maintenance(s: &mut State) {
+    for objects in s.objects.values_mut() {
+        let deployments: Vec<(String, BTreeMap<String, String>)> = objects
+            .deployments
+            .iter()
+            .filter_map(|d| {
+                Some((
+                    d.metadata.name.clone()?,
+                    d.spec.as_ref()?.selector.match_labels.clone()?,
+                ))
+            })
+            .collect();
+        for pod in &mut objects.pods {
+            let name = pod.metadata.name.clone().unwrap_or_default();
+            if pod
+                .metadata
+                .owner_references
+                .as_ref()
+                .is_some_and(|o| !o.is_empty())
+            {
+                continue;
+            }
+            let labels = pod.metadata.labels.get_or_insert_with(Default::default);
+            let owner = deployments
+                .iter()
+                .find(|(_, selector)| selector.iter().all(|(k, v)| labels.get(k) == Some(v)))
+                .map(|(deployment, _)| deployment.clone());
+            let Some(deployment) = owner else {
+                continue;
+            };
+            let hash = name
+                .strip_prefix(&format!("{deployment}-"))
+                .and_then(|rest| rest.split('-').next())
+                .filter(|hash| !hash.is_empty())
+                .unwrap_or("5d8f7c9b6")
+                .to_owned();
+            labels.insert("pod-template-hash".to_owned(), hash.clone());
+            pod.metadata.owner_references = Some(vec![from(json!({
+                "apiVersion": "apps/v1", "kind": "ReplicaSet", "name": format!("{deployment}-{hash}"),
+                "uid": "00000000-0000-0000-0000-000000000000", "controller": true}))]);
+        }
+        for pod in &mut objects.pods {
+            let app = pod
+                .metadata
+                .labels
+                .as_ref()
+                .and_then(|l| l.get("app"))
+                .cloned()
+                .unwrap_or_default();
+            let volume: Option<Value> = match app.as_str() {
+                "worker" => Some(json!({"name": "scratch", "emptyDir": {}})),
+                "db" if objects.namespace == "shop" => Some(
+                    json!({"name": "data", "persistentVolumeClaim": {"claimName": "data-db-0"}}),
+                ),
+                _ => None,
+            };
+            if let (Some(volume), Some(spec)) = (volume, pod.spec.as_mut()) {
+                if app == "db" {
+                    spec.node_name = Some("vps-3".to_owned());
+                }
+                spec.volumes.get_or_insert_with(Vec::new).push(from(volume));
+            }
+        }
+    }
+    if let Some(shop) = s.objects.get_mut("shop") {
+        for claim in &mut shop.persistent_volume_claims {
+            if claim.metadata.name.as_deref() == Some("data-db-0") {
+                claim.spec.get_or_insert_with(Default::default).volume_name =
+                    Some("pvc-8e2d41c7-5b0a-4f3e-9c61-2a7d0e9b4f18".to_owned());
+            }
+        }
+        if let Some(web) = shop.pods.iter_mut().find(|p| {
+            p.metadata
+                .labels
+                .as_ref()
+                .and_then(|l| l.get("app"))
+                .map(String::as_str)
+                == Some("web")
+        }) {
+            web.spec.get_or_insert_with(Default::default).node_name = Some("vps-3".to_owned());
+            s.eviction_refusals.insert(
+                format!("shop/{}", web.metadata.name.as_deref().unwrap_or_default()),
+                zeabur_core::problem::KubernetesStatus {
+                    retry_after_seconds: Some(5),
+                    ..zeabur_core::problem::KubernetesStatus::new(
+                        429,
+                        "TooManyRequests",
+                        "Cannot evict pod as it would violate the pod's disruption budget.",
+                    )
+                },
+            );
+        }
+    }
+    s.served.extend([
+        ServedResource::readable("", "v1", "persistentvolumes", "PersistentVolume", false),
+        ServedResource::readable(
+            "policy",
+            "v1",
+            "poddisruptionbudgets",
+            "PodDisruptionBudget",
+            true,
+        ),
+    ]);
+    s.dynamic.push(from(json!({
+        "apiVersion": "v1", "kind": "PersistentVolume",
+        "metadata": {"name": "pvc-8e2d41c7-5b0a-4f3e-9c61-2a7d0e9b4f18"},
+        "spec": {"capacity": {"storage": "20Gi"}, "accessModes": ["ReadWriteOnce"],
+            "storageClassName": "local-path",
+            "claimRef": {"namespace": "shop", "name": "data-db-0"},
+            "hostPath": {"path": "/var/lib/rancher/k3s/storage/pvc-8e2d41c7_shop_data-db-0"},
+            "nodeAffinity": {"required": {"nodeSelectorTerms": [{"matchExpressions": [
+                {"key": "kubernetes.io/hostname", "operator": "In", "values": ["vps-3"]}]}]}}},
+        "status": {"phase": "Bound"}
+    })));
+    s.dynamic.push(from(json!({
+        "apiVersion": "policy/v1", "kind": "PodDisruptionBudget",
+        "metadata": {"name": "web", "namespace": "shop"},
+        "spec": {"minAvailable": 2, "selector": {"matchLabels": {"app": "web"}}},
+        "status": {"currentHealthy": 2, "desiredHealthy": 2, "disruptionsAllowed": 0,
+            "expectedPods": 2}
+    })));
+    let nodes: Vec<String> = s
+        .nodes
+        .iter()
+        .filter_map(|n| n.metadata.name.clone())
+        .collect();
+    let system = s
+        .objects
+        .entry("kube-system".to_owned())
+        .or_insert_with(|| NamespaceObjects {
+            namespace: "kube-system".to_owned(),
+            ..NamespaceObjects::default()
+        });
+    for (i, node) in nodes.iter().enumerate() {
+        system.pods.push(from(json!({
+            "metadata": {"name": format!("svclb-traefik-4e1f2a9c-{}", ["x7k2p", "m3q8d", "t9w4z"].get(i).copied().unwrap_or("r5n1v")),
+                "namespace": "kube-system", "labels": {"app": "svclb-traefik-4e1f2a9c"},
+                "ownerReferences": [{"apiVersion": "apps/v1", "kind": "DaemonSet",
+                    "name": "svclb-traefik-4e1f2a9c", "uid": "00000000-0000-0000-0000-000000000000",
+                    "controller": true}]},
+            "spec": {"nodeName": node, "containers": [{"name": "lb-tcp-80", "image": "example"}]},
+            "status": {"phase": "Running", "containerStatuses": [{"name": "lb-tcp-80",
+                "ready": true, "restartCount": 0, "image": "example", "imageID": "",
+                "state": {"running": {}}}]}
+        })));
+    }
+    s.namespaces
+        .push(from(json!({"metadata": {"name": "zeabur"}})));
+    s.objects.insert(
+        "zeabur".to_owned(),
+        NamespaceObjects {
+            namespace: "zeabur".to_owned(),
+            pods: vec![from(json!({
+                "metadata": {"name": "zeabur-6c9f7d8b5-r2xkq", "namespace": "zeabur",
+                    "labels": {"app.kubernetes.io/name": "zeabur", "pod-template-hash": "6c9f7d8b5"},
+                    "ownerReferences": [{"apiVersion": "apps/v1", "kind": "ReplicaSet",
+                        "name": "zeabur-6c9f7d8b5", "uid": "00000000-0000-0000-0000-000000000000",
+                        "controller": true}]},
+                "spec": {"nodeName": "vps-3", "containers": [{"name": "zeabur", "image": "example",
+                    "resources": {"requests": {"cpu": "100m", "memory": "256Mi"}}}]},
+                "status": {"phase": "Running", "containerStatuses": [{"name": "zeabur",
+                    "ready": true, "restartCount": 0, "image": "example", "imageID": "",
+                    "state": {"running": {}}}]}
+            }))],
+            ..NamespaceObjects::default()
+        },
+    );
+    if let Some(lab) = s.objects.get_mut("lab") {
+        lab.pods.push(from(json!({
+            "metadata": {"name": "debug-toolbox", "namespace": "lab",
+                "labels": {"run": "debug-toolbox"}},
+            "spec": {"nodeName": "vps-3", "containers": [{"name": "debug-toolbox",
+                "image": "example"}]},
+            "status": {"phase": "Running", "containerStatuses": [{"name": "debug-toolbox",
+                "ready": true, "restartCount": 0, "image": "example", "imageID": "",
+                "state": {"running": {}}}]}
+        })));
+    }
+}
+
+/// The node of the volume `claim` in `namespace` is bound to, when local-path keeps it on one.
+fn pinned(s: &State, namespace: &str, claim: &str) -> Option<String> {
+    let volume = s
+        .objects
+        .get(namespace)?
+        .persistent_volume_claims
+        .iter()
+        .find(|c| c.metadata.name.as_deref() == Some(claim))?
+        .spec
+        .as_ref()?
+        .volume_name
+        .clone()?;
+    let pv = s
+        .dynamic
+        .iter()
+        .find(|o| o.metadata.name.as_deref() == Some(volume.as_str()))?;
+    pv.data
+        .pointer("/spec/nodeAffinity/required/nodeSelectorTerms/0/matchExpressions/0/values/0")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+}
+
+/// Removes evicted pods a couple of seconds after their eviction and starts their controllers'
+/// replacements on another node that takes pods (Pending when their volume is kept on the old
+/// one); lifts the `web` budget eight seconds after the first eviction.
+fn evictions(cluster: MemoryCluster) {
+    tokio::spawn(async move {
+        let mut first: Option<Timestamp> = None;
+        let mut made = 0_u32;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+            let now = Timestamp::now();
+            cluster.update(|s| {
+                if first.is_none()
+                    && s.writes
+                        .iter()
+                        .any(|w| matches!(w.body, zeabur_kube::WriteBody::Evict(_)))
+                {
+                    first = Some(now);
+                }
+                if first.is_some_and(|t| now.duration_since(t) > SignedDuration::from_secs(8))
+                    && !s.eviction_refusals.is_empty()
+                {
+                    s.eviction_refusals.clear();
+                    for object in &mut s.dynamic {
+                        if object.metadata.name.as_deref() == Some("web")
+                            && let Some(status) = object.data.get_mut("status")
+                        {
+                            status["disruptionsAllowed"] = json!(1);
+                        }
+                    }
+                }
+                let open: Vec<String> = s
+                    .nodes
+                    .iter()
+                    .filter(|n| !n.spec.as_ref().and_then(|s| s.unschedulable).unwrap_or(false))
+                    .filter_map(|n| n.metadata.name.clone())
+                    .collect();
+                let mut leaving = Vec::new();
+                for (namespace, objects) in &s.objects {
+                    for pod in &objects.pods {
+                        let Some(deleted) = pod.metadata.deletion_timestamp.as_ref() else {
+                            continue;
+                        };
+                        if now.duration_since(deleted.0) > SignedDuration::from_secs(2) {
+                            leaving.push((namespace.clone(), pod.clone()));
+                        }
+                    }
+                }
+                for (namespace, pod) in leaving {
+                    let name = pod.metadata.name.clone().unwrap_or_default();
+                    let old_node = pod.spec.as_ref().and_then(|s| s.node_name.clone());
+                    let owner = pod
+                        .metadata
+                        .owner_references
+                        .iter()
+                        .flatten()
+                        .find(|o| o.controller == Some(true))
+                        .cloned();
+                    let claims: Vec<String> = pod
+                        .spec
+                        .iter()
+                        .flat_map(|s| s.volumes.iter().flatten())
+                        .filter_map(|v| v.persistent_volume_claim.as_ref())
+                        .map(|c| c.claim_name.clone())
+                        .collect();
+                    let held = claims
+                        .iter()
+                        .any(|c| pinned(s, &namespace, c).is_some_and(|n| Some(n) == old_node));
+                    let Some(objects) = s.objects.get_mut(&namespace) else {
+                        continue;
+                    };
+                    objects.pods.retain(|p| p.metadata.name.as_deref() != Some(name.as_str()));
+                    let Some(owner) = owner else {
+                        continue;
+                    };
+                    made += 1;
+                    let mut replacement = pod;
+                    replacement.metadata.deletion_timestamp = None;
+                    replacement.metadata.creation_timestamp = Some(
+                        zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time(now),
+                    );
+                    if owner.kind == "ReplicaSet" {
+                        replacement.metadata.name =
+                            Some(format!("{}-{:05x}", owner.name, hash(&format!("{name}{made}")) & 0xfffff));
+                    }
+                    replacement.metadata.uid = Some(format!(
+                        "{namespace}-{}-{made}",
+                        replacement.metadata.name.as_deref().unwrap_or_default()
+                    ));
+                    let spec = replacement.spec.get_or_insert_with(Default::default);
+                    spec.node_name = if held {
+                        None
+                    } else {
+                        open.iter()
+                            .find(|n| Some(*n) != old_node.as_ref())
+                            .cloned()
+                    };
+                    if spec.node_name.is_none() {
+                        replacement.status = Some(from(json!({"phase": "Pending",
+                            "conditions": [{"type": "PodScheduled", "status": "False",
+                                "reason": "Unschedulable",
+                                "message": "0/3 nodes are available: 1 node(s) had volume node affinity conflict, 2 node(s) were unschedulable."}]})));
+                    }
+                    objects.pods.push(replacement);
+                }
             });
         }
     });
@@ -2607,6 +2951,7 @@ async fn main() -> std::io::Result<()> {
         });
     }
     cluster.update(|s| {
+        maintenance(s);
         // A debug container's patch tests the pod's uid.
         for (namespace, objects) in &mut s.objects {
             for pod in &mut objects.pods {
@@ -2615,6 +2960,12 @@ async fn main() -> std::io::Result<()> {
                     .uid
                     .get_or_insert_with(|| format!("{namespace}-{name}"));
             }
+        }
+        for node in &mut s.nodes {
+            let name = node.metadata.name.clone().unwrap_or_default();
+            node.metadata
+                .uid
+                .get_or_insert_with(|| format!("node-{name}"));
         }
         s.without_shell
             .extend(["shop/web-7c9d8-abcde", "shop/web-7c9d8-fghij"].map(str::to_owned));
@@ -2630,6 +2981,7 @@ async fn main() -> std::io::Result<()> {
         joining(cluster.clone());
     }
     kubelet(cluster.clone());
+    evictions(cluster.clone());
     let access = Demo {
         cluster: Arc::new(cluster),
         offered: std::env::var_os("ZEABUR_DEMO_ELEVATION").is_some(),

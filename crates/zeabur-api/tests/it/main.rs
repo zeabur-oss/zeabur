@@ -17,6 +17,7 @@ mod files;
 mod incidents;
 mod join;
 mod log_history;
+mod maintenance;
 mod members;
 mod namespace;
 mod preview;
