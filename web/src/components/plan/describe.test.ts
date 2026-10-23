@@ -346,6 +346,22 @@ group("deletion", () => {
     expect(d.consequence).toBe(undefined)
     expect(d.action).toBe("action.delete")
   })
+
+  test("deleting a database says its data goes for good and its backups stay", () => {
+    for (const resource of [
+      { group: "postgresql.cnpg.io", version: "v1", resource: "clusters" },
+      { group: "psmdb.percona.com", version: "v1", resource: "perconaservermongodbs" },
+    ]) {
+      const d = describe(
+        t,
+        { changes: [{ op: "delete", resource, name: "db" }] },
+        plan({}),
+        pods({}),
+        ["deletes"],
+      )
+      expect(d.lines).toStrictEqual(["confirm.deleteDatabase(db)"])
+    }
+  })
 })
 
 group("actionOf", () => {

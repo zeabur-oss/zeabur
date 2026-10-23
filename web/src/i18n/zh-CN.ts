@@ -1261,6 +1261,8 @@ export const zhCN: Messages = {
   "confirm.create": (kind, name) => `创建 ${kind} ${name}。`,
   "confirm.isolates": (name) => `${name} 之后只收发这条和其他策略允许的流量，其余流量集群会拦截。`,
   "confirm.delete": (name: string) => `删除 ${name}。删除后无法恢复。`,
+  "confirm.deleteDatabase": (name: string) =>
+    `删除 ${name} 及其中的数据，无法恢复。对象存储中的备份会保留。`,
   "action.restart": "重启",
   "action.deploy": "部署",
   "action.rebuild": "重新构建",
