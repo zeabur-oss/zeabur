@@ -1,0 +1,101 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/v3.33.1/schema.json",
+  "entry": ["e2e/**/*.ts", "playwright*.config.ts", "scripts/*.ts"],
+  // unplugin-icons loads these by name; `~icons/…` is its virtual module.
+  "ignoreDependencies": ["@svgr/plugin-jsx", "@iconify-json/ph", "~icons"],
+  // router.tsx loads each page with lazyRouteComponent(() => import(…), "<name>"), which fallow
+  // does not follow.
+  "ignoreExports": [
+    { "file": "src/routes/account.tsx", "exports": ["AccountPage"] },
+    { "file": "src/routes/cluster/backups.tsx", "exports": ["BackupsPage"] },
+    { "file": "src/routes/cluster/components.tsx", "exports": ["ComponentsPage"] },
+    { "file": "src/routes/cluster/page.tsx", "exports": ["ClusterPage"] },
+    { "file": "src/routes/database/page.tsx", "exports": ["DatabasePage"] },
+    { "file": "src/routes/home.tsx", "exports": ["HomePage"] },
+    { "file": "src/routes/members.tsx", "exports": ["MembersPage"] },
+    { "file": "src/routes/problem.tsx", "exports": ["ProblemPage"] },
+    { "file": "src/routes/project/create.tsx", "exports": ["CreatePage"] },
+    { "file": "src/routes/project/objects.tsx", "exports": ["ObjectsPage"] },
+    { "file": "src/routes/project/page.tsx", "exports": ["ProjectPage"] },
+    { "file": "src/routes/project/settings.tsx", "exports": ["ProjectSettingsPage"] },
+    { "file": "src/routes/projects.tsx", "exports": ["ProjectsPage"] },
+    { "file": "src/routes/service/page.tsx", "exports": ["ServicePage"] },
+    { "file": "src/routes/settings.tsx", "exports": ["SettingsPage"] }
+  ],
+  // Generated files, and the three catalogs, which repeat the same keys in each language.
+  "duplicates": {
+    "ignore": [
+      "src/api/schema.d.ts",
+      "src/i18n/generated/**",
+      "src/i18n/en.ts",
+      "src/i18n/zh-CN.ts",
+      "src/i18n/zh-TW.ts"
+    ]
+  },
+  "health": { "ignore": ["src/api/schema.d.ts", "src/i18n/generated/**"] },
+  // Each layer imports only the layers below it.
+  "boundaries": {
+    "zones": [
+      { "name": "i18n", "patterns": ["src/i18n/**"] },
+      { "name": "session", "patterns": ["src/auth/session.ts"] },
+      { "name": "api", "patterns": ["src/api/**"] },
+      { "name": "lib", "patterns": ["src/lib/**"] },
+      { "name": "auth", "patterns": ["src/auth/**"] },
+      { "name": "model", "patterns": ["src/model/**"] },
+      { "name": "components", "patterns": ["src/components/**", "src/theme.ts"] },
+      { "name": "modules", "patterns": ["src/modules/**"] },
+      { "name": "routes", "patterns": ["src/routes/**"] },
+      { "name": "app", "patterns": ["src/main.tsx", "src/router.tsx"] },
+      { "name": "test-support", "patterns": ["src/test/**"] }
+    ],
+    "rules": [
+      { "from": "i18n", "allow": [] },
+      { "from": "session", "allow": ["i18n"] },
+      { "from": "api", "allow": ["session", "i18n"] },
+      { "from": "lib", "allow": ["api", "session", "i18n"] },
+      { "from": "auth", "allow": ["session", "api", "lib", "i18n"] },
+      { "from": "model", "allow": ["auth", "api", "lib", "i18n"] },
+      { "from": "components", "allow": ["model", "auth", "session", "api", "lib", "i18n"] },
+      { "from": "modules", "allow": ["components", "model", "auth", "api", "lib", "i18n"] },
+      {
+        "from": "routes",
+        "allow": ["modules", "components", "model", "auth", "session", "api", "lib", "i18n"]
+      },
+      {
+        "from": "app",
+        "allow": [
+          "routes",
+          "modules",
+          "components",
+          "model",
+          "auth",
+          "session",
+          "api",
+          "lib",
+          "i18n"
+        ]
+      },
+      { "from": "test-support", "allow": [] }
+    ],
+    "coverage": {
+      "requireAllFiles": true,
+      "allowUnmatched": [
+        "e2e/**",
+        "scripts/**",
+        "*.config.ts",
+        "index.html",
+        "src/styles/**",
+        "src/**/*.d.ts"
+      ]
+    }
+  },
+  // A unit test may import from any layer.
+  "overrides": [{ "files": ["src/**/*.test.ts"], "rules": { "boundary-violation": "off" } }],
+  "audit": { "deadCodeBaseline": "fallow-baseline.json" },
+  "rules": {
+    "policy-violation": "off",
+    "thin-wrapper": "warn",
+    "prop-drilling": "warn",
+    "duplicate-prop-shape": "warn"
+  }
+}

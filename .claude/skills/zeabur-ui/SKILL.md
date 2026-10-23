@@ -15,7 +15,8 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   to the design system's `Toaster`). Embedding and serving: `crates/zeabur-ui`.
 - **Build and check** (inside `nix develop`):
   ```sh
-  (cd web && bun ci && bun run fmt:check && bun run lint && bun run knip && bun run test)
+  (cd web && bun ci && bun run fmt:check && bun run lint && bun run test)
+  (cd web && bun run fallow dead-code --baseline fallow-baseline.json && bun run fallow audit --base main)
   ./scripts/check-ui-styles.sh && ./scripts/build-ui.sh && ./scripts/ui-budget.sh
   ZEABUR_UI_DIST="$PWD/web/dist" cargo nextest run -p zeabur-ui
   nix develop .#zh -c ./scripts/check-zh-tw.sh   # zh-TW wording, after changing a zh-TW string
@@ -86,6 +87,22 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
      become a summary and a search box, not a squeezed desktop.
   10. *Check at scale*: screenshot every changed collection at 390, 1440 and 1960 with the demo's
       small data and with many items (dozens of services, rules, domains, changes, long names).
+- **fallow** (`bun run fallow <command>`, the version pinned in `web/package.json`, config in
+  `web/.fallowrc.json`).
+  - `dead-code`: unused files, exports and dependencies, and imports that cross a layer. Layers go
+    upwards only: `i18n` ← `session` ← `api` ← `lib` ← `auth` ← `model` ← `components` ←
+    `modules` ← `routes` ← `main.tsx`/`router.tsx`. Unit tests may import any layer. A new
+    directory under `src/` needs a zone. `fallow-baseline.json` holds the findings that predate
+    fallow; never add to it. After a fix, `bun run fallow baselines prune` drops its entry.
+  - `audit --base main`: what CI gates on. It fails on findings that the change introduces in the
+    files it touches: dead code, complexity over the thresholds (cyclomatic 20, cognitive 15,
+    CRAP 30) and new duplicated blocks. Inherited findings are listed but do not fail.
+  - `health`: the score (0–100) and its `penalties`, complexity per function, and hotspots
+    (complex files that change often). `dupes`: clone groups. `health --css`: CSS structure and
+    token drift; it reads stylesheets, not Tailwind classes. These are reports, not gates.
+  - Read a finding from its `--format json` output: `actions` says the fix. A false positive
+    gets an entry in `.fallowrc.json` with the reason, as for the lazy route pages. Do not add
+    `fallow-ignore` comments to hide a true finding.
 - **Lint.** `bun run lint` includes [shadcn/lint](https://github.com/shadcn-ui/lint) (rules in
   `web/.oxlintrc.json`, which recognises the design system's components by `componentImports`;
   conventions in `web/DESIGN.md`, "Lint"). Pages pass only layout classes to a component: a

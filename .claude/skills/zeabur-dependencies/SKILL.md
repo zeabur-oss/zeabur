@@ -36,5 +36,10 @@ description: Add or upgrade a Rust or web dependency in Zeabur under its supply-
   `@svgr/core` + `@svgr/plugin-jsx`; all dev
   dependencies). Components come from the shadcn registry
   (`bunx --bun shadcn@latest add <component>`), on Base UI.
+- fallow is not in nixpkgs. It runs as `bunx fallow@<version>` from the `fallow` script in
+  `package.json`. Its platform packages ship a prebuilt Rust binary (npm provenance; the wrapper
+  checks its signature before it runs) and run no install scripts. Bump it to a release at least
+  seven days old, in the script and in `.fallowrc.json`'s `$schema`. Move it to the flake when
+  nixpkgs has it.
 - Check the first-load size after adding a runtime package: `./scripts/build-ui.sh &&
   ./scripts/ui-budget.sh`.

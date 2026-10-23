@@ -135,17 +135,27 @@ case "$job" in
     cargo fuzz run parse --sanitizer none -- -max_total_time=60
     ;;
   # The web interface: banned styles, generated sentences up to date (before the build regenerates
-  # them), lint, unused code, build, unit tests, generated API types up to date, size budget, and a
-  # release build that embeds it.
+  # them), lint, unused code and layer boundaries, new findings in the changed files, build, unit
+  # tests, generated API types up to date, size budget, and a release build that embeds it. The
+  # health and duplication report after it does not fail the job.
   ui)
     ./scripts/check-ui-styles.sh
     ./scripts/check-messages.sh
     ./scripts/build-ui.sh
-    (cd web; bun run lint; bun run knip; bun run test; bun run gen:api)
+    (
+      cd web
+      bun run lint
+      bun run fallow dead-code --baseline fallow-baseline.json
+      # On a pull request, HEAD is GitHub's merge commit and HEAD^ is the base branch.
+      bun run fallow audit --base "${FALLOW_AUDIT_BASE:-HEAD^}"
+      bun run test
+      bun run gen:api
+    )
     git diff --exit-code -- web/src/api/schema.d.ts
     ./scripts/ui-budget.sh
     ZEABUR_UI_DIST="$root/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
     ZEABUR_UI_DIST="$root/web/dist" cargo nextest run --release --locked -p zeabur-ui
+    (cd web; bun run fallow health --report-only --top 10; bun run fallow dupes --summary)
     ;;
   # The API-only build needs no JavaScript toolchain: bun is taken off PATH.
   no-ui) ./scripts/build-without-ui.sh ;;

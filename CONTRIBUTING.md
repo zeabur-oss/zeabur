@@ -29,14 +29,17 @@ cargo deny --locked check
 ./scripts/build-without-ui.sh                # the API-only build, without bun
 (cd web && bun ci && bun run fmt:check)
 ./scripts/check-ui-styles.sh && ./scripts/build-ui.sh   # build-ui.sh type-checks too (tsc -b)
-(cd web && bun run lint && bun run knip && bun run test && bun run gen:api)
+(cd web && bun run lint && bun run fallow dead-code --baseline fallow-baseline.json && bun run fallow audit --base main && bun run test && bun run gen:api)
 git diff --exit-code -- web/src/api/schema.d.ts     # the generated API types are up to date
 ./scripts/ui-budget.sh
 ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
 ```
 
-`bun run knip` finds unused files, exports and dependencies in `web/`; `bun run test` runs the
-interface's unit tests with `bun test`.
+`bun run fallow` runs [fallow](https://github.com/fallow-rs/fallow) at the version pinned in
+`web/package.json`. `fallow dead-code` finds unused files, exports and dependencies in `web/` and
+imports that cross the layers in `web/.fallowrc.json`; `fallow-baseline.json` lists the findings
+that predate it. `fallow audit` fails on new findings in the files a change touches, complexity and
+duplication included. `bun run test` runs the interface's unit tests with `bun test`.
 
 The interface's zh-TW wording is checked with [zhtw-mcp](https://github.com/sysprog21/zhtw-mcp) in
 a dev shell of its own (it builds from source; the pin and how to bump it are in `flake.nix`), as
