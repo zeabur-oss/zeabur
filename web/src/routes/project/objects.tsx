@@ -384,7 +384,7 @@ function ObjectList({
                       onClick={() =>
                         onOpen(row.object.id.replace(/^projects\/[^/]+\/objects\//, ""))
                       }
-                      className="flex h-8.5 w-full items-center gap-3 px-4 text-left text-sm outline-none hover:bg-hover"
+                      className="flex h-8.5 w-full items-center gap-2 px-4 text-left text-sm outline-none hover:bg-hover"
                     >
                       <CaretRightIcon
                         className="size-3 shrink-0 text-muted-foreground"
@@ -499,7 +499,7 @@ function KindRow({
         title={pinned ? t("objects.unpin", kind.kind) : t("objects.pin", kind.kind)}
         onClick={() => togglePinnedKind(row.key)}
         className={cn(
-          "rounded p-1 outline-none hover:bg-muted",
+          "-mr-1 rounded p-1 outline-none hover:bg-muted",
           pinned ? "text-foreground" : "text-muted-foreground/60",
         )}
       >
