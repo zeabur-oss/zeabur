@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test"
-import { domainsLead, filterRoutes, plainFirst } from "@/model/domains"
+import type { Schemas } from "@/api/client"
+import {
+  configuration,
+  dnsSetup,
+  domainsLead,
+  filterRoutes,
+  plainFirst,
+  recordsFor,
+  wildcardFor,
+} from "@/model/domains"
 import type { PublicRoute } from "@/model/service"
 
 const route = (host: string | undefined, https: boolean, path?: string): PublicRoute => ({
@@ -64,5 +73,89 @@ describe("filterRoutes", () => {
     expect(filterRoutes(routes, "SHOP").map((r) => r.host)).toEqual(["shop.example.com"])
     expect(filterRoutes(routes, "/v1").map((r) => r.host)).toEqual(["api.example.com"])
     expect(filterRoutes(routes, "nothing")).toEqual([])
+  })
+})
+
+const check = (more: Partial<Schemas["DomainCheck"]> = {}): Schemas["DomainCheck"] => ({
+  target: ["203.0.113.10"],
+  dns: "missing",
+  ...more,
+})
+
+describe("recordsFor", () => {
+  test("an A record per IPv4 address and AAAA per IPv6", () => {
+    expect(recordsFor("shop.example.com", ["203.0.113.10", "2001:db8::1"])).toEqual([
+      { type: "A", name: "shop.example.com", value: "203.0.113.10" },
+      { type: "AAAA", name: "shop.example.com", value: "2001:db8::1" },
+    ])
+  })
+  test("one CNAME to a load balancer's host name", () => {
+    expect(
+      recordsFor("shop.example.com", ["lb-1.elb.example.net", "lb-2.elb.example.net"]),
+    ).toEqual([{ type: "CNAME", name: "shop.example.com", value: "lb-1.elb.example.net" }])
+  })
+  test("nothing when no address is known", () => {
+    expect(recordsFor("shop.example.com", [])).toEqual([])
+  })
+})
+
+describe("wildcardFor", () => {
+  test("one label under the suffix is covered by its wildcard", () => {
+    expect(wildcardFor("web-shop.apps.example.com", "apps.example.com")).toBe("*.apps.example.com")
+  })
+  test("deeper names, the suffix itself and other domains are not", () => {
+    expect(wildcardFor("a.b.apps.example.com", "apps.example.com")).toBeUndefined()
+    expect(wildcardFor("apps.example.com", "apps.example.com")).toBeUndefined()
+    expect(wildcardFor("shop.example.com", "apps.example.com")).toBeUndefined()
+    expect(wildcardFor("shop.example.com", undefined)).toBeUndefined()
+  })
+})
+
+describe("dnsSetup", () => {
+  test("pointing at the cluster needs nothing", () => {
+    expect(dnsSetup("shop.example.com", check({ dns: "pointsHere" }))).toEqual({ as: "valid" })
+  })
+  test("a missing record names the record to add", () => {
+    expect(dnsSetup("shop.example.com", check())).toEqual({
+      as: "missing",
+      records: [{ type: "A", name: "shop.example.com", value: "203.0.113.10" }],
+    })
+  })
+  test("a name under the suffix needs the wildcard, not its own record", () => {
+    expect(dnsSetup("web.apps.example.com", check(), "apps.example.com")).toEqual({
+      as: "missing",
+      records: [{ type: "A", name: "*.apps.example.com", value: "203.0.113.10" }],
+    })
+  })
+  test("another address is said with what it resolved to", () => {
+    expect(
+      dnsSetup("shop.example.com", check({ dns: "elsewhere", resolved: ["198.51.100.7"] })),
+    ).toMatchObject({ as: "elsewhere", resolved: ["198.51.100.7"] })
+  })
+})
+
+describe("configuration", () => {
+  test("valid when DNS points here and the certificate is issued", () => {
+    expect(configuration(check({ dns: "pointsHere", certificate: { state: "ready" } }))).toBe(
+      "valid",
+    )
+  })
+  test("valid when no cert-manager certificate is involved", () => {
+    expect(configuration(check({ dns: "pointsHere" }))).toBe("valid")
+  })
+  test("invalid when a record is missing or issuing failed", () => {
+    expect(configuration(check())).toBe("invalid")
+    expect(configuration(check({ dns: "pointsHere", certificate: { state: "failed" } }))).toBe(
+      "invalid",
+    )
+  })
+  test("pending while a certificate is issued", () => {
+    expect(configuration(check({ dns: "pointsHere", certificate: { state: "issuing" } }))).toBe(
+      "pending",
+    )
+  })
+  test("another address is its own state; a lookup without answer is unknown", () => {
+    expect(configuration(check({ dns: "elsewhere" }))).toBe("elsewhere")
+    expect(configuration(check({ dns: "unknown" }))).toBe("unknown")
   })
 })
