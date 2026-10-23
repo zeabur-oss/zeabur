@@ -5402,7 +5402,9 @@ components:
           description: The `PodDisruptionBudget` that covers it.
         budgetBlocks:
           type: boolean
-          description: That budget allows no disruption now, so its eviction waits.
+          description: |-
+            That budget allows fewer disruptions now than this node has pods under it, so some of
+            their evictions wait.
         fate:
           $ref: "#/components/schemas/PodFate"
           description: What happens to it.
@@ -5676,6 +5678,7 @@ components:
       - waiting
       - refused
       - failed
+      - last
     EvictedPod:
       type: object
       description: One pod of a pass.
@@ -5683,6 +5686,7 @@ components:
       - namespace
       - name
       - outcome
+      - zeabur
       properties:
         budget:
           type:
@@ -5710,6 +5714,11 @@ components:
           format: int32
           description: How long kube-apiserver asked to wait before trying again.
           minimum: 0
+        zeabur:
+          type: boolean
+          description: |-
+            One of Zeabur's own pods: once it is leaving, the passes after it fail until Zeabur is up
+            again on another node.
     EvidenceBundle:
       type: object
       description: A service's evidence, as Markdown.

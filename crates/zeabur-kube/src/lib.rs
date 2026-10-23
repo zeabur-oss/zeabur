@@ -257,6 +257,40 @@ fn pool(config: &kube::Config, idle: std::time::Duration) -> Result<Pool, Connec
     )
 }
 
+/// kube-rs's retry of `429`, `503` and `504`, except for evictions: their `429` is a disruption
+/// budget's answer, which the caller reports, and retrying it held a request for minutes.
+#[derive(Clone)]
+struct Retry(kube::client::retry::RetryPolicy);
+
+impl<Res>
+    tower::retry::Policy<http::Request<kube::client::Body>, http::Response<Res>, tower::BoxError>
+    for Retry
+{
+    type Future = tokio::time::Sleep;
+
+    fn retry(
+        &mut self,
+        request: &mut http::Request<kube::client::Body>,
+        result: &mut Result<http::Response<Res>, tower::BoxError>,
+    ) -> Option<Self::Future> {
+        if request.uri().path().ends_with("/eviction") {
+            return None;
+        }
+        self.0.retry(request, result)
+    }
+
+    fn clone_request(
+        &mut self,
+        request: &http::Request<kube::client::Body>,
+    ) -> Option<http::Request<kube::client::Body>> {
+        <kube::client::retry::RetryPolicy as tower::retry::Policy<
+            _,
+            http::Response<Res>,
+            tower::BoxError,
+        >>::clone_request(&mut self.0, request)
+    }
+}
+
 /// The layers of kube-rs's default client (retry, auth, extra headers, tracing) over `pool`.
 fn client(config: kube::Config, pool: Pool) -> Result<kube::Client, ConnectError> {
     use kube::client::ConfigExt as _;
@@ -267,7 +301,7 @@ fn client(config: kube::Config, pool: Pool) -> Result<kube::Client, ConnectError
         .option_layer(
             config
                 .default_retry
-                .then(|| tower::retry::RetryLayer::new(RetryPolicy::server_retry())),
+                .then(|| tower::retry::RetryLayer::new(Retry(RetryPolicy::server_retry()))),
         )
         .option_layer(config.auth_layer().map_err(|e| refused(&e))?)
         .layer(config.extra_headers_layer().map_err(|e| refused(&e))?)
@@ -494,6 +528,68 @@ contexts:
         assert!(first.contains("authorization: bearer alice-token"));
         assert!(second.contains("authorization: bearer bob-token"));
         assert!(!second.contains("alice-token"));
+    }
+
+    /// Answers `429` and then `200` on one connection, and counts the requests.
+    async fn busy_then_ok(listener: tokio::net::TcpListener) -> usize {
+        use tokio::io::AsyncWriteExt as _;
+        let (mut socket, _) = listener.accept().await.unwrap();
+        let mut seen = 0;
+        while request(&mut socket).await.is_some() {
+            seen += 1;
+            let reply = if seen == 1 {
+                let status = r#"{"kind":"Status","apiVersion":"v1","status":"Failure","code":429,"reason":"TooManyRequests"}"#;
+                format!(
+                    "HTTP/1.1 429 Too Many Requests\r\nretry-after: 0\r\ncontent-length: {}\r\n\r\n{status}",
+                    status.len()
+                )
+            } else {
+                "HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\n{}".to_owned()
+            };
+            socket.write_all(reply.as_bytes()).await.unwrap();
+        }
+        seen
+    }
+
+    #[tokio::test]
+    async fn an_eviction_a_budget_refuses_is_answered_at_once() {
+        let (listener, url) = listen().await;
+        let server = tokio::spawn(busy_then_ok(listener));
+        let client = own_pool(kube::Config::new(url), std::time::Duration::from_secs(60));
+        let eviction = http::Request::post("/api/v1/namespaces/shop/pods/web-1/eviction")
+            .body(b"{}".to_vec())
+            .unwrap();
+        let answer = tokio::time::timeout(PATIENCE, client.kube().request_text(eviction))
+            .await
+            .expect("the eviction was retried");
+        assert!(
+            matches!(answer, Err(kube::Error::Api(ref status)) if status.code == 429),
+            "{answer:?}"
+        );
+        drop(client);
+        assert_eq!(
+            tokio::time::timeout(PATIENCE, server)
+                .await
+                .unwrap()
+                .unwrap(),
+            1
+        );
+    }
+
+    #[tokio::test]
+    async fn other_requests_are_still_retried_when_busy() {
+        let (listener, url) = listen().await;
+        let server = tokio::spawn(busy_then_ok(listener));
+        let client = own_pool(kube::Config::new(url), std::time::Duration::from_secs(60));
+        assert_eq!(version(&client).await.unwrap(), "{}");
+        drop(client);
+        assert_eq!(
+            tokio::time::timeout(PATIENCE, server)
+                .await
+                .unwrap()
+                .unwrap(),
+            2
+        );
     }
 
     #[tokio::test]
