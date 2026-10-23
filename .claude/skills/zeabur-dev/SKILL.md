@@ -50,6 +50,11 @@ environment, not a fresh one; on a VM, snapshot its clean state and restore it a
 - Docs: identifiers in backticks (clippy `doc_markdown`); add proper nouns to `clippy.toml`
   `doc-valid-idents` instead of backticking them.
 
+## Standards
+- Writing a comment, rustdoc or commit message; adding or removing a test; adding a trait, layer,
+  option or flag; or code that lists, watches, polls, stores or fans out: apply
+  [`STANDARDS.md`](STANDARDS.md) and check the change against it.
+
 ## Documentation
 - A comment says only what the code cannot: a quirk and its cause, a workaround, or the
   specification section or issue behind behaviour that must not change, cited in rustdoc (see
