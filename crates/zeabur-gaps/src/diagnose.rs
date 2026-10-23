@@ -981,9 +981,11 @@ fn volume_missing(
 
 // ── Scheduling and quota ────────────────────────────────────────────────────────────────────────
 
-/// What the scheduler says is short, from its message ("0/3 nodes are available: 3 Insufficient
-/// cpu."): `claimMissing` or `claimUnbound` (a volume claim the pod mounts), `cpu`, `memory`,
-/// `placement` (taints, affinity, selectors), or `other`.
+/// What the scheduler says is short, from its message.
+///
+/// From "0/3 nodes are available: 3 Insufficient cpu.": `claimMissing` or `claimUnbound` (a
+/// volume claim the pod mounts), `cpu`, `memory`, `placement` (taints, affinity, selectors), or
+/// `other`.
 #[must_use]
 pub fn shortage(message: &str) -> &'static str {
     if missing_claim(message).is_some() {

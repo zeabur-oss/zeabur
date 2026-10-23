@@ -190,7 +190,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
           .getByRole("button", { name: "Terminal", exact: true }),
       ).toBeEnabled()
       await developer.getByRole("tab", { name: "Logs" }).click()
-      await expect(developer.getByRole("tabpanel")).toBeVisible()
+      await expect(developer.getByRole("tabpanel", { name: "Logs" })).toBeVisible()
       await developer.getByRole("tab", { name: "Settings" }).click()
       await developer
         .getByRole("group", { name: "Views" })
