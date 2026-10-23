@@ -1,0 +1,30 @@
+apiVersion: seaweed.seaweedfs.com/v1
+kind: Seaweed
+metadata:
+  name: files
+  namespace: demo
+  resourceVersion: "2"
+spec:
+  master: {replicas: 1, persistence: {enabled: true}}
+  volume: {replicas: 1}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: mount0-files-volume-0, namespace: demo, resourceVersion: "3"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 10Gi}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: files-master-files-master-0, namespace: demo, resourceVersion: "4"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: files-other-0, namespace: demo, resourceVersion: "5"}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}

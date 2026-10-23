@@ -1,0 +1,7 @@
+{
+  "objects": [
+    {"target": {"kind": "Seaweed", "name": "files"}, "write": {"type": "delete", "resourceVersion": "2"}},
+    {"target": {"kind": "PersistentVolumeClaim", "name": "mount0-files-volume-0"}, "write": {"type": "delete", "resourceVersion": "3"}},
+    {"target": {"kind": "PersistentVolumeClaim", "name": "files-master-files-master-0"}, "write": {"type": "delete", "resourceVersion": "4"}}
+  ]
+}

@@ -1,0 +1,8 @@
+description: "Deleting a SeaweedFS store also deletes the claims its StatefulSets keep, and no other claim."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: seaweed.seaweedfs.com, version: v1, resource: seaweeds}
+        name: files

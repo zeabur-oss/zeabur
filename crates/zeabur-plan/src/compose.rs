@@ -1113,7 +1113,7 @@ volumes:
     #[test]
     fn minio_clients_point_at_its_url_and_keys() {
         let c = convert_yaml(
-            r#"
+            r"
 services:
   app:
     image: ghcr.io/acme/app:1
@@ -1128,7 +1128,7 @@ services:
     environment:
       MINIO_ROOT_USER: acme
       MINIO_ROOT_PASSWORD: s3cret
-"#,
+",
             &[],
         );
         let app = find(&c, "app");

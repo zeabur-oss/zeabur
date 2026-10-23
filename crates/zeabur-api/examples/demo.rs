@@ -2054,11 +2054,29 @@ fn state() -> State {
                     "secretName": "files-mvjrswvl-app"}
             })),
             from(json!({
+                "apiVersion": "seaweed.seaweedfs.com/v1", "kind": "S3Identity",
+                "metadata": {"name": "files-mvjrswvl-app", "namespace": "lab"},
+                "spec": {"seaweedRef": {"name": "files-mvjrswvl"}}
+            })),
+            from(json!({
+                "apiVersion": "seaweed.seaweedfs.com/v1", "kind": "S3Policy",
+                "metadata": {"name": "files-mvjrswvl-app", "namespace": "lab"},
+                "spec": {"seaweedRef": {"name": "files-mvjrswvl"},
+                    "statements": [{"effect": "Allow", "actions": ["s3:*"], "resources": ["*"]}]}
+            })),
+            from(json!({
+                "apiVersion": "seaweed.seaweedfs.com/v1", "kind": "S3PolicyBinding",
+                "metadata": {"name": "files-mvjrswvl-app", "namespace": "lab"},
+                "spec": {"seaweedRef": {"name": "files-mvjrswvl"},
+                    "policyRef": {"name": "files-mvjrswvl-app"},
+                    "subjects": [{"kind": "S3Identity", "name": "files-mvjrswvl-app"}]}
+            })),
+            from(json!({
                 "apiVersion": "seaweed.seaweedfs.com/v1", "kind": "Bucket",
                 "metadata": {"name": "uploads", "namespace": "lab"},
                 "spec": {"clusterRef": {"name": "files-mvjrswvl"}, "reclaimPolicy": "Delete"},
                 "status": {"phase": "Ready", "bucketName": "uploads",
-                    "usage": {"sizeBytes": 734003200, "objectCount": 1284}}
+                    "usage": {"sizeBytes": 734_003_200, "objectCount": 1284}}
             })),
             from(json!({
                 "apiVersion": "upgrade.cattle.io/v1", "kind": "Plan",

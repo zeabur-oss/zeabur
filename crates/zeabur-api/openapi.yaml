@@ -13532,7 +13532,7 @@ components:
       - name
       - user
       properties:
-        accessKey:
+        id:
           type:
           - string
           - "null"
@@ -13554,12 +13554,9 @@ components:
       required:
       - origin
       - name
-      - bucket
+      - s3Name
       - deletesContents
       properties:
-        bucket:
-          type: string
-          description: The S3 bucket name.
         deletesContents:
           type: boolean
           description: Deleting the object deletes the bucket and its contents.
@@ -13585,6 +13582,9 @@ components:
           - string
           - "null"
           description: "`Pending`, `Ready`, `Failed` or `Terminating`, as the operator says."
+        s3Name:
+          type: string
+          description: The S3 bucket name.
         usedBytes:
           type:
           - integer
@@ -13600,7 +13600,7 @@ components:
       - state
       - members
       - ready
-      - claims
+      - iam
       - buckets
       - object
       - pods
@@ -13615,13 +13615,6 @@ components:
           items:
             $ref: "#/components/schemas/SeaweedBucket"
           description: Its buckets, by name.
-        claims:
-          type: array
-          items:
-            type: string
-          description: |-
-            Its PersistentVolumeClaims, as the operator names them. The operator keeps them when the
-            store is deleted.
         connection:
           oneOf:
           - $ref: "#/components/schemas/DatabaseConnection"
@@ -13634,6 +13627,11 @@ components:
           - string
           - "null"
           description: When it was created, RFC 3339.
+        iam:
+          type: array
+          items:
+            $ref: "#/components/schemas/Origin"
+          description: "Its IAM objects: identities, credentials, policies and policy bindings, by kind and name."
         image:
           type:
           - string

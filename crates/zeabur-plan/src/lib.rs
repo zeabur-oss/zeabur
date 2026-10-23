@@ -32,7 +32,7 @@ pub use change::{
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};
-pub use delete::{MONGODB_CLAIMS_FINALIZER, mongodb_data_claims};
+pub use delete::{MONGODB_CLAIMS_FINALIZER, data_claims};
 pub use owned::{Owned, SERVICE_LABEL, owned, workload_of};
 pub use plan::{
     CREATABLE, ErrorKind, Fetched, Input, PlanError, RESTARTED_AT, StorageClassInfo, creatable,

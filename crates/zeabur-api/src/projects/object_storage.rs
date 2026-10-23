@@ -61,6 +61,9 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectObjectStora
             &seaweedfs::SEAWEEDS,
             &seaweedfs::BUCKETS,
             &seaweedfs::CREDENTIALS,
+            &seaweedfs::IDENTITIES,
+            &seaweedfs::POLICIES,
+            &seaweedfs::BINDINGS,
         ],
         Some(project),
         &mut unreadable,
@@ -68,11 +71,19 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectObjectStora
     .await
     .map_err(failed)?;
     let (state, mut items) = match read {
-        Ok([stores, buckets, credentials]) => (
+        Ok([stores, buckets, credentials, identities, policies, bindings]) => (
             ProviderState::Installed,
             stores
                 .iter()
-                .map(|s| seaweedfs::object_storage(project, s, &buckets, &credentials))
+                .map(|s| {
+                    seaweedfs::object_storage(
+                        project,
+                        s,
+                        &buckets,
+                        &credentials,
+                        &[&identities, &policies, &bindings],
+                    )
+                })
                 .collect::<Vec<_>>(),
         ),
         Err(state) => (state, Vec::new()),

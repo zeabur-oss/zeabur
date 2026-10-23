@@ -77,13 +77,11 @@ pub(super) async fn reclaim_policies(
     for (resource, name) in deleted(request) {
         if resource.group.is_empty() && resource.resource == "persistentvolumeclaims" {
             claims.push(name.to_owned());
-        } else if resource.group == "psmdb.percona.com"
-            && resource.resource == "perconaservermongodbs"
-            && let Some(found) = objects
-                .iter()
-                .find(|f| &f.resource == resource && f.name == name)
+        } else if let Some(found) = objects
+            .iter()
+            .find(|f| &f.resource == resource && f.name == name)
         {
-            claims.extend(zeabur_plan::mongodb_data_claims(&found.object, snapshot));
+            claims.extend(zeabur_plan::data_claims(resource, &found.object, snapshot));
         }
     }
     let mut out = BTreeMap::new();

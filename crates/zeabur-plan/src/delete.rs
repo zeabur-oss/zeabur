@@ -31,6 +31,8 @@
 //!   object carries the finalizer `percona.com/delete-psmdb-pvc` [psmdb-finalizers], and the plan
 //!   lists them with what goes with it; without the finalizer the plan deletes each claim itself,
 //!   after the object. Backups in object storage stay.
+//! - **A `SeaweedFS` store** (`Seaweed`) keeps its claims: the operator's StatefulSets retain them
+//!   [seaweed-retain]. The plan deletes each claim itself, after the object.
 //! - **A ConfigMap, Secret or claim in use**: the plan names the workloads that still read or mount
 //!   it, whose new pods will not start without it; a claim a pod uses stays until no pod does
 //!   [k8s-in-use].
@@ -48,6 +50,7 @@
 //! [k8s-reclaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 //! [k8s-in-use]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#storage-object-in-use-protection
 //! [psmdb-finalizers]: https://docs.percona.com/percona-operator-for-mongodb/operator.html#metadata
+//! [seaweed-retain]: https://github.com/seaweedfs/seaweedfs-operator/blob/seaweedfs-operator-0.1.43/internal/controller/pv_reclaim.go
 
 use std::collections::BTreeSet;
 
@@ -84,7 +87,7 @@ pub const MONGODB_CLAIMS_FINALIZER: &str = "percona.com/delete-psmdb-pvc";
 /// (`-nv-<n>` and `-hidden-<n>` for non-voting and hidden members), and from its config servers
 /// (`cfg`) when sharded. A claim a controller owns is left out: it goes with its owner.
 #[must_use]
-pub fn mongodb_data_claims(cluster: &Value, snapshot: &Snapshot) -> Vec<String> {
+fn mongodb_data_claims(cluster: &Value, snapshot: &Snapshot) -> Vec<String> {
     let name = cluster
         .pointer("/metadata/name")
         .and_then(Value::as_str)
@@ -119,6 +122,51 @@ pub fn mongodb_data_claims(cluster: &Value, snapshot: &Snapshot) -> Vec<String> 
             })
         })
         .collect()
+}
+
+/// The data claims of `Seaweed` `store` in `snapshot`, by name.
+///
+/// They are `mount<d>-<store>-volume-<n>` for the volume servers, and
+/// `<store>-master-<store>-master-<n>` and `<store>-filer-<store>-filer-<n>` when the master and
+/// filer persist.
+#[must_use]
+fn seaweed_data_claims(store: &Value, snapshot: &Snapshot) -> Vec<String> {
+    let name = store
+        .pointer("/metadata/name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let ordinal = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let volume = format!("-{name}-volume-");
+    let parts = [
+        format!("{name}-master-{name}-master-"),
+        format!("{name}-filer-{name}-filer-"),
+    ];
+    snapshot
+        .persistent_volume_claims
+        .iter()
+        .filter(|c| zeabur_adapters::controller_of(&c.metadata).is_none())
+        .filter_map(|c| c.metadata.name.clone())
+        .filter(|claim| {
+            let disk = claim.strip_prefix("mount").and_then(|rest| {
+                let (d, rest) = rest.split_once(&volume)?;
+                (ordinal(d) && ordinal(rest)).then_some(())
+            });
+            disk.is_some()
+                || parts
+                    .iter()
+                    .any(|p| claim.strip_prefix(p.as_str()).is_some_and(ordinal))
+        })
+        .collect()
+}
+
+/// The data claims that go with deleting `object`, a `resource`, by name.
+#[must_use]
+pub fn data_claims(resource: &ResourceRef, object: &Value, snapshot: &Snapshot) -> Vec<String> {
+    match (resource.group.as_str(), resource.resource.as_str()) {
+        ("psmdb.percona.com", "perconaservermongodbs") => mongodb_data_claims(object, snapshot),
+        ("seaweed.seaweedfs.com", "seaweeds") => seaweed_data_claims(object, snapshot),
+        _ => Vec::new(),
+    }
 }
 
 /// An object the plan read, as the dependents search sees it.
@@ -162,13 +210,7 @@ impl Planner<'_> {
             ));
         }
         let object = self.deletable_object(resource, name)?;
-        let data_claims = if resource.group == "psmdb.percona.com"
-            && resource.resource == "perconaservermongodbs"
-        {
-            mongodb_data_claims(&object, self.input.snapshot)
-        } else {
-            Vec::new()
-        };
+        let data_claims = data_claims(resource, &object, self.input.snapshot);
         let meta: ObjectMeta = object
             .get("metadata")
             .cloned()

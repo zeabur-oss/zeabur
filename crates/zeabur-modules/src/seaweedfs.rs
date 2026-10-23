@@ -27,8 +27,39 @@ use crate::{Module, Read, text};
 pub static MODULE: Module = Module {
     id: "seaweedfs-operator",
     capability: "object-storage",
-    reads: &[SEAWEEDS, BUCKETS, CREDENTIALS],
+    reads: &[
+        SEAWEEDS,
+        BUCKETS,
+        CREDENTIALS,
+        IDENTITIES,
+        POLICIES,
+        BINDINGS,
+    ],
     http: &[],
+};
+
+/// `seaweed.seaweedfs.com/v1` `S3Identity`, in the project's namespace.
+pub const IDENTITIES: Read = Read {
+    group: "seaweed.seaweedfs.com",
+    version: "v1",
+    resource: "s3identities",
+    kind: "S3Identity",
+};
+
+/// `seaweed.seaweedfs.com/v1` `S3Policy`, in the project's namespace.
+pub const POLICIES: Read = Read {
+    group: "seaweed.seaweedfs.com",
+    version: "v1",
+    resource: "s3policies",
+    kind: "S3Policy",
+};
+
+/// `seaweed.seaweedfs.com/v1` `S3PolicyBinding`, in the project's namespace.
+pub const BINDINGS: Read = Read {
+    group: "seaweed.seaweedfs.com",
+    version: "v1",
+    resource: "s3policybindings",
+    kind: "S3PolicyBinding",
 };
 
 const API_VERSION: &str = "seaweed.seaweedfs.com/v1";
@@ -70,7 +101,7 @@ pub struct Bucket {
     /// The object's name.
     pub name: String,
     /// The S3 bucket name.
-    pub bucket: String,
+    pub s3_name: String,
     /// `Pending`, `Ready`, `Failed` or `Terminating`, as the operator says.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phase: Option<String>,
@@ -98,7 +129,7 @@ pub struct AccessKey {
     pub user: String,
     /// The access key ID, once the operator made it; it is not secret.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub access_key: Option<String>,
+    pub id: Option<String>,
     /// `Pending`, `Ready`, `Failed` or `Terminating`, as the operator says.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phase: Option<String>,
@@ -134,9 +165,8 @@ pub struct ObjectStorage {
     /// The `StorageClass` of the volume servers' disks; absent for the cluster's default.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_class: Option<String>,
-    /// Its PersistentVolumeClaims, as the operator names them. The operator keeps them when the
-    /// store is deleted.
-    pub claims: Vec<String>,
+    /// Its IAM objects: identities, credentials, policies and policy bindings, by kind and name.
+    pub iam: Vec<zeabur_model::Origin>,
     /// Where to connect, inside the cluster, and the Secret with the access key. Absent until the
     /// store has an access key.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -191,7 +221,7 @@ fn bucket(namespace: &str, object: &DynamicObject) -> Bucket {
     let name = object.metadata.name.clone().unwrap_or_default();
     Bucket {
         origin: zeabur_model::Origin::complete(API_VERSION, "Bucket", Some(namespace), &name),
-        bucket: text(object, "/status/bucketName")
+        s3_name: text(object, "/status/bucketName")
             .or_else(|| text(object, "/spec/name"))
             .unwrap_or_else(|| name.clone()),
         phase: text(object, "/status/phase"),
@@ -234,36 +264,6 @@ fn counts(seaweed: &DynamicObject) -> (i64, i64) {
         })
 }
 
-/// The claims of the volume servers' disks, and of the master and filer when they persist.
-fn claims(seaweed: &DynamicObject, name: &str) -> Vec<String> {
-    let replicas =
-        |part: &str| databases::int(seaweed, &format!("/spec/{part}/replicas")).unwrap_or(1);
-    let disks = databases::int(seaweed, "/spec/volumeServerDiskCount").unwrap_or(1);
-    let mut out = Vec::new();
-    if seaweed.data.pointer("/spec/volume").is_some() {
-        for i in 0..replicas("volume").max(0) {
-            out.extend((0..disks.max(0)).map(|d| format!("mount{d}-{name}-volume-{i}")));
-        }
-    }
-    for part in ["master", "filer"] {
-        let persists = seaweed
-            .data
-            .pointer(&format!("/spec/{part}/persistence/enabled"))
-            .and_then(Value::as_bool)
-            == Some(true)
-            && seaweed
-                .data
-                .pointer(&format!("/spec/{part}/persistence/existingClaim"))
-                .is_none();
-        if persists {
-            out.extend(
-                (0..replicas(part).max(0)).map(|i| format!("{name}-{part}-{name}-{part}-{i}")),
-            );
-        }
-    }
-    out
-}
-
 fn state(seaweed: &DynamicObject, members: i64, ready: i64) -> State {
     let condition = seaweed
         .data
@@ -279,6 +279,33 @@ fn state(seaweed: &DynamicObject, members: i64, ready: i64) -> State {
     }
 }
 
+fn iam_objects(
+    namespace: &str,
+    store: &str,
+    credentials: &[DynamicObject],
+    iam: &[&[DynamicObject]],
+) -> Vec<zeabur_model::Origin> {
+    let mut out: Vec<_> = iam
+        .iter()
+        .copied()
+        .chain([credentials])
+        .flatten()
+        .filter(|o| store_of(o, "seaweedRef").as_deref() == Some(store))
+        .filter_map(|o| {
+            let kind = o.types.as_ref()?.kind.clone();
+            let name = o.metadata.name.as_deref()?;
+            Some(zeabur_model::Origin::complete(
+                API_VERSION,
+                &kind,
+                Some(namespace),
+                name,
+            ))
+        })
+        .collect();
+    out.sort_by(|a, b| (&a.kind, &a.name).cmp(&(&b.kind, &b.name)));
+    out
+}
+
 /// One `Seaweed` as an object store, with its buckets and the access key services use.
 #[must_use]
 pub fn object_storage(
@@ -286,6 +313,7 @@ pub fn object_storage(
     seaweed: &DynamicObject,
     buckets: &[DynamicObject],
     credentials: &[DynamicObject],
+    iam: &[&[DynamicObject]],
 ) -> ObjectStorage {
     let name = seaweed.metadata.name.clone().unwrap_or_default();
     let (members, ready) = counts(seaweed);
@@ -310,7 +338,7 @@ pub fn object_storage(
         .filter(|b| store_of(b, "clusterRef").as_deref() == Some(name.as_str()))
         .map(|b| bucket(namespace, b))
         .collect();
-    buckets.sort_by(|a, b| a.bucket.cmp(&b.bucket));
+    buckets.sort_by(|a, b| a.s3_name.cmp(&b.s3_name));
     ObjectStorage {
         origin: zeabur_model::Origin::complete(API_VERSION, "Seaweed", Some(namespace), &name),
         state,
@@ -324,7 +352,7 @@ pub fn object_storage(
         image,
         storage: text(seaweed, "/spec/volume/requests/storage"),
         storage_class: text(seaweed, "/spec/volume/storageClassName"),
-        claims: claims(seaweed, &name),
+        iam: iam_objects(namespace, &name, credentials, iam),
         connection: secret
             .as_ref()
             .map(|(secret, access, private, user)| Connection {
@@ -343,7 +371,7 @@ pub fn object_storage(
                 .as_ref()
                 .and_then(|s| s.3.clone())
                 .unwrap_or_default(),
-            access_key: text(k, "/status/accessKey"),
+            id: text(k, "/status/accessKey"),
             phase: text(k, "/status/phase"),
         }),
         buckets,
@@ -366,7 +394,7 @@ mod tests {
         serde_json::from_value(value).unwrap()
     }
 
-    fn seaweed(status: Value) -> DynamicObject {
+    fn seaweed(status: &Value) -> DynamicObject {
         object(serde_json::json!({
             "apiVersion": API_VERSION, "kind": "Seaweed",
             "metadata": {"name": "files", "namespace": "shop"},
@@ -413,7 +441,7 @@ mod tests {
         ];
         let store = object_storage(
             "shop",
-            &seaweed(serde_json::json!({
+            &seaweed(&serde_json::json!({
                 "conditions": [{"type": "Ready", "status": "True", "message": "ok"}],
                 "master": {"replicas": 1, "readyReplicas": 1},
                 "volume": {"replicas": 1, "readyReplicas": 1},
@@ -422,6 +450,11 @@ mod tests {
             })),
             &buckets,
             &credentials,
+            &[&[object(serde_json::json!({
+                "apiVersion": API_VERSION, "kind": "S3Identity",
+                "metadata": {"name": "files-app", "namespace": "shop"},
+                "spec": {"seaweedRef": {"name": "files"}}
+            }))]],
         );
         assert_eq!(
             (store.state, store.members, store.ready),
@@ -437,24 +470,31 @@ mod tests {
         assert_eq!(connection.secret, "files-app");
         assert_eq!(connection.username_key.as_deref(), Some("accessKey"));
         assert_eq!(connection.password_key, "secretKey");
-        assert_eq!(
-            store.access_key.unwrap().access_key.as_deref(),
-            Some("AKIA1")
-        );
+        assert_eq!(store.access_key.unwrap().id.as_deref(), Some("AKIA1"));
         assert_eq!(store.buckets.len(), 1);
         let uploads = &store.buckets[0];
         assert!(uploads.deletes_contents);
         assert_eq!((uploads.used_bytes, uploads.objects), (Some(2048), Some(3)));
+        let iam: Vec<_> = store
+            .iam
+            .iter()
+            .map(|o| (o.kind.as_str(), o.name.as_str()))
+            .collect();
+        assert_eq!(
+            iam,
+            [("S3Credentials", "files-app"), ("S3Identity", "files-app")]
+        );
     }
 
     #[test]
     fn a_new_store_is_progressing_and_has_no_connection_without_a_key() {
         let store = object_storage(
             "shop",
-            &seaweed(serde_json::json!({
+            &seaweed(&serde_json::json!({
                 "conditions": [{"type": "Ready", "status": "False",
                     "message": "Master: 0/1 ready, Volume: 0/1 ready"}]
             })),
+            &[],
             &[],
             &[],
         );
@@ -465,13 +505,5 @@ mod tests {
         );
         assert!(store.connection.is_none());
         assert_eq!(store.storage_class.as_deref(), Some("longhorn"));
-        assert_eq!(
-            store.claims,
-            [
-                "mount0-files-volume-0",
-                "files-master-files-master-0",
-                "files-filer-files-filer-0"
-            ]
-        );
     }
 }
