@@ -1499,7 +1499,7 @@
   },
   "en": "Volume claim1 has no backup schedule.",
   "zh-TW": "磁碟區 claim1 沒有備份排程。",
-  "zh-CN": "卷 claim1 没有备份计划。"
+  "zh-CN": "卷 claim1 没有定时备份。"
  },
  {
   "key": "gap.databaseWithoutBackup",
@@ -1508,7 +1508,7 @@
   },
   "en": "Database database1 has no backup schedule.",
   "zh-TW": "資料庫 database1 沒有備份排程。",
-  "zh-CN": "数据库 database1 没有备份计划。"
+  "zh-CN": "数据库 database1 没有定时备份。"
  },
  {
   "key": "incident.componentDown.cause.ingressController",

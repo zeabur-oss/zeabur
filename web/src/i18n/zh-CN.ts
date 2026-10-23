@@ -4,6 +4,7 @@ import sentences from "@/i18n/generated/zh-CN"
 
 // A space where Han text meets a Latin word ("查看 Secrets 需要…").
 
+const weekdayZhCN = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
 const latinEnd = (text: string) => (/[A-Za-z0-9]$/.test(text) ? " " : "")
 
@@ -492,6 +493,22 @@ export const zhCN: Messages = {
         : `${total} 个卷都没有备份。`
       : `${total} 个卷中有 ${missing} 个没有备份。`,
   "backups.volumes": (n) => `${n} 个卷`,
+
+  "cron.minute": "每分钟",
+  "cron.minutes": (n) => `每 ${n} 分钟`,
+  "cron.hour": (minute) => (minute === 0 ? "每小时" : `每小时第 ${minute} 分`),
+  "cron.hours": (n, minute) => (minute === 0 ? `每 ${n} 小时` : `每 ${n} 小时的第 ${minute} 分`),
+  "cron.day": (times) => `每天 ${listZh("zh-CN", times)}`,
+  "cron.week": (days, times) =>
+    `每${listZh(
+      "zh-CN",
+      days.map((d) => weekdayZhCN[d] ?? ""),
+    )} ${listZh("zh-CN", times)}`,
+  "cron.weekRange": (from, to, times) =>
+    `每${weekdayZhCN[from]}至${weekdayZhCN[to]} ${listZh("zh-CN", times)}`,
+  "cron.month": (days, times) =>
+    `每月 ${listZh("zh-CN", days.map(String))} 日 ${listZh("zh-CN", times)}`,
+  "cron.zone": (words, zone) => `${words}（${zone}）`,
 
   "lane.web": "Web",
   "lane.internal": "私有服务",
@@ -1571,13 +1588,13 @@ export const zhCN: Messages = {
   "alerts.filter": "筛选告警",
   "backups.title": "备份",
   "backups.namespace": "Namespace 内的所有对象",
-  "backups.unscheduled": "没有备份计划",
+  "backups.unscheduled": "没有定时备份",
   "backups.none": "没有备份",
   "backups.noRun": "还没备份过",
   "backups.noProvider": "要备份卷，请先安装备份组件。",
   "backups.seeComponents": "打开组件",
   "backups.refused": (module) => `没有权限读取 ${module} 的备份。`,
-  "backups.details": "备份计划与记录",
+  "backups.details": "定时备份与记录",
   "backups.paused": "已暂停",
   "backups.succeeded": "成功",
   "backups.partiallyFailed": "部分失败",
@@ -1585,7 +1602,7 @@ export const zhCN: Messages = {
   "backups.running": "运行中",
   "backups.unknown": "未知",
   "backups.veleroVolumesNeedSnapshots": "卷数据需配合快照",
-  "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有备份计划`,
+  "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有定时备份`,
 
   "add.button": "新建",
   "add.inProject": (project) => `在 ${project} 新建`,
@@ -1751,7 +1768,7 @@ export const zhCN: Messages = {
   "db.backup.regionHint": "只在存储服务要求时填写。",
   "db.backup.accessKey": "访问密钥 ID",
   "db.backup.secretKey": "私密访问密钥",
-  "db.backup.frequency": "计划",
+  "db.backup.frequency": "定时",
   "db.backup.daily": "每天 03:00 UTC",
   "db.backup.weekly": "每周日 03:00 UTC",
   "db.backup.keep": "保留天数",
@@ -1768,8 +1785,8 @@ export const zhCN: Messages = {
   "db.backup.retention": "保留",
   "db.backup.retentionDays": (days) => `${days} 天`,
   "db.backup.retentionCount": (count) => `最近 ${count} 份备份`,
-  "db.backup.schedule": "计划",
-  "db.backup.unscheduled": "没有备份计划",
+  "db.backup.schedule": "定时",
+  "db.backup.unscheduled": "没有定时备份",
   "db.backup.runs": "备份记录",
   "db.backup.storeIdle": (store) => `${store} 已经存在，但这个数据库还没有把备份发送到那里。`,
   "db.backup.pluginMissing": "备份 PostgreSQL 需要 CloudNativePG 的 Barman Cloud 插件。",

@@ -4,6 +4,7 @@ import sentences from "@/i18n/generated/zh-TW"
 
 // A space where Han text meets a Latin word ("檢視 Secrets 需要…").
 
+const weekdayZhTW = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
 const latinEnd = (text: string) => (/[A-Za-z0-9]$/.test(text) ? " " : "")
 
@@ -493,6 +494,22 @@ export const zhTW: Messages = {
         : `${total} 個磁碟區都沒有備份。`
       : `${total} 個磁碟區中有 ${missing} 個沒有備份。`,
   "backups.volumes": (n) => `${n} 個磁碟區`,
+
+  "cron.minute": "每分鐘",
+  "cron.minutes": (n) => `每 ${n} 分鐘`,
+  "cron.hour": (minute) => (minute === 0 ? "每小時" : `每小時第 ${minute} 分`),
+  "cron.hours": (n, minute) => (minute === 0 ? `每 ${n} 小時` : `每 ${n} 小時的第 ${minute} 分`),
+  "cron.day": (times) => `每天 ${listZh("zh-TW", times)}`,
+  "cron.week": (days, times) =>
+    `每${listZh(
+      "zh-TW",
+      days.map((d) => weekdayZhTW[d] ?? ""),
+    )} ${listZh("zh-TW", times)}`,
+  "cron.weekRange": (from, to, times) =>
+    `每${weekdayZhTW[from]}至${weekdayZhTW[to]} ${listZh("zh-TW", times)}`,
+  "cron.month": (days, times) =>
+    `每月 ${listZh("zh-TW", days.map(String))} 日 ${listZh("zh-TW", times)}`,
+  "cron.zone": (words, zone) => `${words}（${zone}）`,
 
   "lane.web": "網站",
   "lane.internal": "私有服務",

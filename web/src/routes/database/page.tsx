@@ -23,6 +23,7 @@ import { GateTip, useGate } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
+import { Schedule } from "@/components/schedule"
 import { StatusPill } from "@/components/status"
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
@@ -549,9 +550,7 @@ function Target({ database }: { database: Database }) {
           ) : (
             database.backups.schedules.map((s) => (
               <span key={s.name} className="flex items-center gap-2">
-                <code className="type-mono" translate="no">
-                  {s.cron}
-                </code>
+                <Schedule cron={s.cron} />
                 {s.paused ? (
                   <StatusPill health="idle" size="sm" dot={false}>
                     {t("backups.paused")}

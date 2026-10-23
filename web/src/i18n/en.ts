@@ -4,6 +4,8 @@ import type { P } from "@/i18n/sentence-parts"
 import sentences from "@/i18n/generated/en"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+const listEn = (items: string[]) => new Intl.ListFormat("en").format(items)
+const weekdayEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** What a refused verb does, in a phrase: `patch` changes, `create` adds. */
@@ -549,6 +551,21 @@ export const en = {
         : `None of the ${total} volumes is backed up.`
       : `${missing} of ${total} volumes aren't backed up.`,
   "backups.volumes": (n: number) => plural(n, "volume", "volumes"),
+
+  // Schedules
+  "cron.minute": "Every minute",
+  "cron.minutes": (n: number) => `Every ${n} minutes`,
+  "cron.hour": (minute: number) => (minute === 0 ? "Every hour" : `Every hour at minute ${minute}`),
+  "cron.hours": (n: number, minute: number) =>
+    minute === 0 ? `Every ${n} hours` : `Every ${n} hours at minute ${minute}`,
+  "cron.day": (times: string[]) => `Every day at ${listEn(times)}`,
+  "cron.week": (days: number[], times: string[]) =>
+    `Every ${listEn(days.map((d) => weekdayEn[d] ?? ""))} at ${listEn(times)}`,
+  "cron.weekRange": (from: number, to: number, times: string[]) =>
+    `${weekdayEn[from]} to ${weekdayEn[to]} at ${listEn(times)}`,
+  "cron.month": (days: number[], times: string[]) =>
+    `On day ${listEn(days.map(String))} of every month at ${listEn(times)}`,
+  "cron.zone": (words: string, zone: string) => `${words} (${zone})`,
 
   // Architecture
   "lane.web": "Web",
