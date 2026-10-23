@@ -82,8 +82,8 @@ export function usePlanner(
   return { plan, dialog, fields: refusal?.fields ?? [], refusal }
 }
 
-/** A plan shown as a drawer's second step (`PlanDrawer`), not a dialog over it. `onDone` closes
- * the drawer once the apply starts. */
+/** A plan shown as a drawer's second step (`PlanDrawer`), not a dialog over it. Once the apply
+ * starts the step closes and `onDone` runs, which usually closes the drawer. */
 export function usePlanStep(project: string, onDone: () => void, onApplied?: () => void) {
   const [open, setOpen] = useState<Open | null>(null)
   const [refusal, setRefusal] = useState<Problem | undefined>(undefined)
@@ -108,7 +108,10 @@ export function usePlanStep(project: string, onDone: () => void, onApplied?: () 
         ask={open.ask}
         footer={footer}
         onClose={() => setOpen(null)}
-        onConfirmed={onDone}
+        onConfirmed={() => {
+          setOpen(null)
+          onDone()
+        }}
         onApplied={onApplied}
         reopen={reopen}
         onRefused={setRefusal}
