@@ -25,6 +25,7 @@ mod preview;
 mod releases;
 mod reloader;
 mod rollout;
+mod storage;
 mod terminal;
 mod timeline;
 mod trace;

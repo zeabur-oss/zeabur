@@ -2618,6 +2618,34 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/storage":
+    get:
+      tags:
+      - projects
+      summary: |-
+        The `StorageClasses` a new volume of the project can use, and what each of its claims is
+        on: the class, and the node its PersistentVolume is pinned to. Read as you: listing
+        `StorageClasses` and getting PersistentVolumes are cluster-wide rights, and a refusal is named
+        in `unreadable` instead of failing the answer.
+      operationId: getProjectStorage
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectStorage"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/timeline":
     get:
       tags:
@@ -4040,6 +4068,48 @@ components:
         url:
           type: string
           description: Where to read it.
+    ClaimStorage:
+      type: object
+      description: Where one claim's data is.
+      required:
+      - origin
+      - claim
+      properties:
+        capacity:
+          type:
+          - string
+          - "null"
+          description: The size it has (`status.capacity.storage`), once bound.
+        claim:
+          type: string
+          description: Its name.
+        node:
+          type:
+          - string
+          - "null"
+          description: >-
+            The one node the PersistentVolume's node affinity names, by
+            `kubernetes.io/hostname`.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The PersistentVolumeClaim.
+        pinned:
+          type:
+          - boolean
+          - "null"
+          description: |-
+            Whether the PersistentVolume may be used only on some nodes (a required node affinity);
+            absent when it could not be read or there is none yet.
+        storageClass:
+          type:
+          - string
+          - "null"
+          description: "`spec.storageClassName`; absent when it names none."
+        volume:
+          type:
+          - string
+          - "null"
+          description: Its PersistentVolume (`spec.volumeName`), once bound.
     Classification:
       type: object
       description: Where a workload is listed and under which name.
@@ -4903,6 +4973,13 @@ components:
           - string
           - "null"
           description: The size of each member's volume, as asked for.
+        storageClass:
+          type:
+          - string
+          - "null"
+          description: |-
+            The `StorageClass` of each member's volume, as asked for; absent for the cluster's
+            default.
         version:
           type:
           - string
@@ -10356,6 +10433,37 @@ components:
       enum:
       - developer
       - viewer
+    ProjectStorage:
+      type: object
+      description: A project's storage.
+      required:
+      - id
+      - classes
+      - claims
+      - unreadable
+      properties:
+        claims:
+          type: array
+          items:
+            $ref: "#/components/schemas/ClaimStorage"
+          description: The project's PersistentVolumeClaims, by name.
+        classes:
+          type: array
+          items:
+            $ref: "#/components/schemas/StorageClassView"
+          description: >-
+            The cluster's `StorageClasses`, the default first; empty when they may not be
+            listed.
+        id:
+          type: string
+          description: "`projects/{project}/storage`."
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: |-
+            What could not be read: `storageclasses.storage.k8s.io`, `persistentvolumeclaims`,
+            `persistentvolumes`.
     ProjectSummary:
       allOf:
       - $ref: "#/components/schemas/ProjectDetails"
@@ -11728,6 +11836,52 @@ components:
       enum:
       - daemonSet
       - static
+    StorageClassView:
+      type: object
+      description: A `StorageClass`.
+      required:
+      - origin
+      - name
+      - provisioner
+      - kind
+      - default
+      - allowExpansion
+      - reclaimPolicy
+      - bindingMode
+      properties:
+        allowExpansion:
+          type: boolean
+          description: "`allowVolumeExpansion`: its claims may grow."
+        bindingMode:
+          type: string
+          description: |-
+            `volumeBindingMode`: `WaitForFirstConsumer` makes the volume where its first pod runs,
+            `Immediate` when the claim is made.
+        default:
+          type: boolean
+          description: The cluster's default (`storageclass.kubernetes.io/is-default-class`).
+        kind:
+          $ref: "#/components/schemas/StorageKind"
+          description: What kind of disk it gives.
+        name:
+          type: string
+          description: Its name.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `StorageClass`.
+        provisioner:
+          type: string
+          description: "`provisioner`."
+        reclaimPolicy:
+          type: string
+          description: "`reclaimPolicy`: what becomes of a volume when its claim is deleted (`Delete`, `Retain`)."
+    StorageKind:
+      type: string
+      description: What kind of disk a `StorageClass` gives, from its provisioner.
+      enum:
+      - local
+      - replicated
+      - other
     StoreState:
       type: string
       description: Whether the metrics store answered, as the person. An open set.
