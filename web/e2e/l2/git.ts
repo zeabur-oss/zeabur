@@ -13,7 +13,11 @@ export async function deleteService(page: Page, project: string, service: string
     .click()
   await page.getByRole("menuitem", { name: "Delete service" }).click()
   const plan = page.getByRole("dialog", { name: `Delete Deployment ${service}` })
-  await expect(plan).toContainText("Build")
+  const deletes = `Delete ${service}. This can't be undone.`
+  await expect
+    .poll(async () => ((await plan.textContent()) ?? "").split(deletes).length - 1)
+    .toBe(2)
+  await plan.getByRole("textbox", { name: `Type ${service} to confirm` }).fill(service)
   await plan.getByRole("button").last().click()
   await expect(toast(page, "Applied")).toBeVisible({ timeout: 30_000 })
   await expect
