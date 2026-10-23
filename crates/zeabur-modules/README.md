@@ -48,7 +48,7 @@ reads) and `zeabur-adapters` (for label selectors). Only the crates that compose
 | `system-upgrade-controller` | node-updates | `upgrade.cattle.io/v1` plans |
 | `network-policy` | network-policy | `networking.k8s.io/v1` networkpolicies |
 | `k8up` | volume-backup | `k8up.io/v1` schedules, backups |
-| `velero` | volume-backup | `velero.io/v1` schedules, backups |
+| `velero` | volume-backup | `velero.io/v1` schedules, backups, backupstoragelocations, podvolumebackups (the cluster's backups) |
 | `cloudnative-pg` | postgres | `postgresql.cnpg.io/v1` clusters, scheduledbackups, backups |
 | `falco` | runtime-security | `wgpolicyk8s.io/v1alpha2` policyreports, clusterpolicyreports (written by falcosidekick) |
 | `reloader` | config-reload | `apps/v1` deployments labelled `app.kubernetes.io/name: reloader`, cluster-wide |

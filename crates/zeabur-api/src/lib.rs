@@ -18,6 +18,7 @@
 //! | `GET /api/v1/cluster/node-policies` | whether the installer's baseline network policies let every node's traffic in |
 //! | `GET /api/v1/cluster/node-shells` | the node shell pods (cluster administrators only) |
 //! | `GET /api/v1/cluster/node-shells/{pod}/terminal` | a root shell on the node, over a WebSocket, for whoever opened it |
+//! | `GET /api/v1/cluster/backups` | Velero's backup locations (and whether Velero reaches them), schedules and newest backups, or that Velero is not installed |
 //! | `GET /api/v1/cluster/capabilities` | what is installed (with versions), and what to install |
 //! | `GET /api/v1/cluster/components/{capability}/{component}/install` | how to install it yourself, in four forms |
 //! | `GET /api/v1/settings/metrics-store` | the metrics store history is read from, whether it answers, who may change it |
@@ -62,6 +63,8 @@
 //! | `POST /api/v1/members/apply` | carries out a member plan by its token; an invitation's link is made then, shown once |
 //! | `POST /api/v1/cluster/node-policies/plan` | how the baseline network policies change to let every node in, and a token; writes nothing |
 //! | `POST /api/v1/cluster/node-policies/apply` | carries out that plan by its token |
+//! | `POST /api/v1/cluster/backups/plan` | what setting the backup location or schedule, pausing it or backing up now writes, and a token; writes nothing and never shows the keys |
+//! | `POST /api/v1/cluster/backups/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/node-shells/plan` | what opening a shell on a node, or removing a shell pod, writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/node-shells/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/nodes/{node}/maintenance/plan` | what stopping scheduling, resuming it or maintenance does to a node's pods, and a token; writes nothing |
@@ -190,6 +193,9 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(identity::get))
         .routes(routes!(cluster::get))
         .routes(routes!(cluster::capabilities))
+        .routes(routes!(cluster::backups::get))
+        .routes(routes!(cluster::backups::plan))
+        .routes(routes!(cluster::backups::apply))
         .routes(routes!(cluster::config_reload::get))
         .routes(routes!(cluster::install::guide_for))
         .routes(routes!(cluster::join::get))

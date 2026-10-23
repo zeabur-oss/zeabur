@@ -27,6 +27,8 @@
 
 use zeabur_kube::DynamicObject;
 
+pub mod cluster;
+
 use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, newest};
 use crate::{Module, Read, strings, text};
 
@@ -34,7 +36,7 @@ use crate::{Module, Read, strings, text};
 pub static MODULE: Module = Module {
     id: "velero",
     capability: "volume-backup",
-    reads: &[SCHEDULES, BACKUPS],
+    reads: &[SCHEDULES, BACKUPS, cluster::LOCATIONS],
     http: &[],
 };
 
