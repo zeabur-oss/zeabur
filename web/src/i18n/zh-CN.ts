@@ -2259,7 +2259,6 @@ export const zhCN: Messages = {
     "跳过 healthcheck：Zeabur 会检查第一个端口能否连接。可以在「设置」中修改检查方式。",
   "add.composeFinding.build": (image) =>
     `跳过 build:，直接拉取 ${image}。如果这个镜像只在本地构建，请改用「从 Git 部署」。`,
-  "add.composeFinding.buildOnly": "跳过 build:。请改用「从 Git 部署」。",
   "add.composeFinding.udpPort": (port) =>
     `跳过 UDP 端口 ${port}：服务的 Kubernetes Service 只承载 TCP。`,
   "add.composeFinding.sharedVolume": (volume) =>

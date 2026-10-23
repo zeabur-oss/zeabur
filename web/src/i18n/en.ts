@@ -2487,7 +2487,6 @@ export const en = {
     "healthcheck is left out: Zeabur checks that the first port accepts connections. Change the check in Settings.",
   "add.composeFinding.build": (image: string) =>
     `build: is left out and ${image} is pulled. If the image is only built locally, deploy it from Git instead.`,
-  "add.composeFinding.buildOnly": "build: is left out. Deploy it from Git instead.",
   "add.composeFinding.udpPort": (port: string) =>
     `UDP port ${port} is left out: the service's Kubernetes Service carries TCP only.`,
   "add.composeFinding.sharedVolume": (volume: string) =>

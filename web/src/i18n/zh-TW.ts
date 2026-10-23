@@ -2263,7 +2263,6 @@ export const zhTW: Messages = {
     "略過 healthcheck：Zeabur 會檢查第一個連接埠能否連線。可以在「設定」修改檢查方式。",
   "add.composeFinding.build": (image) =>
     `略過 build:，直接下載 ${image}。如果這個映像檔只在本機建置，請改用「從 Git 部署」。`,
-  "add.composeFinding.buildOnly": "略過 build:。請改用「從 Git 部署」。",
   "add.composeFinding.udpPort": (port) =>
     `略過 UDP 連接埠 ${port}：服務的 Kubernetes Service 只有 TCP。`,
   "add.composeFinding.sharedVolume": (volume) =>

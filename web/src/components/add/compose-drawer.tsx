@@ -307,6 +307,7 @@ function TextFile({
       <div className="flex flex-col gap-2">
         <Textarea
           mono
+          className="max-h-80"
           rows={rows}
           value={value}
           placeholder={placeholder}
@@ -554,7 +555,7 @@ const FINDING: {
   dockerSocket: (t, f) => t("add.composeFinding.dockerSocket", f.source),
   hostPath: (t, f) => t("add.composeFinding.hostPath", f.source, f.target),
   build: (t, _, s) =>
-    s.image ? t("add.composeFinding.build", s.image) : t("add.composeFinding.buildOnly"),
+    s.image ? t("add.composeFinding.build", s.image) : t("add.composeBuildOnly"),
   udpPort: (t, f) => t("add.composeFinding.udpPort", String(f.port)),
   sharedVolume: (t, f) => t("add.composeFinding.sharedVolume", f.volume),
   renamed: (t, _, s) => t("add.composeFinding.renamed", s.composeName, s.name),
