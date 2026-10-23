@@ -461,21 +461,11 @@ export const en = {
   "join.unavailable.noCaHash":
     "Zeabur cannot read the cluster's CA certificate (ConfigMap kube-root-ca.crt in kube-system), which the join token needs.",
   "join.before": "Before you start",
-  "join.warn.sameRegion":
-    "Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.",
-  "join.warn.ports":
-    "Allow these between the nodes: TCP 9345 and 6443 to the servers, TCP 10250 and 9099 and UDP 8472 (Canal VXLAN) between all nodes, and TCP 2379 to 2381 between servers. Keep UDP 8472 closed to the internet.",
-  "join.warn.storageLocal":
-    "Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.",
-  "join.warn.udp":
-    "UDP 8472 cannot be checked from here. If it is blocked, pods on different nodes cannot reach each other.",
   "join.role": "Role",
   "join.worker": "Worker",
   "join.workerHint": "Runs your services. The control plane stays on the servers you have.",
   "join.serverNote": (command: string) =>
     `To add a server (control plane), run ${command} on an existing server.`,
-  "join.serversHa":
-    "The control plane survives losing a server only with three or more servers: etcd needs a majority. With two, losing either one stops the cluster, so add a third.",
   "join.lifetime": "Token works for",
   "join.hours": (n: number) => plural(n, "hour", "hours"),
   "join.minutes": (n: number) => plural(n, "minute", "minutes"),
@@ -513,7 +503,38 @@ export const en = {
   "join.byInstaller": "Created by zeabur-installer",
   "join.revoke": "Revoke",
   "join.revokeTitle": (id: string) => `Revoke join token ${id}`,
-  "join.revokeNote": "Nodes that already joined stay, and reconnect after a restart with their own certificate. No new machine can join with this token, and a node deleted from the cluster needs a new token to join again.",
+  "join.revokeNote":
+    "Nodes that already joined stay, and reconnect after a restart with their own certificate. No new machine can join with this token, and a node deleted from the cluster needs a new token to join again.",
+  "join.next": "Now that it is Ready:",
+  "join.revokeStep": "Revoke the join token.",
+  "join.planSays": "If plan stops or warns",
+  "policies.step": "Let its traffic through the network policies.",
+  "policies.current": "The network policies let every node's traffic through.",
+  "policies.behind": (names: string[]) =>
+    `The network policies do not let ${new Intl.ListFormat("en").format(names)} in yet.`,
+  "policies.unreadable": (command: string) =>
+    `Zeabur cannot read the network policies. On a server, run ${command}.`,
+  "policies.cannotUpdate": (command: string) =>
+    `You cannot update the network policies here. On a server, run ${command}.`,
+  "policies.planTitle": "Update network policies",
+  "policies.planLine": (namespaces: string[]) =>
+    `Lets every node's traffic into ${new Intl.ListFormat("en").format(namespaces)}. Only the node addresses in each policy change.`,
+  "warning.join.sameRegion":
+    "Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.",
+  "warning.join.ports":
+    "Allow these between the nodes: TCP 9345 and 6443 to the servers, TCP 10250 and 9099 and UDP 8472 (Canal VXLAN) between all nodes, and TCP 2379 to 2381 between servers. Keep UDP 8472 closed to the internet.",
+  "warning.join.storage.local":
+    "Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.",
+  "warning.join.udp":
+    "UDP 8472 cannot be checked from here. If it is blocked, pods on different nodes cannot reach each other.",
+  "warning.join.servers.ha":
+    "The control plane survives losing a server only with three or more servers: etcd needs a majority. With two, losing either one stops the cluster, so add a third.",
+  "warning.join.server.unreachable": (server: string) =>
+    `Cannot connect to ${server}. Check the address and that TCP 9345 is open from this VM.`,
+  "warning.join.port.closed": (ports: string, host: string) =>
+    `TCP ${ports} on ${host} cannot be reached from this VM; check the firewall or security group.`,
+  "warning.join.token.unpinned":
+    "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as shown here.",
 
   // Projects
   "projects.title": "Projects",

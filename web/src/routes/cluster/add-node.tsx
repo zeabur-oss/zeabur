@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState, type ReactElement } from "react"
+import CaretRightIcon from "~icons/ph/caret-right"
 import PlusIcon from "~icons/ph/plus"
 import WarningFillIcon from "~icons/ph/warning-fill"
 
@@ -25,15 +26,23 @@ import {
   liveTokens,
   newToken,
   secretName,
+  serverHost,
   serverProblem,
   tokenSecret,
   tokenString,
   unavailable,
+  WORKER_PORTS,
   type JoinToken,
   type Lifetime,
 } from "@/model/join"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
+import { PoliciesStep } from "@/routes/cluster/node-policies"
 import { Button } from "@zeabur/design-system/components/button"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@zeabur/design-system/components/collapsible"
 import { Input } from "@zeabur/design-system/components/input"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
@@ -164,6 +173,7 @@ function AddNodeDrawer({
           </p>
         ) : (
           <Ready
+            server={server.trim()}
             script={joinScript({ server, token: tokenString(caHash, stage.token), expect })}
             until={formatTime(stage.until, locale)}
             token={stage.token.id}
@@ -204,12 +214,12 @@ function AddNodeDrawer({
           </h3>
           <Alert variant="warn" role="note">
             <WarningFillIcon aria-hidden="true" />
-            <AlertDescription>{t("join.warn.sameRegion")}</AlertDescription>
+            <AlertDescription>{t("warning.join.sameRegion")}</AlertDescription>
           </Alert>
           <ul className="flex list-disc flex-col gap-1.5 pl-5 type-meta text-muted-foreground">
-            <li>{t("join.warn.ports")}</li>
-            <li>{t("join.warn.udp")}</li>
-            <li>{t("join.warn.storageLocal")}</li>
+            <li>{t("warning.join.ports")}</li>
+            <li>{t("warning.join.udp")}</li>
+            <li>{t("warning.join.storage.local")}</li>
           </ul>
         </section>
         <FormField label={t("join.role")} hint={t("join.workerHint")}>
@@ -261,18 +271,20 @@ function ServerNote() {
         </code>
         {after}
       </p>
-      <p>{t("join.serversHa")}</p>
+      <p>{t("warning.join.servers.ha")}</p>
     </div>
   )
 }
 
 function Ready({
+  server,
   script,
   until,
   token,
   before,
   onClose,
 }: {
+  server: string
   script: string
   until: string
   token: string
@@ -316,6 +328,7 @@ function Ready({
           <span>{t("join.stepRun")}</span>
           <YamlBlock yaml={script} label={t("join.script")} />
           <span className="type-meta text-muted-foreground">{t("join.stepRunHint")}</span>
+          <PlanSays server={server} />
         </li>
       </ol>
       <Alert variant="warn" role="note">
@@ -339,17 +352,6 @@ function Ready({
             >
               {t("join.viewNode")}
             </Link>
-            {node.ready ? (
-              revoked ? (
-                <span className="type-meta text-muted-foreground sm:ml-auto">
-                  {t("join.revokedNow")}
-                </span>
-              ) : (
-                <Button variant="outline" size="xs" className="sm:ml-auto" onClick={revoke}>
-                  {t("join.revokeNow")}
-                </Button>
-              )
-            ) : null}
           </>
         ) : (
           <span className="flex items-center gap-2 text-muted-foreground">
@@ -358,7 +360,53 @@ function Ready({
           </span>
         )}
       </div>
+      {node?.ready ? (
+        <section aria-labelledby="join-next" className="flex flex-col gap-2">
+          <h3 id="join-next" className="type-label">
+            {t("join.next")}
+          </h3>
+          <ol className="flex list-decimal flex-col gap-3 pl-5">
+            <PoliciesStep />
+            <li>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span>{t("join.revokeStep")}</span>
+                {revoked ? (
+                  <span className="type-meta text-muted-foreground sm:ml-auto">
+                    {t("join.revokedNow")}
+                  </span>
+                ) : (
+                  <Button variant="outline" size="xs" className="sm:ml-auto" onClick={revoke}>
+                    {t("join.revokeNow")}
+                  </Button>
+                )}
+              </div>
+            </li>
+          </ol>
+        </section>
+      ) : null}
       {planner.dialog}
+    </div>
+  )
+}
+
+/** What plan says when the VM cannot reach the server, as plan says it. */
+function PlanSays({ server }: { server: string }) {
+  const t = useT()
+  return (
+    <div className="type-meta">
+      <Collapsible>
+        <CollapsibleTrigger variant="disclosure">
+          <CaretRightIcon aria-hidden="true" />
+          {t("join.planSays")}
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <ul className="flex list-disc flex-col gap-1.5 pt-2 pl-5 text-muted-foreground">
+            <li>{t("warning.join.server.unreachable", server)}</li>
+            <li>{t("warning.join.port.closed", WORKER_PORTS.join(", "), serverHost(server))}</li>
+            <li>{t("warning.join.token.unpinned")}</li>
+          </ul>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   )
 }
