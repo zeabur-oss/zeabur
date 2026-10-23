@@ -220,9 +220,12 @@ function sentenceOf(
   }
 }
 
-type ImportPortOrBuild = Extract<Change, { op: "envImport" | "publicPort" | "buildOptions" }>
+type ServiceChange = Extract<
+  Change,
+  { op: "envImport" | "publicPort" | "buildOptions" | "labelVolume" }
+>
 
-function accessSentence(t: Translate, change: AccessChange | ImportPortOrBuild): string {
+function accessSentence(t: Translate, change: AccessChange | ServiceChange): string {
   switch (change.op) {
     case "scheduleTask":
       return t("confirm.scheduleTask", change.name, change.from.name)
@@ -237,11 +240,11 @@ function accessSentence(t: Translate, change: AccessChange | ImportPortOrBuild):
         ? t("confirm.basicAuth", change.route.name)
         : t("confirm.basicAuthOff", change.route.name)
     default:
-      return importPortOrBuildSentence(t, change)
+      return serviceSentence(t, change)
   }
 }
 
-function importPortOrBuildSentence(t: Translate, change: ImportPortOrBuild): string {
+function serviceSentence(t: Translate, change: ServiceChange): string {
   switch (change.op) {
     case "envImport":
       return change.remove
@@ -253,6 +256,8 @@ function importPortOrBuildSentence(t: Translate, change: ImportPortOrBuild): str
         : t("confirm.publicPort", change.port, change.workload.name)
     case "buildOptions":
       return t("confirm.buildOptions", change.build)
+    case "labelVolume":
+      return t("confirm.labelVolume", change.claim)
   }
 }
 
@@ -768,7 +773,7 @@ export function actionOf(t: Translate, ask: Asked): string {
   }
 }
 
-function accessAction(t: Translate, change: AccessChange | ImportPortOrBuild): string {
+function accessAction(t: Translate, change: AccessChange | ServiceChange): string {
   switch (change.op) {
     case "scheduleTask":
       return t("action.create")
@@ -779,11 +784,11 @@ function accessAction(t: Translate, change: AccessChange | ImportPortOrBuild): s
     case "basicAuth":
       return change.user ? t("action.askPassword") : t("action.stopPassword")
     default:
-      return importPortOrBuildAction(t, change)
+      return serviceAction(t, change)
   }
 }
 
-function importPortOrBuildAction(t: Translate, change: ImportPortOrBuild): string {
+function serviceAction(t: Translate, change: ServiceChange): string {
   switch (change.op) {
     case "envImport":
       return t("action.saveVariables")
@@ -791,6 +796,8 @@ function importPortOrBuildAction(t: Translate, change: ImportPortOrBuild): strin
       return change.remove ? t("action.closePort") : t("action.openPort")
     case "buildOptions":
       return t("action.saveBuildOptions")
+    case "labelVolume":
+      return t("action.save")
   }
 }
 

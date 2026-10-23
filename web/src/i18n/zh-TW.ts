@@ -1189,6 +1189,8 @@ export const zhTW: Messages = {
   "confirm.toolsStops": (most: number, after: number) =>
     `它最多執行 ${most} 分鐘，最後一個終端機關閉 ${after} 分鐘後就會刪除。`,
   "confirm.toolsReused": "你的 kubectl 終端機已在執行，會直接再次開啟。",
+  "confirm.labelVolume": (claim) =>
+    `在 ${claim} 加上標籤和註解，讓只有它自己的排程會備份它。不會重新啟動任何東西。`,
   "confirm.details": "把名稱、描述和圖示存到 Namespace 上。",
   "access.title": (ns) => `無法變更 ${ns}`,
   "access.you": "<你的使用者名稱>",
@@ -1929,6 +1931,38 @@ export const zhTW: Messages = {
   "backups.unknown": "不明",
   "backups.veleroVolumesNeedSnapshots": "磁碟區資料需搭配快照",
   "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有排程`,
+  "backups.volume.set": "備份這個磁碟區",
+  "backups.volume.body":
+    "K8up 會依排程把這個磁碟區的檔案複製到 S3 相容儲存空間。金鑰和儲存庫密碼存放在這個專案的 Secret，移除 Zeabur 後備份也會照常執行。",
+  "backups.volume.folderHint": (folder) => `留白時使用 ${folder}。`,
+  "backups.volume.keepLast": "保留最新幾份",
+  "backups.volume.keepDaily": "每日備份保留天數",
+  "backups.volume.keepWeekly": "每週備份保留週數",
+  "backups.volume.problem.keep": "請填整數：1 到 365 天、最新最多 100 份、最多 520 週。",
+  "backups.volume.password": (secret) =>
+    `Zeabur 會產生儲存庫密碼，存放在 Secret ${secret}。少了它就讀不到備份，請另外留一份。`,
+  "backups.volume.root": "這個服務以 root 執行，備份也一樣，才能讀取磁碟區裡的每個檔案。",
+  "backups.volume.user": (user: number) =>
+    `備份和服務一樣以使用者 ${user} 執行，符合 restricted Pod Security 等級。`,
+  "backups.volume.imageUser":
+    "這個服務沒有指定使用者，備份會以 K8up 的非 root 使用者執行，符合 restricted Pod Security 等級，但會略過只有服務使用者能讀的檔案。在服務的安全性設定指定使用者，就能一併備份。",
+  "backups.volume.restricted":
+    "這個專案強制使用 restricted Pod Security 等級，以 root 執行的 Pod 會遭拒絕。管理員把等級降為 baseline 之前，這個磁碟區的備份都會失敗。",
+  "backups.volume.long": "這個磁碟區名稱超過 63 個字元，K8up 無法用標籤選取它。",
+  "backups.volume.notInstalled": "備份磁碟區需要 K8up，這個叢集還沒安裝。管理員可以安裝。",
+  "backups.volume.openK8up": "開啟 K8up",
+  "backups.volume.planNow": (claim) => `立即備份 ${claim}`,
+  "backups.volume.keeps": (list) => `保留${list}`,
+  "backups.volume.keep.last": (n) => `最新 ${n} 份`,
+  "backups.volume.keep.hourly": (n) => `每小時 ${n} 份`,
+  "backups.volume.keep.daily": (n) => `每日 ${n} 份`,
+  "backups.volume.keep.weekly": (n) => `每週 ${n} 份`,
+  "backups.volume.keep.monthly": (n) => `每月 ${n} 份`,
+  "backups.volume.keep.yearly": (n) => `每年 ${n} 份`,
+  "backups.volume.restore":
+    "Zeabur 不提供磁碟區備份的還原。K8up 的 Restore 物件可以把備份複製到你指定的磁碟區。",
+  "backups.volume.restoreGuide": "K8up：還原",
+  "backups.volume.runs": "這些磁碟區的備份",
 
   // 叢集 → 備份（Velero）
   "cluster.backups": "備份",

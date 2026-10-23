@@ -1306,6 +1306,8 @@ export const en = {
   "confirm.toolsStops": (most: number, after: number) =>
     `It stops after ${plural(most, "minute", "minutes")} at most, and is deleted ${plural(after, "minute", "minutes")} after its last terminal closes.`,
   "confirm.toolsReused": "Your kubectl terminal is already running; it opens again.",
+  "confirm.labelVolume": (claim: string) =>
+    `Adds a label and an annotation to ${claim} so that only its own schedule backs it up. Nothing restarts.`,
   "confirm.details": "Saves the name, description, and icon on the namespace.",
   "access.title": (ns: string) => `You can't change ${ns}`,
   "access.you": "<your user name>",
@@ -2118,6 +2120,40 @@ export const en = {
   "backups.unknown": "Unknown",
   "backups.veleroVolumesNeedSnapshots": "volume data only with snapshots",
   "backups.scheduledOf": (scheduled: number, total: number) => `${scheduled}/${total} scheduled`,
+  "backups.volume.set": "Back up this volume",
+  "backups.volume.body":
+    "K8up copies this volume's files to S3-compatible storage on a schedule. The keys and the repository password stay in a Secret of this project, and the backups keep running without Zeabur.",
+  "backups.volume.folderHint": (folder: string) => `${folder} when left empty.`,
+  "backups.volume.keepLast": "Keep the newest",
+  "backups.volume.keepDaily": "Keep daily, in days",
+  "backups.volume.keepWeekly": "Keep weekly, in weeks",
+  "backups.volume.problem.keep": "Whole numbers: 1 to 365 days, up to 100 newest, up to 520 weeks.",
+  "backups.volume.password": (secret: string) =>
+    `Zeabur makes a repository password and keeps it in the Secret ${secret}. Without it the backups can't be read, so keep a copy somewhere else.`,
+  "backups.volume.root":
+    "The service runs as root, so its backups do too and can read every file of the volume.",
+  "backups.volume.user": (user: number) =>
+    `Backups run as user ${user}, as the service does, and meet the restricted Pod Security level.`,
+  "backups.volume.imageUser":
+    "The service sets no user, so backups run as K8up's non-root user and meet the restricted Pod Security level. They skip files that only the service's user may read: set a user in the service's security settings to include them.",
+  "backups.volume.restricted":
+    "This project enforces the restricted Pod Security level, which refuses pods that run as root. Backups of this volume fail until an administrator lowers the level to baseline.",
+  "backups.volume.long": "K8up can't select this volume: its name is longer than 63 characters.",
+  "backups.volume.notInstalled":
+    "Volume backups need K8up, which this cluster doesn't have. An administrator can install it.",
+  "backups.volume.openK8up": "Open K8up",
+  "backups.volume.planNow": (claim: string) => `Back up ${claim} now`,
+  "backups.volume.keeps": (list: string) => `keeps ${list}`,
+  "backups.volume.keep.last": (n: number) => `the newest ${n}`,
+  "backups.volume.keep.hourly": (n: number) => `${n} hourly`,
+  "backups.volume.keep.daily": (n: number) => `${n} daily`,
+  "backups.volume.keep.weekly": (n: number) => `${n} weekly`,
+  "backups.volume.keep.monthly": (n: number) => `${n} monthly`,
+  "backups.volume.keep.yearly": (n: number) => `${n} yearly`,
+  "backups.volume.restore":
+    "Zeabur doesn't restore volume backups. K8up's Restore object copies a backup into a volume you choose.",
+  "backups.volume.restoreGuide": "K8up: restore",
+  "backups.volume.runs": "Backups of these volumes",
 
   // Cluster → Backups (Velero)
   "cluster.backups": "Backups",

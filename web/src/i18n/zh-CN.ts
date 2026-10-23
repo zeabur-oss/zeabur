@@ -1187,6 +1187,8 @@ export const zhCN: Messages = {
   "confirm.toolsStops": (most: number, after: number) =>
     `它最多运行 ${most} 分钟，最后一个终端关闭 ${after} 分钟后就会删除。`,
   "confirm.toolsReused": "你的 kubectl 终端已在运行，会直接再次打开。",
+  "confirm.labelVolume": (claim) =>
+    `给 ${claim} 加上标签和注解，只让它自己的定时备份选中它。不会重启任何东西。`,
   "confirm.details": "把名称、描述和图标保存到 Namespace 上。",
   "access.title": (ns) => `无法更改 ${ns}`,
   "access.you": "<你的用户名>",
@@ -1926,6 +1928,38 @@ export const zhCN: Messages = {
   "backups.unknown": "未知",
   "backups.veleroVolumesNeedSnapshots": "卷数据需配合快照",
   "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有定时备份`,
+  "backups.volume.set": "备份这个卷",
+  "backups.volume.body":
+    "K8up 会按计划把这个卷的文件复制到 S3 兼容存储。密钥和仓库密码保存在这个项目的 Secret 里，移除 Zeabur 后备份也会照常运行。",
+  "backups.volume.folderHint": (folder) => `留空时使用 ${folder}。`,
+  "backups.volume.keepLast": "保留最新几份",
+  "backups.volume.keepDaily": "每日备份保留天数",
+  "backups.volume.keepWeekly": "每周备份保留周数",
+  "backups.volume.problem.keep": "请填整数：1 到 365 天、最新最多 100 份、最多 520 周。",
+  "backups.volume.password": (secret) =>
+    `Zeabur 会生成仓库密码，保存在 Secret ${secret}。没有它就读不到备份，请另外保存一份。`,
+  "backups.volume.root": "这个服务以 root 运行，备份也一样，才能读取卷里的每个文件。",
+  "backups.volume.user": (user: number) =>
+    `备份和服务一样以用户 ${user} 运行，符合 restricted Pod Security 级别。`,
+  "backups.volume.imageUser":
+    "这个服务没有指定用户，备份会以 K8up 的非 root 用户运行，符合 restricted Pod Security 级别，但会跳过只有服务用户能读的文件。在服务的安全性设置中指定用户，就能一并备份。",
+  "backups.volume.restricted":
+    "这个项目强制使用 restricted Pod Security 级别，以 root 运行的 Pod 会被拒绝。管理员把级别降为 baseline 之前，这个卷的备份都会失败。",
+  "backups.volume.long": "这个卷的名称超过 63 个字符，K8up 无法用标签选中它。",
+  "backups.volume.notInstalled": "备份卷需要 K8up，这个集群还没安装。管理员可以安装。",
+  "backups.volume.openK8up": "打开 K8up",
+  "backups.volume.planNow": (claim) => `立即备份 ${claim}`,
+  "backups.volume.keeps": (list) => `保留${list}`,
+  "backups.volume.keep.last": (n) => `最新 ${n} 份`,
+  "backups.volume.keep.hourly": (n) => `每小时 ${n} 份`,
+  "backups.volume.keep.daily": (n) => `每日 ${n} 份`,
+  "backups.volume.keep.weekly": (n) => `每周 ${n} 份`,
+  "backups.volume.keep.monthly": (n) => `每月 ${n} 份`,
+  "backups.volume.keep.yearly": (n) => `每年 ${n} 份`,
+  "backups.volume.restore":
+    "Zeabur 不提供卷备份的恢复。K8up 的 Restore 对象可以把备份复制到你指定的卷。",
+  "backups.volume.restoreGuide": "K8up：恢复",
+  "backups.volume.runs": "这些卷的备份",
 
   // 集群 → 备份（Velero）
   "cluster.backups": "备份",

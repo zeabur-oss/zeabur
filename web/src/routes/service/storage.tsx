@@ -8,7 +8,7 @@ import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 
 import type { Schemas } from "@/api/client"
-import { VolumeBackups } from "@/components/backups"
+import { VolumeBackups } from "@/components/volume-backups"
 import {
   useVolumeFills,
   VolumeFullNote,
@@ -343,7 +343,11 @@ export function StorageTab({ project, service }: { project: string; service: Ser
           </ul>
         </Panel>
       ) : null}
-      <VolumeBackups project={project} claims={mounts.map(({ mount }) => claimOf(mount))} />
+      <VolumeBackups
+        project={project}
+        service={service}
+        claims={mounts.map(({ mount }) => claimOf(mount))}
+      />
       <KubeDetails
         facts={[
           ...mounts.map(({ mount: m }): [string, string] => [

@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
+import type { ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import type { Schemas } from "@/api/client"
@@ -13,6 +14,7 @@ import {
   CollapsibleTrigger,
 } from "@zeabur/design-system/components/collapsible"
 import { useT } from "@/i18n"
+import { cn } from "@/lib/utils"
 import type { Health } from "@/model/service"
 
 type Outcome = Schemas["BackupOutcome"]
@@ -43,18 +45,27 @@ export function shownCoverage(coverage: Coverage[]) {
   )
 }
 
-export function CoverageRow({ coverage }: { coverage: Coverage }) {
+/** A target's backups; `detail` replaces the providers line, `action` follows the status. */
+export function CoverageRow({
+  coverage,
+  detail,
+  action,
+}: {
+  coverage: Coverage
+  detail?: ReactNode
+  action?: ReactNode
+}) {
   const t = useT()
   const run = coverage.lastRun
   const providers = [...new Set(coverage.scheduledBy.map(providerOf))]
   return (
-    <li className={row}>
-      <div className="flex min-w-0 flex-1 flex-col">
+    <li className={cn(row, "flex-wrap")}>
+      <div className={cn("flex min-w-0 flex-1 flex-col", action && "min-w-48")}>
         <span className="truncate type-mono" translate="no">
           {coverage.target.kind === "namespace" ? t("backups.namespace") : coverage.target.name}
         </span>
-        <span className="truncate type-meta text-muted-foreground">
-          {providers.length > 0 ? providers.join(", ") : t("backups.unscheduled")}
+        <span className={cn("type-meta text-muted-foreground", !detail && "truncate")}>
+          {detail ?? (providers.length > 0 ? providers.join(", ") : t("backups.unscheduled"))}
         </span>
       </div>
       {run ? (
@@ -71,6 +82,7 @@ export function CoverageRow({ coverage }: { coverage: Coverage }) {
       ) : (
         <span className="shrink-0 type-meta text-muted-foreground">{t("backups.noRun")}</span>
       )}
+      {action}
     </li>
   )
 }
@@ -132,24 +144,7 @@ export function BackupDetails({ data }: { data: Schemas["ProjectBackups"] }) {
             </li>
           ))}
           {data.runs.map((r) => (
-            <li key={`${r.provider}:${r.name}`} className={row}>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate type-mono" translate="no">
-                  {r.name}
-                </span>
-                <span
-                  className="truncate type-meta text-muted-foreground"
-                  title={r.message ?? undefined}
-                >
-                  {r.provider}
-                  {r.message ? `${t("common.sep")}${r.message}` : ""}
-                </span>
-              </div>
-              <StatusPill health={outcomeHealth[r.outcome]} size="sm">
-                {t(`backups.${r.outcome}`)}
-              </StatusPill>
-              <Ago iso={r.finished ?? r.started} className="type-meta text-muted-foreground" />
-            </li>
+            <RunRow key={`${r.provider}:${r.name}`} run={r} />
           ))}
         </ul>
       </CollapsibleContent>
@@ -157,26 +152,24 @@ export function BackupDetails({ data }: { data: Schemas["ProjectBackups"] }) {
   )
 }
 
-export function VolumeBackups({ project, claims }: { project: string; claims: string[] }) {
+/** One backup run: its object, the provider and its message, and how it went. */
+export function RunRow({ run }: { run: Schemas["BackupRun"] }) {
   const t = useT()
-  const backups = useBackups(project)
-  const data = backups.data
-  if (!data || claims.length === 0) return null
-  const rows = data.coverage.filter(
-    (c) => c.target.kind === "volume" && claims.includes(c.target.name),
-  )
   return (
-    <section aria-labelledby="storage-backups" className="flex flex-col">
-      <h2 id="storage-backups" className="mb-1 flex items-baseline gap-1.5 text-sm font-medium">
-        {t("backups.title")}
-      </h2>
-      <ul className="flex flex-col">
-        {rows.map((c) => (
-          <CoverageRow key={`${c.target.kind}/${c.target.name}`} coverage={c} />
-        ))}
-      </ul>
-      <ProviderNotes data={data} />
-      <BackupDetails data={data} />
-    </section>
+    <li className={row}>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate type-mono" translate="no">
+          {run.name}
+        </span>
+        <span className="truncate type-meta text-muted-foreground" title={run.message ?? undefined}>
+          {run.provider}
+          {run.message ? `${t("common.sep")}${run.message}` : ""}
+        </span>
+      </div>
+      <StatusPill health={outcomeHealth[run.outcome]} size="sm">
+        {t(`backups.${run.outcome}`)}
+      </StatusPill>
+      <Ago iso={run.finished ?? run.started} className="type-meta text-muted-foreground" />
+    </li>
   )
 }

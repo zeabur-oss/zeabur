@@ -27,6 +27,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   changeDatabases: { role: "developer", rule: "create clusters.postgresql.cnpg.io" },
   changeObjectStorage: { role: "developer", rule: "create seaweeds.seaweed.seaweedfs.com" },
   backUpDatabases: { role: "developer", rule: "create backups.postgresql.cnpg.io" },
+  backUpVolumes: { role: "developer", rule: "create schedules.k8up.io" },
   openTerminal: { role: "developer", rule: "create pods/exec" },
   readLogs: { role: "developer", rule: "get pods/log" },
   build: { role: "developer", rule: "patch builds.builder.zeabur.com" },

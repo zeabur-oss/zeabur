@@ -2228,6 +2228,8 @@ export interface components {
     BackupSchedule: {
       /** @description The cron expression, as the provider writes it (CloudNativePG's has a seconds field). */
       cron: string
+      /** @description Where it writes, such as `s3:https://s3.example.com/backups/shop`, when the provider says. */
+      destination?: string | null
       /** @description The provider's object, `<namespace>/<name>`. */
       name: string
       /** @description What else to know about the coverage (an i18n key), such as `velero.volumesNeedSnapshots`. */
@@ -2236,6 +2238,18 @@ export interface components {
       paused: boolean
       /** @description The provider (module id). */
       provider: string
+      /**
+       * @description How many backups it keeps, by period (`last`, `hourly`, `daily`, `weekly`, `monthly`,
+       *     `yearly`), when the provider counts them.
+       */
+      retention?: {
+        [key: string]: number
+      }
+      /**
+       * @description The object that runs it once, without `metadata`: for K8up, a `Backup` with the schedule's
+       *     backup spec and backend.
+       */
+      runNow?: Record<string, never> | null
       /** @description What it covers in the project. */
       targets: components["schemas"]["BackupTarget"][]
     }
@@ -2546,6 +2560,10 @@ export interface components {
           /** @description The new size, a Kubernetes quantity such as `20Gi`. */
           size: string
         }
+      | (components["schemas"]["LabelVolumeChange"] & {
+          /** @enum {string} */
+          op: "labelVolume"
+        })
       | {
           /** @description The container; may be left out when the workload has only one. */
           container?: string | null
@@ -4645,6 +4663,19 @@ export interface components {
        */
       retryAfterSeconds?: number | null
     }
+    /** @description A [`Change::LabelVolume`]. A key the claim has already is set to the new value. */
+    LabelVolumeChange: {
+      /** @description Annotations to set. */
+      annotations?: {
+        [key: string]: string
+      }
+      /** @description The claim. */
+      claim: string
+      /** @description Labels to set. */
+      labels?: {
+        [key: string]: string
+      }
+    }
     /** @description A component's leader lease in `kube-system`. */
     LeaderLease: {
       /** @description `kube-scheduler` or `kube-controller-manager`. */
@@ -6481,6 +6512,8 @@ export interface components {
     ProjectRights: {
       /** @description Back up databases: `create` on an operator's backups. */
       backUpDatabases: components["schemas"]["Permission"]
+      /** @description Back up volumes: `create` on K8up's schedules, backups and pod configs. */
+      backUpVolumes: components["schemas"]["Permission"]
       /** @description Build again: `patch` on Zeabur Builder's builds. */
       build: components["schemas"]["Permission"]
       /** @description Create and change ConfigMaps: `create` and `patch` on configmaps. */
@@ -6998,6 +7031,27 @@ export interface components {
       fix?: components["schemas"]["PlanRequest"] | null
     }
     /**
+     * @description The user and groups a workload's pods run as: its first container's security context, else
+     *     the pod's. An absent user or group is the image's.
+     */
+    RunAs: {
+      /**
+       * Format: int64
+       * @description The pod's `fsGroup`.
+       */
+      fsGroup?: number | null
+      /**
+       * Format: int64
+       * @description `runAsGroup`.
+       */
+      group?: number | null
+      /**
+       * Format: int64
+       * @description `runAsUser`.
+       */
+      user?: number | null
+    }
+    /**
      * @description How a run stands.
      * @enum {string}
      */
@@ -7173,6 +7227,7 @@ export interface components {
        *     document's `routes`.
        */
       routeNames: string[]
+      runAs?: components["schemas"]["RunAs"] | null
       /** @description Its health and the word for it, from the workload and its pods. */
       status: components["schemas"]["ServiceStatus"]
     }

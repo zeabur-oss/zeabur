@@ -33,6 +33,7 @@ import { GatedMenuItem, GateTip, useGate } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
+import { FrequencyField, S3Fields } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
 import { StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
@@ -61,7 +62,6 @@ import {
   targetProblems,
   type BackupTarget,
   type Database,
-  type Frequency,
 } from "@/model/databases"
 import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
@@ -74,7 +74,6 @@ import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
-import { Select } from "@zeabur/design-system/components/select"
 import {
   SummaryCard,
   SummaryCardAside,
@@ -730,82 +729,14 @@ function SetUp({ project, database }: { project: string; database: Database }) {
           review()
         }}
       >
-        <FormField label={t("db.backup.endpoint")} errors={error("endpoint")}>
-          <Input
-            size="sm"
-            mono
-            placeholder="https://s3.example.com"
-            value={target.endpoint}
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => set({ endpoint: event.target.value })}
-          />
-        </FormField>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField label={t("db.backup.bucket")} errors={error("bucket")}>
-            <Input
-              size="sm"
-              mono
-              value={target.bucket}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => set({ bucket: event.target.value })}
-            />
-          </FormField>
-          {fixedFolder(database.engine) ? null : (
-            <FormField label={t("db.backup.path")} hint={t("db.backup.pathHint")}>
-              <Input
-                size="sm"
-                mono
-                placeholder={database.name}
-                value={target.path}
-                autoComplete="off"
-                spellCheck={false}
-                onChange={(event) => set({ path: event.target.value })}
-              />
-            </FormField>
-          )}
-          <FormField label={t("db.backup.accessKey")} errors={error("keys")}>
-            <Input
-              size="sm"
-              mono
-              value={target.accessKey}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => set({ accessKey: event.target.value })}
-            />
-          </FormField>
-          <FormField label={t("db.backup.secretKey")}>
-            <Input
-              size="sm"
-              mono
-              type="password"
-              value={target.secretKey}
-              autoComplete="new-password"
-              onChange={(event) => set({ secretKey: event.target.value })}
-            />
-          </FormField>
-          <FormField label={t("db.backup.region")} hint={t("db.backup.regionHint")}>
-            <Input
-              size="sm"
-              mono
-              value={target.region}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => set({ region: event.target.value })}
-            />
-          </FormField>
-          <FormField label={t("db.backup.frequency")}>
-            <Select
-              size="sm"
-              value={target.frequency}
-              onValueChange={(frequency) => set({ frequency: frequency as Frequency })}
-              items={[
-                { value: "daily", label: t("db.backup.daily") },
-                { value: "weekly", label: t("db.backup.weekly") },
-              ]}
-            />
-          </FormField>
+        <S3Fields
+          target={target}
+          set={set}
+          errors={error}
+          folder={fixedFolder(database.engine) ? undefined : database.name}
+          folderHint={t("db.backup.pathHint")}
+        >
+          <FrequencyField value={target.frequency} onChange={(frequency) => set({ frequency })} />
           {keepsEverything(database.engine) ? null : (
             <FormField label={t("db.backup.keep")} errors={error("keep")}>
               <Input
@@ -818,7 +749,7 @@ function SetUp({ project, database }: { project: string; database: Database }) {
               />
             </FormField>
           )}
-        </div>
+        </S3Fields>
         {fixedFolder(database.engine) ? (
           <p className="type-meta text-muted-foreground">
             {t("db.backup.fixedFolder", `moco/${project}/${database.name}`)}
