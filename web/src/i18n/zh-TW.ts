@@ -1466,6 +1466,8 @@ export const zhTW: Messages = {
   "security.profile.privileged": "不受限",
   "security.about.restricted":
     "以非 root 使用者執行，且無法提升權限。以 root 執行的映像檔（例如 nginx:latest）無法啟動；請改用不需要 root 的版本，例如 nginxinc/nginx-unprivileged。",
+  "security.aboutBuilt":
+    "以非 root 使用者執行，且無法提升權限。Railpack 建置的映像檔以使用者 1000 執行；Dockerfile 需要用數字指定非 root 的使用者，例如 USER 1000。",
   "security.about.baseline": "允許以 root 執行，但仍無法存取主機或提升權限。",
   "security.about.privileged":
     "這個服務有超出「相容」範圍的設定，例如存取主機；這些是在 Zeabur 以外設定的。要變更請編輯 YAML。",

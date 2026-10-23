@@ -160,6 +160,39 @@ describe("the objects", () => {
     expect(ref(" release/1.2 ")).toBe("release/1.2")
   })
 
+  test("a new Git service is Strict and runs as the user its image names", () => {
+    expect(newGitService().security).toBe("restricted")
+    const pod = find(gitObjects(form({}), "shop", "zot:5000", {}), "Deployment").spec.template.spec
+    expect(pod.automountServiceAccountToken).toBe(false)
+    expect(pod.securityContext).toEqual({
+      runAsNonRoot: true,
+      seccompProfile: { type: "RuntimeDefault" },
+    })
+    expect(pod.containers[0].securityContext).toEqual({
+      allowPrivilegeEscalation: false,
+      capabilities: { drop: ["ALL"] },
+    })
+    const changes = createGitService(form({}), "shop", "zot:5000", {}, "restricted")
+    expect(changes.some((c) => c.op === "podSecurity")).toBe(false)
+  })
+
+  test("a Compatible Git service lowers a Strict project in the same plan", () => {
+    const changes = createGitService(
+      form({ security: "baseline" }),
+      "shop",
+      "zot:5000",
+      {},
+      "restricted",
+    )
+    expect(changes.at(-1)).toEqual({ op: "podSecurity", level: "baseline" })
+    const deployment = changes.find(
+      (c) => c.op === "create" && (c.object as Object).kind === "Deployment",
+    ) as { object: Object }
+    expect(deployment.object.spec.template.spec.securityContext).toEqual({
+      seccompProfile: { type: "RuntimeDefault" },
+    })
+  })
+
   test("a public domain adds an Ingress", () => {
     const objects = gitObjects(
       form({ publicUrl: true, host: "site.example.com" }),

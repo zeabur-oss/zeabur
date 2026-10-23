@@ -250,11 +250,12 @@ A project Zeabur creates enforces, audits and warns at Pod Security's `restricte
 `pod-security.kubernetes.io/enforce`, `audit` and `warn` labels), and a new service is Strict:
 its pod template sets `runAsNonRoot`, the `RuntimeDefault` seccomp profile and
 `allowPrivilegeEscalation: false`, drops every capability, and does not mount the service
-account's token. A service whose image must run as root can be Compatible (`baseline`), chosen
-when it is created or in its settings; the same plan lowers the project's `enforce` label to
-`baseline` and leaves `audit` and `warn` at `restricted`. That is a label, so the policy above
-leaves it to whoever may `zeabur-manage` the Namespace: a Developer asks an admin, or takes admin
-rights. Zeabur does not raise the label back by itself; when the last Compatible service is made
+account's token. A service built from Git is Strict too: Zeabur Builder's Railpack images run as
+uid 1000, and a Dockerfile needs a numeric user other than root, such as `USER 1000`. A service
+whose image must run as root can be Compatible (`baseline`), chosen when it is created or in its
+settings; the same plan lowers the project's `enforce` label to `baseline` and leaves `audit`
+and `warn` at `restricted`. That is a label, so the policy above leaves it to whoever may
+`zeabur-manage` the Namespace: a Developer asks an admin, or takes admin rights. Zeabur does not raise the label back by itself; when the last Compatible service is made
 Strict, the plan offers to, and refuses while any workload in the namespace would break
 `restricted`. A namespace without an `enforce` label is never lowered: the cluster's default
 applies there.

@@ -27,6 +27,7 @@ export function SecurityProfileField({
   project,
   value,
   current,
+  built,
   disabled,
   onChange,
 }: {
@@ -34,6 +35,8 @@ export function SecurityProfileField({
   value: Profile
   /** The level the service's pods meet now, when it exists. */
   current?: Level
+  /** Built from Git, where the build, not an image's name, decides the user. */
+  built?: boolean
   disabled?: boolean
   onChange: (profile: Profile) => void
 }) {
@@ -43,7 +46,12 @@ export function SecurityProfileField({
   const shown = current === "privileged" ? "privileged" : value
   return (
     <div className="flex flex-col gap-2">
-      <FormField label={t("part.security")} hint={t(`security.about.${shown}`)}>
+      <FormField
+        label={t("part.security")}
+        hint={
+          built && shown === "restricted" ? t("security.aboutBuilt") : t(`security.about.${shown}`)
+        }
+      >
         <Select
           size="sm"
           value={shown}

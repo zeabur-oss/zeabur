@@ -223,6 +223,39 @@ mod tests {
         assert_eq!(after["metadata"]["labels"][ENFORCE], "restricted");
     }
 
+    /// The Deployment the web writes for a service built from Git (`web/src/model/git-service.ts`).
+    fn from_git() -> Value {
+        let mut site = deployment(
+            "site",
+            &json!({
+                "automountServiceAccountToken": false,
+                "securityContext": {"runAsNonRoot": true, "seccompProfile": {"type": "RuntimeDefault"}},
+                "containers": [{"name": "site", "image": "zot.zot.svc:5000/shop/site:pending",
+                    "securityContext": {"allowPrivilegeEscalation": false,
+                                        "capabilities": {"drop": ["ALL"]}}}]
+            }),
+        );
+        site["metadata"]["annotations"] = json!({"keel.sh/policy": "force"});
+        site
+    }
+
+    #[test]
+    fn a_service_built_from_git_is_strict_and_runs_as_its_images_user() {
+        let site = from_git();
+        assert_eq!(spec_level(&site), Restricted);
+        let pod = &site["spec"]["template"]["spec"];
+        assert!(pod["securityContext"].get("runAsUser").is_none(), "{pod}");
+        let stored = namespace(Some("baseline"));
+        let plan = planned(
+            &[site],
+            Some(&stored),
+            vec![Change::PodSecurity { level: Restricted }],
+        )
+        .unwrap();
+        let after = written(&plan, &stored, "Namespace");
+        assert_eq!(after["metadata"]["labels"][ENFORCE], "restricted");
+    }
+
     #[test]
     fn the_last_service_made_restricted_says_the_project_could_be_too() {
         let stored = namespace(Some("baseline"));

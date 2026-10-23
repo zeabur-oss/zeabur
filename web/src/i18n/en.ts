@@ -1623,6 +1623,8 @@ export const en = {
   "security.profile.privileged": "Unrestricted",
   "security.about.restricted":
     "Runs as a non-root user and can't gain privileges. An image that runs as root, such as nginx:latest, won't start; use an unprivileged one, such as nginxinc/nginx-unprivileged.",
+  "security.aboutBuilt":
+    "Runs as a non-root user and can't gain privileges. Railpack builds run as user 1000; a Dockerfile needs a numeric user other than root, such as USER 1000.",
   "security.about.baseline": "May run as root, but still can't reach the host or gain privileges.",
   "security.about.privileged":
     "Its settings ask for more than Compatible allows, such as reaching the host; they were set outside Zeabur. Edit its YAML to change them.",

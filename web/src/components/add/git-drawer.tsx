@@ -464,6 +464,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
               </FormField>
               <SecurityProfileField
                 project={project}
+                built
                 value={form.security}
                 onChange={(security) => set({ security })}
               />

@@ -1464,6 +1464,8 @@ export const zhCN: Messages = {
   "security.profile.privileged": "不受限",
   "security.about.restricted":
     "以非 root 用户运行，且无法提升权限。以 root 运行的镜像（例如 nginx:latest）无法启动；请改用不需要 root 的版本，例如 nginxinc/nginx-unprivileged。",
+  "security.aboutBuilt":
+    "以非 root 用户运行，且无法提升权限。Railpack 构建的镜像以用户 1000 运行；Dockerfile 需要用数字指定非 root 用户，例如 USER 1000。",
   "security.about.baseline": "允许以 root 运行，但仍无法访问主机或提升权限。",
   "security.about.privileged":
     "这个服务有超出「兼容」范围的设置，例如访问主机；这些是在 Zeabur 以外设置的。要变更请编辑 YAML。",
