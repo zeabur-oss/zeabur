@@ -14,6 +14,7 @@ import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import BracketsCurlyIcon from "~icons/ph/brackets-curly"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
+import DotsThreeIcon from "~icons/ph/dots-three"
 import EyeIcon from "~icons/ph/eye"
 import EyeSlashIcon from "~icons/ph/eye-slash"
 import FileTextIcon from "~icons/ph/file-text"
@@ -21,6 +22,7 @@ import KeyIcon from "~icons/ph/key"
 import ListBulletsIcon from "~icons/ph/list-bullets"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
+import PlugsIcon from "~icons/ph/plugs"
 import PlugsConnectedIcon from "~icons/ph/plugs-connected"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
@@ -31,7 +33,7 @@ import { CopyButton, Hint, ManagedTip, Segmented } from "@/components/bits"
 import { ConnectDrawer, useTargets } from "@/components/connect"
 import { FilterField } from "@/components/filter-field"
 import { KubeDetails } from "@/components/kube-details"
-import { GateTip, useGates } from "@/components/gate"
+import { GatedMenuItem, GateTip, useGates } from "@/components/gate"
 import { useDraft, useHold } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
@@ -47,6 +49,7 @@ import {
   EmptyTitle,
 } from "@zeabur/design-system/components/empty"
 import { Input } from "@zeabur/design-system/components/input"
+import { Menu, MenuContent, MenuTrigger } from "@zeabur/design-system/components/menu"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Select } from "@zeabur/design-system/components/select"
 import { Spinner } from "@zeabur/design-system/components/spinner"
@@ -56,7 +59,7 @@ import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { databaseLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
-import { databaseOfEnv } from "@/model/connect"
+import { databaseOfEnv, disconnectChange, disconnection } from "@/model/connect"
 import type { Database } from "@/model/databases"
 import type { Edge } from "@/model/connections"
 import {
@@ -74,6 +77,7 @@ import {
   type RowProblem,
 } from "@/model/env-edit"
 import { isLongList } from "@/model/lists"
+import type { Gate } from "@/model/rights"
 import { envSecretsOf, type Service } from "@/model/service"
 
 const DataEditor = lazy(() =>
@@ -138,8 +142,29 @@ export function VariablesTab({
     databases.some((d) => d.app) &&
     targets.some((s) => s.kind === service.kind && s.name === service.name)
   const containers = service.containers
+  const envIn = (container: string) => containers.find((c) => c.name === container)?.env ?? []
   const databaseOf = (container: string, env: Schemas["EnvVar"]) =>
-    databaseOfEnv(env, containers.find((c) => c.name === container)?.env ?? [], databases)
+    databaseOfEnv(env, envIn(container), databases)
+  const disconnector = usePlanner(project, undefined, true)
+  const disconnectNote = (database: Database) =>
+    t("connect.disconnectNote", database.name, database.app?.secret ?? database.connection.secret)
+  const disconnect = (container: string, name: string) => {
+    const found = disconnection(name, envIn(container), databases)
+    if (!found) return
+    disconnector.plan({
+      title: t("connect.disconnectTitle", service.name, found.database.name),
+      changes: [disconnectChange(service, container, found.names)],
+      notes: [disconnectNote(found.database)],
+    })
+  }
+  const rowMenu = (container: string, name: string) =>
+    managed ? null : (
+      <DisconnectMenu
+        name={name}
+        gate={gates("changeServices")}
+        onDisconnect={() => disconnect(container, name)}
+      />
+    )
   const literal = containers.flatMap((c) =>
     c.env.filter((e) => e.source.kind === "Literal").map((e) => ({ container: c.name, env: e })),
   )
@@ -162,6 +187,8 @@ export function VariablesTab({
     removed: false,
   })
   const [focus, setFocus] = useState<string>()
+  /** `container/name` of the database variables read from a Secret that the editor removes. */
+  const [dropped, setDropped] = useState<string[]>([])
 
   const reveal = async (name: string) => {
     setSecrets((previous) => ({ ...previous, [name]: { pending: true } }))
@@ -303,6 +330,7 @@ export function VariablesTab({
     const blank = add || rows.length === 0 ? blankRow() : undefined
     const all = blank ? [...rows, blank] : rows
     setEditing(raw && !multi ? { rows, text: toDotenv(rows) } : { rows: all })
+    setDropped([])
     setFocus(blank?.id)
   }
 
@@ -315,6 +343,49 @@ export function VariablesTab({
       ? fromDotenv(editing.rows, containers[0]?.name ?? "", parsed.entries)
       : (editing?.rows ?? [])
   const problems = problemsOf(effective, taken)
+  // Removing a database's variable in the editor disconnects it, with its MongoDB pair.
+  const disconnects = containers.flatMap((c) => {
+    const removed = [
+      ...dropped
+        .filter((key) => key.startsWith(`${c.name}/`))
+        .map((key) => key.slice(c.name.length + 1)),
+      ...effective
+        .filter((r) => r.container === c.name && r.was && r.removed)
+        .map((r) => r.was?.name ?? ""),
+    ]
+    return removed.flatMap((name) => {
+      const found = editing ? disconnection(name, c.env, databases) : undefined
+      return found ? [{ container: c.name, ...found }] : []
+    })
+  })
+  const going = new Set(disconnects.flatMap((d) => d.names.map((n) => `${d.container}/${n}`)))
+  const dropRow = (container: string, name: string) => {
+    const found = disconnection(name, envIn(container), databases)
+    const names = found?.names ?? [name]
+    const secretNames = names.filter(
+      (n) => envIn(container).find((e) => e.name === n)?.source.kind === "Secret",
+    )
+    setDropped((d) => [...new Set([...d, ...secretNames.map((n) => `${container}/${n}`)])])
+    setRows((rows) =>
+      rows.map((r) =>
+        r.container === container && r.was && names.includes(r.was.name)
+          ? { ...r, removed: true }
+          : r,
+      ),
+    )
+  }
+  const keepRow = (container: string, name: string) => {
+    const names = disconnects.find((d) => d.container === container && d.names.includes(name))
+      ?.names ?? [name]
+    setDropped((d) => d.filter((key) => !names.some((n) => key === `${container}/${n}`)))
+    setRows((rows) =>
+      rows.map((r) =>
+        r.container === container && r.was && names.includes(r.was.name)
+          ? { ...r, removed: false }
+          : r,
+      ),
+    )
+  }
   const blocked =
     parsed && parsed.unread.length > 0
       ? t("vars.unread", parsed.unread)
@@ -322,16 +393,29 @@ export function VariablesTab({
         ? t("vars.blocked", problems.size)
         : undefined
   const held = editing
-    ? changesOf(effective).map(({ container, changes }): Schemas["Change"] => ({
-        op: "env",
-        workload,
-        container,
-        changes,
-      }))
+    ? containers.flatMap(({ name: container }): Schemas["Change"][] => {
+        const own = changesOf(effective).find((c) => c.container === container)?.changes ?? []
+        const extra = disconnects
+          .filter((d) => d.container === container)
+          .flatMap((d) => d.names)
+          .filter((n, i, all) => all.indexOf(n) === i && !own.some((e) => e.name === n))
+          .map((name): Schemas["EnvEdit"] => ({ op: "remove", name }))
+        const changes = [...extra, ...own]
+        return changes.length > 0 ? [{ op: "env", workload, container, changes }] : []
+      })
     : undefined
+  const notes = [...new Set(disconnects.map((d) => d.database))].map(disconnectNote)
   useHold(
     "variables",
-    held ? { changes: held, blocked, editing: true, scope: { ops: ["env"], workload } } : undefined,
+    held
+      ? {
+          changes: held,
+          blocked,
+          editing: true,
+          scope: { ops: ["env"], workload },
+          notes: notes.length > 0 ? notes : undefined,
+        }
+      : undefined,
   )
 
   const setRows = (change: (rows: EnvRow[]) => EnvRow[]) =>
@@ -397,6 +481,25 @@ export function VariablesTab({
     const value = valueOf(env)
     const secret = env.source.kind === "Secret" ? env.source.name : undefined
     const from = databaseOf(container, env)
+    const removing = going.has(`${container}/${env.name}`)
+    if (editing && from && removing)
+      return (
+        <li
+          key={`${container}/${env.name}`}
+          className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
+        >
+          <span className="font-mono text-xs font-medium text-tertiary line-through" translate="no">
+            {env.name}
+          </span>
+          <span className="type-meta text-fail-strong">{t("vars.state.removed")}</span>
+          <span className="flex min-w-0 items-center gap-1 sm:justify-end">
+            <Button variant="ghost" size="xs" onClick={() => keepRow(container, env.name)}>
+              <ArrowCounterClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+              {t("vars.undo")}
+            </Button>
+          </span>
+        </li>
+      )
     return (
       <li
         key={`${container}/${env.name}`}
@@ -423,7 +526,22 @@ export function VariablesTab({
         <span className="flex min-w-0 items-center gap-1 sm:max-w-72 sm:justify-end">
           {env.pendingRestart ? <PendingMark pending={env.pendingRestart} /> : null}
           {from ? (
-            <FromDatabase project={project} database={from} detail={sourceWords(t, env.source)} />
+            <>
+              <FromDatabase project={project} database={from} detail={sourceWords(t, env.source)} />
+              {editing ? (
+                <Button
+                  variant="muted"
+                  size="icon-xs"
+                  aria-label={t("edit.remove", env.name)}
+                  title={t("edit.remove", env.name)}
+                  onClick={() => dropRow(container, env.name)}
+                >
+                  <TrashIcon aria-hidden="true" />
+                </Button>
+              ) : (
+                rowMenu(container, env.name)
+              )}
+            </>
           ) : (
             <SourceLink
               source={env.source}
@@ -811,7 +929,9 @@ export function VariablesTab({
                       problem={problems.get(row.id)}
                       focus={focus === row.id}
                       onChange={(next) =>
-                        setRows((rows) => rows.map((r) => (r.id === row.id ? next : r)))
+                        row.removed && !next.removed && row.was
+                          ? keepRow(row.container, row.was.name)
+                          : setRows((rows) => rows.map((r) => (r.id === row.id ? next : r)))
                       }
                       onDrop={() => setRows((rows) => rows.filter((r) => r.id !== row.id))}
                       onPaste={(event) => paste(row, event)}
@@ -874,8 +994,9 @@ export function VariablesTab({
                             </span>
                             <CopyButton value={env.value ?? ""} />
                             {from ? (
-                              <span className="ml-auto shrink-0">
+                              <span className="ml-auto flex shrink-0 items-center gap-1">
                                 <FromDatabase project={project} database={from} />
+                                {rowMenu(container, env.name)}
                               </span>
                             ) : null}
                             {targets.map((target) => (
@@ -941,7 +1062,37 @@ export function VariablesTab({
         </Suspense>
       ) : null}
       {planner.dialog}
+      {disconnector.dialog}
     </div>
+  )
+}
+
+function DisconnectMenu({
+  name,
+  gate,
+  onDisconnect,
+}: {
+  name: string
+  gate: Gate
+  onDisconnect: () => void
+}) {
+  const t = useT()
+  return (
+    <Menu>
+      <MenuTrigger
+        render={
+          <Button variant="muted" size="icon-xs" aria-label={t("connect.actionsFor", name)} />
+        }
+      >
+        <DotsThreeIcon aria-hidden="true" />
+      </MenuTrigger>
+      <MenuContent align="end">
+        <GatedMenuItem gate={gate} onClick={onDisconnect}>
+          <PlugsIcon aria-hidden="true" />
+          {t("connect.disconnect")}
+        </GatedMenuItem>
+      </MenuContent>
+    </Menu>
   )
 }
 

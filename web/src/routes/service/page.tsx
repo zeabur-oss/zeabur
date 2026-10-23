@@ -486,6 +486,7 @@ function ServiceView({
                 reviewer.plan({
                   title: t("draft.title", service.name),
                   changes: draft.withHeld(),
+                  notes: draft.notes.length > 0 ? draft.notes : undefined,
                   service: { kind: service.kind, name: service.name },
                 })
               }

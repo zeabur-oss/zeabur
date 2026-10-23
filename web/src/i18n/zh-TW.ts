@@ -1745,6 +1745,11 @@ export const zhTW: Messages = {
   "connect.note.mongodb": (secret, url, password) =>
     `密碼留在機密 ${secret}；服務啟動時，${url} 從 ${password} 帶入密碼。`,
   "connect.taken": (name, service) => `${service} 已經有 ${name}。`,
+  "connect.disconnect": "中斷連線",
+  "connect.actionsFor": (name) => `${name} 的動作`,
+  "connect.disconnectTitle": (service, database) => `中斷 ${service} 和 ${database} 的連線`,
+  "connect.disconnectNote": (database, secret) =>
+    `只移除服務的變數，資料庫 ${database} 和機密 ${secret} 都會留著。`,
   "connect.noApp": (database) =>
     `${database} 沒有自動產生密碼的應用程式使用者，無法在這裡接到服務。在 Zeabur 建立的資料庫都有。`,
   "connect.noDatabases": "這個專案沒有可以接上的資料庫。",

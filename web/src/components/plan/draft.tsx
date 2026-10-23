@@ -21,6 +21,8 @@ export interface Held {
   blocked?: string
   /** An editor is open, so the bar shows even with nothing changed yet. */
   editing?: boolean
+  /** Sentences for the plan that the changes cannot say themselves. */
+  notes?: string[]
 }
 
 export function covers(scope: Scope, change: Schemas["Change"]): boolean {
@@ -47,6 +49,8 @@ export interface Draft {
   editing: boolean
   /** Why the held edits cannot be saved yet, the first form's reason. */
   blocked?: string
+  /** The held edits' sentences for the plan. */
+  notes: string[]
   /** Sets or clears one form's held edits; stable across renders. */
   hold: (key: string, held: Held | undefined) => void
   /** The staged changes with the held ones in place of those they cover. */
@@ -99,6 +103,7 @@ export function useDraftState(): Draft {
     applied: reset,
     editing: held.some((h) => h.editing),
     blocked: held.find((h) => h.blocked)?.blocked,
+    notes: held.flatMap((h) => h.notes ?? []),
     hold,
     withHeld,
   }

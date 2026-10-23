@@ -1905,6 +1905,12 @@ export const en = {
   "connect.note.mongodb": (secret: string, url: string, password: string) =>
     `The password stays in Secret ${secret}; ${url} takes it from ${password} when the service starts.`,
   "connect.taken": (name: string, service: string) => `${service} already has ${name}.`,
+  "connect.disconnect": "Disconnect",
+  "connect.actionsFor": (name: string) => `Actions for ${name}`,
+  "connect.disconnectTitle": (service: string, database: string) =>
+    `Disconnect ${service} from ${database}`,
+  "connect.disconnectNote": (database: string, secret: string) =>
+    `Only the service's variables are removed. ${database} and its Secret ${secret} stay.`,
   "connect.noApp": (database: string) =>
     `${database} has no app user with a generated password, so it cannot be connected here. Databases created in Zeabur have one.`,
   "connect.noDatabases": "No database in this project can be connected.",
