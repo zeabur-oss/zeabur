@@ -12,6 +12,7 @@ import type { Schemas } from "@/api/client"
 import { projectAlertsQuery, projectTimelineQuery } from "@/api/queries"
 import { AlertList, AlertsRefused, RecentNote } from "@/components/alerts"
 import { Ago, Segmented } from "@/components/bits"
+import { KubeDetails } from "@/components/kube-details"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusDot, StatusPill } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
@@ -57,7 +58,7 @@ import {
   type Service,
 } from "@/model/service"
 import { folded, serviceOf, type Alert } from "@/model/alerts"
-import { entryTone, severity } from "@/model/severity"
+import { activityTone, warningTone, warningVariant } from "@/model/severity"
 import { refusedPlaces } from "@/routes/project/data"
 import { FilterBox } from "@/routes/project/filter-box"
 import { MeterStack, meterPartTone } from "@zeabur/design-system/components/meter"
@@ -225,21 +226,37 @@ function TimelineEntries({
         )
         const who = writerOf(t, entry.writer)
         const named = names(entry)
+        const params = entry.message.params ?? {}
+        const replica = service ? service.pods.find((p) => p.name === params.replica) : undefined
+        const replicaName = params.replica ? (
+          service && replica ? (
+            <Link
+              {...podEventsLink(project, service, replica.name)}
+              className="hover:text-foreground hover:underline"
+              translate="no"
+            >
+              {replica.name}
+            </Link>
+          ) : (
+            <span translate="no">{params.replica}</span>
+          )
+        ) : null
+        const tone = activityTone(entry, service && statusOf(service).health)
         return (
           <TimelineItem
             key={`${entry.at}/${entry.kind}/${entry.workload.name}/${i}`}
-            tone={entryTone[entry.kind]}
+            tone={tone}
             time={<Ago iso={entry.at} />}
             title={
               <span className="wrap-anywhere">
                 {write(entry.message)}
-                {entry.count && entry.count > 1 ? (
+                {entry.count && entry.count > 1 && params.count === undefined ? (
                   <span className="text-muted-foreground"> ×{entry.count}</span>
                 ) : null}
               </span>
             }
             meta={
-              named && !who ? undefined : (
+              named && !who && !replicaName ? undefined : (
                 <span className="flex flex-wrap items-center gap-x-1.5">
                   {named ? null : service ? (
                     <Link
@@ -252,11 +269,25 @@ function TimelineEntries({
                   ) : (
                     <span translate="no">{entry.workload.name}</span>
                   )}
+                  {replicaName ? (
+                    <span>
+                      {t("events.forPod")} {replicaName}
+                    </span>
+                  ) : null}
                   {who ? <span>{t("timeline.by", who)}</span> : null}
                 </span>
               )
             }
-          />
+          >
+            {entry.kind === "warning" && params.note ? (
+              <KubeDetails
+                facts={[
+                  [t("problem.reason"), params.reason],
+                  [t("problem.message"), params.note],
+                ]}
+              />
+            ) : undefined}
+          </TimelineItem>
         )
       })}
     </Timeline>
@@ -274,24 +305,45 @@ function EventEntries({
   events: Event[]
   empty: string
 }) {
-  const objectLink = (event: Event) => {
+  const t = useT()
+  const serviceOf = (event: Event) => {
     const regarding = event.regarding
-    if (!regarding) return null
-    const label = `${regarding.kind.toLowerCase()}/${regarding.name}`
-    const service = services.find((s) =>
+    if (!regarding) return undefined
+    return services.find((s) =>
       regarding.kind === "Pod"
         ? s.pods.some((p) => p.name === regarding.name)
         : s.kind === regarding.kind && s.name === regarding.name,
     )
-    if (!service) return <span translate="no">{label}</span>
-    const link =
-      regarding.kind === "Pod"
-        ? podEventsLink(project, service, regarding.name)
-        : serviceLink(project, service, { tab: "events" })
-    return (
-      <Link {...link} className="hover:text-foreground hover:underline" translate="no">
-        {label}
+  }
+  const objectLink = (event: Event, service: Service | undefined) => {
+    const regarding = event.regarding
+    if (!regarding) return null
+    if (!service)
+      return <span translate="no">{`${regarding.kind.toLowerCase()}/${regarding.name}`}</span>
+    const link = (
+      <Link
+        {...serviceLink(project, service, { tab: "events" })}
+        className="hover:text-foreground hover:underline"
+        translate="no"
+      >
+        {service.name}
       </Link>
+    )
+    if (regarding.kind !== "Pod") return link
+    return (
+      <span className="flex flex-wrap items-center gap-x-1.5">
+        {link}
+        <span>
+          {t("events.forPod")}{" "}
+          <Link
+            {...podEventsLink(project, service, regarding.name)}
+            className="hover:text-foreground hover:underline"
+            translate="no"
+          >
+            {regarding.name}
+          </Link>
+        </span>
+      </span>
     )
   }
   if (events.length === 0)
@@ -303,28 +355,35 @@ function EventEntries({
     )
   return (
     <Timeline>
-      {events.map((event) => (
-        <TimelineItem
-          key={event.id}
-          tone={isWarning(event) ? severity.warningEvent : "neutral"}
-          time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
-          title={
-            <span>
-              <span className="font-medium" translate="no">
-                {event.reason}
+      {events.map((event) => {
+        const service = serviceOf(event)
+        return (
+          <TimelineItem
+            key={event.id}
+            tone={
+              isWarning(event)
+                ? warningTone(warningVariant(event), service && statusOf(service).health)
+                : "neutral"
+            }
+            time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
+            title={
+              <span>
+                <span className="font-medium" translate="no">
+                  {event.reason}
+                </span>
+                {event.count > 1 ? (
+                  <span className="text-muted-foreground"> ×{event.count}</span>
+                ) : null}
               </span>
-              {event.count > 1 ? (
-                <span className="text-muted-foreground"> ×{event.count}</span>
-              ) : null}
-            </span>
-          }
-          meta={objectLink(event)}
-        >
-          {event.note ? (
-            <span className="line-clamp-2 text-muted-foreground">{event.note}</span>
-          ) : undefined}
-        </TimelineItem>
-      ))}
+            }
+            meta={objectLink(event, service)}
+          >
+            {event.note ? (
+              <span className="line-clamp-2 text-muted-foreground">{event.note}</span>
+            ) : undefined}
+          </TimelineItem>
+        )
+      })}
     </Timeline>
   )
 }

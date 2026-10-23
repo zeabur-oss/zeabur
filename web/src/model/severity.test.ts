@@ -5,6 +5,7 @@ import { nodeIssues } from "@/model/node-health"
 import type { Overview } from "@/model/overview"
 import type { Status } from "@/model/service"
 import {
+  activityTone,
   entryTone,
   logTone,
   reachHealth,
@@ -12,7 +13,10 @@ import {
   SCHEDULING_GRACE_MS,
   schedulingHealth,
   severity,
+  timelineVariant,
   troubleTone,
+  warningTone,
+  warningVariant,
   worstOf,
 } from "@/model/severity"
 import { verdictOf } from "@/model/verdict"
@@ -191,5 +195,50 @@ describe("one mark per row", () => {
   test("a problem's pill takes its service's tone", () => {
     expect(troubleTone("fail")).toBe("fail")
     expect(troubleTone("warn")).toBe("warn")
+  })
+})
+
+describe("Warning events by what they say", () => {
+  test("a crash loop is red, however it reached Activity", () => {
+    expect(warningTone(timelineVariant("timeline.warning.crashLoop"))).toBe("fail")
+    expect(
+      warningTone(
+        warningVariant({ reason: "BackOff", note: "Back-off restarting failed container" }),
+      ),
+    ).toBe("fail")
+    expect(warningTone(warningVariant({ reason: "CrashLoopBackOff" }))).toBe("fail")
+  })
+
+  test("an image that cannot be pulled is red", () => {
+    expect(warningVariant({ reason: "BackOff", note: 'Back-off pulling image "x"' })).toBe(
+      "imagePull",
+    )
+    expect(warningTone("imagePull")).toBe("fail")
+  })
+
+  test("waiting for a node is red only past the allowance, which the service's health says", () => {
+    const missing = timelineVariant("timeline.warning.unschedulable.claimMissing")
+    expect(warningTone(missing, "fail")).toBe("fail")
+    expect(warningTone(missing, "progress")).toBe("warn")
+    expect(warningTone(warningVariant({ reason: "FailedScheduling" }), "fail")).toBe("fail")
+  })
+
+  test("other warnings stay amber", () => {
+    expect(warningTone(timelineVariant("timeline.warning.probe"), "fail")).toBe("warn")
+    expect(warningTone(warningVariant({ reason: "Unhealthy" }))).toBe("warn")
+  })
+})
+
+describe("Activity entries", () => {
+  test("a container that ended is red while its service is failing, amber once it runs", () => {
+    const ended = { kind: "termination" as const, message: { key: "timeline.termination.exited" } }
+    expect(activityTone(ended, "fail")).toBe("fail")
+    expect(activityTone(ended, "ok")).toBe("warn")
+  })
+
+  test("a crash loop warning is red", () => {
+    expect(
+      activityTone({ kind: "warning", message: { key: "timeline.warning.crashLoop" } }, "ok"),
+    ).toBe("fail")
   })
 })

@@ -20,6 +20,12 @@ const verbZhTW: Record<string, string> = {
 }
 
 /** A wait in its largest unit, rounded up: 90 s is 2 minutes. */
+/** A container by its service, or the service alone when the container has its name. */
+const containerZhTW = (p: Record<string, string | undefined>) =>
+  !p.service || p.container === p.service
+    ? (p.service ?? p.container)
+    : `${p.service} 的 ${p.container}`
+
 const waitZh = (s: number) =>
   s < 60 ? `${s} 秒` : s < 3600 ? `${Math.ceil(s / 60)} 分鐘` : `${Math.ceil(s / 3600)} 小時`
 
@@ -2358,23 +2364,29 @@ export const zhTW: Messages = {
     `Kubernetes（${p.manager}）最近一次修改${p.fields ? ` ${p.fields}` : "它"}。`,
   "sentence.timeline.write.other": (p) =>
     `${p.manager} 最近一次修改${p.fields ? ` ${p.fields}` : "它"}。`,
-  "sentence.timeline.warning.crashLoop": (p) => `${p.object} 反覆崩潰、重新啟動（${p.count} 次）。`,
-  "sentence.timeline.warning.evicted": (p) =>
-    `${p.object} 被移出所在的節點（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.unschedulable": (p) =>
-    `${p.object} 找不到可以執行的機器（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.imagePull": (p) =>
-    `${p.object} 無法下載映像檔（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.probe": (p) =>
-    `${p.object} 的健康檢查失敗（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.quota": (p) =>
-    `${p.object} 無法建立副本（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
-  "sentence.timeline.warning.other": (p) =>
-    `${p.object} 發生 ${p.reason}（${p.count} 次）${p.note ? `：${p.note}` : "。"}`,
+  "sentence.timeline.warning.crashLoop": (p) =>
+    `${p.service} 反覆崩潰、重新啟動（${p.count} 次）。`,
+  "sentence.timeline.warning.evicted": (p) => `${p.service} 被移出所在的節點（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.claimMissing": (p) =>
+    `${p.service} 無法啟動：它要掛載的磁碟區 ${p.claim} 不存在（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.claimUnbound": (p) =>
+    `${p.service} 無法啟動：它的磁碟區還沒準備好（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.cpu": (p) =>
+    `${p.service} 在等待可用資源：沒有機器有足夠的 CPU（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.memory": (p) =>
+    `${p.service} 在等待可用資源：沒有機器有足夠的記憶體（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.placement": (p) =>
+    `${p.service} 在等待可以執行它的機器（${p.count} 次）。`,
+  "sentence.timeline.warning.unschedulable.other": (p) =>
+    `${p.service} 在等待可以執行的機器（${p.count} 次）。`,
+  "sentence.timeline.warning.imagePull": (p) => `${p.service} 無法下載映像檔（${p.count} 次）。`,
+  "sentence.timeline.warning.probe": (p) => `${p.service} 的健康檢查失敗（${p.count} 次）。`,
+  "sentence.timeline.warning.quota": (p) => `${p.service} 無法建立副本（${p.count} 次）。`,
+  "sentence.timeline.warning.other": (p) => `${p.service} 發生 ${p.reason}（${p.count} 次）。`,
   "sentence.timeline.termination.oomKilled": (p) =>
-    `${p.pod} 裡的 ${p.container} 用完了記憶體，系統終止了它。`,
+    `${containerZhTW(p)} 用完了記憶體，系統終止了它。`,
   "sentence.timeline.termination.exited": (p) =>
-    `${p.pod} 裡的 ${p.container} 結束了，結束碼 ${p.exitCode}${p.reason ? `（${p.reason}）` : ""}。`,
+    `${containerZhTW(p)} 結束了，結束碼 ${p.exitCode}${p.reason ? `（${p.reason}）` : ""}。`,
   "sentence.rollout.progressing": (p) =>
     `${p.name} 正在部署：${p.desired} 個副本中有 ${p.updated} 個是新的修訂版本。`,
   "sentence.rollout.done": (p) => `${p.name} 已部署完成：每個副本都是目前的修訂版本。`,

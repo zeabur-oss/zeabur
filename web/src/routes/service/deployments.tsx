@@ -4,6 +4,7 @@ import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import type { Schemas } from "@/api/client"
+import { KubeDetails } from "@/components/kube-details"
 import { Ago } from "@/components/bits"
 import { FilterField } from "@/components/filter-field"
 import { LoadingRows } from "@/components/page"
@@ -41,9 +42,9 @@ import {
   weekOf,
   type ChangeEntry,
 } from "@/model/changes"
-import { entryTone, severity } from "@/model/severity"
+import { activityTone, warningTone, warningVariant } from "@/model/severity"
 import { writerOf } from "@/routes/project/side"
-import { imageTag, isTask, type Event, type Service } from "@/model/service"
+import { imageTag, isTask, statusOf, type Event, type Health, type Service } from "@/model/service"
 
 type Release = Schemas["WorkloadRelease"]
 
@@ -150,6 +151,7 @@ export function DeploymentsTab({
             <Entry
               key={entryKey(entry)}
               entry={entry}
+              health={statusOf(service).health}
               picked={picked}
               managed={managed}
               onCompare={compare}
@@ -162,6 +164,7 @@ export function DeploymentsTab({
         {older.length > 0 ? (
           <Older
             entries={older}
+            health={statusOf(service).health}
             picked={picked}
             managed={managed}
             onCompare={compare}
@@ -184,6 +187,8 @@ const entryKey = (entry: ChangeEntry) =>
       : `${entry.entry.kind}/${entry.at}/${entry.entry.message.key}`
 
 interface RowProps {
+  /** The service's health now, which says whether waiting for a node is past its allowance. */
+  health?: Health
   picked?: number
   managed?: string | null
   onCompare: (release: Release) => void
@@ -194,6 +199,7 @@ interface RowProps {
 
 function Entry({
   entry,
+  health,
   picked,
   managed,
   onCompare,
@@ -207,7 +213,7 @@ function Entry({
   if (entry.kind === "warning")
     return (
       <TimelineItem
-        tone={severity.warningEvent}
+        tone={warningTone(warningVariant(entry.event), health)}
         time={time}
         title={
           <span translate="no">
@@ -230,19 +236,27 @@ function Entry({
     )
   if (entry.kind === "timeline") {
     const who = writerOf(t, entry.entry.writer)
+    const params = entry.entry.message.params ?? {}
+    const warning = entry.entry.kind === "warning"
     return (
       <TimelineItem
-        tone={entryTone[entry.entry.kind]}
+        tone={activityTone(entry.entry, health)}
         time={time}
         title={
           <span>
             {write(entry.entry.message)}
-            {entry.entry.count && entry.entry.count > 1 ? (
+            {entry.entry.count && entry.entry.count > 1 && params.count === undefined ? (
               <span className="ml-1.5 font-normal text-tertiary">×{entry.entry.count}</span>
             ) : null}
           </span>
         }
-        meta={who ? t("timeline.by", who) : undefined}
+        meta={
+          who
+            ? t("timeline.by", who)
+            : params.replica
+              ? `${t("events.forPod")} ${params.replica}`
+              : undefined
+        }
         actions={
           isTrouble(entry) ? (
             <Button variant="ghost" size="xs" onClick={onEvents}>
@@ -250,7 +264,16 @@ function Entry({
             </Button>
           ) : undefined
         }
-      />
+      >
+        {warning && params.note ? (
+          <KubeDetails
+            facts={[
+              [t("problem.reason"), params.reason],
+              [t("problem.message"), params.note],
+            ]}
+          />
+        ) : undefined}
+      </TimelineItem>
     )
   }
   const who = writerOf(t, entry.entry?.writer)

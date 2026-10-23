@@ -24,6 +24,12 @@ const thingEn = (p: P) =>
   p.name ?? (p.resource ? `${p.resource}${p.namespace ? ` in ${p.namespace}` : ""}` : "this")
 
 /** A wait in its largest unit, rounded up: 90 s is 2 minutes. */
+/** A container by its service, or the service alone when the container has its name. */
+const containerEn = (p: P) =>
+  !p.service || p.container === p.service
+    ? (p.service ?? p.container)
+    : `${p.container} in ${p.service}`
+
 const waitEn = (s: number) =>
   s < 60
     ? plural(s, "second", "seconds")
@@ -2573,23 +2579,33 @@ export const en = {
     `Kubernetes (${p.manager}) last changed ${p.fields || "it"}.`,
   "sentence.timeline.write.other": (p: P) => `${p.manager} last changed ${p.fields || "it"}.`,
   "sentence.timeline.warning.crashLoop": (p: P) =>
-    `${p.object} kept crashing and restarting (${plural(Number(p.count), "time", "times")}).`,
+    `${p.service} kept crashing and restarting (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.evicted": (p: P) =>
-    `${p.object} was removed from its node (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
-  "sentence.timeline.warning.unschedulable": (p: P) =>
-    `${p.object} found no machine to run on (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+    `${p.service} was removed from its node (${plural(Number(p.count), "time", "times")}).`,
+  "sentence.timeline.warning.unschedulable.claimMissing": (p: P) =>
+    `${p.service} couldn't start: the volume ${p.claim} it mounts doesn't exist (${plural(Number(p.count), "time", "times")}).`,
+  "sentence.timeline.warning.unschedulable.claimUnbound": (p: P) =>
+    `${p.service} couldn't start: its volume wasn't ready (${plural(Number(p.count), "time", "times")}).`,
+  "sentence.timeline.warning.unschedulable.cpu": (p: P) =>
+    `${p.service} waited for room: no machine had enough CPU free (${plural(Number(p.count), "time", "times")}).`,
+  "sentence.timeline.warning.unschedulable.memory": (p: P) =>
+    `${p.service} waited for room: no machine had enough memory free (${plural(Number(p.count), "time", "times")}).`,
+  "sentence.timeline.warning.unschedulable.placement": (p: P) =>
+    `${p.service} waited for a machine it is allowed to run on (${plural(Number(p.count), "time", "times")}).`,
+  "sentence.timeline.warning.unschedulable.other": (p: P) =>
+    `${p.service} waited for a machine to run on (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.imagePull": (p: P) =>
-    `${p.object} couldn't download its image (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+    `${p.service} couldn't download its image (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.probe": (p: P) =>
-    `${p.object} failed a health check (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+    `${p.service} failed a health check (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.quota": (p: P) =>
-    `${p.object} couldn't create a replica (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+    `${p.service} couldn't create a replica (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.other": (p: P) =>
-    `${p.reason} on ${p.object} (${plural(Number(p.count), "time", "times")})${p.note ? `: ${p.note}` : "."}`,
+    `${p.reason} on ${p.service} (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.termination.oomKilled": (p: P) =>
-    `${p.container} in ${p.pod} ran out of memory and was stopped.`,
+    `${containerEn(p)} ran out of memory and was stopped.`,
   "sentence.timeline.termination.exited": (p: P) =>
-    `${p.container} in ${p.pod} ended with exit code ${p.exitCode}${p.reason ? ` (${p.reason})` : ""}.`,
+    `${containerEn(p)} ended with exit code ${p.exitCode}${p.reason ? ` (${p.reason})` : ""}.`,
   "sentence.rollout.progressing": (p: P) =>
     `${p.name} is rolling out: ${p.updated} of ${plural(Number(p.desired), "replica runs", "replicas run")} the new release.`,
   "sentence.rollout.done": (p: P) =>
