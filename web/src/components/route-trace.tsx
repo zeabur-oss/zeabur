@@ -7,6 +7,7 @@ import XCircleFillIcon from "~icons/ph/x-circle-fill"
 import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
 import { BrowserCheckLine } from "@/components/browser-check"
+import { DomainState } from "@/components/domain-setup"
 import { StatusDot } from "@/components/status"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
@@ -17,6 +18,7 @@ import {
 } from "@zeabur/design-system/components/collapsible"
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
+import { needsSetup } from "@/model/domains"
 
 type Route = Schemas["RouteTraceView"]
 type HopStatus = Schemas["HopStatus"]
@@ -66,7 +68,7 @@ export function RouteLine({
     : { ...verdict[route.status], text: t(verdict[route.status].key) }
   return (
     <div className="flex flex-col gap-2 px-4 py-3">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="flex min-w-0 items-center">
         {route.kind === "domain" ? (
           <a
             href={`${secure ? "https" : "http"}://${route.address}`}
@@ -93,17 +95,22 @@ export function RouteLine({
             <CopyButton value={route.address} />
           </span>
         )}
-        <span className={cn("ml-auto flex shrink-0 items-center gap-1.5 text-sm", said.tone)}>
+      </div>
+      <div className="flex flex-col gap-1">
+        {route.domain && needsSetup(route.domain) ? (
+          <DomainState check={route.domain} size="text-sm" />
+        ) : null}
+        <span className={cn("flex items-center gap-1.5 text-sm", said.tone)}>
           <StatusDot health={said.health} />
           {said.text}
         </span>
+        {route.kind === "domain" && route.status === "unknown" && !waiting ? (
+          <BrowserCheckLine
+            address={route.address}
+            tls={route.hops.some((h) => h.step === "certificate")}
+          />
+        ) : null}
       </div>
-      {route.kind === "domain" && route.status === "unknown" && !waiting ? (
-        <BrowserCheckLine
-          address={route.address}
-          tls={route.hops.some((h) => h.step === "certificate")}
-        />
-      ) : null}
       {stop ? (
         <div className="flex flex-col gap-1 text-sm">
           <p>{write(stop.message)}</p>

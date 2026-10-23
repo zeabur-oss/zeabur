@@ -62,7 +62,7 @@ export function BrowserCheckLine({ address, tls }: { address: string; tls: boole
         </span>
         {url ? (
           <Button
-            variant="ghost"
+            variant="link"
             size="xs"
             disabled={state === "checking"}
             onClick={() => start(url)}

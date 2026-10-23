@@ -10,6 +10,7 @@ import {
 } from "@zeabur/design-system/components/collapsible"
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import { configuration, dnsSetup, recordsFor, wildcardFor, type DnsRecord } from "@/model/domains"
 
 type DomainCheck = Schemas["DomainCheck"]
@@ -23,7 +24,13 @@ const configHealth = {
 } as const
 
 /** One line beside a domain: whether it is set up, and its certificate. */
-export function DomainState({ check }: { check: DomainCheck }) {
+export function DomainState({
+  check,
+  size = "type-meta",
+}: {
+  check: DomainCheck
+  size?: "type-meta" | "text-sm"
+}) {
   const t = useT()
   const { locale } = useI18n()
   const state = configuration(check)
@@ -35,7 +42,7 @@ export function DomainState({ check }: { check: DomainCheck }) {
         : t("domain.cert.ready")
       : undefined
   return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 type-meta text-secondary">
+    <span className={cn("flex flex-wrap items-center gap-x-2 gap-y-0.5 text-secondary", size)}>
       <span className="flex items-center gap-1.5" role="status">
         <StatusDot health={configHealth[state]} />
         <span className={state === "invalid" ? "text-fail-strong" : undefined}>
