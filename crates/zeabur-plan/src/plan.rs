@@ -77,6 +77,7 @@ pub const CREATABLE: &[(&str, &str, &str)] = &[
     ("v1", "PersistentVolumeClaim", "persistentvolumeclaims"),
     ("v1", "Service", "services"),
     ("apps/v1", "Deployment", "deployments"),
+    ("batch/v1", "Job", "jobs"),
     ("networking.k8s.io/v1", "Ingress", "ingresses"),
     ("builder.zeabur.com/v1alpha1", "Build", "builds"),
     ("postgresql.cnpg.io/v1", "Cluster", "clusters"),

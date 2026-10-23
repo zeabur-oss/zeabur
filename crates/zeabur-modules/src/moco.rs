@@ -7,8 +7,16 @@
 //! the Service `moco-<cluster>-primary` on port 3306. Each member keeps its data in the claim
 //! `mysql-data-moco-<cluster>-<n>`. `status.conditions` has `Initialized`, `Available` and
 //! `Healthy`, and `status.syncedReplicas` counts the members in sync, the primary with them
-//! [moco-crd]. MOCO keeps its users' passwords in the Secret `moco-<cluster>`; services connect as
-//! `moco-writable` (`WRITABLE_PASSWORD`), which may create databases and users [moco-usage].
+//! [moco-crd]. MOCO keeps its users' passwords in the Secret `moco-<cluster>`. `moco-writable`
+//! (`WRITABLE_PASSWORD`) may create databases and users [moco-usage].
+//!
+//! # The app database
+//!
+//! MOCO makes no database. Zeabur's create plan adds the Job `<cluster>-app-setup`, which connects
+//! as `moco-writable` and makes a database and a user of the same name, with access to that
+//! database only. The annotations `zeabur.com/app-database` and `zeabur.com/app-secret` name the
+//! database and the Secret that holds the user's password, key `password`. Services connect as
+//! that user. A cluster without the annotations connects as `moco-writable`.
 //!
 //! # Backups
 //!
@@ -52,6 +60,11 @@ pub const BACKUP_POLICIES: Read = Read {
     kind: "BackupPolicy",
 };
 
+/// MOCO's user that may create databases and users.
+pub const WRITABLE: &str = "moco-writable";
+/// The key of `moco-writable`'s password in the Secret `moco-<cluster>`.
+pub const WRITABLE_KEY: &str = "WRITABLE_PASSWORD";
+
 fn condition<'a>(cluster: &'a DynamicObject, kind: &str) -> Option<&'a Value> {
     cluster
         .data
@@ -83,6 +96,45 @@ fn mysqld(cluster: &DynamicObject) -> Option<&Value> {
         .as_array()?
         .iter()
         .find(|c| c["name"] == "mysqld")
+}
+
+/// The annotation naming the app database and its user.
+pub const APP_DATABASE: &str = "zeabur.com/app-database";
+/// The annotation naming the Secret that holds the app user's password, key `password`.
+pub const APP_SECRET: &str = "zeabur.com/app-secret";
+
+fn app_user(cluster: &DynamicObject) -> Option<AppUser> {
+    let annotations = cluster.metadata.annotations.as_ref()?;
+    let database = annotations.get(APP_DATABASE)?;
+    Some(AppUser {
+        username: database.clone(),
+        database: Some(database.clone()),
+        secret: annotations.get(APP_SECRET)?.clone(),
+        password_key: "password".to_owned(),
+    })
+}
+
+/// The state with the app setup Job: progressing while it runs, failed when it failed.
+fn with_setup(state: State, name: &str, jobs: &[DynamicObject]) -> (State, Option<String>) {
+    let setup = format!("{name}-app-setup");
+    let Some(job) = jobs
+        .iter()
+        .find(|j| j.metadata.name.as_deref() == Some(&setup))
+    else {
+        return (state, None);
+    };
+    if databases::conditions_true(job, "Complete") || state != State::Ready {
+        (state, None)
+    } else if databases::conditions_true(job, "Failed") {
+        (
+            State::Failed,
+            Some(format!(
+                "The Job {setup} could not make the app database. Its logs say why."
+            )),
+        )
+    } else {
+        (State::Progressing, None)
+    }
 }
 
 fn data_claim(cluster: &DynamicObject) -> Option<&Value> {
@@ -163,12 +215,17 @@ pub fn database(
     let name = cluster.metadata.name.clone().unwrap_or_default();
     let members = databases::int(cluster, "/spec/replicas").unwrap_or(1);
     let ready = databases::int(cluster, "/status/syncedReplicas").unwrap_or(0);
-    let state = state(cluster, members, ready);
+    let (state, setup_problem) = with_setup(state(cluster, members, ready), &name, jobs);
     let healthy = condition(cluster, "Healthy");
     let server = mysqld(cluster);
     let image = server.and_then(|c| c["image"].as_str()).map(str::to_owned);
     let claim = data_claim(cluster);
-    let secret = format!("moco-{name}");
+    let app = app_user(cluster).unwrap_or_else(|| AppUser {
+        username: WRITABLE.to_owned(),
+        database: None,
+        secret: format!("moco-{name}"),
+        password_key: WRITABLE_KEY.to_owned(),
+    });
     Database {
         origin: zeabur_model::Origin::complete(
             "moco.cybozu.com/v1beta2",
@@ -185,11 +242,13 @@ pub fn database(
         phase: healthy
             .and_then(|c| c["reason"].as_str())
             .map(str::to_owned),
-        message: healthy
-            .filter(|c| c["status"] != "True")
-            .and_then(|c| c["message"].as_str())
-            .filter(|m| !m.is_empty())
-            .map(str::to_owned),
+        message: setup_problem.or_else(|| {
+            healthy
+                .filter(|c| c["status"] != "True")
+                .and_then(|c| c["message"].as_str())
+                .filter(|m| !m.is_empty())
+                .map(str::to_owned)
+        }),
         members,
         ready,
         primary: databases::int(cluster, "/status/currentPrimaryIndex")
@@ -212,19 +271,14 @@ pub fn database(
         connection: Connection {
             host: format!("moco-{name}-primary.{namespace}.svc"),
             port: 3306,
-            database: None,
-            username: Some("moco-writable".to_owned()),
-            secret: secret.clone(),
+            database: app.database.clone(),
+            username: Some(app.username.clone()),
+            secret: app.secret.clone(),
             username_key: None,
-            password_key: "WRITABLE_PASSWORD".to_owned(),
+            password_key: app.password_key.clone(),
             options: None,
         },
-        app: Some(AppUser {
-            username: "moco-writable".to_owned(),
-            database: None,
-            secret,
-            password_key: "WRITABLE_PASSWORD".to_owned(),
-        }),
+        app: Some(app),
         backups: backups_of(namespace, cluster, &name, state, policies, jobs),
         created: cluster
             .metadata
@@ -381,5 +435,39 @@ mod tests {
             ),
             State::Failed
         );
+    }
+
+    #[test]
+    fn the_app_database_waits_for_its_setup_job() {
+        let mut annotated = cluster(&serde_json::json!({
+            "conditions": [{"type": "Initialized", "status": "True"},
+                           {"type": "Available", "status": "True"},
+                           {"type": "Healthy", "status": "True"}],
+            "syncedReplicas": 3
+        }));
+        annotated.metadata.annotations = Some(
+            [(APP_DATABASE, "app"), (APP_SECRET, "mysql-app")]
+                .into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect(),
+        );
+        let setup = |conditions: Value| {
+            object(serde_json::json!({
+                "apiVersion": "batch/v1", "kind": "Job",
+                "metadata": {"name": "mysql-app-setup", "namespace": "shop"},
+                "status": {"conditions": conditions}
+            }))
+        };
+        let with = |conditions: Value| database("shop", &annotated, &[], &[setup(conditions)]);
+        assert_eq!(with(serde_json::json!([])).state, State::Progressing);
+        let failed = with(serde_json::json!([{"type": "Failed", "status": "True"}]));
+        assert_eq!(failed.state, State::Failed);
+        assert!(failed.message.unwrap().contains("mysql-app-setup"));
+        let done = with(serde_json::json!([{"type": "Complete", "status": "True"}]));
+        assert_eq!(done.state, State::Ready);
+        assert_eq!(done.connection.username.as_deref(), Some("app"));
+        assert_eq!(done.connection.database.as_deref(), Some("app"));
+        assert_eq!(done.connection.secret, "mysql-app");
+        assert_eq!(done.connection.password_key, "password");
     }
 }

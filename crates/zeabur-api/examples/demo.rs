@@ -801,9 +801,9 @@ fn lab() -> NamespaceObjects {
                 1,
                 1,
                 &json!([
-                    {"name": "MYSQLPASSWORD", "valueFrom": secret("moco-mysql-mvjrswvl", "WRITABLE_PASSWORD")},
+                    {"name": "MYSQLPASSWORD", "valueFrom": secret("mysql-mvjrswvl-app", "password")},
                     {"name": "DATABASE_URL",
-                        "value": "mysql://moco-writable:$(MYSQLPASSWORD)@moco-mysql-mvjrswvl-primary.lab.svc:3306/shop"}
+                        "value": "mysql://app:$(MYSQLPASSWORD)@moco-mysql-mvjrswvl-primary.lab.svc:3306/app"}
                 ]),
             ),
         ],
@@ -899,6 +899,7 @@ fn lab() -> NamespaceObjects {
             "mongo-mvjrswvl-custom-user-secret",
             "moco-mysql-mvjrswvl",
             "moco-mysql-mvjrswvl-restored-1022",
+            "mysql-mvjrswvl-app",
             "mariadb-mvjrswvl-app",
             "dragonfly-mvjrswvl-auth",
         ]
@@ -1802,7 +1803,9 @@ fn state() -> State {
             from(json!({
                 "apiVersion": "moco.cybozu.com/v1beta2", "kind": "MySQLCluster",
                 "metadata": {"name": "mysql-mvjrswvl", "namespace": "lab",
-                    "creationTimestamp": created("mysql-mvjrswvl")},
+                    "creationTimestamp": created("mysql-mvjrswvl"),
+                    "annotations": {"zeabur.com/app-database": "app",
+                        "zeabur.com/app-secret": "mysql-mvjrswvl-app"}},
                 "spec": {"replicas": 1, "backupPolicyName": "mysql-mvjrswvl-backups",
                     "podTemplate": {"spec": {"containers": [{"name": "mysqld",
                         "image": "ghcr.io/cybozu-go/moco/mysql:8.4.10",
@@ -1827,6 +1830,12 @@ fn state() -> State {
             })),
             from(json!({
                 "apiVersion": "batch/v1", "kind": "Job",
+                "metadata": {"name": "mysql-mvjrswvl-app-setup", "namespace": "lab"},
+                "status": {"conditions": [{"type": "Complete", "status": "True"}],
+                    "completionTime": "2026-09-21T10:03:00Z"}
+            })),
+            from(json!({
+                "apiVersion": "batch/v1", "kind": "Job",
                 "metadata": {"name": "moco-backup-mysql-mvjrswvl-29350260", "namespace": "lab",
                     "ownerReferences": [{"apiVersion": "batch/v1", "kind": "CronJob",
                         "name": "moco-backup-mysql-mvjrswvl", "uid": "00000000-0000-0000-0000-000000000002",
@@ -1837,7 +1846,9 @@ fn state() -> State {
                 "apiVersion": "moco.cybozu.com/v1beta2", "kind": "MySQLCluster",
                 "metadata": {"name": "mysql-mvjrswvl-restored-1022", "namespace": "lab",
                     "creationTimestamp": created("mysql-mvjrswvl-restored-1022"),
-                    "annotations": {"zeabur.com/restored-from": "mysql-mvjrswvl",
+                    "annotations": {"zeabur.com/app-database": "app",
+                        "zeabur.com/app-secret": "mysql-mvjrswvl-app",
+                        "zeabur.com/restored-from": "mysql-mvjrswvl",
                         "zeabur.com/restored-backup": "moco-backup-mysql-mvjrswvl-29350260",
                         "zeabur.com/restored-time": "2026-10-22T03:00:41Z"}},
                 "spec": {"replicas": 1,

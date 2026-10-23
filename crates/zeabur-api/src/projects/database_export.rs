@@ -117,7 +117,7 @@ async fn plan(cluster: &dyn Cluster, project: &str, database: &Database) -> Resu
             extension: "archive.gz",
         },
         zeabur_modules::databases::Engine::Mysql => {
-            let secret = &database.connection.secret;
+            let secret = &format!("moco-{name}");
             let values = cluster.reveal_secret(project, secret).await.map_err(|e| {
                 read_problem(
                     e,
@@ -126,7 +126,7 @@ async fn plan(cluster: &dyn Cluster, project: &str, database: &Database) -> Resu
                 )
             })?;
             let mut password = values
-                .get(&database.connection.password_key)
+                .get(moco::WRITABLE_KEY)
                 .cloned()
                 .ok_or_else(|| failed(&format!("Secret {secret} holds no password.")))?;
             password.push(b'\n');
@@ -136,7 +136,7 @@ async fn plan(cluster: &dyn Cluster, project: &str, database: &Database) -> Resu
                 command: sql_dump(
                     "mysql",
                     "mysqldump",
-                    "moco-writable",
+                    moco::WRITABLE,
                     "-",
                     " --set-gtid-purged=OFF",
                 ),

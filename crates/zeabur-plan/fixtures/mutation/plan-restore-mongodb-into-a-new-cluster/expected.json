@@ -16,6 +16,9 @@
           "kind": "PerconaServerMongoDB",
           "metadata": {
             "name": "shop-restored-1023",
+            "finalizers": [
+              "percona.com/delete-psmdb-pvc"
+            ],
             "annotations": {
               "zeabur.com/restored-from": "shop",
               "zeabur.com/restored-backup": "shop-20261022-030000",

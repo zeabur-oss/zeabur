@@ -17,6 +17,8 @@
           "metadata": {
             "name": "shop-restored-1023",
             "annotations": {
+              "zeabur.com/app-database": "app",
+              "zeabur.com/app-secret": "mysql-app",
               "zeabur.com/restored-from": "shop",
               "zeabur.com/restored-backup": "shop-20261022-030000",
               "zeabur.com/restored-time": "2026-10-22T03:01:00Z"
