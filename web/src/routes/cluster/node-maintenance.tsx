@@ -532,6 +532,7 @@ const outcomeTone: Record<Schemas["EvictOutcome"], string | undefined> = {
   waiting: "text-warn-strong",
   refused: "text-fail-strong",
   failed: "text-fail-strong",
+  last: "text-muted-foreground",
 }
 
 function Progress({
@@ -573,7 +574,7 @@ function Progress({
               <span className={cn("type-meta", outcomeTone[pod.outcome])}>
                 {pod.outcome === "waiting"
                   ? t("maint.outcome.waiting", pod.budget ?? undefined)
-                  : t(`maint.outcome.${pod.outcome as "refused" | "failed"}`)}
+                  : t(`maint.outcome.${pod.outcome as "refused" | "failed" | "last"}`)}
                 {pod.detail ? (
                   <span className="block text-muted-foreground" translate="no">
                     {pod.detail}

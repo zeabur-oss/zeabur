@@ -568,7 +568,7 @@ export const en = {
   "maint.controlPlane": (node: string) =>
     `${node} runs the cluster's control plane. Its components stay on it, but while the node is down the cluster may not answer.`,
   "maint.zeabur":
-    "Zeabur itself runs on this node. When it moves, this page loses its connection for a moment, then reconnects.",
+    "Zeabur itself runs on this node. It moves last, once the other replicas have left; you are then signed in again and need to turn on admin rights again.",
   "maint.moves": (n: number) => `Move to other nodes (${n})`,
   "maint.scratch": (n: number) =>
     `${n === 1 ? "1 of them loses" : `${n} of them lose`} what they keep in scratch space.`,
@@ -598,6 +598,7 @@ export const en = {
     budget ? `Waiting on disruption budget ${budget}` : "Waiting on a disruption budget",
   "maint.outcome.refused": "You may not move it",
   "maint.outcome.failed": "Could not move it",
+  "maint.outcome.last": "Zeabur itself: moves once the others have left",
   "maint.leaveNote":
     "You can close this. The node stays out of scheduling; open maintenance mode again to move what is left.",
   "maint.retry": "Try again",

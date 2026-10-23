@@ -28,6 +28,7 @@ describe("drain passes", () => {
     expect(settled(progress("gone", "refused", "failed"))).toBe(true)
     expect(settled(progress("gone", "leaving"))).toBe(false)
     expect(settled(progress("waiting"))).toBe(false)
+    expect(settled(progress("gone", "last"))).toBe(false)
   })
 
   test("wait 2 s for replicas to stop, and back off while a budget holds one", () => {

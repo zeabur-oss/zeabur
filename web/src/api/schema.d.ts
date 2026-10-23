@@ -2820,7 +2820,10 @@ export interface components {
     DrainPod: {
       /** @description The `PodDisruptionBudget` that covers it. */
       budget?: string | null
-      /** @description That budget allows no disruption now, so its eviction waits. */
+      /**
+       * @description That budget allows fewer disruptions now than this node has pods under it, so some of
+       *     their evictions wait.
+       */
       budgetBlocks: boolean
       /** @description What happens to it. */
       fate: components["schemas"]["PodFate"]
@@ -2953,7 +2956,7 @@ export interface components {
      * @description What a pass found or did for one pod.
      * @enum {string}
      */
-    EvictOutcome: "gone" | "leaving" | "waiting" | "refused" | "failed"
+    EvictOutcome: "gone" | "leaving" | "waiting" | "refused" | "failed" | "last"
     /** @description One pod of a pass. */
     EvictedPod: {
       /** @description The budget it waits on, when one was found. */

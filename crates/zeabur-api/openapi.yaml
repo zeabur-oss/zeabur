@@ -5396,7 +5396,9 @@ components:
           description: The `PodDisruptionBudget` that covers it.
         budgetBlocks:
           type: boolean
-          description: That budget allows no disruption now, so its eviction waits.
+          description: |-
+            That budget allows fewer disruptions now than this node has pods under it, so some of
+            their evictions wait.
         fate:
           $ref: "#/components/schemas/PodFate"
           description: What happens to it.
@@ -5670,6 +5672,7 @@ components:
       - waiting
       - refused
       - failed
+      - last
     EvictedPod:
       type: object
       description: One pod of a pass.

@@ -490,14 +490,15 @@ export const zhTW: Messages = {
   "maint.lead.continue": (node, n) =>
     n === 0 ? `${node} 上已經沒有要移走的副本。` : `${node} 上還有 ${n} 個副本，會移到其他節點。`,
   "maint.amounts": (cpu, memory) => `${cpu} CPU 和 ${memory} 記憶體`,
-  "maint.fits": (needs, room) => `其他節點放得下：這些副本要求 ${needs}，目前還有 ${room} 可用。`,
+  "maint.fits": (needs, room) => `其他節點放得下：這些副本要求 ${needs}，目前可用的還有 ${room}。`,
   "maint.short": (n) => `其他節點放不下其中 ${n} 個副本，要等到有空間或加了節點才會啟動。`,
   "maint.shortDetail": (needs, room) => `它們要求 ${needs}，其他節點只剩 ${room}。`,
   "maint.unknownRoom": "Zeabur 沒辦法讀取所有 Pod，所以無法確認其他節點放不放得下。",
   "maint.noOther": "沒有其他節點能放新的副本，移走的副本會一直等到有節點可用。",
   "maint.controlPlane": (node) =>
     `${node} 執行叢集的控制平面。控制平面的元件會留在上面，但這個節點停機時，叢集可能沒有回應。`,
-  "maint.zeabur": "Zeabur 本身也在這個節點上。移走時這個頁面會斷線一下，接著自動重新連上。",
+  "maint.zeabur":
+    "Zeabur 本身也在這個節點上，會等其他副本都移走後最後才移走。那時會重新登入，管理員權限也要再開一次。",
   "maint.moves": (n) => `移到其他節點（${n}）`,
   "maint.scratch": (n) => `其中 ${n} 個副本的暫存空間會清空。`,
   "maint.lose": "暫存空間會清空",
@@ -525,6 +526,7 @@ export const zhTW: Messages = {
   "maint.outcome.waiting": (budget) => (budget ? `等待中斷預算 ${budget}` : "等待中斷預算"),
   "maint.outcome.refused": "你沒有權限移走它",
   "maint.outcome.failed": "移不走",
+  "maint.outcome.last": "Zeabur 本身，等其他副本移走後再移",
   "maint.leaveNote":
     "可以先關掉這個視窗。節點會維持停止排程，要移走剩下的副本時，再打開維護模式就好。",
   "maint.retry": "再試一次",

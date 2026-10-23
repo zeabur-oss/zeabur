@@ -490,14 +490,15 @@ export const zhCN: Messages = {
   "maint.lead.continue": (node, n) =>
     n === 0 ? `${node} 上已经没有要迁走的副本。` : `${node} 上还有 ${n} 个副本，会迁到其他节点。`,
   "maint.amounts": (cpu, memory) => `${cpu} CPU 和 ${memory} 内存`,
-  "maint.fits": (needs, room) => `其他节点放得下：这些副本请求 ${needs}，目前还有 ${room} 可用。`,
+  "maint.fits": (needs, room) => `其他节点放得下：这些副本请求 ${needs}，目前可用的还有 ${room}。`,
   "maint.short": (n) => `其他节点放不下其中 ${n} 个副本，要等到有空间或加了节点才会启动。`,
   "maint.shortDetail": (needs, room) => `它们请求 ${needs}，其他节点只剩 ${room}。`,
   "maint.unknownRoom": "Zeabur 无法读取所有 Pod，所以无法确认其他节点放不放得下。",
   "maint.noOther": "没有其他节点能放新的副本，迁走的副本会一直等到有节点可用。",
   "maint.controlPlane": (node) =>
     `${node} 运行集群的控制平面。控制平面的组件会留在上面，但这个节点停机时，集群可能没有响应。`,
-  "maint.zeabur": "Zeabur 本身也在这个节点上。迁走时这个页面会断开一下，然后自动重新连接。",
+  "maint.zeabur":
+    "Zeabur 本身也在这个节点上，会等其他副本都迁走后最后才迁走。那时会重新登录，管理员权限也要再开一次。",
   "maint.moves": (n) => `迁到其他节点（${n}）`,
   "maint.scratch": (n) => `其中 ${n} 个副本的临时空间会清空。`,
   "maint.lose": "临时空间会清空",
@@ -525,6 +526,7 @@ export const zhCN: Messages = {
   "maint.outcome.waiting": (budget) => (budget ? `等待中断预算 ${budget}` : "等待中断预算"),
   "maint.outcome.refused": "你没有权限迁走它",
   "maint.outcome.failed": "迁不走",
+  "maint.outcome.last": "Zeabur 本身，等其他副本迁走后再迁",
   "maint.leaveNote":
     "可以先关掉这个窗口。节点会保持停止调度，要迁走剩下的副本时，再打开维护模式即可。",
   "maint.retry": "再试一次",

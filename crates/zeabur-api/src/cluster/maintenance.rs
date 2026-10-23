@@ -28,7 +28,9 @@
 //! `uid`. Apply patches `spec.unschedulable` (a dry run first) and, for maintenance, makes the
 //! first eviction pass. A pass evicts each of those pods still on the node through the Eviction
 //! API, which respects `PodDisruptionBudget`s: a budget that allows no disruption now is answered
-//! `429` and the pod is reported waiting on it. The browser repeats passes while it stays open
+//! `429` and the pod is reported waiting on it. Zeabur's own pods are evicted only once no other
+//! pod is leaving or waiting, since moving Zeabur ends the person's session (sessions live in its
+//! memory) and with it the passes. The browser repeats passes while it stays open
 //! (`evict`, with the same token, for an hour); nothing runs on the server between passes. A
 //! person who leaves leaves the node cordoned, and a new plan shows what is still on it.
 //!
@@ -155,7 +157,8 @@ pub struct DrainPod {
     /// The `PodDisruptionBudget` that covers it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub budget: Option<String>,
-    /// That budget allows no disruption now, so its eviction waits.
+    /// That budget allows fewer disruptions now than this node has pods under it, so some of
+    /// their evictions wait.
     pub budget_blocks: bool,
     /// One of Zeabur's own pods.
     pub zeabur: bool,
@@ -251,6 +254,9 @@ pub enum EvictOutcome {
     Refused,
     /// The eviction failed otherwise.
     Failed,
+    /// One of Zeabur's own pods, left until the others are off the node: moving it ends the
+    /// person's session, and with it the passes.
+    Last,
 }
 
 /// One pod of a pass.
@@ -295,6 +301,9 @@ struct Planned {
     name: String,
     uid: String,
     fate: PodFate,
+    /// One of Zeabur's own pods, evicted last.
+    #[serde(default)]
+    zeabur: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -431,6 +440,38 @@ fn budget_for<'a>(budgets: &'a [Value], pod: &Pod) -> Option<&'a Value> {
     })
 }
 
+/// Marks the pods whose budget allows fewer disruptions now than this node has pods under it to
+/// evict: kubectl drain waits on the rest.
+fn held_by_budgets(out: &mut [DrainPod], budgets: &[Value]) {
+    let under = |namespace: &str, budget: &str| {
+        out.iter()
+            .filter(|p| p.fate != PodFate::Stays && p.namespace == namespace)
+            .filter(|p| p.budget.as_deref() == Some(budget))
+            .count()
+    };
+    let blocked: Vec<bool> = out
+        .iter()
+        .map(|pod| {
+            let Some(name) = pod.budget.as_deref() else {
+                return false;
+            };
+            let allowed = budgets
+                .iter()
+                .find(|b| {
+                    text(b, "/metadata/namespace") == pod.namespace
+                        && text(b, "/metadata/name") == name
+                })
+                .and_then(|b| b.pointer("/status/disruptionsAllowed"))
+                .and_then(Value::as_i64);
+            allowed
+                .is_some_and(|n| i64::try_from(under(&pod.namespace, name)).unwrap_or(i64::MAX) > n)
+        })
+        .collect();
+    for (pod, blocks) in out.iter_mut().zip(blocked) {
+        pod.budget_blocks = blocks;
+    }
+}
+
 /// What maintenance does to each pod on `node`, those that move first.
 fn classify(node: &Node, pods: &[Pod], context: &Context) -> Vec<DrainPod> {
     let host = hostname(node);
@@ -444,7 +485,8 @@ fn classify(node: &Node, pods: &[Pod], context: &Context) -> Vec<DrainPod> {
                 .annotations
                 .as_ref()
                 .is_some_and(|a| a.contains_key(MIRROR));
-            let workload = workload_of(pod);
+            // A mirror pod's owner is the Node; the pod's own name says more.
+            let workload = (!mirror).then(|| workload_of(pod)).flatten();
             let volumes = pod.spec.as_ref().and_then(|s| s.volumes.as_ref());
             let scratch: Vec<String> = volumes
                 .into_iter()
@@ -500,11 +542,7 @@ fn classify(node: &Node, pods: &[Pod], context: &Context) -> Vec<DrainPod> {
                 scratch,
                 local_claims,
                 budget: budget.map(|b| text(b, "/metadata/name").to_owned()),
-                budget_blocks: budget.is_some_and(|b| {
-                    b.pointer("/status/disruptionsAllowed")
-                        .and_then(Value::as_i64)
-                        .is_some_and(|n| n <= 0)
-                }),
+                budget_blocks: false,
                 zeabur: context.zeabur_namespace.as_deref() == Some(namespace.as_str())
                     && labels_of(pod)
                         .get("app.kubernetes.io/name")
@@ -520,6 +558,7 @@ fn classify(node: &Node, pods: &[Pod], context: &Context) -> Vec<DrainPod> {
             }
         })
         .collect();
+    held_by_budgets(&mut out, &context.budgets);
     let rank = |fate: PodFate| match fate {
         PodFate::Moves => 0,
         PodFate::Stuck => 1,
@@ -807,6 +846,7 @@ pub(crate) async fn plan(
                     name: p.name.clone(),
                     uid,
                     fate: p.fate,
+                    zeabur: p.zeabur,
                 }
             })
             .collect()
@@ -1094,7 +1134,12 @@ async fn pass(
         .filter_map(|p| Some((p.metadata.uid.as_deref()?, p)))
         .collect();
     let mut pods = Vec::new();
-    for target in planned {
+    let mut order: Vec<(usize, &Planned)> = planned.iter().enumerate().collect();
+    order.sort_by_key(|(_, p)| p.zeabur);
+    for (index, target) in order {
+        let in_flight = pods.iter().any(|(_, p): &(usize, EvictedPod)| {
+            matches!(p.outcome, EvictOutcome::Leaving | EvictOutcome::Waiting)
+        });
         let mut evicted = EvictedPod {
             namespace: target.namespace.clone(),
             name: target.name.clone(),
@@ -1104,12 +1149,17 @@ async fn pass(
             detail: None,
         };
         let Some(pod) = found.get(target.uid.as_str()) else {
-            pods.push(evicted);
+            pods.push((index, evicted));
             continue;
         };
         if pod.metadata.deletion_timestamp.is_some() {
             evicted.outcome = EvictOutcome::Leaving;
-            pods.push(evicted);
+            pods.push((index, evicted));
+            continue;
+        }
+        if target.zeabur && in_flight {
+            evicted.outcome = EvictOutcome::Last;
+            pods.push((index, evicted));
             continue;
         }
         let write = WriteRequest {
@@ -1144,8 +1194,10 @@ async fn pass(
                 EvictOutcome::Failed
             }
         };
-        pods.push(evicted);
+        pods.push((index, evicted));
     }
+    pods.sort_by_key(|(index, _)| *index);
+    let pods: Vec<EvictedPod> = pods.into_iter().map(|(_, pod)| pod).collect();
     let remaining = pods
         .iter()
         .filter(|p| p.outcome != EvictOutcome::Gone)
@@ -1436,8 +1488,30 @@ mod tests {
         assert_eq!(find("db-0").local_claims, ["data-db-0"]);
         assert_eq!(find("canal-x").stays, Some(StayReason::DaemonSet));
         assert_eq!(find("kube-apiserver-vps-3").stays, Some(StayReason::Static));
+        assert_eq!(find("kube-apiserver-vps-3").workload, None);
         assert_eq!(find("canal-x").project, None);
         assert_eq!(web.requests.memory_bytes, 1 << 30);
+    }
+
+    #[test]
+    fn a_budget_holds_the_drain_when_the_node_has_more_of_its_pods_than_it_allows() {
+        let replica = |name: &str| {
+            pod(
+                "shop",
+                name,
+                Some(("ReplicaSet", "web-7c9d8")),
+                &json!({"metadata": {"labels": {"app": "web"}}}),
+            )
+        };
+        let mut context = context();
+        context.budgets[0]["status"]["disruptionsAllowed"] = json!(1);
+        let blocks = |pods: &[Pod]| {
+            classify(&node("vps-3"), pods, &context)
+                .iter()
+                .all(|p| p.budget_blocks)
+        };
+        assert!(!blocks(&[replica("web-7c9d8-a")]));
+        assert!(blocks(&[replica("web-7c9d8-a"), replica("web-7c9d8-b")]));
     }
 
     #[test]
@@ -1562,6 +1636,7 @@ mod tests {
             name: name.to_owned(),
             uid: format!("shop-{name}"),
             fate: PodFate::Moves,
+            zeabur: false,
         }
     }
 
@@ -1647,6 +1722,56 @@ mod tests {
             .inspect(|s| s.writes.iter().map(|w| w.target.name.clone()).collect())
             .unwrap();
         assert_eq!(evictions, ["web-1"], "a leaving pod is not evicted again");
+    }
+
+    #[tokio::test]
+    async fn zeabur_itself_moves_only_once_the_other_pods_are_off_the_node() {
+        let web = pod(
+            "shop",
+            "web-1",
+            Some(("ReplicaSet", "web-7c9d8")),
+            &json!({}),
+        );
+        let zeabur = pod(
+            "shop",
+            "zeabur-1",
+            Some(("ReplicaSet", "zeabur-7c9d8")),
+            &json!({}),
+        );
+        let cluster = cluster(vec![web, zeabur]);
+        let ours = Planned {
+            zeabur: true,
+            ..planned("zeabur-1")
+        };
+        let targets = [ours.clone(), planned("web-1")];
+        let first = pass(&cluster, "vps-3", &targets).await.unwrap();
+        let outcomes: Vec<(&str, EvictOutcome)> = first
+            .pods
+            .iter()
+            .map(|p| (p.name.as_str(), p.outcome))
+            .collect();
+        assert_eq!(
+            outcomes,
+            [
+                ("zeabur-1", EvictOutcome::Last),
+                ("web-1", EvictOutcome::Leaving)
+            ]
+        );
+        let evicted = |cluster: &MemoryCluster| -> Vec<String> {
+            cluster
+                .inspect(|s| s.writes.iter().map(|w| w.target.name.clone()).collect())
+                .unwrap()
+        };
+        assert_eq!(evicted(&cluster), ["web-1"]);
+
+        let second = pass(&cluster, "vps-3", &[ours, planned("gone-1")])
+            .await
+            .unwrap();
+        assert_eq!(
+            second.pods.first().map(|p| p.outcome),
+            Some(EvictOutcome::Leaving)
+        );
+        assert_eq!(evicted(&cluster), ["web-1", "zeabur-1"]);
     }
 
     #[tokio::test]
