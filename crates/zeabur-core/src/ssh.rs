@@ -98,6 +98,40 @@ pub fn deploy_key(comment: &str) -> Result<DeployKey, RandomError> {
     })
 }
 
+/// The `ssh-<type> AAAA…` public key held in an unencrypted OpenSSH private key, without its
+/// comment; `None` for anything else.
+#[must_use]
+pub fn public_key(private: &str) -> Option<String> {
+    let text: String = private
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with("-----"))
+        .collect();
+    let bytes = STANDARD.decode(text).ok()?;
+    let mut rest = bytes.strip_prefix(MAGIC)?;
+    let (cipher, after) = field(rest)?;
+    if cipher != b"none" {
+        return None;
+    }
+    rest = after;
+    for _ in 0..2 {
+        rest = field(rest)?.1;
+    }
+    let (count, after) = rest.split_first_chunk::<4>()?;
+    if u32::from_be_bytes(*count) != 1 {
+        return None;
+    }
+    let (blob, _) = field(after)?;
+    let kind = std::str::from_utf8(field(blob)?.0).ok()?;
+    Some(format!("{kind} {}", STANDARD.encode(blob)))
+}
+
+/// One length-prefixed string and what follows it.
+fn field(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
+    let (length, rest) = bytes.split_first_chunk::<4>()?;
+    rest.split_at_checked(usize::try_from(u32::from_be_bytes(*length)).ok()?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +181,14 @@ mod tests {
         let seed = &secret[8 + 4 + 11 + 4 + 32 + 4..][..32];
         let pair = Ed25519KeyPair::from_seed_unchecked(seed).unwrap();
         assert_eq!(pair.public_key().as_ref(), &blob[blob.len() - 32..]);
+    }
+
+    #[test]
+    fn the_public_key_comes_back_from_the_private_key() {
+        let key = deploy_key("zeabur shop").unwrap();
+        let public = public_key(&key.private).unwrap();
+        assert_eq!(format!("{public} zeabur shop"), key.public);
+        assert_eq!(public_key("not a key"), None);
+        assert_eq!(public_key(&key.private.replace("b3BlbnNzaC1rZXktdjE", "AAAA")), None);
     }
 }
