@@ -268,19 +268,9 @@ function ComponentCard({
   const down = installed && isDown(capability.name, component.id)
   const state = down ? "down" : installed ? "installed" : (capability.suggestion ?? "optional")
   return (
-    <article
-      className={cn(
-        "flex w-full flex-col gap-3 rounded-xl border border-v2-border bg-card p-4 transition-colors hover:border-foreground/20",
-        installed && (down ? "border-fail/30" : "border-ok/30"),
-      )}
-    >
+    <article className="flex w-full flex-col gap-3 rounded-xl border border-v2-border bg-card p-4 transition-colors hover:border-foreground/20">
       <div className="flex items-start gap-3">
-        <span
-          className={cn(
-            "flex size-6 shrink-0 items-center justify-center text-muted-foreground",
-            installed && (down ? "text-fail" : "text-ok"),
-          )}
-        >
+        <span className="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
           <CapIcon className="size-5" aria-hidden="true" />
         </span>
         <div className="flex min-w-0 flex-1 flex-col">
