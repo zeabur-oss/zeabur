@@ -214,6 +214,7 @@ why. Add a row before introducing a new concept.
 | Overview / Logs / Deployments / Networking / Variables / Settings (a service's tabs) | 概覽／日誌／部署紀錄／網路／環境變數／設定 | 概览／日志／部署记录／网络／变量／设置 | The dashboard's tab names; Deployments holds the releases and what changed |
 | reachable / not reachable / not verified (a domain or address) | 可連線／無法連線／無法確認 | 可访问／无法访问／无法确认 | "Not verified" is never a failure: Zeabur could not check it from where it runs |
 | connection check (one hop of the way to an address) | 連線檢查 | 连接检查 | |
+| configured connection / guessed from variables (where a line on the map comes from) | 已設定的連線／從變數推測 | 已配置的连接／从变量推测 | Configured: an Ingress or a shared Secret or ConfigMap; guessed: a variable's value names the Service |
 | waiting for web to be ready (an address whose only failing hop is a cause said above) | 等待 web 就緒 | 等待 web 就绪 | Neutral, never red; the cause is said once |
 | this also means (what one cause also takes down) | 連帶影響 | 连带影响 | Inside the cause, never a card of its own |
 | deployment stuck | 部署卡住 | 部署卡住 | A rollout that never finishes by itself |
