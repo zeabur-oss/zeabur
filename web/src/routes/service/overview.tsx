@@ -106,6 +106,7 @@ export function OverviewTab({
     status: statusOf(service),
     said,
     routes,
+    pods: service.pods,
     checks: (address) => {
       const route = routes.find((r) => r.kind === "domain" && r.address === address)
       return browser(address, route?.hops.some((h) => h.step === "certificate") ?? false)

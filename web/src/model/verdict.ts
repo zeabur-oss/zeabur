@@ -5,9 +5,11 @@ import type { BrowserCheck } from "@/model/browser-check"
 import { configuration } from "@/model/domains"
 import type { Overview } from "@/model/overview"
 import { reasonWord, type Health, type ReasonWord, type Status } from "@/model/service"
+import { schedulingHealth, severity, troubleTone } from "@/model/severity"
 
 type Diagnosis = Schemas["Diagnosis"]
 type Route = Schemas["RouteTraceView"]
+type Pod = Pick<Schemas["PodSummary"], "name" | "created">
 
 /** What is wrong, in a few words. */
 export type Trouble =
@@ -113,22 +115,38 @@ function reachOf(
   return reach
 }
 
+/** A rollout whose only trouble is pods waiting for a node, in its first minutes. */
+function problemTone(status: Status, causes: Diagnosis[], pods: Pod[], now: number): Health {
+  if (status.health !== "progress" || !causes.every((c) => c.kind === "unschedulable"))
+    return troubleTone(status.health)
+  const waiting = new Set(causes.flatMap((c) => c.pods))
+  const created = pods
+    .filter((pod) => waiting.has(pod.name))
+    .map((pod) => pod.created ?? undefined)
+    .toSorted()[0]
+  return schedulingHealth(created, now)
+}
+
 export function verdictOf({
   status,
   said,
   routes,
   checks,
+  pods = [],
+  now = Date.now(),
 }: {
   status: Status
   said: Pick<Overview, "causes" | "rollout" | "waiting">
   routes: Route[]
   checks: (address: string) => BrowserCheck | undefined
+  pods?: Pod[]
+  now?: number
 }): Verdict {
   const reach = reachOf(routes, said.waiting, checks)
   if (status.desired === 0 && !status.task) return { tone: "idle", headline: { as: "stopped" } }
   if (said.causes.length > 0 || status.health === "fail" || status.health === "warn")
     return {
-      tone: status.health === "warn" ? "warn" : "fail",
+      tone: problemTone(status, said.causes, pods, now),
       headline: { as: "problem", trouble: troubleOf(status, said.causes) },
       reach,
     }
@@ -139,7 +157,7 @@ export function verdictOf({
   const failed = routes.find((r) => isPublic(r) && r.status === "failed")
   if (failed)
     return {
-      tone: "warn",
+      tone: severity.unreachable,
       headline: { as: "problem", trouble: { as: "unreachable", domain: failed.address } },
       reach: reach?.as === "unreachable" ? undefined : reach,
     }

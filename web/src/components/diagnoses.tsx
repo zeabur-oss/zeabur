@@ -18,6 +18,7 @@ import { serviceLink } from "@/lib/place"
 import { writeBundle } from "@/model/bundle"
 import { originOf } from "@/model/origin"
 import { isTask, statusOf, type Service } from "@/model/service"
+import { troubleTone } from "@/model/severity"
 import { cn } from "@/lib/utils"
 import type { ServicePlace } from "@/routes/search"
 
@@ -169,8 +170,7 @@ export function Diagnoses({
   if (!diagnoses || diagnoses.length === 0) return null
   const button = buttonVariants({ variant: "outline", size: "sm" })
   const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
-  // A stuck rollout while the release before serves is a warning, not a failure.
-  const warn = statusOf(service).health === "warn"
+  const warn = troubleTone(statusOf(service).health) === "warn"
   return (
     <section
       aria-labelledby="diagnoses-title"

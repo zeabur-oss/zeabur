@@ -5,6 +5,7 @@ import { useT } from "@/i18n"
 import { DOMAINS_NAMED, type Headline, type Reach, type Trouble } from "@/model/verdict"
 import { useStatusWord } from "@/components/status"
 import type { Status } from "@/model/service"
+import { reachHealth } from "@/model/severity"
 
 export function useHeadline() {
   const t = useT()
@@ -27,15 +28,6 @@ export function useHeadline() {
   return (headline: Headline, status: Status): string =>
     headline.as === "problem" ? t("verdict.problem", trouble(headline.trouble)) : word(status)
 }
-
-const reachHealth = {
-  reachable: "ok",
-  unreachable: "fail",
-  unknown: "idle",
-  invalid: "fail",
-  elsewhere: "warn",
-  issuing: "progress",
-} as const
 
 /** Whether people reach the service's domains, in one line under the verdict; `more` leads to
  * where a domain is set up. */

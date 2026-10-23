@@ -140,7 +140,7 @@ describe("verdictOf", () => {
       routes: [route("shop.example.com", "failed"), route("api.example.com", "ok")],
       checks: none,
     })
-    expect(verdict.tone).toBe("warn")
+    expect(verdict.tone).toBe("fail")
     expect(verdict.headline).toEqual({
       as: "problem",
       trouble: { as: "unreachable", domain: "shop.example.com" },
