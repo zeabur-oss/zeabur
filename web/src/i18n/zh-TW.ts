@@ -1916,7 +1916,7 @@ export const zhTW: Messages = {
     "資料庫（PostgreSQL、MongoDB）有自己的備份，在各資料庫的「備份」分頁設定。這裡的備份涵蓋其他磁碟區和所有 Kubernetes 物件。",
   "clusterBackups.notInstalled": "備份需要 Velero",
   "clusterBackups.notInstalledBody":
-    "Velero 依排程複製叢集的物件和磁碟區裡的檔案，存到 S3 相容儲存。先到「元件」安裝，再回來這裡設定。",
+    "Velero 依排程備份叢集：物件和磁碟區裡的檔案都存到 S3 相容儲存。先到「元件」安裝，再回來這裡設定。",
   "clusterBackups.install": "安裝 Velero",
   "clusterBackups.location": "備份存放位置",
   "clusterBackups.setUp": "設定",
