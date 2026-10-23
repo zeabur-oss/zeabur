@@ -515,7 +515,8 @@ export interface paths {
     /**
      * Works out what starting the person's cluster tools pod writes, and a token to apply it; writes
      *     nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do everything
-     *     everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over.
+     *     everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over;
+     *     without a token while `exposed` lists bindings that let others into the pod.
      */
     post: operations["planClusterTools"]
     delete?: never
@@ -2334,12 +2335,20 @@ export interface components {
     ClusterToolsPlan: {
       /** @description When the token stops working, RFC 3339. */
       expiresAt: string
+      /**
+       * @description Bindings that let others into the pod, and so to the credential in it; the plan cannot be
+       *     applied while there is one.
+       */
+      exposed: components["schemas"]["ShellExposure"][]
       /** @description The namespace of the pod. */
       namespace: string
       /** @description The pod it starts, or the one it uses. */
       pod: string
-      /** @description Send this to `apply` to carry out exactly this plan. */
-      token: string
+      /**
+       * @description Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
+       *     bindings.
+       */
+      token?: string | null
       /**
        * @description Who `kubectl` acts as and until when, or that a running pod is used; who else could use
        *     the credential.

@@ -412,18 +412,19 @@ async fn rbac(
         .collect())
 }
 
-/// The bindings that let others into node shells.
-async fn exposed(
+/// The bindings that let others into the pods of `namespace`: node shells, or cluster tools pods.
+pub(crate) async fn exposed(
     cluster: &dyn Cluster,
+    namespace: &str,
     namespace_exists: bool,
 ) -> Result<Vec<shell::Exposure>, ApiError> {
     let mut bindings = rbac(cluster, "clusterrolebindings", "ClusterRoleBinding", None).await?;
     let mut roles = rbac(cluster, "clusterroles", "ClusterRole", None).await?;
     if namespace_exists {
-        bindings.extend(rbac(cluster, "rolebindings", "RoleBinding", Some(NAMESPACE)).await?);
-        roles.extend(rbac(cluster, "roles", "Role", Some(NAMESPACE)).await?);
+        bindings.extend(rbac(cluster, "rolebindings", "RoleBinding", Some(namespace)).await?);
+        roles.extend(rbac(cluster, "roles", "Role", Some(namespace)).await?);
     }
-    Ok(shell::exposures(&bindings, &roles))
+    Ok(shell::exposures(namespace, &bindings, &roles))
 }
 
 async fn opening(cluster: &dyn Cluster, node: &str) -> Result<Opening, ApiError> {
@@ -440,7 +441,7 @@ async fn opening(cluster: &dyn Cluster, node: &str) -> Result<Opening, ApiError>
             )
         })?
         .map(value);
-    let exposed = exposed(cluster, namespace.is_some()).await?;
+    let exposed = exposed(cluster, NAMESPACE, namespace.is_some()).await?;
     Ok(Opening {
         node_uid: text(&found, "/metadata/uid"),
         namespace,
@@ -501,7 +502,7 @@ fn namespace_write(namespace: Option<&Value>) -> Option<(WriteBody, ShellWriteAc
     )
 }
 
-fn exposure_views(exposed: Vec<shell::Exposure>) -> Vec<ShellExposure> {
+pub(crate) fn exposure_views(exposed: Vec<shell::Exposure>) -> Vec<ShellExposure> {
     exposed
         .into_iter()
         .map(|e| ShellExposure {

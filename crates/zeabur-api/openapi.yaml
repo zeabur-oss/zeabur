@@ -714,7 +714,8 @@ paths:
       summary: |-
         Works out what starting the person's cluster tools pod writes, and a token to apply it; writes
         nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do everything
-        everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over.
+        everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over;
+        without a token while `exposed` lists bindings that let others into the pod.
       operationId: planClusterTools
       responses:
         "200":
@@ -4434,16 +4435,23 @@ components:
         A plan that starts the person's cluster tools pod, or uses the one that still
         runs.
       required:
-      - token
       - expiresAt
       - namespace
       - pod
       - writes
       - warnings
+      - exposed
       properties:
         expiresAt:
           type: string
           description: When the token stops working, RFC 3339.
+        exposed:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShellExposure"
+          description: |-
+            Bindings that let others into the pod, and so to the credential in it; the plan cannot be
+            applied while there is one.
         namespace:
           type: string
           description: The namespace of the pod.
@@ -4451,8 +4459,12 @@ components:
           type: string
           description: The pod it starts, or the one it uses.
         token:
-          type: string
-          description: Send this to `apply` to carry out exactly this plan.
+          type:
+          - string
+          - "null"
+          description: |-
+            Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
+            bindings.
         warnings:
           type: array
           items:

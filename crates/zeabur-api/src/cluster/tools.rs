@@ -16,8 +16,11 @@
 //! `terminal.clusterToolsNamespace`, never in `terminal.toolsNamespace`: the credential written
 //! into it at each terminal (see the `tools` module) is the administrator's, and people who use a
 //! project's tools pods may run commands in pods there. `kubectl` starts in namespace `default`.
-//! The plan says who else could use the credential (`toolsCredentialExposed`), as a project's
-//! does. Everything else (the credential, the pod's lifetime) is the project tools pod's.
+//! As for node shells, a plan has no token while a binding lets anyone but cluster administrators
+//! create pods in that namespace or run commands in its pods (`exposed`), and its apply is
+//! refused when one has appeared since; the plan also says who could use the credential
+//! (`toolsCredentialExposed`), as a project's does. Everything else (the credential, the pod's
+//! lifetime) is the project tools pod's.
 
 use axum::Json;
 use axum::extract::{Path, State, WebSocketUpgrade};
@@ -33,7 +36,8 @@ use zeabur_plan::terminal::{self as plans, ToolsScope};
 use zeabur_plan::{Plan, Warning, Write};
 
 use super::node_shells::{
-    ShellWrite, ShellWriteAction, moved, plan_key, require_admin, seal, send, yaml,
+    ShellExposure, ShellWrite, ShellWriteAction, exposed, exposure_views, moved, plan_key,
+    require_admin, seal, send, yaml,
 };
 use crate::access::Handoff;
 use crate::error::{ApiError, get_read};
@@ -52,8 +56,10 @@ const WHAT: &str = "a kubectl terminal for the cluster";
 #[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterToolsPlan {
-    /// Send this to `apply` to carry out exactly this plan.
-    pub token: String,
+    /// Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
+    /// bindings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
     /// When the token stops working, RFC 3339.
     pub expires_at: String,
     /// The namespace of the pod.
@@ -65,6 +71,9 @@ pub struct ClusterToolsPlan {
     /// Who `kubectl` acts as and until when, or that a running pod is used; who else could use
     /// the credential.
     pub warnings: Vec<Warning>,
+    /// Bindings that let others into the pod, and so to the credential in it; the plan cannot be
+    /// applied while there is one.
+    pub exposed: Vec<ShellExposure>,
 }
 
 /// The token of a plan to apply.
@@ -102,6 +111,7 @@ struct Computed {
     existing: Option<Value>,
     plan: Plan,
     pod: String,
+    exposed: Vec<zeabur_plan::node_shell::Exposure>,
 }
 
 impl Computed {
@@ -181,6 +191,7 @@ async fn compute(
             )
         })?
         .map(|o: DynamicObject| serde_json::to_value(o).unwrap_or(Value::Null));
+    let exposed = exposed(cluster, &namespace, existing.is_some()).await?;
     let pods = if existing.is_some() {
         list_pods(cluster, &namespace).await?
     } else {
@@ -218,6 +229,7 @@ async fn compute(
         existing,
         plan,
         pod,
+        exposed,
     })
 }
 
@@ -239,7 +251,8 @@ pub(crate) async fn status(
 
 /// Works out what starting the person's cluster tools pod writes, and a token to apply it; writes
 /// nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do everything
-/// everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over.
+/// everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over;
+/// without a token while `exposed` lists bindings that let others into the pod.
 #[utoipa::path(post, path = "/api/v1/cluster/tools/plan", tag = "cluster",
     operation_id = "planClusterTools",
     responses((status = 200, body = ClusterToolsPlan),
@@ -290,8 +303,13 @@ pub(crate) async fn plan(
             yaml: yaml(&body),
         })
         .collect();
+    let token = if computed.exposed.is_empty() {
+        Some(seal(&sealing, PREFIX, &claims)?)
+    } else {
+        None
+    };
     Ok(Json(ClusterToolsPlan {
-        token: seal(&sealing, PREFIX, &claims)?,
+        token,
         expires_at: Timestamp::from_second(expires_at)
             .unwrap_or(Timestamp::UNIX_EPOCH)
             .to_string(),
@@ -299,6 +317,7 @@ pub(crate) async fn plan(
         pod: computed.pod,
         writes,
         warnings: computed.plan.warnings,
+        exposed: exposure_views(computed.exposed),
     }))
 }
 
@@ -344,6 +363,20 @@ pub(crate) async fn apply(
     }
     if computed.pod != claims.pod {
         return Err(moved("Your cluster tools pod"));
+    }
+    if !computed.exposed.is_empty() {
+        let names: Vec<String> = computed
+            .exposed
+            .iter()
+            .map(|e| format!("{} {}", e.kind, e.name))
+            .collect();
+        return Err(ApiError::from(Problem::new(
+            Kind::Conflict,
+            format!(
+                "Since the plan was made, {} let others into cluster kubectl terminals.",
+                names.join(", ")
+            ),
+        )));
     }
     // One at a time: a pod's dry run needs its namespace to exist.
     for (target, body, refused) in computed.writes() {

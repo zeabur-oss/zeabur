@@ -1,11 +1,14 @@
 // The pieces of a cluster-wide plan dialog (a node terminal, the cluster's kubectl terminal): its
-// writes, and a footer that applies the plan until its token runs out.
+// writes, the bindings that stop it, and a footer that applies the plan until its token runs out.
 import CaretRightIcon from "~icons/ph/caret-right"
+import WarningCircleIcon from "~icons/ph/warning-circle"
 
 import type { Schemas } from "@/api/client"
 import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
+import { subjectName } from "@/model/node-shell"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Collapsible,
@@ -96,5 +99,43 @@ export function PlanWrites({ writes }: { writes: Schemas["ShellWrite"][] }) {
         </div>
       </CollapsibleContent>
     </Collapsible>
+  )
+}
+
+/** Someone besides cluster administrators could get into the pod: the plan stops here. */
+export function Exposed({
+  namespace,
+  exposed,
+}: {
+  namespace: string
+  exposed: Schemas["ShellExposure"][]
+}) {
+  const t = useT()
+  return (
+    <Alert variant="destructive">
+      <WarningCircleIcon aria-hidden="true" />
+      <AlertTitle>{t("nodeShell.exposedTitle")}</AlertTitle>
+      <AlertDescription>
+        <p>{t("nodeShell.exposed", namespace)}</p>
+        <ul className="mt-2 flex flex-col gap-2">
+          {exposed.map((binding) => (
+            <li key={`${binding.kind}/${binding.name}`} className="flex flex-col gap-0.5">
+              <span className="font-mono text-xs break-all" translate="no">
+                {`${binding.kind}/${binding.name} → ${binding.role}`}
+              </span>
+              <span className="type-meta">
+                <span translate="no">{binding.rights.join(", ")}</span>
+                {t("common.sep")}
+                <span translate="no">
+                  {binding.subjects
+                    .map((subject) => `${subject.kind} ${subjectName(subject)}`)
+                    .join(", ")}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </AlertDescription>
+    </Alert>
   )
 }

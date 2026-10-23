@@ -4,7 +4,6 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 import TerminalIcon from "~icons/ph/terminal"
-import WarningCircleIcon from "~icons/ph/warning-circle"
 
 import {
   applyNodeShell,
@@ -16,7 +15,7 @@ import {
   type NodeShellRequest,
 } from "@/api/node-shells"
 import { Ago, CopyButton } from "@/components/bits"
-import { PlanFooter, PlanWrites } from "@/components/cluster-plan"
+import { Exposed, PlanFooter, PlanWrites } from "@/components/cluster-plan"
 import { useMayActAsClusterAdmin } from "@/components/gate"
 import { Consequence, Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
@@ -24,8 +23,7 @@ import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
 import { openNodeShell } from "@/lib/dock"
-import { enters, shellHealth, shellsOn, shellWord, subjectName } from "@/model/node-shell"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
+import { enters, shellHealth, shellsOn, shellWord } from "@/model/node-shell"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Collapsible,
@@ -211,7 +209,9 @@ function OpenPlan({ plan }: { plan: NodeShellPlan }) {
         <li>{t("nodeShell.firstSession", minutes(plan.firstSessionSeconds))}</li>
         <li>{t("nodeShell.recorded")}</li>
       </ul>
-      {plan.exposed.length > 0 ? <Exposed plan={plan} /> : null}
+      {plan.exposed.length > 0 ? (
+        <Exposed namespace={plan.namespace} exposed={plan.exposed} />
+      ) : null}
       <PlanWrites writes={plan.writes} />
       {plan.kubectl ? (
         <Collapsible>
@@ -233,37 +233,5 @@ function OpenPlan({ plan }: { plan: NodeShellPlan }) {
         </Collapsible>
       ) : null}
     </>
-  )
-}
-
-/** Someone besides cluster administrators could enter the shell: the plan stops here. */
-function Exposed({ plan }: { plan: NodeShellPlan }) {
-  const t = useT()
-  return (
-    <Alert variant="destructive">
-      <WarningCircleIcon aria-hidden="true" />
-      <AlertTitle>{t("nodeShell.exposedTitle")}</AlertTitle>
-      <AlertDescription>
-        <p>{t("nodeShell.exposed", plan.namespace)}</p>
-        <ul className="mt-2 flex flex-col gap-2">
-          {plan.exposed.map((binding) => (
-            <li key={`${binding.kind}/${binding.name}`} className="flex flex-col gap-0.5">
-              <span className="font-mono text-xs break-all" translate="no">
-                {`${binding.kind}/${binding.name} → ${binding.role}`}
-              </span>
-              <span className="type-meta">
-                <span translate="no">{binding.rights.join(", ")}</span>
-                {t("common.sep")}
-                <span translate="no">
-                  {binding.subjects
-                    .map((subject) => `${subject.kind} ${subjectName(subject)}`)
-                    .join(", ")}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </AlertDescription>
-    </Alert>
   )
 }

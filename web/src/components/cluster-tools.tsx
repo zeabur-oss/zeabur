@@ -8,7 +8,7 @@ import {
   refreshClusterTools,
   type ClusterToolsPlan,
 } from "@/api/cluster-tools"
-import { PlanFooter, PlanWrites } from "@/components/cluster-plan"
+import { Exposed, PlanFooter, PlanWrites } from "@/components/cluster-plan"
 import { Consequence, Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
 import { terminalLines } from "@/components/plan/describe"
@@ -49,7 +49,7 @@ export function ClusterToolsDialog({
         <PlanFooter
           expiresAt={plan.data?.expiresAt}
           ready={!!plan.data && !plan.isFetching}
-          token={plan.data?.token}
+          token={plan.data?.token ?? undefined}
           action={t("action.openToolsTerminal")}
           applying={apply.isPending}
           onCancel={onClose}
@@ -79,6 +79,9 @@ function Planned({ plan }: { plan: ClusterToolsPlan }) {
   const exposed = plan.warnings.find((w) => w.code === "toolsCredentialExposed")
   return (
     <>
+      {plan.exposed.length > 0 ? (
+        <Exposed namespace={plan.namespace} exposed={plan.exposed} />
+      ) : null}
       {exposed ? (
         <Consequence>{t("warn.toolsCredentialExposed", plan.namespace)}</Consequence>
       ) : null}
