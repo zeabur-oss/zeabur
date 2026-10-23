@@ -144,6 +144,9 @@ pub const DEBUG_IMAGE: &str = "docker.io/library/busybox:1.37.0@sha256:bdf57e528
 /// 1.36.5, `helm` and a busybox shell on Alpine.
 pub const TOOLS_IMAGE: &str = "docker.io/alpine/k8s:1.36.5@sha256:094adf64cdc4827377cdbe7ea5747472ce115f9fbc64a4e35970ec66777f9a00";
 
+/// The namespace of cluster tools pods, which only administrators use.
+pub const CLUSTER_TOOLS_NAMESPACE: &str = "zeabur-cluster-tools";
+
 /// What the debug container and the tools pod are made from (see `zeabur_plan::terminal` and the
 /// `tools` module), from the chart's `terminal` values.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -154,6 +157,10 @@ pub struct TerminalSettings {
     pub tools_image: String,
     /// The namespace tools pods go in; `None`: the project's.
     pub tools_namespace: Option<String>,
+    /// The namespace cluster tools pods go in: an administrator's credential is written into
+    /// them, so never `tools_namespace`, where people who use a project's tools pods may run
+    /// commands.
+    pub cluster_tools_namespace: String,
     /// How long a tools pod may run at most, in seconds (`activeDeadlineSeconds`).
     pub tools_deadline_seconds: i64,
     /// How long after its last terminal closes a tools pod is deleted, for a reconnect.
@@ -168,6 +175,7 @@ impl Default for TerminalSettings {
             debug_image: DEBUG_IMAGE.to_owned(),
             tools_image: TOOLS_IMAGE.to_owned(),
             tools_namespace: None,
+            cluster_tools_namespace: CLUSTER_TOOLS_NAMESPACE.to_owned(),
             tools_deadline_seconds: 30 * 60,
             tools_grace: std::time::Duration::from_mins(1),
             tools_resources: zeabur_plan::terminal::ToolsResources::default(),

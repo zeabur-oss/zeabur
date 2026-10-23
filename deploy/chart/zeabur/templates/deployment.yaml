@@ -108,6 +108,8 @@ spec:
             - name: ZEABUR_TOOLS_NAMESPACE
               value: {{ . | quote }}
             {{- end }}
+            - name: ZEABUR_CLUSTER_TOOLS_NAMESPACE
+              value: {{ .clusterToolsNamespace | quote }}
             - name: ZEABUR_TOOLS_DEADLINE_MINUTES
               value: {{ .toolsDeadlineMinutes | int | quote }}
             - name: ZEABUR_TOOLS_GRACE_SECONDS

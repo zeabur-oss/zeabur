@@ -100,6 +100,9 @@ pub(crate) struct Args {
     /// The namespace tools pods go in. Empty: the project's.
     #[arg(long, env = "ZEABUR_TOOLS_NAMESPACE", default_value = "")]
     pub(crate) tools_namespace: String,
+    /// The namespace administrators' cluster tools pods go in; not `--tools-namespace`.
+    #[arg(long, env = "ZEABUR_CLUSTER_TOOLS_NAMESPACE", default_value = zeabur_api::settings::CLUSTER_TOOLS_NAMESPACE)]
+    pub(crate) cluster_tools_namespace: String,
     /// Minutes a tools pod may run at most.
     #[arg(long, env = "ZEABUR_TOOLS_DEADLINE_MINUTES", default_value_t = 30)]
     pub(crate) tools_deadline_minutes: u32,
@@ -326,6 +329,16 @@ fn terminal(
         }
         terminal.tools_namespace = Some(args.tools_namespace.clone());
     }
+    if !zeabur_plan::checks::is_dns_label(&args.cluster_tools_namespace)
+        || terminal.tools_namespace.as_deref() == Some(args.cluster_tools_namespace.as_str())
+    {
+        return Err(format!(
+            "--cluster-tools-namespace: {:?} is not a namespace's name of its own",
+            args.cluster_tools_namespace
+        ));
+    }
+    args.cluster_tools_namespace
+        .clone_into(&mut terminal.cluster_tools_namespace);
     if args.tools_deadline_minutes == 0 {
         return Err("--tools-deadline-minutes must be at least 1".to_owned());
     }
@@ -508,6 +521,8 @@ mod tests {
                 "registry.example.com/busybox:1",
                 "--tools-namespace",
                 "zeabur-tools",
+                "--cluster-tools-namespace",
+                "ops-tools",
                 "--tools-deadline-minutes",
                 "10",
                 "--tools-grace-seconds",
@@ -521,6 +536,7 @@ mod tests {
         assert_eq!(terminal.debug_image, "registry.example.com/busybox:1");
         assert_eq!(terminal.tools_image, zeabur_api::settings::TOOLS_IMAGE);
         assert_eq!(terminal.tools_namespace.as_deref(), Some("zeabur-tools"));
+        assert_eq!(terminal.cluster_tools_namespace, "ops-tools");
         assert_eq!(terminal.tools_deadline_seconds, 600);
         assert_eq!(terminal.tools_grace, std::time::Duration::from_secs(5));
         assert_eq!(terminal.tools_resources.limits["memory"], "256Mi");

@@ -5,6 +5,7 @@
 mod account;
 mod api;
 mod cluster_name;
+mod cluster_tools;
 #[cfg(test)]
 #[path = "../common/mod.rs"]
 mod common;

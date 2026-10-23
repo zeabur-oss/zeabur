@@ -1,13 +1,15 @@
 //! A terminal with `kubectl` and `helm` that act as the person, in a short-lived pod of theirs.
 //!
-//! A plan creates the pod (the `clusterTools` change; see `zeabur_plan::terminal`); these
-//! endpoints use it.
+//! A plan creates the pod (the `clusterTools` change for a project, see `zeabur_plan::terminal`;
+//! `cluster::tools` for the whole cluster); these endpoints use it.
 //!
 //! | Method and path | What it does |
 //! |---|---|
 //! | `GET /api/v1/projects/{p}/tools` | the person's tools pods and how they are doing; deletes those that have stopped or whose terminals closed |
 //! | `GET /api/v1/projects/{p}/tools/{name}/terminal` | a terminal in it, over a WebSocket, as `pods/exec` (see `pods::exec`) |
 //! | `DELETE /api/v1/projects/{p}/tools/{name}` | deletes it |
+//!
+//! `cluster::tools` serves the same for an administrator's cluster tools pods ([`Scope`]).
 //!
 //! # The credential
 //!
@@ -16,11 +18,12 @@
 //! memory-backed `~/.kube`, through standard input of a command run in it with `pods/exec`
 //! (`Cluster::run`), so it never appears in an object, an environment variable, a command line
 //! or a log. It names kube-apiserver's in-cluster address, the CA from the pod's
-//! `kube-root-ca.crt`, and the project as the namespace. The token is the one the session uses
-//! (minutes long; see `zeabur_auth`), and kube-apiserver accepts it until it expires: Zeabur
-//! cannot revoke it. The terminal closes when it expires, as every terminal does (`4000`); the
-//! next one writes a fresh token. `kubectl` and `helm` in the pod are wrappers that refuse to run
-//! once the token has expired, with a message saying to reopen the terminal.
+//! `kube-root-ca.crt`, and the project as the namespace (`default` in a cluster tools pod). The
+//! token is the one the session uses (minutes long; see `zeabur_auth`), and kube-apiserver accepts
+//! it until it expires: Zeabur cannot revoke it. The terminal closes when it expires, as every
+//! terminal does (`4000`); the next one writes a fresh token. `kubectl` and `helm` in the pod are
+//! wrappers that refuse to run once the token has expired, with a message saying to reopen the
+//! terminal.
 //!
 //! # Lifetime
 //!
@@ -55,7 +58,7 @@ use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ExecRequest, ExitStatus, WriteRequest};
-use zeabur_plan::terminal::{self as plans, TOOLS_CONTAINER, TOOLS_PROJECT_ANNOTATION};
+use zeabur_plan::terminal::{self as plans, TOOLS_CONTAINER, TOOLS_PROJECT_ANNOTATION, ToolsScope};
 
 use crate::access::{Elevation, Handoff};
 use crate::error::{ApiError, offer_elevation, read_problem, review_refusal};
@@ -72,6 +75,62 @@ const IN_CLUSTER_SERVER: &str = "https://kubernetes.default.svc";
 
 /// How long after its deadline a tools pod that still shows as running is deleted anyway.
 const SWEEP_SLACK_SECONDS: i64 = 5 * 60;
+
+/// What a tools pod is for, as its routes name it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Scope {
+    /// The project of `/api/v1/projects/{p}/tools`.
+    Project(String),
+    /// The whole cluster, for an administrator: `/api/v1/cluster/tools`.
+    Cluster,
+}
+
+/// Why a cluster tools terminal is for cluster administrators only.
+pub(crate) const CLUSTER_ADMIN: &str =
+    "kubectl and helm in it act with your admin rights across the cluster.";
+
+impl Scope {
+    pub(crate) fn tools(&self) -> ToolsScope<'_> {
+        match self {
+            Self::Project(project) => ToolsScope::Project(project),
+            Self::Cluster => ToolsScope::Cluster,
+        }
+    }
+
+    /// The namespace its tools pods go in.
+    pub(crate) fn namespace<'a>(&'a self, settings: &'a TerminalSettings) -> &'a str {
+        match self {
+            Self::Project(project) => settings.tools_namespace.as_deref().unwrap_or(project),
+            Self::Cluster => &settings.cluster_tools_namespace,
+        }
+    }
+
+    /// Where `kubectl` acts, for the greeting.
+    fn place(&self) -> String {
+        match self {
+            Self::Project(project) => format!("in project {project}"),
+            Self::Cluster => format!(
+                "across the cluster, starting in namespace {}",
+                plans::CLUSTER_TOOLS_START
+            ),
+        }
+    }
+
+    /// Refused unless it is the project's or the person is a cluster administrator.
+    async fn allowed(&self, cluster: &dyn Cluster) -> Result<(), ApiError> {
+        match self {
+            Self::Project(_) => Ok(()),
+            Self::Cluster => {
+                crate::cluster::node_shells::require_admin(
+                    cluster,
+                    "a kubectl terminal for the cluster",
+                    CLUSTER_ADMIN,
+                )
+                .await
+            }
+        }
+    }
+}
 
 /// The open terminals of each tools pod, by `namespace/name`.
 #[derive(Debug, Default)]
@@ -179,7 +238,7 @@ pub struct ToolsPodStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolsStatus {
-    /// The namespace tools pods of this project go in.
+    /// The namespace these tools pods go in.
     pub namespace: String,
     /// Whether Zeabur can open a tools terminal here; `false` in local mode, which holds no
     /// token to hand over.
@@ -189,10 +248,6 @@ pub struct ToolsStatus {
     pub pods: Vec<ToolsPodStatus>,
     /// The tools pods that had stopped or outlived their deadline and were deleted now.
     pub deleted: Vec<String>,
-}
-
-fn namespace_for<'a>(settings: &'a TerminalSettings, project: &'a str) -> &'a str {
-    settings.tools_namespace.as_deref().unwrap_or(project)
 }
 
 fn text<'a>(object: &'a Value, path: &str) -> Option<&'a str> {
@@ -298,7 +353,25 @@ pub(crate) async fn status(
     crate::handlers::Credential(handoff): crate::handlers::Credential,
     Path(project): Path<String>,
 ) -> Result<Json<ToolsStatus>, ApiError> {
-    let namespace = namespace_for(&state.settings.terminal, &project).to_owned();
+    status_in(
+        &state,
+        cluster.as_ref(),
+        handoff.is_some(),
+        &Scope::Project(project),
+    )
+    .await
+    .map(Json)
+}
+
+/// The person's tools pods for `scope`, deleting those that are done with.
+pub(crate) async fn status_in(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    available: bool,
+    scope: &Scope,
+) -> Result<ToolsStatus, ApiError> {
+    scope.allowed(cluster).await?;
+    let namespace = scope.namespace(&state.settings.terminal).to_owned();
     let identity = cluster
         .whoami()
         .await
@@ -307,8 +380,8 @@ pub(crate) async fn status(
     let now = (state.clock)();
     let mut pods = Vec::new();
     let mut deleted = Vec::new();
-    for pod in list_pods(cluster.as_ref(), &namespace).await? {
-        if !plans::is_tools_pod_of(&pod, &key) {
+    for pod in list_pods(cluster, &namespace).await? {
+        if !plans::is_tools_pod_of(&pod, &key, scope.tools()) {
             continue;
         }
         let name = text(&pod, "/metadata/name").unwrap_or_default().to_owned();
@@ -334,18 +407,19 @@ pub(crate) async fn status(
         pods.push(pod_status(&pod, &state.tools));
     }
     pods.sort_by(|a, b| a.started_at.cmp(&b.started_at));
-    Ok(Json(ToolsStatus {
+    Ok(ToolsStatus {
         namespace,
-        available: handoff.is_some(),
+        available,
         pods,
         deleted,
-    }))
+    })
 }
 
 /// The person's tools pod `name`, read as them; `404` for anyone else's.
 async fn own_pod(
     cluster: &dyn Cluster,
     namespace: &str,
+    scope: &Scope,
     name: &str,
 ) -> Result<(Value, String), ApiError> {
     let identity = cluster
@@ -353,7 +427,7 @@ async fn own_pod(
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     let pod = read_pod(cluster, namespace, name).await?;
-    if plans::is_tools_pod_of(&pod, &plans::person_key(&identity.username)) {
+    if plans::is_tools_pod_of(&pod, &plans::person_key(&identity.username), scope.tools()) {
         Ok((pod, identity.username))
     } else {
         Err(ApiError::from(Problem::new(
@@ -377,8 +451,19 @@ pub(crate) async fn delete(
     Person(cluster): Person,
     Path((project, name)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    let namespace = namespace_for(&state.settings.terminal, &project);
-    let (pod, _) = own_pod(cluster.as_ref(), namespace, &name).await?;
+    delete_in(&state, cluster.as_ref(), &Scope::Project(project), &name).await
+}
+
+/// Deletes the person's tools pod `name` for `scope`.
+pub(crate) async fn delete_in(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    scope: &Scope,
+    name: &str,
+) -> Result<StatusCode, ApiError> {
+    scope.allowed(cluster).await?;
+    let namespace = scope.namespace(&state.settings.terminal);
+    let (pod, _) = own_pod(cluster, namespace, scope, name).await?;
     let request = delete_request(namespace, &pod);
     cluster.write(&request).await.map_err(|error| {
         let mut problem = error.into_problem(&format!("pod {name}"));
@@ -387,7 +472,7 @@ pub(crate) async fn delete(
                 verb: "delete".to_owned(),
                 group: String::new(),
                 resource: "pods".to_owned(),
-                name: Some(name.clone()),
+                name: Some(name.to_owned()),
                 namespace: Some(namespace.to_owned()),
             });
         }
@@ -396,7 +481,7 @@ pub(crate) async fn delete(
     Ok(StatusCode::NO_CONTENT)
 }
 
-fn kubeconfig(handoff: &Handoff, person: &str, project: &str) -> Vec<u8> {
+fn kubeconfig(handoff: &Handoff, person: &str, start: &str) -> Vec<u8> {
     let config = json!({
         "apiVersion": "v1",
         "kind": "Config",
@@ -408,7 +493,7 @@ fn kubeconfig(handoff: &Handoff, person: &str, project: &str) -> Vec<u8> {
         "contexts": [{"name": "zeabur", "context": {
             "cluster": "zeabur",
             "user": person,
-            "namespace": project,
+            "namespace": start,
         }}],
         "current-context": "zeabur",
     });
@@ -451,7 +536,7 @@ helm cannot act as you. Close the terminal and open it again from Zeabur.";
 fn greeting(
     handoff: &Handoff,
     person: &str,
-    project: &str,
+    place: &str,
     stops_at: Option<Timestamp>,
     grace_seconds: u64,
 ) -> String {
@@ -462,7 +547,7 @@ fn greeting(
     };
     let stops = stops_at.map_or_else(String::new, |t| format!(", and stops at {t} in any case"));
     format!(
-        "kubectl and helm here act as {person}{rights}, in project {project}.\n\
+        "kubectl and helm here act as {person}{rights}, {place}.\n\
          Your credential expires at {expires}; the terminal then closes, and reopening it \
          brings a fresh one.\n\
          This pod is deleted {grace_seconds} seconds after its last terminal closes{stops}.\n",
@@ -486,8 +571,7 @@ fn script(command: &str, args: &[String]) -> Vec<String> {
 async fn open(
     terminal: &Terminal,
     settings: &TerminalSettings,
-    namespace: &str,
-    project: &str,
+    scope: &Scope,
     name: &str,
 ) -> Result<(Value, zeabur_kube::ExecSession), ApiError> {
     let Some(handoff) = terminal.handoff.as_ref() else {
@@ -498,7 +582,9 @@ async fn open(
         )));
     };
     let cluster = terminal.cluster.as_ref();
-    let (pod, person) = own_pod(cluster, namespace, name).await?;
+    scope.allowed(cluster).await?;
+    let namespace = scope.namespace(settings);
+    let (pod, person) = own_pod(cluster, namespace, scope, name).await?;
     exec::pick_container(&pod, name, Some(TOOLS_CONTAINER.to_owned()))?;
     let exec_right = || exec::exec_right(namespace, name);
     if matches!(cluster.review_access(&exec_right()).await, Ok(false)) {
@@ -507,14 +593,14 @@ async fn open(
             exec_right(),
         ));
     }
-    let mut input = kubeconfig(handoff, &person, project);
+    let mut input = kubeconfig(handoff, &person, scope.tools().start());
     let args = [
         handoff.expires_at.as_second().to_string(),
         EXPIRED.to_owned(),
         greeting(
             handoff,
             &person,
-            project,
+            &scope.place(),
             stops_at(&pod),
             settings.tools_grace.as_secs(),
         ),
@@ -614,23 +700,34 @@ pub(crate) async fn terminal(
     Path((project, name)): Path<(String, String)>,
     upgrade: WebSocketUpgrade,
 ) -> Response {
+    upgrade_in(state, terminal, Scope::Project(project), name, upgrade)
+}
+
+/// The terminal in the person's tools pod `name` for `scope`.
+pub(crate) fn upgrade_in(
+    state: AppState,
+    terminal: Terminal,
+    scope: Scope,
+    name: String,
+    upgrade: WebSocketUpgrade,
+) -> Response {
     upgrade
         .max_message_size(exec::MAX_MESSAGE)
-        .on_upgrade(move |socket| run(socket, state, terminal, project, name))
+        .on_upgrade(move |socket| run(socket, state, terminal, scope, name))
 }
 
 async fn run(
     mut socket: WebSocket,
     state: AppState,
     terminal: Terminal,
-    project: String,
+    scope: Scope,
     name: String,
 ) {
     let settings = &state.settings.terminal;
-    let namespace = namespace_for(settings, &project).to_owned();
+    let namespace = scope.namespace(settings).to_owned();
     let key = format!("{namespace}/{name}");
     state.tools.opened(&key);
-    match open(&terminal, settings, &namespace, &project, &name).await {
+    match open(&terminal, settings, &scope, &name).await {
         Ok((pod, session)) => {
             let ready = ServerFrame::Ready {
                 container: TOOLS_CONTAINER.to_owned(),

@@ -18,6 +18,8 @@
 //! | `GET /api/v1/cluster/node-policies` | whether the installer's baseline network policies let every node's traffic in |
 //! | `GET /api/v1/cluster/node-shells` | the node shell pods (cluster administrators only) |
 //! | `GET /api/v1/cluster/node-shells/{pod}/terminal` | a root shell on the node, over a WebSocket, for whoever opened it |
+//! | `GET /api/v1/cluster/tools` | your cluster tools pods, for administrators; deletes those that have stopped (see `cluster::tools`) |
+//! | `GET /api/v1/cluster/tools/{name}/terminal` | a terminal in it, `kubectl` and `helm` acting as you with admin rights, over a WebSocket |
 //! | `GET /api/v1/cluster/capabilities` | what is installed (with versions), and what to install |
 //! | `GET /api/v1/cluster/components/{capability}/{component}/install` | how to install it yourself, in four forms |
 //! | `GET /api/v1/settings/metrics-store` | the metrics store history is read from, whether it answers, who may change it |
@@ -64,9 +66,12 @@
 //! | `POST /api/v1/cluster/node-policies/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/node-shells/plan` | what opening a shell on a node, or removing a shell pod, writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/node-shells/apply` | carries out that plan by its token |
+//! | `POST /api/v1/cluster/tools/plan` | what starting a kubectl terminal for the whole cluster writes, and a token; writes nothing |
+//! | `POST /api/v1/cluster/tools/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/nodes/{node}/maintenance/plan` | what stopping scheduling, resuming it or maintenance does to a node's pods, and a token; writes nothing |
 //! | `POST /api/v1/cluster/nodes/{node}/maintenance/apply` | carries out that plan by its token: patches the node and makes the first eviction pass |
 //! | `POST /api/v1/cluster/nodes/{node}/maintenance/evict` | evicts that plan's pods still on the node, once more |
+//! | `DELETE /api/v1/cluster/tools/{name}` | deletes your cluster tools pod |
 //! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
 //! | `POST /api/v1/members/{username}/setup-links` | a new setup link for a member, optionally removing their passkeys first |
 //! | `DELETE /api/v1/members/{username}/credentials/{id}` | removes a member's passkey or linked account |
@@ -200,6 +205,11 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::node_shells::plan))
         .routes(routes!(cluster::node_shells::apply))
         .routes(routes!(cluster::node_shells::terminal))
+        .routes(routes!(cluster::tools::status))
+        .routes(routes!(cluster::tools::plan))
+        .routes(routes!(cluster::tools::apply))
+        .routes(routes!(cluster::tools::delete))
+        .routes(routes!(cluster::tools::terminal))
         .routes(routes!(cluster::maintenance::plan))
         .routes(routes!(cluster::maintenance::apply))
         .routes(routes!(cluster::maintenance::evict))

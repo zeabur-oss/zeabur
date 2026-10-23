@@ -188,6 +188,9 @@ person who opened it. Both are created as that person, so they need `patch` on
 `pods/ephemeralcontainers`, or `create` and `delete` on `pods`, plus `get` on `pods/exec`.
 With `terminal.toolsNamespace`, tools pods go in a namespace of their own instead of the
 project's; give people those rights there, and nobody else `pods/exec` in it.
+Administrators also open a tools terminal for the whole cluster, from the Components page; its
+pods go in `terminal.clusterToolsNamespace` (`zeabur-cluster-tools`, created by the first plan
+that needs it), never in `terminal.toolsNamespace`, since they hold an administrator's token.
 `terminal.toolsDeadlineMinutes` and `terminal.toolsResources` bound each tools pod.
 
 ### Use, disk and history

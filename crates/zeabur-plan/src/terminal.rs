@@ -32,16 +32,17 @@
 //!
 //! # Cluster tools
 //!
-//! A pod in the project's namespace (or the one Zeabur's chart names) with an image that has
-//! `kubectl` and `helm`, created as the person. It has no service account token
+//! A pod with an image that has `kubectl` and `helm`, created as the person: for a project, in its
+//! namespace (or the one Zeabur's chart names for tools pods); for the whole cluster, opened by an
+//! administrator, in a namespace of its own ([`ToolsScope`]). It has no service account token
 //! (`automountServiceAccountToken: false`), runs as user 65532 with a read-only root file system,
 //! no capabilities and the runtime's default seccomp profile, stops at its
 //! `activeDeadlineSeconds`, and is labelled as Zeabur's tools pod for one person
-//! ([`TOOLS_LABEL`], [`TOOLS_PERSON_LABEL`]). Its home directory's `.kube` is a memory-backed
-//! `emptyDir`; the credential is written there through the terminal's exec stream when the
-//! terminal opens, never into the spec, an environment variable, a ConfigMap or a Secret (see
-//! `zeabur_api::tools`). kube-apiserver's CA comes from the `kube-root-ca.crt` ConfigMap that
-//! kube-controller-manager publishes in every namespace [k8s-root-ca].
+//! ([`TOOLS_LABEL`], whose value is its scope, and [`TOOLS_PERSON_LABEL`]). Its home directory's
+//! `.kube` is a memory-backed `emptyDir`; the credential is written there through the terminal's
+//! exec stream when the terminal opens, never into the spec, an environment variable, a ConfigMap
+//! or a Secret (see `zeabur_api::tools`). kube-apiserver's CA comes from the `kube-root-ca.crt`
+//! ConfigMap that kube-controller-manager publishes in every namespace [k8s-root-ca].
 //!
 //! # References
 //!
@@ -80,6 +81,8 @@ pub const TOOLS_HOME: &str = "/home/user";
 pub const TOOLS_CA: &str = "/var/run/zeabur/kube-api/ca.crt";
 /// The user the tools container runs as.
 pub const TOOLS_USER: i64 = 65532;
+/// The namespace `kubectl` starts in, in a cluster tools pod.
+pub const CLUSTER_TOOLS_START: &str = "default";
 /// The user a debug container runs as when the pod must not run as root and names no user.
 const NOBODY: i64 = 65534;
 
@@ -490,13 +493,42 @@ impl Default for ToolsResources {
     }
 }
 
+/// What a tools pod is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolsScope<'a> {
+    /// The project it is opened from.
+    Project(&'a str),
+    /// The whole cluster, for an administrator.
+    Cluster,
+}
+
+impl<'a> ToolsScope<'a> {
+    /// The value of the tools label ([`TOOLS_LABEL`]) on its pods.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Project(_) => "true",
+            Self::Cluster => "cluster",
+        }
+    }
+
+    /// The namespace `kubectl` starts in.
+    #[must_use]
+    pub const fn start(self) -> &'a str {
+        match self {
+            Self::Project(project) => project,
+            Self::Cluster => CLUSTER_TOOLS_START,
+        }
+    }
+}
+
 /// What a tools pod is made from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolsPod<'a> {
     /// The namespace it goes in.
     pub namespace: &'a str,
-    /// The project it is opened from: the namespace `kubectl` starts in.
-    pub project: &'a str,
+    /// What it is for.
+    pub scope: ToolsScope<'a>,
     /// The person's user name.
     pub person: &'a str,
     /// Whether the credential in use now is an administrator's.
@@ -515,20 +547,28 @@ pub struct ToolsPod<'a> {
     pub made_at: &'a str,
 }
 
-/// Whether `pod` is a tools pod of the person whose [`person_key`] is `key`.
+/// Whether `pod` is a tools pod for `scope` of the person whose [`person_key`] is `key`.
+///
+/// A project's pods are told apart by the project they were opened from only where they share a
+/// namespace, which the caller knows.
 #[must_use]
-pub fn is_tools_pod_of(pod: &Value, key: &str) -> bool {
-    is_tools_pod_of_with(pod, key, &Conventions::ZEABUR)
+pub fn is_tools_pod_of(pod: &Value, key: &str, scope: ToolsScope<'_>) -> bool {
+    is_tools_pod_of_with(pod, key, scope, &Conventions::ZEABUR)
 }
 
 /// [`is_tools_pod_of`] by the tools labels of `conventions`.
 #[must_use]
-pub fn is_tools_pod_of_with(pod: &Value, key: &str, conventions: &Conventions) -> bool {
+pub fn is_tools_pod_of_with(
+    pod: &Value,
+    key: &str,
+    scope: ToolsScope<'_>,
+    conventions: &Conventions,
+) -> bool {
     let label = |name: &str| {
         pod.pointer(&format!("/metadata/labels/{}", name.replace('/', "~1")))
             .and_then(Value::as_str)
     };
-    label(&conventions.tools_label) == Some("true")
+    label(&conventions.tools_label) == Some(scope.label())
         && label(&conventions.tools_person_label) == Some(key)
 }
 
@@ -549,6 +589,14 @@ pub fn tools_pod_body_with(request: &ToolsPod<'_>, conventions: &Conventions) ->
         hex(digest.get(..3).unwrap_or_default())
     );
     let home = TOOLS_HOME;
+    let mut annotations = json!({(&*conventions.tools_person_annotation): request.person});
+    if let (ToolsScope::Project(project), Some(map)) = (request.scope, annotations.as_object_mut())
+    {
+        map.insert(
+            conventions.tools_project_annotation.to_string(),
+            json!(project),
+        );
+    }
     json!({
         "apiVersion": "v1",
         "kind": "Pod",
@@ -558,13 +606,10 @@ pub fn tools_pod_body_with(request: &ToolsPod<'_>, conventions: &Conventions) ->
             "labels": {
                 "app.kubernetes.io/name": conventions.tools_prefix.trim_end_matches('-'),
                 "app.kubernetes.io/managed-by": conventions.field_manager,
-                (&*conventions.tools_label): "true",
+                (&*conventions.tools_label): request.scope.label(),
                 (&*conventions.tools_person_label): key,
             },
-            "annotations": {
-                (&*conventions.tools_person_annotation): request.person,
-                (&*conventions.tools_project_annotation): request.project,
-            },
+            "annotations": annotations,
         },
         "spec": {
             "automountServiceAccountToken": false,
@@ -671,6 +716,23 @@ pub fn tools_pod_with(request: &ToolsPod<'_>, conventions: &Conventions) -> Plan
             },
         ],
     }
+}
+
+/// The namespace of cluster tools pods, when it is not there yet: tools pods meet the `restricted`
+/// Pod Security Standard, which it enforces [k8s-pss].
+#[must_use]
+pub fn cluster_tools_namespace_body(name: &str) -> Value {
+    json!({
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {
+            "name": name,
+            "labels": {
+                "app.kubernetes.io/managed-by": zeabur_kernel::names::FIELD_MANAGER,
+                "pod-security.kubernetes.io/enforce": "restricted",
+            },
+        },
+    })
 }
 
 /// The plan when the person's tools pod `pod` in `namespace` is still there: nothing to write.
@@ -838,7 +900,7 @@ mod tests {
     fn tools(person: &str, admin: bool) -> ToolsPod<'static> {
         ToolsPod {
             namespace: "shop",
-            project: "shop",
+            scope: ToolsScope::Project("shop"),
             person: Box::leak(person.to_owned().into_boxed_str()),
             admin,
             credential_expires_at: Some("2026-10-21T00:10:00Z".to_owned()),
@@ -885,8 +947,22 @@ mod tests {
                 .iter()
                 .any(|m| m["name"] == "credential" && m["mountPath"] == "/home/user/.kube")
         );
-        assert!(is_tools_pod_of(&body, &person_key("alice@example.com")));
-        assert!(!is_tools_pod_of(&body, &person_key("bob@example.com")));
+        let shop = ToolsScope::Project("shop");
+        assert!(is_tools_pod_of(
+            &body,
+            &person_key("alice@example.com"),
+            shop
+        ));
+        assert!(!is_tools_pod_of(
+            &body,
+            &person_key("bob@example.com"),
+            shop
+        ));
+        assert!(!is_tools_pod_of(
+            &body,
+            &person_key("alice@example.com"),
+            ToolsScope::Cluster
+        ));
     }
 
     #[test]
@@ -900,6 +976,27 @@ mod tests {
                 Warning::ToolsCredentialExposed { namespace },
             ] if person == "alice" && namespace == "shop"
         ));
+    }
+
+    #[test]
+    fn a_cluster_tools_pod_names_no_project_and_is_not_a_projects() {
+        let request = ToolsPod {
+            namespace: "zeabur-cluster-tools",
+            scope: ToolsScope::Cluster,
+            ..tools("alice", true)
+        };
+        let body = tools_pod_body(&request);
+        assert_eq!(body["metadata"]["labels"][TOOLS_LABEL], "cluster");
+        assert!(
+            body["metadata"]["annotations"]
+                .get(TOOLS_PROJECT_ANNOTATION)
+                .is_none()
+        );
+        let key = person_key("alice");
+        assert!(is_tools_pod_of(&body, &key, ToolsScope::Cluster));
+        assert!(!is_tools_pod_of(&body, &key, ToolsScope::Project("shop")));
+        assert_eq!(ToolsScope::Cluster.start(), "default");
+        assert_eq!(ToolsScope::Project("shop").start(), "shop");
     }
 
     #[test]
@@ -923,8 +1020,9 @@ mod tests {
         assert_eq!(meta["annotations"]["example.com/person"], "alice");
         assert!(meta["labels"].get(TOOLS_LABEL).is_none());
         let key = person_key("alice");
-        assert!(is_tools_pod_of_with(&body, &key, &conventions));
-        assert!(!is_tools_pod_of(&body, &key));
+        let shop = ToolsScope::Project("shop");
+        assert!(is_tools_pod_of_with(&body, &key, shop, &conventions));
+        assert!(!is_tools_pod_of(&body, &key, shop));
 
         let plan = debug_container_with(&pod(), None, "b", "t", &conventions).unwrap();
         let Write::EphemeralContainers { operations } = &plan.objects[0].write else {

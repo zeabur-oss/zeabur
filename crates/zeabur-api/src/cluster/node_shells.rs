@@ -259,7 +259,7 @@ fn text(object: &Value, path: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-fn yaml(object: &Value) -> Option<String> {
+pub(crate) fn yaml(object: &Value) -> Option<String> {
     zeabur_graph::manifest::to_yaml(&zeabur_graph::manifest::clean(object)).ok()
 }
 
@@ -273,19 +273,23 @@ fn right(verb: &str, group: &str, resource: &str, namespace: Option<&str>) -> De
     }
 }
 
-/// Refused unless kube-apiserver says the person may do everything everywhere.
-pub(crate) async fn require_admin(cluster: &dyn Cluster, what: &str) -> Result<(), ApiError> {
+/// Refused unless kube-apiserver says the person may do everything everywhere; `why` ends the
+/// refusal's sentence.
+pub(crate) async fn require_admin(
+    cluster: &dyn Cluster,
+    what: &str,
+    why: &str,
+) -> Result<(), ApiError> {
     if crate::account::cluster_admin(cluster).await {
         return Ok(());
     }
     let mut refusal = review_refusal(what, right("*", "*", "*", None));
-    format!(
-        "Only cluster administrators can use {what}: it is root on the node, outside Zeabur and \
-         Kubernetes."
-    )
-    .clone_into(&mut refusal.0.detail);
+    format!("Only cluster administrators can use {what}: {why}").clone_into(&mut refusal.0.detail);
     Err(refusal)
 }
+
+/// Why a node shell is for cluster administrators only.
+const ROOT: &str = "it is root on the node, outside Zeabur and Kubernetes.";
 
 fn view(found: shell::ShellPod, person_key: &str, pods: &[Value]) -> NodeShellView {
     let mine = pods
@@ -336,7 +340,7 @@ pub(crate) async fn list(
     Person(cluster): Person,
     Everyday(everyday): Everyday,
 ) -> Result<Json<NodeShells>, ApiError> {
-    require_admin(cluster.as_ref(), "node shells").await?;
+    require_admin(cluster.as_ref(), "node shells", ROOT).await?;
     let identity = everyday
         .whoami()
         .await
@@ -518,7 +522,7 @@ fn exposure_views(exposed: Vec<shell::Exposure>) -> Vec<ShellExposure> {
         .collect()
 }
 
-fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError> {
+pub(crate) fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError> {
     state.plan_key.clone().ok_or_else(|| {
         ApiError::from(Problem::new(
             Kind::Internal,
@@ -527,8 +531,13 @@ fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError
     })
 }
 
-fn seal(sealing: &token::PlanKey, claims: &Claims) -> Result<String, ApiError> {
-    token::sign_as(sealing, PREFIX, claims).map_err(|_random| {
+/// Seals `claims` under `prefix` (see `plan_token::sign_as`).
+pub(crate) fn seal<T: Serialize>(
+    sealing: &token::PlanKey,
+    prefix: &str,
+    claims: &T,
+) -> Result<String, ApiError> {
+    token::sign_as(sealing, prefix, claims).map_err(|_random| {
         ApiError::from(Problem::new(
             Kind::Internal,
             "The system random number generator failed, so Zeabur could not seal the plan.",
@@ -696,7 +705,7 @@ pub(crate) async fn plan(
     Json(request): Json<NodeShellPlanRequest>,
 ) -> Result<Json<NodeShellPlan>, ApiError> {
     let sealing = plan_key(&state)?;
-    require_admin(cluster.as_ref(), "a shell on a node").await?;
+    require_admin(cluster.as_ref(), "a shell on a node", ROOT).await?;
     let identity = everyday
         .whoami()
         .await
@@ -719,12 +728,12 @@ pub(crate) async fn plan(
         .unwrap_or(Timestamp::UNIX_EPOCH)
         .to_string();
     if plan.exposed.is_empty() {
-        plan.token = Some(seal(&sealing, &claims)?);
+        plan.token = Some(seal(&sealing, PREFIX, &claims)?);
     }
     Ok(Json(plan))
 }
 
-async fn send(
+pub(crate) async fn send(
     cluster: &dyn Cluster,
     target: ObjectTarget,
     body: WriteBody,
@@ -744,7 +753,7 @@ async fn send(
         .map_err(|error| read_problem(error, &what, refused))
 }
 
-fn moved(what: &str) -> ApiError {
+pub(crate) fn moved(what: &str) -> ApiError {
     ApiError::from(Problem::new(
         Kind::Conflict,
         format!("{what} changed after the plan was made."),
@@ -792,7 +801,7 @@ pub(crate) async fn apply(
             "Someone else made this plan, or you made it with other group memberships.",
         )));
     }
-    require_admin(cluster.as_ref(), "a shell on a node").await?;
+    require_admin(cluster.as_ref(), "a shell on a node", ROOT).await?;
     let cluster = cluster.as_ref();
     if claims.op == "remove" {
         return apply_remove(cluster, claims).await.map(Json);
@@ -1009,7 +1018,7 @@ async fn enter(
     cluster: &dyn Cluster,
     pod: &str,
 ) -> Result<(Option<String>, ExecSession), ApiError> {
-    require_admin(cluster, "a shell on a node").await?;
+    require_admin(cluster, "a shell on a node", ROOT).await?;
     let right = exec::exec_right(NAMESPACE, pod);
     if matches!(cluster.review_access(&right).await, Ok(false)) {
         return Err(review_refusal(&format!("node shell {pod}"), right));
