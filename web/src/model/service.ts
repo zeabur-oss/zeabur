@@ -82,7 +82,7 @@ export const podReason = (pod: Pod): string | undefined => pod.reason ?? undefin
 
 export const podHealth = (pod: Pod): Health => pod.health
 
-export function worstPod(service: Service): Pod | undefined {
+export function worstPod(service: Pick<Service, "pods">): Pod | undefined {
   return (
     service.pods.find((pod) => pod.health === "fail") ??
     service.pods.find((pod) => !pod.ready && pod.phase !== "Succeeded") ??

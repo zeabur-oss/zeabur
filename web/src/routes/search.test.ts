@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { formerPlace, servicePlace, validateServiceSearch } from "@/routes/search"
+import {
+  formerPlace,
+  servicePlace,
+  validateDatabaseSearch,
+  validateServiceSearch,
+} from "@/routes/search"
 
 describe("service places", () => {
   test("a place names its tab, and a part of Settings its anchor", () => {
@@ -63,5 +68,23 @@ describe("service places", () => {
       tab: undefined,
       former: undefined,
     })
+  })
+})
+
+describe("database places", () => {
+  test("a tab, Settings' YAML view, and a pod where logs and events take one", () => {
+    expect(validateDatabaseSearch({ tab: "overview" })).toEqual({})
+    expect(validateDatabaseSearch({ tab: "settings", mode: "yaml" })).toEqual({
+      tab: "settings",
+      mode: "yaml",
+    })
+    expect(validateDatabaseSearch({ tab: "backups", mode: "yaml", pod: "pg-1" })).toEqual({
+      tab: "backups",
+    })
+    expect(validateDatabaseSearch({ tab: "logs", pod: "pg-1" })).toEqual({
+      tab: "logs",
+      pod: "pg-1",
+    })
+    expect(validateDatabaseSearch({ tab: "deployments" })).toEqual({})
   })
 })

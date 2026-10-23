@@ -11,7 +11,8 @@
 // is a `PerconaServerMongoDBBackup`.
 // https://docs.percona.com/percona-operator-for-mongodb/backups.html
 import type { Schemas } from "@/api/client"
-import type { Health } from "@/model/service"
+import type { ObjectAddress } from "@/api/queries"
+import type { Event, Health } from "@/model/service"
 
 export type Database = Schemas["Database"]
 export type Engine = Schemas["DatabaseEngine"]
@@ -255,13 +256,10 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
   const region = target.region.trim()
   const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
   const spec = (object.spec ??= {})
+  const { group, version, resource } = databaseAddress(database)
   const edit: Change = {
     op: "edit",
-    resource: {
-      group: database.apiVersion.split("/")[0] ?? "",
-      version: database.apiVersion.split("/")[1] ?? "",
-      resource: database.resource,
-    },
+    resource: { group, version, resource },
     name: database.name,
     yaml: "",
   }
@@ -427,22 +425,142 @@ export function connectionUri(database: Database, password = "PASSWORD") {
   return `${scheme}://${user}:${encodeURIComponent(password)}@${c.host}:${c.port}/${c.database ?? ""}${options}`
 }
 
+/** Where the database's own object lives in the objects API: a custom resource of its operator. */
+export function databaseAddress(database: Database): ObjectAddress {
+  const [group = "", version = ""] = database.apiVersion.split("/")
+  return { group, version, resource: database.resource, name: database.name }
+}
+
+/** The container the server runs in, in each member. */
+export const serverContainer: Record<Engine, string> = { postgresql: "postgres", mongodb: "mongod" }
+
+/** The member a shell opens in: PostgreSQL's primary; MongoDB's first member. */
+export const shellPod = (database: Database) =>
+  database.engine === "postgresql"
+    ? (database.primary ?? `${database.name}-1`)
+    : `${database.name}-rs0-0`
+
+// The operator mounts its users' Secret into each member at /etc/users-secret.
+const mongoLogin =
+  'mongosh -u "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_USER)" -p "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_PASSWORD)" --authenticationDatabase admin'
+
+/** What a terminal runs in the server's container: the engine's own shell, signed in. */
+export function shellCommand(database: Database): string[] {
+  if (database.engine === "postgresql") return ["psql", database.connection.database ?? "app"]
+  return ["bash", "-c", mongoLogin]
+}
+
+/** Events about the database's object, its members and their volumes. */
+export function eventsOf(events: Event[], database: Database): Event[] {
+  const pods = new Set(database.pods.map((p) => p.name))
+  const claims = new Set(database.claims)
+  return events.filter(({ regarding: r }) => {
+    if (!r?.name) return false
+    if (r.kind === database.kind) return r.name === database.name
+    if (r.kind === "Pod") return pods.has(r.name)
+    return r.kind === "PersistentVolumeClaim" && claims.has(r.name)
+  })
+}
+
 const q = (word: string) => (/^[\w./:=@-]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`)
 
 /** kubectl commands for the tools terminal: the object, and a shell in the database. */
 export function commands(project: string, database: Database) {
   const ns = q(project)
   const name = q(database.name)
-  const resource = `${database.resource}.${database.apiVersion.split("/")[0]}`
+  const resource = `${database.resource}.${databaseAddress(database).group}`
   const describe = `kubectl get ${resource} ${name} -n ${ns} -o wide`
+  const pod = q(shellPod(database))
+  const container = serverContainer[database.engine]
+  const command =
+    database.engine === "postgresql"
+      ? shellCommand(database).map(q).join(" ")
+      : `bash -c '${mongoLogin}'`
+  return { describe, shell: `kubectl exec -it -n ${ns} ${pod} -c ${container} -- ${command}` }
+}
+
+export interface DatabaseShape {
+  members: number
+  /** Unchanged when absent: what the database asks for is no preset. */
+  size?: SizePreset
+  /** Per member, as `5Gi`. */
+  storage: string
+}
+
+const BYTES: Record<string, number> = { Mi: 2 ** 20, Gi: 2 ** 30, Ti: 2 ** 40 }
+
+/** Bytes in a size written as `512Mi`, `5Gi` or `1Ti`; `undefined` for anything else. */
+function storageBytes(size: string): number | undefined {
+  const match = /^(\d+(?:\.\d+)?)(Mi|Gi|Ti)$/.exec(size.trim())
+  return match ? Number(match[1]) * (BYTES[match[2] ?? ""] ?? 0) : undefined
+}
+
+/** A volume can grow, not shrink. */
+export function storageProblem(current: string | null | undefined, next: string) {
+  const bytes = storageBytes(next)
+  if (bytes === undefined || bytes <= 0) return "invalid" as const
+  const now = current ? storageBytes(current) : undefined
+  return now !== undefined && bytes < now ? ("shrink" as const) : undefined
+}
+
+/** The edit that gives the database `shape`: instances, the size of each, and its storage. A
+ * MongoDB volume grows only with `enableVolumeExpansion`, and fewer than three members needs
+ * `unsafeFlags.replsetSize`.
+ * https://docs.percona.com/percona-operator-for-mongodb/scaling.html */
+export function reshapeDatabase(database: Database, shape: DatabaseShape): Change[] {
+  const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
+  const spec = (object.spec ??= {})
+  const resources = shape.size
+    ? structuredClone(presetResources[database.engine][shape.size])
+    : undefined
+  const storage = shape.storage.trim()
   if (database.engine === "postgresql") {
-    const pod = q(database.primary ?? `${database.name}-1`)
-    const db = q(database.connection.database ?? "app")
-    return { describe, shell: `kubectl exec -it -n ${ns} ${pod} -c postgres -- psql ${db}` }
+    spec.instances = shape.members
+    if (resources) spec.resources = resources
+    spec.storage = { ...(spec.storage as Manifest | undefined), size: storage }
+  } else {
+    const [first = {}, ...rest] = (spec.replsets as Manifest[] | undefined) ?? []
+    const volume = (first.volumeSpec as Manifest | undefined) ?? {}
+    const claim = (volume.persistentVolumeClaim as Manifest | undefined) ?? {}
+    const asked = (claim.resources as Manifest | undefined) ?? {}
+    spec.replsets = [
+      {
+        ...first,
+        size: shape.members,
+        ...(resources ? { resources } : {}),
+        volumeSpec: {
+          ...volume,
+          persistentVolumeClaim: {
+            ...claim,
+            resources: {
+              ...asked,
+              requests: { ...(asked.requests as Manifest | undefined), storage },
+            },
+          },
+        },
+      },
+      ...rest,
+    ]
+    if (storage !== database.storage) spec.enableVolumeExpansion = true
+    const flags = { ...(spec.unsafeFlags as Manifest | undefined) }
+    if (shape.members < 3) flags.replsetSize = true
+    else delete flags.replsetSize
+    if (Object.keys(flags).length > 0) spec.unsafeFlags = flags
+    else delete spec.unsafeFlags
   }
-  const pod = q(`${database.name}-rs0-0`)
-  // The operator mounts its users' Secret into each member at /etc/users-secret.
-  const login =
-    'mongosh -u "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_USER)" -p "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_PASSWORD)" --authenticationDatabase admin'
-  return { describe, shell: `kubectl exec -it -n ${ns} ${pod} -c mongod -- bash -c '${login}'` }
+  const { group, version, resource } = databaseAddress(database)
+  return [
+    {
+      op: "edit",
+      resource: { group, version, resource },
+      name: database.name,
+      yaml: JSON.stringify(object),
+    },
+  ]
+}
+
+/** Deleting the database: its object, which the operator deletes its members and volumes with. */
+export function deleteDatabase(database: Database): Change[] {
+  const { group, version, resource } = databaseAddress(database)
+  return [{ op: "delete", resource: { group, version, resource }, name: database.name }]
 }

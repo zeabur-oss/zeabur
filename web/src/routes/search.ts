@@ -148,6 +148,27 @@ export function validateServiceSearch(search: Record<string, unknown>): ServiceS
   }
 }
 
+/** A database's tabs, in their order. */
+export const databaseTabs = ["overview", "logs", "backups", "events", "settings"] as const
+export type DatabaseTab = (typeof databaseTabs)[number]
+
+export interface DatabaseSearch {
+  /** Overview when absent. */
+  tab?: DatabaseTab
+  /** Settings' YAML view; only with Settings. */
+  mode?: "yaml"
+  pod?: string
+}
+
+export function validateDatabaseSearch(search: Record<string, unknown>): DatabaseSearch {
+  const tab = oneOf(databaseTabs, search.tab)
+  return {
+    tab: tab === "overview" ? undefined : tab,
+    mode: tab === "settings" && search.mode === "yaml" ? "yaml" : undefined,
+    pod: tab === "logs" || tab === "events" ? str(search.pod) : undefined,
+  }
+}
+
 export interface ObjectsSearch {
   q?: string
   /** `group/version/resource/name` of the object whose YAML is open. */

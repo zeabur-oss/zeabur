@@ -8,12 +8,18 @@ import {
   commands,
   connectionUri,
   createDatabase,
+  databaseAddress,
+  deleteDatabase,
+  eventsOf,
   enableBackups,
   nameProblem,
   newBackupTarget,
   newDatabase,
   presetOf,
   presetResources,
+  reshapeDatabase,
+  shellCommand,
+  storageProblem,
   targetProblems,
   type Database,
 } from "@/model/databases"
@@ -30,6 +36,7 @@ const postgres: Database = {
   ready: 1,
   primary: "pg-1",
   claims: ["pg-1"],
+  pods: [],
   origin: {} as Database["origin"],
   connection: {
     host: "pg-rw.shop.svc",
@@ -294,5 +301,99 @@ describe("connecting", () => {
     expect(commands("shop", mongo).shell).toStartWith(
       "kubectl exec -it -n shop mongo-rs0-0 -c mongod -- bash -c 'mongosh",
     )
+  })
+})
+
+describe("the database's own object", () => {
+  test("is its operator's custom resource", () => {
+    expect(databaseAddress(postgres)).toEqual({
+      group: "postgresql.cnpg.io",
+      version: "v1",
+      resource: "clusters",
+      name: "pg",
+    })
+    expect(databaseAddress(mongo)).toEqual({
+      group: "psmdb.percona.com",
+      version: "v1",
+      resource: "perconaservermongodbs",
+      name: "mongo",
+    })
+  })
+})
+
+describe("a terminal in the database", () => {
+  test("starts the engine's shell", () => {
+    expect(shellCommand(postgres)).toEqual(["psql", "app"])
+    expect(shellCommand(mongo).slice(0, 2)).toEqual(["bash", "-c"])
+    expect(shellCommand(mongo)[2]).toStartWith("mongosh -u")
+  })
+})
+
+describe("events", () => {
+  const event = (kind: string, name: string) =>
+    ({ regarding: { kind, name } }) as unknown as Parameters<typeof eventsOf>[0][number]
+  test("are those about the object, its members and their volumes", () => {
+    const withPods = { ...postgres, pods: [{ name: "pg-1" }] } as unknown as Database
+    const events = [
+      event("Cluster", "pg"),
+      event("Cluster", "other"),
+      event("Pod", "pg-1"),
+      event("Pod", "pg-2"),
+      event("PersistentVolumeClaim", "pg-1"),
+      event("Deployment", "pg"),
+    ]
+    const shown = eventsOf(events, withPods).map((e) => `${e.regarding?.kind}/${e.regarding?.name}`)
+    expect(shown).toEqual(["Cluster/pg", "Pod/pg-1", "PersistentVolumeClaim/pg-1"])
+  })
+})
+
+describe("reshaping", () => {
+  test("a volume grows and does not shrink", () => {
+    expect(storageProblem("5Gi", "10Gi")).toBeUndefined()
+    expect(storageProblem("5Gi", "5120Mi")).toBeUndefined()
+    expect(storageProblem("5Gi", "1Gi")).toBe("shrink")
+    expect(storageProblem("5Gi", "five")).toBe("invalid")
+    expect(storageProblem(null, "1Gi")).toBeUndefined()
+  })
+
+  test("PostgreSQL's instances, size and storage are the Cluster's spec", () => {
+    const [edit] = reshapeDatabase(postgres, { members: 3, size: "medium", storage: "10Gi" })
+    expect(edit).toMatchObject({
+      op: "edit",
+      resource: { group: "postgresql.cnpg.io", version: "v1", resource: "clusters" },
+      name: "pg",
+    })
+    const spec = JSON.parse((edit as { yaml: string }).yaml).spec
+    expect(spec.instances).toBe(3)
+    expect(spec.resources).toEqual(presetResources.postgresql.medium)
+    expect(spec.storage).toEqual({ size: "10Gi" })
+    expect(spec.plugins).toEqual([{ name: "other" }])
+  })
+
+  test("MongoDB's are the first replica set's, with the flags the operator asks for", () => {
+    const grown = { ...mongo, storage: "2Gi" }
+    const [edit] = reshapeDatabase(grown, { members: 3, size: "small", storage: "4Gi" })
+    const spec = JSON.parse((edit as { yaml: string }).yaml).spec
+    expect(spec.replsets[0]).toMatchObject({
+      name: "rs0",
+      size: 3,
+      volumeSpec: { persistentVolumeClaim: { resources: { requests: { storage: "4Gi" } } } },
+    })
+    expect(spec.enableVolumeExpansion).toBe(true)
+    expect(spec.unsafeFlags).toBeUndefined()
+    const [one] = reshapeDatabase(grown, { members: 1, size: "small", storage: "2Gi" })
+    const single = JSON.parse((one as { yaml: string }).yaml).spec
+    expect(single.unsafeFlags).toEqual({ replsetSize: true })
+    expect(single.enableVolumeExpansion).toBeUndefined()
+  })
+
+  test("deleting removes the operator's object", () => {
+    expect(deleteDatabase(mongo)).toEqual([
+      {
+        op: "delete",
+        resource: { group: "psmdb.percona.com", version: "v1", resource: "perconaservermongodbs" },
+        name: "mongo",
+      },
+    ])
   })
 })

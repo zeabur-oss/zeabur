@@ -41,6 +41,7 @@ import {
   validateObjectsSearch,
   validateProjectSearch,
   validateProjectsSearch,
+  validateDatabaseSearch,
   validateServiceSearch,
 } from "@/routes/search"
 
@@ -67,8 +68,9 @@ import {
 //                                              terminal view opens Logs with the dock;
 //                                              Settings' parts as #anchors; a former ?tab=status…
 //                                              redirects to its place
-//   /projects/$project/databases/$engine/$name one database an operator runs: its state and how
-//                                              to connect, or ?tab=backups
+//   /projects/$project/databases/$engine/$name one database an operator runs: ?tab=logs|backups|
+//                                              events|settings (Overview when absent), and
+//                                              Settings' YAML view (?mode=yaml)
 //   /settings                                  preferences, the signed-in person, About
 //   /account                                   your account: who you are, your role in each
 //                                              project, a link to manage how you sign in
@@ -277,9 +279,7 @@ const serviceRoute = createRoute({
 const databaseRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/databases/$engine/$name",
-  validateSearch: (search: Record<string, unknown>): { tab?: "backups" } => ({
-    tab: search.tab === "backups" ? "backups" : undefined,
-  }),
+  validateSearch: validateDatabaseSearch,
   loader: ({ params }) => load(ensure(databasesQuery(params.project))),
   remountDeps: ({ params }) => `${params.project}/${params.engine}/${params.name}`,
   component: lazyRouteComponent(() => import("@/routes/database/page"), "DatabasePage"),
