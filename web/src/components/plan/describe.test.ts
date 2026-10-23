@@ -3,6 +3,7 @@ import { describe as group, test, expect } from "bun:test"
 import type { Schemas } from "@/api/client"
 import {
   actionOf,
+  claimDataSaid,
   describe,
   failureOf,
   replaced,
@@ -691,5 +692,35 @@ group("deploying from Git", () => {
     expect(d.lines).toContain("confirm.deployKey(site-git)")
     expect(d.lines.join(" ")).not.toContain("k1.sealed")
     expect(actionOf(t, { changes })).toBe("action.create")
+  })
+})
+
+group("a deleted claim's data", () => {
+  const warning = (
+    reclaimPolicy?: string,
+  ): Extract<Schemas["PlanWarning"], { code: "claimDataMayBeLost" }> => ({
+    code: "claimDataMayBeLost",
+    claim: "web-data",
+    volume: reclaimPolicy ? "pvc-1" : undefined,
+    reclaimPolicy,
+  })
+
+  test("names the reclaim policy when it can be read", () => {
+    expect(claimDataSaid(t, warning("Delete"))).toEqual({
+      text: "warn.claimDataDeleted(web-data, pvc-1)",
+      kept: false,
+    })
+    expect(claimDataSaid(t, warning("Retain"))).toEqual({
+      text: "warn.claimDataRetained(web-data, pvc-1)",
+      kept: true,
+    })
+  })
+
+  test("says it is deleted, unless the cluster keeps it, when the policy cannot be read", () => {
+    const said = claimDataSaid(t, warning())
+    expect(said).toEqual({ text: "warn.claimDataUnlessRetained(web-data)", kept: false })
+    expect(claimDataSaid(translator(zhTW), warning()).text).toBe(
+      "磁碟區（web-data）的資料會一起刪除；叢集設定成保留時，管理員還能救回",
+    )
   })
 })

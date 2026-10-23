@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import type { Problem, Schemas } from "@/api/client"
 import { useDraft } from "@/components/plan/draft"
 import { fallback, next, type Open } from "@/components/plan/fallback"
+import type { Reviewed } from "@/components/plan/replan"
 import type { Skipped } from "@/model/managed"
 
 const PlanDialog = lazy(() =>
@@ -54,9 +55,9 @@ export function usePlanner(
       mounted.current = false
     }
   }, [])
-  const show = (ask: PlanAsk) => {
+  const show = (ask: PlanAsk, reviewed?: Reviewed) => {
     setRefusal(undefined)
-    setOpen(next(project, ask))
+    setOpen(next(project, ask, reviewed))
   }
   /** True when the ask waits in the draft instead of opening the dialog. */
   const plan = (ask: PlanAsk): boolean => {
@@ -64,13 +65,15 @@ export function usePlanner(
     show(ask)
     return false
   }
-  const reopen = (ask: PlanAsk) => (mounted.current ? show(ask) : fallback.open(project, ask))
+  const reopen = (ask: PlanAsk, reviewed?: Reviewed) =>
+    mounted.current ? show(ask, reviewed) : fallback.open(project, ask, reviewed)
   const dialog = open ? (
     <Suspense fallback={null}>
       <PlanDialog
         key={open.attempt}
         project={project}
         ask={open.ask}
+        reviewed={open.reviewed}
         onClose={() => setOpen(null)}
         onApplied={onApplied}
         reopen={reopen}
@@ -95,17 +98,20 @@ export function usePlanStep(project: string, onDone: () => void, onApplied?: () 
       mounted.current = false
     }
   }, [])
-  const plan = (ask: PlanAsk) => {
+  const show = (ask: PlanAsk, reviewed?: Reviewed) => {
     setRefusal(undefined)
-    setOpen(next(project, ask))
+    setOpen(next(project, ask, reviewed))
   }
-  const reopen = (ask: PlanAsk) => (mounted.current ? plan(ask) : fallback.open(project, ask))
+  const plan = (ask: PlanAsk) => show(ask)
+  const reopen = (ask: PlanAsk, reviewed?: Reviewed) =>
+    mounted.current ? show(ask, reviewed) : fallback.open(project, ask, reviewed)
   const view = open ? (
     <Suspense fallback={null}>
       <PlanStep
         key={open.attempt}
         project={project}
         ask={open.ask}
+        reviewed={open.reviewed}
         footer={footer}
         onClose={() => setOpen(null)}
         onConfirmed={() => {

@@ -1275,6 +1275,9 @@ export const zhTW: Messages = {
   "plan.cancel": "取消",
   "plan.back": "返回",
   "plan.replan": "重新檢查",
+  "plan.replanned": "檢查之後有東西變了，請再看一次。",
+  "plan.replannedAdded": (names: string) => `這次多了：${names}`,
+  "plan.replannedDropped": (names: string) => `這次少了：${names}`,
   "plan.details": "技術細節",
   "plan.expiresIn": (time: string) => `${time} 後失效`,
   "plan.expired": "已失效",
@@ -1400,8 +1403,8 @@ export const zhTW: Messages = {
     `叢集會刪除磁碟區（${claim}）的資料：它的 PersistentVolume ${volume} 回收政策是 Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
     `磁碟區（${claim}）的資料會留在 PersistentVolume ${volume}（回收政策 Retain），直到管理員移除`,
-  "warn.claimDataUnknown": (claim: string) =>
-    `磁碟區（${claim}）的資料可能遺失：無法讀取它的回收政策`,
+  "warn.claimDataUnlessRetained": (claim: string) =>
+    `磁碟區（${claim}）的資料會一起刪除；叢集設定成保留時，管理員還能救回`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} 仍在讀取 ${name}：少了它，新的副本無法啟動`,
   "warn.claimStillMounted": (name: string, names: string) =>

@@ -736,3 +736,20 @@ export function failureOf(t: Translate, locale: Locale, problem: Schemas["Proble
     review: problem.kind === "conflict" || problem.kind === "plan-expired",
   }
 }
+
+/** What becomes of a deleted claim's data. Its PersistentVolume and StorageClass are cluster-wide,
+ * so a developer often cannot read the reclaim policy: then it says what usually happens, deleted
+ * (the default of a dynamically provisioned volume), and when an admin can still recover it. */
+export function claimDataSaid(
+  t: Translate,
+  warning: Extract<Schemas["PlanWarning"], { code: "claimDataMayBeLost" }>,
+): { text: string; kept: boolean } {
+  switch (warning.reclaimPolicy) {
+    case "Retain":
+      return { text: t("warn.claimDataRetained", warning.claim, warning.volume ?? ""), kept: true }
+    case "Delete":
+      return { text: t("warn.claimDataDeleted", warning.claim, warning.volume ?? ""), kept: false }
+    default:
+      return { text: t("warn.claimDataUnlessRetained", warning.claim), kept: false }
+  }
+}
