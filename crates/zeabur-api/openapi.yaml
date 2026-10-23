@@ -3909,6 +3909,12 @@ components:
             type: string
             enum:
             - delete
+          owned:
+            type: boolean
+            description: |-
+              For a workload: also delete what the service made and nothing else uses, its
+              Kubernetes Services, routes, ConfigMaps, Secrets and claims (see the `owned` module).
+              What it uses that stays is named in a warning with the reason.
           resource:
             $ref: "#/components/schemas/ResourceRef"
             description: The object's resource.
@@ -6834,6 +6840,15 @@ components:
         policy:
           type: string
           description: "The `keel.sh/policy` annotation: `force`, `major`, `minor`, `patch`, `all`, `glob:…`."
+    KeptReason:
+      type: string
+      description: Why an object a deleted service uses or made stays.
+      enum:
+      - shared
+      - routesElsewhere
+      - controlled
+      - managed
+      - notMade
     Kind:
       type: string
       description: |-
@@ -8995,6 +9010,59 @@ components:
             - string
             - "null"
             description: Its PersistentVolume; absent while the claim is not bound.
+      - type: object
+        description: |-
+          Deleting the service also deletes these objects: it made them and nothing else uses
+          them.
+        required:
+        - target
+        - objects
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - deletesOwned
+          objects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ObjectName"
+            description: The objects, in the order they are deleted.
+          target:
+            $ref: "#/components/schemas/ObjectName"
+            description: The deleted workload.
+      - type: object
+        description: The deleted service uses or made this object, and it stays.
+        required:
+        - object
+        - reason
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - stays
+          object:
+            $ref: "#/components/schemas/ObjectName"
+            description: The object.
+          owner:
+            oneOf:
+            - $ref: "#/components/schemas/ObjectName"
+              description: Its controller, for `controlled`.
+            - type: "null"
+          reason:
+            $ref: "#/components/schemas/KeptReason"
+            description: Why.
+          tool:
+            oneOf:
+            - $ref: "#/components/schemas/Tool"
+              description: The tool that manages it, for `managed`.
+            - type: "null"
+          workloads:
+            type: array
+            items:
+              $ref: "#/components/schemas/WorkloadRef"
+            description: The other workloads that use it, for `shared`.
       - type: object
         description: |-
           These workloads still use the deleted ConfigMap, Secret or claim: their pods that start

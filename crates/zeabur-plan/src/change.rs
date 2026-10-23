@@ -257,6 +257,11 @@ pub enum Change {
         /// for an object it just created; when left out, the version the plan reads.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         resource_version: Option<String>,
+        /// For a workload: also delete what the service made and nothing else uses, its
+        /// Kubernetes Services, routes, ConfigMaps, Secrets and claims (see the `owned` module).
+        /// What it uses that stays is named in a warning with the reason.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        owned: bool,
     },
     /// Make the namespace a project: add the label `zeabur.com/project: "true"` to the
     /// Namespace, and nothing else. Refused for the namespaces Kubernetes keeps for itself
@@ -678,6 +683,32 @@ pub enum Warning {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         reclaim_policy: Option<String>,
     },
+    /// Deleting the service also deletes these objects: it made them and nothing else uses
+    /// them.
+    #[serde(rename_all = "camelCase")]
+    DeletesOwned {
+        /// The deleted workload.
+        target: ObjectName,
+        /// The objects, in the order they are deleted.
+        objects: Vec<ObjectName>,
+    },
+    /// The deleted service uses or made this object, and it stays.
+    #[serde(rename_all = "camelCase")]
+    Stays {
+        /// The object.
+        object: ObjectName,
+        /// Why.
+        reason: KeptReason,
+        /// The other workloads that use it, for `shared`.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        workloads: Vec<WorkloadRef>,
+        /// Its controller, for `controlled`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        owner: Option<ObjectName>,
+        /// The tool that manages it, for `managed`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tool: Option<zeabur_kernel::tool::Tool>,
+    },
     /// These workloads still use the deleted ConfigMap, Secret or claim: their pods that start
     /// after it is gone fail to start, and a claim in use stays until no pod uses it
     /// [k8s-in-use].
@@ -805,6 +836,24 @@ pub struct Plan {
     pub impact: Vec<WorkloadRef>,
     /// What to know before applying.
     pub warnings: Vec<Warning>,
+}
+
+/// Why an object a deleted service uses or made stays.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum KeptReason {
+    /// Other workloads use it too.
+    Shared,
+    /// It is a route that also leads to a Kubernetes Service that stays.
+    RoutesElsewhere,
+    /// Another controller owns it, such as a database operator its Secrets.
+    Controlled,
+    /// Helm, Argo CD or Flux manages it.
+    Managed,
+    /// The service uses it but did not make it: neither the service's label nor a name Zeabur
+    /// gives it.
+    NotMade,
 }
 
 /// Why a new hostname gets no HTTPS.

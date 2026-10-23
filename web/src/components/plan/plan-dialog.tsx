@@ -589,6 +589,19 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
         warning.dependents.map((d) => `${d.kind} ${d.name}`),
         (list) => t("warn.deletesDependents", warning.target.name, list),
       )
+    case "deletesOwned":
+      return namedText(
+        t,
+        warning.objects.map((o) => `${o.kind} ${o.name}`),
+        (list) => t("warn.deletesOwned", warning.target.name, list),
+      )
+    case "stays":
+      return { text: staysSentence(t, warning), health: "idle" }
+    case "claimDataMayBeLost":
+      return {
+        text: warningSentence(t, warning),
+        health: warning.reclaimPolicy === "Retain" ? "warn" : "fail",
+      }
     case "rightsMissing":
       return namedText(
         t,
@@ -609,9 +622,35 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
   }
 }
 
+function staysSentence(
+  t: Translate,
+  warning: Extract<Schemas["PlanWarning"], { code: "stays" }>,
+): string {
+  const object = `${warning.object.kind} ${warning.object.name}`
+  switch (warning.reason) {
+    case "shared":
+      return t("warn.staysShared", object, names(t, warning.workloads ?? []))
+    case "routesElsewhere":
+      return t("warn.staysRoute", object)
+    case "controlled":
+      return t(
+        "warn.staysControlled",
+        object,
+        warning.owner ? `${warning.owner.kind} ${warning.owner.name}` : "",
+      )
+    case "managed":
+      return t("warn.staysManaged", object, warning.tool ?? "")
+    case "notMade":
+      return t("warn.staysNotMade", object)
+  }
+}
+
 function warningSentence(
   t: Translate,
-  warning: Exclude<Schemas["PlanWarning"], { code: "deletesDependents" | "rightsMissing" }>,
+  warning: Exclude<
+    Schemas["PlanWarning"],
+    { code: "deletesDependents" | "deletesOwned" | "stays" | "rightsMissing" }
+  >,
 ): string {
   switch (warning.code) {
     case "restartNeeded":

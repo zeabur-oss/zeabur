@@ -34,6 +34,11 @@
 //! - **A ConfigMap, Secret or claim in use**: the plan names the workloads that still read or mount
 //!   it, whose new pods will not start without it; a claim a pod uses stays until no pod does
 //!   [k8s-in-use].
+//! - **A service** (a workload deleted with `owned`) takes with it what it made and nothing else
+//!   uses: its Kubernetes Services, routes, ConfigMaps, Secrets and claims, each deleted the same
+//!   way after it (the `owned` module). The workload is not counted among the users of what goes
+//!   with it.
+//! - **An Ingress** takes the Certificates cert-manager made for it, and their Secrets.
 //! - **A NetworkPolicy**'s effect on reachability (which services are no longer isolated, which
 //!   connections open) is added by the API, which composes the network-policy module.
 //!
@@ -278,7 +283,11 @@ impl Planner<'_> {
                 self.delete_data_claim(claim)?;
             }
         }
-        let users = self.users(&this);
+        let users: Vec<WorkloadRef> = self
+            .users(&this)
+            .into_iter()
+            .filter(|w| !self.deletes(w.kind.as_str(), &w.name))
+            .collect();
         if !users.is_empty() {
             self.impact.extend(users.iter().cloned());
             self.warnings.push(Warning::StillUsed {
@@ -287,6 +296,71 @@ impl Planner<'_> {
             });
         }
         Ok(())
+    }
+
+    /// A `delete` change: the object, then, with `owned`, what the service made.
+    pub(crate) fn delete_change(
+        &mut self,
+        resource: &ResourceRef,
+        name: &str,
+        expected: Option<&str>,
+        owned: bool,
+    ) -> Result<(), PlanError> {
+        self.delete(resource, name, expected)?;
+        if owned {
+            self.delete_owned(resource, name)?;
+        }
+        Ok(())
+    }
+
+    /// Deletes what workload `name` made and nothing else uses, after the workload itself, and
+    /// names what it uses that stays (the `owned` module).
+    fn delete_owned(&mut self, resource: &ResourceRef, name: &str) -> Result<(), PlanError> {
+        let Some(workload) = crate::owned::workload_of(resource, name) else {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "owned_of_workload_only",
+                format!(
+                    "Only a workload's objects are deleted with it; {} is not one.",
+                    resource.resource
+                ),
+            ));
+        };
+        let owned = crate::owned::owned(self.input.snapshot, self.input.http_routes, &workload);
+        let at = self.warnings.len();
+        let mut objects = Vec::new();
+        for (resource, object) in &owned.deleted {
+            let kind = kind_of(resource);
+            if self.deletes(kind, object) {
+                continue;
+            }
+            self.delete(resource, object, None)?;
+            objects.push(ObjectName {
+                kind: kind.to_owned(),
+                name: object.clone(),
+            });
+        }
+        if !objects.is_empty() {
+            self.warnings.insert(
+                at,
+                Warning::DeletesOwned {
+                    target: ObjectName {
+                        kind: workload.kind.as_str().to_owned(),
+                        name: name.to_owned(),
+                    },
+                    objects,
+                },
+            );
+        }
+        self.warnings.extend(owned.stays);
+        Ok(())
+    }
+
+    /// Whether the plan deletes object `kind` `name`.
+    fn deletes(&self, kind: &str, name: &str) -> bool {
+        self.objects
+            .iter()
+            .any(|w| w.deleted && w.target.kind == kind && w.target.name == name)
     }
 
     fn claim_data_warning(&mut self, claim: &ObjectName) {
@@ -343,8 +417,9 @@ impl Planner<'_> {
         Ok(())
     }
 
-    /// The object to delete, as read; a ConfigMap or Secret the person may list but not get
-    /// comes from the project's objects (a Secret without its values).
+    /// The object to delete, as read; one the plan did not read alone (a ConfigMap or Secret
+    /// the person may list but not get, or what a service is deleted with) comes from the
+    /// project's objects (a Secret without its values).
     fn deletable_object(&self, resource: &ResourceRef, name: &str) -> Result<Value, PlanError> {
         let fetched = self
             .input
@@ -360,6 +435,34 @@ impl Planner<'_> {
                 .map(to_json)
                 .transpose()?,
             ("", "secrets") => self.input.snapshot.secret(name).map(to_json).transpose()?,
+            ("", "services") => self
+                .input
+                .snapshot
+                .services
+                .iter()
+                .find(|o| o.metadata.name.as_deref() == Some(name))
+                .map(to_json)
+                .transpose()?,
+            ("networking.k8s.io", "ingresses") => self
+                .input
+                .snapshot
+                .ingresses
+                .iter()
+                .find(|o| o.metadata.name.as_deref() == Some(name))
+                .map(to_json)
+                .transpose()?,
+            ("", "persistentvolumeclaims") => self
+                .input
+                .snapshot
+                .persistent_volume_claim(name)
+                .map(to_json)
+                .transpose()?,
+            ("gateway.networking.k8s.io", "httproutes") => self
+                .input
+                .http_routes
+                .iter()
+                .find(|o| o.pointer("/metadata/name").and_then(Value::as_str) == Some(name))
+                .cloned(),
             _ => None,
         };
         // A listed object is typed, so it carries its `apiVersion` and `kind`: k8s-openapi writes
@@ -439,6 +542,9 @@ impl Planner<'_> {
             seen.extend(level.iter().cloned());
             out.extend(found.into_iter().map(|n| n.name.clone()));
         }
+        if target.kind == "Ingress" {
+            out.extend(certificates_of(snapshot, &target.name));
+        }
         if let Some(workload) = workloads(snapshot)
             .into_iter()
             .find(|w| w.kind().as_str() == target.kind && w.name() == target.name)
@@ -492,6 +598,53 @@ impl Planner<'_> {
             }
         }
         out.into_iter().collect()
+    }
+}
+
+/// The Certificates cert-manager made for Ingress `name` and their Secrets: a Certificate is
+/// named after the Secret the Ingress lists and owned by the Ingress, and the Secret is owned
+/// by its Certificate when cert-manager runs with `--enable-certificate-owner-ref`, as the
+/// catalog installs it [cert-manager-ingress].
+///
+/// [cert-manager-ingress]: https://cert-manager.io/docs/usage/ingress/
+fn certificates_of(snapshot: &Snapshot, name: &str) -> Vec<ObjectName> {
+    let listed = snapshot
+        .ingresses
+        .iter()
+        .filter(|i| i.metadata.name.as_deref() == Some(name))
+        .flat_map(|i| i.spec.iter().flat_map(|s| s.tls.iter().flatten()))
+        .filter_map(|t| t.secret_name.as_deref());
+    let mut out = Vec::new();
+    for secret_name in listed {
+        let Some(secret) = snapshot.secret(secret_name) else {
+            continue;
+        };
+        let Some(certificate) =
+            zeabur_adapters::controller_of(&secret.metadata).filter(|c| c.kind == "Certificate")
+        else {
+            continue;
+        };
+        out.push(ObjectName {
+            kind: "Certificate".to_owned(),
+            name: certificate.name.clone(),
+        });
+        out.push(ObjectName {
+            kind: "Secret".to_owned(),
+            name: secret_name.to_owned(),
+        });
+    }
+    out
+}
+
+/// The kind of the objects of `resource`, for the kinds a service is deleted with.
+fn kind_of(resource: &ResourceRef) -> &'static str {
+    match resource.resource.as_str() {
+        "services" => "Service",
+        "ingresses" => "Ingress",
+        "httproutes" => "HTTPRoute",
+        "configmaps" => "ConfigMap",
+        "secrets" => "Secret",
+        _ => "PersistentVolumeClaim",
     }
 }
 

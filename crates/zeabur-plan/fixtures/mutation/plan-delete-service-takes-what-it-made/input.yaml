@@ -1,0 +1,256 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  uid: d-web
+  resourceVersion: "41"
+  labels: {app.kubernetes.io/name: web}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: web}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: web}
+    spec:
+      imagePullSecrets:
+        - name: web-registry
+      containers:
+        - name: web
+          image: example/web:3.0
+          envFrom:
+            - secretRef: {name: web-env}
+            - secretRef: {name: shared-env}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: pg-app, key: uri}
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: config, mountPath: /etc/shared}
+            - {name: notes, mountPath: /etc/notes}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: web-data}
+        - name: config
+          configMap: {name: shared-config}
+        - name: notes
+          configMap: {name: web-notes}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+  uid: d-api
+  resourceVersion: "12"
+  labels: {app.kubernetes.io/name: api}
+spec:
+  selector:
+    matchLabels: {app.kubernetes.io/name: api}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: api}
+    spec:
+      containers:
+        - name: api
+          image: example/api:1.0
+          envFrom:
+            - secretRef: {name: shared-env}
+      volumes:
+        - name: config
+          configMap: {name: shared-config}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: demo
+  uid: s-web
+  resourceVersion: "42"
+  labels: {app.kubernetes.io/name: web}
+spec:
+  selector: {app.kubernetes.io/name: web}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: demo
+  uid: s-api
+  resourceVersion: "13"
+  labels: {app.kubernetes.io/name: api}
+spec:
+  selector: {app.kubernetes.io/name: api}
+  ports:
+    - {name: http, port: 80, targetPort: 80}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  namespace: demo
+  uid: i-web
+  resourceVersion: "43"
+  labels: {app.kubernetes.io/name: web}
+  annotations: {cert-manager.io/cluster-issuer: letsencrypt}
+spec:
+  tls:
+    - hosts: [web.example.test]
+      secretName: web-tls
+  rules:
+    - host: web.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: web, port: {number: 8080}}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-shop-example-test
+  namespace: demo
+  uid: i-shop
+  resourceVersion: "44"
+spec:
+  tls:
+    - hosts: [shop.example.test]
+      secretName: web-shop-example-test-tls
+  rules:
+    - host: shop.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: web, port: {number: 8080}}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: demo
+  uid: i-api
+  resourceVersion: "14"
+  labels: {app.kubernetes.io/name: api}
+spec:
+  rules:
+    - host: api.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: api, port: {number: 80}}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-env
+  namespace: demo
+  uid: sec-web-env
+  resourceVersion: "45"
+  labels: {app.kubernetes.io/name: web}
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-registry
+  namespace: demo
+  uid: sec-web-registry
+  resourceVersion: "46"
+  labels: {app.kubernetes.io/name: web}
+type: kubernetes.io/dockerconfigjson
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-git
+  namespace: demo
+  uid: sec-web-git
+  resourceVersion: "47"
+  labels: {app.kubernetes.io/name: web, builder.zeabur.com/git-credentials: "true"}
+type: kubernetes.io/basic-auth
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-tls
+  namespace: demo
+  uid: sec-web-tls
+  resourceVersion: "48"
+  ownerReferences:
+    - {apiVersion: cert-manager.io/v1, kind: Certificate, name: web-tls, uid: cert-web-tls, controller: true}
+type: kubernetes.io/tls
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-shop-example-test-tls
+  namespace: demo
+  uid: sec-shop-tls
+  resourceVersion: "49"
+type: kubernetes.io/tls
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: shared-env
+  namespace: demo
+  uid: sec-shared
+  resourceVersion: "50"
+  labels: {app.kubernetes.io/name: web}
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pg-app
+  namespace: demo
+  uid: sec-pg-app
+  resourceVersion: "51"
+  ownerReferences:
+    - {apiVersion: postgresql.cnpg.io/v1, kind: Cluster, name: pg, uid: c-pg, controller: true}
+type: kubernetes.io/basic-auth
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shared-config
+  namespace: demo
+  uid: cm-shared
+  resourceVersion: "52"
+data: {LOG_LEVEL: info}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-notes
+  namespace: demo
+  uid: cm-notes
+  resourceVersion: "53"
+data: {NOTE: hello}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-root-ca.crt
+  namespace: demo
+  uid: cm-root
+  resourceVersion: "1"
+data: {ca.crt: x}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-data
+  namespace: demo
+  uid: pvc-web-data
+  resourceVersion: "54"
+  labels: {app.kubernetes.io/name: web}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}
+  volumeName: pv-web-data

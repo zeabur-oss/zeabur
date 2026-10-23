@@ -9,6 +9,7 @@ pub mod edit;
 pub mod fields;
 pub mod json;
 pub mod node_shell;
+mod owned;
 mod plan;
 mod project;
 pub mod releases;
@@ -19,12 +20,13 @@ pub mod terminal;
 pub mod token;
 
 pub use change::{
-    Change, ConnectionRef, DataEdit, DataKind, FieldOwners, HttpOnlyReason, ObjectName, Plan,
-    PlanRequest, PlannedObject, ProbeKind, RouteKind, RouteRef, Target, Warning, Write,
+    Change, ConnectionRef, DataEdit, DataKind, FieldOwners, HttpOnlyReason, KeptReason, ObjectName,
+    Plan, PlanRequest, PlannedObject, ProbeKind, RouteKind, RouteRef, Target, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};
 pub use delete::{MONGODB_CLAIMS_FINALIZER, mongodb_data_claims};
+pub use owned::{Owned, SERVICE_LABEL, owned, workload_of};
 pub use plan::{
     CREATABLE, ErrorKind, Fetched, Input, PlanError, RESTARTED_AT, StorageClassInfo, creatable,
     plan, plan_with, versions,

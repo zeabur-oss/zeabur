@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: demo
+  uid: ss-db
+  resourceVersion: "7"
+spec:
+  serviceName: backend
+  selector:
+    matchLabels: {app: db}
+  template:
+    metadata:
+      labels: {app: db, tier: backend}
+    spec:
+      containers:
+        - name: db
+          image: example/db:1
+          envFrom:
+            - secretRef: {name: common}
+            - secretRef: {name: db-chart}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 1Gi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache
+  namespace: demo
+  uid: d-cache
+  resourceVersion: "8"
+spec:
+  selector:
+    matchLabels: {app: cache}
+  template:
+    metadata:
+      labels: {app: cache, tier: backend}
+    spec:
+      containers:
+        - name: cache
+          image: example/cache:1
+          envFrom:
+            - secretRef: {name: common}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: demo
+  uid: s-backend
+  resourceVersion: "9"
+  labels: {app.kubernetes.io/name: db}
+spec:
+  selector: {tier: backend}
+  ports:
+    - {port: 5432}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: db-db-example-test
+  namespace: demo
+  uid: i-db
+  resourceVersion: "10"
+spec:
+  rules:
+    - host: db.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: backend, port: {number: 5432}}}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: common
+  namespace: demo
+  uid: sec-common
+  resourceVersion: "11"
+  labels: {app.kubernetes.io/name: db}
+type: Opaque
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-chart
+  namespace: demo
+  uid: sec-chart
+  resourceVersion: "12"
+  labels: {app.kubernetes.io/name: db, app.kubernetes.io/managed-by: Helm}
+  annotations: {meta.helm.sh/release-name: db}
+type: Opaque
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-db-0
+  namespace: demo
+  uid: pvc-data-db-0
+  resourceVersion: "13"
+  labels: {app: db}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}

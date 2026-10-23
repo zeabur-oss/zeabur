@@ -1386,6 +1386,13 @@ export const zhCN: Messages = {
     `${workload} 有多个副本：ReadWriteOncePod 卷一次只能给一个副本使用`,
   "warn.deletesDependents": (owner: string, names: string) =>
     `也会删除 ${owner} 拥有的对象：${names}`,
+  "warn.deletesOwned": (owner: string, names: string) =>
+    `也会删除 ${owner} 创建、且没有其他服务使用的对象：${names}`,
+  "warn.staysShared": (object: string, names: string) => `保留 ${object}：${names} 也在使用`,
+  "warn.staysRoute": (object: string) => `保留 ${object}：它也指向一个会保留的 Service`,
+  "warn.staysControlled": (object: string, owner: string) => `保留 ${object}：它属于 ${owner}`,
+  "warn.staysManaged": (object: string, tool: string) => `保留 ${object}：由 ${tool} 管理`,
+  "warn.staysNotMade": (object: string) => `保留 ${object}：服务有用到它，但它不是跟服务一起创建的`,
   "warn.podReplaced": (pod: string, owner: string) => `${owner} 会启动新的副本替代 ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>
     `集群会删除卷（${claim}）的数据：它的 PersistentVolume ${volume} 回收策略是 Delete`,

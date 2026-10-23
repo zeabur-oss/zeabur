@@ -1,0 +1,38 @@
+{
+  "impact": [{"kind": "Deployment", "name": "web"}],
+  "objects": [
+    {"target": {"kind": "Deployment", "name": "web"}, "write": {"type": "delete", "uid": "d-web", "resourceVersion": "41"}},
+    {"target": {"kind": "Ingress", "name": "web"}, "write": {"type": "delete", "uid": "i-web", "resourceVersion": "43"}},
+    {"target": {"kind": "Ingress", "name": "web-shop-example-test"}, "write": {"type": "delete", "uid": "i-shop", "resourceVersion": "44"}},
+    {"target": {"kind": "Service", "name": "web"}, "write": {"type": "delete", "uid": "s-web", "resourceVersion": "42"}},
+    {"target": {"kind": "Secret", "name": "web-env"}, "write": {"type": "delete", "uid": "sec-web-env", "resourceVersion": "45"}},
+    {"target": {"kind": "Secret", "name": "web-registry"}, "write": {"type": "delete", "uid": "sec-web-registry", "resourceVersion": "46"}},
+    {"target": {"kind": "Secret", "name": "web-shop-example-test-tls"}, "write": {"type": "delete", "uid": "sec-shop-tls", "resourceVersion": "49"}},
+    {"target": {"kind": "PersistentVolumeClaim", "name": "web-data"}, "write": {"type": "delete", "uid": "pvc-web-data", "resourceVersion": "54"}}
+  ],
+  "warnings": [
+    {
+      "code": "deletesOwned",
+      "target": {"kind": "Deployment", "name": "web"},
+      "objects": [
+        {"kind": "Ingress", "name": "web"},
+        {"kind": "Ingress", "name": "web-shop-example-test"},
+        {"kind": "Service", "name": "web"},
+        {"kind": "Secret", "name": "web-env"},
+        {"kind": "Secret", "name": "web-registry"},
+        {"kind": "Secret", "name": "web-shop-example-test-tls"},
+        {"kind": "PersistentVolumeClaim", "name": "web-data"}
+      ]
+    },
+    {
+      "code": "deletesDependents",
+      "target": {"kind": "Ingress", "name": "web"},
+      "dependents": [{"kind": "Certificate", "name": "web-tls"}, {"kind": "Secret", "name": "web-tls"}]
+    },
+    {"code": "claimDataMayBeLost", "claim": "web-data", "volume": "pv-web-data", "reclaimPolicy": "Delete"},
+    {"code": "stays", "object": {"kind": "ConfigMap", "name": "shared-config"}, "reason": "shared", "workloads": [{"kind": "Deployment", "name": "api"}]},
+    {"code": "stays", "object": {"kind": "ConfigMap", "name": "web-notes"}, "reason": "notMade", "workloads": null, "owner": null},
+    {"code": "stays", "object": {"kind": "Secret", "name": "shared-env"}, "reason": "shared", "workloads": [{"kind": "Deployment", "name": "api"}]},
+    {"code": "stays", "object": {"kind": "Secret", "name": "pg-app"}, "reason": "controlled", "owner": {"kind": "Cluster", "name": "pg"}}
+  ]
+}

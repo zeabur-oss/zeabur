@@ -42,19 +42,38 @@ pub(super) async fn replica_sets_of_deleted(
 }
 
 /// The reclaim policy of the PersistentVolume of each claim `request` deletes, a deleted MongoDB's
-/// data claims included (`objects` holds the MongoDB as read), as the person may read it
-/// [k8s-reclaim]; a volume they may not read is left out, and the plan says the
-/// policy is unknown.
+/// data claims and a deleted service's claims included (`objects` holds the MongoDB as read), as
+/// the person may read it [k8s-reclaim]; a volume they may not read is left out, and the plan says
+/// the policy is unknown.
 ///
 /// [k8s-reclaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
 pub(super) async fn reclaim_policies(
     cluster: &dyn Cluster,
     request: &PlanRequest,
     snapshot: &zeabur_graph::Snapshot,
+    http_routes: &[serde_json::Value],
     objects: &[Fetched],
 ) -> Result<BTreeMap<String, String>, ApiError> {
     let volumes = zeabur_kube::ResourceRef::new("", "v1", "persistentvolumes", "PersistentVolume");
     let mut claims: Vec<String> = Vec::new();
+    for change in &request.changes {
+        if let Change::Delete {
+            resource,
+            name,
+            owned: true,
+            ..
+        } = change
+            && let Some(workload) = zeabur_plan::workload_of(resource, name)
+        {
+            claims.extend(
+                zeabur_plan::owned(snapshot, http_routes, &workload)
+                    .deleted
+                    .into_iter()
+                    .filter(|(r, _)| r.resource == "persistentvolumeclaims")
+                    .map(|(_, claim)| claim),
+            );
+        }
+    }
     for (resource, name) in deleted(request) {
         if resource.group.is_empty() && resource.resource == "persistentvolumeclaims" {
             claims.push(name.to_owned());

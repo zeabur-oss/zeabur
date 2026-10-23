@@ -207,7 +207,7 @@ function ServiceView({
     deleter.plan({
       title: t("title.delete", service.kind, service.name),
       changes: [
-        { op: "delete", resource: workloadResource[service.kind], name: service.name },
+        { op: "delete", resource: workloadResource[service.kind], name: service.name, owned: true },
         ...buildDeletions(service, data.services, serviceBuilds.builds.data?.builds ?? []),
       ],
     })

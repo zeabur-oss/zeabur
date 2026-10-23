@@ -1388,6 +1388,13 @@ export const zhTW: Messages = {
     `${workload} 有多個副本：ReadWriteOncePod 磁碟區一次只能給一個副本使用`,
   "warn.deletesDependents": (owner: string, names: string) =>
     `也會刪除 ${owner} 擁有的物件：${names}`,
+  "warn.deletesOwned": (owner: string, names: string) =>
+    `也會刪除 ${owner} 建立、且沒有其他服務使用的物件：${names}`,
+  "warn.staysShared": (object: string, names: string) => `保留 ${object}：${names} 也在使用`,
+  "warn.staysRoute": (object: string) => `保留 ${object}：它也導向一個會保留的 Service`,
+  "warn.staysControlled": (object: string, owner: string) => `保留 ${object}：它屬於 ${owner}`,
+  "warn.staysManaged": (object: string, tool: string) => `保留 ${object}：由 ${tool} 管理`,
+  "warn.staysNotMade": (object: string) => `保留 ${object}：服務有用到它，但它不是跟服務一起建立的`,
   "warn.podReplaced": (pod: string, owner: string) => `${owner} 會啟動新的副本取代 ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>
     `叢集會刪除磁碟區（${claim}）的資料：它的 PersistentVolume ${volume} 回收政策是 Delete`,
