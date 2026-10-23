@@ -308,11 +308,20 @@ function Overview({ project, database }: { project: string; database: Database }
   )
 }
 
+/** Rows in a card, labels and values at the summary card's facts' x. */
+function Rows({ children }: { children: ReactNode }) {
+  return (
+    <dl className="flex flex-col divide-y divide-main rounded-lg border border-main bg-card">
+      {children}
+    </dl>
+  )
+}
+
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-x-4 gap-y-0.5 border-t border-rule py-2.5 sm:flex-row sm:items-center">
-      <dt className="shrink-0 type-meta text-muted-foreground sm:w-40">{label}</dt>
-      <dd className="flex min-h-8 min-w-0 items-center gap-2">{children}</dd>
+    <div className="flex min-w-0 items-center gap-x-4 px-4 py-1.5">
+      <dt className="w-fact-label shrink-0 type-meta text-muted-foreground">{label}</dt>
+      <dd className="flex min-h-8 min-w-0 flex-1 items-center gap-2">{children}</dd>
     </div>
   )
 }
@@ -354,7 +363,7 @@ function Connection({ project, database }: { project: string; database: Database
     <Section id="db-connect" title={t("db.connect")}>
       <ConnectServices project={project} database={database} />
       <p className="type-meta text-muted-foreground">{t("db.inCluster")}</p>
-      <dl className="flex flex-col">
+      <Rows>
         <Row label={t("db.host")}>
           {mono(c.host)}
           <CopyText value={() => c.host} label={t("common.copy")} />
@@ -396,7 +405,7 @@ function Connection({ project, database }: { project: string; database: Database
           {mono(uri)}
           <CopyText value={() => uri} label={t("common.copy")} />
         </Row>
-      </dl>
+      </Rows>
       {secret?.problem ? <Problem problem={secret.problem} what={c.secret} /> : null}
     </Section>
   )
@@ -519,7 +528,7 @@ function Target({ database }: { database: Database }) {
         : store.retention
   return (
     <Section id="db-target" title={t("db.backup.destination")}>
-      <dl className="flex flex-col">
+      <Rows>
         <Row label={t("db.backup.destination")}>
           <span className="min-w-0 truncate type-mono" translate="no">
             {store.destination ?? store.name}
@@ -551,7 +560,7 @@ function Target({ database }: { database: Database }) {
           )}
         </Row>
         <Row label={t("db.backup.retention")}>{retention}</Row>
-      </dl>
+      </Rows>
       {database.engine === "postgresql" ? (
         <p className="type-meta text-muted-foreground">{t("db.backup.walNote")}</p>
       ) : null}
