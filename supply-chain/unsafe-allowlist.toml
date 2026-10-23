@@ -1103,8 +1103,9 @@ reason = "Enabled by rmcp's default `futures` features (and unified with kube's 
 approved = "2026-10-16"
 
 # --- Basic auth on a domain (bcrypt): Traefik reads a bcrypt htpasswd hash.
+# Approved by Yi-Jyun Pan.
 [[crate]]
 name = "byteorder"
 kind = "unsafe"
-reason = "Under blowfish, for bcrypt. Reads and writes integers of fixed byte order through pointer copies over slices it has checked for length"
-approved = "pending"
+reason = "bcrypt -> blowfish, for the Traefik basic-auth hashes. Reads and writes integers of fixed byte order through pointer copies over slices it has checked for length"
+approved = "2026-10-23"
