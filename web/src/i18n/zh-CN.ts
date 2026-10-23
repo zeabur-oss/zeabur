@@ -3038,6 +3038,8 @@ export const zhCN: Messages = {
   "warn.permanentRedirect": (host) =>
     `浏览器会记住永久重定向：之后即使取消，来过的访客清除缓存前，打开 ${host} 仍会转到旧的域名`,
   "warn.publicDatabase": (name) => `${name} 是数据库：面对互联网，只剩它自己的密码保护数据`,
+  "warn.publicPortBlocked": (port, policies) =>
+    `端口 ${port} 不会有响应：连接规则 ${policies} 不让互联网的连接进来。请在规则里加一条 ingress 规则，允许端口 ${port} 的 ipBlock 0.0.0.0/0`,
   "warn.publicPort": (port) =>
     `端口 ${port} 开在节点地址上；如果节点上有其他程序占用这个号码，它会一直等不到地址`,
   "warn.passwordOverHttp": (hosts) => `${hosts} 没有 HTTPS，密码会以明文在网络上传输`,

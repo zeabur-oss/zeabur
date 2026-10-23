@@ -487,6 +487,11 @@ const sentenced = new Set<Schemas["PlanWarning"]["code"]>([
   "toolsPodReused",
 ])
 
+/** A database open to the internet is worse than the other high risks. */
+function alertVariant(warnings: Schemas["PlanWarning"][]): "destructive" | "warn" {
+  return warnings.some((w) => w.code === "publicPort" && w.dataStore) ? "destructive" : "warn"
+}
+
 function PlanBody({
   plan,
   skipped,
@@ -516,14 +521,7 @@ function PlanBody({
   return (
     <div className="flex flex-col gap-3">
       {alerted && first ? (
-        <Alert
-          variant={
-            plan.warnings.some((w) => w.code === "publicPort" && w.dataStore)
-              ? "destructive"
-              : "warn"
-          }
-          role="note"
-        >
+        <Alert variant={alertVariant(plan.warnings)} role="note">
           <WarningFillIcon aria-hidden="true" />
           <AlertDescription>
             {first}
@@ -683,14 +681,23 @@ function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
       const cut = bounded(t, all).rest.length > 0
       return { text: warningSentence(t, warning), names: cut ? all : undefined }
     }
-    case "httpsCertificate":
-      return { text: warningSentence(t, warning), health: "ok" }
-    case "taskImageCopied":
-      return { text: warningSentence(t, warning), health: "idle" }
-    case "publicPort":
-      return { text: warningSentence(t, warning), health: warning.dataStore ? "fail" : "warn" }
     default:
-      return { text: warningSentence(t, warning) }
+      return { text: warningSentence(t, warning), health: healthOf(warning) }
+  }
+}
+
+function healthOf(warning: Schemas["PlanWarning"]): Said["health"] {
+  switch (warning.code) {
+    case "httpsCertificate":
+      return "ok"
+    case "taskImageCopied":
+      return "idle"
+    case "publicPort":
+      return warning.dataStore ? "fail" : "warn"
+    case "publicPortBlocked":
+      return "fail"
+    default:
+      return undefined
   }
 }
 
@@ -785,6 +792,31 @@ function warningSentence(
         .join(" ")
     case "toolsCredentialExposed":
       return t("warn.toolsCredentialExposed", warning.namespace)
+    case "debugContainerStays":
+    case "debugContainerReused":
+    case "toolsPod":
+    case "toolsPodReused":
+      return ""
+    default:
+      return accessWarning(t, warning)
+  }
+}
+
+function accessWarning(
+  t: Translate,
+  warning: Extract<
+    Schemas["PlanWarning"],
+    {
+      code:
+        | "taskImageCopied"
+        | "permanentRedirect"
+        | "passwordOverHttp"
+        | "publicPort"
+        | "publicPortBlocked"
+    }
+  >,
+): string {
+  switch (warning.code) {
     case "taskImageCopied":
       return t("warn.taskImageCopied", warning.from.name, warning.image)
     case "permanentRedirect":
@@ -795,10 +827,7 @@ function warningSentence(
       return warning.dataStore
         ? t("warn.publicDatabase", warning.workload.name)
         : t("warn.publicPort", warning.port)
-    case "debugContainerStays":
-    case "debugContainerReused":
-    case "toolsPod":
-    case "toolsPodReused":
-      return ""
+    case "publicPortBlocked":
+      return t("warn.publicPortBlocked", warning.port, t("common.list", warning.policies))
   }
 }

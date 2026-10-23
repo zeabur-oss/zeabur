@@ -5729,6 +5729,19 @@ export interface components {
         }
       | {
           /** @enum {string} */
+          code: "publicPortBlocked"
+          /** @description The policies that isolate its pods, by name. */
+          policies: string[]
+          /**
+           * Format: int32
+           * @description The port.
+           */
+          port: number
+          /** @description The workload. */
+          workload: components["schemas"]["WorkloadRef"]
+        }
+      | {
+          /** @enum {string} */
           code: "passwordOverHttp"
           /** @description Its hostnames without HTTPS. */
           hostnames: string[]

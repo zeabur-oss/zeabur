@@ -3331,6 +3331,8 @@ export const en = {
     `Browsers remember a permanent redirect: if you remove it later, earlier visitors of ${host} still go to the old target until they clear their cache`,
   "warn.publicDatabase": (name: string) =>
     `${name} is a database: its own password is all that protects its data from the internet`,
+  "warn.publicPortBlocked": (port: number, policies: string) =>
+    `Port ${port} will not answer: connection rule ${policies} lets nothing from the internet in. Add an ingress rule with ipBlock 0.0.0.0/0 on port ${port} to it`,
   "warn.publicPort": (port: number) =>
     `Port ${port} opens on the nodes' addresses. If another program there uses it, the port waits without an address`,
   "warn.passwordOverHttp": (hosts: string) =>

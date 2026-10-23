@@ -787,6 +787,60 @@ mod tests {
     /// `resourceVersion` the creation returned, then the plan says which service it no longer
     /// isolates, and the apply sends a `DELETE` whose preconditions are the policy's `uid` and
     /// that version, dry run first; the policy is gone.
+    /// Given a policy that isolates web and admits only the project's pods, when a port of web is
+    /// opened to the internet, then the plan warns that the policy keeps the port from answering.
+    #[tokio::test]
+    async fn a_public_port_behind_an_isolating_policy_is_warned_about() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.served.push(zeabur_kube::ServedResource::readable(
+                "networking.k8s.io",
+                "v1",
+                "networkpolicies",
+                "NetworkPolicy",
+                true,
+            ));
+        });
+        let app = app(&cluster);
+        let objects = [
+            json!({"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+                "metadata": {"name": "web-isolate"},
+                "spec": {"podSelector": {"matchLabels": {"app": "web"}},
+                    "ingress": [{"from": [{"podSelector": {}}]}]}}),
+            json!({"apiVersion": "v1", "kind": "Service", "metadata": {"name": "web"},
+                "spec": {"selector": {"app": "web"}, "ports": [{"port": 8080}]}}),
+        ];
+        for object in objects {
+            let planned = plan(
+                &app,
+                &json!({"changes": [{"op": "create", "object": object}]}),
+            )
+            .await;
+            let (status, applied) = post(
+                app.clone(),
+                "/api/v1/projects/shop/apply",
+                &json!({"token": planned["token"]}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{applied}");
+        }
+        let planned = plan(
+            &app,
+            &json!({"changes": [{"op": "publicPort",
+                "workload": {"kind": "Deployment", "name": "web"}, "service": "web", "port": 8080}]}),
+        )
+        .await;
+        assert_eq!(
+            planned["warnings"],
+            json!([
+                {"code": "publicPort", "workload": {"kind": "Deployment", "name": "web"}, "port": 8080},
+                {"code": "publicPortBlocked", "workload": {"kind": "Deployment", "name": "web"},
+                    "port": 8080, "policies": ["web-isolate"]}
+            ]),
+            "{planned}"
+        );
+    }
+
     #[tokio::test]
     async fn a_created_policy_is_undone_by_deleting_the_version_it_was_created_at() {
         let cluster = cluster();

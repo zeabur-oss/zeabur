@@ -3045,6 +3045,8 @@ export const zhTW: Messages = {
   "warn.permanentRedirect": (host) =>
     `瀏覽器會記住永久轉址：之後就算取消，來過的訪客清除快取前，開啟 ${host} 仍會轉到舊的網域`,
   "warn.publicDatabase": (name) => `${name} 是資料庫：面對網際網路，只剩它自己的密碼保護資料`,
+  "warn.publicPortBlocked": (port, policies) =>
+    `連接埠 ${port} 不會有回應：連線規則 ${policies} 不讓網際網路的連線進來。請在規則裡加一條 ingress 規則，允許連接埠 ${port} 的 ipBlock 0.0.0.0/0`,
   "warn.publicPort": (port) =>
     `連接埠 ${port} 開在節點位址上；如果節點上有其他程式占用這個號碼，它會一直等不到位址`,
   "warn.passwordOverHttp": (hosts) => `${hosts} 沒有 HTTPS，密碼會以明文在網路上傳送`,

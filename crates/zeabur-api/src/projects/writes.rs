@@ -48,7 +48,10 @@ use std::sync::Arc;
 use axum::Json;
 use axum::extract::{Path, State};
 use creations::{refuse_existing, served_kinds};
-use deletions::{deleted, network_policies_opened, reclaim_policies, replica_sets_of_deleted};
+use deletions::{
+    deleted, network_policies_opened, public_ports_blocked, reclaim_policies,
+    replica_sets_of_deleted,
+};
 use edits::edited_objects;
 use namespace::compute_namespace;
 use refusals::refused;
@@ -230,6 +233,8 @@ async fn compute(
         .collect();
     plan.warnings
         .extend(network_policies_opened(cluster, &snapshot, &policies).await?);
+    plan.warnings
+        .extend(public_ports_blocked(cluster, &snapshot, request).await?);
     Ok(plan)
 }
 

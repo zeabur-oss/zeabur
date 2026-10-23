@@ -642,6 +642,56 @@ pub fn opened_without(input: Input<'_>, name: &str) -> Opened {
     opened
 }
 
+/// The policies that keep every connection from the internet off service `id`.
+///
+/// `None` when no policy isolates it for ingress, when one may admit such a connection, or when
+/// `id` is not a service of `input`.
+///
+/// A connection to a `LoadBalancer` port reaches the pod from an address outside the cluster's
+/// pods, or, through k3s `ServiceLB`, from a pod in `kube-system` [k3s-servicelb]. Thus a rule
+/// admits it when it has no `from`, an `ipBlock` peer, or a peer that may be a pod of
+/// `kube-system`. A rule that names ports may admit it, so it counts as admitting.
+///
+/// [k3s-servicelb]: https://docs.k3s.io/networking/networking-services#how-the-service-lb-works
+#[must_use]
+pub fn blocks_internet(input: Input<'_>, id: &str) -> Option<Vec<String>> {
+    let workload = input.workloads.iter().find(|w| w.id == id)?;
+    let policies = policies(input.policies);
+    let kube_system = Pod {
+        namespace: "kube-system",
+        labels: None,
+    };
+    let isolating: Vec<&NetworkPolicy> = policies
+        .iter()
+        .filter(|p| types(p).0 && selects(p, &workload.labels))
+        .collect();
+    if isolating.is_empty() {
+        return None;
+    }
+    let admits = isolating.iter().any(|policy| {
+        policy
+            .spec
+            .iter()
+            .flat_map(|s| s.ingress.iter().flatten())
+            .any(|rule| {
+                rule.from
+                    .as_ref()
+                    .is_none_or(|from| from.is_empty() || from.iter().any(|p| p.ip_block.is_some()))
+                    || peer_access(rule.from.as_ref(), input.namespace, &kube_system)
+                        != Access::Blocked
+            })
+    });
+    if admits {
+        return None;
+    }
+    Some(
+        isolating
+            .iter()
+            .filter_map(|p| p.metadata.name.clone())
+            .collect(),
+    )
+}
+
 /// The connections the policies block: what the "blocked connection" gap reports.
 #[must_use]
 pub fn blocked_connections(reachability: &Reachability) -> Vec<&Connection> {
@@ -1106,6 +1156,36 @@ mod tests {
 
     fn object(value: Value) -> DynamicObject {
         serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn the_isolate_preset_blocks_the_internet_until_a_rule_admits_an_ip_block() {
+        let workloads = [workload("db", "db")];
+        let isolate = presets("shop", &workloads[0], &workloads)
+            .into_iter()
+            .find(|p| p.kind == "isolate")
+            .unwrap();
+        let open = object(json!({
+            "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+            "metadata": {"name": "db-from-internet", "namespace": "shop"},
+            "spec": {"podSelector": {"matchLabels": {"app": "db"}},
+                "ingress": [{"from": [{"ipBlock": {"cidr": "0.0.0.0/0"}}], "ports": [{"port": 5432}]}]}
+        }));
+        let blocked = |policies: &[DynamicObject]| {
+            blocks_internet(
+                Input {
+                    namespace: "shop",
+                    workloads: &workloads,
+                    policies,
+                    connections: &[],
+                },
+                &workloads[0].id,
+            )
+        };
+        let isolated = [object(isolate.object)];
+        assert_eq!(blocked(&isolated).map(|p| p.len()), Some(1));
+        assert_eq!(blocked(&[isolated[0].clone(), open]), None);
+        assert_eq!(blocked(&[]), None);
     }
 
     #[test]

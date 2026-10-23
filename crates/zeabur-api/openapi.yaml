@@ -10997,6 +10997,33 @@ components:
             description: The workload.
       - type: object
         description: |-
+          A NetworkPolicy isolates the workload's pods and admits nothing from the internet, so the
+          new public port does not answer until a policy admits it (added by the API, which reads the
+          project's policies).
+        required:
+        - workload
+        - port
+        - policies
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - publicPortBlocked
+          policies:
+            type: array
+            items:
+              type: string
+            description: The policies that isolate its pods, by name.
+          port:
+            type: integer
+            format: int32
+            description: The port.
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
           The Ingress serves these hostnames over plain HTTP, so the password crosses the network
           readable on them.
         required:

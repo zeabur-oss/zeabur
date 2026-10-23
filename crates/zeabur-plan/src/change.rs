@@ -1014,6 +1014,18 @@ pub enum Warning {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         data_store: Option<zeabur_model::DataStore>,
     },
+    /// A NetworkPolicy isolates the workload's pods and admits nothing from the internet, so the
+    /// new public port does not answer until a policy admits it (added by the API, which reads the
+    /// project's policies).
+    #[serde(rename_all = "camelCase")]
+    PublicPortBlocked {
+        /// The workload.
+        workload: WorkloadRef,
+        /// The port.
+        port: i32,
+        /// The policies that isolate its pods, by name.
+        policies: Vec<String>,
+    },
     /// The Ingress serves these hostnames over plain HTTP, so the password crosses the network
     /// readable on them.
     #[serde(rename_all = "camelCase")]

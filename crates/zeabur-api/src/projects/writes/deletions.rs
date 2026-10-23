@@ -174,3 +174,52 @@ pub(super) async fn network_policies_opened(
     }
     Ok(out)
 }
+
+/// A warning for each port the request opens to the internet whose pods a NetworkPolicy keeps
+/// the internet from (`zeabur_modules::network_policy::blocks_internet`). The policies are read
+/// once, and only when the request opens a port; none when they could not be read.
+pub(super) async fn public_ports_blocked(
+    cluster: &dyn Cluster,
+    snapshot: &zeabur_graph::Snapshot,
+    request: &PlanRequest,
+) -> Result<Vec<zeabur_plan::Warning>, ApiError> {
+    let opened: Vec<&zeabur_plan::PublicPortChange> = request
+        .changes
+        .iter()
+        .filter_map(|c| {
+            if let Change::PublicPort(public) = c
+                && !public.remove
+            {
+                Some(public)
+            } else {
+                None
+            }
+        })
+        .collect();
+    if opened.is_empty() {
+        return Ok(Vec::new());
+    }
+    let project = zeabur_graph::project(snapshot);
+    let mut unreadable = Vec::new();
+    let Some(facts) =
+        crate::projects::network_policy::read(cluster, snapshot, &project, &mut unreadable).await?
+    else {
+        return Ok(Vec::new());
+    };
+    Ok(opened
+        .into_iter()
+        .filter_map(|public| {
+            let id = zeabur_model::id::service(
+                &snapshot.namespace,
+                public.workload.kind,
+                &public.workload.name,
+            );
+            let policies = zeabur_modules::network_policy::blocks_internet(facts.input(), &id)?;
+            Some(zeabur_plan::Warning::PublicPortBlocked {
+                workload: public.workload.clone(),
+                port: public.port,
+                policies,
+            })
+        })
+        .collect())
+}
