@@ -6,11 +6,13 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import { clusterQuery, creatableQuery, projectQuery } from "@/api/queries"
 import { FormField, quantity } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { PortNoteHint, useImageInspection } from "@/components/add/image-port"
 import { usePlanStep } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { handOff } from "@/lib/adding"
 import { serviceLink } from "@/lib/place"
 import { toYaml } from "@/lib/yaml-out"
+import { portNote, shownPort } from "@/model/image-ports"
 import {
   createImageService,
   hasTag,
@@ -93,7 +95,15 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const more = (patch: Partial<Extras>) => setExtras((e) => ({ ...e, ...patch }))
 
   const name = named ? form.name : form.image.trim() ? nameFromImage(form.image, taken) : ""
-  const port = options.port ? form.port.trim() : ""
+  const [typedPort, setTypedPort] = useState<string>()
+  const login = options.secrets && extras.registry ? registryLogin(extras) : undefined
+  const inspection = useImageInspection(project, options.port, {
+    image: form.image.trim(),
+    registry: login,
+  }).data
+  const portValue = shownPort(typedPort, inspection)
+  const note = portNote(portValue, inspection)
+  const port = options.port ? portValue.trim() : ""
   const publicUrl = options.publicUrl && port !== "" && form.publicUrl
   const host = hosted ? form.host : suggestedHost(name, project, domains.suffix)
   const env = parseEnv(extras.env)
@@ -221,16 +231,22 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
           {options.port ? (
             <FormField
               label={t("add.field.port")}
-              hint={t("add.portHint")}
+              hint={
+                note ? (
+                  <PortNoteHint note={note} port={portValue} onPick={setTypedPort} />
+                ) : (
+                  t("add.portHint")
+                )
+              }
               errors={shown(problems.port, () => t("add.problem.port.invalid"))}
             >
               <Input
                 size="sm"
                 mono
                 inputMode="numeric"
-                value={form.port}
+                value={portValue}
                 placeholder="8080"
-                onChange={(event) => set({ port: event.target.value })}
+                onChange={(event) => setTypedPort(event.target.value)}
               />
             </FormField>
           ) : null}
@@ -441,6 +457,11 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
     </PlanDrawer>
   )
 }
+
+const registryLogin = ({ server, username, password }: Extras) =>
+  [server, username, password].every((v) => v.trim() !== "")
+    ? { server: server.trim(), username, password }
+    : undefined
 
 function Toggle({
   id,

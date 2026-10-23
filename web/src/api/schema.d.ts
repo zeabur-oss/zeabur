@@ -849,6 +849,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/images/inspect": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Reads an image's configuration from its registry: the ports it declares and the user it runs
+     *     as. A registry that cannot be read answers `200` with `unreadable`.
+     */
+    post: operations["inspectImage"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/incidents": {
     parameters: {
       query?: never
@@ -3002,6 +3022,16 @@ export interface components {
      * @enum {string}
      */
     ExitReason: "command-not-found" | "failed"
+    /** @description A port the image declares (`EXPOSE`). */
+    ExposedPort: {
+      /**
+       * Format: int32
+       * @description The port number.
+       */
+      port: number
+      /** @description `TCP`, `UDP` or `SCTP`, as a container port names it. */
+      protocol: string
+    }
     /** @description A readiness check that failed. */
     FailingCheck: {
       /** @description The check's name (`etcd`, `poststarthook/crd-informer-synced`). */
@@ -3366,6 +3396,30 @@ export interface components {
      * @enum {string}
      */
     HttpOnlyReason: "noIssuer" | "certificatesElsewhere"
+    /** @description What the image's configuration says, or why it could not be read. */
+    ImageInspection: {
+      /**
+       * @description The registry's or the network's own words for `unreadable`, or the platforms the image
+       *     has for `no-platform`.
+       */
+      detail?: string | null
+      /** @description The digest of the platform's manifest. */
+      digest?: string | null
+      /** @description `config.ExposedPorts`, sorted by port; empty when the image declares none or was not read. */
+      exposedPorts: components["schemas"]["ExposedPort"][]
+      /** @description The image as asked. */
+      image: string
+      /** @description The platform read, such as `linux/amd64`; absent when nothing was read. */
+      platform?: string | null
+      /** @description Whether the image runs as root: no user, `root` or UID `0`. */
+      runsAsRoot?: boolean | null
+      unreadable?: components["schemas"]["UnreadableReason"] | null
+      /**
+       * @description `config.User` as written (`nginx`, `1000:1000`); empty when the image sets none and runs
+       *     as root. Kubernetes' `runAsNonRoot` cannot check a name, only a number.
+       */
+      user?: string | null
+    }
     /**
      * @description One `envFrom` entry. Imports are not flattened into variables: a ConfigMap's twelve keys
      *     shown as twelve entries would misrepresent what the workload says.
@@ -3433,6 +3487,17 @@ export interface components {
      * @enum {string}
      */
     InferredFrom: "appProtocol" | "name" | "protocol"
+    /** @description The image to read. */
+    InspectRequest: {
+      /** @description The image reference, as a container's `image`. */
+      image: string
+      /**
+       * @description A `kubernetes.io/dockerconfigjson` or `kubernetes.io/dockercfg` Secret of the project,
+       *     read as the person, whose entry for the image's registry is used.
+       */
+      pullSecret?: string | null
+      registry?: components["schemas"]["RegistryLogin"] | null
+    }
     /** @description How to install one component, and the profile that fits this cluster. */
     InstallAnswer: components["schemas"]["InstallGuide"] & {
       /**
@@ -5464,6 +5529,15 @@ export interface components {
           /** @description The tool. */
           tool: components["schemas"]["Tool"]
         }
+    /** @description Credentials for the image's registry. */
+    RegistryLogin: {
+      /** @description The password or access token. */
+      password: string
+      /** @description The registry, such as `ghcr.io`; used only when it is the image's. */
+      server: string
+      /** @description The username. */
+      username: string
+    }
     /** @description One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`. */
     Release: {
       /** @description The last day it gets patches. */
@@ -6240,6 +6314,17 @@ export interface components {
      * @enum {string}
      */
     UnavailableLog: "no-previous-run" | "not-started" | "removed"
+    /**
+     * @description Why an image's configuration could not be read.
+     * @enum {string}
+     */
+    UnreadableReason:
+      | "not-found"
+      | "unauthorized"
+      | "no-platform"
+      | "credentials"
+      | "unreachable"
+      | "unexpected"
     /** @description A kind the person could not read, and kube-apiserver's answer. */
     UnreadableView: {
       /** @description kube-apiserver's answer. */
@@ -8087,6 +8172,40 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  inspectImage: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["InspectRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ImageInspection"]
+        }
+      }
+      400: {
         headers: {
           [name: string]: unknown
         }

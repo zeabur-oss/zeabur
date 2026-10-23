@@ -691,3 +691,20 @@ export const metricsStoreQuery = queryOptions({
   queryFn: async ({ signal }) =>
     unwrap(await api.GET("/api/v1/settings/metrics-store", { signal })),
 })
+
+/** What an image declares (its ports, its user), read from its registry; `unreadable` says why
+ * not. A `POST`, since it may carry registry credentials. */
+export const imageInspectionQuery = (project: string, body: Schemas["InspectRequest"]) =>
+  queryOptions({
+    queryKey: ["project", project, "image", body],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.POST("/api/v1/projects/{project}/images/inspect", {
+          params: { path: { project } },
+          body,
+          signal,
+        }),
+      ),
+    staleTime: 5 * 60_000,
+    retry: false,
+  })

@@ -2015,6 +2015,18 @@ export const en = {
   "add.field.image": "Image",
   "add.field.port": "Port",
   "add.portHint": "Leave empty for a background service that takes no connections.",
+  "add.portRead": (port: string) => `Port ${port}, read from the image.`,
+  "add.portChoose": (ports: string, port: string) =>
+    `The image declares ports ${ports}; using ${port}.`,
+  "add.portDeclared": (ports: string) => `The image declares ${ports}.`,
+  "add.portUse": (port: string) => `Use ${port}`,
+  "add.portNoPlatform": (platforms: string) =>
+    `The image is built only for ${platforms}, which this cluster's nodes can't run.`,
+  "add.portUnreadable.not-found":
+    "The registry has no such image. Check the name and tag, or enter the port.",
+  "add.portUnreadable.unauthorized":
+    "The registry needs credentials to read this image. Add them under Private registry, or enter the port.",
+  "add.portUnreadable.other": "Unable to read the image's port. Enter the port it listens on.",
   "add.noTag": "Without a tag the registry serves latest, which is hard to track later.",
   "add.problem.image.empty": "Enter the image to run.",
   "add.problem.image.invalid": "An image reference, like ghcr.io/acme/web:1.4.",
