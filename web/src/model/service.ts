@@ -129,6 +129,7 @@ export type ReasonWord =
   | "evicted"
   | "releaseStuck"
   | "gaveUp"
+  | "buildFailed"
 
 const reasonWords: Record<string, ReasonWord> = {
   CrashLoopBackOff: "crashing",
@@ -146,6 +147,7 @@ const reasonWords: Record<string, ReasonWord> = {
   Evicted: "evicted",
   ProgressDeadlineExceeded: "releaseStuck",
   BackoffLimitExceeded: "gaveUp",
+  BuildFailed: "buildFailed",
 }
 
 /** `Error` is how a run ended: a task's run failed, a service that keeps restarting crashed. */
