@@ -133,7 +133,8 @@ export function Histogram({
   height?: string
   labels?: [string, string]
 }) {
-  const max = Math.max(1, ...buckets.map((b) => b.warning + b.normal))
+  // A few lines a bucket stay short bars, so a quiet, even stream does not fill the chart.
+  const max = Math.max(4, ...buckets.map((b) => b.warning + b.normal))
   return (
     <div className={cn("flex flex-col gap-1", className)} aria-hidden="true">
       <div className={cn("flex items-end gap-0.75", height)}>
