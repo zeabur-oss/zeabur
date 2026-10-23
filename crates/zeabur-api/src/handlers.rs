@@ -35,6 +35,8 @@ pub struct AppState {
     pub sign_in: Arc<dyn crate::account::SignInPage>,
     /// Zeabur Proxy, for log history (see [`crate::services::logs`]); `None` without one.
     pub log_proxy: Option<Arc<dyn crate::services::logs::LogProxy>>,
+    /// Reads images' configurations from their registries (see [`crate::images`]).
+    pub images: Arc<crate::images::Inspector>,
 }
 
 impl std::fmt::Debug for AppState {

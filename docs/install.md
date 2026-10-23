@@ -221,6 +221,17 @@ own; Zeabur reads the CA when it starts. The proxy's NetworkPolicy lets it reach
 VictoriaLogs and kube-apiserver only. Where kube-apiserver is not at the addresses of
 `default/kubernetes`, list its CIDRs in `proxy.apiServer`.
 
+### Reading images' ports
+
+When someone deploys an image, Zeabur reads its configuration from the registry to suggest the
+port it listens on (its `EXPOSE`), so the server needs outbound HTTPS to the registries people
+use. Public images on Docker Hub, GitHub and Quay are read without credentials; private ones
+with the credentials typed in the form or the project's pull Secret, read as the person. The
+server never connects to loopback, link-local (such as a cloud's metadata service), multicast
+or unspecified addresses. Zeabur Builder's registry (`builds.registry`) is read over plain HTTP;
+every other registry over HTTPS. When the registry cannot be reached the form says so and keeps
+the port empty.
+
 ### An image of your own
 
 To run a build of your own instead, build the image on a Linux machine with Docker

@@ -24,6 +24,13 @@ the in-cluster server a client per request, tests an in-memory cluster.
   (`unreadable`) instead of silently showing less.
 - **Nothing is cached.** Every answer is `Cache-Control: no-store` (`cache`): answers are read as
   the person and carry values such as environment variables. Clients poll rather than watch.
+- **Images are read from their registries, never on Zeabur's own rights.** `images/inspect`
+  reads an image's declared ports and user anonymously, with credentials the person typed, or
+  with a pull Secret read as the person; credentials go only to the registry they name. The
+  in-cluster server does not connect to loopback, link-local, multicast or unspecified
+  addresses, which its pod may reach and a person may not. Answers are kept in memory for five
+  minutes, per credential; a registry that cannot be read is an answer (`unreadable`), so
+  deploying never waits on one.
 - **Secret values are an explicit action.** Listings never include them; `POST
   …/secrets/{name}/reveal` returns them with `Cache-Control: no-store`, and nothing logs or keeps
   them. Granting `list` on Secrets already lets a person read their values [k8s-secrets], so the
