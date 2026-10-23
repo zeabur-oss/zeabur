@@ -10,13 +10,13 @@
 //!    or, with no reason given, five restarts or more; or, ready or not, a container that has
 //!    restarted three times or more and whose last run lasted less than ten minutes and ended with
 //!    a non-zero exit code less than ten minutes ago (see [`CRASH_WINDOW`]). While a Deployment's
-//!    update is under way or stuck and some replica is ready, that failure only warns: the release
-//!    before still serves, and the word is `RolloutStuck`.
-//! 2. Otherwise the workload's [`Phase`] decides: `Failed` fails, `Degraded` warns, `Progressing`
-//!    progresses (a Deployment past its progress deadline with a ready replica warns, as
-//!    `RolloutStuck`), and `Paused`, `Suspended`, `Completed` and `Unknown` are idle.
-//! 3. A `Running` workload is idle when it is a CronJob or scaled to zero, warns when fewer
-//!    replicas are ready than wanted, and is ok otherwise.
+//!    update is under way or stuck and some replica is ready, the word is `RolloutStuck`: the
+//!    release before still serves, but the failing pod does not recover on its own.
+//! 2. Otherwise the workload's [`Phase`] decides: `Failed` and `Degraded` (no replica ready) fail,
+//!    `Progressing` progresses (a Deployment past its progress deadline with a ready replica
+//!    warns, as `RolloutStuck`), and `Paused`, `Suspended`, `Completed` and `Unknown` are idle.
+//! 3. A `Running` workload is idle when it is a CronJob or scaled to zero, fails when no replica
+//!    is ready, warns when fewer replicas are ready than wanted, and is ok otherwise.
 //!
 //! A pod fails by rule 1, is idle once it succeeded, ok when ready, and warns otherwise.
 
@@ -135,10 +135,10 @@ pub fn status(
         && matches!(workload.phase, Phase::Progressing | Phase::Failed)
         && workload.replicas.is_some_and(|r| r.ready > 0);
     if let Some(pod) = pods.iter().find(|pod| failing(pod, now)) {
-        let (health, word) = if serving {
-            (Health::Warn, StatusWord::RolloutStuck)
+        let word = if serving {
+            StatusWord::RolloutStuck
         } else {
-            (Health::Fail, StatusWord::Failing)
+            StatusWord::Failing
         };
         return ServiceStatus {
             reason: pod.reason.clone().or_else(|| {
@@ -147,13 +147,13 @@ pub fn status(
                     .filter(|status| crashed_recently(status, now))
                     .find_map(|status| status.last_termination.as_ref()?.reason.clone())
             }),
-            ..of(health, word)
+            ..of(Health::Fail, word)
         };
     }
     match workload.phase {
         Phase::Failed if serving => of(Health::Warn, StatusWord::RolloutStuck),
         Phase::Failed => of(Health::Fail, StatusWord::Failed),
-        Phase::Degraded => of(Health::Warn, StatusWord::Degraded),
+        Phase::Degraded => of(Health::Fail, StatusWord::Degraded),
         Phase::Progressing => of(Health::Progress, StatusWord::RollingOut),
         Phase::Paused | Phase::Suspended => of(Health::Idle, StatusWord::Paused),
         Phase::Completed => of(Health::Idle, StatusWord::Completed),
@@ -163,6 +163,7 @@ pub fn status(
             (_, Some(replicas)) if replicas.desired == 0 => {
                 of(Health::Idle, StatusWord::ScaledToZero)
             }
+            (_, Some(replicas)) if replicas.ready <= 0 => of(Health::Fail, StatusWord::Degraded),
             (_, Some(replicas)) if replicas.ready < replicas.desired => {
                 of(Health::Warn, StatusWord::Degraded)
             }
@@ -248,7 +249,8 @@ mod tests {
             health(&service(Deployment, Phase::Progressing, None)),
             Progress
         );
-        assert_eq!(health(&service(Deployment, Phase::Degraded, None)), Warn);
+        assert_eq!(health(&running(Some((0, 2)))), Fail);
+        assert_eq!(health(&service(Deployment, Phase::Degraded, None)), Fail);
         assert_eq!(health(&service(Deployment, Phase::Failed, None)), Fail);
         assert_eq!(
             health(&service(Deployment, Phase::Failed, Some((0, 1)))),
@@ -303,7 +305,7 @@ mod tests {
     }
 
     #[test]
-    fn a_stuck_update_warns_while_the_release_before_serves() {
+    fn a_stuck_update_warns_while_the_release_before_serves_but_a_crash_loop_fails() {
         let stuck = service(WorkloadKind::Deployment, Phase::Failed, Some((1, 1)));
         let read = status(&stuck.workload, &stuck.pods, None);
         assert_eq!(read.health, Health::Warn);
@@ -312,7 +314,7 @@ mod tests {
         let mut crashing = service(WorkloadKind::Deployment, Phase::Progressing, Some((1, 1)));
         crashing.pods = vec![pod("Running", false, 3, Some("CrashLoopBackOff"))];
         let read = status(&crashing.workload, &crashing.pods, None);
-        assert_eq!(read.health, Health::Warn);
+        assert_eq!(read.health, Health::Fail);
         assert_eq!(read.word, StatusWord::RolloutStuck);
         assert_eq!(read.reason.as_deref(), Some("CrashLoopBackOff"));
 

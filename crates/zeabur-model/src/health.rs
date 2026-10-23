@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum Health {
-    /// A pod keeps failing, or the workload failed.
+    /// A pod keeps failing, the workload failed, or no replica is ready.
     Fail,
-    /// Fewer replicas are ready than wanted, with no rollout under way.
+    /// Some replica serves, but fewer than wanted with no rollout under way, or an update is stuck.
     Warn,
     /// A rollout is under way.
     Progress,
