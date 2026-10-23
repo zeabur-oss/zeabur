@@ -513,7 +513,7 @@ export const en = {
   "join.byInstaller": "Created by zeabur-installer",
   "join.revoke": "Revoke",
   "join.revokeTitle": (id: string) => `Revoke join token ${id}`,
-  "join.revokeNote": "Nodes that already joined stay. No new machine can join with this token.",
+  "join.revokeNote": "Nodes that already joined stay, and reconnect after a restart with their own certificate. No new machine can join with this token, and a node deleted from the cluster needs a new token to join again.",
 
   // Projects
   "projects.title": "Projects",
