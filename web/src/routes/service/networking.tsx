@@ -7,6 +7,7 @@ import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretDownIcon from "~icons/ph/caret-down"
 import ClockIcon from "~icons/ph/clock"
 import GlobeIcon from "~icons/ph/globe"
+import HourglassMediumIcon from "~icons/ph/hourglass-medium-bold"
 import LockSimpleBoldIcon from "~icons/ph/lock-simple-bold"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import PlugsIcon from "~icons/ph/plugs"
@@ -321,7 +322,7 @@ export function NetworkingTab({
                               ) : (
                                 <span className="flex min-w-0 flex-col gap-1 max-sm:w-full">
                                   <span className="flex min-w-0 items-center gap-2">
-                                    <Host route={route} />
+                                    <Host route={route} certificate={check?.certificate} />
                                     <span className="flex-1 sm:hidden" />
                                     {route.host && !route.https ? (
                                       <span className="shrink-0 type-meta text-warn-strong">
@@ -728,15 +729,37 @@ function PendingHost({
   )
 }
 
-function Host({ route }: { route: PublicRoute }) {
+function Host({
+  route,
+  certificate,
+}: {
+  route: PublicRoute
+  certificate?: Schemas["DomainCheck"]["certificate"]
+}) {
   const t = useT()
-  const Icon = route.https ? LockSimpleBoldIcon : GlobeIcon
+  const issuing = route.https && certificate?.state === "issuing"
+  const failed = route.https && certificate?.state === "failed"
+  const Icon = issuing ? HourglassMediumIcon : route.https ? LockSimpleBoldIcon : GlobeIcon
+  const tone = issuing
+    ? "text-progress"
+    : failed
+      ? "text-fail"
+      : route.https
+        ? "text-ok"
+        : "text-muted-foreground"
+  const label = issuing
+    ? t("domain.pending")
+    : failed
+      ? t("domain.cert.failed")
+      : route.https
+        ? t("domains.https")
+        : undefined
   return (
     <span className="flex min-w-0 items-center gap-1.5 text-xs">
       <Icon
-        className={`size-3.5 shrink-0 ${route.https ? "text-ok" : "text-muted-foreground"}`}
-        aria-label={route.https ? t("domains.https") : undefined}
-        aria-hidden={route.https ? undefined : true}
+        className={`size-3.5 shrink-0 ${tone}`}
+        aria-label={label}
+        aria-hidden={label ? undefined : true}
       />
       {route.host ? (
         <>
