@@ -172,6 +172,17 @@ describe("nodes, worst first", () => {
     expect(worstNode([node("a"), node("b", { cordoned: true })])).toBeUndefined()
     expect(worstNode([node("a"), node("b", { disk: disk(40, 3) }), node("c")])?.node.name).toBe("b")
   })
+
+  test("a cordoned node says whether replicas are leaving, all are gone, or they stay", () => {
+    const kind = (more: Partial<Schemas["NodeView"]>) =>
+      nodeIssues(node("a", { cordoned: true, ...more })).map((i) => [i.kind, i.health])
+    expect(kind({ movablePods: 3, leavingPods: 1 })).toEqual([["draining", "progress"]])
+    expect(kind({ movablePods: 0, leavingPods: 0 })).toEqual([["maintenance", "idle"]])
+    expect(kind({ movablePods: 3, leavingPods: 0 })).toEqual([["cordoned", "warn"]])
+    expect(kind({})).toEqual([["cordoned", "warn"]])
+    expect(kind({ movablePods: 0 }).map(([k]) => k)).not.toContain("cordoned")
+    expect(isProblem({ kind: "maintenance", node: "a", health: "idle" })).toBe(false)
+  })
 })
 
 const volume = (claim: string, capacity: number, available: number): Schemas["VolumeUsage"] => ({

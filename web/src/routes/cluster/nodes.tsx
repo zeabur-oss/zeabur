@@ -32,6 +32,7 @@ import type { Health } from "@/model/service"
 import { useIssueText } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { AddNodeButton, JoinTokens } from "@/routes/cluster/add-node"
+import { NodeMenu } from "@/routes/cluster/node-maintenance"
 import { PoliciesBehind } from "@/routes/cluster/node-policies"
 import { Section } from "@/routes/cluster/section"
 import { Meter } from "@zeabur/design-system/components/meter"
@@ -446,7 +447,9 @@ function NodeRow({
         <StatusPill key={issue.kind} health={issue.health} size="sm">
           {issue.kind === "notReady" && node.ready === "Unknown"
             ? t("status.unknown")
-            : t(`node.word.${issue.kind}`)}
+            : issue.kind === "draining"
+              ? t("node.drainingLeft", node.movablePods ?? 0)
+              : t(`node.word.${issue.kind}`)}
         </StatusPill>
       ))
     )
@@ -500,6 +503,7 @@ function NodeRow({
           </Tooltip>
         </div>
       </div>
+      <NodeMenu node={node} className="-my-1 self-start sm:order-last sm:self-center" />
       <div className="grid w-full grid-cols-2 items-start gap-x-4 gap-y-3 sm:flex sm:w-auto sm:gap-x-6">
         {gauge(
           t("cluster.cpu"),

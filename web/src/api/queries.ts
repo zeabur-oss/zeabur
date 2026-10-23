@@ -288,6 +288,40 @@ export async function applyNodePolicies(token: string) {
   return unwrap(await api.POST("/api/v1/cluster/node-policies/apply", { body: { token } }))
 }
 
+/** What stopping scheduling, resuming it or maintenance does to a node's pods; writes nothing. */
+export async function planNodeMaintenance(
+  node: string,
+  action: Schemas["NodeAction"],
+  signal?: AbortSignal,
+) {
+  return unwrap(
+    await api.POST("/api/v1/cluster/nodes/{node}/maintenance/plan", {
+      params: { path: { node } },
+      body: { action },
+      signal,
+    }),
+  )
+}
+
+export async function applyNodeMaintenance(node: string, body: Schemas["MaintenanceApply"]) {
+  return unwrap(
+    await api.POST("/api/v1/cluster/nodes/{node}/maintenance/apply", {
+      params: { path: { node } },
+      body,
+    }),
+  )
+}
+
+/** One more eviction pass of a maintenance plan. */
+export async function evictNodePods(node: string, body: Schemas["MaintenanceApply"]) {
+  return unwrap(
+    await api.POST("/api/v1/cluster/nodes/{node}/maintenance/evict", {
+      params: { path: { node } },
+      body,
+    }),
+  )
+}
+
 /** `kinds` are `<group>/<resource>` (`core` for the core group); `all` reads every kind controllers
  * do not generate. */
 export interface ObjectsRead {

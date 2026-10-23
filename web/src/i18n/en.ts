@@ -412,6 +412,17 @@ export const en = {
   "node.word.cordoned": "Cordoned",
   "node.word.reservedMemory": "Memory over-reserved",
   "node.word.reservedCpu": "CPU over-reserved",
+  "node.word.maintenance": "In maintenance",
+  "node.word.draining": "Moving replicas off",
+  "node.drainingLeft": (n: number) => `Moving replicas off, ${n} left`,
+  "node.maintenance": (n: number, node: string) =>
+    n === 1 ? `${node} is in maintenance` : `${n} nodes are in maintenance`,
+  "node.maintenance.why": "No replica is left to move there, and no new one is placed there.",
+  "node.maintenance.fix": "When the maintenance is done, resume scheduling from the node's menu.",
+  "node.draining": (n: number, node: string) =>
+    n === 1 ? `Replicas are moving off ${node}` : `Replicas are moving off ${n} nodes`,
+  "node.draining.why": "Their services start them again on other nodes.",
+  "node.draining.fix": "Open maintenance mode from the node's menu to see what is left.",
   "cluster.cores": (n: string) => `${n} cores`,
   "cluster.requestedOf": (requested: string, allocatable: string) =>
     `${requested} of ${allocatable} reserved`,
@@ -521,6 +532,73 @@ export const en = {
   "policies.planTitle": "Update network policies",
   "policies.planLine": (namespaces: string[]) =>
     `Lets every node's traffic into ${new Intl.ListFormat("en").format(namespaces)}. Only the node addresses in each policy change.`,
+  "maint.actions": (node: string) => `Actions for ${node}`,
+  "maint.cordon": "Stop scheduling",
+  "maint.drain": "Maintenance mode",
+  "maint.continue": "Continue maintenance",
+  "maint.uncordon": "Resume scheduling",
+  "maint.title.cordon": (node: string) => `Stop scheduling on ${node}`,
+  "maint.title.drain": (node: string) => `Maintenance mode for ${node}`,
+  "maint.title.uncordon": (node: string) => `Resume scheduling on ${node}`,
+  "maint.lead.cordon": (node: string) =>
+    `New replicas will not be placed on ${node}. The ones running there keep running.`,
+  "maint.lead.uncordon": (node: string) => `New replicas can be placed on ${node} again.`,
+  "maint.lead.drain": (node: string, n: number) =>
+    n === 0
+      ? `${node} stops taking new replicas. No replica needs to move.`
+      : `${node} stops taking new replicas, then ${n === 1 ? "1 replica moves" : `${n} replicas move`} to other nodes.`,
+  "maint.lead.continue": (node: string, n: number) =>
+    n === 0
+      ? `Nothing on ${node} is left to move.`
+      : `${n === 1 ? "1 replica is" : `${n} replicas are`} still on ${node} and move to other nodes.`,
+  "maint.amounts": (cpu: string, memory: string) => `${cpu} and ${memory} of memory`,
+  "maint.fits": (needs: string, room: string) =>
+    `The other nodes have room: the replicas ask for ${needs}, and ${room} is free.`,
+  "maint.short": (n: number) =>
+    `The other nodes lack room for ${n === 1 ? "1 replica" : `${n} replicas`}. They wait until room frees up or a node is added.`,
+  "maint.shortDetail": (needs: string, room: string) =>
+    `They ask for ${needs}; the other nodes have ${room} free.`,
+  "maint.unknownRoom":
+    "Zeabur could not read every pod, so it cannot tell whether the other nodes have room.",
+  "maint.noOther": "No other node takes new replicas. The moved replicas wait until one does.",
+  "maint.controlPlane": (node: string) =>
+    `${node} runs the cluster's control plane. Its components stay on it, but while the node is down the cluster may not answer.`,
+  "maint.zeabur":
+    "Zeabur itself runs on this node. When it moves, this page loses its connection for a moment, then reconnects.",
+  "maint.moves": (n: number) => `Move to other nodes (${n})`,
+  "maint.scratch": (n: number) =>
+    `${n === 1 ? "1 of them loses" : `${n} of them lose`} what they keep in scratch space.`,
+  "maint.lose": "scratch space emptied",
+  "maint.budget": (name: string) => `may wait for disruption budget ${name}`,
+  "maint.stuck": (n: number) => `Cannot move (${n})`,
+  "maint.stuck.why": (node: string) =>
+    `Their data is on a volume that stays on ${node}. Started on another node, they would wait for it until ${node} is back.`,
+  "maint.stuck.include": (node: string) => `Move them anyway; they stay down until ${node} is back`,
+  "maint.deleted": (n: number) => `Not run by a service (${n})`,
+  "maint.deleted.why": "Nothing starts them again: moving them deletes them for good.",
+  "maint.deleted.confirm": "Delete them",
+  "maint.stays": (n: number) => `Stay on the node (${n})`,
+  "maint.stays.why": "They run on every node, or the node starts them from its own files.",
+  "maint.reason.daemonSet": "on every node",
+  "maint.reason.static": "started by the node",
+  "maint.kube.command": "Command",
+  "maint.kube.budgets": "Disruption budgets",
+  "maint.progress": (node: string, left: number, total: number) =>
+    `Moving replicas off ${node}: ${left} of ${total} left.`,
+  "maint.done": (node: string, kept: number) =>
+    kept === 0
+      ? `${node} is in maintenance. No replica is left to move.`
+      : `${node} is in maintenance. ${kept === 1 ? "1 replica stays because its data is" : `${kept} replicas stay because their data is`} only on ${node}.`,
+  "maint.stopped": "Some replicas could not be moved.",
+  "maint.outcome.waiting": (budget?: string) =>
+    budget ? `Waiting on disruption budget ${budget}` : "Waiting on a disruption budget",
+  "maint.outcome.refused": "You may not move it",
+  "maint.outcome.failed": "Could not move it",
+  "maint.leaveNote":
+    "You can close this. The node stays out of scheduling; open maintenance mode again to move what is left.",
+  "maint.retry": "Try again",
+  "maint.unreadable":
+    "Some reads were refused, so this plan may miss disruption budgets or volumes that stay on this node.",
   "warning.join.sameRegion":
     "Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.",
   "warning.join.ports":

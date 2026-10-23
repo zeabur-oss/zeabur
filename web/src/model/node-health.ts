@@ -40,6 +40,8 @@ export type IssueKind =
   | "memoryFull"
   | "diskFull"
   | "cordoned"
+  | "draining"
+  | "maintenance"
   | "reservedMemory"
   | "reservedCpu"
 
@@ -67,13 +69,30 @@ const order: IssueKind[] = [
   "diskFull",
   "pidPressure",
   "cordoned",
+  "draining",
+  "maintenance",
   "reservedMemory",
   "reservedCpu",
 ]
 
 /** Takes, or is about to take, services down; the rest only limit what new pods can do. */
 export const isProblem = (issue: NodeIssue) =>
-  issue.kind !== "cordoned" && issue.kind !== "reservedMemory" && issue.kind !== "reservedCpu"
+  !(
+    ["cordoned", "draining", "maintenance", "reservedMemory", "reservedCpu"] as IssueKind[]
+  ).includes(issue.kind)
+
+/** A cordoned node, by what is still on it: replicas leaving, none left to move (maintenance), or
+ * replicas that stay until someone moves them. Unknown when its pods cannot be read. */
+export function cordonedKind(node: NodeView): IssueKind {
+  if ((node.leavingPods ?? 0) > 0) return "draining"
+  if (node.movablePods === 0) return "maintenance"
+  return "cordoned"
+}
+
+const cordonedHealth: Partial<Record<IssueKind, Health>> = {
+  draining: "progress",
+  maintenance: "idle",
+}
 
 const byIssue = (a: NodeIssue, b: NodeIssue) =>
   healthRank[a.health] - healthRank[b.health] ||
@@ -103,7 +122,10 @@ export function nodeIssues(node: NodeView): NodeIssue[] {
   const diskHealth = fillHealth(disk, DISK)
   if (diskHealth !== "ok" && !has("diskPressure"))
     issues.push({ kind: "diskFull", node: name, health: diskHealth, share: disk })
-  if (node.cordoned) issues.push({ kind: "cordoned", node: name, health: "warn" })
+  if (node.cordoned) {
+    const kind = cordonedKind(node)
+    issues.push({ kind, node: name, health: cordonedHealth[kind] ?? "warn" })
+  }
   if (node.requests) {
     const memoryReserved = share(node.requests.memoryBytes, node.allocatable.memoryBytes)
     if (memoryReserved !== undefined && memoryReserved >= TIGHT)
