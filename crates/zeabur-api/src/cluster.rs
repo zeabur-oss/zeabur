@@ -56,6 +56,7 @@ pub(crate) mod health;
 pub mod install;
 pub mod join;
 pub mod modules;
+pub mod node_policies;
 
 use std::collections::BTreeMap;
 
