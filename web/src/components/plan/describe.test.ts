@@ -467,7 +467,7 @@ group("failureOf", () => {
       }),
     )
     expect(f.title).toBe("Your everyday rights can't change api.")
-    expect(f.description).toBe("Ask an admin, or retry as admin.")
+    expect(f.description).toBe("Ask an admin, or retry with admin rights.")
     expect(f.review).toBe(false)
   })
 
@@ -504,7 +504,7 @@ group("failureOf", () => {
       "zh-TW",
       problem("conflict", { detail: "Already written: x" }),
     )
-    expect(f.title).toBe("你預覽之後，它又有了變更。")
+    expect(f.title).toBe("你檢查之後，它又有了變更。")
   })
 
   test("a refusal for a managing tool says where to change it, whatever the status and wording", () => {

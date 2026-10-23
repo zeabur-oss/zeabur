@@ -5,6 +5,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import type { Schemas } from "@/api/client"
 import { backupsQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
+import { Schedule } from "@/components/schedule"
 import { StatusPill } from "@/components/status"
 import {
   Collapsible,
@@ -117,7 +118,7 @@ export function BackupDetails({ data }: { data: Schemas["ProjectBackups"] }) {
                 <span className="truncate type-meta text-muted-foreground">
                   {s.provider}
                   {t("common.sep")}
-                  <code translate="no">{s.cron}</code>
+                  <Schedule cron={s.cron} />
                   {s.note
                     ? `${t("common.sep")}${t(s.note as "backups.veleroVolumesNeedSnapshots")}`
                     : ""}

@@ -2,9 +2,9 @@
 // to the outcome. Success names what changed and offers View (where to see it) or Undo (where the
 // change can be taken back, model/risk.ts); failure gives the reason in plain words and, when the
 // object moved on or the plan ran out, "Review again", which plans the same change afresh; when the
-// cluster refused it and the server offers admin rights, "Retry as admin", which applies the same
-// plan again after the passkey confirmation (auth/elevation.ts); when Helm would undo it, the
-// kubectl terminal with `helm list` typed in.
+// cluster refused it and the server offers admin rights, "Retry with admin rights", which applies
+// the same plan again after the passkey confirmation (auth/elevation.ts); when Helm would undo it,
+// the kubectl terminal with `helm list` typed in.
 import { toast } from "sonner"
 
 import { api, toProblem, unwrap, type Schemas } from "@/api/client"
@@ -128,8 +128,9 @@ async function takeBack(
 }
 
 /** Reports a failed apply. `review` plans the change afresh; `again` applies the same plan once
- * more, which is what "Retry as admin" does after the passkey confirmation. A change Helm would
- * undo offers the kubectl terminal with `helm list` typed in, to find the release to upgrade. */
+ * more, which is what "Retry with admin rights" does after the passkey confirmation. A change Helm
+ * would undo offers the kubectl terminal with `helm list` typed in, to find the release to
+ * upgrade. */
 async function fail(
   project: string,
   id: string | number,

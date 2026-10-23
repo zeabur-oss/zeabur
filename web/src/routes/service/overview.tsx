@@ -15,6 +15,7 @@ import { AlertList, RecentNote } from "@/components/alerts"
 import { Ago, CopyButton } from "@/components/bits"
 import { Diagnoses } from "@/components/diagnoses"
 import { EventList } from "@/components/events"
+import { KubeDetails } from "@/components/kube-details"
 import { replicaCounts } from "@/components/pods"
 import { RouteLine } from "@/components/route-trace"
 import { ServiceIcon } from "@/components/service-icon"
@@ -565,6 +566,11 @@ function Replicas({
             })}
           </ul>
         )}
+        {service.pods.length > 0 ? (
+          <div className="px-2 py-1">
+            <KubeDetails facts={[[t("pod.pods"), `${service.kind}/${service.name} → Pod`]]} />
+          </div>
+        ) : null}
         {scalable ? (
           <div className="mt-1 border-t border-v2-border px-2 pt-2 pb-1">
             <More onClick={() => onTab("compute")}>{t("overview.replicaSettings")}</More>

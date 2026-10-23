@@ -10,6 +10,7 @@ import { buildsQuery, capabilitiesQuery, logsQuery } from "@/api/queries"
 import { Ago, CopyButton, Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { GateTip, useHereGate } from "@/components/gate"
+import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Alert, AlertAction, AlertDescription } from "@zeabur/design-system/components/alert"
@@ -369,6 +370,14 @@ function AutoUpdate({
           </AlertAction>
         </Alert>
       ) : null}
+      <KubeDetails
+        facts={[
+          [
+            t("builds.autoUpdate"),
+            `Keel: ${service.kind}/${service.name} keel.sh/policy${policy ? `=${policy}` : ""}`,
+          ],
+        ]}
+      />
       {installing ? (
         <Suspense fallback={null}>
           <InstallSheet

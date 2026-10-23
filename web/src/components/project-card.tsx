@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 import CaretUpDownIcon from "~icons/ph/caret-up-down"
 import CaretUpIcon from "~icons/ph/caret-up"
@@ -10,6 +10,7 @@ import SquaresFourIcon from "~icons/ph/squares-four"
 
 import type { Schemas } from "@/api/client"
 import { projectQuery } from "@/api/queries"
+import { KubeTip } from "@/components/kube-details"
 import { ProjectGlyph } from "@/components/shell/project-glyph"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
@@ -127,6 +128,15 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+function NamespaceTip({ project, children }: { project: ProjectItem; children: ReactElement }) {
+  const t = useT()
+  const facts: [string, string][] =
+    project.displayName && project.displayName !== project.name
+      ? [[t("column.namespace"), project.name]]
+      : []
+  return <KubeTip facts={facts}>{children}</KubeTip>
+}
+
 function ProjectCard({ project, document, documentPending }: CardProps) {
   const t = useT()
   return (
@@ -137,20 +147,15 @@ function ProjectCard({ project, document, documentPending }: CardProps) {
     >
       <span className="flex h-8 items-center gap-x-2.5">
         <ProjectTile project={project} />
-        <span className="min-w-0 flex-1 truncate type-heading text-main" translate="no">
-          {project.displayName ?? project.name}
-        </span>
+        <NamespaceTip project={project}>
+          <span className="min-w-0 flex-1 truncate type-heading text-main" translate="no">
+            {project.displayName ?? project.name}
+          </span>
+        </NamespaceTip>
       </span>
       <span className="mt-2 block h-4 truncate text-xs text-tertiary">{project.description}</span>
       <span className="min-h-2 flex-1" />
       <span className="flex flex-col gap-y-2.5">
-        {project.displayName && project.displayName !== project.name ? (
-          <InfoRow label={t("column.namespace")}>
-            <span className="truncate font-mono text-xs text-main" translate="no">
-              {project.name}
-            </span>
-          </InfoRow>
-        ) : null}
         <InfoRow label={t("metric.services")}>
           <ServicesHealth project={project} />
         </InfoRow>
@@ -163,7 +168,6 @@ function ProjectCard({ project, document, documentPending }: CardProps) {
 }
 
 const columns = {
-  namespace: "hidden w-40 shrink-0 @3xl:block",
   services: "w-36 shrink-0",
   restarts: "hidden w-20 shrink-0 text-right @xl:block",
   domain: "hidden w-48 shrink-0 pl-3 @4xl:block",
@@ -179,20 +183,16 @@ function ProjectListRow({ project, document, documentPending }: CardProps) {
     >
       <span className="flex min-w-0 flex-1 items-center gap-x-2.5">
         <ProjectTile project={project} small />
-        <span className="min-w-0 truncate text-sm font-medium text-main" translate="no">
-          {project.displayName ?? project.name}
-        </span>
+        <NamespaceTip project={project}>
+          <span className="min-w-0 truncate text-sm font-medium text-main" translate="no">
+            {project.displayName ?? project.name}
+          </span>
+        </NamespaceTip>
         {project.description ? (
           <span className="min-w-0 flex-1 basis-0 truncate text-xs text-tertiary">
             {project.description}
           </span>
         ) : null}
-      </span>
-      <span
-        className={cn(columns.namespace, "truncate font-mono text-xs text-main")}
-        translate="no"
-      >
-        {project.name}
       </span>
       <span className={columns.services}>
         <ServicesHealth project={project} />
@@ -241,7 +241,6 @@ function ListHeader({
   return (
     <div className="flex h-8 items-center gap-x-3 border-b border-main bg-muted/30 px-4 type-meta font-medium whitespace-nowrap text-muted-foreground">
       <span className="min-w-0 flex-1">{sortable("name", t("projects.columnName"))}</span>
-      <span className={columns.namespace}>{t("column.namespace")}</span>
       <span className={columns.services}>{sortable("health", t("metric.services"))}</span>
       <span className={columns.restarts}>{t("table.restarts")}</span>
       <span className={columns.domain}>{t("table.domain")}</span>

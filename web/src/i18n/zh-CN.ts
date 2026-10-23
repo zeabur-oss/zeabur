@@ -4,6 +4,7 @@ import sentences from "@/i18n/generated/zh-CN"
 
 // A space where Han text meets a Latin word ("查看 Secrets 需要…").
 
+const weekdayZhCN = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
 const latinEnd = (text: string) => (/[A-Za-z0-9]$/.test(text) ? " " : "")
 
@@ -46,7 +47,7 @@ export const zhCN: Messages = {
   "shell.whoamiUnknown": "未知用户",
   "shell.signOut": "退出登录",
   "shell.theme": "主题",
-  "elevate.retry": "以管理员身份重试",
+  "elevate.retry": "临时用管理员权限重试",
   "elevate.title": "管理员权限",
   "elevate.waiting": "在新窗口用通行密钥确认。",
   "elevate.notAllowed": "这个 Zeabur 不能请求管理员权限，请联系集群管理员。",
@@ -57,12 +58,12 @@ export const zhCN: Messages = {
   "elevate.until": (time) => `管理员权限至 ${time}`,
   "elevate.activeDetail": "在此之前，你的所有操作都会使用管理员权限。",
   "elevate.drop": "放弃管理员权限",
-  "elevate.use": "使用管理员权限",
+  "elevate.use": "临时使用管理员权限",
   "shell.switchProject": "切换项目",
   "column.label": "服务",
   "column.other": "其他对象",
   "column.advanced": "高级",
-  "column.namespace": "Namespace",
+  "column.namespace": "Kubernetes Namespace",
 
   "theme.system": "跟随系统",
   "theme.light": "亮色",
@@ -102,8 +103,8 @@ export const zhCN: Messages = {
   "problem.title.log-unavailable": "无法获取日志",
   "problem.title.conflict": "在此期间已有其他更改",
   "problem.title.managed": "由其他工具管理",
-  "problem.title.plan-expired": "计划已过期",
-  "problem.title.system-namespace": "这是 Kubernetes 自用的 Namespace",
+  "problem.title.plan-expired": "这份变更已过期",
+  "problem.title.system-namespace": "这个名称是 Kubernetes 自用的",
   "problem.title.invalid": "集群拒绝了这项更改",
   "problem.title.too-many-requests": "集群繁忙",
   "problem.title.unavailable": "无法连接集群",
@@ -112,7 +113,7 @@ export const zhCN: Messages = {
   "problem.fix.unauthenticated": "重新登录。",
   "problem.fix.signed-out": "重新登录。",
   "problem.fix.forbidden": "向集群管理员申请权限，或改用有权限的账号。",
-  "problem.fix.elevation-required": "以管理员身份重试，或向集群管理员申请权限。",
+  "problem.fix.elevation-required": "临时用管理员权限重试，或向集群管理员申请权限。",
   "problem.fix.quota-exceeded": "减少请求的量、释放项目已占用的资源，或请集群管理员调高上限。",
   "problem.fix.policy-denied": "按策略指出的地方修改，或向集群管理员询问这项策略。",
   "problem.fix.not-found": "刷新页面，查看集群当前有什么。",
@@ -120,8 +121,8 @@ export const zhCN: Messages = {
   "problem.fix.conflict": "刷新页面查看最新版本，再做一次更改。",
   "problem.fix.managed":
     "到管理工具读取配置的地方更改，例如 Helm values 或 Git 仓库。这里仍然可以重启。",
-  "problem.fix.plan-expired": "重新生成计划。",
-  "problem.fix.system-namespace": "改为纳入你自己的 Namespace。",
+  "problem.fix.plan-expired": "重新检查变更。",
+  "problem.fix.system-namespace": "改用不以 kube- 开头的名称。",
   "problem.fix.invalid": "修正详细信息中集群指出的字段，然后重试。",
   "problem.fix.too-many-requests": "稍等片刻再重试。",
   "problem.fix.unavailable": "确认集群正在运行，并且这台机器能连接到它。",
@@ -150,13 +151,13 @@ export const zhCN: Messages = {
   "problemPage.rule.log-unavailable":
     "集群只保留容器这一次与上一次运行的日志，而且只在副本还存在时保留。从未写出的日志，或副本已经不在的日志，都无法读取。",
   "problemPage.rule.conflict":
-    "Zeabur 只会把更改写到你预览的那个版本上。如果之后有人或其他程序（例如部署工具、自动扩缩）改了这个对象，就什么都不会写入，谁的更改都不会丢失。",
+    "Zeabur 只会把更改写到你检查过的那个版本上。如果之后有人或其他程序（例如部署工具、自动扩缩）改了这个对象，就什么都不会写入，谁的更改都不会丢失。",
   "problemPage.rule.managed":
     "这个对象由其他工具（Helm、Argo CD、Flux）管理。那个工具下一次同步或升级时，会换回自己的版本，覆盖在这里做的更改，所以 Zeabur 不接受。",
   "problemPage.rule.plan-expired":
-    "计划就是你预览过、Zeabur 将要写入的内容。它只在几分钟内有效，确保应用时内容仍然符合集群当前的状态。",
+    "你检查过的变更，就是 Zeabur 将要写入的内容。它只在几分钟内有效，确保应用时内容仍然符合集群当前的状态。",
   "problemPage.rule.system-namespace":
-    "Kubernetes 保留了几个 Namespace 给自己的组件使用（kube-system、kube-public、kube-node-lease），它们不能成为项目。",
+    "以 kube- 开头的名称是 Kubernetes 组件专用的（kube-system、kube-public、kube-node-lease），不能成为项目。",
   "problemPage.rule.invalid":
     "集群存储对象之前，会按照它的模式与规则检查。集群拒绝了这个对象，并指出了哪些字段无效。",
   "problemPage.rule.too-many-requests":
@@ -169,7 +170,7 @@ export const zhCN: Messages = {
   "refused.rights": "这需要更多权限。",
   "refused.rightsFor": (what) => `${what}${latinEnd(what)}需要更多权限。`,
   "refused.ask": "请联系集群管理员。",
-  "refused.view": "以管理员身份查看",
+  "refused.view": "临时使用管理员权限",
   "refused.details": "详情",
   "refused.missing": "缺少的权限",
   "refused.see": (what) => `查看${latinStart(what)}${what}`,
@@ -177,7 +178,7 @@ export const zhCN: Messages = {
   "refused.terminal": "打开终端",
   "refused.reveal": "显示 Secret 的值",
   "refused.listThese": "列出这些对象",
-  "refused.adopt": (ns) => `纳入 ${ns}`,
+  "refused.adopt": (ns) => `使用已有的 Namespace ${ns}`,
   "refused.createProject": (name) => `创建项目 ${name}`,
   "refused.unadopt": (ns) => `从 Zeabur 移除 ${ns}`,
 
@@ -216,7 +217,7 @@ export const zhCN: Messages = {
 
   "role.web": "Web",
   "role.internal": "私有服务",
-  "role.worker": "后台任务",
+  "role.worker": "后台服务",
   "role.job": "批处理任务",
   "role.data": "数据",
 
@@ -256,7 +257,7 @@ export const zhCN: Messages = {
   "cluster.attEolSoon.why": "之后就不再收到安全修复。",
   "cluster.attEol.fix": "升级到仍受支持的次版本。",
   "cluster.attSkewMany": (n) => `${n} 个节点的 kubelet 超出支持的版本差距`,
-  "cluster.attSkew.why": "Kubernetes 不支持这种组合，上面的 Pod 可能出错。",
+  "cluster.attSkew.why": "Kubernetes 不支持这种组合，上面的副本可能出错。",
   "cluster.attSkew.fix": "把 kubelet 升级到和控制平面相同的次版本。",
   "cluster.attComponents": (n) => `${n} 个组件比已测试的版本旧`,
   "cluster.attComponent.why": "仍在运行，但 Zeabur 是用较新的版本测试的。",
@@ -279,23 +280,23 @@ export const zhCN: Messages = {
   "cluster.leaseRenewed": "领导者最后续约",
   "cluster.leaseStale": "没有领导者：最后续约",
   "node.notReady": (n, node) => (n === 1 ? `${node} 未就绪` : `${n} 个节点未就绪`),
-  "node.notReady.why": "在上面有 Pod 的服务会停摆，直到节点恢复或 Pod 移走。",
+  "node.notReady.why": "在上面有副本的服务会停摆，直到节点恢复或副本移走。",
   "node.notReady.fix": "确认机器在运行，且 kubelet 连得上控制平面。",
   "node.memoryPressure": (n, node) => (n === 1 ? `${node} 内存不足` : `${n} 个节点内存不足`),
-  "node.memoryPressure.why": "kubelet 正在停掉 Pod 来释放内存。",
+  "node.memoryPressure.why": "kubelet 正在停掉副本来释放内存。",
   "node.memoryPressure.fix": "停掉或限制最耗内存的服务，或给服务器加内存。",
   "node.diskPressure": (n, node) =>
     n === 1 ? `${node} 磁盘空间快用完了` : `${n} 个节点磁盘空间快用完了`,
-  "node.diskPressure.why": "kubelet 正在删除没用到的镜像并停掉 Pod 来腾出空间，新的 Pod 无法启动。",
+  "node.diskPressure.why": "kubelet 正在删除没用到的镜像并停掉副本来腾出空间，新的副本无法启动。",
   "node.diskPressure.fix":
     "腾出空间：删除没用到的镜像（crictl rmi --prune）、旧日志或卷，或扩大磁盘。",
   "node.pidPressure": (n, node) =>
     n === 1 ? `${node} 的进程数快用完了` : `${n} 个节点的进程数快用完了`,
-  "node.pidPressure.why": "新的进程和 Pod 可能无法启动。",
+  "node.pidPressure.why": "新的进程和副本可能无法启动。",
   "node.pidPressure.fix": "找出开了太多进程的服务，重启或加上限制。",
   "node.networkUnavailable": (n, node) =>
     n === 1 ? `${node} 没有 Pod 网络` : `${n} 个节点没有 Pod 网络`,
-  "node.networkUnavailable.why": "上面的 Pod 连不上其他 Pod 或服务。",
+  "node.networkUnavailable.why": "上面的副本连不上其他副本或服务。",
   "node.networkUnavailable.fix": "检查节点上的网络插件。",
   "node.memoryFull": (n, node, share) =>
     n === 1 ? `${node}：内存已用 ${share}` : `${n} 个节点内存快满了（最高 ${share}）`,
@@ -304,20 +305,20 @@ export const zhCN: Messages = {
   "node.memoryFull.fix": "给最耗内存的服务设置内存上限、停掉用不到的服务，或加内存。",
   "node.diskFull": (n, node, share) =>
     n === 1 ? `${node}：磁盘已用 ${share}` : `${n} 个节点磁盘快满了（最高 ${share}）`,
-  "node.diskFull.warn": "到 90% 时 kubelet 会开始停掉 Pod 来腾出空间。",
-  "node.diskFull.fail": "kubelet 即将停掉 Pod 来腾出空间。",
+  "node.diskFull.warn": "到 90% 时 kubelet 会开始停掉副本来腾出空间。",
+  "node.diskFull.fail": "kubelet 即将停掉副本来腾出空间。",
   "node.diskFull.fix": "删除没用到的镜像（crictl rmi --prune）、旧日志或卷，或扩大磁盘。",
   "node.cordoned": (n, node) => (n === 1 ? `${node} 已停止调度` : `${n} 个节点已停止调度`),
-  "node.cordoned.why": "新的 Pod 不会放到上面，运行中的会留着。",
+  "node.cordoned.why": "新的副本不会放到上面，运行中的会留着。",
   "node.cordoned.fix": (n, node) =>
     n === 1 ? `维护完成后恢复调度（kubectl uncordon ${node}）。` : "维护完成后恢复这些节点的调度。",
   "node.reservedMemory": (n, node, share) =>
     n === 1 ? `${node}：内存已预留 ${share}` : `${n} 个节点的内存预留过量`,
-  "node.reservedMemory.why": "请求内存的新 Pod 可能要等到有空间。",
+  "node.reservedMemory.why": "请求内存的新副本可能要等到有空间。",
   "node.reservedMemory.fix": "调低上面服务的内存请求量，或加一个节点。",
   "node.reservedCpu": (n, node, share) =>
     n === 1 ? `${node}：CPU 已预留 ${share}` : `${n} 个节点的 CPU 预留过量`,
-  "node.reservedCpu.why": "请求 CPU 的新 Pod 可能要等到有空间。",
+  "node.reservedCpu.why": "请求 CPU 的新副本可能要等到有空间。",
   "node.reservedCpu.fix": "调低上面服务的 CPU 请求量，或加一个节点。",
   "unreachable.title": (name) => `连不上 ${name}`,
   "unreachable.zeabur": "Zeabur 没有响应",
@@ -325,7 +326,8 @@ export const zhCN: Messages = {
   "unreachable.retrying": "正在重试…",
   "unreachable.every": "Zeabur 每 15 秒会重试一次。",
   "cluster.noProjects": "还没有项目",
-  "cluster.noProjectsBody": "项目是 Zeabur 显示的 Kubernetes Namespace。在“项目”页面纳入一个。",
+  "cluster.noProjectsBody":
+    "项目是 Zeabur 显示的 Kubernetes Namespace。在“项目”页面新建，或使用下方已有的 Namespace。",
   "cluster.openProjects": "打开项目页面",
   "cluster.nodes": "节点",
   "cluster.cpu": "CPU",
@@ -401,7 +403,7 @@ export const zhCN: Messages = {
   "projects.filterOther": "筛选命名空间",
   "projects.noOtherMatch": (query) => `没有匹配“${query}”的命名空间。`,
   "projects.noneBody":
-    "项目是 Zeabur 显示的 Kubernetes Namespace。新建一个，或从下方纳入 Namespace。",
+    "项目是 Zeabur 显示的 Kubernetes Namespace。新建一个，或使用下方已有的 Namespace。",
   "projects.new": "新建项目",
   "projects.newBody": "项目是带有 Zeabur 项目标签的 Namespace。创建前会先让你确认。",
   "projects.newName": "名称",
@@ -412,7 +414,7 @@ export const zhCN: Messages = {
   "projects.problem.invalid": "小写字母、数字和连字符，开头和结尾是字母或数字。",
   "projects.problem.long": "最多 63 个字符。",
   "projects.problem.system": "kube- 开头的名称保留给 Kubernetes。",
-  "projects.problem.taken": "已有同名的 Namespace，可以改用纳入。",
+  "projects.problem.taken": "已有同名的 Namespace，可以改为使用已有的 Namespace。",
   "projects.planNew": (name) => `创建项目 ${name}`,
   "projects.rowMenu": (name) => `${name} 的更多操作`,
   "projects.showSystem": "显示系统 Namespace",
@@ -493,12 +495,29 @@ export const zhCN: Messages = {
       : `${total} 个卷中有 ${missing} 个没有备份。`,
   "backups.volumes": (n) => `${n} 个卷`,
 
+  "cron.minute": "每分钟",
+  "cron.minutes": (n) => `每 ${n} 分钟`,
+  "cron.hour": (minute) => (minute === 0 ? "每小时" : `每小时第 ${minute} 分`),
+  "cron.hours": (n, minute) => (minute === 0 ? `每 ${n} 小时` : `每 ${n} 小时的第 ${minute} 分`),
+  "cron.day": (times) => `每天 ${listZh("zh-CN", times)}`,
+  "cron.week": (days, times) =>
+    `每${listZh(
+      "zh-CN",
+      days.map((d) => weekdayZhCN[d] ?? ""),
+    )} ${listZh("zh-CN", times)}`,
+  "cron.weekRange": (from, to, times) =>
+    `每${weekdayZhCN[from]}至${weekdayZhCN[to]} ${listZh("zh-CN", times)}`,
+  "cron.month": (days, times) =>
+    `每月 ${listZh("zh-CN", days.map(String))} 日 ${listZh("zh-CN", times)}`,
+  "cron.zone": (words, zone) => `${words}（${zone}）`,
+
   "lane.web": "Web",
   "lane.internal": "私有服务",
-  "lane.workers": "后台与批处理任务",
+  "lane.workers": "后台服务",
   "lane.data": "数据",
-  "edge.declared": "声明",
-  "edge.inferred": "推断",
+  "lane.scheduled": "定时",
+  "edge.declared": "已配置的连接",
+  "edge.inferred": "从变量推测",
   "edge.route": "经由公开域名",
   "edge.sharedSecret": (name) => `都读取机密 ${name}`,
   "edge.sharedConfig": (name) => `都读取配置文件 ${name}`,
@@ -510,7 +529,7 @@ export const zhCN: Messages = {
   "canvas.fit": "适应画面",
   "canvas.legend": "连线说明",
   "canvas.legendHint":
-    "根据 Kubernetes 对象和环境变量值绘制，不是根据实际流量。声明：Ingress，或共用的 Secret、ConfigMap。推断：环境变量值提到了该 Service。",
+    "根据 Kubernetes 对象和环境变量值绘制，不是根据实际流量。已配置的连接：Ingress，或两个服务共用的 Secret、ConfigMap。从变量推测：环境变量值提到了另一个服务的私有地址（Kubernetes Service）。",
   "architecture.edges": (n) => `${n} 条连线`,
   "quickLook.label": (name) => `快速查看：${name}`,
   "quickLook.open": "打开服务页面",
@@ -568,7 +587,7 @@ export const zhCN: Messages = {
   "builds.autoUpdateHint": "每次构建完成就立即上线。",
   "builds.autoUpdatePolicy": (policy) =>
     `Keel 按 ${policy} 规则更新这个服务，这个设置不是在 Zeabur 设的。`,
-  "builds.keelMissing": "自动部署需要 Keel，这个集群还没有安装。",
+  "builds.keelMissing": "自动部署需要集群里的 Keel 组件，目前还没有安装。",
   "builds.installKeel": "安装方式",
   "builds.history": "记录",
   "builds.trigger.webhook": "推送触发",
@@ -784,10 +803,10 @@ export const zhCN: Messages = {
   "net.anyPort": "唯一的端口",
   "net.fullForm": "从其他项目连接",
   "net.forwardsTo": (port) => `转发到容器的端口 ${port}`,
-  "net.exposeHint": "要添加私有地址，请应用 Service 或运行这条命令。",
+  "net.exposeHint": "要添加私有地址，请应用 Kubernetes Service 或运行这条命令。",
   "net.noneTitle": (name) => `${name} 无法接收连接`,
   "net.noneBody":
-    "它没有私有地址，也没有公开域名。只主动向外连接的后台任务两者都不需要，仍然可以连接其他服务和互联网。",
+    "它没有私有地址，也没有公开域名。只主动向外连接的后台服务两者都不需要，仍然可以连接其他服务和互联网。",
   "net.scheduledTitle": (name) => `${name} 不接收流量`,
   "net.scheduledBody": "批处理任务运行完就结束，不会有连接进来；它仍然可以连接其他服务和互联网。",
   "reach.fromDomains": "公开域名",
@@ -898,13 +917,13 @@ export const zhCN: Messages = {
   "project.entry.objects": "对象",
   // 项目的 Namespace
   "project.entry.settings": "设置",
-  "action.adopt": "纳入",
+  "action.adopt": "使用这个 Namespace",
   "action.unadopt": "不再显示为项目",
   "action.openDebugTerminal": "打开调试终端",
   "action.openToolsTerminal": "打开 kubectl 终端",
   "action.openInToolsTerminal": "在 kubectl 终端打开",
   "action.saveDetails": "保存详细信息",
-  "title.adopt": (ns) => `纳入 ${ns}`,
+  "title.adopt": (ns) => `使用已有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再显示为项目`,
   "title.details": (ns) => `${ns} 的详细信息`,
   "title.pauseAll": (ns) => `暂停 ${ns} 的所有服务`,
@@ -962,7 +981,7 @@ export const zhCN: Messages = {
   "projectSettings.namespaceHint": "这个项目就是这个 Namespace，名称无法更改。",
   "projectSettings.shown": "显示为项目",
   "projectSettings.shownYes": "是。Namespace 带有 Zeabur 的项目标签。",
-  "projectSettings.shownNo": "否。纳入只会加上 Zeabur 的项目标签，其他都不变。",
+  "projectSettings.shownNo": "否。改为显示成项目时，Zeabur 只会加上项目标签，其他都不变。",
   "projectSettings.batch": "批量操作",
   "projectSettings.pauseAll": "暂停所有服务",
   "projectSettings.pauseAllHint": "停止这个项目的所有服务；之后可以恢复。",
@@ -998,10 +1017,10 @@ export const zhCN: Messages = {
   "objects.empty": "空的",
   "objects.scan": "扫描全部类型",
   "objects.scanning": "正在扫描…",
-  "objects.scanned": "已读取全部类型",
+  "objects.scanned": "已加载全部类型",
   "objects.refresh": "刷新",
-  "objects.load": (kind: string) => `读取 ${kind}`,
-  "objects.unread": "未读取",
+  "objects.load": (kind: string) => `加载 ${kind}`,
+  "objects.unread": "尚未加载",
   "objects.denied": "没有权限",
   "objects.pin": (kind: string) => `固定 ${kind}`,
   "create.button": "创建",
@@ -1013,7 +1032,7 @@ export const zhCN: Messages = {
   "create.more": "其他可创建的类型",
   "create.documents": (n) => `${n} 份文档`,
   "create.editor": "要创建的 YAML",
-  "create.review": "预览",
+  "create.review": "检查变更",
   "create.empty": "用 YAML 写下要创建的对象，或添加模板。",
   "create.inOrder": "创建顺序",
   "create.inOrderHint":
@@ -1023,13 +1042,13 @@ export const zhCN: Messages = {
   "create.showInYaml": "在 YAML 中显示",
   "create.problems": (n) => `${n} 个问题`,
   "create.notes": (n) => `${n} 条提醒`,
-  "create.fixFirst": "修正上面的问题后才能预览。",
+  "create.fixFirst": "修正上面的问题后才能检查变更。",
   "create.found.invalidYaml": "这一行读不成 YAML：请检查缩进和引号。",
   "create.found.missingField": (field) => `每个对象都需要 ${field}。`,
   "create.found.clusterScoped": (kind) => `${kind} 属于整个集群，Zeabur 只在项目内创建对象。`,
   "create.found.notServed": (kind, apiVersion) => `这个集群没有提供 ${kind}（${apiVersion}）。`,
   "create.found.rights": (kind, project) =>
-    `你的权限似乎不能在 ${project} 创建 ${kind}，预览时会再询问集群。`,
+    `你的权限似乎不能在 ${project} 创建 ${kind}，检查变更时会再询问集群。`,
   "create.found.otherNamespace": (namespace, project) =>
     `命名空间 ${namespace} 不是这个项目。请删掉这一行，或改成 ${project}。`,
   "create.found.duplicate": (kind, name) => `${kind} ${name} 写了两次。`,
@@ -1057,13 +1076,13 @@ export const zhCN: Messages = {
   "yaml.hidden": "Secret 的值已隐藏。",
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
-  // 变更计划
-  "plan.planning": "正在计算…",
+  // 检查变更
+  "plan.planning": "正在检查变更…",
   "plan.apply": "应用",
   "plan.applying": "正在应用…",
   "plan.cancel": "取消",
   "plan.back": "返回",
-  "plan.replan": "重新预览",
+  "plan.replan": "重新检查",
   "plan.details": "技术细节",
   "plan.expiresIn": (time: string) => `${time} 后失效`,
   "plan.expired": "已失效",
@@ -1103,12 +1122,12 @@ export const zhCN: Messages = {
   "plan.short.title": "空间不足",
   "plan.short.nodes": (names, n) =>
     n === 0
-      ? "新的 Pod 会停在 Pending，等节点有空间才启动。旧的 Pod 会继续运行，服务不中断，但变更要到那时才完成。"
-      : `新的 Pod 会停在 Pending，等节点有空间才启动。在那之前，${names}${latinEnd(names)}不会运行。`,
+      ? "新的副本会停在 Pending，等节点有空间才启动。旧的副本会继续运行，服务不中断，但变更要到那时才完成。"
+      : `新的副本会停在 Pending，等节点有空间才启动。在那之前，${names}${latinEnd(names)}不会运行。`,
   "plan.short.quota": (names, n) =>
     n === 0
-      ? "配额会拒绝新的 Pod，直到配额有空间。旧的 Pod 会继续运行，服务不中断，但变更要到那时才完成。"
-      : `配额会拒绝新的 Pod，直到配额有空间。在那之前，${names}${latinEnd(names)}不会运行。`,
+      ? "配额会拒绝新的副本，直到配额有空间。旧的副本会继续运行，服务不中断，但变更要到那时才完成。"
+      : `配额会拒绝新的副本，直到配额有空间。在那之前，${names}${latinEnd(names)}不会运行。`,
   "plan.short.fix": (quota, nodes) =>
     quota && nodes
       ? "要完成变更，调高配额并腾出节点空间，或调低每个副本的预留量。"
@@ -1164,13 +1183,13 @@ export const zhCN: Messages = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的证书不是由 cert-manager 签发的，请到生成证书的地方加入 ${host}`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
-    `连接到 Gateway ${gateway}（共找到 ${of} 个）`,
-  "warn.gatewaysUnreadable": "无法读取 Gateway：Zeabur 改用 Ingress",
+    `公开域名会连接到 Gateway ${gateway}（共找到 ${of} 个）`,
+  "warn.gatewaysUnreadable": "无法读取 Gateway：公开域名不会连接到 Gateway",
   "warn.secretValuesUnknown": (name: string) => `无法读取 ${name} 的值：差异只列出键名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 读取 ConfigMap 或 Secret：回滚不会改动它们的内容`,
   "warn.storageClassUnknown": (claim: string) =>
-    `无法读取 ${claim} 的 StorageClass：能否扩容由集群决定`,
+    `无法读取卷（${claim}）的 StorageClass：能否扩容由集群决定`,
   "warn.readWriteOnceShared": (workload: string) =>
     `${workload} 有多个副本：ReadWriteOnce 卷只能挂在一个节点上`,
   "warn.readWriteOncePodShared": (workload: string) =>
@@ -1179,14 +1198,14 @@ export const zhCN: Messages = {
     `也会删除 ${owner} 拥有的对象：${names}`,
   "warn.podReplaced": (pod: string, owner: string) => `${owner} 会启动新的副本替代 ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>
-    `集群会删除 ${claim} 的数据：卷 ${volume} 的回收策略是 Delete`,
+    `集群会删除卷（${claim}）的数据：它的 PersistentVolume ${volume} 回收策略是 Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
-    `卷 ${volume} 会保留 ${claim} 的数据（回收策略 Retain），直到管理员移除`,
-  "warn.claimDataUnknown": (claim: string) => `${claim} 的数据可能丢失：无法读取其卷的回收策略`,
+    `卷（${claim}）的数据会留在 PersistentVolume ${volume}（回收策略 Retain），直到管理员移除`,
+  "warn.claimDataUnknown": (claim: string) => `卷（${claim}）的数据可能丢失：无法读取它的回收策略`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} 仍在读取 ${name}：少了它，新的副本无法启动`,
   "warn.claimStillMounted": (name: string, names: string) =>
-    `${names} 仍挂载 ${name}：等到没有副本使用后，Kubernetes 才会移除它`,
+    `${names} 仍挂载卷（${name}）：等到没有副本使用后，Kubernetes 才会移除它`,
   "warn.ingressOpened": (names: string) => `不再隔离：${names} 会接受任何来源的流量`,
   "warn.egressOpened": (names: string) => `不再限制：${names} 可以把流量发送到任何地方`,
   "warn.connectionsOpened": (pairs: string) => `恢复允许：${pairs}`,
@@ -1226,7 +1245,7 @@ export const zhCN: Messages = {
   "confirm.image": (service, tag) => `${service} 会改为运行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 会用分支最新的提交重新构建 ${build}。`,
   "confirm.autoUpdateOn": (service) => `${service} 每次构建完成就会立即上线。`,
-  "confirm.autoUpdateOff": (service) => `${service} 的新镜像会等你手动部署。`,
+  "confirm.autoUpdateOff": (service) => `${service} 的新构建会等你手动部署。`,
   "confirm.renameDomain": (from) => `指向 ${from} 的链接会失效。`,
   "confirm.removeDomain": (host) => `访问 ${host} 的请求不会再进入这个项目。`,
   "confirm.rollback": (revision) => `修订版本 ${revision} 之后的模板变更都会撤销。`,
@@ -1238,7 +1257,7 @@ export const zhCN: Messages = {
   "confirm.writable": (path, service) => `把 ${service} 的 ${path} 设为可写。`,
   "confirm.mount": (service) => `修改 ${service} 的挂载。`,
   "confirm.removeVolume": (service, path) =>
-    `${service} 不再挂载 ${path}。它的 PVC 和里面的数据会保留；要释放空间，到“对象”删除这个 PVC。`,
+    `${service} 不再挂载 ${path}。卷和里面的数据会保留；要释放空间，到“对象”删除它的 PVC。`,
   "confirm.probeSet.readiness": (check, period) =>
     `${check}成功之前，副本不会收到流量（每 ${period} 秒检查一次）。`,
   "confirm.probeSet.liveness": (check, period, failures) =>
@@ -1383,7 +1402,7 @@ export const zhCN: Messages = {
 
   // 编辑
   "edit.add": "添加",
-  "edit.review": "预览变更",
+  "edit.review": "检查变更",
   "edit.cancel": "取消",
   "edit.edit": (name: string) => `编辑 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
@@ -1572,13 +1591,13 @@ export const zhCN: Messages = {
   "alerts.filter": "筛选告警",
   "backups.title": "备份",
   "backups.namespace": "Namespace 内的所有对象",
-  "backups.unscheduled": "没有备份计划",
+  "backups.unscheduled": "没有定时备份",
   "backups.none": "没有备份",
   "backups.noRun": "还没备份过",
   "backups.noProvider": "要备份卷，请先安装备份组件。",
   "backups.seeComponents": "打开组件",
   "backups.refused": (module) => `没有权限读取 ${module} 的备份。`,
-  "backups.details": "备份计划与记录",
+  "backups.details": "定时备份与记录",
   "backups.paused": "已暂停",
   "backups.succeeded": "成功",
   "backups.partiallyFailed": "部分失败",
@@ -1586,7 +1605,7 @@ export const zhCN: Messages = {
   "backups.running": "运行中",
   "backups.unknown": "未知",
   "backups.veleroVolumesNeedSnapshots": "卷数据需配合快照",
-  "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有备份计划`,
+  "backups.scheduledOf": (scheduled, total) => `${scheduled}/${total} 有定时备份`,
 
   "add.button": "新建",
   "add.inProject": (project) => `在 ${project} 新建`,
@@ -1599,7 +1618,7 @@ export const zhCN: Messages = {
   "add.imageBody": (project) => `在 ${project} 运行容器镜像。创建前会先让你确认要新建的对象。`,
   "add.field.image": "镜像",
   "add.field.port": "端口",
-  "add.portHint": "留空表示不接受连接，例如后台任务。",
+  "add.portHint": "留空表示不接受连接，例如后台服务。",
   "add.noTag": "没有写版本时会用 latest，之后不好追踪。",
   "add.problem.image.empty": "填写要运行的镜像。",
   "add.problem.image.invalid": "镜像地址，例如 ghcr.io/acme/web:1.4。",
@@ -1610,11 +1629,11 @@ export const zhCN: Messages = {
   "add.problem.port.invalid": "1 到 65535 之间的端口。",
   "add.problem.host.empty": "填写域名。",
   "add.problem.host.invalid": "域名，例如 web.example.com。",
-  "add.publicUrl": "公开网址",
+  "add.publicUrl": "公开域名",
   "add.hostHint": "把这个域名的 DNS 指向集群的 Ingress。",
   "add.https": (issuer) => `HTTPS 证书由 cert-manager（${issuer}）签发。`,
   "add.httpOnly": "这个网址只有 HTTP。管理员指定 cert-manager 的签发者后会使用 HTTPS。",
-  "add.noPublicUrl": "你的角色不能在这个项目新建公开网址（Ingress）。",
+  "add.noPublicUrl": "你的角色不能在这个项目新建公开域名。",
   "add.more": "更多设置",
   "add.moreSummary": "环境变量、磁盘、规格、副本数和私有 registry。",
   "add.variables": "环境变量",
@@ -1625,7 +1644,7 @@ export const zhCN: Messages = {
   "add.volumePath": "挂载路径",
   "add.volumeSize": "磁盘大小",
   "add.volumeRecreate":
-    "有磁盘时服务只运行一个 Pod，更新时先停旧的再启动新的：这个磁盘同时只能挂在一个节点上。",
+    "有磁盘时服务只运行一个副本，更新时先停旧的再启动新的：这个磁盘同时只能挂在一个节点上。",
   "add.problem.volumePath": "绝对路径，例如 /data。",
   "add.replicas": "副本数",
   "add.replicasFixed": "有磁盘时固定为 1。",
@@ -1656,25 +1675,25 @@ export const zhCN: Messages = {
   "db.field.engine": "引擎",
   "db.field.name": "名称",
   "db.field.version": "版本",
-  "db.field.members": "成员数",
-  "db.field.storage": "每个成员的存储空间",
+  "db.field.members": "实例数",
+  "db.field.storage": "每个实例的存储空间",
   "db.field.size": "规格",
   "db.size.small": "小",
   "db.size.medium": "中",
   "db.size.large": "大",
   "db.sizeDetail": (cpu, memory, limit) =>
-    `每个成员请求 ${cpu} CPU 和 ${memory} 内存，最多可使用 ${limit}。`,
+    `每个实例请求 ${cpu} CPU 和 ${memory} 内存，最多可使用 ${limit}。`,
   "db.name.empty": "请输入名称。",
   "db.name.invalid": "只能用小写字母、数字和连字符，并以字母开头。",
   "db.name.long": "最多 30 个字符。",
   "db.name.taken": "已经有同名的数据库。",
   "db.storageHint": "之后可以扩容，不能缩小。",
   "db.noRedundancy": (backedUp: boolean) =>
-    `只有一个成员：它故障时没有其他成员接手，数据也只在一个卷上。${backedUp ? "" : "请设置备份。"}`,
-  "db.replicaSetHint": "副本集有三个成员时，坏掉一个也能继续运行。",
+    `只有一个实例：它故障时没有其他实例接手，数据也只在一个卷上。${backedUp ? "" : "请设置备份。"}`,
+  "db.replicaSetHint": "副本集有三个实例时，坏掉一个也能继续运行。",
   "db.kernelBlocked": (versions: string) =>
     `这个集群的节点内核是 Linux 6.19 及以上，${versions} 无法在上面启动。`,
-  "db.onOneNode": "这个集群只有一个节点，所以默认一个成员。",
+  "db.onOneNode": "这个集群只有一个节点，所以默认一个实例。",
   "db.planCreate": (name) => `创建数据库 ${name}`,
   "db.noOperator": "要创建数据库，请先安装数据库组件。",
   "db.refused": (engine) => `你没有权限读取 ${engine} 数据库。`,
@@ -1693,8 +1712,8 @@ export const zhCN: Messages = {
   "db.tabs": "数据库分页",
   "db.fact.engine": "引擎",
   "db.fact.version": "版本",
-  "db.fact.members": "成员",
-  "db.fact.primary": "主成员",
+  "db.fact.members": "实例",
+  "db.fact.primary": "主实例",
   "db.fact.storage": "存储空间",
   "db.fact.size": "规格",
   "db.fact.custom": "自定义",
@@ -1752,7 +1771,7 @@ export const zhCN: Messages = {
   "db.backup.regionHint": "只在存储服务要求时填写。",
   "db.backup.accessKey": "访问密钥 ID",
   "db.backup.secretKey": "私密访问密钥",
-  "db.backup.frequency": "计划",
+  "db.backup.frequency": "定时",
   "db.backup.daily": "每天 03:00 UTC",
   "db.backup.weekly": "每周日 03:00 UTC",
   "db.backup.keep": "保留天数",
@@ -1769,8 +1788,8 @@ export const zhCN: Messages = {
   "db.backup.retention": "保留",
   "db.backup.retentionDays": (days) => `${days} 天`,
   "db.backup.retentionCount": (count) => `最近 ${count} 份备份`,
-  "db.backup.schedule": "计划",
-  "db.backup.unscheduled": "没有备份计划",
+  "db.backup.schedule": "定时",
+  "db.backup.unscheduled": "没有定时备份",
   "db.backup.runs": "备份记录",
   "db.backup.storeIdle": (store) => `${store} 已经存在，但这个数据库还没有把备份发送到那里。`,
   "db.backup.pluginMissing": "备份 PostgreSQL 需要 CloudNativePG 的 Barman Cloud 插件。",
@@ -1841,7 +1860,7 @@ export const zhCN: Messages = {
   "usage.installVm": "安装 VictoriaMetrics",
   "usage.chooseStore": "改用其他存储服务",
   "usage.needsStoreHint": (service) =>
-    `Zeabur 查找的是 ${service}。兼容 Prometheus 的存储服务都可以用，例如 Prometheus 或 VictoriaMetrics；在设置里指定它的 Service。`,
+    `Zeabur 查找的是 ${service}。兼容 Prometheus 的存储服务都可以用，例如 Prometheus 或 VictoriaMetrics；在设置里指定它的 Kubernetes Service。`,
   "usage.whatHistory": "查看用量历史",
   "usage.proxyHint":
     "Zeabur 以你的身份通过 Kubernetes API 读取 metrics 存储服务。能这样读取的人可以看到所有项目的 metrics，所以通常只有管理员有这项权限。",
@@ -1869,7 +1888,7 @@ export const zhCN: Messages = {
   "settings.metricsStore": "用量历史",
   "settings.store": "历史数据来源",
   "settings.storeHint":
-    "保存用量历史的 Service，格式为 namespace/name:port。任何提供 Prometheus HTTP API 的存储服务都可以。Zeabur 通过 Kubernetes API，以每个人自己的权限读取。",
+    "保存用量历史的 Kubernetes Service，格式为 namespace/name:port。任何提供 Prometheus HTTP API 的存储服务都可以。Zeabur 通过 Kubernetes API，以每个人自己的权限读取。",
   "settings.storeDefault": "默认",
   "settings.storeIsDefault": "（默认）",
   "settings.storeChosen": "在 Zeabur 中设置",
@@ -2085,14 +2104,14 @@ export const zhCN: Messages = {
   // 账号与成员结束
   "sentence.problem.forbidden.fix.askForRule": (p) =>
     `向集群管理员申请 ${p.rule} 的权限，例如创建授予该权限的 ClusterRole，以及绑定到你的 ClusterRoleBinding。`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "联系管理员，或以管理员身份重试。",
+  "sentence.problem.forbidden.fix.askOrRetry": () => "联系管理员，或临时用管理员权限重试。",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "把下面的配置交给管理员。它只授予这项权限，而且只在这个项目有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
-    `计划只在 ${p.minutes} 分钟内有效。重新生成计划。`,
+    `检查过的变更只在 ${p.minutes} 分钟内有效。重新检查一次。`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "重新生成计划。计划只能在生成它的服务器上，用原来的令牌原样应用。",
-  "sentence.problem.conflict.fix.review": () => "重新预览，从它当前的状态开始。",
+    "重新检查变更。变更只能在检查它的服务器上，用原来的令牌原样应用。",
+  "sentence.problem.conflict.fix.review": () => "重新检查，从它当前的状态开始。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等它开始运行；它的日志和事件会说明为什么还没运行。",
   "sentence.problem.unavailable.fix.tryAgainSoon": () => "稍后再试一次。",
@@ -2126,12 +2145,12 @@ export const zhCN: Messages = {
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "它不存在。"),
   "sentence.problem.summary.log-unavailable": () => "无法读取这份日志。",
   "sentence.problem.summary.conflict": (p) =>
-    p.name ? `你预览之后，${p.name} 又有了更改。` : "你预览之后，它又有了更改。",
+    p.name ? `你检查之后，${p.name} 又有了更改。` : "你检查之后，它又有了更改。",
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "这由其他工具管理。",
-  "sentence.problem.summary.plan-expired": () => "计划已过期。",
+  "sentence.problem.summary.plan-expired": () => "这份变更已过期。",
   "sentence.problem.summary.system-namespace": (p) =>
-    p.name ? `${p.name} 是 Kubernetes 自用的 Namespace。` : "这是 Kubernetes 自用的 Namespace。",
+    p.name ? `${p.name} 是 Kubernetes 自用的名称。` : "这是 Kubernetes 自用的名称。",
   "sentence.problem.summary.invalid": (p) =>
     p.name ? `集群拒绝了对 ${p.name} 的更改。` : "集群拒绝了这项更改。",
   "sentence.problem.summary.too-many-requests": () => "集群正忙。",
@@ -2230,9 +2249,9 @@ export const zhCN: Messages = {
   "part.health-checks": "健康检查",
   "form.healthHint": "集群在每个副本上运行的检查：能不能接收流量、要不要重启，以及是否已经启动。",
   "draft.add": "加入变更",
-  "draft.pendingHere": "有等待预览的变更",
+  "draft.pendingHere": "有等待检查的变更",
   "draft.count": (n) => `${n} 项变更待应用`,
-  "draft.review": "预览变更",
+  "draft.review": "检查变更",
   "draft.none": "暂无变更",
   "draft.save": "保存",
   "draft.leaveTitle": "不保存就离开？",
@@ -2268,7 +2287,7 @@ export const zhCN: Messages = {
   "home.unchecked": (n) => `有 ${n} 个项目无法检查，这里没有列出它们的问题。`,
   "home.incidentsUnchecked": "集群里的成因没能全部读取，可能漏掉其中的问题。",
   "home.lastKnown": "最后已知状态",
-  "home.adoptTitle": "可纳入的命名空间",
+  "home.adoptTitle": "已有的 Namespace",
   "home.showWarningsOf": (shown, total) => `显示 ${total} 条警告中的 ${shown} 条`,
   "home.allWarnings": (n) => `到集群页面查看全部 ${n} 条`,
   "home.affects": "影响",
@@ -2390,16 +2409,16 @@ export const zhCN: Messages = {
   "preview.downtime": "会有短暂的时间没有副本提供服务。",
   "preview.cores": (n) => `${n} 核 CPU`,
   "preview.fits": (pods, cpu, memory) =>
-    `资源足够：峰值时会多出 ${pods} 个 Pod、${cpu} 和 ${memory}。`,
+    `资源足够：峰值时会多出 ${pods} 个副本、${cpu} 和 ${memory}。`,
   "preview.blockedQuota": (name, resource, need, left) =>
     resource === "pods"
-      ? `配额 ${name} 只允许再多 ${left} 个 Pod，这次需要 ${need} 个。`
+      ? `配额 ${name} 只允许再多 ${left} 个副本，这次需要 ${need} 个。`
       : `配额 ${name} 只剩 ${left}，这次需要 ${need}。`,
   "preview.blockedNodes": (_name, resource, need, left) =>
     resource === "pods"
-      ? `没有节点放得下 ${need} 个新的 Pod，最空的节点只能再放 ${left} 个。`
+      ? `没有节点放得下 ${need} 个新的副本，最空的节点只能再放 ${left} 个。`
       : `没有节点有 ${need} 的空间，最空的节点只有 ${left}。`,
-  "preview.fitUnknown": "Zeabur 无法确认新的 Pod 是否放得下。",
+  "preview.fitUnknown": "Zeabur 无法确认新的副本是否放得下。",
   "preview.dataLoss": "会丢失的数据",
   "preview.loss.claimDeleted": (claim, paths) =>
     `会删除磁盘 ${claim}${paths ? `，以及 ${paths} 里的数据` : ""}。`,

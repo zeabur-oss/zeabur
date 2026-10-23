@@ -151,15 +151,16 @@ why. Add a row before introducing a new concept.
 
 | English | zh-TW | zh-CN | Note |
 |---|---|---|---|
-| project | 專案 | 项目 | |
+| project | 專案 | 项目 | A project card or row names the project; its namespace, when the name differs, is in the Kubernetes details (Kubernetes Namespace) |
 | service | 服務 | 服务 | |
 | cluster | 叢集 | 集群 | |
 | node | 節點 | 节点 | |
-| namespace | Namespace | Namespace | Kubernetes kind, as the dashboard writes it |
-| replica | 副本 | 副本 | |
+| namespace | Namespace | Namespace | Kubernetes kind, as the dashboard writes it. Only where the namespace is what's chosen (use an existing namespace); a name kept by Kubernetes is a name, not a namespace |
+| replica | 副本 | 副本 | Also where a node's trouble stops or blocks them (kubelet stopping pods); Pod stays for the cluster's own counts and the pod network. The replicas list's Kubernetes details say Pod |
+| instance (a database's server: CNPG `spec.instances`, a replica set's `size`) | 執行個體 | 实例 | Never 成員, which names a person on the Members page |
 | container | 容器 | 容器 | |
 | image | 映像檔 | 镜像 | |
-| volume | 磁碟區 | 卷 | The dashboard also says 硬碟／硬盘; a claim is not a disk |
+| volume | 磁碟區 | 卷 | The dashboard also says 硬碟／硬盘; a claim is not a disk. A sentence says 磁碟區 with the claim's name in parentheses, never "claim"; the PersistentVolume behind it is named as one |
 | port | 連接埠 | 端口 | |
 | domain | 網域 | 域名 | |
 | environment variable; Variables tab | 環境變數 | 环境变量; tab 变量 | Tab names as on the dashboard |
@@ -185,6 +186,7 @@ why. Add a row before introducing a new concept.
 | policy | 政策 | 策略 | |
 | permission, rights | 權限 | 权限 | |
 | admin rights | 管理員權限 | 管理员权限 | |
+| use admin rights for a few minutes (the offer to elevate) | 暫時使用管理員權限 | 临时使用管理员权限 | Never 以管理員身分檢視: it changes rights, not the view. The time is Zeabur Identity's setting, so no number is promised |
 | Admin / Developer / Viewer (a role in a project) | 管理員／開發者／檢視者 | 管理员／开发者／查看者 | |
 | session | 工作階段 | 会话 | |
 | credential | 認證資訊 | 凭证 | zh-TW 憑證 is a certificate |
@@ -193,20 +195,22 @@ why. Add a row before introducing a new concept.
 | passkey | 通行密鑰 | 通行密钥 | Apple's name in the system dialog that asks for it (Google's zh-TW wording differs; not verified); chosen over the dashboard's Latin "Passkey" so the page and that dialog match |
 | sign in / sign out | 登入／登出 | 登录／退出登录 | |
 | deploy, roll out | 部署 | 部署 | |
+| auto-deploy new builds | 新建置完成後自動部署 | 新构建完成后自动部署 | Keel is named only when it is missing, when its own policy decides, and in the Kubernetes details |
 | releases (a service's revisions) | 發布紀錄 | 发布记录 | |
 | revision | 修訂版本 | 修订版本 | |
 | restart | 重新啟動 | 重启 | |
 | roll back | 回滾 | 回滚 | |
 | apply a change | 套用 | 应用 | |
-| review (a plan) | 預覽 | 预览 | |
+| review changes (a plan, as the API and docs keep calling it) | 檢查變更 | 检查变更 | Never 計畫／计划 on screen: it reads as a schedule. Expired: 這份變更已過期 |
 | run a command | 執行 | 运行 | |
-| adopt (show a namespace as a project) | 納入 | 纳入 | |
+| use an existing namespace (show it as a project) | 使用既有的 Namespace | 使用已有的 Namespace | A namespace's own row says 使用這個 Namespace; the API and zeaburctl keep adopt |
 | remove from Zeabur | 移除 | 移除 | |
 | read-only | 唯讀 | 只读 | |
 | view (compact action) | 檢視 | 查看 | |
 | jobs (Jobs and CronJobs together) | 批次工作 | 批处理任务 | One-off Jobs are not scheduled |
 | scheduled job | 排程工作 | 定时任务 | A CronJob |
-| background job | 背景工作 | 后台任务 | |
+| schedule (when a backup runs) | 排程 | 定时 | In words with its time zone (每天 03:00（UTC）); the cron expression on hover. Never 计划, which reads as a plan |
+| background service (no public domain; the map's lane and the sidebar's group) | 背景服務 | 后台服务 | A CronJob in it is marked 排程／定时 |
 | health check | 健康檢查 | 健康检查 | |
 | traffic check (readiness) | 就緒檢查 | 就绪检查 | |
 | restart check (liveness) | 存活檢查 | 存活检查 | |
@@ -214,6 +218,7 @@ why. Add a row before introducing a new concept.
 | Overview / Logs / Deployments / Networking / Variables / Settings (a service's tabs) | 概覽／日誌／部署紀錄／網路／環境變數／設定 | 概览／日志／部署记录／网络／变量／设置 | The dashboard's tab names; Deployments holds the releases and what changed |
 | reachable / not reachable / not verified (a domain or address) | 可連線／無法連線／無法確認 | 可访问／无法访问／无法确认 | "Not verified" is never a failure: Zeabur could not check it from where it runs |
 | connection check (one hop of the way to an address) | 連線檢查 | 连接检查 | |
+| configured connection / guessed from variables (where a line on the map comes from) | 已設定的連線／從變數推測 | 已配置的连接／从变量推测 | Configured: an Ingress or a shared Secret or ConfigMap; guessed: a variable's value names the Service |
 | waiting for web to be ready (an address whose only failing hop is a cause said above) | 等待 web 就緒 | 等待 web 就绪 | Neutral, never red; the cause is said once |
 | this also means (what one cause also takes down) | 連帶影響 | 连带影响 | Inside the cause, never a card of its own |
 | deployment stuck | 部署卡住 | 部署卡住 | A rollout that never finishes by itself |
@@ -222,9 +227,9 @@ why. Add a row before introducing a new concept.
 | suggestion (a gap to close) | 建議 | 建议 | |
 | errors in the app / settings to change / caused by the cluster (where a problem comes from, as a group title) | 應用程式出錯／需要調整設定／叢集造成的問題 | 应用出错／需要调整配置／集群造成的问题 | Group titles on Home; beside a single problem, a cause outside the service is a sentence, and the reader's own is not said |
 | this needs a cluster administrator (who must act, when it is not the reader) | 這需要叢集管理員處理 | 这需要集群管理员处理 | Leads the fix, with 複製診斷 as the primary action; never said when the reader can fix it |
-| public domain | 公開網域 | 公开域名 | An Ingress or HTTPRoute host; the dashboard's 公有網路 names the network, not the address |
+| public domain | 公開網域 | 公开域名 | An Ingress or HTTPRoute host; the dashboard's 公有網路 names the network, not the address. Ingress and HTTPRoute appear only in the Kubernetes details, YAML and suggestions about those objects; never "public URL" |
 | private network | 私有網路 | 私有网络 | Reaching a service from inside the cluster through its `Service`; the dashboard says 內網 |
-| private address | 私有位址 | 私有地址 | A `Service` DNS name and port; never 內部位址 |
+| private address | 私有位址 | 私有地址 | A `Service` DNS name and port; never 內部位址. Where the object itself is meant, write Kubernetes Service, since a bare Service reads as 服務 |
 | private service (reachable only inside the cluster) | 私有服務 | 私有服务 | Replaces "internal" (內部) as a role |
 | connection rules | 連線規則 | 连接规则 | `NetworkPolicy`; 政策 stays for policies in general |
 | sends to (a route's backend) | 轉送到 | 转发到 | |

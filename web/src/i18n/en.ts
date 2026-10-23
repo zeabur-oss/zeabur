@@ -4,6 +4,8 @@ import type { P } from "@/i18n/sentence-parts"
 import sentences from "@/i18n/generated/en"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
+const listEn = (items: string[]) => new Intl.ListFormat("en").format(items)
+const weekdayEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** What a refused verb does, in a phrase: `patch` changes, `create` adds. */
@@ -57,7 +59,7 @@ export const en = {
   "shell.signOut": "Sign out",
   "shell.theme": "Theme",
   // Admin rights
-  "elevate.retry": "Retry as admin",
+  "elevate.retry": "Retry with admin rights",
   "elevate.title": "Admin rights",
   "elevate.waiting": "Confirm with your passkey in the new window.",
   "elevate.notAllowed": "This Zeabur may not ask for admin rights. Ask your cluster administrator.",
@@ -68,12 +70,12 @@ export const en = {
   "elevate.until": (time: string) => `Admin until ${time}`,
   "elevate.activeDetail": "Everything you do uses your admin rights until then.",
   "elevate.drop": "Drop admin rights",
-  "elevate.use": "Use admin rights",
+  "elevate.use": "Use admin rights for a few minutes",
   "shell.switchProject": "Switch project",
   "column.label": "Services",
   "column.other": "Other objects",
   "column.advanced": "Advanced",
-  "column.namespace": "Namespace",
+  "column.namespace": "Kubernetes namespace",
 
   "theme.system": "System theme",
   "theme.light": "Light",
@@ -116,8 +118,8 @@ export const en = {
   "problem.title.log-unavailable": "The log is not available",
   "problem.title.conflict": "It changed in the meantime",
   "problem.title.managed": "Another tool manages it",
-  "problem.title.plan-expired": "The plan expired",
-  "problem.title.system-namespace": "Kubernetes keeps this namespace for itself",
+  "problem.title.plan-expired": "These changes expired",
+  "problem.title.system-namespace": "Kubernetes keeps this name for itself",
   "problem.title.invalid": "The cluster rejected the change",
   "problem.title.too-many-requests": "The cluster is busy",
   "problem.title.unavailable": "The cluster cannot be reached",
@@ -126,7 +128,8 @@ export const en = {
   "problem.fix.unauthenticated": "Sign in again.",
   "problem.fix.signed-out": "Sign in again.",
   "problem.fix.forbidden": "Ask a cluster administrator for access, or use an account that has it.",
-  "problem.fix.elevation-required": "Retry as admin, or ask a cluster administrator for access.",
+  "problem.fix.elevation-required":
+    "Retry with admin rights, or ask a cluster administrator for access.",
   "problem.fix.quota-exceeded":
     "Ask for less, free some of what the project uses, or ask a cluster administrator to raise the limit.",
   "problem.fix.policy-denied":
@@ -136,8 +139,8 @@ export const en = {
   "problem.fix.conflict": "Reload to see the latest version, then make the change again.",
   "problem.fix.managed":
     "Change it where the managing tool reads it, such as Helm values or a Git repository. Restarting still works here.",
-  "problem.fix.plan-expired": "Make the plan again.",
-  "problem.fix.system-namespace": "Adopt a namespace of your own instead.",
+  "problem.fix.plan-expired": "Review the changes again.",
+  "problem.fix.system-namespace": "Choose a name that doesn't start with kube-.",
   "problem.fix.invalid": "Correct the fields the cluster names in the details, then try again.",
   "problem.fix.too-many-requests": "Wait a moment and try again.",
   "problem.fix.unavailable":
@@ -173,9 +176,9 @@ export const en = {
   "problemPage.rule.managed":
     "Another tool (Helm, Argo CD, Flux) owns this object and puts its own version back at its next sync or upgrade. A change made here would be undone, so Zeabur refuses it.",
   "problemPage.rule.plan-expired":
-    "A plan is what Zeabur will write, as you reviewed it. It holds for a few minutes only, so what is applied still matches the cluster as it is.",
+    "Reviewed changes are what Zeabur will write, as you saw them. They hold for a few minutes only, so what is applied still matches the cluster as it is.",
   "problemPage.rule.system-namespace":
-    "Kubernetes keeps some namespaces for its own components (kube-system, kube-public, kube-node-lease). They cannot become projects.",
+    "Kubernetes keeps names starting with kube- (kube-system, kube-public, kube-node-lease) for its own components. They cannot become projects.",
   "problemPage.rule.invalid":
     "The cluster checks each object against its schema and rules before it stores it. It refused this one, and named the fields that are not valid.",
   "problemPage.rule.too-many-requests":
@@ -189,7 +192,7 @@ export const en = {
   "refused.rights": "This needs more rights.",
   "refused.rightsFor": (what: string) => `${what} needs more rights.`,
   "refused.ask": "Ask a cluster administrator.",
-  "refused.view": "View as admin",
+  "refused.view": "Use admin rights for a few minutes",
   "refused.details": "Details",
   "refused.missing": "Missing",
   "refused.see": (what: string) => `Seeing ${what}`,
@@ -197,7 +200,7 @@ export const en = {
   "refused.terminal": "Opening a terminal",
   "refused.reveal": "Showing Secret values",
   "refused.listThese": "Listing these",
-  "refused.adopt": (ns: string) => `Adopting ${ns}`,
+  "refused.adopt": (ns: string) => `Using the existing namespace ${ns}`,
   "refused.createProject": (name: string) => `Creating project ${name}`,
   "refused.unadopt": (ns: string) => `Removing ${ns} from Zeabur`,
 
@@ -240,7 +243,7 @@ export const en = {
   // Roles
   "role.web": "Web",
   "role.internal": "Private services",
-  "role.worker": "Workers",
+  "role.worker": "Background",
   "role.job": "Jobs",
   "role.data": "Data",
 
@@ -287,7 +290,7 @@ export const en = {
   "cluster.attEol.fix": "Upgrade to a supported minor version.",
   "cluster.attSkewMany": (n: number) =>
     `${n} nodes run a kubelet outside the supported version skew`,
-  "cluster.attSkew.why": "Kubernetes does not support it, so pods there may misbehave.",
+  "cluster.attSkew.why": "Kubernetes does not support it, so replicas there may misbehave.",
   "cluster.attSkew.fix": "Upgrade the kubelet to the control plane's minor version.",
   "cluster.attComponents": (n: number) => `${n} components are older than the tested versions`,
   "cluster.attComponent.why": "It still runs; Zeabur was tested with a newer version.",
@@ -313,28 +316,29 @@ export const en = {
   "cluster.leaseStale": "No leader: last renewed",
   "node.notReady": (n: number, node: string) =>
     n === 1 ? `${node} is not ready` : `${n} nodes are not ready`,
-  "node.notReady.why": "Services with pods there are down until it is back or the pods move.",
+  "node.notReady.why":
+    "Services with replicas there are down until it is back or the replicas move.",
   "node.notReady.fix":
     "Check that the machine is running and its kubelet can reach the control plane.",
   "node.memoryPressure": (n: number, node: string) =>
     n === 1 ? `${node} is out of memory` : `${n} nodes are out of memory`,
-  "node.memoryPressure.why": "The kubelet is stopping pods to free memory.",
+  "node.memoryPressure.why": "The kubelet is stopping replicas to free memory.",
   "node.memoryPressure.fix":
     "Stop or limit the services that use the most memory, or add memory to the server.",
   "node.diskPressure": (n: number, node: string) =>
     n === 1 ? `${node} is almost out of disk space` : `${n} nodes are almost out of disk space`,
   "node.diskPressure.why":
-    "The kubelet is removing unused images and stopping pods to free space; new pods cannot start.",
+    "The kubelet is removing unused images and stopping replicas to free space; new replicas cannot start.",
   "node.diskPressure.fix":
     "Free space: remove unused images (crictl rmi --prune), old logs or volumes, or grow the disk.",
   "node.pidPressure": (n: number, node: string) =>
     n === 1 ? `${node} is running out of processes` : `${n} nodes are running out of processes`,
-  "node.pidPressure.why": "New processes and pods may fail to start.",
+  "node.pidPressure.why": "New processes and replicas may fail to start.",
   "node.pidPressure.fix":
     "Find the service that starts too many processes, and restart or limit it.",
   "node.networkUnavailable": (n: number, node: string) =>
     n === 1 ? `${node} has no pod network` : `${n} nodes have no pod network`,
-  "node.networkUnavailable.why": "Pods there cannot reach other pods or services.",
+  "node.networkUnavailable.why": "Replicas there cannot reach other replicas or services.",
   "node.networkUnavailable.fix": "Check the network plugin on the node.",
   "node.memoryFull": (n: number, node: string, share: string) =>
     n === 1
@@ -346,24 +350,24 @@ export const en = {
     "Set memory limits on the services that use the most, stop one you do not need, or add memory.",
   "node.diskFull": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: disk ${share} full` : `${n} nodes have disks nearly full (up to ${share})`,
-  "node.diskFull.warn": "From 90% the kubelet stops pods to free space.",
-  "node.diskFull.fail": "The kubelet is about to stop pods to free space.",
+  "node.diskFull.warn": "From 90% the kubelet stops replicas to free space.",
+  "node.diskFull.fail": "The kubelet is about to stop replicas to free space.",
   "node.diskFull.fix":
     "Remove unused images (crictl rmi --prune), old logs or volumes, or grow the disk.",
   "node.cordoned": (n: number, node: string) =>
     n === 1 ? `${node} is cordoned` : `${n} nodes are cordoned`,
-  "node.cordoned.why": "New pods are not placed there; the running ones stay.",
+  "node.cordoned.why": "New replicas are not placed there; the running ones stay.",
   "node.cordoned.fix": (n: number, node: string) =>
     n === 1
       ? `When its maintenance is done, uncordon it (kubectl uncordon ${node}).`
       : "When their maintenance is done, uncordon them.",
   "node.reservedMemory": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: memory ${share} reserved` : `${n} nodes over-reserved on memory`,
-  "node.reservedMemory.why": "New pods that ask for memory may wait for room.",
+  "node.reservedMemory.why": "New replicas that ask for memory may wait for room.",
   "node.reservedMemory.fix": "Lower the memory requests of the services there, or add a node.",
   "node.reservedCpu": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: CPU ${share} reserved` : `${n} nodes over-reserved on CPU`,
-  "node.reservedCpu.why": "New pods that ask for CPU may wait for room.",
+  "node.reservedCpu.why": "New replicas that ask for CPU may wait for room.",
   "node.reservedCpu.fix": "Lower the CPU requests of the services there, or add a node.",
   "unreachable.title": (name: string) => `Cannot reach ${name}`,
   "unreachable.zeabur": "Zeabur does not respond",
@@ -372,7 +376,7 @@ export const en = {
   "unreachable.every": "Zeabur tries again every 15 seconds.",
   "cluster.noProjects": "No projects yet",
   "cluster.noProjectsBody":
-    "A project is a Kubernetes namespace shown in Zeabur. Adopt one on the Projects page.",
+    "A project is a Kubernetes namespace shown in Zeabur. Create one on the Projects page, or use an existing namespace below.",
   "cluster.openProjects": "Open projects",
   "cluster.nodes": "Nodes",
   "cluster.cpu": "CPU",
@@ -452,7 +456,7 @@ export const en = {
   "projects.filterOther": "Filter namespaces",
   "projects.noOtherMatch": (query: string) => `No namespaces match “${query}”.`,
   "projects.noneBody":
-    "A project is a Kubernetes namespace shown in Zeabur. Create one, or adopt a namespace below.",
+    "A project is a Kubernetes namespace shown in Zeabur. Create one, or use an existing namespace below.",
   "projects.new": "New project",
   "projects.newBody":
     "A project is a namespace with the Zeabur project label. You review it before it is created.",
@@ -465,7 +469,7 @@ export const en = {
     "Lowercase letters, digits and hyphens, starting and ending with a letter or digit.",
   "projects.problem.long": "At most 63 characters.",
   "projects.problem.system": "Names starting with kube- belong to Kubernetes.",
-  "projects.problem.taken": "A namespace of this name exists. Adopt it instead.",
+  "projects.problem.taken": "A namespace of this name exists. Use the existing namespace instead.",
   "projects.planNew": (name: string) => `Create project ${name}`,
   "projects.rowMenu": (name: string) => `More for ${name}`,
   "projects.showSystem": "Show system namespaces",
@@ -550,13 +554,29 @@ export const en = {
       : `${missing} of ${total} volumes aren't backed up.`,
   "backups.volumes": (n: number) => plural(n, "volume", "volumes"),
 
+  // Schedules
+  "cron.minute": "Every minute",
+  "cron.minutes": (n: number) => `Every ${n} minutes`,
+  "cron.hour": (minute: number) => (minute === 0 ? "Every hour" : `Every hour at minute ${minute}`),
+  "cron.hours": (n: number, minute: number) =>
+    minute === 0 ? `Every ${n} hours` : `Every ${n} hours at minute ${minute}`,
+  "cron.day": (times: string[]) => `Every day at ${listEn(times)}`,
+  "cron.week": (days: number[], times: string[]) =>
+    `Every ${listEn(days.map((d) => weekdayEn[d] ?? ""))} at ${listEn(times)}`,
+  "cron.weekRange": (from: number, to: number, times: string[]) =>
+    `${weekdayEn[from]} to ${weekdayEn[to]} at ${listEn(times)}`,
+  "cron.month": (days: number[], times: string[]) =>
+    `On day ${listEn(days.map(String))} of every month at ${listEn(times)}`,
+  "cron.zone": (words: string, zone: string) => `${words} (${zone})`,
+
   // Architecture
   "lane.web": "Web",
   "lane.internal": "Private services",
-  "lane.workers": "Workers & jobs",
+  "lane.workers": "Background services",
   "lane.data": "Data",
-  "edge.declared": "Declared",
-  "edge.inferred": "Inferred",
+  "lane.scheduled": "Scheduled",
+  "edge.declared": "Configured connection",
+  "edge.inferred": "Guessed from variables",
   "edge.route": "its public domain",
   "edge.sharedSecret": (name: string) => `both read the secret ${name}`,
   "edge.sharedConfig": (name: string) => `both read the config file ${name}`,
@@ -568,7 +588,7 @@ export const en = {
   "canvas.fit": "Fit to screen",
   "canvas.legend": "About the lines",
   "canvas.legendHint":
-    "Drawn from Kubernetes objects and variable values, not from traffic. Declared: an Ingress or a shared Secret or ConfigMap. Inferred: a variable's value names the Service.",
+    "Drawn from Kubernetes objects and variable values, not from traffic. Configured connection: an Ingress, or a Secret or ConfigMap both services read. Guessed from variables: a variable's value names the other service's private address (Kubernetes Service).",
   "architecture.edges": (n: number) => plural(n, "connection", "connections"),
   "quickLook.label": (name: string) => `Quick look: ${name}`,
   "quickLook.open": "Open service page",
@@ -628,7 +648,7 @@ export const en = {
   "builds.autoUpdateHint": "Each new build goes live as soon as it finishes.",
   "builds.autoUpdatePolicy": (policy: string) =>
     `Keel updates this service with its ${policy} policy, set outside Zeabur.`,
-  "builds.keelMissing": "Deploying automatically needs Keel, which this cluster does not have.",
+  "builds.keelMissing": "Auto-deploy needs the Keel component, which this cluster doesn't have.",
   "builds.installKeel": "How to install",
   "builds.history": "History",
   "builds.trigger.webhook": "Pushed",
@@ -869,10 +889,10 @@ export const en = {
   "net.anyPort": "The only port",
   "net.fullForm": "From another project",
   "net.forwardsTo": (port: string) => `Forwarded to the container's port ${port}`,
-  "net.exposeHint": "To add one, apply a Service or run this command.",
+  "net.exposeHint": "To add one, apply a Kubernetes Service or run this command.",
   "net.noneTitle": (name: string) => `${name} can't receive connections`,
   "net.noneBody":
-    "It has no private address and no public domain. A worker that only makes outgoing connections needs neither, and can still reach other services and the internet.",
+    "It has no private address and no public domain. A background service that only makes outgoing connections needs neither, and can still reach other services and the internet.",
   "net.scheduledTitle": (name: string) => `${name} doesn't receive traffic`,
   "net.scheduledBody":
     "A job runs and exits, so nothing connects to it. It can still connect to other services and the internet.",
@@ -988,13 +1008,13 @@ export const en = {
   "project.entry.objects": "Objects",
   // A project's namespace
   "project.entry.settings": "Settings",
-  "action.adopt": "Adopt",
+  "action.adopt": "Use this namespace",
   "action.unadopt": "Stop showing as a project",
   "action.openDebugTerminal": "Open debug terminal",
   "action.openToolsTerminal": "Open kubectl terminal",
   "action.openInToolsTerminal": "Open in kubectl terminal",
   "action.saveDetails": "Save details",
-  "title.adopt": (ns: string) => `Adopt ${ns}`,
+  "title.adopt": (ns: string) => `Use the existing namespace ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
   "title.details": (ns: string) => `${ns} details`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
@@ -1057,7 +1077,8 @@ export const en = {
   "projectSettings.namespaceHint": "The project is this namespace. Its name can't change.",
   "projectSettings.shown": "Shown as a project",
   "projectSettings.shownYes": "Yes. The namespace has Zeabur's project label.",
-  "projectSettings.shownNo": "No. Adopting adds Zeabur's project label and changes nothing else.",
+  "projectSettings.shownNo":
+    "No. Showing it as a project only adds Zeabur's project label; nothing else changes.",
   "projectSettings.batch": "Batch actions",
   "projectSettings.pauseAll": "Pause all services",
   "projectSettings.pauseAllHint":
@@ -1096,10 +1117,10 @@ export const en = {
   "objects.empty": "Empty",
   "objects.scan": "Scan all kinds",
   "objects.scanning": "Scanning…",
-  "objects.scanned": "All kinds read",
+  "objects.scanned": "All kinds loaded",
   "objects.refresh": "Refresh",
-  "objects.load": (kind: string) => `Read ${kind}`,
-  "objects.unread": "Not read",
+  "objects.load": (kind: string) => `Load ${kind}`,
+  "objects.unread": "Not loaded",
   "objects.denied": "No access",
   "objects.pin": (kind: string) => `Pin ${kind}`,
   "objects.unpin": (kind: string) => `Unpin ${kind}`,
@@ -1118,7 +1139,7 @@ export const en = {
   "create.more": "Other kinds you may create",
   "create.documents": (n: number) => plural(n, "document", "documents"),
   "create.editor": "YAML to create",
-  "create.review": "Review",
+  "create.review": "Review changes",
   "create.empty": "Write the objects as YAML, or add a template.",
   "create.inOrder": "Created in this order",
   "create.inOrderHint":
@@ -1162,7 +1183,7 @@ export const en = {
   "yaml.label": (name: string) => `YAML of ${name}`,
 
   // Plans
-  "plan.planning": "Planning…",
+  "plan.planning": "Checking changes…",
   "plan.apply": "Apply",
   "plan.applying": "Applying…",
   "plan.cancel": "Cancel",
@@ -1209,12 +1230,12 @@ export const en = {
   "plan.short.title": "Not enough room",
   "plan.short.nodes": (names: string, n: number) =>
     n === 0
-      ? "The new pods wait as Pending until a node has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
-      : `The new pods wait as Pending until a node has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
+      ? "The new replicas wait as Pending until a node has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
+      : `The new replicas wait as Pending until a node has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
   "plan.short.quota": (names: string, n: number) =>
     n === 0
-      ? "The quota refuses the new pods until it has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
-      : `The quota refuses the new pods until it has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
+      ? "The quota refuses the new replicas until it has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
+      : `The quota refuses the new replicas until it has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
   "plan.short.fix": (quota: boolean, nodes: boolean): string =>
     quota && nodes
       ? "To finish it, raise the quota and free up room on a node, or reserve less per replica."
@@ -1277,14 +1298,14 @@ export const en = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} is HTTP only: ${route}'s certificates don't come from cert-manager, so add ${host} where they're made`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
-    `Attaches to Gateway ${gateway} (${of} found)`,
-  "warn.gatewaysUnreadable": "Unable to read Gateways: Zeabur uses an Ingress",
+    `Attaches the public domain to Gateway ${gateway} (${of} found)`,
+  "warn.gatewaysUnreadable": "Unable to read Gateways: the public domain won't attach to one",
   "warn.secretValuesUnknown": (name: string) =>
     `Unable to read ${name}'s values: the diff shows keys only`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} reads ConfigMaps or Secrets: a rollback leaves their contents as they are`,
   "warn.storageClassUnknown": (claim: string) =>
-    `Unable to read the StorageClass of ${claim}: the cluster decides whether it can grow`,
+    `Unable to read the volume's StorageClass (${claim}): the cluster decides whether it can grow`,
   "warn.readWriteOnceShared": (workload: string) =>
     `${workload} runs several replicas: a ReadWriteOnce volume mounts on one node only`,
   "warn.readWriteOncePodShared": (workload: string) =>
@@ -1294,15 +1315,15 @@ export const en = {
   "warn.podReplaced": (pod: string, owner: string) =>
     `${owner} starts a new replica in place of ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>
-    `${claim}'s data is deleted: volume ${volume} has reclaim policy Delete`,
+    `The volume's data is deleted (${claim}): its PersistentVolume ${volume} has reclaim policy Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
-    `Volume ${volume} keeps ${claim}'s data (reclaim policy Retain) until an admin removes it`,
+    `The volume's data stays (${claim}): PersistentVolume ${volume} keeps it (reclaim policy Retain) until an admin removes it`,
   "warn.claimDataUnknown": (claim: string) =>
-    `${claim}'s data may be lost: unable to read its volume's reclaim policy`,
+    `The volume's data may be lost (${claim}): unable to read its reclaim policy`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} still read ${name}: their new replicas will not start without it`,
   "warn.claimStillMounted": (name: string, names: string) =>
-    `${names} still mount ${name}: Kubernetes removes it once no replica uses it`,
+    `${names} still mount the volume (${name}): Kubernetes removes it once no replica uses it`,
   "warn.ingressOpened": (names: string) =>
     `No longer isolated: ${names} accept traffic from anywhere`,
   "warn.egressOpened": (names: string) => `No longer limited: ${names} can send traffic anywhere`,
@@ -1359,7 +1380,7 @@ export const en = {
   "confirm.autoUpdateOn": (service: string) =>
     `Each new build of ${service} will go live as soon as it finishes.`,
   "confirm.autoUpdateOff": (service: string) =>
-    `New images of ${service} will wait for you to deploy them.`,
+    `New builds of ${service} will wait for you to deploy them.`,
   "confirm.renameDomain": (from: string) => `Links to ${from} stop working.`,
   "confirm.removeDomain": (host: string) => `Requests to ${host} no longer reach this project.`,
   "confirm.rollback": (revision: number) =>
@@ -1373,7 +1394,7 @@ export const en = {
   "confirm.writable": (path: string, service: string) => `Make ${path} writable in ${service}.`,
   "confirm.mount": (service: string) => `Change a mount of ${service}.`,
   "confirm.removeVolume": (service: string, path: string) =>
-    `${service} stops mounting ${path}. Its claim and the data on it stay; delete the claim under Objects to free the space.`,
+    `${service} stops mounting ${path}. The volume and the data on it stay; to free the space, delete its PersistentVolumeClaim under Objects.`,
   "confirm.probeSet.readiness": (check: string, period: number, _failures: number) =>
     `A replica gets no traffic until ${check} succeeds (checked every ${period} s).`,
   "confirm.probeSet.liveness": (check: string, period: number, failures: number) =>
@@ -1525,7 +1546,7 @@ export const en = {
 
   // Editing
   "edit.add": "Add",
-  "edit.review": "Review",
+  "edit.review": "Review changes",
   "edit.cancel": "Cancel",
   "edit.edit": (name: string) => `Edit ${name}`,
   "edit.remove": (name: string) => `Remove ${name}`,
@@ -1756,7 +1777,7 @@ export const en = {
     `Runs a container image in ${project}. You review the objects before anything is created.`,
   "add.field.image": "Image",
   "add.field.port": "Port",
-  "add.portHint": "Leave empty for a worker that takes no connections.",
+  "add.portHint": "Leave empty for a background service that takes no connections.",
   "add.noTag": "Without a tag the registry serves latest, which is hard to track later.",
   "add.problem.image.empty": "Enter the image to run.",
   "add.problem.image.invalid": "An image reference, like ghcr.io/acme/web:1.4.",
@@ -1767,12 +1788,12 @@ export const en = {
   "add.problem.port.invalid": "A port from 1 to 65535.",
   "add.problem.host.empty": "Enter the domain.",
   "add.problem.host.invalid": "A domain name, like web.example.com.",
-  "add.publicUrl": "Public URL",
+  "add.publicUrl": "Public domain",
   "add.hostHint": "Point this domain's DNS at the cluster's ingress.",
   "add.https": (issuer: string) => `HTTPS, with a certificate from cert-manager (${issuer}).`,
   "add.httpOnly":
     "This URL is HTTP only. An administrator can name a cert-manager issuer to make it HTTPS.",
-  "add.noPublicUrl": "Your role can't add a public URL (Ingress) in this project.",
+  "add.noPublicUrl": "Your role can't add a public domain in this project.",
   "add.more": "More settings",
   "add.moreSummary": "Variables, volume, size, replicas and a private registry.",
   "add.variables": "Variables",
@@ -1783,7 +1804,7 @@ export const en = {
   "add.volumePath": "Mount path",
   "add.volumeSize": "Volume size",
   "add.volumeRecreate":
-    "With a volume the service runs one pod, and an update stops the old pod before the new one starts: the volume mounts on one node at a time.",
+    "With a volume the service runs one replica, and an update stops the old replica before the new one starts: the volume mounts on one node at a time.",
   "add.problem.volumePath": "An absolute path, like /data.",
   "add.replicas": "Replicas",
   "add.replicasFixed": "One, because of the volume.",
@@ -1816,25 +1837,25 @@ export const en = {
   "db.field.engine": "Engine",
   "db.field.name": "Name",
   "db.field.version": "Version",
-  "db.field.members": "Members",
-  "db.field.storage": "Storage per member",
+  "db.field.members": "Instances",
+  "db.field.storage": "Storage per instance",
   "db.field.size": "Size",
   "db.size.small": "Small",
   "db.size.medium": "Medium",
   "db.size.large": "Large",
   "db.sizeDetail": (cpu: string, memory: string, limit: string) =>
-    `Each member asks for ${cpu} CPU and ${memory} memory, and may use up to ${limit}.`,
+    `Each instance asks for ${cpu} CPU and ${memory} memory, and may use up to ${limit}.`,
   "db.name.empty": "Give it a name.",
   "db.name.invalid": "Lowercase letters, digits and hyphens, starting with a letter.",
   "db.name.long": "At most 30 characters.",
   "db.name.taken": "A database of this name exists.",
   "db.storageHint": "It can grow later, not shrink.",
   "db.noRedundancy": (backedUp: boolean) =>
-    `One member: nothing takes over if it fails, and its data is on one volume.${backedUp ? "" : " Set up backups."}`,
-  "db.replicaSetHint": "A replica set keeps running through one failure with three members.",
+    `One instance: nothing takes over if it fails, and its data is on one volume.${backedUp ? "" : " Set up backups."}`,
+  "db.replicaSetHint": "A replica set keeps running through one failure with three instances.",
   "db.kernelBlocked": (versions: string) =>
     `This cluster's nodes run Linux 6.19 or newer, where ${versions} does not start.`,
-  "db.onOneNode": "This cluster has one node, so one member.",
+  "db.onOneNode": "This cluster has one node, so one instance.",
   "db.planCreate": (name: string) => `Create database ${name}`,
   "db.noOperator": "To create databases, install a database component.",
   "db.refused": (engine: string) => `You don't have permission to read ${engine} databases.`,
@@ -1853,7 +1874,7 @@ export const en = {
   "db.tabs": "Database sections",
   "db.fact.engine": "Engine",
   "db.fact.version": "Version",
-  "db.fact.members": "Members",
+  "db.fact.members": "Instances",
   "db.fact.primary": "Primary",
   "db.fact.storage": "Storage",
   "db.fact.size": "Size",
@@ -2012,7 +2033,7 @@ export const en = {
   "usage.installVm": "Install VictoriaMetrics",
   "usage.chooseStore": "Choose another store",
   "usage.needsStoreHint": (service: string) =>
-    `Zeabur looked for ${service}. Any Prometheus-compatible store works, such as Prometheus or VictoriaMetrics; choose its Service in Settings.`,
+    `Zeabur looked for ${service}. Any Prometheus-compatible store works, such as Prometheus or VictoriaMetrics; choose its Kubernetes Service in Settings.`,
   "usage.whatHistory": "Seeing usage history",
   "usage.proxyHint":
     "Zeabur reads the metrics store through the Kubernetes API as you. Anyone allowed to do that can read every project's metrics, so usually only administrators have that permission.",
@@ -2041,7 +2062,7 @@ export const en = {
   "settings.metricsStore": "Usage history",
   "settings.store": "History source",
   "settings.storeHint":
-    "The Service that holds usage history, as namespace/name:port. Any store with the Prometheus HTTP API works. Zeabur reads it through the Kubernetes API with each person's own rights.",
+    "The Kubernetes Service that holds usage history, as namespace/name:port. Any store with the Prometheus HTTP API works. Zeabur reads it through the Kubernetes API with each person's own rights.",
   "settings.storeDefault": "Default",
   "settings.storeIsDefault": "(default)",
   "settings.storeChosen": "Set in Zeabur",
@@ -2276,13 +2297,13 @@ export const en = {
   // above); `writeSentence` finds them under `sentence.<key>`.
   "sentence.problem.forbidden.fix.askForRule": (p: P) =>
     `Ask a cluster administrator for ${p.rule}, for example with a ClusterRole granting it and a ClusterRoleBinding to you.`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "Ask an admin, or retry as admin.",
+  "sentence.problem.forbidden.fix.askOrRetry": () => "Ask an admin, or retry with admin rights.",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "Send this to an admin. It grants only that permission, and only in this project.",
   "sentence.problem.planExpired.fix.again": (p: P) =>
-    `Plans last ${p.minutes} minutes. Make the plan again.`,
+    `Reviewed changes hold for ${p.minutes} minutes. Review them again.`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "Make the plan again. A plan applies only on the server that made it, with its token unchanged.",
+    "Review the changes again. They apply only on the server that checked them, with their token unchanged.",
   "sentence.problem.conflict.fix.review": () => "Review again to start from its current state.",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "Wait until it runs; its logs and events say why it doesn't.",
@@ -2322,9 +2343,9 @@ export const en = {
     p.name ? `${p.name} changed after you reviewed it.` : "It changed after you reviewed it.",
   "sentence.problem.summary.managed": (p: P) =>
     p.name ? `Another tool manages ${p.name}.` : "Another tool manages this.",
-  "sentence.problem.summary.plan-expired": () => "The plan expired.",
+  "sentence.problem.summary.plan-expired": () => "These changes expired.",
   "sentence.problem.summary.system-namespace": (p: P) =>
-    `${p.name ?? "This namespace"} belongs to Kubernetes itself.`,
+    `${p.name ?? "This name"} belongs to Kubernetes itself.`,
   "sentence.problem.summary.invalid": (p: P) =>
     p.name ? `The cluster refused the change to ${p.name}.` : "The cluster refused the change.",
   "sentence.problem.summary.too-many-requests": () => "The cluster is busy.",
@@ -2437,7 +2458,7 @@ export const en = {
   "draft.add": "Add to changes",
   "draft.pendingHere": "has changes waiting for review",
   "draft.count": (n: number) => plural(n, "change pending", "changes pending"),
-  "draft.review": "Review",
+  "draft.review": "Review changes",
   "draft.none": "No changes yet",
   "draft.save": "Save",
   "draft.leaveTitle": "Leave without saving?",
@@ -2481,7 +2502,7 @@ export const en = {
   "home.incidentsUnchecked":
     "Causes in the cluster could not all be read; a problem there may be missing.",
   "home.lastKnown": "Last known",
-  "home.adoptTitle": "Namespaces to adopt",
+  "home.adoptTitle": "Existing namespaces",
   "home.showWarningsOf": (shown: number, total: number) => `Show ${shown} of ${total} warnings`,
   "home.allWarnings": (n: number) => `All ${n} on the cluster page`,
   "home.affects": "Affects",
@@ -2617,17 +2638,17 @@ export const en = {
   "preview.pendingRestart": (name: string) => `${name} keeps the old value until it restarts.`,
   "preview.downtime": "Nothing serves for a moment.",
   "preview.cores": (n: string) => `${n} CPU`,
-  "preview.fits": (pods: number, cpu: string, memory: string) =>
-    `Fits: it adds ${plural(pods, "pod", "pods")}, ${cpu} and ${memory} at its peak.`,
+  "preview.fits": (replicas: number, cpu: string, memory: string) =>
+    `Fits: it adds ${plural(replicas, "replica", "replicas")}, ${cpu} and ${memory} at its peak.`,
   "preview.blockedQuota": (name: string, resource: string, need: string, left: string) =>
     resource === "pods"
-      ? `Quota ${name} allows ${left} more pods; this needs ${need}.`
+      ? `Quota ${name} allows ${left} more replicas; this needs ${need}.`
       : `Quota ${name} allows ${left} more; this needs ${need}.`,
   "preview.blockedNodes": (_name: string, resource: string, need: string, left: string) =>
     resource === "pods"
-      ? `No node has room for ${need} more pods; the roomiest has room for ${left}.`
+      ? `No node has room for ${need} more replicas; the roomiest has room for ${left}.`
       : `No node has ${need} free; the roomiest has ${left}.`,
-  "preview.fitUnknown": "Zeabur could not check whether the new pods fit.",
+  "preview.fitUnknown": "Zeabur could not check whether the new replicas fit.",
   "preview.dataLoss": "Data this loses",
   "preview.loss.claimDeleted": (claim: string, paths: string) =>
     `Deletes the disk ${claim}${paths ? ` and what is in ${paths}` : ""}.`,

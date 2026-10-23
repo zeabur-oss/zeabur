@@ -122,9 +122,9 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       await developer.getByRole("menuitem", { name: db.engine, exact: true }).click()
       const drawer = developer.getByRole("dialog", { name: "New database" })
       await drawer.getByRole("textbox", { name: "Name" }).fill(db.name)
-      await drawer.getByRole("textbox", { name: "Storage per member" }).fill("1Gi")
+      await drawer.getByRole("textbox", { name: "Storage per instance" }).fill("1Gi")
       await expect(drawer.getByRole("alert")).toContainText("nothing takes over")
-      await drawer.getByRole("button", { name: "Review", exact: true }).click()
+      await drawer.getByRole("button", { name: "Review changes", exact: true }).click()
       await apply(developer, `Create database ${db.name}`)
 
       await developer.goto(databasePage(db.path, db.name))
@@ -141,7 +141,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       const drawer = developer.getByRole("dialog", { name: `Connect ${db.name} to services` })
       await drawer.getByRole("checkbox", { name: service }).click()
       await expect(drawer).toContainText(db.variables.join(", "))
-      await drawer.getByRole("button", { name: "Review", exact: true }).click()
+      await drawer.getByRole("button", { name: "Review changes", exact: true }).click()
       const title = `Connect ${db.name} to ${service}`
       // The plan is the drawer's second step; it names the restart and writes no password.
       const plan = developer.getByRole("dialog", { name: title })
@@ -181,7 +181,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       await setUp.getByRole("textbox", { name: "Bucket" }).fill("backups")
       await setUp.getByRole("textbox", { name: "Access key ID" }).fill(keys.access)
       await setUp.getByRole("textbox", { name: "Secret access key" }).fill(keys.secret)
-      await setUp.getByRole("button", { name: "Review", exact: true }).click()
+      await setUp.getByRole("button", { name: "Review changes", exact: true }).click()
       const plan = developer.getByRole("dialog", { name: `Back up ${db.name}` })
       await expect(plan).not.toContainText(keys.secret)
       await apply(developer, `Back up ${db.name}`)

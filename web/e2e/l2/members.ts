@@ -15,7 +15,7 @@ export async function signInAsAdmin(page: Page, link: string) {
   await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible()
   await page.goto("/cluster")
   const nodes = page.getByRole("region", { name: "Nodes" })
-  const view = nodes.getByRole("button", { name: "View as admin" })
+  const view = nodes.getByRole("button", { name: "Use admin rights for a few minutes" })
   await expect(view).toBeVisible({ timeout: 30_000 })
   const opened = page.waitForEvent("popup")
   await view.click()

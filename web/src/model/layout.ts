@@ -1,6 +1,6 @@
 // The Architecture tab's automatic layered layout, left to right: Web (exposed by an Ingress) →
-// Internal (behind a Service) → Workers & jobs → Data. Within a layer, nodes are ordered by the
-// barycentre of their neighbours (a few down and up sweeps; Sugiyama, Tagawa and Toda 1981) to
+// Internal (behind a Service) → Background services → Data. Within a layer, nodes are ordered by
+// the barycentre of their neighbours (a few down and up sweeps; Sugiyama, Tagawa and Toda 1981) to
 // reduce crossings; a layer with many cards wraps into up to three columns. Deterministic: the
 // same project always gives the same coordinates.
 import type { Edge } from "@/model/connections"

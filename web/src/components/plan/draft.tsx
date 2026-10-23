@@ -118,7 +118,7 @@ export function DraftProvider({ draft, children }: { draft: Draft; children: Rea
   return <DraftContext value={draft}>{children}</DraftContext>
 }
 
-/** "Add to changes" where edits wait in a draft, else "Review". */
+/** "Add to changes" where edits wait in a draft, else "Review changes". */
 export function ReviewWord() {
   const t = useT()
   return useDraft() ? t("draft.add") : t("edit.review")

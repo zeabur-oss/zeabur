@@ -4,6 +4,7 @@ import sentences from "@/i18n/generated/zh-TW"
 
 // A space where Han text meets a Latin word ("檢視 Secrets 需要…").
 
+const weekdayZhTW = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
 const latinEnd = (text: string) => (/[A-Za-z0-9]$/.test(text) ? " " : "")
 
@@ -46,7 +47,7 @@ export const zhTW: Messages = {
   "shell.whoamiUnknown": "不明使用者",
   "shell.signOut": "登出",
   "shell.theme": "主題",
-  "elevate.retry": "以管理員身分重試",
+  "elevate.retry": "暫時用管理員權限重試",
   "elevate.title": "管理員權限",
   "elevate.waiting": "在新視窗用通行密鑰確認。",
   "elevate.notAllowed": "這個 Zeabur 不能要求管理員權限，請洽叢集管理員。",
@@ -57,12 +58,12 @@ export const zhTW: Messages = {
   "elevate.until": (time) => `管理員權限至 ${time}`,
   "elevate.activeDetail": "在此之前，你的所有操作都會使用管理員權限。",
   "elevate.drop": "放棄管理員權限",
-  "elevate.use": "使用管理員權限",
+  "elevate.use": "暫時使用管理員權限",
   "shell.switchProject": "切換專案",
   "column.label": "服務",
   "column.other": "其他物件",
   "column.advanced": "進階",
-  "column.namespace": "Namespace",
+  "column.namespace": "Kubernetes Namespace",
 
   "theme.system": "跟隨系統",
   "theme.light": "淺色",
@@ -102,8 +103,8 @@ export const zhTW: Messages = {
   "problem.title.log-unavailable": "無法取得日誌",
   "problem.title.conflict": "這段期間已有其他變更",
   "problem.title.managed": "由其他工具管理",
-  "problem.title.plan-expired": "計畫已過期",
-  "problem.title.system-namespace": "這是 Kubernetes 自用的 Namespace",
+  "problem.title.plan-expired": "這份變更已過期",
+  "problem.title.system-namespace": "這個名稱是 Kubernetes 自用的",
   "problem.title.invalid": "叢集拒絕了這項變更",
   "problem.title.too-many-requests": "叢集忙碌中",
   "problem.title.unavailable": "無法連上叢集",
@@ -112,7 +113,7 @@ export const zhTW: Messages = {
   "problem.fix.unauthenticated": "重新登入。",
   "problem.fix.signed-out": "重新登入。",
   "problem.fix.forbidden": "向叢集管理員要求權限，或改用有權限的帳號。",
-  "problem.fix.elevation-required": "以管理員身分重試，或向叢集管理員要求權限。",
+  "problem.fix.elevation-required": "暫時用管理員權限重試，或向叢集管理員要求權限。",
   "problem.fix.quota-exceeded": "減少要求的量、釋出專案已用的資源，或請叢集管理員調高上限。",
   "problem.fix.policy-denied": "依政策指出的地方修改，或向叢集管理員詢問這項政策。",
   "problem.fix.not-found": "重新載入頁面，看看叢集目前有什麼。",
@@ -120,8 +121,8 @@ export const zhTW: Messages = {
   "problem.fix.conflict": "重新載入看最新版本，再做一次變更。",
   "problem.fix.managed":
     "到管理工具讀取設定的地方變更，例如 Helm values 或 Git 儲存庫。這裡仍然可以重新啟動。",
-  "problem.fix.plan-expired": "重新產生計畫。",
-  "problem.fix.system-namespace": "改為納入你自己的 Namespace。",
+  "problem.fix.plan-expired": "重新檢查變更。",
+  "problem.fix.system-namespace": "改用不是 kube- 開頭的名稱。",
   "problem.fix.invalid": "修正細節中叢集指出的欄位，再試一次。",
   "problem.fix.too-many-requests": "稍等一下再試一次。",
   "problem.fix.unavailable": "確認叢集正在運作，而且這台機器連得到它。",
@@ -150,13 +151,13 @@ export const zhTW: Messages = {
   "problemPage.rule.log-unavailable":
     "叢集只保留容器這一次與上一次執行的日誌，而且只在副本還存在時保留。從未寫出的日誌，或副本已經不在的日誌，都無法讀取。",
   "problemPage.rule.conflict":
-    "Zeabur 只會把變更寫到你預覽的那個版本上。如果之後有人或其他程式（例如部署工具、自動擴縮）改了這個物件，就什麼都不會寫入，誰的變更都不會遺失。",
+    "Zeabur 只會把變更寫到你檢查過的那個版本上。如果之後有人或其他程式（例如部署工具、自動擴縮）改了這個物件，就什麼都不會寫入，誰的變更都不會遺失。",
   "problemPage.rule.managed":
     "這個物件由其他工具（Helm、Argo CD、Flux）管理。那個工具下一次同步或升級時，會換回自己的版本，蓋掉在這裡做的變更，所以 Zeabur 不接受。",
   "problemPage.rule.plan-expired":
-    "計畫就是你預覽過、Zeabur 將要寫入的內容。它只在幾分鐘內有效，這樣套用時，內容仍符合叢集現況。",
+    "你檢查過的變更，就是 Zeabur 將要寫入的內容。它只在幾分鐘內有效，這樣套用時，內容仍符合叢集現況。",
   "problemPage.rule.system-namespace":
-    "Kubernetes 保留了幾個 Namespace 給自己的元件使用（kube-system、kube-public、kube-node-lease），它們不能成為專案。",
+    "kube- 開頭的名稱是 Kubernetes 元件專用的（kube-system、kube-public、kube-node-lease），不能成為專案。",
   "problemPage.rule.invalid":
     "叢集儲存物件之前，會依照它的結構描述與規則檢查。叢集拒絕了這個物件，並指出哪些欄位無效。",
   "problemPage.rule.too-many-requests":
@@ -169,7 +170,7 @@ export const zhTW: Messages = {
   "refused.rights": "這需要更多權限。",
   "refused.rightsFor": (what) => `${what}${latinEnd(what)}需要更多權限。`,
   "refused.ask": "請洽叢集管理員。",
-  "refused.view": "以管理員身分檢視",
+  "refused.view": "暫時使用管理員權限",
   "refused.details": "細節",
   "refused.missing": "缺少的權限",
   "refused.see": (what) => `檢視${latinStart(what)}${what}`,
@@ -177,7 +178,7 @@ export const zhTW: Messages = {
   "refused.terminal": "開啟終端機",
   "refused.reveal": "顯示 Secret 的值",
   "refused.listThese": "列出這些物件",
-  "refused.adopt": (ns) => `納入 ${ns}`,
+  "refused.adopt": (ns) => `使用既有的 Namespace ${ns}`,
   "refused.createProject": (name) => `建立專案 ${name}`,
   "refused.unadopt": (ns) => `從 Zeabur 移除 ${ns}`,
 
@@ -216,7 +217,7 @@ export const zhTW: Messages = {
 
   "role.web": "網站",
   "role.internal": "私有服務",
-  "role.worker": "背景工作",
+  "role.worker": "背景服務",
   "role.job": "批次工作",
   "role.data": "資料",
 
@@ -256,7 +257,7 @@ export const zhTW: Messages = {
   "cluster.attEolSoon.why": "之後就不再收到安全性修補。",
   "cluster.attEol.fix": "升級到仍受支援的次要版本。",
   "cluster.attSkewMany": (n) => `${n} 個節點的 kubelet 版本差距超出支援範圍`,
-  "cluster.attSkew.why": "Kubernetes 不支援這種組合，上面的 Pod 可能出錯。",
+  "cluster.attSkew.why": "Kubernetes 不支援這種組合，上面的副本可能出錯。",
   "cluster.attSkew.fix": "把 kubelet 升級到和控制平面相同的次要版本。",
   "cluster.attComponents": (n) => `${n} 個元件比已測試的版本舊`,
   "cluster.attComponent.why": "仍在執行；Zeabur 測試時用的是較新版本。",
@@ -279,24 +280,23 @@ export const zhTW: Messages = {
   "cluster.leaseRenewed": "領導者最後續約",
   "cluster.leaseStale": "沒有領導者：最後續約",
   "node.notReady": (n, node) => (n === 1 ? `${node} 未就緒` : `${n} 個節點未就緒`),
-  "node.notReady.why": "在上面有 Pod 的服務會停擺，直到節點恢復或 Pod 移走。",
+  "node.notReady.why": "在上面有副本的服務會停擺，直到節點恢復或副本移走。",
   "node.notReady.fix": "確認機器有在運作，且 kubelet 連得到控制平面。",
   "node.memoryPressure": (n, node) => (n === 1 ? `${node} 記憶體不足` : `${n} 個節點記憶體不足`),
-  "node.memoryPressure.why": "kubelet 正在停掉 Pod 來釋放記憶體。",
+  "node.memoryPressure.why": "kubelet 正在停掉副本來釋放記憶體。",
   "node.memoryPressure.fix": "停掉或限制最耗記憶體的服務，或替伺服器加記憶體。",
   "node.diskPressure": (n, node) =>
     n === 1 ? `${node} 磁碟空間快用完了` : `${n} 個節點磁碟空間快用完了`,
-  "node.diskPressure.why":
-    "kubelet 正在刪除沒用到的映像檔並停掉 Pod 來騰出空間，新的 Pod 無法啟動。",
+  "node.diskPressure.why": "kubelet 正在刪除沒用到的映像檔並停掉副本來騰出空間，新的副本無法啟動。",
   "node.diskPressure.fix":
     "騰出空間：刪除沒用到的映像檔（crictl rmi --prune）、舊日誌或磁碟區，或加大磁碟。",
   "node.pidPressure": (n, node) =>
     n === 1 ? `${node} 的行程數快用完了` : `${n} 個節點的行程數快用完了`,
-  "node.pidPressure.why": "新的行程和 Pod 可能無法啟動。",
+  "node.pidPressure.why": "新的行程和副本可能無法啟動。",
   "node.pidPressure.fix": "找出開了太多行程的服務，重新啟動或加上限制。",
   "node.networkUnavailable": (n, node) =>
     n === 1 ? `${node} 沒有 Pod 網路` : `${n} 個節點沒有 Pod 網路`,
-  "node.networkUnavailable.why": "上面的 Pod 連不到其他 Pod 或服務。",
+  "node.networkUnavailable.why": "上面的副本連不到其他副本或服務。",
   "node.networkUnavailable.fix": "檢查節點上的網路外掛。",
   "node.memoryFull": (n, node, share) =>
     n === 1 ? `${node}：記憶體已用 ${share}` : `${n} 個節點記憶體快滿了（最高 ${share}）`,
@@ -305,20 +305,20 @@ export const zhTW: Messages = {
   "node.memoryFull.fix": "替最耗記憶體的服務設定記憶體上限、停掉用不到的服務，或加記憶體。",
   "node.diskFull": (n, node, share) =>
     n === 1 ? `${node}：磁碟已用 ${share}` : `${n} 個節點磁碟快滿了（最高 ${share}）`,
-  "node.diskFull.warn": "到 90% 時 kubelet 會開始停掉 Pod 來騰出空間。",
-  "node.diskFull.fail": "kubelet 即將停掉 Pod 來騰出空間。",
+  "node.diskFull.warn": "到 90% 時 kubelet 會開始停掉副本來騰出空間。",
+  "node.diskFull.fail": "kubelet 即將停掉副本來騰出空間。",
   "node.diskFull.fix": "刪除沒用到的映像檔（crictl rmi --prune）、舊日誌或磁碟區，或加大磁碟。",
   "node.cordoned": (n, node) => (n === 1 ? `${node} 已停止排程` : `${n} 個節點已停止排程`),
-  "node.cordoned.why": "新的 Pod 不會放到上面，執行中的會留著。",
+  "node.cordoned.why": "新的副本不會放到上面，執行中的會留著。",
   "node.cordoned.fix": (n, node) =>
     n === 1 ? `維護完成後恢復排程（kubectl uncordon ${node}）。` : "維護完成後恢復這些節點的排程。",
   "node.reservedMemory": (n, node, share) =>
     n === 1 ? `${node}：記憶體已保留 ${share}` : `${n} 個節點的記憶體保留過量`,
-  "node.reservedMemory.why": "要求記憶體的新 Pod 可能要等到有空間。",
+  "node.reservedMemory.why": "要求記憶體的新副本可能要等到有空間。",
   "node.reservedMemory.fix": "調低上面服務的記憶體要求量，或加一個節點。",
   "node.reservedCpu": (n, node, share) =>
     n === 1 ? `${node}：CPU 已保留 ${share}` : `${n} 個節點的 CPU 保留過量`,
-  "node.reservedCpu.why": "要求 CPU 的新 Pod 可能要等到有空間。",
+  "node.reservedCpu.why": "要求 CPU 的新副本可能要等到有空間。",
   "node.reservedCpu.fix": "調低上面服務的 CPU 要求量，或加一個節點。",
   "unreachable.title": (name) => `連不到 ${name}`,
   "unreachable.zeabur": "Zeabur 沒有回應",
@@ -326,7 +326,8 @@ export const zhTW: Messages = {
   "unreachable.retrying": "正在重試…",
   "unreachable.every": "Zeabur 每 15 秒會重試一次。",
   "cluster.noProjects": "還沒有專案",
-  "cluster.noProjectsBody": "專案是 Zeabur 顯示的 Kubernetes Namespace。到「專案」頁面納入一個。",
+  "cluster.noProjectsBody":
+    "專案是 Zeabur 顯示的 Kubernetes Namespace。到「專案」頁面新增，或使用下方既有的 Namespace。",
   "cluster.openProjects": "開啟專案頁面",
   "cluster.nodes": "節點",
   "cluster.cpu": "CPU",
@@ -402,7 +403,7 @@ export const zhTW: Messages = {
   "projects.filterOther": "篩選命名空間",
   "projects.noOtherMatch": (query) => `沒有符合「${query}」的命名空間。`,
   "projects.noneBody":
-    "專案是 Zeabur 顯示的 Kubernetes Namespace。新增一個，或從下方納入 Namespace。",
+    "專案是 Zeabur 顯示的 Kubernetes Namespace。新增一個，或使用下方既有的 Namespace。",
   "projects.new": "新增專案",
   "projects.newBody": "專案是帶有 Zeabur 專案標籤的 Namespace。建立前會先讓你確認。",
   "projects.newName": "名稱",
@@ -413,7 +414,7 @@ export const zhTW: Messages = {
   "projects.problem.invalid": "小寫字母、數字和連字號，開頭和結尾是字母或數字。",
   "projects.problem.long": "最多 63 個字元。",
   "projects.problem.system": "kube- 開頭的名稱保留給 Kubernetes。",
-  "projects.problem.taken": "已經有同名的 Namespace，可以改用納入。",
+  "projects.problem.taken": "已經有同名的 Namespace，可以改為使用既有的 Namespace。",
   "projects.planNew": (name) => `建立專案 ${name}`,
   "projects.rowMenu": (name) => `${name} 的更多動作`,
   "projects.showSystem": "顯示系統 Namespace",
@@ -494,12 +495,29 @@ export const zhTW: Messages = {
       : `${total} 個磁碟區中有 ${missing} 個沒有備份。`,
   "backups.volumes": (n) => `${n} 個磁碟區`,
 
+  "cron.minute": "每分鐘",
+  "cron.minutes": (n) => `每 ${n} 分鐘`,
+  "cron.hour": (minute) => (minute === 0 ? "每小時" : `每小時第 ${minute} 分`),
+  "cron.hours": (n, minute) => (minute === 0 ? `每 ${n} 小時` : `每 ${n} 小時的第 ${minute} 分`),
+  "cron.day": (times) => `每天 ${listZh("zh-TW", times)}`,
+  "cron.week": (days, times) =>
+    `每${listZh(
+      "zh-TW",
+      days.map((d) => weekdayZhTW[d] ?? ""),
+    )} ${listZh("zh-TW", times)}`,
+  "cron.weekRange": (from, to, times) =>
+    `每${weekdayZhTW[from]}至${weekdayZhTW[to]} ${listZh("zh-TW", times)}`,
+  "cron.month": (days, times) =>
+    `每月 ${listZh("zh-TW", days.map(String))} 日 ${listZh("zh-TW", times)}`,
+  "cron.zone": (words, zone) => `${words}（${zone}）`,
+
   "lane.web": "網站",
   "lane.internal": "私有服務",
-  "lane.workers": "背景與批次工作",
+  "lane.workers": "背景服務",
   "lane.data": "資料",
-  "edge.declared": "宣告",
-  "edge.inferred": "推測",
+  "lane.scheduled": "排程",
+  "edge.declared": "已設定的連線",
+  "edge.inferred": "從變數推測",
   "edge.route": "經由公開網域",
   "edge.sharedSecret": (name) => `都讀取機密 ${name}`,
   "edge.sharedConfig": (name) => `都讀取設定檔 ${name}`,
@@ -511,7 +529,7 @@ export const zhTW: Messages = {
   "canvas.fit": "符合畫面大小",
   "canvas.legend": "連線說明",
   "canvas.legendHint":
-    "根據 Kubernetes 物件和環境變數值畫出，不是根據實際流量。宣告：Ingress，或共用的 Secret、ConfigMap。推測：環境變數值提到了這個 Service。",
+    "根據 Kubernetes 物件和環境變數值畫出，不是根據實際流量。已設定的連線：Ingress，或兩個服務共用的 Secret、ConfigMap。從變數推測：環境變數值提到了另一個服務的私有位址（Kubernetes Service）。",
   "architecture.edges": (n) => `${n} 條連線`,
   "quickLook.label": (name) => `快速檢視：${name}`,
   "quickLook.open": "開啟服務頁面",
@@ -569,7 +587,7 @@ export const zhTW: Messages = {
   "builds.autoUpdateHint": "每次建置完成就立刻上線。",
   "builds.autoUpdatePolicy": (policy) =>
     `Keel 依 ${policy} 規則更新這個服務，這個設定不是在 Zeabur 設的。`,
-  "builds.keelMissing": "自動部署需要 Keel，這個叢集還沒有安裝。",
+  "builds.keelMissing": "自動部署需要叢集裡的 Keel 元件，目前還沒有安裝。",
   "builds.installKeel": "安裝方式",
   "builds.history": "紀錄",
   "builds.trigger.webhook": "推送觸發",
@@ -786,10 +804,10 @@ export const zhTW: Messages = {
   "net.anyPort": "唯一的連接埠",
   "net.fullForm": "從其他專案連線",
   "net.forwardsTo": (port) => `轉送到容器的連接埠 ${port}`,
-  "net.exposeHint": "要新增私有位址，請套用 Service 或執行這個指令。",
+  "net.exposeHint": "要新增私有位址，請套用 Kubernetes Service 或執行這個指令。",
   "net.noneTitle": (name) => `${name} 無法接收連線`,
   "net.noneBody":
-    "它沒有私有位址，也沒有公開網域。只會主動往外連的背景工作兩者都不需要，仍然可以連到其他服務和網際網路。",
+    "它沒有私有位址，也沒有公開網域。只會主動往外連的背景服務兩者都不需要，仍然可以連到其他服務和網際網路。",
   "net.scheduledTitle": (name) => `${name} 不接收流量`,
   "net.scheduledBody": "批次工作執行完就結束，不會有連線進來；它仍然可以連到其他服務和網際網路。",
   "reach.fromDomains": "公開網域",
@@ -901,13 +919,13 @@ export const zhTW: Messages = {
   "project.entry.objects": "物件",
   // 專案的 Namespace
   "project.entry.settings": "設定",
-  "action.adopt": "納入",
+  "action.adopt": "使用這個 Namespace",
   "action.unadopt": "不再顯示為專案",
   "action.openDebugTerminal": "開啟除錯終端機",
   "action.openToolsTerminal": "開啟 kubectl 終端機",
   "action.openInToolsTerminal": "在 kubectl 終端機開啟",
   "action.saveDetails": "儲存詳細資料",
-  "title.adopt": (ns) => `納入 ${ns}`,
+  "title.adopt": (ns) => `使用既有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再顯示為專案`,
   "title.details": (ns) => `${ns} 的詳細資料`,
   "title.pauseAll": (ns) => `暫停 ${ns} 的所有服務`,
@@ -965,7 +983,7 @@ export const zhTW: Messages = {
   "projectSettings.namespaceHint": "這個專案就是這個 Namespace，名稱無法變更。",
   "projectSettings.shown": "顯示為專案",
   "projectSettings.shownYes": "是。Namespace 帶有 Zeabur 的專案標籤。",
-  "projectSettings.shownNo": "否。納入只會加上 Zeabur 的專案標籤，其他都不變。",
+  "projectSettings.shownNo": "否。改為顯示成專案時，Zeabur 只會加上專案標籤，其他都不變。",
   "projectSettings.batch": "批次操作",
   "projectSettings.pauseAll": "暫停所有服務",
   "projectSettings.pauseAllHint": "停止這個專案的所有服務；之後可以恢復。",
@@ -1001,10 +1019,10 @@ export const zhTW: Messages = {
   "objects.empty": "空的",
   "objects.scan": "掃描全部種類",
   "objects.scanning": "正在掃描…",
-  "objects.scanned": "已讀取全部種類",
+  "objects.scanned": "已載入全部種類",
   "objects.refresh": "重新整理",
-  "objects.load": (kind: string) => `讀取 ${kind}`,
-  "objects.unread": "未讀取",
+  "objects.load": (kind: string) => `載入 ${kind}`,
+  "objects.unread": "尚未載入",
   "objects.denied": "沒有權限",
   "objects.pin": (kind: string) => `釘選 ${kind}`,
   "create.button": "建立",
@@ -1016,7 +1034,7 @@ export const zhTW: Messages = {
   "create.more": "其他可建立的類型",
   "create.documents": (n) => `${n} 份文件`,
   "create.editor": "要建立的 YAML",
-  "create.review": "預覽",
+  "create.review": "檢查變更",
   "create.empty": "用 YAML 寫下要建立的物件，或加入範本。",
   "create.inOrder": "建立順序",
   "create.inOrderHint":
@@ -1026,13 +1044,13 @@ export const zhTW: Messages = {
   "create.showInYaml": "在 YAML 中顯示",
   "create.problems": (n) => `${n} 個問題`,
   "create.notes": (n) => `${n} 則提醒`,
-  "create.fixFirst": "修正上面的問題後才能預覽。",
+  "create.fixFirst": "修正上面的問題後才能檢查變更。",
   "create.found.invalidYaml": "這一行讀不成 YAML：請檢查縮排和引號。",
   "create.found.missingField": (field) => `每個物件都需要 ${field}。`,
   "create.found.clusterScoped": (kind) => `${kind} 屬於整個叢集，Zeabur 只在專案內建立物件。`,
   "create.found.notServed": (kind, apiVersion) => `這個叢集沒有提供 ${kind}（${apiVersion}）。`,
   "create.found.rights": (kind, project) =>
-    `你的權限似乎不能在 ${project} 建立 ${kind}，預覽時會再問叢集。`,
+    `你的權限似乎不能在 ${project} 建立 ${kind}，檢查變更時會再問叢集。`,
   "create.found.otherNamespace": (namespace, project) =>
     `命名空間 ${namespace} 不是這個專案。請刪掉這一行，或改成 ${project}。`,
   "create.found.duplicate": (kind, name) => `${kind} ${name} 寫了兩次。`,
@@ -1060,13 +1078,13 @@ export const zhTW: Messages = {
   "yaml.hidden": "Secret 的值已隱藏。",
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
-  // 變更計畫
-  "plan.planning": "正在計算…",
+  // 檢查變更
+  "plan.planning": "正在檢查變更…",
   "plan.apply": "套用",
   "plan.applying": "正在套用…",
   "plan.cancel": "取消",
   "plan.back": "返回",
-  "plan.replan": "重新預覽",
+  "plan.replan": "重新檢查",
   "plan.details": "技術細節",
   "plan.expiresIn": (time: string) => `${time} 後失效`,
   "plan.expired": "已失效",
@@ -1106,12 +1124,12 @@ export const zhTW: Messages = {
   "plan.short.title": "空間不足",
   "plan.short.nodes": (names, n) =>
     n === 0
-      ? "新的 Pod 會停在 Pending，等節點有空間才啟動。舊的 Pod 會繼續執行，服務不中斷，但變更要到那時才完成。"
-      : `新的 Pod 會停在 Pending，等節點有空間才啟動。在那之前，${names}${latinEnd(names)}不會執行。`,
+      ? "新的副本會停在 Pending，等節點有空間才啟動。舊的副本會繼續執行，服務不中斷，但變更要到那時才完成。"
+      : `新的副本會停在 Pending，等節點有空間才啟動。在那之前，${names}${latinEnd(names)}不會執行。`,
   "plan.short.quota": (names, n) =>
     n === 0
-      ? "配額會拒絕新的 Pod，直到配額有空間。舊的 Pod 會繼續執行，服務不中斷，但變更要到那時才完成。"
-      : `配額會拒絕新的 Pod，直到配額有空間。在那之前，${names}${latinEnd(names)}不會執行。`,
+      ? "配額會拒絕新的副本，直到配額有空間。舊的副本會繼續執行，服務不中斷，但變更要到那時才完成。"
+      : `配額會拒絕新的副本，直到配額有空間。在那之前，${names}${latinEnd(names)}不會執行。`,
   "plan.short.fix": (quota, nodes) =>
     quota && nodes
       ? "要完成變更，調高配額並騰出節點空間，或調低每個副本的保留量。"
@@ -1167,13 +1185,13 @@ export const zhTW: Messages = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的憑證不是 cert-manager 簽發的，請到產生憑證的地方加入 ${host}`,
   "warn.gatewayChosen": (gateway: string, of: number) =>
-    `掛接到 Gateway ${gateway}（共找到 ${of} 個）`,
-  "warn.gatewaysUnreadable": "無法讀取 Gateway：Zeabur 改用 Ingress",
+    `公開網域會掛接到 Gateway ${gateway}（共找到 ${of} 個）`,
+  "warn.gatewaysUnreadable": "無法讀取 Gateway：公開網域不會掛接到 Gateway",
   "warn.secretValuesUnknown": (name: string) => `無法讀取 ${name} 的值：差異只列出鍵名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 讀取 ConfigMap 或 Secret：回滾不會改動它們的內容`,
   "warn.storageClassUnknown": (claim: string) =>
-    `無法讀取 ${claim} 的 StorageClass：能否擴充由叢集決定`,
+    `無法讀取磁碟區（${claim}）的 StorageClass：能否擴充由叢集決定`,
   "warn.readWriteOnceShared": (workload: string) =>
     `${workload} 有多個副本：ReadWriteOnce 磁碟區只能掛在一個節點上`,
   "warn.readWriteOncePodShared": (workload: string) =>
@@ -1182,14 +1200,15 @@ export const zhTW: Messages = {
     `也會刪除 ${owner} 擁有的物件：${names}`,
   "warn.podReplaced": (pod: string, owner: string) => `${owner} 會啟動新的副本取代 ${pod}`,
   "warn.claimDataDeleted": (claim: string, volume: string) =>
-    `叢集會刪除 ${claim} 的資料：磁碟區 ${volume} 的回收政策是 Delete`,
+    `叢集會刪除磁碟區（${claim}）的資料：它的 PersistentVolume ${volume} 回收政策是 Delete`,
   "warn.claimDataRetained": (claim: string, volume: string) =>
-    `磁碟區 ${volume} 會保留 ${claim} 的資料（回收政策 Retain），直到管理員移除`,
-  "warn.claimDataUnknown": (claim: string) => `${claim} 的資料可能遺失：無法讀取其磁碟區的回收政策`,
+    `磁碟區（${claim}）的資料會留在 PersistentVolume ${volume}（回收政策 Retain），直到管理員移除`,
+  "warn.claimDataUnknown": (claim: string) =>
+    `磁碟區（${claim}）的資料可能遺失：無法讀取它的回收政策`,
   "warn.stillUsed": (name: string, names: string) =>
     `${names} 仍在讀取 ${name}：少了它，新的副本無法啟動`,
   "warn.claimStillMounted": (name: string, names: string) =>
-    `${names} 仍掛載 ${name}：等到沒有副本使用後，Kubernetes 才會移除它`,
+    `${names} 仍掛載磁碟區（${name}）：等到沒有副本使用後，Kubernetes 才會移除它`,
   "warn.ingressOpened": (names: string) => `不再隔離：${names} 會接受任何來源的流量`,
   "warn.egressOpened": (names: string) => `不再限制：${names} 可以把流量送到任何地方`,
   "warn.connectionsOpened": (pairs: string) => `恢復允許：${pairs}`,
@@ -1229,7 +1248,7 @@ export const zhTW: Messages = {
   "confirm.image": (service, tag) => `${service} 會改為執行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 會用分支最新的提交重新建置 ${build}。`,
   "confirm.autoUpdateOn": (service) => `${service} 每次建置完成就會立刻上線。`,
-  "confirm.autoUpdateOff": (service) => `${service} 的新映像檔會等你手動部署。`,
+  "confirm.autoUpdateOff": (service) => `${service} 的新建置會等你手動部署。`,
   "confirm.renameDomain": (from) => `連到 ${from} 的連結會失效。`,
   "confirm.removeDomain": (host) => `送到 ${host} 的請求不會再到達這個專案。`,
   "confirm.rollback": (revision) => `修訂版本 ${revision} 之後的範本變更都會撤銷。`,
@@ -1241,7 +1260,7 @@ export const zhTW: Messages = {
   "confirm.writable": (path, service) => `把 ${service} 的 ${path} 設為可寫入。`,
   "confirm.mount": (service) => `修改 ${service} 的掛載。`,
   "confirm.removeVolume": (service, path) =>
-    `${service} 不再掛載 ${path}。它的 PVC 和裡面的資料會保留；要釋放空間，到「物件」刪除這個 PVC。`,
+    `${service} 不再掛載 ${path}。磁碟區和裡面的資料會保留；要釋放空間，到「物件」刪除它的 PVC。`,
   "confirm.probeSet.readiness": (check, period) =>
     `${check}成功之前，副本不會收到流量（每 ${period} 秒檢查一次）。`,
   "confirm.probeSet.liveness": (check, period, failures) =>
@@ -1386,7 +1405,7 @@ export const zhTW: Messages = {
 
   // 編輯
   "edit.add": "新增",
-  "edit.review": "預覽變更",
+  "edit.review": "檢查變更",
   "edit.cancel": "取消",
   "edit.edit": (name: string) => `編輯 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
@@ -1603,7 +1622,7 @@ export const zhTW: Messages = {
   "add.imageBody": (project) => `在 ${project} 執行容器映像檔。建立前會先讓你確認要新增的物件。`,
   "add.field.image": "映像檔",
   "add.field.port": "連接埠",
-  "add.portHint": "留空表示不接受連線，例如背景工作。",
+  "add.portHint": "留空表示不接受連線，例如背景服務。",
   "add.noTag": "沒有寫版本時會用 latest，之後不好追蹤。",
   "add.problem.image.empty": "填入要執行的映像檔。",
   "add.problem.image.invalid": "映像檔位址，例如 ghcr.io/acme/web:1.4。",
@@ -1614,11 +1633,11 @@ export const zhTW: Messages = {
   "add.problem.port.invalid": "1 到 65535 之間的連接埠。",
   "add.problem.host.empty": "填入網域。",
   "add.problem.host.invalid": "網域名稱，例如 web.example.com。",
-  "add.publicUrl": "公開網址",
+  "add.publicUrl": "公開網域",
   "add.hostHint": "把這個網域的 DNS 指向叢集的 Ingress。",
   "add.https": (issuer) => `HTTPS 憑證由 cert-manager（${issuer}）簽發。`,
   "add.httpOnly": "這個網址只有 HTTP。管理員指定 cert-manager 的簽發者後會使用 HTTPS。",
-  "add.noPublicUrl": "你的角色不能在這個專案新增公開網址（Ingress）。",
+  "add.noPublicUrl": "你的角色不能在這個專案新增公開網域。",
   "add.more": "更多設定",
   "add.moreSummary": "環境變數、磁碟、規格、副本數和私有 registry。",
   "add.variables": "環境變數",
@@ -1629,7 +1648,7 @@ export const zhTW: Messages = {
   "add.volumePath": "掛載路徑",
   "add.volumeSize": "磁碟大小",
   "add.volumeRecreate":
-    "有磁碟時服務只跑一個 Pod，更新時先停舊的再啟動新的：這個磁碟同時只能掛在一個節點上。",
+    "有磁碟時服務只跑一個副本，更新時先停舊的再啟動新的：這個磁碟同時只能掛在一個節點上。",
   "add.problem.volumePath": "絕對路徑，例如 /data。",
   "add.replicas": "副本數",
   "add.replicasFixed": "有磁碟時固定為 1。",
@@ -1660,25 +1679,25 @@ export const zhTW: Messages = {
   "db.field.engine": "引擎",
   "db.field.name": "名稱",
   "db.field.version": "版本",
-  "db.field.members": "成員數",
-  "db.field.storage": "每個成員的儲存空間",
+  "db.field.members": "執行個體數",
+  "db.field.storage": "每個執行個體的儲存空間",
   "db.field.size": "規格",
   "db.size.small": "小",
   "db.size.medium": "中",
   "db.size.large": "大",
   "db.sizeDetail": (cpu, memory, limit) =>
-    `每個成員要求 ${cpu} CPU 和 ${memory} 記憶體，最多可使用 ${limit}。`,
+    `每個執行個體要求 ${cpu} CPU 和 ${memory} 記憶體，最多可使用 ${limit}。`,
   "db.name.empty": "請輸入名稱。",
   "db.name.invalid": "只能用小寫字母、數字和連字號，並以字母開頭。",
   "db.name.long": "最多 30 個字元。",
   "db.name.taken": "已經有同名的資料庫。",
   "db.storageHint": "之後可以擴充，不能縮小。",
   "db.noRedundancy": (backedUp: boolean) =>
-    `只有一個成員：它故障時沒有其他成員接手，資料也只在一個磁碟區上。${backedUp ? "" : "請設定備份。"}`,
-  "db.replicaSetHint": "副本集有三個成員時，壞掉一個也能繼續運作。",
+    `只有一個執行個體：它故障時沒有其他執行個體接手，資料也只在一個磁碟區上。${backedUp ? "" : "請設定備份。"}`,
+  "db.replicaSetHint": "副本集有三個執行個體時，壞掉一個也能繼續運作。",
   "db.kernelBlocked": (versions: string) =>
     `這個叢集的節點核心是 Linux 6.19 以上，${versions} 無法在上面啟動。`,
-  "db.onOneNode": "這個叢集只有一個節點，所以預設一個成員。",
+  "db.onOneNode": "這個叢集只有一個節點，所以預設一個執行個體。",
   "db.planCreate": (name) => `建立資料庫 ${name}`,
   "db.noOperator": "要建立資料庫，請先安裝資料庫元件。",
   "db.refused": (engine) => `你沒有權限讀取 ${engine} 資料庫。`,
@@ -1697,8 +1716,8 @@ export const zhTW: Messages = {
   "db.tabs": "資料庫分頁",
   "db.fact.engine": "引擎",
   "db.fact.version": "版本",
-  "db.fact.members": "成員",
-  "db.fact.primary": "主要成員",
+  "db.fact.members": "執行個體",
+  "db.fact.primary": "主要執行個體",
   "db.fact.storage": "儲存空間",
   "db.fact.size": "規格",
   "db.fact.custom": "自訂",
@@ -1846,7 +1865,7 @@ export const zhTW: Messages = {
   "usage.installVm": "安裝 VictoriaMetrics",
   "usage.chooseStore": "改用其他儲存服務",
   "usage.needsStoreHint": (service) =>
-    `Zeabur 找的是 ${service}。相容 Prometheus 的儲存服務都可以用，例如 Prometheus 或 VictoriaMetrics；在設定裡指定它的 Service。`,
+    `Zeabur 找的是 ${service}。相容 Prometheus 的儲存服務都可以用，例如 Prometheus 或 VictoriaMetrics；在設定裡指定它的 Kubernetes Service。`,
   "usage.whatHistory": "檢視用量歷史紀錄",
   "usage.proxyHint":
     "Zeabur 以你的身分透過 Kubernetes API 讀取 metrics 儲存服務。能這樣讀取的人可以看到所有專案的 metrics，所以通常只有管理員有這項權限。",
@@ -1873,7 +1892,7 @@ export const zhTW: Messages = {
   "settings.metricsStore": "用量歷史",
   "settings.store": "歷史資料來源",
   "settings.storeHint":
-    "保存用量歷史的 Service，格式為 namespace/name:port。任何提供 Prometheus HTTP API 的儲存服務都可以。Zeabur 透過 Kubernetes API，以每個人自己的權限讀取。",
+    "保存用量歷史的 Kubernetes Service，格式為 namespace/name:port。任何提供 Prometheus HTTP API 的儲存服務都可以。Zeabur 透過 Kubernetes API，以每個人自己的權限讀取。",
   "settings.storeDefault": "預設",
   "settings.storeIsDefault": "（預設）",
   "settings.storeChosen": "在 Zeabur 中設定",
@@ -2089,14 +2108,14 @@ export const zhTW: Messages = {
   // 帳號與成員結束
   "sentence.problem.forbidden.fix.askForRule": (p) =>
     `向叢集管理員要求 ${p.rule} 的權限，例如建立授予這項權限的 ClusterRole，以及綁定到你的 ClusterRoleBinding。`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "洽詢管理員，或以管理員身分重試。",
+  "sentence.problem.forbidden.fix.askOrRetry": () => "洽詢管理員，或暫時用管理員權限重試。",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "把下面的設定交給管理員。它只授予這項權限，而且只在這個專案有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
-    `計畫只在 ${p.minutes} 分鐘內有效。重新產生計畫。`,
+    `檢查過的變更只在 ${p.minutes} 分鐘內有效。重新檢查一次。`,
   "sentence.problem.badRequest.fix.planToken": () =>
-    "重新產生計畫。計畫只能在產生它的伺服器上，用原本的權杖原封不動地套用。",
-  "sentence.problem.conflict.fix.review": () => "重新預覽，從它目前的狀態開始。",
+    "重新檢查變更。變更只能在檢查它的伺服器上，用原本的權杖原封不動地套用。",
+  "sentence.problem.conflict.fix.review": () => "重新檢查，從它目前的狀態開始。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等它開始執行；它的日誌和事件會說明為什麼還沒執行。",
   "sentence.problem.unavailable.fix.tryAgainSoon": () => "稍後再試一次。",
@@ -2130,12 +2149,12 @@ export const zhTW: Messages = {
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "它不存在。"),
   "sentence.problem.summary.log-unavailable": () => "無法讀取這份日誌。",
   "sentence.problem.summary.conflict": (p) =>
-    p.name ? `你預覽之後，${p.name} 又有了變更。` : "你預覽之後，它又有了變更。",
+    p.name ? `你檢查之後，${p.name} 又有了變更。` : "你檢查之後，它又有了變更。",
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "這由其他工具管理。",
-  "sentence.problem.summary.plan-expired": () => "計畫已過期。",
+  "sentence.problem.summary.plan-expired": () => "這份變更已過期。",
   "sentence.problem.summary.system-namespace": (p) =>
-    p.name ? `${p.name} 是 Kubernetes 自用的 Namespace。` : "這是 Kubernetes 自用的 Namespace。",
+    p.name ? `${p.name} 是 Kubernetes 自用的名稱。` : "這是 Kubernetes 自用的名稱。",
   "sentence.problem.summary.invalid": (p) =>
     p.name ? `叢集拒絕了對 ${p.name} 的變更。` : "叢集拒絕了這項變更。",
   "sentence.problem.summary.too-many-requests": () => "叢集正忙。",
@@ -2235,9 +2254,9 @@ export const zhTW: Messages = {
   "form.healthHint":
     "叢集在每個副本上執行的檢查：能不能接收流量、要不要重新啟動，以及是否已經啟動。",
   "draft.add": "加入變更",
-  "draft.pendingHere": "有等待預覽的變更",
+  "draft.pendingHere": "有等待檢查的變更",
   "draft.count": (n) => `${n} 項變更待套用`,
-  "draft.review": "預覽變更",
+  "draft.review": "檢查變更",
   "draft.none": "尚無變更",
   "draft.save": "儲存",
   "draft.leaveTitle": "不儲存就離開？",
@@ -2273,7 +2292,7 @@ export const zhTW: Messages = {
   "home.unchecked": (n) => `有 ${n} 個專案無法檢查，這裡沒有列出它們的問題。`,
   "home.incidentsUnchecked": "叢集裡的成因沒能全部讀取，可能漏掉其中的問題。",
   "home.lastKnown": "最後已知狀態",
-  "home.adoptTitle": "可納入的命名空間",
+  "home.adoptTitle": "既有的 Namespace",
   "home.showWarningsOf": (shown, total) => `顯示 ${total} 則警告中的 ${shown} 則`,
   "home.allWarnings": (n) => `在叢集頁面檢視全部 ${n} 則`,
   "home.affects": "影響",
@@ -2395,16 +2414,16 @@ export const zhTW: Messages = {
   "preview.downtime": "會有短暫的時間沒有副本提供服務。",
   "preview.cores": (n) => `${n} 核心 CPU`,
   "preview.fits": (pods, cpu, memory) =>
-    `資源足夠：尖峰時會多出 ${pods} 個 Pod、${cpu} 和 ${memory}。`,
+    `資源足夠：尖峰時會多出 ${pods} 個副本、${cpu} 和 ${memory}。`,
   "preview.blockedQuota": (name, resource, need, left) =>
     resource === "pods"
-      ? `配額 ${name} 只容許再多 ${left} 個 Pod，這次需要 ${need} 個。`
+      ? `配額 ${name} 只容許再多 ${left} 個副本，這次需要 ${need} 個。`
       : `配額 ${name} 只剩 ${left}，這次需要 ${need}。`,
   "preview.blockedNodes": (_name, resource, need, left) =>
     resource === "pods"
-      ? `沒有節點放得下 ${need} 個新的 Pod，最空的節點只能再放 ${left} 個。`
+      ? `沒有節點放得下 ${need} 個新的副本，最空的節點只能再放 ${left} 個。`
       : `沒有節點有 ${need} 的空間，最空的節點只有 ${left}。`,
-  "preview.fitUnknown": "Zeabur 無法確認新的 Pod 是否放得下。",
+  "preview.fitUnknown": "Zeabur 無法確認新的副本是否放得下。",
   "preview.dataLoss": "會遺失的資料",
   "preview.loss.claimDeleted": (claim, paths) =>
     `會刪除磁碟 ${claim}${paths ? `，以及 ${paths} 裡的資料` : ""}。`,

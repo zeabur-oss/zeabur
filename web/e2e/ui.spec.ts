@@ -551,21 +551,21 @@ test("Objects lists the project's objects and opens one as YAML", async ({ page 
   await expect(page).not.toHaveURL(/object=/)
 })
 
-test("Objects reads unusual kinds on click and on a scan", async ({ page }) => {
+test("Objects loads unusual kinds on click and on a scan", async ({ page }) => {
   await page.goto(`${project}/objects`)
   const list = page.getByRole("list", { name: "Objects" })
   const filter = page.getByRole("searchbox", { name: "Filter objects" })
   // The list is virtual, so find the kind by name.
   await page.getByRole("button", { name: /^Generated/ }).click()
   await filter.fill("Lease")
-  const leases = list.getByRole("button", { name: "Read Lease", exact: true })
+  const leases = list.getByRole("button", { name: "Load Lease", exact: true })
   await expect(leases).toBeVisible()
   await leases.click()
   await expect(leases).toBeHidden()
   await filter.fill("")
   // Reads every served kind, CRDs included: slow on a slow runner.
   await page.getByRole("button", { name: "Scan all kinds" }).click()
-  await expect(page.getByText("All kinds read")).toBeVisible({
+  await expect(page.getByText("All kinds loaded")).toBeVisible({
     timeout: 30_000,
   })
   await page.getByRole("button", { name: "Refresh" }).click()
@@ -610,7 +610,8 @@ async function confirmPlan(
 }
 
 /** Sends the service page's pending changes to review. */
-const review = (page: Page) => page.getByRole("button", { name: "Review", exact: true }).click()
+const review = (page: Page) =>
+  page.getByRole("button", { name: "Review changes", exact: true }).click()
 
 async function editorReplicas(page: Page): Promise<number | undefined> {
   const answer = await page.request.get(`/api/v1/projects/${namespace}`)
@@ -878,7 +879,7 @@ test("an object's YAML is edited and planned", async ({ page }) => {
   await expect(panel.locator(".cm-editor")).toHaveCSS("display", "flex")
   await text.getByText("untouched").dblclick()
   await page.keyboard.type("edited")
-  await panel.getByRole("button", { name: "Review" }).click()
+  await panel.getByRole("button", { name: "Review changes" }).click()
   await confirmPlan(page, "Edit editor-config", "Save YAML", "Zeabur writes the YAML as it is")
   await expect(page.locator("[data-sonner-toaster]")).toHaveCSS("position", "fixed")
   await expect(panel.getByRole("figure", { name: "YAML of editor-config" })).toContainText(
@@ -1072,9 +1073,15 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   test.skip(!other, "ZEABUR_E2E_ADOPT is not set")
   await page.goto("/projects")
   const row = page.getByRole("listitem").filter({ hasText: other })
-  await row.getByRole("button", { name: "Adopt" }).click()
-  await confirmPlan(page, `Adopt ${other}`, "Adopt", "Nothing in it changes.")
-  await expect(row.getByRole("button", { name: "Adopt" })).toHaveCount(0, {
+  await row.getByRole("button", { name: `More for ${other}` }).click()
+  await page.getByRole("menuitem", { name: "Use this namespace" }).click()
+  await confirmPlan(
+    page,
+    `Use the existing namespace ${other}`,
+    "Use this namespace",
+    "Nothing in it changes.",
+  )
+  await expect(row.getByRole("button", { name: `More for ${other}` })).toHaveCount(0, {
     timeout: 15_000,
   })
 
@@ -1101,7 +1108,10 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   )
   await page.goto("/projects")
   await expect(
-    page.getByRole("listitem").filter({ hasText: other }).getByRole("button", { name: "Adopt" }),
+    page
+      .getByRole("listitem")
+      .filter({ hasText: other })
+      .getByRole("button", { name: `More for ${other}` }),
   ).toBeVisible({ timeout: 15_000 })
 })
 
@@ -1115,7 +1125,7 @@ test("a Deployment and a Service are created from templates and drawn on the map
   await page.getByRole("button", { name: "Add a template" }).click()
   await page.getByRole("menuitem", { name: "Service", exact: true }).click()
   await expect(page.getByText("2 documents")).toBeVisible()
-  await page.getByRole("button", { name: "Review", exact: true }).click()
+  await page.getByRole("button", { name: "Review changes", exact: true }).click()
   await confirmPlan(page, `Create 2 objects in ${namespace}`, "Create 2 objects", "Service hello")
   await expect(page).toHaveURL(new RegExp(`${project}/objects`))
   await page.goto(`${project}?view=map`)
@@ -1136,7 +1146,7 @@ test("a create the cluster refuses points at its document and line", async ({ pa
       "          image: busybox:1.37\n",
   )
   await expect(page.getByText("2 documents")).toBeVisible()
-  await page.getByRole("button", { name: "Review", exact: true }).click()
+  await page.getByRole("button", { name: "Review changes", exact: true }).click()
   const dialog = page.getByRole("dialog", { name: `Create 2 objects in ${namespace}` })
   await expect(dialog).toContainText("Document 2, line 11")
   await dialog.getByRole("button", { name: "Show in YAML" }).click()
