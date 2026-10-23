@@ -529,7 +529,7 @@ export const zhTW: Messages = {
   "canvas.fit": "符合畫面大小",
   "canvas.legend": "連線說明",
   "canvas.legendHint":
-    "根據 Kubernetes 物件和環境變數值畫出，不是根據實際流量。已設定的連線：Ingress，或兩個服務共用的 Secret、ConfigMap。從變數推測：環境變數值提到了另一個服務的 Service。",
+    "根據 Kubernetes 物件和環境變數值畫出，不是根據實際流量。已設定的連線：Ingress，或兩個服務共用的 Secret、ConfigMap。從變數推測：環境變數值提到了另一個服務的私有位址（Kubernetes Service）。",
   "architecture.edges": (n) => `${n} 條連線`,
   "quickLook.label": (name) => `快速檢視：${name}`,
   "quickLook.open": "開啟服務頁面",
@@ -804,7 +804,7 @@ export const zhTW: Messages = {
   "net.anyPort": "唯一的連接埠",
   "net.fullForm": "從其他專案連線",
   "net.forwardsTo": (port) => `轉送到容器的連接埠 ${port}`,
-  "net.exposeHint": "要新增私有位址，請套用 Service 或執行這個指令。",
+  "net.exposeHint": "要新增私有位址，請套用 Kubernetes Service 或執行這個指令。",
   "net.noneTitle": (name) => `${name} 無法接收連線`,
   "net.noneBody":
     "它沒有私有位址，也沒有公開網域。只會主動往外連的背景服務兩者都不需要，仍然可以連到其他服務和網際網路。",
@@ -1863,7 +1863,7 @@ export const zhTW: Messages = {
   "usage.installVm": "安裝 VictoriaMetrics",
   "usage.chooseStore": "改用其他儲存服務",
   "usage.needsStoreHint": (service) =>
-    `Zeabur 找的是 ${service}。相容 Prometheus 的儲存服務都可以用，例如 Prometheus 或 VictoriaMetrics；在設定裡指定它的 Service。`,
+    `Zeabur 找的是 ${service}。相容 Prometheus 的儲存服務都可以用，例如 Prometheus 或 VictoriaMetrics；在設定裡指定它的 Kubernetes Service。`,
   "usage.whatHistory": "檢視用量歷史紀錄",
   "usage.proxyHint":
     "Zeabur 以你的身分透過 Kubernetes API 讀取 metrics 儲存服務。能這樣讀取的人可以看到所有專案的 metrics，所以通常只有管理員有這項權限。",
@@ -1890,7 +1890,7 @@ export const zhTW: Messages = {
   "settings.metricsStore": "用量歷史",
   "settings.store": "歷史資料來源",
   "settings.storeHint":
-    "保存用量歷史的 Service，格式為 namespace/name:port。任何提供 Prometheus HTTP API 的儲存服務都可以。Zeabur 透過 Kubernetes API，以每個人自己的權限讀取。",
+    "保存用量歷史的 Kubernetes Service，格式為 namespace/name:port。任何提供 Prometheus HTTP API 的儲存服務都可以。Zeabur 透過 Kubernetes API，以每個人自己的權限讀取。",
   "settings.storeDefault": "預設",
   "settings.storeIsDefault": "（預設）",
   "settings.storeChosen": "在 Zeabur 中設定",

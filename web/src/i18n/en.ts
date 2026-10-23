@@ -588,7 +588,7 @@ export const en = {
   "canvas.fit": "Fit to screen",
   "canvas.legend": "About the lines",
   "canvas.legendHint":
-    "Drawn from Kubernetes objects and variable values, not from traffic. Configured connection: an Ingress, or a Secret or ConfigMap both services read. Guessed from variables: a variable's value names the other service's Service.",
+    "Drawn from Kubernetes objects and variable values, not from traffic. Configured connection: an Ingress, or a Secret or ConfigMap both services read. Guessed from variables: a variable's value names the other service's private address (Kubernetes Service).",
   "architecture.edges": (n: number) => plural(n, "connection", "connections"),
   "quickLook.label": (name: string) => `Quick look: ${name}`,
   "quickLook.open": "Open service page",
@@ -889,7 +889,7 @@ export const en = {
   "net.anyPort": "The only port",
   "net.fullForm": "From another project",
   "net.forwardsTo": (port: string) => `Forwarded to the container's port ${port}`,
-  "net.exposeHint": "To add one, apply a Service or run this command.",
+  "net.exposeHint": "To add one, apply a Kubernetes Service or run this command.",
   "net.noneTitle": (name: string) => `${name} can't receive connections`,
   "net.noneBody":
     "It has no private address and no public domain. A background service that only makes outgoing connections needs neither, and can still reach other services and the internet.",
@@ -2031,7 +2031,7 @@ export const en = {
   "usage.installVm": "Install VictoriaMetrics",
   "usage.chooseStore": "Choose another store",
   "usage.needsStoreHint": (service: string) =>
-    `Zeabur looked for ${service}. Any Prometheus-compatible store works, such as Prometheus or VictoriaMetrics; choose its Service in Settings.`,
+    `Zeabur looked for ${service}. Any Prometheus-compatible store works, such as Prometheus or VictoriaMetrics; choose its Kubernetes Service in Settings.`,
   "usage.whatHistory": "Seeing usage history",
   "usage.proxyHint":
     "Zeabur reads the metrics store through the Kubernetes API as you. Anyone allowed to do that can read every project's metrics, so usually only administrators have that permission.",
@@ -2060,7 +2060,7 @@ export const en = {
   "settings.metricsStore": "Usage history",
   "settings.store": "History source",
   "settings.storeHint":
-    "The Service that holds usage history, as namespace/name:port. Any store with the Prometheus HTTP API works. Zeabur reads it through the Kubernetes API with each person's own rights.",
+    "The Kubernetes Service that holds usage history, as namespace/name:port. Any store with the Prometheus HTTP API works. Zeabur reads it through the Kubernetes API with each person's own rights.",
   "settings.storeDefault": "Default",
   "settings.storeIsDefault": "(default)",
   "settings.storeChosen": "Set in Zeabur",

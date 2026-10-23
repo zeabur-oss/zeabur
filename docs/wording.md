@@ -229,7 +229,7 @@ why. Add a row before introducing a new concept.
 | this needs a cluster administrator (who must act, when it is not the reader) | 這需要叢集管理員處理 | 这需要集群管理员处理 | Leads the fix, with 複製診斷 as the primary action; never said when the reader can fix it |
 | public domain | 公開網域 | 公开域名 | An Ingress or HTTPRoute host; the dashboard's 公有網路 names the network, not the address. Ingress and HTTPRoute appear only in the Kubernetes details, YAML and suggestions about those objects; never "public URL" |
 | private network | 私有網路 | 私有网络 | Reaching a service from inside the cluster through its `Service`; the dashboard says 內網 |
-| private address | 私有位址 | 私有地址 | A `Service` DNS name and port; never 內部位址 |
+| private address | 私有位址 | 私有地址 | A `Service` DNS name and port; never 內部位址. Where the object itself is meant, write Kubernetes Service, since a bare Service reads as 服務 |
 | private service (reachable only inside the cluster) | 私有服務 | 私有服务 | Replaces "internal" (內部) as a role |
 | connection rules | 連線規則 | 连接规则 | `NetworkPolicy`; 政策 stays for policies in general |
 | sends to (a route's backend) | 轉送到 | 转发到 | |
