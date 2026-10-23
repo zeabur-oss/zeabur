@@ -1738,8 +1738,14 @@ export const zhCN: Messages = {
   "connect.extras": (names) => `同时添加 ${names}`,
   "connect.adds": "会添加的变量",
   "connect.note.postgresql": (secret) => `值保留在机密 ${secret} 中，服务只写引用。`,
-  "connect.note.mongodb": (secret) =>
-    `密码保留在机密 ${secret} 中；服务启动时，MONGO_URL 从 MONGOPASSWORD 代入密码。`,
+  "connect.note.mongodb": (secret, url, password) =>
+    `密码保留在机密 ${secret} 中；服务启动时，${url} 从 ${password} 代入密码。`,
+  "connect.taken": (name, service) => `${service} 已有 ${name}。`,
+  "connect.disconnect": "断开连接",
+  "connect.actionsFor": (name) => `${name} 的操作`,
+  "connect.disconnectTitle": (service, database) => `断开 ${service} 与 ${database} 的连接`,
+  "connect.disconnectNote": (database, secret) =>
+    `只移除服务的变量，数据库 ${database} 及其机密 ${secret} 会保留。`,
   "connect.noApp": (database) =>
     `${database} 没有自动生成密码的应用用户，无法在这里连接到服务。在 Zeabur 创建的数据库都有。`,
   "connect.noDatabases": "此项目中没有可以连接的数据库。",

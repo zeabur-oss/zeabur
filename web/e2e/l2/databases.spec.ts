@@ -40,7 +40,9 @@ const engines = [
     path: "postgresql",
     name: postgres,
     secret: `${postgres}-app`,
-    variables: ["DATABASE_URL"],
+    // A name of the Developer's own; the companions follow it.
+    variable: "E2E_DATABASE_URL",
+    variables: ["E2E_DATABASE_URL"],
     resource: { group: "postgresql.cnpg.io", version: "v1", resource: "clusters" },
     backup: {
       apiVersion: "postgresql.cnpg.io/v1",
@@ -56,7 +58,8 @@ const engines = [
           path: "mongodb",
           name: mongo,
           secret: `${mongo}-secrets`,
-          variables: ["MONGOPASSWORD", "MONGO_URL"],
+          variable: "E2E_MONGO_URL",
+          variables: ["E2E_MONGOPASSWORD", "E2E_MONGO_URL"],
           resource: {
             group: "psmdb.percona.com",
             version: "v1",
@@ -140,6 +143,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       await connect.getByRole("button", { name: "Connect to a service" }).click()
       const drawer = developer.getByRole("dialog", { name: `Connect ${db.name} to services` })
       await drawer.getByRole("checkbox", { name: service }).click()
+      await drawer.getByRole("textbox", { name: "Variable name" }).fill(db.variable)
       await expect(drawer).toContainText(db.variables.join(", "))
       await drawer.getByRole("button", { name: "Review changes", exact: true }).click()
       const title = `Connect ${db.name} to ${service}`
@@ -226,14 +230,35 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
 
   await test.step("the Developer disconnects and deletes the databases", async () => {
     for (const db of keep ? [] : engines) {
-      const disconnected = await planAndApply(developer, project, [
-        {
-          op: "env",
-          workload: { kind: "Deployment", name: service },
-          changes: db.variables.map((name) => ({ op: "remove", name })),
-        },
-      ])
-      expect(disconnected.status, JSON.stringify(disconnected.body)).toBe(200)
+      await developer.goto(
+        `/projects/${encodeURIComponent(project)}/services/Deployment/${service}?tab=variables`,
+      )
+      await developer.getByRole("button", { name: `Actions for ${db.variable}` }).click()
+      await developer.getByRole("menuitem", { name: "Disconnect" }).click()
+      const title = `Disconnect ${service} from ${db.name}`
+      const plan = developer.getByRole("dialog", { name: title })
+      // The database and its Secret stay; for MongoDB the password goes with the URL.
+      await expect(plan).toContainText(`${db.name} and its Secret`)
+      for (const name of db.variables) await expect(plan).toContainText(name)
+      await apply(developer, title)
+      await expect
+        .poll(
+          async () => {
+            const answer = await developer.request.get(
+              `/api/v1/projects/${encodeURIComponent(project)}`,
+            )
+            const body = (await answer.json()) as {
+              services: { name: string; containers: { env: { name: string }[] }[] }[]
+            }
+            const own = body.services.find((s) => s.name === service)
+            return (own?.containers.flatMap((c) => c.env.map((e) => e.name)) ?? []).filter((n) =>
+              db.variables.includes(n),
+            )
+          },
+          { timeout: 30_000 },
+        )
+        .toEqual([])
+      await expect(developer.getByRole("main")).not.toContainText(`From database ${db.name}`)
       const deleted = await planAndApply(developer, project, [
         { op: "delete", resource: db.resource, name: db.name },
       ])

@@ -8,14 +8,14 @@ import type { Schemas } from "@/api/client"
 import { databasesQuery, nodesQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { FormField, quantity } from "@/components/form-field"
-import { ConnectFields, newChoice, pickedOf, useTargets, type Choice } from "@/components/connect"
+import { ConnectFields, namingOf, newChoice, useTargets, type Choice } from "@/components/connect"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { GateTip, useGate } from "@/components/gate"
 import { useT } from "@/i18n"
 import { databaseLink } from "@/lib/place"
-import { connectChanges, pendingDatabase, variableProblem } from "@/model/connect"
+import { connectChanges, pendingDatabase } from "@/model/connect"
 import {
   createDatabase,
   engineName,
@@ -190,16 +190,16 @@ export function NewDatabaseDrawer({
   const [tried, setTried] = useState(false)
   const step = usePlanStep(project, onClose)
   const targets = useTargets(project)
-  const [choice, setChoice] = useState<Choice>(() => newChoice(form))
+  const [choice, setChoice] = useState<Choice>(() => newChoice())
   const set = (patch: Partial<NewDatabase>) => setForm((f) => ({ ...f, ...patch }))
   const nameIssue = nameProblem(form.name, taken)
   const storageBad = !quantity.test(form.storage.trim())
   const resources = presetResources[form.engine][form.size]
   const pending = pendingDatabase(form, project)
-  const picked = pickedOf(targets, choice)
+  const { fresh: picked, name: variable, problem } = namingOf(pending, targets, choice)
   const review = () => {
     setTried(true)
-    if (nameIssue || storageBad || (picked.length > 0 && variableProblem(choice.name))) return
+    if (nameIssue || storageBad || (picked.length > 0 && problem)) return
     const names = t(
       "common.list",
       picked.map((s) => s.name),
@@ -208,7 +208,7 @@ export function NewDatabaseDrawer({
       title: t("db.planCreate", form.name),
       changes: [
         ...createDatabase({ ...form, storage: form.storage.trim() }),
-        ...connectChanges(pending, picked, choice),
+        ...connectChanges(pending, picked, { ...choice, name: variable }),
       ],
       notes: picked.length > 0 ? [t("connect.waitsReady", names, form.name)] : undefined,
     })
@@ -252,7 +252,7 @@ export function NewDatabaseDrawer({
                   name: form.name,
                 })
                 setMembersPicked(false)
-                setChoice((c) => newChoice({ engine: engine as Engine }, c.picked))
+                setChoice((c) => newChoice(c.picked))
               }}
               items={available.map((e) => ({ value: e, label: t(`db.engine.${e}`) }))}
             />

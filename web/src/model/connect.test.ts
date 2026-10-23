@@ -5,7 +5,12 @@ import {
   connectChanges,
   connected,
   databaseOfEnv,
+  disconnectChange,
+  disconnection,
+  nameProblem,
+  namesOf,
   pendingDatabase,
+  suggestedName,
   variablesFor,
   type Target,
 } from "@/model/connect"
@@ -93,6 +98,123 @@ describe("connecting a database to a service", () => {
     expect(variablesFor(mongo, web([literal("MONGO_URL", "x")]))[1]?.value).toContain(
       "$(MONGO_MONGOPASSWORD)",
     )
+  })
+
+  test("a chosen name; the companions follow it", () => {
+    expect(
+      variablesFor(postgres, web(), { name: "ORDERS_URL", extras: true }).map((e) => e.name),
+    ).toEqual([
+      "ORDERS_URL",
+      "ORDERS_PGHOST",
+      "ORDERS_PGPORT",
+      "ORDERS_PGUSER",
+      "ORDERS_PGPASSWORD",
+      "ORDERS_PGDATABASE",
+    ])
+    const [password, url] = variablesFor(mongo, web(), { name: "SESSIONS_URL" })
+    expect(password?.name).toBe("SESSIONS_MONGOPASSWORD")
+    expect(url?.name).toBe("SESSIONS_URL")
+    expect(url?.value).toContain("$(SESSIONS_MONGOPASSWORD)@")
+    expect(namesOf(mongo, "MONGO_URL").password).toBe("MONGOPASSWORD")
+    expect(namesOf(mongo, "DB").password).toBe("DB_MONGOPASSWORD")
+  })
+
+  test("the suggestion is free in every service, MongoDB's password too", () => {
+    expect(suggestedName(postgres, [web()])).toBe("DATABASE_URL")
+    const other = { ...web([literal("DATABASE_URL", "x")]), name: "api" }
+    expect(suggestedName(postgres, [web(), other])).toBe("PG_MAIN_DATABASE_URL")
+    expect(suggestedName(mongo, [web([literal("MONGOPASSWORD", "x")])])).toBe("MONGO_MONGO_URL")
+    const both = web([literal("DATABASE_URL", "x"), literal("PG_MAIN_DATABASE_URL", "y")])
+    expect(suggestedName(postgres, [both])).toBe("PG_MAIN_2_DATABASE_URL")
+    expect(suggestedName(postgres, [web([literal("PGHOST", "x")])], true)).toBe(
+      "PG_MAIN_DATABASE_URL",
+    )
+  })
+
+  test("a name must be a variable name and free in each service", () => {
+    expect(nameProblem(postgres, [web()], "DATABASE_URL")).toBeUndefined()
+    expect(nameProblem(postgres, [web()], "1URL")).toEqual({ kind: "invalid" })
+    expect(nameProblem(postgres, [web()], "DATABASE-URL")).toEqual({ kind: "invalid" })
+    expect(nameProblem(postgres, [web([literal("DATABASE_URL", "x")])], "DATABASE_URL")).toEqual({
+      kind: "taken",
+      name: "DATABASE_URL",
+      service: "web",
+    })
+    expect(nameProblem(mongo, [web([literal("MONGOPASSWORD", "x")])], "MONGO_URL")).toEqual({
+      kind: "taken",
+      name: "MONGOPASSWORD",
+      service: "web",
+    })
+    expect(nameProblem(postgres, [web([literal("PGHOST", "x")])], "DATABASE_URL", true)).toEqual({
+      kind: "taken",
+      name: "PGHOST",
+      service: "web",
+    })
+  })
+
+  test("several services get the same name", () => {
+    const other = { ...web([literal("DATABASE_URL", "x")]), name: "api" }
+    const changes = connectChanges(postgres, [web(), other])
+    expect(changes.map((c) => (c.op === "env" ? c.changes[0]?.name : ""))).toEqual([
+      "PG_MAIN_DATABASE_URL",
+      "PG_MAIN_DATABASE_URL",
+    ])
+  })
+
+  test("disconnecting PostgreSQL removes the one variable", () => {
+    const env = [
+      fromSecret("DATABASE_URL", "pg-main-app", "uri"),
+      fromSecret("PGHOST", "pg-main-app", "host"),
+      literal("PORT", "3000"),
+    ]
+    expect(disconnection("DATABASE_URL", env, [postgres, mongo])).toEqual({
+      database: postgres,
+      names: ["DATABASE_URL"],
+    })
+    expect(disconnection("PORT", env, [postgres, mongo])).toBeUndefined()
+    expect(disconnection("MISSING", env, [postgres])).toBeUndefined()
+  })
+
+  test("disconnecting MongoDB removes the URL and its password, from either row", () => {
+    const env = [
+      fromSecret("MONGOPASSWORD", "mongo-custom-user-secret", "app"),
+      literal("MONGO_URL", "mongodb://app:$(MONGOPASSWORD)@mongo-rs0.shop.svc:27017/app"),
+      literal("PORT", "3000"),
+    ]
+    const both = { database: mongo, names: ["MONGOPASSWORD", "MONGO_URL"] }
+    expect(disconnection("MONGO_URL", env, [postgres, mongo])).toEqual(both)
+    expect(disconnection("MONGOPASSWORD", env, [postgres, mongo])).toEqual(both)
+  })
+
+  test("a password another URL still reads stays", () => {
+    const env = [
+      fromSecret("MONGOPASSWORD", "mongo-custom-user-secret", "app"),
+      literal("MONGO_URL", "mongodb://app:$(MONGOPASSWORD)@mongo-rs0/app"),
+      literal("REPLICA_URL", "mongodb://app:$(MONGOPASSWORD)@mongo-rs0-1/app"),
+    ]
+    expect(disconnection("MONGO_URL", env, [mongo])?.names).toEqual(["MONGO_URL"])
+  })
+
+  test("a variable read from the database's own Secret counts, as made before naming", () => {
+    const admin = fromSecret("ADMIN_PASSWORD", "mongo-secrets", "MONGODB_DATABASE_ADMIN_PASSWORD")
+    expect(databaseOfEnv(admin, [admin], [postgres, mongo])?.name).toBe("mongo")
+    const old = [
+      fromSecret("MONGO_MONGOPASSWORD", "mongo-custom-user-secret", "app"),
+      literal("MONGO_MONGO_URL", "mongodb://app:$(MONGO_MONGOPASSWORD)@mongo-rs0/app"),
+    ]
+    expect(disconnection("MONGO_MONGO_URL", old, [mongo])?.names).toEqual([
+      "MONGO_MONGOPASSWORD",
+      "MONGO_MONGO_URL",
+    ])
+  })
+
+  test("the removal patch names the container only when there are several", () => {
+    expect(disconnectChange(web(), "web", ["DATABASE_URL"])).toEqual({
+      op: "env",
+      workload: { kind: "Deployment", name: "web" },
+      changes: [{ op: "remove", name: "DATABASE_URL" }],
+    })
+    expect(disconnectChange(web([], 2), "side-1", ["X"])).toMatchObject({ container: "side-1" })
   })
 
   test("a database without an app user gives nothing", () => {

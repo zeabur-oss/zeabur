@@ -10,11 +10,13 @@ import {
   candidates,
   connectChanges,
   connected,
-  mainVariable,
+  nameProblem,
+  namesOf,
   pgExtras,
-  variableProblem,
+  suggestedName,
   variablesFor,
   type Connectable,
+  type NameProblem,
 } from "@/model/connect"
 import type { Database } from "@/model/databases"
 import type { Service } from "@/model/service"
@@ -27,17 +29,26 @@ import { Select } from "@zeabur/design-system/components/select"
 export interface Choice {
   /** `kind/name` of each service picked. */
   picked: string[]
-  name: string
+  /** As typed; the suggested name until then. */
+  name?: string
   extras: boolean
 }
 
 const keyOf = (s: { kind: string; name: string }) => `${s.kind}/${s.name}`
 
-export const newChoice = (database: Pick<Database, "engine">, picked: string[] = []): Choice => ({
-  picked,
-  name: mainVariable(database),
-  extras: false,
-})
+export const newChoice = (picked: string[] = []): Choice => ({ picked, extras: false })
+
+/** The name the connection uses in these services, and what is wrong with it. */
+export function namingOf(database: Connectable, targets: Service[], choice: Choice) {
+  const fresh = pickedOf(targets, choice).filter((s) => !connected(s, database))
+  const name = choice.name ?? suggestedName(database, fresh, choice.extras)
+  return { fresh, name, problem: nameProblem(database, fresh, name, choice.extras) }
+}
+
+export const nameProblemText = (t: Translate, problem: NameProblem) =>
+  problem.kind === "invalid"
+    ? t("connect.badName")
+    : t("connect.taken", problem.name, problem.service)
 
 /** Services the person may change, for connecting a database. */
 export function useTargets(project: string): Service[] {
@@ -62,7 +73,10 @@ function connectAsk(
   )
   return {
     title: t("connect.planTitle", database.name, names),
-    changes: connectChanges(database, targets, choice),
+    changes: connectChanges(database, targets, {
+      ...choice,
+      name: choice.name ?? suggestedName(database, targets, choice.extras),
+    }),
   }
 }
 
@@ -88,7 +102,8 @@ export function ConnectFields({
 }) {
   const t = useT()
   const id = useId()
-  const picked = pickedOf(targets, choice).filter((s) => !connected(s, database))
+  const { fresh: picked, name, problem } = namingOf(database, targets, choice)
+  const names = namesOf(database, name, choice.extras)
   const toggle = (key: string, on: boolean) =>
     onChange({
       ...choice,
@@ -143,12 +158,14 @@ export function ConnectFields({
         <>
           <FormField
             label={t("connect.variable")}
-            errors={tried && variableProblem(choice.name) ? [t("connect.badName")] : []}
+            errors={
+              (tried || choice.name !== undefined) && problem ? [nameProblemText(t, problem)] : []
+            }
           >
             <Input
               size="sm"
               mono
-              value={choice.name}
+              value={name}
               autoComplete="off"
               spellCheck={false}
               onChange={(event) => onChange({ ...choice, name: event.target.value.trim() })}
@@ -184,7 +201,7 @@ export function ConnectFields({
                     </span>
                   ) : null}
                   <span className="min-w-0 type-mono wrap-anywhere" translate="no">
-                    {variablesFor(database, s, choice)
+                    {variablesFor(database, s, { ...choice, name })
                       .map((e) => e.name)
                       .join(", ")}
                   </span>
@@ -194,7 +211,7 @@ export function ConnectFields({
             <p className="type-meta text-muted-foreground">
               {database.engine === "postgresql"
                 ? t("connect.note.postgresql", database.app?.secret ?? "")
-                : t("connect.note.mongodb", database.app?.secret ?? "")}
+                : t("connect.note.mongodb", database.app?.secret ?? "", name, names.password ?? "")}
             </p>
           </div>
         </>
@@ -223,16 +240,15 @@ export function ConnectDrawer({
   const database = usable.find((d) => d.name === chosen) ?? usable[0]
   const everyone = useTargets(project)
   const targets = service ? [service] : everyone
-  const [choice, setChoice] = useState<Choice>(() =>
-    newChoice(database ?? { engine: "postgresql" }, service ? [keyOf(service)] : []),
-  )
+  const [choice, setChoice] = useState<Choice>(() => newChoice(service ? [keyOf(service)] : []))
   const [tried, setTried] = useState(false)
   const step = usePlanStep(project, onClose)
-  const fresh = database ? pickedOf(targets, choice).filter((s) => !connected(s, database)) : []
+  const naming = database ? namingOf(database, targets, choice) : undefined
+  const fresh = naming?.fresh ?? []
   const review = () => {
     setTried(true)
-    if (!database || fresh.length === 0 || variableProblem(choice.name)) return
-    step.plan(connectAsk(t, database, fresh, choice))
+    if (!database || !naming || fresh.length === 0 || naming.problem) return
+    step.plan(connectAsk(t, database, fresh, { ...choice, name: naming.name }))
   }
   return (
     <PlanDrawer
@@ -270,7 +286,7 @@ export function ConnectDrawer({
               onValueChange={(name) => {
                 setChosen(name)
                 const next = usable.find((d) => d.name === name)
-                if (next) setChoice((c) => ({ ...c, name: mainVariable(next), extras: false }))
+                if (next) setChoice((c) => ({ ...c, name: undefined, extras: false }))
               }}
               items={usable.map((d) => ({ value: d.name, label: d.name }))}
             />
