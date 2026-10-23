@@ -602,7 +602,8 @@ function editFacts(
 
 const minutes = (seconds: number) => Math.max(1, Math.ceil(seconds / 60))
 
-function terminalLines(t: Translate, plan: Plan): string[] {
+/** What a debug container or tools pod plan means for the person, in sentences. */
+export function terminalLines(t: Translate, plan: Pick<Plan, "warnings">): string[] {
   return plan.warnings.flatMap((w) => {
     switch (w.code) {
       case "debugContainerStays":

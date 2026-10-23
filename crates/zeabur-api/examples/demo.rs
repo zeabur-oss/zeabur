@@ -36,7 +36,8 @@
 //! after it is added, as do tools pods and node shells. With `ZEABUR_DEMO_RKE2=1`, `vps-2` also has
 //! a node shell Bob left behind, which ended when its time ran out; a node shell's terminal is the
 //! in-memory cluster's echo shell, with a root prompt. `ZEABUR_DEMO_TOOLS=1` hands the session a
-//! made-up token, so the kubectl terminal is offered.
+//! made-up token, so the kubectl terminal is offered: a project's, and the whole cluster's from a
+//! component's install text on Cluster → Components.
 //!
 //! Node maintenance: `vps-3` holds Zeabur itself, a bare pod (`lab/debug-toolbox`), `shop`'s
 //! `db-0` on a local-path volume pinned to it, and a `web` replica that the disruption budget

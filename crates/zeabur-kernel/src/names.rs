@@ -46,7 +46,8 @@ pub const DEBUG_PREFIX: &str = "zeabur-debug-";
 /// The name of every tools pod starts with this.
 pub const TOOLS_PREFIX: &str = "zeabur-tools-";
 
-/// The label every tools pod carries, `"true"`.
+/// The label every tools pod carries: `"true"` on a project's, `"cluster"` on one for the whole
+/// cluster.
 pub const TOOLS_LABEL: &str = "zeabur.com/tools";
 
 /// The label naming whose tools pod it is: a key derived from their user name.

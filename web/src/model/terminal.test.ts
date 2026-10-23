@@ -3,6 +3,7 @@ import { describe, test, expect } from "bun:test"
 import type { Problem } from "@/api/client"
 import {
   applyCommand,
+  installCommand,
   createCommand,
   execRole,
   isManifest,
@@ -156,6 +157,9 @@ describe("the dock", () => {
     expect(toolsTerminalUrl({ protocol: "https:", host: "z.example" }, "shop", "tools-ada")).toBe(
       "wss://z.example/api/v1/projects/shop/tools/tools-ada/terminal",
     )
+    expect(toolsTerminalUrl({ protocol: "http:", host: "z.local" }, undefined, "tools-ada")).toBe(
+      "ws://z.local/api/v1/cluster/tools/tools-ada/terminal",
+    )
   })
 })
 
@@ -169,6 +173,15 @@ describe("a command typed into the kubectl terminal", () => {
     const yaml = "apiVersion: v1\r\nkind: ConfigMap\r\ndata:\r\n  home: $HOME\r\n"
     expect(applyCommand(yaml)).toBe(
       "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: ConfigMap\ndata:\n  home: $HOME\nEOF",
+    )
+  })
+
+  test("an install's Helm commands are typed as they are; its objects are applied", () => {
+    const helm =
+      "cat > values.yaml <<'ZEABUR_VALUES'\napiVersion: v1\nkind: X\nZEABUR_VALUES\nhelm upgrade --install a b\n"
+    expect(installCommand("helm", helm)).toBe(helm.trimEnd())
+    expect(installCommand("flux", "apiVersion: v1\nkind: ConfigMap\n")).toBe(
+      "kubectl apply -f - <<'EOF'\napiVersion: v1\nkind: ConfigMap\nEOF",
     )
   })
 

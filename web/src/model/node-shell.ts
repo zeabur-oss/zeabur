@@ -1,17 +1,11 @@
 // Protocol: crates/zeabur-api/src/cluster/node_shells.rs.
 import type { Schemas } from "@/api/client"
-import type { Asker } from "@/model/rights"
 import type { Health } from "@/model/service"
 
 type NodeShell = Schemas["NodeShellView"]
 
 /** Never a project's: only cluster administrators may create or exec pods in it. */
 export const NODE_SHELL_NAMESPACE = "zeabur-node-shell"
-
-/** Cluster administrators, and admins who may take admin rights: the plan offers them. */
-export function mayOpenNodeShell(clusterAdmin: boolean | undefined, asker: Asker): boolean {
-  return clusterAdmin === true || (asker.admin && asker.elevation === "available")
-}
 
 export function nodeShellUrl(location: Pick<Location, "protocol" | "host">, pod: string): string {
   const scheme = location.protocol === "https:" ? "wss:" : "ws:"

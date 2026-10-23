@@ -916,6 +916,13 @@ export const zhCN: Messages = {
   "tools.stop": "停止",
   "tools.expired": "这个终端里的凭证已过期。重新打开即可换上新的继续使用。",
   "tools.reopen": "重新打开",
+  "clusterTools.about":
+    "带 kubectl 和 helm 的终端，以你的身份操作整个集群，kubectl 默认在 default 命名空间。它运行在一个临时容器里，用完后 Zeabur 会删除它。",
+  "clusterTools.tab": "集群",
+  "clusterTools.title": "打开集群的 kubectl 终端",
+  "clusterTools.what": "打开集群的 kubectl 终端",
+  "clusterTools.starts": (namespace) =>
+    `在 ${namespace} 为你启动一个临时容器，内含 kubectl 和 helm。kubectl 默认在 default 命名空间，你有权限的命名空间都能操作。`,
   "nodeShell.action": "节点终端",
   "nodeShell.actionOn": (node) => `${node} 的节点终端`,
   "nodeShell.what": "打开节点终端",

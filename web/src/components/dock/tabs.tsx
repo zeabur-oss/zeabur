@@ -2,13 +2,21 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
 import { api, isStatus, unwrap } from "@/api/client"
+import { clusterToolsQuery, deleteClusterTools } from "@/api/cluster-tools"
 import { databasesQuery, debugQuery, projectQuery, queryClient, toolsQuery } from "@/api/queries"
+import { ClusterToolsDialog } from "@/components/cluster-tools"
 import { Session } from "@/components/dock/session"
 import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { useI18n, useT } from "@/i18n"
-import { commandTyped, openKubectl, updateShell, type DockTab } from "@/lib/dock"
+import {
+  commandTyped,
+  openClusterKubectl,
+  openKubectl,
+  updateShell,
+  type DockTab,
+} from "@/lib/dock"
 import { formatAgo } from "@/lib/format"
 import { serverContainer, shellCommand, shellPod } from "@/model/databases"
 import type { Pod } from "@/model/service"
@@ -245,30 +253,50 @@ function DebugOffer({
 
 type KubectlTabProps = { tab: Extract<DockTab, { kind: "kubectl" }>; shown: boolean; focus: number }
 
-/** kubectl and helm in a tools pod of the person's: planned the first time, used again after. */
+const toolsOf = (project: string | undefined) =>
+  project === undefined ? clusterToolsQuery : toolsQuery(project)
+
+/** Plans a tools pod: in a project as any change, for the cluster in a plan of its own. */
+function useStartTools(project: string | undefined, onApplied: () => void) {
+  const t = useT()
+  const planner = usePlanner(project ?? "", onApplied, true)
+  const [cluster, setCluster] = useState(false)
+  if (project !== undefined)
+    return {
+      start: () =>
+        planner.plan({
+          title: t("action.openToolsTerminal"),
+          changes: [{ op: "clusterTools" }],
+          quiet: true,
+        }),
+      dialog: planner.dialog,
+    }
+  return {
+    start: () => setCluster(true),
+    dialog: cluster ? (
+      <ClusterToolsDialog onClose={() => setCluster(false)} onApplied={onApplied} />
+    ) : null,
+  }
+}
+
+/** kubectl and helm in a tools pod of the person's, in a project or for the whole cluster: planned
+ * the first time, used again after. */
 export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
   const t = useT()
   const project = tab.project
   const [waiting, setWaiting] = useState(false)
   const tools = useQuery({
-    ...toolsQuery(project),
+    ...toolsOf(project),
     refetchInterval: (query) =>
       waiting || query.state.data?.pods.some((p) => !p.ready) ? 1500 : 15_000,
   })
   const [open, setOpen] = useState<string>()
   const [attempt, setAttempt] = useState(0)
-  const { plan, dialog } = usePlanner(project, () => setWaiting(true), true)
+  const { start, dialog } = useStartTools(project, () => setWaiting(true))
   const pods = tools.data?.pods ?? []
   const ready = pods.find((p) => p.ready)?.name
   const shownPod = pods.some((p) => p.name === open) ? open : undefined
   const failed = waiting ? pods.find((p) => p.problem)?.problem : undefined
-
-  const start = () =>
-    plan({
-      title: t("action.openToolsTerminal"),
-      changes: [{ op: "clusterTools" }],
-      quiet: true,
-    })
 
   const attach = (name: string) => {
     setAttempt(attempt + 1)
@@ -296,7 +324,13 @@ export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
   }, [tab.asked, data])
 
   if (tools.isPending) return <LoadingRows label={t("common.loading")} rows={2} />
-  if (tools.isError) return <Problem error={tools.error} />
+  if (tools.isError)
+    return (
+      <Problem
+        error={tools.error}
+        what={project === undefined ? t("clusterTools.what") : undefined}
+      />
+    )
   if (!tools.data.available)
     return (
       <Empty className="flex-1">
@@ -312,10 +346,11 @@ export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
         id={tab.id}
         url={toolsTerminalUrl(window.location, project, shownPod)}
         attempt={attempt}
-        project={project}
+        project={project ?? tools.data.namespace}
         shown={shown}
         focus={focus}
         command={tab.command}
+        grant={project !== undefined}
         onTyped={() => commandTyped(tab.id)}
         onReconnect={() => setAttempt(attempt + 1)}
       />
@@ -323,7 +358,9 @@ export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">
       <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-0 max-w-prose flex-1 text-sm text-secondary">{t("tools.about")}</p>
+        <p className="min-w-0 max-w-prose flex-1 text-sm text-secondary">
+          {project === undefined ? t("clusterTools.about") : t("tools.about")}
+        </p>
         <Button size="sm" onClick={start} disabled={waiting}>
           {waiting ? t("tools.starting") : t("action.openToolsTerminal")}
         </Button>
@@ -335,13 +372,13 @@ export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
   )
 }
 
-/** The person's running tools pods in a project, to use again or stop. */
+/** The person's running tools pods in a project, or the cluster's, to use again or stop. */
 export function ToolsPods({
   project,
   pods,
   onOpen,
 }: {
-  project: string
+  project: string | undefined
   pods: { name: string; ready: boolean; stopsAt?: string | null }[]
   onOpen?: (name: string) => void
 }) {
@@ -349,6 +386,7 @@ export function ToolsPods({
   const { locale } = useI18n()
   const stop = useMutation({
     mutationFn: async (name: string) => {
+      if (project === undefined) return deleteClusterTools(name)
       try {
         unwrap(
           await api.DELETE("/api/v1/projects/{project}/tools/{name}", {
@@ -360,7 +398,7 @@ export function ToolsPods({
         if (!isStatus(error, 404)) throw error
       }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: toolsQuery(project).queryKey }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: toolsOf(project).queryKey }),
   })
   return (
     <section className="flex flex-col gap-2">
@@ -384,7 +422,11 @@ export function ToolsPods({
                     size="sm"
                     variant="outline"
                     onClick={() =>
-                      onOpen ? onOpen(pod.name) : openKubectl(project, { pod: pod.name })
+                      onOpen
+                        ? onOpen(pod.name)
+                        : project === undefined
+                          ? openClusterKubectl({ pod: pod.name })
+                          : openKubectl(project, { pod: pod.name })
                     }
                   >
                     {t("tools.open")}

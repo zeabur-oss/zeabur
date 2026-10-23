@@ -501,7 +501,7 @@ pub fn shells(pods: &[Value]) -> Vec<ShellPod> {
     found
 }
 
-/// Someone an RBAC binding lets create pods in [`NAMESPACE`], or run commands in them.
+/// Someone an RBAC binding lets create pods in a namespace, or run commands in them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Subject {
     /// `User`, `Group` or `ServiceAccount`.
@@ -513,16 +513,16 @@ pub struct Subject {
 }
 
 /// A binding that lets someone other than cluster administrators and Kubernetes' own components
-/// into node shells.
+/// into node shells, or into a cluster tools pod.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Exposure {
-    /// `RoleBinding` (in [`NAMESPACE`]) or `ClusterRoleBinding`.
+    /// `RoleBinding` (in the namespace) or `ClusterRoleBinding`.
     pub kind: String,
     /// Its name.
     pub name: String,
     /// The role it binds, as `Role/name` or `ClusterRole/name`.
     pub role: String,
-    /// What the role grants of what matters: `create pods` (in [`NAMESPACE`] only), and `create`
+    /// What the role grants of what matters: `create pods` (in the namespace only), and `create`
     /// or `get` on `pods/exec` and `pods/attach`.
     pub rights: Vec<String>,
     /// Who it lets in.
@@ -609,18 +609,21 @@ fn find<'a>(
 }
 
 /// The bindings that let anyone but cluster administrators and Kubernetes' own components into
-/// node shells.
+/// the pods of `pods_in`.
 ///
-/// `bindings` are the `RoleBindings` of [`NAMESPACE`] and every `ClusterRoleBinding`, `roles` the
+/// That is [`NAMESPACE`]'s node shells, or a cluster tools pod, which holds an administrator's
+/// credential.
+///
+/// `bindings` are the `RoleBindings` of `pods_in` and every `ClusterRoleBinding`, `roles` the
 /// namespace's `Roles` and every `ClusterRole`. A binding counts when its role lets its subjects
-/// exec or attach into pods, or, bound in [`NAMESPACE`], create pods there. Bindings to
+/// exec or attach into pods, or, bound in `pods_in`, create pods there. Bindings to
 /// `cluster-admin` are left out: their subjects are cluster administrators.
 ///
 /// Cluster-wide `create pods` is not counted: whoever holds it can already run a privileged pod
 /// in `kube-system` or any other privileged namespace, so a node shell adds nothing. That is the
 /// residual risk: such a subject (a provisioner, a CI runner) is as good as node root anyway.
 #[must_use]
-pub fn exposures(bindings: &[Value], roles: &[Value]) -> Vec<Exposure> {
+pub fn exposures(pods_in: &str, bindings: &[Value], roles: &[Value]) -> Vec<Exposure> {
     let mut found = Vec::new();
     for binding in bindings {
         let kind = binding
@@ -630,7 +633,7 @@ pub fn exposures(bindings: &[Value], roles: &[Value]) -> Vec<Exposure> {
         let namespace = binding
             .pointer("/metadata/namespace")
             .and_then(Value::as_str);
-        if kind == "RoleBinding" && namespace != Some(NAMESPACE) {
+        if kind == "RoleBinding" && namespace != Some(pods_in) {
             continue;
         }
         let role_kind = binding
@@ -1082,7 +1085,7 @@ mod tests {
                 &json!([{"kind": "User", "name": "zeabur:dave"}]),
             ),
         ];
-        let found = exposures(&bindings, &roles);
+        let found = exposures(NAMESPACE, &bindings, &roles);
         assert_eq!(
             found,
             [
@@ -1110,7 +1113,7 @@ mod tests {
                 },
             ]
         );
-        assert_eq!(exposures(bindings.get(..4).unwrap(), &roles), []);
+        assert_eq!(exposures(NAMESPACE, bindings.get(..4).unwrap(), &roles), []);
     }
 
     #[test]
@@ -1171,7 +1174,10 @@ mod tests {
             &json!([{"kind": "ServiceAccount", "name": "local-path-provisioner-service-account",
                      "namespace": "local-path-storage"}]),
         );
-        assert_eq!(exposures(std::slice::from_ref(&provisioner), &roles), []);
+        assert_eq!(
+            exposures(NAMESPACE, std::slice::from_ref(&provisioner), &roles),
+            []
+        );
         let in_namespace = binding(
             "RoleBinding",
             Some(NAMESPACE),
@@ -1186,7 +1192,7 @@ mod tests {
             ("ClusterRole", "attacher"),
             &json!([{"kind": "Group", "name": "ops"}]),
         );
-        let found = exposures(&[provisioner, in_namespace, attach], &roles);
+        let found = exposures(NAMESPACE, &[provisioner, in_namespace, attach], &roles);
         let rights: Vec<(&str, &[String])> = found
             .iter()
             .map(|e| (e.name.as_str(), e.rights.as_slice()))

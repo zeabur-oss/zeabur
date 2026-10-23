@@ -5,7 +5,7 @@ use serde_json::Value;
 use zeabur_core::problem::{Denied, Kind, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
-use zeabur_plan::terminal::{self as plans, ToolsPod};
+use zeabur_plan::terminal::{self as plans, ToolsPod, ToolsScope};
 use zeabur_plan::{Change, Plan, PlanRequest, Warning};
 
 use super::plan_problem;
@@ -170,7 +170,7 @@ async fn debug_container(
     Ok(plan)
 }
 
-fn local_mode() -> ApiError {
+pub(crate) fn local_mode() -> ApiError {
     let mut problem = Problem::new(
         Kind::BadRequest,
         "A tools terminal needs Zeabur running in the cluster: on your own computer, Zeabur has \
@@ -183,11 +183,15 @@ fn local_mode() -> ApiError {
     ApiError::from(problem)
 }
 
-/// The person's tools pod that still runs or is starting, in `namespace`.
-pub(crate) fn running_tools_pod(pods: &[Value], person: &str) -> Option<String> {
+/// The person's tools pod for `scope` that still runs or is starting, among `pods`.
+pub(crate) fn running_tools_pod(
+    pods: &[Value],
+    person: &str,
+    scope: ToolsScope<'_>,
+) -> Option<String> {
     let key = plans::person_key(person);
     pods.iter()
-        .filter(|p| plans::is_tools_pod_of(p, &key))
+        .filter(|p| plans::is_tools_pod_of(p, &key, scope))
         .filter(|p| p.pointer("/metadata/deletionTimestamp").is_none())
         .find(|p| {
             matches!(
@@ -231,24 +235,23 @@ async fn tools(
     made_at: &str,
 ) -> Result<Plan, ApiError> {
     let handoff = planner.handoff.ok_or_else(local_mode)?;
-    let settings = planner.settings;
-    let namespace = settings.tools_namespace.as_deref().unwrap_or(project);
+    let namespace = planner
+        .settings
+        .tools_namespace
+        .as_deref()
+        .unwrap_or(project);
     let pods = list_pods(cluster, namespace).await?;
-    if let Some(pod) = running_tools_pod(&pods, planner.person) {
-        return Ok(plans::tools_pod_reused(namespace, &pod));
-    }
-    let mut plan = plans::tools_pod(&ToolsPod {
+    let mut plan = tools_plan(
+        planner,
+        handoff,
         namespace,
-        project,
-        person: planner.person,
-        admin: handoff.admin,
-        credential_expires_at: Some(handoff.expires_at.to_string()),
-        image: &settings.tools_image,
-        deadline_seconds: settings.tools_deadline_seconds,
-        grace_seconds: i64::try_from(settings.tools_grace.as_secs()).unwrap_or(i64::MAX),
-        resources: &settings.tools_resources,
+        ToolsScope::Project(project),
+        &pods,
         made_at,
-    });
+    );
+    if plan.objects.is_empty() {
+        return Ok(plan);
+    }
     plan.warnings.extend(
         rights_missing(
             cluster,
@@ -261,4 +264,32 @@ async fn tools(
         .await,
     );
     Ok(plan)
+}
+
+/// The plan that starts the person's tools pod for `scope` in `namespace`, or uses the one among
+/// `pods` that still runs.
+pub(crate) fn tools_plan(
+    planner: &Planner<'_>,
+    handoff: &Handoff,
+    namespace: &str,
+    scope: ToolsScope<'_>,
+    pods: &[Value],
+    made_at: &str,
+) -> Plan {
+    if let Some(pod) = running_tools_pod(pods, planner.person, scope) {
+        return plans::tools_pod_reused(namespace, &pod);
+    }
+    let settings = planner.settings;
+    plans::tools_pod(&ToolsPod {
+        namespace,
+        scope,
+        person: planner.person,
+        admin: handoff.admin,
+        credential_expires_at: Some(handoff.expires_at.to_string()),
+        image: &settings.tools_image,
+        deadline_seconds: settings.tools_deadline_seconds,
+        grace_seconds: i64::try_from(settings.tools_grace.as_secs()).unwrap_or(i64::MAX),
+        resources: &settings.tools_resources,
+        made_at,
+    })
 }

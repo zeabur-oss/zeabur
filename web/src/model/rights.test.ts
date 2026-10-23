@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
-import { askerOf, gate, neededRole, rightOfResource, ruleOf, unknownRights } from "@/model/rights"
+import {
+  askerOf,
+  gate,
+  mayActAsClusterAdmin,
+  neededRole,
+  rightOfResource,
+  ruleOf,
+  unknownRights,
+} from "@/model/rights"
 
 const member = askerOf({ username: "zeabur:bob", groups: ["zeabur:members"] }, "available")
 const admin = askerOf({ username: "zeabur:alice", groups: ["zeabur:admins"] }, "available")
@@ -25,6 +33,15 @@ describe("closing an action by the person's rights", () => {
     expect(gate("installComponents", "denied", elevated).open).toBe(false)
     // Admin rights offered to someone outside the admins group would be refused by Zeabur Identity.
     expect(gate("installComponents", "denied", member).open).toBe(false)
+  })
+
+  test("node and cluster terminals are offered to cluster administrators and admins who may elevate", () => {
+    const elevated = askerOf({ username: "zeabur:alice", groups: ["zeabur:admins"] }, "active")
+    expect(mayActAsClusterAdmin(true, kubeconfig)).toBe(true)
+    expect(mayActAsClusterAdmin(false, admin)).toBe(true)
+    expect(mayActAsClusterAdmin(false, elevated)).toBe(false)
+    expect(mayActAsClusterAdmin(false, member)).toBe(false)
+    expect(mayActAsClusterAdmin(undefined, kubeconfig)).toBe(false)
   })
 
   test("someone signed in with a kubeconfig is told the rule, not a role", () => {

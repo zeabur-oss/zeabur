@@ -648,6 +648,151 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/tools:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The person's cluster tools pods, deleting those that are done with; cluster administrators
+        only.
+      operationId: clusterTools
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ToolsStatus"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/tools/apply:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Carries out a plan by its token: checks it and the cluster again, dry-runs each write, then
+        writes it.
+      operationId: applyClusterTools
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClusterToolsApply"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterToolsApplied"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/tools/plan:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Works out what starting the person's cluster tools pod writes, and a token to apply it; writes
+        nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do everything
+        everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over;
+        without a token while `exposed` lists bindings that let others into the pod.
+      operationId: planClusterTools
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterToolsPlan"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/tools/{name}":
+    delete:
+      tags:
+      - cluster
+      summary: Deletes a cluster tools pod of the person's, as long as it is the one they read.
+      operationId: deleteClusterTools
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/tools/{name}/terminal":
+    get:
+      tags:
+      - cluster
+      summary: |-
+        A terminal in a cluster tools pod of the person's, over a WebSocket: the project tools
+        terminal's protocol and credential (see the `tools` module), with `kubectl` starting in
+        namespace `default`. Failures arrive as an `error` frame, as there, and `403`
+        (`elevation-required` where admin rights are offered and not in use) for anyone who may not do
+        everything everywhere.
+      operationId: clusterToolsTerminal
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "101":
+          description: Switched to the terminal's WebSocket
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/upgrades:
     get:
       tags:
@@ -4301,6 +4446,76 @@ components:
         installComponents:
           $ref: "#/components/schemas/Permission"
           description: "Install components with Zeabur: `create` on `helmcharts.helm.cattle.io` in `kube-system`."
+    ClusterToolsApplied:
+      type: object
+      description: What an apply did.
+      required:
+      - pod
+      - namespace
+      properties:
+        namespace:
+          type: string
+          description: Its namespace.
+        pod:
+          type: string
+          description: The pod a terminal opens in.
+    ClusterToolsApply:
+      type: object
+      description: The token of a plan to apply.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token `plan` returned.
+    ClusterToolsPlan:
+      type: object
+      description: >-
+        A plan that starts the person's cluster tools pod, or uses the one that still
+        runs.
+      required:
+      - expiresAt
+      - namespace
+      - pod
+      - writes
+      - warnings
+      - exposed
+      properties:
+        expiresAt:
+          type: string
+          description: When the token stops working, RFC 3339.
+        exposed:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShellExposure"
+          description: |-
+            Bindings that let others into the pod, and so to the credential in it; the plan cannot be
+            applied while there is one.
+        namespace:
+          type: string
+          description: The namespace of the pod.
+        pod:
+          type: string
+          description: The pod it starts, or the one it uses.
+        token:
+          type:
+          - string
+          - "null"
+          description: |-
+            Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
+            bindings.
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanWarning"
+          description: |-
+            Who `kubectl` acts as and until when, or that a running pod is used; who else could use
+            the credential.
+        writes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShellWrite"
+          description: The writes, in order; none when it uses a running pod.
     Component:
       type: object
       description: "One component of the catalogue: an upstream project that provides a capability."
@@ -12059,7 +12274,7 @@ components:
           description: The tools pods that had stopped or outlived their deadline and were deleted now.
         namespace:
           type: string
-          description: The namespace tools pods of this project go in.
+          description: The namespace these tools pods go in.
         pods:
           type: array
           items:

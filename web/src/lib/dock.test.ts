@@ -5,6 +5,7 @@ import {
   commandTyped,
   dock,
   isDockShortcut,
+  openClusterKubectl,
   openDatabaseShell,
   openKubectl,
   openShell,
@@ -79,6 +80,19 @@ describe("the dock", () => {
     commandTyped("kubectl:shop")
     expect(dock.get().tabs[0]).toMatchObject({ asked: 3, command: undefined })
     expect(dock.get()).toMatchObject({ open: true, active: "kubectl:shop" })
+  })
+
+  test("the cluster's kubectl terminal is a tab of its own, beside a project's", () => {
+    openKubectl("shop")
+    openClusterKubectl({ command: "helm list -A" })
+    openClusterKubectl()
+    const state = dock.get()
+    expect(state.tabs.map((tab) => tab.id)).toStrictEqual(["kubectl:shop", "kubectl@cluster"])
+    expect(state.tabs[1]).toMatchObject({ kind: "kubectl", asked: 2, command: "helm list -A" })
+    expect(state.tabs[1]).not.toHaveProperty("project", expect.anything())
+    expect(state.active).toBe("kubectl@cluster")
+    commandTyped("kubectl@cluster")
+    expect(dock.get().tabs[1]).toMatchObject({ command: undefined })
   })
 
   test("closing shows the tab beside it and leaves the dock open after the last", () => {

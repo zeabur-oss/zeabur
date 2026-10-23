@@ -103,6 +103,11 @@ terminal:
   # The namespace tools pods go in. Empty: the project's. A namespace of its own keeps the
   # person's token away from whoever may exec into pods in the project.
   toolsNamespace: ""
+  # The namespace administrators' cluster tools pods go in (the Components page's kubectl
+  # terminal); Zeabur creates it when they first open one. Their admin credential is written into
+  # those pods, so it must not be toolsNamespace, and only administrators should run commands in
+  # pods there.
+  clusterToolsNamespace: zeabur-cluster-tools
   # A tools pod stops after this many minutes in any case.
   toolsDeadlineMinutes: 30
   # A tools pod is deleted this many seconds after its last terminal closes.

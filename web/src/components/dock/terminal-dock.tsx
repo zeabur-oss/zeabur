@@ -157,7 +157,7 @@ export function TerminalDock() {
                   <DockTab
                     key={tab.id}
                     value={tab.id}
-                    closeLabel={t("dock.close", tabName(tab))}
+                    closeLabel={t("dock.close", tabName(tab, t("clusterTools.tab")))}
                     onClose={() => closeTab(tab.id)}
                   >
                     <TerminalWindowIcon aria-hidden="true" />
@@ -209,20 +209,20 @@ export function TerminalDock() {
   )
 }
 
-function tabName(tab: Tab): string {
+function tabParts(tab: Tab, cluster: string): [string, string | undefined] {
+  if (tab.kind === "node") return [tab.node, "root"]
+  if (tab.kind === "kubectl") return ["kubectl", tab.project ?? cluster]
+  return [tab.service.name, tab.container]
+}
+
+function tabName(tab: Tab, cluster: string): string {
   if (tab.kind === "node") return `root@${tab.node}`
-  return tab.kind === "kubectl"
-    ? `kubectl ${tab.project}`
-    : [tab.service.name, tab.container].filter(Boolean).join(" ")
+  return tabParts(tab, cluster).filter(Boolean).join(" ")
 }
 
 function TabLabel({ tab }: { tab: Tab }) {
-  const [main, detail] =
-    tab.kind === "node"
-      ? [tab.node, "root"]
-      : tab.kind === "kubectl"
-        ? ["kubectl", tab.project]
-        : [tab.service.name, tab.container]
+  const t = useT()
+  const [main, detail] = tabParts(tab, t("clusterTools.tab"))
   return (
     <span className="flex min-w-0 items-baseline gap-1.5" translate="no">
       <span className="truncate">{main}</span>
