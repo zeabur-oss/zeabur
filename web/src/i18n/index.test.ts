@@ -8,18 +8,29 @@ const taiwanese = { ...en, "shell.home": "首頁" } as Messages
 const mainland = { ...en, "shell.home": "首页" } as Messages
 
 describe("catalogues", () => {
-  test("English is there without loading anything", () => {
+  test("when no catalogue loads, the shell's words remain and other keys show as themselves", async () => {
     const catalogues = catalogueLoader({
-      "zh-TW": () => Promise.reject(new Error("not asked for")),
+      en: () => Promise.reject(new TypeError("Failed to fetch dynamically imported module")),
+      "zh-TW": () => Promise.reject(new TypeError("Failed to fetch dynamically imported module")),
       "zh-CN": () => Promise.reject(new Error("not asked for")),
     })
-    expect(catalogues.cached("en")).toStrictEqual({ locale: "en", messages: en })
-    expect(catalogues.cached("zh-TW")).toBe(undefined)
+    const { locale, messages } = await catalogues.load("zh-TW")
+    const t = translator(messages)
+    expect([locale, t("shell.home"), t("clusterBackups.edit")]).toEqual([
+      "en",
+      "Home",
+      "clusterBackups.edit",
+    ])
   })
 
-  test("switching loads a catalogue once and back to English needs no load", async () => {
+  test("each catalogue loads once", async () => {
     let loads = 0
+    let english = 0
     const catalogues = catalogueLoader({
+      en: () => {
+        english += 1
+        return Promise.resolve(en)
+      },
       "zh-TW": () => {
         loads += 1
         return Promise.resolve(taiwanese)
@@ -29,14 +40,16 @@ describe("catalogues", () => {
     expect(await catalogues.load("zh-TW")).toStrictEqual({ locale: "zh-TW", messages: taiwanese })
     expect(await catalogues.load("zh-CN")).toStrictEqual({ locale: "zh-CN", messages: mainland })
     expect(await catalogues.load("en")).toStrictEqual({ locale: "en", messages: en })
+    expect(await catalogues.load("en")).toStrictEqual({ locale: "en", messages: en })
     expect(await catalogues.load("zh-TW")).toStrictEqual({ locale: "zh-TW", messages: taiwanese })
     expect(catalogues.cached("zh-TW")).toStrictEqual({ locale: "zh-TW", messages: taiwanese })
-    expect(loads).toBe(1)
+    expect([loads, english]).toEqual([1, 1])
   })
 
   test("a chunk that fails to load gives English, and the next choice tries again", async () => {
     let fail = true
     const catalogues = catalogueLoader({
+      en: () => Promise.resolve(en),
       "zh-TW": () =>
         fail
           ? Promise.reject(new TypeError("Failed to fetch dynamically imported module"))
@@ -52,6 +65,7 @@ describe("catalogues", () => {
   test("only the latest choice applies when an earlier one loads after it", async () => {
     let release: (messages: Messages) => void = () => {}
     const catalogues = catalogueLoader({
+      en: () => Promise.resolve(en),
       "zh-TW": () => new Promise((resolve) => (release = resolve)),
       "zh-CN": () => Promise.resolve(mainland),
     })

@@ -1,6 +1,7 @@
 // English: the source of every message key. The other locales are typed as `Messages`, so a key
 // missing there (or added there only) is a TypeScript error.
 import type { P } from "@/i18n/sentence-parts"
+import { core } from "@/i18n/en-core"
 import sentences from "@/i18n/generated/en"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
@@ -40,30 +41,10 @@ const waitEn = (s: number) =>
 export const en = {
   // Diagnoses, gaps, traces and incidents: crates/zeabur-gaps/messages
   ...sentences,
+  // The shell: src/i18n/en-core.ts
+  ...core,
   // Shell
-  "shell.skip": "Skip to content",
-  "shell.nav": "Main",
-  "shell.home": "Home",
-  "shell.projects": "Projects",
-  "shell.settings": "Settings",
-  "shell.nameFrom.setting": "Name from Settings",
-  "shell.nameFrom.install": "Name from the installation",
-  "shell.nameFrom.kubeconfig": "Name from kubeconfig",
-  "shell.nameFrom.address": "Name from the URL",
-  "shell.nameFrom.node": "Name from the control plane node",
-  "shell.nameFrom.provider": (provider: string) => `Name from ${provider}`,
-  "shell.nameFrom.distributionNode": (distribution: string) =>
-    `Name from the ${distribution} control plane node`,
-  "shell.renameCluster": "Rename in Settings",
-  "shell.cluster": "Cluster",
-  "shell.search": "Search",
-  "shell.jumpTo": "Jump to…",
-  "shell.menu": "Menu",
   "shell.findProject": "Find a project",
-  "shell.manage": "Manage",
-  "shell.whoamiUnknown": "Unknown user",
-  "shell.signOut": "Sign out",
-  "shell.theme": "Theme",
   // Admin rights
   "elevate.retry": "Retry with admin rights",
   "elevate.title": "Admin rights",
@@ -73,26 +54,16 @@ export const en = {
   "elevate.failed": "Admin rights were not granted.",
   "elevate.signedOut": "Your session ended. Sign in again.",
   "elevate.signIn": "Sign in",
-  "elevate.until": (time: string) => `Admin until ${time}`,
-  "elevate.activeDetail": "Everything you do uses your admin rights until then.",
-  "elevate.drop": "Drop admin rights",
-  "elevate.use": "Use admin rights for a few minutes",
   "shell.switchProject": "Switch project",
   "column.label": "Services",
   "column.other": "Other objects",
   "column.advanced": "Advanced",
   "column.namespace": "Kubernetes namespace",
 
-  "theme.system": "System theme",
-  "theme.light": "Light",
-  "theme.dark": "Dark",
-
   // Common
   "common.colon": ": ",
-  "common.loading": "Loading…",
   "common.retry": "Try again",
   "common.all": "All",
-  "common.close": "Close",
   "common.copy": "Copy",
   "common.copied": "Copied",
   "common.status": "Status",
@@ -101,8 +72,6 @@ export const en = {
   "common.more": (n: number) => `${n} more`,
   "common.domains": "Domains",
   "common.newTab": "(opens in a new tab)",
-  "common.notFound": "This page doesn't exist",
-  "common.backToProjects": "Back to projects",
   "common.managedBy": (tool: string) => `Managed by ${tool}`,
   "common.managedByDetail": (tool: string) =>
     `Changes made outside ${tool} are overwritten on its next sync or upgrade.`,
@@ -969,7 +938,6 @@ export const en = {
   "logs.historyRoles":
     "Project developers have it, as does anyone with Kubernetes' view role in the namespace. Viewers read no logs.",
   "logs.historyUnavailable": "The log store did not respond.",
-  "dock.label": "Terminal",
   "dock.show": "Show terminal",
   "dock.hide": "Hide terminal",
   "dock.resize": "Terminal height",
@@ -1204,7 +1172,6 @@ export const en = {
   "storage.binding.Immediate": "Made as soon as it is asked for",
 
   // Palette
-  "palette.title": "Command palette",
   "palette.search": "Jump to a project, service, replica, or domain",
   "palette.recent": "Recent",
   "palette.actions": "Actions",
@@ -1222,7 +1189,6 @@ export const en = {
   // Settings
   "settings.title": "Settings",
   "settings.preferences": "Preferences",
-  "settings.language": "Language",
   "settings.languageHint": "Messages from the cluster stay in English.",
   "settings.theme": "Theme",
   "settings.about": "About",
@@ -1824,7 +1790,6 @@ export const en = {
   "action.hideErrorPages": "Remove error pages",
   "action.delete": "Delete",
   // Toasts
-  "toast.region": "Notifications",
   "toast.applied": "Applied",
   "toast.view": "View",
   "toast.undo": "Undo",
@@ -2986,8 +2951,6 @@ export const en = {
   "settings.storeTenancy":
     "Anyone who can read the store can read every project's metrics. Grant access only to people who may see the whole cluster.",
   // Account and members (Zeabur Identity)
-  "shell.account": "Account",
-  "shell.members": "Members",
   "account.title": "Account",
   "account.you": "You",
   "account.username": "User name",
@@ -3737,7 +3700,6 @@ export const en = {
   "home.affects": "Affects",
   "home.inProgress": "In progress",
   "home.problems": "What needs you",
-  "shell.context": (cluster: string, user: string) => `Cluster ${cluster}, signed in as ${user}`,
   "home.clusterNotices": (n: number) =>
     n === 1
       ? "1 cluster notice, nothing down because of it:"
