@@ -13,10 +13,10 @@
 //!    update is under way or stuck and some replica is ready, the word is `RolloutStuck`: the
 //!    release before still serves, but the failing pod does not recover on its own.
 //! 2. Otherwise the workload's [`Phase`] decides: `Failed` and `Degraded` (no replica ready) fail,
-//!    `Progressing` progresses (a Deployment past its progress deadline with a ready replica
-//!    warns, as `RolloutStuck`), and `Paused`, `Suspended`, `Completed` and `Unknown` are idle.
-//! 3. A `Running` workload is idle when it is a CronJob or scaled to zero, fails when no replica
-//!    is ready, warns when fewer replicas are ready than wanted, and is ok otherwise.
+//!    `Progressing` progresses (a Deployment past its progress deadline with a ready replica warns,
+//!    as `RolloutStuck`), and `Paused`, `Suspended`, `Completed` and `Unknown` are idle.
+//! 3. A `Running` workload is idle when it is a CronJob or scaled to zero, fails when no replica is
+//!    ready, warns when fewer replicas are ready than wanted, and is ok otherwise.
 //!
 //! A pod fails by rule 1, is idle once it succeeded, ok when ready, and warns otherwise.
 
