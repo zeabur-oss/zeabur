@@ -111,6 +111,18 @@
         }
       }
     },
+    "builds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "registry": {
+          "description": "The registry services deployed from Git use, host[:port], or empty to turn it off.",
+          "type": "string",
+          "pattern": "^([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*(:[0-9]{1,5})?)?$",
+          "maxLength": 259
+        }
+      }
+    },
     "elevation": {
       "type": "object",
       "additionalProperties": false,

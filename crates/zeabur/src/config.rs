@@ -80,6 +80,11 @@ pub(crate) struct Args {
     /// URL is HTTP only.
     #[arg(long, env = "ZEABUR_CLUSTER_ISSUER", default_value = "")]
     pub(crate) cluster_issuer: String,
+    /// The registry Zeabur Builder pushes to and nodes pull from, such as `zot.zot.svc:5000`; a
+    /// service deployed from Git runs `<registry>/<project>/<service>`. Empty: services are not
+    /// deployed from Git.
+    #[arg(long, env = "ZEABUR_BUILD_REGISTRY", default_value = "")]
+    pub(crate) build_registry: String,
     /// The namespace Zeabur runs in, where the ConfigMap `zeabur-settings` keeps the settings
     /// people choose. Empty: settings cannot be changed.
     #[arg(long, env = "ZEABUR_NAMESPACE", default_value = "")]
@@ -183,7 +188,7 @@ impl Args {
                     .map_err(|e| format!("--cluster-name: {e}"))?,
             );
         }
-        settings.domains = domains(self)?;
+        (settings.domains, settings.builds) = (domains(self)?, builds(self)?);
         let authority = public_url.authority();
         settings.public_host = Some(
             authority
@@ -265,6 +270,27 @@ fn domains(args: &Args) -> Result<zeabur_api::settings::DomainSettings, String> 
         domains.cluster_issuer = Some(issuer.to_owned());
     }
     Ok(domains)
+}
+
+/// Where services deployed from Git keep their images, from `args`.
+fn builds(args: &Args) -> Result<zeabur_api::settings::BuildSettings, String> {
+    let registry = args.build_registry.trim().trim_end_matches('/');
+    if registry.is_empty() {
+        return Ok(zeabur_api::settings::BuildSettings::default());
+    }
+    let (host, port) = registry
+        .split_once(':')
+        .map_or((registry, None), |(host, port)| (host, Some(port)));
+    let port_ok = port.is_none_or(|p| p.parse::<u16>().is_ok_and(|p| p > 0));
+    if !(zeabur_plan::checks::is_dns_subdomain(host) && port_ok) {
+        return Err(format!(
+            "--build-registry: {:?} is not a registry such as zot.zot.svc:5000",
+            args.build_registry
+        ));
+    }
+    Ok(zeabur_api::settings::BuildSettings {
+        registry: Some(registry.to_owned()),
+    })
 }
 
 /// The terminal's settings from `args`.
@@ -551,6 +577,16 @@ mod tests {
         assert!(error.starts_with("--domain-suffix:"), "{error}");
         let error = args(&files, &["--cluster-issuer", "Let's Encrypt"]).unwrap_err();
         assert!(error.starts_with("--cluster-issuer:"), "{error}");
+        let config = args(&files, &["--build-registry", "zot.zot.svc:5000/"]).unwrap();
+        assert_eq!(
+            config.settings.builds.registry.as_deref(),
+            Some("zot.zot.svc:5000")
+        );
+        assert_eq!(args(&files, &[]).unwrap().settings.builds.registry, None);
+        for bad in ["zot:http", "Zot_Registry", "zot.svc/team"] {
+            let error = args(&files, &["--build-registry", bad]).unwrap_err();
+            assert!(error.starts_with("--build-registry:"), "{error}");
+        }
         let config = args(&files, &["--public-url", "https://zeabur.localhost:8443"]).unwrap();
         assert_eq!(
             config.settings.public_host.as_deref(),

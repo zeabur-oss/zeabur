@@ -1008,7 +1008,7 @@ mod tests {
         assert_eq!(
             about,
             json!({"name": "zeabur", "nameSource": "kubeconfig", "nameProvider": "k3d",
-                   "kubernetesVersion": "v1.36.5+k3s1", "distribution": "k3s", "domains": {},
+                   "kubernetesVersion": "v1.36.5+k3s1", "distribution": "k3s", "domains": {}, "builds": {},
                    "can": {"installComponents": "allowed", "changeNodes": "allowed"}})
         );
 

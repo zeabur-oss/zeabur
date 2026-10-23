@@ -53,6 +53,12 @@ domains:
   suffix: ""
   clusterIssuer: ""
 
+# Services deployed from Git. registry: where Zeabur Builder pushes and nodes pull, the same as the
+# Builder's default registry; a new service runs <registry>/<project>/<service>. The default is the
+# catalog's Zot. Empty: "Deploy from Git" is turned off.
+builds:
+  registry: zot.zot.svc:5000
+
 # Anything the cluster refuses offers to ask for the passkey again (Zeabur Identity's `elevate` scope) and
 # retry with admin rights. Needs a client registered with `--allow-elevation`.
 elevation:
