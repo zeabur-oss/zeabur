@@ -202,7 +202,7 @@ why. Add a row before introducing a new concept.
 | apply a change | 套用 | 应用 | |
 | review (a plan) | 預覽 | 预览 | |
 | run a command | 執行 | 运行 | |
-| adopt (show a namespace as a project) | 納入 | 纳入 | |
+| use an existing namespace (show it as a project) | 使用既有的 Namespace | 使用已有的 Namespace | A namespace's own row says 使用這個 Namespace; the API and zeaburctl keep adopt |
 | remove from Zeabur | 移除 | 移除 | |
 | read-only | 唯讀 | 只读 | |
 | view (compact action) | 檢視 | 查看 | |

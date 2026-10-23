@@ -1072,9 +1072,15 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   test.skip(!other, "ZEABUR_E2E_ADOPT is not set")
   await page.goto("/projects")
   const row = page.getByRole("listitem").filter({ hasText: other })
-  await row.getByRole("button", { name: "Adopt" }).click()
-  await confirmPlan(page, `Adopt ${other}`, "Adopt", "Nothing in it changes.")
-  await expect(row.getByRole("button", { name: "Adopt" })).toHaveCount(0, {
+  await row.getByRole("button", { name: `More for ${other}` }).click()
+  await page.getByRole("menuitem", { name: "Use this namespace" }).click()
+  await confirmPlan(
+    page,
+    `Use the existing namespace ${other}`,
+    "Use this namespace",
+    "Nothing in it changes.",
+  )
+  await expect(row.getByRole("button", { name: `More for ${other}` })).toHaveCount(0, {
     timeout: 15_000,
   })
 
@@ -1101,7 +1107,10 @@ test("a namespace is adopted, named, and let go, through plans", async ({ page }
   )
   await page.goto("/projects")
   await expect(
-    page.getByRole("listitem").filter({ hasText: other }).getByRole("button", { name: "Adopt" }),
+    page
+      .getByRole("listitem")
+      .filter({ hasText: other })
+      .getByRole("button", { name: `More for ${other}` }),
   ).toBeVisible({ timeout: 15_000 })
 })
 

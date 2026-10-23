@@ -139,7 +139,7 @@ export const en = {
   "problem.fix.managed":
     "Change it where the managing tool reads it, such as Helm values or a Git repository. Restarting still works here.",
   "problem.fix.plan-expired": "Make the plan again.",
-  "problem.fix.system-namespace": "Adopt a namespace of your own instead.",
+  "problem.fix.system-namespace": "Use a namespace of your own instead.",
   "problem.fix.invalid": "Correct the fields the cluster names in the details, then try again.",
   "problem.fix.too-many-requests": "Wait a moment and try again.",
   "problem.fix.unavailable":
@@ -199,7 +199,7 @@ export const en = {
   "refused.terminal": "Opening a terminal",
   "refused.reveal": "Showing Secret values",
   "refused.listThese": "Listing these",
-  "refused.adopt": (ns: string) => `Adopting ${ns}`,
+  "refused.adopt": (ns: string) => `Using the existing namespace ${ns}`,
   "refused.createProject": (name: string) => `Creating project ${name}`,
   "refused.unadopt": (ns: string) => `Removing ${ns} from Zeabur`,
 
@@ -374,7 +374,7 @@ export const en = {
   "unreachable.every": "Zeabur tries again every 15 seconds.",
   "cluster.noProjects": "No projects yet",
   "cluster.noProjectsBody":
-    "A project is a Kubernetes namespace shown in Zeabur. Adopt one on the Projects page.",
+    "A project is a Kubernetes namespace shown in Zeabur. Create one on the Projects page, or use an existing namespace below.",
   "cluster.openProjects": "Open projects",
   "cluster.nodes": "Nodes",
   "cluster.cpu": "CPU",
@@ -454,7 +454,7 @@ export const en = {
   "projects.filterOther": "Filter namespaces",
   "projects.noOtherMatch": (query: string) => `No namespaces match “${query}”.`,
   "projects.noneBody":
-    "A project is a Kubernetes namespace shown in Zeabur. Create one, or adopt a namespace below.",
+    "A project is a Kubernetes namespace shown in Zeabur. Create one, or use an existing namespace below.",
   "projects.new": "New project",
   "projects.newBody":
     "A project is a namespace with the Zeabur project label. You review it before it is created.",
@@ -467,7 +467,7 @@ export const en = {
     "Lowercase letters, digits and hyphens, starting and ending with a letter or digit.",
   "projects.problem.long": "At most 63 characters.",
   "projects.problem.system": "Names starting with kube- belong to Kubernetes.",
-  "projects.problem.taken": "A namespace of this name exists. Adopt it instead.",
+  "projects.problem.taken": "A namespace of this name exists. Use the existing namespace instead.",
   "projects.planNew": (name: string) => `Create project ${name}`,
   "projects.rowMenu": (name: string) => `More for ${name}`,
   "projects.showSystem": "Show system namespaces",
@@ -1006,13 +1006,13 @@ export const en = {
   "project.entry.objects": "Objects",
   // A project's namespace
   "project.entry.settings": "Settings",
-  "action.adopt": "Adopt",
+  "action.adopt": "Use this namespace",
   "action.unadopt": "Stop showing as a project",
   "action.openDebugTerminal": "Open debug terminal",
   "action.openToolsTerminal": "Open kubectl terminal",
   "action.openInToolsTerminal": "Open in kubectl terminal",
   "action.saveDetails": "Save details",
-  "title.adopt": (ns: string) => `Adopt ${ns}`,
+  "title.adopt": (ns: string) => `Use the existing namespace ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
   "title.details": (ns: string) => `${ns} details`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
@@ -1075,7 +1075,8 @@ export const en = {
   "projectSettings.namespaceHint": "The project is this namespace. Its name can't change.",
   "projectSettings.shown": "Shown as a project",
   "projectSettings.shownYes": "Yes. The namespace has Zeabur's project label.",
-  "projectSettings.shownNo": "No. Adopting adds Zeabur's project label and changes nothing else.",
+  "projectSettings.shownNo":
+    "No. Showing it as a project only adds Zeabur's project label; nothing else changes.",
   "projectSettings.batch": "Batch actions",
   "projectSettings.pauseAll": "Pause all services",
   "projectSettings.pauseAllHint":
@@ -2497,7 +2498,7 @@ export const en = {
   "home.incidentsUnchecked":
     "Causes in the cluster could not all be read; a problem there may be missing.",
   "home.lastKnown": "Last known",
-  "home.adoptTitle": "Namespaces to adopt",
+  "home.adoptTitle": "Existing namespaces",
   "home.showWarningsOf": (shown: number, total: number) => `Show ${shown} of ${total} warnings`,
   "home.allWarnings": (n: number) => `All ${n} on the cluster page`,
   "home.affects": "Affects",
