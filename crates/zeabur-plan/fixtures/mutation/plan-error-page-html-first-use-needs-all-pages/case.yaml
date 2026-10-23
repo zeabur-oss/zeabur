@@ -1,0 +1,7 @@
+description: "Without a ConfigMap of error pages, a change that gives only some pages is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: errorPageHtml
+        maintenance: "<p>Back soon</p>"

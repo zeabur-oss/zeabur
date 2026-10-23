@@ -136,6 +136,12 @@ pub struct Route {
     /// of users has the same name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basic_auth: Option<RouteMiddleware>,
+    /// The Traefik `errors` middleware Zeabur makes to show the project's error pages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_pages: Option<RouteMiddleware>,
+    /// The hosts that show the maintenance page instead of their workload, sorted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub maintenance: Vec<String>,
     /// The tool that manages the Ingress, if any.
     pub provenance: Provenance,
     /// The Ingress object.

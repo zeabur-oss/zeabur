@@ -552,11 +552,29 @@ fn shop() -> NamespaceObjects {
     }));
     NamespaceObjects {
         namespace: "shop".to_owned(),
-        deployments: vec![web, api, worker],
+        deployments: vec![
+            web,
+            api,
+            worker,
+            deployment(
+                "zeabur-error-pages",
+                "docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim",
+                1,
+                1,
+                &json!([]),
+            ),
+        ],
         stateful_sets: vec![db, redis],
         cron_jobs: vec![nightly],
         pods: vec![
             pod("web-7c9d8-abcde", "web", true, 0, None),
+            pod(
+                "zeabur-error-pages-5d4f7-k2m9x",
+                "zeabur-error-pages",
+                true,
+                0,
+                None,
+            ),
             pod("web-7c9d8-fghij", "web", true, 2, None),
             pod("api-5f6b7-k2m4p", "api", true, 0, None),
             pod("api-5f6b7-q8r1s", "api", true, 0, None),
@@ -603,6 +621,12 @@ fn shop() -> NamespaceObjects {
             service("web", 80, "http"),
             service("api", 8080, "http"),
             service("db", 5432, "postgres"),
+            from(
+                json!({"metadata": {"name": "zeabur-error-pages", "namespace": "shop"},
+                "spec": {"selector": {"app": "zeabur-error-pages"}, "ports": [
+                    {"name": "pages", "port": 8080, "targetPort": "http"},
+                    {"name": "maintenance", "port": 8081, "targetPort": "http"}]}}),
+            ),
             service("redis", 6379, "redis"),
             from(
                 json!({"metadata": {"name": "redis-public-6379", "namespace": "shop",
@@ -614,6 +638,14 @@ fn shop() -> NamespaceObjects {
             ),
         ],
         config_maps: vec![
+            from::<ConfigMap>(
+                json!({"metadata": {"name": "zeabur-error-pages", "namespace": "shop"},
+                "data": {
+                    "502.html": "<!doctype html><title>Shop</title><h1>Shop is not responding</h1>",
+                    "503.html": "<!doctype html><title>Shop</title><h1>Shop is not available right now</h1>",
+                    "504.html": "<!doctype html><title>Shop</title><h1>Shop took too long to respond</h1>",
+                    "maintenance.html": "<!doctype html><title>Shop</title><h1>Shop is under maintenance</h1><p>We will be back soon.</p>"}}),
+            ),
             from::<ConfigMap>(
                 json!({"metadata": {"name": "web-config", "namespace": "shop"},
                 "data": {"LOG_LEVEL": "info", "FEATURE_CHECKOUT_V2": "true"}}),
@@ -663,20 +695,24 @@ fn shop() -> NamespaceObjects {
             ),
         ],
         ingresses: vec![
-            // www redirects to the apex through a Traefik middleware.
+            // www redirects to the apex, and both show the error pages, through Traefik
+            // middlewares.
             from::<Ingress>(json!({"metadata": {"name": "web", "namespace": "shop",
                     "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0001",
                     "annotations": {"traefik.ingress.kubernetes.io/router.middlewares":
-                        "shop-web-redirect-www-shop-example-com@kubernetescrd"}},
+                        "shop-web-redirect-www-shop-example-com@kubernetescrd,shop-web-error-pages@kubernetescrd"}},
                 "spec": {"rules": [{"host": "shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
                     "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}},
                     {"host": "www.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
                     "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}}],
                     "tls": [{"hosts": ["shop.example.com", "www.shop.example.com"], "secretName": "shop-tls"}]},
                 "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
-            from::<Ingress>(json!({"metadata": {"name": "api", "namespace": "shop"},
+            // The API shows the maintenance page.
+            from::<Ingress>(json!({"metadata": {"name": "api", "namespace": "shop",
+                    "annotations": {"zeabur.com/maintenance-backend":
+                        r#"{"api.shop.example.com":[{"service":{"name":"api","port":{"name":"http"}}}]}"#}},
                 "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
-                    "backend": {"service": {"name": "api", "port": {"name": "http"}}}}]}}],
+                    "backend": {"service": {"name": "zeabur-error-pages", "port": {"number": 8081}}}}]}}],
                     "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
                 "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
         ],
@@ -1855,6 +1891,15 @@ fn state() -> State {
         .chain(alerting_served())
         .collect(),
         dynamic: [
+            from(json!({
+                "apiVersion": "traefik.io/v1alpha1", "kind": "Middleware",
+                "metadata": {"name": "web-error-pages", "namespace": "shop",
+                    "resourceVersion": "4",
+                    "ownerReferences": [{"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+                        "name": "web", "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0001"}]},
+                "spec": {"errors": {"status": ["502-504"],
+                    "service": {"name": "zeabur-error-pages", "port": 8080}, "query": "/{status}.html"}}
+            })),
             from(json!({
                 "apiVersion": "traefik.io/v1alpha1", "kind": "Middleware",
                 "metadata": {"name": "web-redirect-www-shop-example-com", "namespace": "shop",

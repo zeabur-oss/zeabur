@@ -1,0 +1,11 @@
+[
+  {
+    "name": "shop",
+    "rules": [
+      {"host": "shop.example.test", "service": "web", "port": "8080"},
+      {"host": "www.shop.example.test", "service": "web", "port": "8080"}
+    ],
+    "errorPages": {"middleware": "shop-error-pages"},
+    "maintenance": ["www.shop.example.test"]
+  }
+]

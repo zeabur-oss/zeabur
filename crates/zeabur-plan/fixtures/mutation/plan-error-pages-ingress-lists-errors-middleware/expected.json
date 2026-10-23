@@ -1,0 +1,67 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "Ingress",
+        "plural": "ingresses",
+        "name": "shop"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "9"
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations",
+            "value": {
+              "traefik.ingress.kubernetes.io/router.middlewares": "demo-shop-error-pages@kubernetescrd"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "target": {
+        "apiVersion": "traefik.io/v1alpha1",
+        "kind": "Middleware",
+        "plural": "middlewares",
+        "name": "shop-error-pages"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "metadata": {
+            "name": "shop-error-pages",
+            "namespace": "demo",
+            "ownerReferences": [
+              {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "name": "shop",
+                "uid": "7d1f5c2a-0000-4000-8000-000000000001"
+              }
+            ]
+          },
+          "spec": {
+            "errors": {
+              "status": [
+                "502-504"
+              ],
+              "service": {
+                "name": "zeabur-error-pages",
+                "port": 8080
+              },
+              "query": "/{status}.html"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "warnings": []
+}

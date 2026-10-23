@@ -8,6 +8,7 @@ pub mod compose;
 mod create;
 mod delete;
 pub mod edit;
+mod error_pages;
 pub mod fields;
 pub mod json;
 pub mod node_shell;

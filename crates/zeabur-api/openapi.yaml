@@ -4657,6 +4657,46 @@ components:
           Ask for a user name and password on every hostname of an Ingress, or stop (see the
           `access` module).
       - allOf:
+        - $ref: "#/components/schemas/ErrorPageHtml"
+          description: |-
+            Write the project's error pages, and run the server that serves them (see the
+            `error_pages` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - errorPageHtml
+        description: |-
+          Write the project's error pages, and run the server that serves them (see the
+          `error_pages` module).
+      - allOf:
+        - $ref: "#/components/schemas/ErrorPagesChange"
+          description: Show the project's error pages on every hostname of an Ingress, or stop.
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - errorPages
+        description: Show the project's error pages on every hostname of an Ingress, or stop.
+      - allOf:
+        - $ref: "#/components/schemas/MaintenanceChange"
+          description: Show the maintenance page on a hostname instead of its workload, or stop.
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - maintenance
+        description: Show the maintenance page on a hostname instead of its workload, or stop.
+      - allOf:
         - $ref: "#/components/schemas/EnvImportChange"
           description: |-
             Give a container every key of a ConfigMap or Secret as variables (`envFrom`), or stop
@@ -7307,6 +7347,45 @@ components:
           - string
           - "null"
           description: The value, for a literal only.
+    ErrorPageHtml:
+      type: object
+      description: |-
+        A [`Change::ErrorPageHtml`]: the HTML of each page. A page left out keeps its HTML; the first
+        change of a project gives all four.
+      properties:
+        badGateway:
+          type:
+          - string
+          - "null"
+          description: "`502.html`: the workload sent no valid answer."
+        gatewayTimeout:
+          type:
+          - string
+          - "null"
+          description: "`504.html`: the workload did not answer in time."
+        maintenance:
+          type:
+          - string
+          - "null"
+          description: "`maintenance.html`: what a hostname in maintenance shows."
+        serviceUnavailable:
+          type:
+          - string
+          - "null"
+          description: "`503.html`: the workload cannot answer now."
+    ErrorPagesChange:
+      type: object
+      description: A [`Change::ErrorPages`].
+      required:
+      - route
+      - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: Show the pages when true; stop when false.
+        route:
+          $ref: "#/components/schemas/RouteRef"
+          description: The Ingress.
     EventList:
       type: object
       description: Events of a project, the newest `limit` of them.
@@ -9018,6 +9097,25 @@ components:
         token:
           type: string
           description: The token `plan` returned.
+    MaintenanceChange:
+      type: object
+      description: A [`Change::Maintenance`].
+      required:
+      - route
+      - hostname
+      - enabled
+      properties:
+        enabled:
+          type: boolean
+          description: >-
+            Show the maintenance page when true; send requests to the workload again when
+            false.
+        hostname:
+          type: string
+          description: The hostname.
+        route:
+          $ref: "#/components/schemas/RouteRef"
+          description: The route.
     MaintenancePlan:
       type: object
       description: What a plan changes, and the token that applies it.
@@ -13408,11 +13506,21 @@ components:
             annotation [k8s-ingress-class].
             
             [k8s-ingress-class]: https://kubernetes.io/docs/concepts/services-networking/ingress/#deprecated-annotation
+        errorPages:
+          oneOf:
+          - $ref: "#/components/schemas/RouteMiddleware"
+            description: The Traefik `errors` middleware Zeabur makes to show the project's error pages.
+          - type: "null"
         hostnames:
           type: array
           items:
             type: string
           description: The hosts its rules match.
+        maintenance:
+          type: array
+          items:
+            type: string
+          description: The hosts that show the maintenance page instead of their workload, sorted.
         name:
           type: string
           description: The Ingress's name.

@@ -54,6 +54,15 @@ pub fn basic_auth_name(ingress: &str) -> String {
     format!("{name}{SUFFIX}")
 }
 
+/// The `errors` middleware that shows the project's error pages on Ingress `ingress`.
+#[must_use]
+pub fn error_pages_name(ingress: &str) -> String {
+    const SUFFIX: &str = "-error-pages";
+    let mut name = ingress.to_owned();
+    name.truncate(NAME_MAX - SUFFIX.len());
+    format!("{name}{SUFFIX}")
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;

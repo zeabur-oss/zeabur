@@ -1,8 +1,12 @@
 //! Service ports and their application protocols; Ingress rules.
 
+use std::collections::BTreeMap;
+
 use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort};
 use k8s_openapi::api::networking::v1::{Ingress, IngressServiceBackend};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use serde_json::Value;
+use zeabur_adapters::error_pages;
 use zeabur_model::{InferredFrom, Origin, Port, PortProtocol, ProtocolInference, RouteRule};
 
 use crate::snapshot::name_of;
@@ -149,5 +153,35 @@ pub(crate) fn route_rules(ingress: &Ingress) -> Vec<RouteRule> {
                     })
                 })
         });
-    default.into_iter().chain(rules).collect()
+    let mut out: Vec<RouteRule> = default.into_iter().chain(rules).collect();
+    shown_through_maintenance(ingress, &mut out);
+    out
+}
+
+/// A hostname in maintenance keeps showing the Services it had, from
+/// [`error_pages::MAINTENANCE_ANNOTATION`], so it stays with its workload.
+fn shown_through_maintenance(ingress: &Ingress, rules: &mut [RouteRule]) {
+    let Some(maintenance) = error_pages::maintenance(&ingress.metadata) else {
+        return;
+    };
+    let mut seen: BTreeMap<&str, usize> = BTreeMap::new();
+    for rule in rules.iter_mut() {
+        let Some(host) = rule.host.clone() else {
+            continue;
+        };
+        let Some((key, backends)) = maintenance.get_key_value(&host) else {
+            continue;
+        };
+        let index = seen.entry(key.as_str()).or_default();
+        let backend = backends.get(*index).and_then(|b| b.get("service"));
+        *index += 1;
+        let Some(name) = backend.and_then(|s| s.get("name")).and_then(Value::as_str) else {
+            continue;
+        };
+        name.clone_into(&mut rule.service);
+        rule.port = backend
+            .and_then(|s| s.get("port"))
+            .and_then(|p| p.get("number").or_else(|| p.get("name")))
+            .map(|p| p.as_str().map_or_else(|| p.to_string(), str::to_owned));
+    }
 }

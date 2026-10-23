@@ -17,6 +17,4 @@ workspace = true
 [dependencies]
 zeabur-kernel.workspace = true
 k8s-openapi.workspace = true
-
-[dev-dependencies]
 serde_json.workspace = true

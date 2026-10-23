@@ -1,0 +1,9 @@
+description: "Error pages on an Ingress are a Traefik errors middleware for 502 to 504 that asks the error-page Service for /{status}.html, owned by the Ingress and listed last."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: errorPages
+        route: {kind: Ingress, name: shop}
+        enabled: true

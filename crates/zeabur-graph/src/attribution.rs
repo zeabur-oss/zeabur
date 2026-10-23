@@ -6,6 +6,7 @@ use k8s_openapi::api::apps::v1::StatefulSet;
 use k8s_openapi::api::core::v1::{PodTemplateSpec, Secret, Service as KubeService, Volume};
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use zeabur_adapters::error_pages;
 use zeabur_adapters::provenance::is_helm_release_secret;
 use zeabur_model::{
     Attribution, NamespaceAttribution, ObjectRef, Origin, Ownership, Relation, RelationKind,
@@ -410,7 +411,19 @@ fn route_relations(
     out: &mut Vec<Relation>,
 ) {
     let name = name_of(&ingress.metadata);
-    for (service, path) in ingress_backends(ingress) {
+    let kept: Vec<String> = error_pages::maintenance(&ingress.metadata)
+        .unwrap_or_default()
+        .values()
+        .flat_map(error_pages::ingress_services)
+        .collect();
+    let kept_at = format!(
+        "metadata.annotations[{}]",
+        error_pages::MAINTENANCE_ANNOTATION
+    );
+    let backends = ingress_backends(ingress)
+        .into_iter()
+        .chain(kept.iter().map(|s| (s.as_str(), kept_at.clone())));
+    for (service, path) in backends {
         for &workload in selected.get(service).into_iter().flatten() {
             out.push(relation(
                 workload,

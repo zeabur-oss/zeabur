@@ -1,0 +1,7 @@
+description: "Once the server exists, a new page replaces only its key of the ConfigMap; the Deployment and Service stay."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: errorPageHtml
+        maintenance: "<p>Back at noon</p>"

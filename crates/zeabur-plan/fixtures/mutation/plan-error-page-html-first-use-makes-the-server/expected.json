@@ -1,0 +1,32 @@
+{
+  "objects": [
+    {
+      "target": {"apiVersion": "v1", "kind": "ConfigMap", "plural": "configmaps", "name": "zeabur-error-pages"},
+      "write": {"type": "create", "body": {
+        "metadata": {"name": "zeabur-error-pages", "namespace": "demo"},
+        "data": {"502.html": "<p>502</p>", "503.html": "<p>503</p>", "504.html": "<p>504</p>", "maintenance.html": "<p>Back soon</p>"}
+      }}
+    },
+    {
+      "target": {"apiVersion": "apps/v1", "kind": "Deployment", "plural": "deployments", "name": "zeabur-error-pages"},
+      "write": {"type": "create", "body": {"spec": {"template": {"spec": {
+        "automountServiceAccountToken": false,
+        "securityContext": {"runAsNonRoot": true, "seccompProfile": {"type": "RuntimeDefault"}},
+        "containers": [{
+          "name": "nginx",
+          "resources": {"requests": {"cpu": "5m", "memory": "8Mi"}},
+          "securityContext": {"allowPrivilegeEscalation": false, "capabilities": {"drop": ["ALL"]}}
+        }]
+      }}}}}
+    },
+    {
+      "target": {"apiVersion": "v1", "kind": "Service", "plural": "services", "name": "zeabur-error-pages"},
+      "write": {"type": "create", "body": {"spec": {"ports": [
+        {"name": "pages", "port": 8080},
+        {"name": "maintenance", "port": 8081}
+      ]}}}
+    }
+  ],
+  "impact": [],
+  "warnings": []
+}

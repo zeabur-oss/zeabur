@@ -76,6 +76,9 @@ pub(crate) async fn compute(
         | Change::EnvImport(_)
         | Change::PublicPort(_)
         | Change::BasicAuth(_)
+        | Change::ErrorPageHtml(_)
+        | Change::ErrorPages(_)
+        | Change::Maintenance(_)
         | Change::Restart { .. }
         | Change::Rollback { .. }
         | Change::ExpandVolume { .. }

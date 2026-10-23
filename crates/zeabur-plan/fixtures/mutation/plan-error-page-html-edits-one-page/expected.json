@@ -1,0 +1,12 @@
+{
+  "objects": [
+    {
+      "target": {"apiVersion": "v1", "kind": "ConfigMap", "plural": "configmaps", "name": "zeabur-error-pages"},
+      "write": {"type": "patch", "operations": [
+        {"op": "test", "path": "/metadata/resourceVersion", "value": "4"},
+        {"op": "add", "path": "/data/maintenance.html", "value": "<p>Back at noon</p>"}
+      ]}
+    }
+  ],
+  "warnings": []
+}

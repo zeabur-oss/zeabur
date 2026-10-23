@@ -1,0 +1,2 @@
+description: A host in maintenance sends its requests to the error-page server, but its rules still name the Service kept in zeabur.com/maintenance-backend, so it stays with its workload; the route lists it as in maintenance and names the errors middleware.
+operation: projection.routes

@@ -1,0 +1,9 @@
+description: "Stopping maintenance writes back the backends from zeabur.com/maintenance-backend, removes the annotation, and lets the errors middleware catch 503 again."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test
+        enabled: false

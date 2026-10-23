@@ -1,0 +1,9 @@
+description: "Maintenance needs the project's error pages; without them it is refused and says to write them first."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test
+        enabled: true

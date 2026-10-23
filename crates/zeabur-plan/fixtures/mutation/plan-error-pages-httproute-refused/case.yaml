@@ -1,0 +1,8 @@
+description: "Gateway API has no standard filter for error pages, so error pages on an HTTPRoute are refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: errorPages
+        route: {kind: HTTPRoute, name: web-www}
+        enabled: true

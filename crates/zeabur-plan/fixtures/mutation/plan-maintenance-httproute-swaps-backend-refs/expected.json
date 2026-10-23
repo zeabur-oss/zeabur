@@ -1,0 +1,14 @@
+{
+  "objects": [
+    {
+      "target": {"apiVersion": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute", "plural": "httproutes", "name": "web-www"},
+      "write": {"type": "patch", "operations": [
+        {"op": "test", "path": "/metadata/resourceVersion", "value": "5"},
+        {"op": "test", "path": "/spec/rules/0/backendRefs", "value": [{"name": "web", "port": 8080}]},
+        {"op": "replace", "path": "/spec/rules/0/backendRefs", "value": [{"name": "zeabur-error-pages", "port": 8081}]},
+        {"op": "add", "path": "/metadata/annotations", "value": {"zeabur.com/maintenance-backend": "{\"www.shop.example.test\":[[{\"name\":\"web\",\"port\":8080}]]}"}}
+      ]}
+    }
+  ],
+  "warnings": []
+}

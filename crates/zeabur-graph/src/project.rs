@@ -8,7 +8,7 @@ use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use zeabur_adapters::provenance::{detect_tool, managed_by};
-use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, traefik};
+use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, traefik};
 use zeabur_model::{
     Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin,
     ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,
@@ -210,6 +210,12 @@ fn route(object: &Ingress) -> Route {
             host: None,
             middleware,
         });
+    let error_pages = Some(traefik::error_pages_name(name))
+        .filter(|m| middlewares.contains(m))
+        .map(|middleware| RouteMiddleware {
+            host: None,
+            middleware,
+        });
     Route {
         name: name.to_owned(),
         hostnames,
@@ -219,6 +225,11 @@ fn route(object: &Ingress) -> Route {
         tls_hosts,
         redirects,
         basic_auth,
+        error_pages,
+        maintenance: error_pages::maintenance(&object.metadata)
+            .unwrap_or_default()
+            .into_keys()
+            .collect(),
         provenance: provenance(&object.metadata),
         origin: Origin::object("Ingress", name),
     }

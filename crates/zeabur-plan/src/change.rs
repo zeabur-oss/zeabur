@@ -73,6 +73,13 @@ pub enum Change {
     /// Ask for a user name and password on every hostname of an Ingress, or stop (see the
     /// `access` module).
     BasicAuth(BasicAuthChange),
+    /// Write the project's error pages, and run the server that serves them (see the
+    /// `error_pages` module).
+    ErrorPageHtml(ErrorPageHtml),
+    /// Show the project's error pages on every hostname of an Ingress, or stop.
+    ErrorPages(ErrorPagesChange),
+    /// Show the maintenance page on a hostname instead of its workload, or stop.
+    Maintenance(MaintenanceChange),
     /// Give a container every key of a ConfigMap or Secret as variables (`envFrom`), or stop
     /// (see the `shared` module).
     EnvImport(EnvImportChange),
@@ -541,6 +548,50 @@ impl std::fmt::Debug for BasicAuthUser {
             .field("username", &self.username)
             .finish_non_exhaustive()
     }
+}
+
+/// A [`Change::ErrorPageHtml`]: the HTML of each page. A page left out keeps its HTML; the first
+/// change of a project gives all four.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorPageHtml {
+    /// `502.html`: the workload sent no valid answer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bad_gateway: Option<String>,
+    /// `503.html`: the workload cannot answer now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_unavailable: Option<String>,
+    /// `504.html`: the workload did not answer in time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gateway_timeout: Option<String>,
+    /// `maintenance.html`: what a hostname in maintenance shows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maintenance: Option<String>,
+}
+
+/// A [`Change::ErrorPages`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct ErrorPagesChange {
+    /// The Ingress.
+    pub route: RouteRef,
+    /// Show the pages when true; stop when false.
+    pub enabled: bool,
+}
+
+/// A [`Change::Maintenance`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct MaintenanceChange {
+    /// The route.
+    pub route: RouteRef,
+    /// The hostname.
+    pub hostname: String,
+    /// Show the maintenance page when true; send requests to the workload again when false.
+    pub enabled: bool,
 }
 
 /// A CronJob's `concurrencyPolicy` [k8s-concurrency].

@@ -39,7 +39,7 @@ const MIDDLEWARE_VERSION: &str = "v1alpha1";
 /// Traefik checks the hash on each request, so a higher cost slows every page.
 const BCRYPT_COST: u32 = 10;
 
-fn middleware_resource() -> ResourceRef {
+pub(crate) fn middleware_resource() -> ResourceRef {
     ResourceRef {
         group: TRAEFIK_GROUP.to_owned(),
         version: MIDDLEWARE_VERSION.to_owned(),
@@ -47,7 +47,7 @@ fn middleware_resource() -> ResourceRef {
     }
 }
 
-fn middleware_target(name: &str) -> Target {
+pub(crate) fn middleware_target(name: &str) -> Target {
     Target {
         api_version: format!("{TRAEFIK_GROUP}/{MIDDLEWARE_VERSION}"),
         kind: "Middleware".to_owned(),
@@ -75,7 +75,7 @@ pub fn middleware_read(change: &Change) -> Option<(ResourceRef, String)> {
             traefik::basic_auth_name(&auth.route.name),
         ));
     }
-    None
+    crate::error_pages::middleware_read(change)
 }
 
 #[expect(
@@ -231,6 +231,20 @@ impl Planner<'_> {
     /// Route `route` as read, after the checks both changes share. An empty `hostname` is not
     /// checked.
     fn access_route(&mut self, route: &RouteRef, hostname: &str) -> Result<Value, PlanError> {
+        let object = self.checked_route(route, hostname)?;
+        if route.kind == RouteKind::Ingress {
+            self.refuse_without_traefik(&object, &route.name)?;
+        }
+        Ok(object)
+    }
+
+    /// Route `route` as read, after it is found not managed by a tool and to route `hostname`
+    /// (when not empty). Its workloads join the plan's impact.
+    pub(crate) fn checked_route(
+        &mut self,
+        route: &RouteRef,
+        hostname: &str,
+    ) -> Result<Value, PlanError> {
         let (object, meta, services) = self.route(route)?;
         let kind = match route.kind {
             RouteKind::Ingress => "Ingress",
@@ -244,15 +258,16 @@ impl Planner<'_> {
                 format!("{} does not route {hostname}.", route.name),
             ));
         }
-        if route.kind == RouteKind::Ingress {
-            self.refuse_without_traefik(&object, &route.name)?;
-        }
         let behind = self.behind(&services);
         self.impact.extend(behind);
         Ok(object)
     }
 
-    fn refuse_without_traefik(&self, ingress: &Value, name: &str) -> Result<(), PlanError> {
+    pub(crate) fn refuse_without_traefik(
+        &self,
+        ingress: &Value,
+        name: &str,
+    ) -> Result<(), PlanError> {
         let served = self
             .input
             .kinds
@@ -269,7 +284,7 @@ impl Planner<'_> {
             ErrorKind::Invalid,
             "needs_traefik",
             format!(
-                "Redirects and passwords on Ingress {name} need Traefik, and {}.",
+                "Redirects, passwords and error pages on Ingress {name} need Traefik, and {}.",
                 if served {
                     "its class is not Traefik's"
                 } else {
@@ -397,7 +412,7 @@ impl Planner<'_> {
         self.patch(index, operations)
     }
 
-    fn fetched_middleware(&self, name: &str) -> Option<Value> {
+    pub(crate) fn fetched_middleware(&self, name: &str) -> Option<Value> {
         let resource = middleware_resource();
         self.input
             .objects
@@ -406,7 +421,7 @@ impl Planner<'_> {
             .map(|f| f.object.clone())
     }
 
-    fn owned_metadata(&self, name: &str, owner: Option<&Value>) -> Value {
+    pub(crate) fn owned_metadata(&self, name: &str, owner: Option<&Value>) -> Value {
         let mut metadata = json!({"name": name, "namespace": self.input.snapshot.namespace});
         if let (Some(owner), Some(map)) = (owner, metadata.as_object_mut()) {
             map.insert("ownerReferences".to_owned(), json!([owner]));
@@ -414,7 +429,7 @@ impl Planner<'_> {
         metadata
     }
 
-    fn created_middleware(&mut self, name: &str, owner: Option<&Value>, spec: &Value) {
+    pub(crate) fn created_middleware(&mut self, name: &str, owner: Option<&Value>, spec: &Value) {
         let body = json!({
             "apiVersion": format!("{TRAEFIK_GROUP}/{MIDDLEWARE_VERSION}"),
             "kind": "Middleware",
@@ -424,7 +439,7 @@ impl Planner<'_> {
         self.created(middleware_target(name), body);
     }
 
-    fn created(&mut self, target: Target, body: Value) {
+    pub(crate) fn created(&mut self, target: Target, body: Value) {
         self.objects.push(Working {
             target,
             original: None,
@@ -436,7 +451,7 @@ impl Planner<'_> {
     }
 
     /// Adds middleware `name` to the annotation of Ingress `index`: first, or last.
-    fn list(&mut self, index: usize, name: &str, first: bool) -> Result<(), PlanError> {
+    pub(crate) fn list(&mut self, index: usize, name: &str, first: bool) -> Result<(), PlanError> {
         let entry = traefik::reference(&self.input.snapshot.namespace, name);
         self.edit_list(index, |entries| {
             if first {
@@ -447,7 +462,7 @@ impl Planner<'_> {
         })
     }
 
-    fn unlist(&mut self, index: usize, name: &str) -> Result<(), PlanError> {
+    pub(crate) fn unlist(&mut self, index: usize, name: &str) -> Result<(), PlanError> {
         let entry = traefik::reference(&self.input.snapshot.namespace, name);
         self.edit_list(index, |entries| entries.retain(|e| *e != entry))
     }
@@ -457,19 +472,11 @@ impl Planner<'_> {
         index: usize,
         edit: impl FnOnce(&mut Vec<String>),
     ) -> Result<(), PlanError> {
-        self.claim(
-            index,
-            &[
-                Step::field("metadata"),
-                Step::field("annotations"),
-                Step::field(MIDDLEWARES_ANNOTATION),
-            ],
-            "annotations",
-        )?;
         let current = self.current(index);
         let path = pointer(&["metadata", "annotations", MIDDLEWARES_ANNOTATION]);
-        let before = current.pointer(&path).and_then(Value::as_str);
-        let mut entries: Vec<String> = before
+        let mut entries: Vec<String> = current
+            .pointer(&path)
+            .and_then(Value::as_str)
             .into_iter()
             .flat_map(|list| list.split(','))
             .map(str::trim)
@@ -477,17 +484,35 @@ impl Planner<'_> {
             .map(str::to_owned)
             .collect();
         edit(&mut entries);
-        let after = entries.join(",");
+        self.set_annotation(index, MIDDLEWARES_ANNOTATION, &entries.join(","))
+    }
+
+    /// Sets annotation `key` of object `index` to `after`, or removes it when `after` is empty.
+    pub(crate) fn set_annotation(
+        &mut self,
+        index: usize,
+        key: &str,
+        after: &str,
+    ) -> Result<(), PlanError> {
+        self.claim(
+            index,
+            &[
+                Step::field("metadata"),
+                Step::field("annotations"),
+                Step::field(key),
+            ],
+            "annotations",
+        )?;
+        let current = self.current(index);
+        let path = pointer(&["metadata", "annotations", key]);
+        let before = current.pointer(&path).and_then(Value::as_str);
         let operations = match before {
             Some(before) if after.is_empty() => vec![test(&path, json!(before)), remove(&path)],
             Some(before) => vec![test(&path, json!(before)), replace(&path, json!(after))],
             None if current.pointer("/metadata/annotations").is_some() => {
                 vec![add(&path, json!(after))]
             }
-            None => vec![add(
-                "/metadata/annotations",
-                json!({ MIDDLEWARES_ANNOTATION: after }),
-            )],
+            None => vec![add("/metadata/annotations", json!({ key: after }))],
         };
         self.patch(index, operations)
     }
@@ -556,7 +581,7 @@ fn hosts(object: &Value, kind: RouteKind) -> Vec<String> {
         .collect()
 }
 
-fn meta_of(object: &Value) -> ObjectMeta {
+pub(crate) fn meta_of(object: &Value) -> ObjectMeta {
     object
         .get("metadata")
         .cloned()
@@ -565,7 +590,7 @@ fn meta_of(object: &Value) -> ObjectMeta {
 }
 
 /// An owner reference to the Ingress, so the garbage collector deletes what it owns with it.
-fn owner_of(meta: &ObjectMeta) -> Option<Value> {
+pub(crate) fn owner_of(meta: &ObjectMeta) -> Option<Value> {
     Some(json!({
         "apiVersion": "networking.k8s.io/v1",
         "kind": "Ingress",

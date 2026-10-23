@@ -1,0 +1,9 @@
+description: "Maintenance on an Ingress hostname sends its paths to the maintenance port, keeps the backends in zeabur.com/maintenance-backend, and stops the errors middleware from catching 503."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test
+        enabled: true
