@@ -646,7 +646,7 @@ export const en = {
   "builds.autoUpdateHint": "Each new build goes live as soon as it finishes.",
   "builds.autoUpdatePolicy": (policy: string) =>
     `Keel updates this service with its ${policy} policy, set outside Zeabur.`,
-  "builds.keelMissing": "Deploying automatically needs Keel, which this cluster does not have.",
+  "builds.keelMissing": "Auto-deploy needs the Keel component, which this cluster doesn't have.",
   "builds.installKeel": "How to install",
   "builds.history": "History",
   "builds.trigger.webhook": "Pushed",
@@ -1377,7 +1377,7 @@ export const en = {
   "confirm.autoUpdateOn": (service: string) =>
     `Each new build of ${service} will go live as soon as it finishes.`,
   "confirm.autoUpdateOff": (service: string) =>
-    `New images of ${service} will wait for you to deploy them.`,
+    `New builds of ${service} will wait for you to deploy them.`,
   "confirm.renameDomain": (from: string) => `Links to ${from} stop working.`,
   "confirm.removeDomain": (host: string) => `Requests to ${host} no longer reach this project.`,
   "confirm.rollback": (revision: number) =>

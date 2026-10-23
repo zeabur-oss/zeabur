@@ -194,6 +194,7 @@ why. Add a row before introducing a new concept.
 | passkey | 通行密鑰 | 通行密钥 | Apple's name in the system dialog that asks for it (Google's zh-TW wording differs; not verified); chosen over the dashboard's Latin "Passkey" so the page and that dialog match |
 | sign in / sign out | 登入／登出 | 登录／退出登录 | |
 | deploy, roll out | 部署 | 部署 | |
+| auto-deploy new builds | 新建置完成後自動部署 | 新构建完成后自动部署 | Keel is named only when it is missing, when its own policy decides, and in the Kubernetes details |
 | releases (a service's revisions) | 發布紀錄 | 发布记录 | |
 | revision | 修訂版本 | 修订版本 | |
 | restart | 重新啟動 | 重启 | |

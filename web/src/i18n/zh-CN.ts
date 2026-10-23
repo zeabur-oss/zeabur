@@ -586,7 +586,7 @@ export const zhCN: Messages = {
   "builds.autoUpdateHint": "每次构建完成就立即上线。",
   "builds.autoUpdatePolicy": (policy) =>
     `Keel 按 ${policy} 规则更新这个服务，这个设置不是在 Zeabur 设的。`,
-  "builds.keelMissing": "自动部署需要 Keel，这个集群还没有安装。",
+  "builds.keelMissing": "自动部署需要集群里的 Keel 组件，目前还没有安装。",
   "builds.installKeel": "安装方式",
   "builds.history": "记录",
   "builds.trigger.webhook": "推送触发",
@@ -1244,7 +1244,7 @@ export const zhCN: Messages = {
   "confirm.image": (service, tag) => `${service} 会改为运行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 会用分支最新的提交重新构建 ${build}。`,
   "confirm.autoUpdateOn": (service) => `${service} 每次构建完成就会立即上线。`,
-  "confirm.autoUpdateOff": (service) => `${service} 的新镜像会等你手动部署。`,
+  "confirm.autoUpdateOff": (service) => `${service} 的新构建会等你手动部署。`,
   "confirm.renameDomain": (from) => `指向 ${from} 的链接会失效。`,
   "confirm.removeDomain": (host) => `访问 ${host} 的请求不会再进入这个项目。`,
   "confirm.rollback": (revision) => `修订版本 ${revision} 之后的模板变更都会撤销。`,

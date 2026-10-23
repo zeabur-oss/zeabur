@@ -587,7 +587,7 @@ export const zhTW: Messages = {
   "builds.autoUpdateHint": "每次建置完成就立刻上線。",
   "builds.autoUpdatePolicy": (policy) =>
     `Keel 依 ${policy} 規則更新這個服務，這個設定不是在 Zeabur 設的。`,
-  "builds.keelMissing": "自動部署需要 Keel，這個叢集還沒有安裝。",
+  "builds.keelMissing": "自動部署需要叢集裡的 Keel 元件，目前還沒有安裝。",
   "builds.installKeel": "安裝方式",
   "builds.history": "紀錄",
   "builds.trigger.webhook": "推送觸發",
@@ -1247,7 +1247,7 @@ export const zhTW: Messages = {
   "confirm.image": (service, tag) => `${service} 會改為執行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 會用分支最新的提交重新建置 ${build}。`,
   "confirm.autoUpdateOn": (service) => `${service} 每次建置完成就會立刻上線。`,
-  "confirm.autoUpdateOff": (service) => `${service} 的新映像檔會等你手動部署。`,
+  "confirm.autoUpdateOff": (service) => `${service} 的新建置會等你手動部署。`,
   "confirm.renameDomain": (from) => `連到 ${from} 的連結會失效。`,
   "confirm.removeDomain": (host) => `送到 ${host} 的請求不會再到達這個專案。`,
   "confirm.rollback": (revision) => `修訂版本 ${revision} 之後的範本變更都會撤銷。`,
