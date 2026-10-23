@@ -39,6 +39,8 @@ import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import {
+  branchOf,
+  buildProblem,
   building,
   builtContainers,
   durationOf,
@@ -196,6 +198,9 @@ function Summary({
   const { build, image } = built
   const current = runsLatest(image, build)
   const since = latest?.started ?? latest?.created
+  const problem = buildProblem(build, latest)
+  const branch = branchOf(build)
+  const failure = problem?.message ?? (build.ready === "False" ? build.message : undefined)
   const deployGate = useHereGate("changeServices")
   const rebuildGate = useHereGate("build")
   const deployButton = (
@@ -212,8 +217,28 @@ function Summary({
   return (
     <SummaryCard aria-label={t("builds.status", build.name)}>
       <SummaryCardMain>
-        <SummaryCardStatus tone={latest ? tones[runTone(latest)] : "idle"}>
-          <SummaryCardWord>{phaseWord(t, latest)}</SummaryCardWord>
+        <SummaryCardStatus
+          tone={
+            problem
+              ? problem.lasting
+                ? "fail"
+                : "progress"
+              : latest
+                ? tones[runTone(latest)]
+                : "idle"
+          }
+        >
+          <SummaryCardWord>
+            {problem
+              ? t(
+                  !problem.lasting
+                    ? "builds.word.retrying"
+                    : problem.condition === "BuilderReady"
+                      ? "builds.word.builderMissing"
+                      : "builds.word.sourceFailed",
+                )
+              : phaseWord(t, latest)}
+          </SummaryCardWord>
         </SummaryCardStatus>
         {since ? (
           <SummaryCardSince>
@@ -227,9 +252,13 @@ function Summary({
               ? t("builds.behind", service.name, imageTag(build.latestImage))
               : t("builds.noImage")}
         </p>
-        {build.ready === "False" && build.message ? (
-          <p className="mt-1 max-w-prose text-sm text-fail-strong" lang="en" translate="no">
-            {build.message}
+        {failure ? (
+          <p
+            className={`mt-1 max-w-prose text-sm break-words ${problem && !problem.lasting ? "text-secondary" : "text-fail-strong"}`}
+            lang="en"
+            translate="no"
+          >
+            {failure}
           </p>
         ) : latest?.phase === "Failed" && latest.message ? (
           <p
@@ -249,8 +278,11 @@ function Summary({
               <GitBranchIcon aria-hidden="true" />
               <span className="truncate font-mono" title={build.gitUrl} translate="no">
                 {build.gitUrl.replace(/^https?:\/\//, "")}
-                {build.gitRef ? `@${build.gitRef}` : ""}
+                {branch ? `@${branch}` : ""}
               </span>
+              {branch ? null : (
+                <span className="shrink-0 text-secondary">{t("builds.defaultBranch")}</span>
+              )}
             </SummaryCardFact>
           ) : null}
           {build.latestImage ? (

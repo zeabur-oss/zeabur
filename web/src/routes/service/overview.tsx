@@ -49,7 +49,7 @@ import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
 import { alertsFor, folded } from "@/model/alerts"
-import { runsOf } from "@/model/builds"
+import { buildProblem, runsOf } from "@/model/builds"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
@@ -369,8 +369,14 @@ function FirstBuild({
   const build = built[0]?.build
   const run = build ? runsOf(builds.data?.runs ?? [], build)[0] : undefined
   const failed = statusOf(service).reason === "BuildFailed"
+  const problem = build ? buildProblem(build, run) : undefined
   const why = failed
-    ? (run?.message ?? run?.reason ?? build?.message ?? build?.reason ?? undefined)
+    ? (problem?.message ??
+      run?.message ??
+      run?.reason ??
+      build?.message ??
+      build?.reason ??
+      undefined)
     : t("overview.building")
   return (
     <p className="mt-1 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">

@@ -13,6 +13,9 @@ export const buildMethods: BuildMethod[] = ["railpack", "dockerfile"]
 
 export type Access = "public" | "deployKey" | "token"
 
+/** The ref Zeabur Builder takes for the repository's default branch. */
+export const DEFAULT_BRANCH_REF = "HEAD"
+
 /** The tag the Deployment names until the first build. */
 const PENDING_TAG = "pending"
 const GIT_CREDENTIALS_LABEL = "builder.zeabur.com/git-credentials"
@@ -30,6 +33,7 @@ export interface GitService extends Pick<
   "name" | "port" | "publicUrl" | "host" | "variables" | "size"
 > {
   url: string
+  /** Empty: the repository's default branch. */
   branch: string
   /** Empty: the repository's root. */
   directory: string
@@ -44,7 +48,7 @@ export interface GitService extends Pick<
 
 export const newGitService = (): GitService => ({
   url: "",
-  branch: "main",
+  branch: "",
   directory: "",
   method: "railpack",
   access: "public",
@@ -118,9 +122,9 @@ export function urlProblem(url: string): "empty" | "invalid" | undefined {
   return parseRepository(url) ? undefined : "invalid"
 }
 
-export function branchProblem(branch: string): "empty" | "invalid" | undefined {
+export function branchProblem(branch: string): "invalid" | undefined {
   const value = branch.trim()
-  if (value === "") return "empty"
+  if (value === "") return undefined
   return BRANCH.test(value) ? undefined : "invalid"
 }
 
@@ -204,7 +208,7 @@ export function gitObjects(
       source: {
         git: {
           url: repo ? (form.access === "deployKey" ? sshUrl(repo) : httpsUrl(repo)) : form.url,
-          ref: form.branch.trim(),
+          ref: form.branch.trim() || DEFAULT_BRANCH_REF,
           ...(directory ? { contextDir: directory } : {}),
         },
         ...(credentials ? { credentialsRef: { name: credentials } } : {}),

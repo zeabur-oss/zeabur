@@ -12,6 +12,7 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef};
 use zeabur_modules::Reading;
 use zeabur_modules::zeabur_builder::{
@@ -96,7 +97,7 @@ pub(crate) async fn first_images(
     else {
         return;
     };
-    let builds = zeabur_builder::builds(&builds);
+    let builds = zeabur_builder::builds(&builds, Some(Timestamp::now()));
     if builds.iter().all(|b| b.latest_image.is_some()) {
         return;
     }
@@ -182,7 +183,7 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectBuilds, Clu
     };
     Ok(ProjectBuilds {
         state: ProviderState::Installed,
-        builds: zeabur_builder::builds(&builds),
+        builds: zeabur_builder::builds(&builds, Some(Timestamp::now())),
         runs,
         keel,
         unreadable,

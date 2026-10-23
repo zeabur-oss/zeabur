@@ -206,6 +206,14 @@ mod tests {
     }
 
     fn waiting_service(cluster: &MemoryCluster, run_phase: Option<&str>) {
+        waiting_service_with(cluster, run_phase, None);
+    }
+
+    fn waiting_service_with(
+        cluster: &MemoryCluster,
+        run_phase: Option<&str>,
+        build_status: Option<&Value>,
+    ) {
         let deployment: Deployment = serde_json::from_value(json!({
             "metadata": {"name": "site", "namespace": "shop", "labels": {"app": "site"},
                          "annotations": {"keel.sh/policy": "force"}},
@@ -232,6 +240,9 @@ mod tests {
             if run_phase == Some("Failed") {
                 build["status"] = json!({"conditions": [{"type": "Ready", "status": "False",
                     "reason": "BuildFailed"}]});
+            }
+            if let Some(status) = build_status {
+                build["status"] = status.clone();
             }
             s.dynamic.push(serde_json::from_value(build).unwrap());
             if let Some(phase) = run_phase {
@@ -282,5 +293,46 @@ mod tests {
         let cluster = cluster();
         waiting_service(&cluster, Some("Failed"));
         cluster
+    }
+
+    fn source_not_ready(reason: &str, since: &str) -> Value {
+        json!({"conditions": [
+            {"type": "BuilderReady", "status": "True", "reason": "Found"},
+            {"type": "SourceReady", "status": "False", "reason": reason,
+                "message": "no branch or tag `main`", "lastTransitionTime": since},
+            {"type": "Ready", "status": "Unknown", "reason": "NotBuilt"}]})
+    }
+
+    /// A ref that cannot be resolved never builds: the service fails with the build at once, and
+    /// the Builds answer carries the controller's message. A timeout waits a few minutes first.
+    #[tokio::test]
+    async fn a_source_that_cannot_be_resolved_fails_the_service() {
+        let missing = cluster();
+        waiting_service_with(
+            &missing,
+            None,
+            Some(&source_not_ready("RefNotFound", "2026-10-23T08:00:00Z")),
+        );
+        let service = site(&missing).await;
+        assert_eq!(service["status"]["word"], "failed", "{service}");
+        assert_eq!(service["status"]["health"], "fail");
+        assert_eq!(service["status"]["reason"], "BuildFailed");
+        assert_eq!(service["diagnoses"], json!([]), "{service}");
+        let (status, builds) =
+            send(&app(&missing), "GET", "/api/v1/projects/shop/builds", None).await;
+        assert_eq!(status, StatusCode::OK, "{builds}");
+        assert_eq!(builds["builds"][0]["problem"]["condition"], "SourceReady");
+        assert_eq!(builds["builds"][0]["problem"]["reason"], "RefNotFound");
+        assert_eq!(
+            builds["builds"][0]["problem"]["message"],
+            "no branch or tag `main`"
+        );
+        assert_eq!(builds["builds"][0]["problem"]["lasting"], true);
+
+        let slow = cluster();
+        let now = zeabur_kube::k8s_openapi::jiff::Timestamp::now().to_string();
+        waiting_service_with(&slow, None, Some(&source_not_ready("ResolveFailed", &now)));
+        let service = site(&slow).await;
+        assert_eq!(service["status"]["word"], "building", "{service}");
     }
 }

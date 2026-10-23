@@ -203,14 +203,14 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             label={t("add.field.branch")}
-            errors={shown(problems.branch, () =>
-              t(`add.problem.branch.${problems.branch ?? "empty"}`),
-            )}
+            hint={t("add.branchHint")}
+            errors={shown(problems.branch, () => t("add.problem.branch"))}
           >
             <Input
               size="sm"
               mono
               value={form.branch}
+              placeholder={t("add.branchDefault")}
               autoComplete="off"
               spellCheck={false}
               onChange={(event) => set({ branch: event.target.value })}
