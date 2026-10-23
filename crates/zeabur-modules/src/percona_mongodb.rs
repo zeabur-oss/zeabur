@@ -270,6 +270,10 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
             .and_then(|r| r.pointer("/volumeSpec/persistentVolumeClaim/resources/requests/storage"))
             .and_then(Value::as_str)
             .map(str::to_owned),
+        storage_class: replset
+            .and_then(|r| r.pointer("/volumeSpec/persistentVolumeClaim/storageClassName"))
+            .and_then(Value::as_str)
+            .map(str::to_owned),
         claims,
         resources: replset.and_then(|r| r.get("resources")).cloned(),
         connection: Connection {
@@ -336,6 +340,7 @@ mod tests {
                 "image": "percona/percona-server-mongodb:8.0.32-14",
                 "unsafeFlags": {"replsetSize": true},
                 "replsets": [{"name": "rs0", "size": 1, "volumeSpec": {"persistentVolumeClaim": {
+                    "storageClassName": "local-path",
                     "resources": {"requests": {"storage": "2Gi"}}}}}],
                 "backup": {
                     "enabled": true,
@@ -361,6 +366,7 @@ mod tests {
         assert_eq!(db.state, State::Ready);
         assert_eq!((db.members, db.ready), (1, 1));
         assert_eq!(db.claims, ["mongod-data-mongo-rs0-0"]);
+        assert_eq!(db.storage_class.as_deref(), Some("local-path"));
         assert_eq!(db.connection.host, "mongo-rs0.shop.svc");
         assert_eq!(db.connection.secret, "mongo-secrets");
         let store = db.backups.store.unwrap();
