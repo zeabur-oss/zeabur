@@ -9,8 +9,7 @@ import { serviceId, type Claim, type Health, type Project, type Service } from "
 import { bytesOf } from "@/model/volume-edit"
 
 /** Whether a database's operator runs this workload for the database. */
-export const isDatabasePart = (service: Pick<Service, "managedBy">) =>
-  Boolean(service.managedBy?.engine)
+const isDatabasePart = (service: Pick<Service, "managedBy">) => Boolean(service.managedBy?.engine)
 
 const key = (ref: { kind: string; name: string }) => `${ref.kind}/${ref.name}`
 
@@ -34,7 +33,7 @@ const ENGINE_OF: Record<string, Database["engine"]> = {
 }
 
 /** The database a part belongs to, among `databases`. */
-export const databaseOfPart = (service: Service, databases: Database[]) =>
+const databaseOfPart = (service: Service, databases: Database[]) =>
   databases.find(
     (d) =>
       d.name === service.managedBy?.name && d.engine === ENGINE_OF[service.managedBy.engine ?? ""],
@@ -50,7 +49,7 @@ export interface DatabaseNode {
   volumes: { name: string; size?: string | null }[]
 }
 
-export const databaseNodeId = (database: Pick<Database, "engine" | "name">) =>
+const databaseNodeId = (database: Pick<Database, "engine" | "name">) =>
   `database:${database.engine}/${database.name}`
 
 /** `claims` from the whole project give a volume its size when the database has none. */

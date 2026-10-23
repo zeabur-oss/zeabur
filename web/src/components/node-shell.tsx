@@ -44,7 +44,7 @@ import {
 } from "@zeabur/design-system/components/collapsible"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
-export function useMayOpenNodeShell(): boolean {
+function useMayOpenNodeShell(): boolean {
   const account = useQuery(accountQuery).data
   const whoami = useQuery(whoamiQuery).data
   const elevation = useQuery(sessionQuery).data?.elevation

@@ -14,7 +14,7 @@ export const buildMethods: BuildMethod[] = ["railpack", "dockerfile"]
 export type Access = "public" | "deployKey" | "token"
 
 /** The ref Zeabur Builder takes for the repository's default branch. */
-export const DEFAULT_BRANCH_REF = "HEAD"
+const DEFAULT_BRANCH_REF = "HEAD"
 
 /** The tag the Deployment names until the first build. */
 const PENDING_TAG = "pending"

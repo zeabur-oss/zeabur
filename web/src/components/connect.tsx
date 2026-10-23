@@ -45,7 +45,7 @@ export function namingOf(database: Connectable, targets: Service[], choice: Choi
   return { fresh, name, problem: nameProblem(database, fresh, name, choice.extras) }
 }
 
-export const nameProblemText = (t: Translate, problem: NameProblem) =>
+const nameProblemText = (t: Translate, problem: NameProblem) =>
   problem.kind === "invalid"
     ? t("connect.badName")
     : t("connect.taken", problem.name, problem.service)
@@ -57,7 +57,7 @@ export function useTargets(project: string): Service[] {
   return candidates(services, rights)
 }
 
-export const pickedOf = (targets: Service[], choice: Choice) =>
+const pickedOf = (targets: Service[], choice: Choice) =>
   targets.filter((s) => choice.picked.includes(keyOf(s)))
 
 /** The plan of connecting; `pending` when the database is created in the same plan. */

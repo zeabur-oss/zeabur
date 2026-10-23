@@ -11,7 +11,7 @@ export type Target = Pick<Service, "kind" | "name" | "containers">
 export type Connectable = Pick<Database, "engine" | "name" | "connection" | "app">
 
 /** The variable a service reads the database from, as Railway names it. */
-export const mainVariable = (database: Pick<Database, "engine">) =>
+const mainVariable = (database: Pick<Database, "engine">) =>
   database.engine === "postgresql" ? "DATABASE_URL" : "MONGO_URL"
 
 const PG_EXTRAS = [
@@ -263,4 +263,4 @@ export function pendingDatabase(form: NewDatabase, project: string): Connectable
   }
 }
 
-export const variableProblem = (name: string) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
+const variableProblem = (name: string) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)

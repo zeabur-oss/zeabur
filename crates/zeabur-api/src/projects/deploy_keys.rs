@@ -5,7 +5,7 @@
 //!
 //! The answer carries the private key sealed (AES-256-GCM under the plan key, as plan tokens
 //! are), bound to the person, the project and the Git host. A plan's
-//! [`Change::DeployKey`](zeabur_plan::Change::DeployKey) hands it back; [`open`] turns it into
+//! [`Change::DeployKey`] hands it back; `open` turns it into
 //! the `create` of a `kubernetes.io/ssh-auth` Secret with the private key and the host's
 //! `known_hosts`, which Zeabur Builder requires. The plan shows the Secret with its values hidden,
 //! like every Secret it writes.

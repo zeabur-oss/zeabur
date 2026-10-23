@@ -2,7 +2,7 @@
 // Five fields, or six with seconds first as CloudNativePG writes them (robfig/cron).
 import type { Translate } from "@/i18n"
 
-export type CronPlan =
+type CronPlan =
   | { every: "minute" }
   | { every: "minutes"; n: number }
   | { every: "hour"; minute: number }

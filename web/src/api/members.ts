@@ -27,7 +27,6 @@ function done(result: { data?: unknown; error?: unknown; response: Response }): 
 
 export type MemberChange = Schemas["MemberChange"]
 export type MemberPlan = Schemas["MemberPlan"]
-export type MemberWrite = Schemas["MemberWrite"]
 
 /** The objects a change to the members writes, and the token that applies them; writes nothing. */
 export async function planMemberChange(
