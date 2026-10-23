@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils"
 import { edgesOf } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { originOf } from "@/model/origin"
+import { troubleTone } from "@/model/severity"
 import { bounds, fittedZoom, layout, type LaidEdge, type LaidNode, type Lane } from "@/model/layout"
 import {
   claimOf,
@@ -267,10 +268,7 @@ function Graph({
             <div className="flex h-7.5 items-center gap-2 px-3 type-meta font-medium text-muted-foreground">
               {t(laneTitle[frame.lane])}
               <span className="flex items-center gap-1 tracking-normal normal-case">
-                <StatusDot
-                  health={frame.ready === frame.total ? "ok" : "fail"}
-                  className="size-1.5"
-                />
+                <StatusDot health={frame.health} className="size-1.5" />
                 {frame.ready}/{frame.total}
               </span>
             </div>
@@ -515,7 +513,9 @@ function ServiceCard({
         </span>
         {first ? (
           <span className="flex min-w-0">
-            <Badge variant="fail">{t(`origin.${originOf(first).origin}`)}</Badge>
+            <Badge variant={troubleTone(status.health)}>
+              {t(`origin.${originOf(first).origin}`)}
+            </Badge>
           </span>
         ) : null}
         <span className="mt-auto flex items-center gap-2 text-xs">

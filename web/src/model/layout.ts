@@ -10,9 +10,11 @@ import {
   serviceId,
   statusOf,
   volumesOf,
+  type Health,
   type Role,
   type Service,
 } from "@/model/service"
+import { worstOf } from "@/model/severity"
 
 const CARD_W = 224
 const CARD_H = 112
@@ -59,6 +61,8 @@ interface Frame {
   h: number
   ready: number
   total: number
+  /** The worst of its services. */
+  health: Health
 }
 
 export interface Layout {
@@ -221,6 +225,7 @@ export function layout(services: Service[], allEdges: Edge[]): Layout {
       h: bottom - top + FRAME_PAD * 2 + FRAME_HEAD,
       ready: laneServices.filter((s) => isHealthy(statusOf(s))).length,
       total: laneServices.length,
+      health: worstOf(laneServices.map((s) => statusOf(s).health)),
     })
     x += width + GAP_X
   }
