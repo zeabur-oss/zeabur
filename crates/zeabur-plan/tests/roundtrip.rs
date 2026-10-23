@@ -352,7 +352,7 @@ mod tests {
             prop_assume!(specs.iter().all(|s| !s.hosts.contains(&new)));
             let snapshot = build(&specs);
             let before = project(&snapshot);
-            let plan = planned(&snapshot, vec![Change::AddDomain { workload: deployment(&target), hostname: new.clone() }]);
+            let plan = planned(&snapshot, vec![Change::AddDomain(zeabur_plan::AddDomainChange { workload: deployment(&target), hostname: new.clone(), certificate: None })]);
             prop_assert_eq!(plan.objects.len(), 1, "one write for one object");
             let projected = project(&after(&snapshot, &plan));
             let mut expected = specs[0].hosts.clone();

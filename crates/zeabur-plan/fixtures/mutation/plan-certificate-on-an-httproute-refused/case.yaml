@@ -1,0 +1,10 @@
+description: "The certificate of an HTTPRoute's hostname comes from its Gateway, which is the cluster's, so a change to it is refused."
+operation: mutation.plan
+params:
+  issuers: {letsencrypt-dns: dns01}
+  request:
+    changes:
+      - op: certificate
+        route: {kind: HTTPRoute, name: web}
+        hostname: web.example.test
+        certificate: {from: issuer, name: letsencrypt-dns}

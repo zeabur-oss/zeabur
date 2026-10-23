@@ -33,6 +33,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use base64::Engine as _;
 use k8s_openapi::api::apps::v1::ReplicaSet;
+use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use zeabur_adapters::provenance::{Tool, detect_tool};
@@ -40,9 +41,12 @@ use zeabur_graph::{Snapshot, Workload, workloads};
 use zeabur_kernel::names::{Conventions, GatewayRef};
 use zeabur_model::{HttpRoute, PodSecurityLevel, Project, SourceKind, WorkloadKind, WorkloadRef};
 
+use crate::certificates::{
+    CLUSTER_ISSUER, CheckedCertificate, ISSUER, IssuerRead, issued_secret_name,
+};
 use crate::change::{
-    Change, DataEdit, DataKind, FieldOwners, HttpOnlyReason, Plan, PlanRequest, PlannedObject,
-    RouteKind, RouteRef, Target, Warning, Write,
+    CertificateSource, Change, DataEdit, DataKind, FieldOwners, HttpOnlyReason, Plan, PlanRequest,
+    PlannedObject, RouteKind, RouteRef, Target, Warning, Write,
 };
 use crate::checks::ResourceRef;
 use crate::create::ServedKind;
@@ -175,6 +179,11 @@ pub struct Input<'a> {
     /// The `ClusterIssuer` the chart names for new hostnames (`domains.clusterIssuer`); `None`:
     /// a new hostname gets HTTPS only where its Ingress already asks cert-manager for it.
     pub cluster_issuer: Option<&'a str>,
+    /// The `ClusterIssuers` the request names or a wildcard hostname would use, by name, as
+    /// read (see the `certificates` module).
+    pub issuers: &'a BTreeMap<String, IssuerRead>,
+    /// The person's own certificates the request sets, checked, by hostname.
+    pub certificates: &'a BTreeMap<String, CheckedCertificate>,
 }
 
 impl<'a> Input<'a> {
@@ -186,6 +195,8 @@ impl<'a> Input<'a> {
         static NO_SECRET_VALUES: BTreeMap<String, BTreeMap<String, Vec<u8>>> = BTreeMap::new();
         static NO_RELEASES: BTreeMap<WorkloadRef, Vec<Release>> = BTreeMap::new();
         static NO_RECLAIM_POLICIES: BTreeMap<String, String> = BTreeMap::new();
+        static NO_ISSUERS: BTreeMap<String, IssuerRead> = BTreeMap::new();
+        static NO_CERTIFICATES: BTreeMap<String, CheckedCertificate> = BTreeMap::new();
         Self {
             snapshot,
             http_routes: &[],
@@ -201,6 +212,8 @@ impl<'a> Input<'a> {
             reloader: None,
             kinds: &[],
             cluster_issuer: None,
+            issuers: &NO_ISSUERS,
+            certificates: &NO_CERTIFICATES,
         }
     }
 }
@@ -410,7 +423,12 @@ impl<'a> Planner<'a> {
                 name,
                 changes,
             } => self.data(*kind, name, changes),
-            Change::AddDomain { workload, hostname } => self.add_domain(workload, hostname),
+            Change::AddDomain(add) => {
+                self.add_domain(&add.workload, &add.hostname, add.certificate.as_ref())
+            }
+            Change::Certificate(change) => {
+                self.certificate(&change.route, &change.hostname, &change.certificate)
+            }
             Change::RenameDomain { route, from, to } => self.rename_domain(route, from, to),
             Change::RemoveDomain { route, hostname } => self.remove_domain(route, hostname),
             Change::Redirect(redirect) => self.redirect(
@@ -1034,7 +1052,12 @@ impl<'a> Planner<'a> {
     }
 
     #[expect(clippy::too_many_lines, reason = "one change kind, read top to bottom")]
-    fn add_domain(&mut self, reference: &WorkloadRef, hostname: &str) -> Result<(), PlanError> {
+    fn add_domain(
+        &mut self,
+        reference: &WorkloadRef,
+        hostname: &str,
+        certificate: Option<&CertificateSource>,
+    ) -> Result<(), PlanError> {
         let hostname = hostname.to_ascii_lowercase();
         validate_hostname(&hostname).map_err(|r| {
             error(
@@ -1072,24 +1095,50 @@ impl<'a> Planner<'a> {
                 format!("{hostname} already routes somewhere in this project."),
             ));
         }
+        match certificate {
+            Some(CertificateSource::Issuer { name }) => {
+                self.check_chosen_issuer(name, &hostname)?;
+            }
+            Some(CertificateSource::Own { .. }) => {
+                self.checked(&hostname)?;
+            }
+            None => {}
+        }
         self.impact.insert(reference.clone());
         let names: BTreeSet<String> = endpoints.iter().map(|(n, _)| n.clone()).collect();
+        let joins = |i: &Ingress| match certificate {
+            None => true,
+            Some(CertificateSource::Issuer { name }) => {
+                i.metadata
+                    .annotations
+                    .as_ref()
+                    .and_then(|a| a.get(CLUSTER_ISSUER))
+                    == Some(name)
+            }
+            Some(CertificateSource::Own { .. }) => false,
+        };
         // An Ingress that already routes to the workload.
-        let ingress = self.input.snapshot.ingresses.iter().find_map(|i| {
-            let backend = i
-                .spec
-                .iter()
-                .flat_map(|s| s.rules.iter().flatten())
-                .flat_map(|r| r.http.iter().flat_map(|h| h.paths.iter()))
-                .find_map(|p| {
-                    p.backend
-                        .service
-                        .as_ref()
-                        .filter(|s| names.contains(&s.name))
-                        .map(|_| p.backend.clone())
-                })?;
-            Some((i.clone(), backend))
-        });
+        let ingress = self
+            .input
+            .snapshot
+            .ingresses
+            .iter()
+            .filter(|i| joins(i))
+            .find_map(|i| {
+                let backend = i
+                    .spec
+                    .iter()
+                    .flat_map(|s| s.rules.iter().flatten())
+                    .flat_map(|r| r.http.iter().flat_map(|h| h.paths.iter()))
+                    .find_map(|p| {
+                        p.backend
+                            .service
+                            .as_ref()
+                            .filter(|s| names.contains(&s.name))
+                            .map(|_| p.backend.clone())
+                    })?;
+                Some((i.clone(), backend))
+            });
         if let Some((object, backend)) = ingress {
             let name = object.metadata.name.clone().unwrap_or_default();
             Self::refuse_managed(&object.metadata, "Ingress", &name)?;
@@ -1107,13 +1156,14 @@ impl<'a> Planner<'a> {
             } else {
                 add("/spec/rules", json!([rule]))
             };
-            let mut operations = vec![operation];
-            operations.extend(self.https(index, &name, &hostname)?);
-            return self.patch(index, operations);
+            self.patch(index, vec![operation])?;
+            return self.secure(index, &name, &hostname, certificate);
         }
-        // An HTTPRoute that already routes to the workload.
+        // An HTTPRoute that already routes to the workload; a chosen certificate needs an
+        // Ingress.
         let route = self
             .http_routes()
+            .filter(|_| certificate.is_none())
             .find(|(_, route)| route.routes_to(|name| names.contains(name)));
         if let Some((object, route)) = route {
             let name = route.name().to_owned();
@@ -1153,7 +1203,9 @@ impl<'a> Planner<'a> {
         }
         let namespace = self.input.snapshot.namespace.clone();
         let port = port.unwrap_or(80);
-        let gateway = if let Some(gateways) = self.input.gateways {
+        let gateway = if certificate.is_some() {
+            None
+        } else if let Some(gateways) = self.input.gateways {
             gateways.first().map(|g| (g.clone(), gateways.len()))
         } else {
             self.warnings.push(Warning::GatewaysUnreadable);
@@ -1205,14 +1257,29 @@ impl<'a> Planner<'a> {
         });
         if is_ingress {
             let index = self.objects.len() - 1;
-            let operations = self.https(index, &name, &hostname)?;
-            if let Some(working) = self.objects.get_mut(index) {
-                working.current = apply_patch(&working.current, &operations).map_err(|e| {
-                    error(ErrorKind::Invalid, "patch_does_not_apply", e.to_string())
-                })?;
-            }
+            return self.secure(index, &name, &hostname, certificate);
         }
         Ok(())
+    }
+
+    /// Lists `hostname` for HTTPS on Ingress `index`, with the certificate the person chose.
+    fn secure(
+        &mut self,
+        index: usize,
+        ingress: &str,
+        hostname: &str,
+        certificate: Option<&CertificateSource>,
+    ) -> Result<(), PlanError> {
+        match certificate {
+            None => {
+                let operations = self.https(index, ingress, hostname)?;
+                self.patch(index, operations)
+            }
+            Some(CertificateSource::Issuer { name }) => {
+                self.use_issuer(index, ingress, hostname, name)
+            }
+            Some(CertificateSource::Own { .. }) => self.use_own(index, ingress, hostname),
+        }
     }
 
     /// The operations that list `hostname` for HTTPS on Ingress `index` (named `ingress`), where
@@ -1226,8 +1293,6 @@ impl<'a> Planner<'a> {
         ingress: &str,
         hostname: &str,
     ) -> Result<Vec<Value>, PlanError> {
-        const CLUSTER_ISSUER: &str = "cert-manager.io/cluster-issuer";
-        const ISSUER: &str = "cert-manager.io/issuer";
         let current = self.current(index);
         let annotations = current
             .pointer("/metadata/annotations")
@@ -1238,6 +1303,18 @@ impl<'a> Planner<'a> {
             .map(str::to_owned);
         let tls = array(&current, "/spec/tls");
         let mut operations = Vec::new();
+        let unfit = named
+            .as_deref()
+            .or(self.input.cluster_issuer)
+            .filter(|issuer| !self.issuer_fits(issuer, hostname));
+        if unfit.is_some() {
+            self.warnings.push(Warning::HttpOnly {
+                hostname: hostname.to_owned(),
+                reason: HttpOnlyReason::WildcardNeedsDns01,
+                route: None,
+            });
+            return Ok(operations);
+        }
         let issuer = match (named, self.input.cluster_issuer) {
             (Some(issuer), _) => issuer,
             (None, _) if !tls.is_empty() => {
@@ -1277,16 +1354,7 @@ impl<'a> Planner<'a> {
                 return Ok(operations);
             }
         };
-        let taken = |secret: &str| {
-            tls.iter()
-                .any(|t| t.get("secretName").and_then(Value::as_str) == Some(secret))
-        };
-        let mut secret = format!("{ingress}-tls");
-        if taken(&secret) {
-            secret = route_name(ingress, hostname);
-            secret.truncate(249);
-            secret.push_str("-tls");
-        }
+        let secret = issued_secret_name(ingress, hostname, &tls);
         self.claim(index, &[Step::field("spec"), Step::field("tls")], "tls")?;
         let entry = json!({"hosts": [hostname], "secretName": secret});
         operations.push(if current.pointer("/spec/tls").is_some() {
@@ -1736,7 +1804,7 @@ fn metadata(object: &Value) -> ObjectMeta {
 }
 
 pub(crate) fn ingress_target(name: &str) -> Target {
-    Target::of::<k8s_openapi::api::networking::v1::Ingress>(name)
+    Target::of::<Ingress>(name)
 }
 
 pub(crate) fn http_route_target(name: &str) -> Target {

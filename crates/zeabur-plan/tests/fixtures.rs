@@ -15,7 +15,8 @@ mod tests {
     };
     use zeabur_plan::rules::{EnvEdit, diff, route_name, validate_env, validate_hostname};
     use zeabur_plan::{
-        Fetched, GatewayRef, Input, PlanRequest, Release, ServedKind, StorageClassInfo, plan,
+        CheckedCertificate, Fetched, GatewayRef, Input, IssuerRead, PlanRequest, Release,
+        ServedKind, StorageClassInfo, plan,
     };
 
     /// The resource (plural) of a kind, for the fixtures' objects.
@@ -90,6 +91,67 @@ mod tests {
             })
     }
 
+    /// `params.issuers`: each `ClusterIssuer` read, `dns01`, `http01`, `missing` or
+    /// `unreadable`.
+    fn issuers(params: &Value) -> BTreeMap<String, IssuerRead> {
+        params
+            .get("issuers")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .map(|(name, read)| {
+                let read = match read.as_str().unwrap() {
+                    "dns01" => IssuerRead::Found { wildcards: true },
+                    "http01" => IssuerRead::Found { wildcards: false },
+                    "missing" => IssuerRead::Missing,
+                    _ => IssuerRead::Unreadable,
+                };
+                (name.clone(), read)
+            })
+            .collect()
+    }
+
+    /// `params.certificates`: each own certificate's hostname and expiry, as checked.
+    fn certificates(params: &Value) -> BTreeMap<String, CheckedCertificate> {
+        params
+            .get("certificates")
+            .and_then(Value::as_object)
+            .into_iter()
+            .flatten()
+            .map(|(host, not_after)| {
+                (
+                    host.clone(),
+                    CheckedCertificate {
+                        not_after: not_after.as_str().unwrap().to_owned(),
+                        certificate: format!("CERT {host}"),
+                        key: format!("KEY {host}"),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    /// Every object of the fixture, as read for a YAML edit or a deletion.
+    fn fetched(fixture: &Fixture) -> Vec<Fetched> {
+        fixture
+            .input
+            .iter()
+            .filter_map(|object| {
+                let api_version = object["apiVersion"].as_str()?;
+                let (group, version) = api_version.split_once('/').unwrap_or(("", api_version));
+                Some(Fetched {
+                    resource: ResourceRef {
+                        group: group.to_owned(),
+                        version: version.to_owned(),
+                        resource: plural(object["kind"].as_str()?),
+                    },
+                    name: object.pointer("/metadata/name")?.as_str()?.to_owned(),
+                    object: object.clone(),
+                })
+            })
+            .collect()
+    }
+
     /// `mutation.plan`: the request planned against the fixture's objects.
     fn run_plan(fixture: &Fixture) -> Value {
         let params = &fixture.case.params;
@@ -144,23 +206,7 @@ mod tests {
             ),
             None => Some(Vec::new()),
         };
-        let objects: Vec<Fetched> = fixture
-            .input
-            .iter()
-            .filter_map(|object| {
-                let api_version = object["apiVersion"].as_str()?;
-                let (group, version) = api_version.split_once('/').unwrap_or(("", api_version));
-                Some(Fetched {
-                    resource: ResourceRef {
-                        group: group.to_owned(),
-                        version: version.to_owned(),
-                        resource: plural(object["kind"].as_str()?),
-                    },
-                    name: object.pointer("/metadata/name")?.as_str()?.to_owned(),
-                    object: object.clone(),
-                })
-            })
-            .collect();
+        let objects = fetched(fixture);
         let replica_sets: Vec<ReplicaSet> = fixture
             .input
             .iter()
@@ -171,6 +217,8 @@ mod tests {
             .get("reclaimPolicies")
             .map_or_else(BTreeMap::new, |p| from_value(p.clone()).unwrap());
         let kinds = served_kinds(params);
+        let issuers = issuers(params);
+        let certificates = certificates(params);
         let input = Input {
             snapshot: &snapshot,
             http_routes: &routes,
@@ -186,6 +234,8 @@ mod tests {
             reloader: params.get("reloader").and_then(Value::as_bool),
             kinds: &kinds,
             cluster_issuer: params.get("clusterIssuer").and_then(Value::as_str),
+            issuers: &issuers,
+            certificates: &certificates,
         };
         match plan(input, &request) {
             Ok(plan) => to_value(plan).unwrap(),

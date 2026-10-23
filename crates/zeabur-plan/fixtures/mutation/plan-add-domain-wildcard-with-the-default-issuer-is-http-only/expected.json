@@ -1,0 +1,11 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Ingress", "name": "web-wildcard-example-test"},
+      "write": {"type": "create", "body": {"metadata": {"name": "web-wildcard-example-test"}}}
+    }
+  ],
+  "warnings": [
+    {"code": "httpOnly", "hostname": "*.example.test", "reason": "wildcardNeedsDns01"}
+  ]
+}

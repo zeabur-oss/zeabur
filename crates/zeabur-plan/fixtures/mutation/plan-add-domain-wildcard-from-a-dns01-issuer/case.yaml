@@ -1,0 +1,11 @@
+description: "A wildcard hostname with a chosen DNS-01 ClusterIssuer gets an Ingress of its own that names that issuer, since the workload's Ingress names another."
+operation: mutation.plan
+params:
+  clusterIssuer: letsencrypt
+  issuers: {letsencrypt-dns: dns01}
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: "*.example.test"
+        certificate: {from: issuer, name: letsencrypt-dns}

@@ -1,0 +1,10 @@
+description: "Moving a hostname from the person's own certificate to an issuer names the issuer on the Ingress, points the tls entry at a Secret cert-manager fills, and deletes the own certificate's Secret."
+operation: mutation.plan
+params:
+  issuers: {letsencrypt-dns: dns01}
+  request:
+    changes:
+      - op: certificate
+        route: {kind: Ingress, name: shop}
+        hostname: shop.example.test
+        certificate: {from: issuer, name: letsencrypt-dns}

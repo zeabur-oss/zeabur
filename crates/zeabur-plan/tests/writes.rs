@@ -445,10 +445,11 @@ mod tests {
             ),
             10 => (
                 w.clone(),
-                Change::AddDomain {
+                Change::AddDomain(zeabur_plan::AddDomainChange {
                     workload: w.reference(),
                     hostname: "new-domain.example.test".to_owned(),
-                },
+                    certificate: None,
+                }),
                 "route",
                 vec![field("spec"), route_field],
             ),

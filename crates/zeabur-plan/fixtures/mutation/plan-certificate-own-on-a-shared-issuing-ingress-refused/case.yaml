@@ -1,0 +1,10 @@
+description: "Own certificate for one hostname of an Ingress that asks cert-manager for its other hostnames too is refused: cert-manager would write the Secret."
+operation: mutation.plan
+params:
+  certificates: {"shop.example.test": "2027-01-01T00:00:00Z"}
+  request:
+    changes:
+      - op: certificate
+        route: {kind: Ingress, name: shop}
+        hostname: shop.example.test
+        certificate: {from: own, certificate: "PEM", key: "PEM"}

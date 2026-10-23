@@ -5,6 +5,7 @@ use zeabur_kube::{DynamicObject, ResourceRef};
 
 pub mod alertmanager;
 pub mod backups;
+pub mod cert_manager;
 pub mod cloudnative_pg;
 pub mod databases;
 pub mod dragonfly;

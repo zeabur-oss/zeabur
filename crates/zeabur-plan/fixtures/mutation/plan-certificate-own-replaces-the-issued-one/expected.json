@@ -1,0 +1,37 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Ingress", "name": "shop"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "9"},
+          {"op": "test", "path": "/metadata/annotations/cert-manager.io~1cluster-issuer", "value": "letsencrypt"},
+          {"op": "remove", "path": "/metadata/annotations/cert-manager.io~1cluster-issuer"},
+          {"op": "test", "path": "/spec/tls", "value": [{"hosts": ["shop.example.test"], "secretName": "shop-tls"}]},
+          {"op": "replace", "path": "/spec/tls", "value": [{"hosts": ["shop.example.test"], "secretName": "shop-shop-example-test-cert"}]}
+        ]
+      }
+    },
+    {
+      "target": {"kind": "Secret", "name": "shop-shop-example-test-cert"},
+      "write": {
+        "type": "create",
+        "body": {
+          "metadata": {
+            "name": "shop-shop-example-test-cert",
+            "ownerReferences": [{"apiVersion": "networking.k8s.io/v1", "kind": "Ingress", "name": "shop", "uid": "ingress-uid"}]
+          },
+          "type": "kubernetes.io/tls"
+        }
+      }
+    },
+    {
+      "target": {"kind": "Certificate", "name": "shop-tls"},
+      "write": {"type": "delete"}
+    }
+  ],
+  "warnings": [
+    {"code": "ownCertificate", "hostname": "shop.example.test", "notAfter": "2027-01-01T00:00:00Z"}
+  ]
+}

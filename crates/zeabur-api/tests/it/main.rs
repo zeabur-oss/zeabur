@@ -5,6 +5,7 @@
 mod account;
 mod api;
 mod backups;
+mod certificates;
 mod cluster_name;
 mod cluster_tools;
 #[cfg(test)]
@@ -19,6 +20,7 @@ mod exec;
 mod files;
 mod images;
 mod incidents;
+mod issuers;
 mod join;
 mod log_history;
 mod maintenance;

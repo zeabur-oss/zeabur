@@ -1,0 +1,23 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Ingress", "name": "shop"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "9"},
+          {"op": "add", "path": "/metadata/annotations", "value": {"cert-manager.io/cluster-issuer": "letsencrypt-dns"}},
+          {"op": "test", "path": "/spec/tls", "value": [{"hosts": ["shop.example.test"], "secretName": "shop-shop-example-test-cert"}]},
+          {"op": "replace", "path": "/spec/tls", "value": [{"hosts": ["shop.example.test"], "secretName": "shop-tls"}]}
+        ]
+      }
+    },
+    {
+      "target": {"kind": "Secret", "name": "shop-shop-example-test-cert"},
+      "write": {"type": "delete"}
+    }
+  ],
+  "warnings": [
+    {"code": "httpsCertificate", "hostname": "shop.example.test", "issuer": "letsencrypt-dns"}
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Ingress", "name": "web-web-example-test"},
+      "write": {
+        "type": "create",
+        "body": {
+          "metadata": {"name": "web-web-example-test"},
+          "spec": {"tls": [{"hosts": ["web.example.test"], "secretName": "web-web-example-test-cert"}]}
+        }
+      }
+    },
+    {
+      "target": {"kind": "Secret", "name": "web-web-example-test-cert"},
+      "write": {
+        "type": "create",
+        "body": {
+          "metadata": {"name": "web-web-example-test-cert", "namespace": "demo"},
+          "type": "kubernetes.io/tls",
+          "data": {"tls.crt": "Q0VSVCB3ZWIuZXhhbXBsZS50ZXN0", "tls.key": "S0VZIHdlYi5leGFtcGxlLnRlc3Q="}
+        }
+      }
+    }
+  ],
+  "warnings": [
+    {"code": "ownCertificate", "hostname": "web.example.test", "notAfter": "2027-01-01T00:00:00Z"}
+  ]
+}

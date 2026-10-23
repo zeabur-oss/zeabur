@@ -12,7 +12,7 @@ use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, traefik}
 use zeabur_model::{
     Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin,
     ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,
-    Route, RouteMiddleware, Service, WorkloadRef,
+    Route, RouteMiddleware, RouteTls, Service, WorkloadRef,
 };
 
 use crate::attribution::{attribution_of, ingress_backends, relations_of};
@@ -187,6 +187,24 @@ fn route(object: &Ingress) -> Route {
         .collect();
     tls_hosts.sort();
     tls_hosts.dedup();
+    let mut tls: Vec<RouteTls> = object
+        .spec
+        .iter()
+        .flat_map(|spec| spec.tls.iter().flatten())
+        .flat_map(|entry| {
+            entry.hosts.iter().flatten().map(|host| RouteTls {
+                host: host.clone(),
+                secret: entry.secret_name.clone(),
+            })
+        })
+        .collect();
+    tls.sort_by(|a, b| a.host.cmp(&b.host));
+    tls.dedup_by(|a, b| a.host == b.host);
+    let issuer = object.metadata.annotations.as_ref().and_then(|a| {
+        a.get("cert-manager.io/cluster-issuer")
+            .or_else(|| a.get("cert-manager.io/issuer"))
+            .cloned()
+    });
     let middlewares = traefik::middlewares(&object.metadata);
     let hostnames: Vec<String> = object
         .spec
@@ -230,6 +248,8 @@ fn route(object: &Ingress) -> Route {
             .unwrap_or_default()
             .into_keys()
             .collect(),
+        issuer,
+        tls,
         provenance: provenance(&object.metadata),
         origin: Origin::object("Ingress", name),
     }

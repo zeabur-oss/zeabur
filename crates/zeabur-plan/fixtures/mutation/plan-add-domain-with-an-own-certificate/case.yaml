@@ -1,0 +1,13 @@
+description: "A new hostname with the person's own certificate goes on a new Ingress, also where Gateways exist, with a kubernetes.io/tls Secret its tls entry names."
+operation: mutation.plan
+params:
+  clusterIssuer: letsencrypt
+  gateways:
+    - {namespace: gateway, name: public}
+  certificates: {"web.example.test": "2027-01-01T00:00:00Z"}
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: web.example.test
+        certificate: {from: own, certificate: "PEM", key: "PEM"}

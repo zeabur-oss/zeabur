@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+spec:
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: example/web:1.0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: demo
+spec:
+  selector: {app: web}
+  ports:
+    - name: http
+      port: 8080
+---
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop
+  namespace: demo
+  uid: ingress-uid
+  resourceVersion: "9"
+  annotations: {cert-manager.io/cluster-issuer: letsencrypt}
+spec:
+  tls:
+    - hosts: [shop.example.test]
+      secretName: shop-tls
+  rules:
+    - host: shop.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port: {number: 8080}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: shop-tls
+  namespace: demo
+  resourceVersion: "12"
+  uid: certificate-uid
+  ownerReferences:
+    - {apiVersion: networking.k8s.io/v1, kind: Ingress, name: shop, uid: ingress-uid, controller: true}
+spec:
+  secretName: shop-tls

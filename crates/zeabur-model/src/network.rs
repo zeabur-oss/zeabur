@@ -142,10 +142,33 @@ pub struct Route {
     /// The hosts that show the maintenance page instead of their workload, sorted.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub maintenance: Vec<String>,
+    /// The cert-manager issuer the Ingress names in `cert-manager.io/cluster-issuer` or
+    /// `cert-manager.io/issuer`: cert-manager issues a certificate for each of its `spec.tls`
+    /// entries [cm-ingress].
+    ///
+    /// [cm-ingress]: https://cert-manager.io/docs/usage/ingress/
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issuer: Option<String>,
+    /// The Secret that holds each HTTPS host's certificate, from `spec.tls`, sorted by host.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tls: Vec<RouteTls>,
     /// The tool that manages the Ingress, if any.
     pub provenance: Provenance,
     /// The Ingress object.
     pub origin: Origin,
+}
+
+/// The Secret an Ingress names for one HTTPS host.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct RouteTls {
+    /// The host.
+    pub host: String,
+    /// The `kubernetes.io/tls` Secret; absent when the entry names none and the controller's
+    /// default certificate serves the host.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret: Option<String>,
 }
 
 /// A Traefik `Middleware` an Ingress lists.

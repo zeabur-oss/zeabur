@@ -1,0 +1,10 @@
+description: "A wildcard hostname with no chosen certificate, while the chart's issuer has no DNS-01 solver, is served over HTTP only and says why."
+operation: mutation.plan
+params:
+  clusterIssuer: letsencrypt
+  issuers: {letsencrypt: http01}
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: "*.example.test"

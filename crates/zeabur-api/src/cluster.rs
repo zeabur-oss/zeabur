@@ -55,6 +55,7 @@ pub mod config_reload;
 pub(crate) mod disks;
 pub(crate) mod health;
 pub mod install;
+pub mod issuers;
 pub mod join;
 pub mod maintenance;
 pub mod modules;

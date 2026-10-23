@@ -69,7 +69,8 @@ pub(crate) async fn compute(
         Change::ClusterTools => tools(planner, cluster, project, made_at).await,
         Change::Env { .. }
         | Change::Data { .. }
-        | Change::AddDomain { .. }
+        | Change::AddDomain(_)
+        | Change::Certificate(_)
         | Change::RenameDomain { .. }
         | Change::RemoveDomain { .. }
         | Change::Redirect(_)

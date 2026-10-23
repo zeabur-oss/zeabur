@@ -43,13 +43,7 @@ pub enum Change {
         changes: Vec<DataEdit>,
     },
     /// Route a new hostname to a workload.
-    #[serde(rename_all = "camelCase")]
-    AddDomain {
-        /// The workload.
-        workload: WorkloadRef,
-        /// The hostname.
-        hostname: String,
-    },
+    AddDomain(AddDomainChange),
     /// Replace a hostname of a route with another.
     #[serde(rename_all = "camelCase")]
     RenameDomain {
@@ -80,6 +74,9 @@ pub enum Change {
     ErrorPages(ErrorPagesChange),
     /// Show the maintenance page on a hostname instead of its workload, or stop.
     Maintenance(MaintenanceChange),
+    /// Change where the certificate of one hostname of an Ingress comes from (see the
+    /// `certificates` module).
+    Certificate(CertificateChange),
     /// Give a container every key of a ConfigMap or Secret as variables (`envFrom`), or stop
     /// (see the `shared` module).
     EnvImport(EnvImportChange),
@@ -673,6 +670,63 @@ pub struct DataEdit {
     pub value: Option<String>,
 }
 
+/// A [`Change::AddDomain`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct AddDomainChange {
+    /// The workload.
+    pub workload: WorkloadRef,
+    /// The hostname.
+    pub hostname: String,
+    /// Where its certificate comes from; absent: as the route already does, else the chart's
+    /// `ClusterIssuer`. With a source the hostname goes on an Ingress (see the `certificates`
+    /// module).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub certificate: Option<CertificateSource>,
+}
+
+/// A [`Change::Certificate`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct CertificateChange {
+    /// The route; only an Ingress names its certificates.
+    pub route: RouteRef,
+    /// The hostname.
+    pub hostname: String,
+    /// Where its certificate comes from.
+    pub certificate: CertificateSource,
+}
+
+/// Where the certificate of a hostname comes from.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(tag = "from", rename_all = "camelCase")]
+pub enum CertificateSource {
+    /// cert-manager issues and renews it through this `ClusterIssuer`.
+    Issuer {
+        /// The `ClusterIssuer`.
+        name: String,
+    },
+    /// The person's own certificate, kept in a `kubernetes.io/tls` Secret. Nothing renews it.
+    Own {
+        /// The certificate, then its intermediates, PEM.
+        certificate: String,
+        /// Its private key, PEM. It is never shown again.
+        key: String,
+    },
+}
+
+impl std::fmt::Debug for CertificateSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Issuer { name } => f.debug_struct("Issuer").field("name", name).finish(),
+            Self::Own { .. } => f.debug_struct("Own").finish_non_exhaustive(),
+        }
+    }
+}
+
 /// A route object: an Ingress or a Gateway API `HTTPRoute`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -881,6 +935,25 @@ pub enum Warning {
         hostname: String,
         /// The `ClusterIssuer` or `Issuer` the Ingress names.
         issuer: String,
+    },
+    /// The hostname is served with the person's own certificate, which nothing renews.
+    #[serde(rename_all = "camelCase")]
+    OwnCertificate {
+        /// The hostname.
+        hostname: String,
+        /// When the certificate expires, RFC 3339.
+        not_after: String,
+    },
+    /// The issuer is set on the whole Ingress, so these other hostnames also get their
+    /// certificates from it.
+    #[serde(rename_all = "camelCase")]
+    IssuerShared {
+        /// The Ingress.
+        route: String,
+        /// The issuer.
+        issuer: String,
+        /// The other hostnames listed for HTTPS.
+        hostnames: Vec<String>,
     },
     /// The new hostname is served over HTTP only.
     #[serde(rename_all = "camelCase")]
@@ -1213,4 +1286,7 @@ pub enum HttpOnlyReason {
     /// The Ingress lists certificates cert-manager does not issue; the new hostname has to be
     /// added where they are made.
     CertificatesElsewhere,
+    /// The hostname is a wildcard, and the issuer is not known to answer DNS-01 challenges,
+    /// the only ACME challenge for a wildcard.
+    WildcardNeedsDns01,
 }

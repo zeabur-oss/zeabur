@@ -2,6 +2,7 @@
 
 pub mod access;
 pub mod builds;
+mod certificates;
 mod change;
 pub mod checks;
 pub mod compose;
@@ -26,11 +27,12 @@ mod tasks;
 pub mod terminal;
 pub mod token;
 
+pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{
-    BasicAuthUser, BuildOptionsChange, Change, ConnectionRef, DataEdit, DataKind, EnvImportChange,
-    FieldOwners, HttpOnlyReason, KeptReason, LabelVolumeChange, ObjectName, Plan, PlanRequest,
-    PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, Target, TaskConcurrency,
-    Warning, Write,
+    AddDomainChange, BasicAuthUser, BuildOptionsChange, CertificateChange, CertificateSource,
+    Change, ConnectionRef, DataEdit, DataKind, EnvImportChange, FieldOwners, HttpOnlyReason,
+    KeptReason, LabelVolumeChange, ObjectName, Plan, PlanRequest, PlannedObject, ProbeKind,
+    PublicPortChange, RouteKind, RouteRef, Target, TaskConcurrency, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};

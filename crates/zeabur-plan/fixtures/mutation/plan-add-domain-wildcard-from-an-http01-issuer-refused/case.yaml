@@ -1,0 +1,10 @@
+description: "A wildcard hostname cannot get its certificate from a chosen issuer without a DNS-01 solver."
+operation: mutation.plan
+params:
+  issuers: {letsencrypt: http01}
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: "*.example.test"
+        certificate: {from: issuer, name: letsencrypt}

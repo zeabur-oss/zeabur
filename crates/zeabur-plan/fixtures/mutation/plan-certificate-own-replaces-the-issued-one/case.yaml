@@ -1,0 +1,10 @@
+description: "Own certificate on an Ingress that asks cert-manager for its one hostname: the issuer annotation goes, the tls entry names the new kubernetes.io/tls Secret, which the Ingress owns, and cert-manager's Certificate is deleted."
+operation: mutation.plan
+params:
+  certificates: {"shop.example.test": "2027-01-01T00:00:00Z"}
+  request:
+    changes:
+      - op: certificate
+        route: {kind: Ingress, name: shop}
+        hostname: shop.example.test
+        certificate: {from: own, certificate: "PEM", key: "PEM"}

@@ -35,7 +35,7 @@ pub use http_route::{
 };
 pub use network::{
     Endpoint, InferredFrom, Port, PortProtocol, ProtocolInference, Route, RouteMiddleware,
-    RouteRule,
+    RouteRule, RouteTls,
 };
 pub use pod_security::{PodSecurityLevel, RunAs};
 pub use project::{

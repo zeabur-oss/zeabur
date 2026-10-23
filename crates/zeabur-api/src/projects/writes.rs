@@ -32,6 +32,7 @@
 //! does (the `error` module).
 
 pub(crate) mod admission;
+pub(crate) mod certificates;
 mod creations;
 mod deletions;
 mod edits;
@@ -165,7 +166,7 @@ async fn compute(
     let wants_gateways = request
         .changes
         .iter()
-        .any(|c| matches!(c, Change::AddDomain { .. }));
+        .any(|c| matches!(c, Change::AddDomain(_)));
     let gateways: Option<Vec<GatewayRef>> = if wants_gateways {
         cluster
             .gateways()
@@ -191,7 +192,10 @@ async fn compute(
     } else {
         Some(Vec::new())
     };
-    let objects = edited_objects(cluster, project, request).await?;
+    let certificates = certificates::checked(request, now)?;
+    let issuers = certificates::issuers(cluster, request, &snapshot, cluster_issuer).await;
+    let mut objects = edited_objects(cluster, project, request).await?;
+    objects.extend(certificates::issued(cluster, project, request, &snapshot).await);
     let namespace = namespace::pod_security_namespace(cluster, project, request).await?;
     let replica_sets = replica_sets_of_deleted(cluster, project, request).await?;
     let reclaim_policies = reclaim_policies(cluster, request, &snapshot, &routes, &objects).await?;
@@ -221,6 +225,8 @@ async fn compute(
             reloader,
             kinds: &kinds,
             cluster_issuer,
+            issuers: &issuers,
+            certificates: &certificates,
         },
         request,
     )
