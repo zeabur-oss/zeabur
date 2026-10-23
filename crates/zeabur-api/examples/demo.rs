@@ -25,6 +25,11 @@
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
 //! `ZEABUR_DEMO_NO_DOMAINS=1` leaves both unset.
 //!
+//! `ZEABUR_DEMO_RKE2=1` makes the cluster an RKE2 one installed by Zeabur Installer, so Cluster →
+//! Nodes offers Add node: the nodes have addresses and a location, `kube-system` has the CA and
+//! one installer-made join token, and a node `vps-4` joins a few seconds after a join token is
+//! created, Ready a few seconds later.
+//!
 //! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
 //! after it is added, as do tools pods. `ZEABUR_DEMO_TOOLS=1` hands the session a made-up token,
 //! so the kubectl terminal is offered.
@@ -2023,6 +2028,125 @@ impl ClusterAccess for Demo {
 }
 
 /// Starts what the in-memory cluster leaves waiting: added debug containers and tools pods.
+/// The demo as an RKE2 cluster from Zeabur Installer (`ZEABUR_DEMO_RKE2`).
+fn rke2(s: &mut State) {
+    let rke2 = |v: &str| v.replace("+k3s1", "+rke2r1").replace("-k3s1", "");
+    s.facts.version = rke2(&s.facts.version);
+    for (i, node) in s.nodes.iter_mut().enumerate() {
+        let status = node.status.get_or_insert_with(Default::default);
+        if let Some(info) = status.node_info.as_mut() {
+            info.kubelet_version = rke2(&info.kubelet_version);
+            info.container_runtime_version = rke2(&info.container_runtime_version);
+        }
+        status.addresses = Some(vec![from(
+            json!({"type": "InternalIP", "address": format!("10.0.0.{}", i + 5)}),
+        )]);
+        let labels = node.metadata.labels.get_or_insert_with(Default::default);
+        labels.insert(
+            "installer.zeabur.com/provider".to_owned(),
+            "hetzner".to_owned(),
+        );
+        labels.insert(
+            "topology.kubernetes.io/region".to_owned(),
+            "fsn1".to_owned(),
+        );
+        labels.insert(
+            "topology.kubernetes.io/zone".to_owned(),
+            "fsn1-dc14".to_owned(),
+        );
+    }
+    let system = s
+        .objects
+        .entry("kube-system".to_owned())
+        .or_insert_with(|| NamespaceObjects {
+            namespace: "kube-system".to_owned(),
+            ..NamespaceObjects::default()
+        });
+    system.config_maps.push(from(json!({
+        "metadata": {"name": "kube-root-ca.crt", "namespace": "kube-system"},
+        "data": {"ca.crt": include_str!("../tests/fixtures/join/root.pem")}
+    })));
+    let expires = Timestamp::now()
+        .checked_add(SignedDuration::from_hours(5))
+        .expect("in range")
+        .to_string();
+    let created = Timestamp::now()
+        .checked_sub(SignedDuration::from_hours(19))
+        .expect("in range")
+        .to_string();
+    system.secrets.push(SecretSummary {
+        secret: from(json!({
+            "metadata": {"name": "bootstrap-token-k7q2xm", "namespace": "kube-system",
+                         "creationTimestamp": created,
+                         "labels": {"app.kubernetes.io/managed-by": "zeabur-installer"}},
+            "type": "bootstrap.kubernetes.io/token"
+        })),
+        key_count: 7,
+    });
+    s.secret_values.insert(
+        "kube-system/bootstrap-token-k7q2xm".to_owned(),
+        [
+            ("token-id", "k7q2xm"),
+            ("token-secret", "demo0secret0demo"),
+            ("description", "zeabur-installer node add"),
+            ("expiration", expires.as_str()),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.as_bytes().to_vec()))
+        .collect(),
+    );
+}
+
+/// A VM that joins as `vps-4` once a join token has been created: listed after a few seconds,
+/// Ready a few seconds later.
+fn joining(cluster: MemoryCluster) {
+    tokio::spawn(async move {
+        let mut seen: Option<u32> = None;
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            let created = cluster
+                .inspect(|s| {
+                    s.writes.iter().any(|w| {
+                        w.target.kind == "Secret" && w.target.name.starts_with("bootstrap-token-")
+                    })
+                })
+                .unwrap_or(false);
+            if !created {
+                continue;
+            }
+            let ticks = seen.map_or(0, |t| t + 1);
+            seen = Some(ticks);
+            if ticks != 6 && ticks != 12 {
+                continue;
+            }
+            cluster.update(|s| {
+                let Some(mut node) = s.nodes.last().cloned() else {
+                    return;
+                };
+                node.metadata.name = Some("vps-4".to_owned());
+                node.metadata.creation_timestamp = None;
+                if let Some(labels) = node.metadata.labels.as_mut() {
+                    labels.insert("kubernetes.io/hostname".to_owned(), "vps-4".to_owned());
+                }
+                if let Some(status) = node.status.as_mut() {
+                    status.addresses = Some(vec![from(
+                        json!({"type": "InternalIP", "address": "10.0.0.9"}),
+                    )]);
+                    for condition in status.conditions.iter_mut().flatten() {
+                        if condition.type_ == "Ready" {
+                            if ticks == 6 { "False" } else { "True" }
+                                .clone_into(&mut condition.status);
+                        }
+                    }
+                }
+                s.nodes
+                    .retain(|n| n.metadata.name.as_deref() != Some("vps-4"));
+                s.nodes.push(node);
+            });
+        }
+    });
+}
+
 fn kubelet(cluster: MemoryCluster) {
     tokio::spawn(async move {
         loop {
@@ -2127,6 +2251,10 @@ async fn main() -> std::io::Result<()> {
         .is_ok_and(|list| list.split(',').any(|r| r == "namespaces"))
     {
         cluster.update(|s| s.cluster_wide_denied = true);
+    }
+    if std::env::var_os("ZEABUR_DEMO_RKE2").is_some() {
+        cluster.update(rke2);
+        joining(cluster.clone());
     }
     kubelet(cluster.clone());
     let access = Demo {
