@@ -81,7 +81,7 @@ paths:
       summary: |-
         The cluster's backups through Velero: its locations with whether Velero reaches them, its
         schedules, and the newest hundred backups with how each went. Read as the person; Velero not
-        installed is `state: notInstalled`, and a refused read is named in `unreadable`.
+        installed is `state: not-installed`, and a refused read is named in `unreadable`.
       operationId: getClusterBackups
       responses:
         "200":
@@ -4558,7 +4558,13 @@ components:
       required:
       - installComponents
       - changeNodes
+      - changeBackups
       properties:
+        changeBackups:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Set up Velero backups: `create` on `schedules.velero.io`. The backups page asks again in
+            Velero's own namespace.
         changeNodes:
           $ref: "#/components/schemas/Permission"
           description: "Change nodes (labels, taints, cordon): `patch` on nodes."

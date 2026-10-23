@@ -59,6 +59,9 @@ pub struct ClusterRights {
     pub install_components: Permission,
     /// Change nodes (labels, taints, cordon): `patch` on nodes.
     pub change_nodes: Permission,
+    /// Set up Velero backups: `create` on `schedules.velero.io`. The backups page asks again in
+    /// Velero's own namespace.
+    pub change_backups: Permission,
 }
 
 fn any(answers: impl IntoIterator<Item = Permission>) -> Permission {
@@ -188,12 +191,14 @@ impl ClusterRights {
             return Self {
                 install_components: Permission::Unknown,
                 change_nodes: Permission::Unknown,
+                change_backups: Permission::Unknown,
             };
         };
         let ask = Ask(rules);
         Self {
             install_components: ask.can("create", "helm.cattle.io", "helmcharts"),
             change_nodes: ask.can("patch", "", "nodes"),
+            change_backups: ask.can("create", "velero.io", "schedules"),
         }
     }
 }
@@ -258,6 +263,7 @@ mod tests {
         let cluster = ClusterRights::of(Some(&AccessRules::everything()));
         assert_eq!(cluster.install_components, Permission::Allowed);
         assert_eq!(cluster.change_nodes, Permission::Allowed);
+        assert_eq!(cluster.change_backups, Permission::Allowed);
     }
 
     #[test]
@@ -310,6 +316,7 @@ mod tests {
             let cluster = ClusterRights::of(Some(&rules));
             assert_eq!(cluster.install_components, Permission::Denied, "{role:?}");
             assert_eq!(cluster.change_nodes, Permission::Denied, "{role:?}");
+            assert_eq!(cluster.change_backups, Permission::Denied, "{role:?}");
         }
     }
 }

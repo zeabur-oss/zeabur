@@ -21,6 +21,9 @@
 //! system-upgrade-controller Plan resolves a newer patch, so the cluster page shows one; the demo
 //! makes no outbound request: domains resolve from a fixed table (`dns`).
 //!
+//! Velero runs with a location on R2, a daily schedule and a week of backups, the newest failed:
+//! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location.
+//!
 //! `namespaces` in `ZEABUR_DEMO_FORBID` refuses creating projects. New public URLs are suggested
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
 //! `ZEABUR_DEMO_NO_DOMAINS=1` leaves both unset.
@@ -1607,7 +1610,10 @@ fn state() -> State {
                 "ClusterRoleBinding",
                 false,
             ),
-        ],
+        ]
+        .into_iter()
+        .chain(velero_served())
+        .collect(),
         dynamic: [
             certificate(
                 "shop",
@@ -1704,6 +1710,7 @@ fn state() -> State {
         .chain(docs_build())
         .chain(people())
         .chain(member_roles())
+        .chain(velero())
         .collect(),
         // The metrics store where Zeabur's recommendation installs it.
         proxied: BTreeMap::from([(
@@ -1792,6 +1799,125 @@ const VERSION: &str = "v1.34.10+k3s1";
 
 /// `minutes` before now, as an event time.
 /// When a workload was created: a few weeks ago, a different day for each name.
+/// Velero, unless `ZEABUR_DEMO_VELERO` is `none`; `location` has a location and nothing else.
+fn velero_mode() -> String {
+    std::env::var("ZEABUR_DEMO_VELERO").unwrap_or_default()
+}
+
+fn velero_served() -> Vec<ServedResource> {
+    if velero_mode() == "none" {
+        return Vec::new();
+    }
+    [
+        ("backupstoragelocations", "BackupStorageLocation"),
+        ("schedules", "Schedule"),
+        ("backups", "Backup"),
+        ("podvolumebackups", "PodVolumeBackup"),
+    ]
+    .into_iter()
+    .map(|(resource, kind)| ServedResource::readable("velero.io", "v1", resource, kind, true))
+    .collect()
+}
+
+/// A daily schedule kept a week, its backups (the newest failed to reach the bucket, one before
+/// it copied all but two volumes) and what their file-system backups copied.
+fn velero() -> Vec<DynamicObject> {
+    let mode = velero_mode();
+    if mode == "none" {
+        return Vec::new();
+    }
+    let location = from(json!({
+        "apiVersion": "velero.io/v1", "kind": "BackupStorageLocation",
+        "metadata": {"name": "default", "namespace": "velero", "resourceVersion": "12"},
+        "spec": {"provider": "aws", "default": true, "credential":
+                {"name": "zeabur-backup-credentials", "key": "cloud"},
+            "objectStorage": {"bucket": "acme-backups", "prefix": "zeabur"},
+            "config": {"region": "auto", "s3ForcePathStyle": "true",
+                "s3Url": "https://4f1c.r2.cloudflarestorage.com"}},
+        "status": {"phase": "Available", "lastValidationTime": minutes_ago(1)}
+    }));
+    if mode == "location" {
+        return vec![location];
+    }
+    let schedule = from(json!({
+        "apiVersion": "velero.io/v1", "kind": "Schedule",
+        "metadata": {"name": "zeabur", "namespace": "velero", "resourceVersion": "40",
+            "labels": {"app.kubernetes.io/managed-by": "zeabur"}},
+        "spec": {"schedule": "0 3 * * *", "template": {"includedNamespaces": ["*"],
+            "ttl": "168h0m0s", "defaultVolumesToFsBackup": true, "storageLocation": "default"}},
+        "status": {"phase": "Enabled", "lastBackup": minutes_ago(60 * 7)}
+    }));
+    let day = 24 * 60;
+    let backup = |name: &str, started: i64, phase: &str, extra: Value| {
+        let mut status = json!({"phase": phase, "startTimestamp": minutes_ago(started),
+            "expiration": minutes_ago(started - 7 * day)});
+        if let (Some(status), Value::Object(extra)) = (status.as_object_mut(), extra) {
+            if phase != "FailedValidation" {
+                status.insert(
+                    "completionTimestamp".to_owned(),
+                    json!(minutes_ago(started - 6)),
+                );
+            }
+            status.extend(extra);
+        }
+        from(json!({
+            "apiVersion": "velero.io/v1", "kind": "Backup",
+            "metadata": {"name": name, "namespace": "velero",
+                "labels": {"velero.io/schedule-name": "zeabur"}},
+            "spec": {"includedNamespaces": ["*"], "ttl": "168h0m0s",
+                "defaultVolumesToFsBackup": true, "storageLocation": "default"},
+            "status": status
+        }))
+    };
+    let volume = |backup: &str, pod: &str, bytes: u64| {
+        from(json!({
+            "apiVersion": "velero.io/v1", "kind": "PodVolumeBackup",
+            "metadata": {"name": format!("{backup}-{pod}"), "namespace": "velero",
+                "labels": {"velero.io/backup-name": backup}},
+            "status": {"phase": "Completed", "progress": {"bytesDone": bytes, "totalBytes": bytes}}
+        }))
+    };
+    let mut objects = vec![
+        location,
+        schedule,
+        backup(
+            "zeabur-20261023030000",
+            60 * 7,
+            "Failed",
+            json!({"failureReason": "backup storage location default is unavailable: rpc error: code = Unknown desc = AccessDenied: Access Denied"}),
+        ),
+        backup(
+            "zeabur-20261022030000",
+            60 * 7 + day,
+            "PartiallyFailed",
+            json!({"errors": 2, "warnings": 1,
+                "progress": {"itemsBackedUp": 1186, "totalItems": 1188}}),
+        ),
+    ];
+    for n in 2..7 {
+        let name = format!("zeabur-202610{:02}030000", 23 - n);
+        objects.push(backup(
+            &name,
+            60 * 7 + n * day,
+            "Completed",
+            json!({"warnings": u8::from(n == 4),
+                "progress": {"itemsBackedUp": 1180 - n, "totalItems": 1180 - n}}),
+        ));
+        objects.push(volume(
+            &name,
+            "shop-uploads",
+            1_840_000_000 - 9_000_000 * n.unsigned_abs(),
+        ));
+        objects.push(volume(&name, "blog-content", 312_000_000));
+    }
+    objects.push(volume(
+        "zeabur-20261022030000",
+        "shop-uploads",
+        1_852_000_000,
+    ));
+    objects
+}
+
 fn created(name: &str) -> String {
     let days = name.bytes().map(i64::from).sum::<i64>() % 60 + 14;
     minutes_ago(days * 24 * 60)

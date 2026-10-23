@@ -8,7 +8,7 @@
 //! | `POST /api/v1/cluster/backups/apply` | carries out that plan by its token |
 //!
 //! Everything is read and written as the person; RBAC on `velero.io` and on Secrets in Velero's
-//! namespace decides. Velero's API not being served is an answer (`notInstalled`), not an error.
+//! namespace decides. Velero's API not being served is an answer (`not-installed`), not an error.
 //! The token is sealed, so the keys a person types travel in it unreadable; it binds the person,
 //! Velero's namespace, the request, the name of a backup made now and the `resourceVersion` of
 //! every object the plan reads. Apply reads them again, refuses when one moved, dry-runs every
@@ -282,7 +282,7 @@ fn empty(state: ProviderState, unreadable: Vec<UnreadableView>) -> ClusterBackup
 
 /// The cluster's backups through Velero: its locations with whether Velero reaches them, its
 /// schedules, and the newest hundred backups with how each went. Read as the person; Velero not
-/// installed is `state: notInstalled`, and a refused read is named in `unreadable`.
+/// installed is `state: not-installed`, and a refused read is named in `unreadable`.
 #[utoipa::path(get, path = "/api/v1/cluster/backups", tag = "cluster",
     operation_id = "getClusterBackups",
     responses((status = 200, body = ClusterBackups), (status = 401, body = Problem, content_type = PROBLEM)))]
