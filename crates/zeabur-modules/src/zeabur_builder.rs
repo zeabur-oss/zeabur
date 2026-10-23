@@ -212,6 +212,61 @@ pub fn runs(objects: &[DynamicObject]) -> Vec<ZeaburBuilderRun> {
     out
 }
 
+/// The reason a service waiting for its first image shows when the build failed.
+pub const BUILD_FAILED: &str = "BuildFailed";
+
+/// Gives a service whose image a `Build` has not pushed yet the build's status.
+///
+/// It is building, not failing to pull an image that does not exist. A container runs a `Build`'s
+/// image when the repositories match, the `Build`'s own (`spec.output.image`), as a service
+/// deployed from Git has. When the newest run failed, or the `Build` is not ready and nothing runs,
+/// the service has failed with [`BUILD_FAILED`]. Diagnoses of the image pull go: the build is the
+/// cause.
+pub fn first_image(
+    service: &mut zeabur_model::Service,
+    builds: &[ZeaburBuilderBuild],
+    runs: &[ZeaburBuilderRun],
+) {
+    let waiting = builds.iter().find(|build| {
+        build.latest_image.is_none()
+            && build.repository.as_deref().is_some_and(|wanted| {
+                service.containers.iter().any(|c| {
+                    c.image
+                        .as_deref()
+                        .is_some_and(|image| repository(image).eq_ignore_ascii_case(wanted))
+                })
+            })
+    });
+    let Some(build) = waiting else {
+        return;
+    };
+    let newest = runs.iter().find(|run| run.build == build.name);
+    let running = newest.is_some_and(|run| {
+        !matches!(
+            run.phase.as_deref(),
+            Some("Succeeded" | "Failed" | "Cancelled")
+        )
+    });
+    let failed = newest.is_some_and(|run| run.phase.as_deref() == Some("Failed"))
+        || (!running && build.ready.as_deref() == Some("False"));
+    service.status = if failed {
+        zeabur_model::ServiceStatus {
+            health: zeabur_model::Health::Fail,
+            word: zeabur_model::StatusWord::Failed,
+            reason: Some(BUILD_FAILED.to_owned()),
+        }
+    } else {
+        zeabur_model::ServiceStatus {
+            health: zeabur_model::Health::Progress,
+            word: zeabur_model::StatusWord::Building,
+            reason: None,
+        }
+    };
+    service
+        .diagnoses
+        .retain(|d| d.kind != zeabur_model::DiagnosisKind::ImagePull);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
