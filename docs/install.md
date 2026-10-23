@@ -234,8 +234,10 @@ projects:
 | Developer | Chosen projects | Deploy, change variables, restart, read logs, open terminals, read Secret values, change the project's name, description and icon | Other projects, nodes, members, adopting or removing projects |
 | Viewer | Chosen projects | See status and events | Read logs, change anything, open a terminal, read Secret values |
 
-Every member may also list nodes and namespaces, so the interface can show node names and every
-project's name and details; a project without a role says an admin can give one. Listing
+Every member may also list nodes, namespaces and StorageClasses, and get a PersistentVolume by
+name, so the interface can show node names, every project's name and details, the storage a new
+volume can use and the node a volume is kept on; a project without a role says an admin can give
+one. Listing
 namespaces returns their annotations too, so keep secrets out of a project's description.
 
 A Developer may `patch` their project's Namespace, and RBAC cannot narrow that to some fields.
@@ -277,10 +279,11 @@ rights mean:
 Removing a role ends new requests at once. A terminal already open keeps running until it ends,
 as kube-apiserver checks a stream when it starts.
 
-The member baseline, `get` and `list` on `nodes` and `namespaces`, is the ClusterRole
-`zeabur-member`. Zeabur binds it per member, with a ClusterRoleBinding `zeabur-member-<user>` made
-on invitation or on a change of access: Zeabur Identity puts no group on every member, and
-`system:authenticated` would grant it to every ServiceAccount too.
+The member baseline, `get` and `list` on `nodes`, `namespaces` and `storageclasses`, and `get`
+on `persistentvolumes`, is the ClusterRole `zeabur-member`. Zeabur binds it per member, with a
+ClusterRoleBinding `zeabur-member-<user>` made on invitation or on a change of access: Zeabur
+Identity puts no group on every member, and `system:authenticated` would grant it to every
+ServiceAccount too.
 
 Upgrading from a release without roles means inviting members again: Zeabur does not migrate the
 members made before roles. Remove each of them on the Members page and invite them anew; inviting
