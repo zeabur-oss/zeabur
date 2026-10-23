@@ -527,6 +527,9 @@ pub struct Preconditions {
     pub uid: Option<String>,
     /// The object's `metadata.resourceVersion`: unchanged since it was read.
     pub resource_version: Option<String>,
+    /// `gracePeriodSeconds`: how long a pod's containers may take to stop; its own
+    /// `terminationGracePeriodSeconds` when `None`, at once when `0`.
+    pub grace_period_seconds: Option<u32>,
 }
 
 /// One write to one object.

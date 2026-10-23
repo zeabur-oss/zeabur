@@ -33,8 +33,10 @@
 //! `networkpolicies/patch` in `ZEABUR_DEMO_FORBID` refuses rewriting it.
 //!
 //! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
-//! after it is added, as do tools pods. `ZEABUR_DEMO_TOOLS=1` hands the session a made-up token,
-//! so the kubectl terminal is offered.
+//! after it is added, as do tools pods and node shells. With `ZEABUR_DEMO_RKE2=1`, `vps-2` also has
+//! a node shell Bob left behind, which ended when its time ran out; a node shell's terminal is the
+//! in-memory cluster's echo shell, with a root prompt. `ZEABUR_DEMO_TOOLS=1` hands the session a
+//! made-up token, so the kubectl terminal is offered.
 
 #![expect(
     clippy::expect_used,
@@ -2363,7 +2365,38 @@ impl ClusterAccess for Demo {
 
 /// Starts what the in-memory cluster leaves waiting: added debug containers and tools pods.
 /// The demo as an RKE2 cluster from Zeabur Installer (`ZEABUR_DEMO_RKE2`).
+/// A node shell Bob opened on `vps-2` earlier, which ended when its half hour ran out.
+fn leftover_shell(s: &mut State) {
+    let image = zeabur_api::settings::DEBUG_IMAGE;
+    let request = zeabur_plan::node_shell::NodeShell {
+        node: "vps-2",
+        node_uid: None,
+        person: "zeabur:bob",
+        image,
+        made_at: "2026-10-23T02:10:00Z",
+    };
+    let mut pod: Pod = from(zeabur_plan::node_shell::pod_body(&request));
+    pod.metadata.creation_timestamp = Some(from(json!("2026-10-23T02:10:01Z")));
+    pod.metadata.uid = Some("node-shell-bob".to_owned());
+    pod.status = Some(from(
+        json!({"phase": "Failed", "reason": "DeadlineExceeded",
+        "message": "Pod was active on the node longer than the specified deadline",
+        "startTime": "2026-10-23T02:10:04Z"}),
+    ));
+    s.namespaces
+        .push(from(zeabur_plan::node_shell::namespace_body()));
+    s.objects
+        .entry(zeabur_plan::node_shell::NAMESPACE.to_owned())
+        .or_insert_with(|| NamespaceObjects {
+            namespace: zeabur_plan::node_shell::NAMESPACE.to_owned(),
+            ..NamespaceObjects::default()
+        })
+        .pods
+        .push(pod);
+}
+
 fn rke2(s: &mut State) {
+    leftover_shell(s);
     let rke2 = |v: &str| v.replace("+k3s1", "+rke2r1").replace("-k3s1", "");
     s.facts.version = rke2(&s.facts.version);
     for (i, node) in s.nodes.iter_mut().enumerate() {
@@ -2537,11 +2570,9 @@ fn kubelet(cluster: MemoryCluster) {
 }
 
 fn start(pod: &mut Pod, now: &str) {
-    let tools = pod
-        .metadata
-        .labels
-        .as_ref()
-        .is_some_and(|l| l.contains_key("zeabur.com/tools"));
+    let labels = pod.metadata.labels.as_ref();
+    let tools = labels.is_some_and(|l| l.contains_key("zeabur.com/tools"));
+    let shell = labels.is_some_and(|l| l.contains_key(zeabur_plan::node_shell::LABEL));
     let added: Vec<String> = pod
         .spec
         .as_ref()
@@ -2572,12 +2603,18 @@ fn start(pod: &mut Pod, now: &str) {
             changed = true;
         }
     }
-    if tools && status_map.get("phase").and_then(Value::as_str) != Some("Running") {
+    let phase = status_map.get("phase").and_then(Value::as_str);
+    if (tools && phase != Some("Running")) || (shell && phase.is_none()) {
+        let container = if tools {
+            "tools"
+        } else {
+            zeabur_plan::node_shell::CONTAINER
+        };
         status_map.insert("phase".to_owned(), json!("Running"));
         status_map.insert("startTime".to_owned(), json!(now));
         status_map.insert(
             "containerStatuses".to_owned(),
-            json!([{"name": "tools", "image": "tools", "imageID": "", "ready": true,
+            json!([{"name": container, "image": container, "imageID": "", "ready": true,
                 "restartCount": 0, "state": running}]),
         );
         changed = true;

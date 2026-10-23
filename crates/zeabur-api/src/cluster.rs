@@ -57,6 +57,7 @@ pub mod install;
 pub mod join;
 pub mod modules;
 pub mod node_policies;
+pub mod node_shells;
 
 use std::collections::BTreeMap;
 

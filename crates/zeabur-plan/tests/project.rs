@@ -154,8 +154,13 @@ mod tests {
     }
 
     #[test]
-    fn the_namespaces_kubernetes_keeps_are_never_adopted() {
-        for name in ["kube-system", "kube-public", "kube-node-lease"] {
+    fn the_namespaces_kubernetes_keeps_and_the_node_shells_one_are_never_adopted() {
+        for name in [
+            "kube-system",
+            "kube-public",
+            "kube-node-lease",
+            "zeabur-node-shell",
+        ] {
             let stored = namespace(name, &json!({}), None);
             let error = planned(Some(&stored), vec![Change::Adopt]).unwrap_err();
             assert_eq!(error.kind, ErrorKind::SystemNamespace, "{name}");

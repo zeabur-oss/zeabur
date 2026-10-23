@@ -19,6 +19,7 @@ mod join;
 mod log_history;
 mod members;
 mod namespace;
+mod node_shell;
 mod preview;
 mod releases;
 mod reloader;

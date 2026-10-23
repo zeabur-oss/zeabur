@@ -16,6 +16,8 @@
 //! | `GET /api/v1/cluster/incidents` | components down and nodes not ready, with the domains and projects they reach |
 //! | `GET /api/v1/cluster/join` | what a new node needs to join: supervisor, CA hash, location, join tokens (never their secrets) |
 //! | `GET /api/v1/cluster/node-policies` | whether the installer's baseline network policies let every node's traffic in |
+//! | `GET /api/v1/cluster/node-shells` | the node shell pods (cluster administrators only) |
+//! | `GET /api/v1/cluster/node-shells/{pod}/terminal` | a root shell on the node, over a WebSocket, for whoever opened it |
 //! | `GET /api/v1/cluster/capabilities` | what is installed (with versions), and what to install |
 //! | `GET /api/v1/cluster/components/{capability}/{component}/install` | how to install it yourself, in four forms |
 //! | `GET /api/v1/settings/metrics-store` | the metrics store history is read from, whether it answers, who may change it |
@@ -60,6 +62,8 @@
 //! | `POST /api/v1/members/apply` | carries out a member plan by its token; an invitation's link is made then, shown once |
 //! | `POST /api/v1/cluster/node-policies/plan` | how the baseline network policies change to let every node in, and a token; writes nothing |
 //! | `POST /api/v1/cluster/node-policies/apply` | carries out that plan by its token |
+//! | `POST /api/v1/cluster/node-shells/plan` | what opening a shell on a node, or removing a shell pod, writes, and a token; writes nothing |
+//! | `POST /api/v1/cluster/node-shells/apply` | carries out that plan by its token |
 //! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
 //! | `POST /api/v1/members/{username}/setup-links` | a new setup link for a member, optionally removing their passkeys first |
 //! | `DELETE /api/v1/members/{username}/credentials/{id}` | removes a member's passkey or linked account |
@@ -189,6 +193,10 @@ fn routes() -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::node_policies::get))
         .routes(routes!(cluster::node_policies::plan))
         .routes(routes!(cluster::node_policies::apply))
+        .routes(routes!(cluster::node_shells::list))
+        .routes(routes!(cluster::node_shells::plan))
+        .routes(routes!(cluster::node_shells::apply))
+        .routes(routes!(cluster::node_shells::terminal))
         .routes(routes!(cluster::nodes))
         .routes(routes!(cluster::health))
         .routes(routes!(cluster::upgrades))

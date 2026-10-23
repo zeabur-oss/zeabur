@@ -122,6 +122,7 @@ pub(crate) async fn delete<S: Sync>(
     let body = WriteBody::Delete(Preconditions {
         uid: object.metadata.uid.clone(),
         resource_version: None,
+        grace_period_seconds: None,
     });
     match send(cluster, kind, namespace, object.name(), body).await {
         Err(error) if error.0.kind == Kind::NotFound => Ok(()),

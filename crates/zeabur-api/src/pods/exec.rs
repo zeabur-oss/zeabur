@@ -363,6 +363,7 @@ async fn open(
     pod: &str,
     query: ExecQuery,
 ) -> Result<(String, ExecSession), ApiError> {
+    outside_node_shells(project)?;
     let pods = ResourceRef::new("", "v1", "pods", "Pod");
     let what = format!("pod {pod}");
     let object = cluster
@@ -387,6 +388,19 @@ async fn open(
         .await
         .map_err(|e| exec_refusal(read_problem(e, &format!("a terminal in pod {pod}"), right)))?;
     Ok((container, session))
+}
+
+/// Refused for the namespace of node shells: their terminal is `cluster::node_shells`', for
+/// cluster administrators and whoever opened the shell only, and their files are the host's.
+pub(crate) fn outside_node_shells(namespace: &str) -> Result<(), ApiError> {
+    if namespace == zeabur_core::names::NODE_SHELL_NAMESPACE {
+        return Err(Problem::new(
+            Kind::Forbidden,
+            "Node shells open from the node's page, and only for whoever opened them.",
+        )
+        .into());
+    }
+    Ok(())
 }
 
 /// `create` on `pods/exec`, which a terminal takes.
