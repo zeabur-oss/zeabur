@@ -321,7 +321,7 @@ function NodeList({
           ))}
         </ul>
       )}
-      {removed ? <Removed node={removed} onClose={() => setRemoved(undefined)} /> : null}
+      <Removed node={removed} onClose={() => setRemoved(undefined)} />
       {large && sorted.length > ROWS_SHOWN ? (
         <div>
           <Button variant="ghost" size="sm" onClick={() => setAll(!all)} aria-expanded={all}>
@@ -369,6 +369,36 @@ function Notes({ data }: { data: Schemas["NodeList"] }) {
 
 const quiet = new Set<IssueKind>(["reservedMemory", "reservedCpu"])
 
+/** What is wrong with a node; the reservations show in the bars. */
+function NodePills({ node }: { node: NodeView }) {
+  const t = useT()
+  const issues = nodeIssues(node).filter((issue) => !quiet.has(issue.kind))
+  const taints = node.taints.map((taint) => `${taint.key}:${taint.effect}`).join("\n")
+  const pills =
+    issues.length === 0 ? (
+      <StatusPill health="ok" size="sm">
+        {t("status.ready")}
+      </StatusPill>
+    ) : (
+      issues.map((issue) => (
+        <StatusPill key={issue.kind} health={issue.health} size="sm">
+          {issue.kind === "notReady" && node.ready === "Unknown"
+            ? t("status.unknown")
+            : issue.kind === "draining"
+              ? t("node.drainingLeft", node.movablePods ?? 0)
+              : t(`node.word.${issue.kind}`)}
+        </StatusPill>
+      ))
+    )
+  return taints ? (
+    <Tooltip content={<span className="whitespace-pre-line">{taints}</span>}>
+      <span className="flex flex-wrap gap-1">{pills}</span>
+    </Tooltip>
+  ) : (
+    pills
+  )
+}
+
 function NodeRow({
   node,
   skew,
@@ -383,8 +413,6 @@ function NodeRow({
   const t = useT()
   const { cores, memory, percent } = useQuantityFormat()
   const [open, setOpen] = useState<NodeOpen>()
-  // Reservations show in the bars; the pills say what is wrong.
-  const issues = nodeIssues(node).filter((issue) => !quiet.has(issue.kind))
   const gauge = (
     title: string,
     allocatable: number,
@@ -449,23 +477,6 @@ function NodeRow({
     r ? of(r) : undefined
   const cpu = (r: Resources) => r.cpuMillicores
   const mem = (r: Resources) => r.memoryBytes
-  const taints = node.taints.map((taint) => `${taint.key}:${taint.effect}`).join("\n")
-  const pills =
-    issues.length === 0 ? (
-      <StatusPill health="ok" size="sm">
-        {t("status.ready")}
-      </StatusPill>
-    ) : (
-      issues.map((issue) => (
-        <StatusPill key={issue.kind} health={issue.health} size="sm">
-          {issue.kind === "notReady" && node.ready === "Unknown"
-            ? t("status.unknown")
-            : issue.kind === "draining"
-              ? t("node.drainingLeft", node.movablePods ?? 0)
-              : t(`node.word.${issue.kind}`)}
-        </StatusPill>
-      ))
-    )
   return (
     <li
       id={`node-${node.name}`}
@@ -476,13 +487,7 @@ function NodeRow({
           <span className="font-semibold" translate="no">
             {node.name}
           </span>
-          {taints ? (
-            <Tooltip content={<span className="whitespace-pre-line">{taints}</span>}>
-              <span className="flex flex-wrap gap-1">{pills}</span>
-            </Tooltip>
-          ) : (
-            pills
-          )}
+          <NodePills node={node} />
           <span className="type-meta text-muted-foreground">
             {node.roles.length > 0 ? node.roles.join(", ") : t("cluster.worker")}
           </span>
@@ -527,15 +532,13 @@ function NodeRow({
         className="-my-1 self-start sm:order-last sm:self-center"
         onOpen={setOpen}
       />
-      {open ? (
-        <NodeDialog
-          node={node.name}
-          open={open}
-          onOpen={setOpen}
-          onRemoved={onRemoved}
-          onClose={() => setOpen(undefined)}
-        />
-      ) : null}
+      <NodeDialog
+        node={node.name}
+        open={open}
+        onOpen={setOpen}
+        onRemoved={onRemoved}
+        onClose={() => setOpen(undefined)}
+      />
       <div className="grid w-full grid-cols-2 items-start gap-x-4 gap-y-3 sm:flex sm:w-auto sm:gap-x-6">
         {gauge(
           t("cluster.cpu"),

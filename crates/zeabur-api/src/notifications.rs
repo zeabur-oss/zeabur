@@ -546,8 +546,7 @@ impl Edit<'_> {
         let stored: BTreeSet<String> = secret
             .and_then(|s| s.get("data"))
             .and_then(Value::as_object)
-            .map(|data| data.keys().cloned().collect())
-            .unwrap_or_default();
+            .map_or_else(BTreeSet::new, |data| data.keys().cloned().collect());
         let edited = am::edit(self.settings, &stored).map_err(invalid)?;
         let mut writes = Vec::new();
         if !edited.secret.is_empty() {
@@ -595,15 +594,23 @@ impl Edit<'_> {
         let retarget = aim.is_some() && before.pointer(&target_path) != aim.as_ref();
         if before.get("spec") != made.get("spec") || retarget {
             let mut after = before.clone();
-            after["spec"] = made.get("spec").cloned().unwrap_or(Value::Null);
+            if let Some(object) = after.as_object_mut() {
+                object.insert(
+                    "spec".to_owned(),
+                    made.get("spec").cloned().unwrap_or_default(),
+                );
+            }
             let mut patch = vec![
                 json!({"op": "test", "path": "/metadata/resourceVersion",
                        "value": version(Some(&before))}),
                 json!({"op": "replace", "path": "/spec", "value": made.get("spec")}),
             ];
             if let Some(aim) = aim.filter(|_| retarget) {
-                if let Some(slot) = after.pointer_mut("/metadata/annotations") {
-                    slot[am::TARGET_ANNOTATION] = aim.clone();
+                if let Some(slot) = after
+                    .pointer_mut("/metadata/annotations")
+                    .and_then(Value::as_object_mut)
+                {
+                    slot.insert(am::TARGET_ANNOTATION.to_owned(), aim.clone());
                 }
                 patch.push(json!({"op": "add", "path": target_path, "value": aim}));
             }
@@ -617,6 +624,42 @@ impl Edit<'_> {
         }
         Ok(writes)
     }
+}
+
+/// The patch that sets which events channel `name` receives.
+fn events_writes(
+    namespace: &str,
+    scope: Scope,
+    configs: &[DynamicObject],
+    name: &str,
+    events: &[AlertmanagerEvent],
+    versions: &mut BTreeMap<String, String>,
+) -> Result<Vec<Planned>, ApiError> {
+    if let Some(problem) = am::problem(name, events, scope.events(), None) {
+        return Err(invalid(problem));
+    }
+    let object_name = am::object_name(name);
+    let before = value(managed(configs, name)?)?;
+    versions.insert(
+        format!("VMAlertmanagerConfig/{object_name}"),
+        version(Some(&before)),
+    );
+    let after = am::with_events(&before, name, events);
+    if before.get("spec") == after.get("spec") {
+        return Ok(Vec::new());
+    }
+    Ok(vec![Planned {
+        target: target(am::CONFIGS.kind, namespace, &object_name),
+        body: WriteBody::JsonPatch(json!([
+            {"op": "test", "path": "/metadata/resourceVersion",
+             "value": version(Some(&before))},
+            {"op": "add", "path": "/spec/route/matchers",
+             "value": after.pointer("/spec/route/matchers")},
+        ])),
+        action: NotificationWriteAction::Patch,
+        before: Some(before),
+        shown: Some(after),
+    }])
 }
 
 async fn compute(
@@ -675,31 +718,7 @@ async fn compute(
             edit.writes(&configs, secret.as_ref(), &mut versions)?
         }
         NotificationsPlanRequest::Events { name, events } => {
-            if let Some(problem) = am::problem(name, events, scope.events(), None) {
-                return Err(invalid(problem));
-            }
-            let before = value(managed(&configs, name)?)?;
-            versions.insert(
-                format!("VMAlertmanagerConfig/{object_name}"),
-                version(Some(&before)),
-            );
-            let after = am::with_events(&before, name, events);
-            if before.get("spec") == after.get("spec") {
-                Vec::new()
-            } else {
-                vec![Planned {
-                    target: target(am::CONFIGS.kind, namespace, &object_name),
-                    body: WriteBody::JsonPatch(json!([
-                        {"op": "test", "path": "/metadata/resourceVersion",
-                         "value": version(Some(&before))},
-                        {"op": "add", "path": "/spec/route/matchers",
-                         "value": after.pointer("/spec/route/matchers")},
-                    ])),
-                    action: NotificationWriteAction::Patch,
-                    before: Some(before),
-                    shown: Some(after),
-                }]
-            }
+            events_writes(namespace, scope, &configs, name, events, &mut versions)?
         }
         NotificationsPlanRequest::Remove { name } => {
             let before = value(managed(&configs, name)?)?;

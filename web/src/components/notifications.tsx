@@ -32,6 +32,7 @@ import {
   KINDS,
   METRICS_COMPONENT,
   missing,
+  missingInEdit,
   NAME_MAX,
   nameProblem,
   SECRET_FIELDS,
@@ -397,21 +398,9 @@ function ChannelDialog({
   const t = useT()
   const formId = useId()
   const editing = channel !== undefined
-  const [form, setForm] = useState<ChannelForm>(() =>
-    channel
-      ? formOf(channel)
-      : {
-          name: "",
-          kind: "slack",
-          values: {},
-          events: events.filter((e) => e.endsWith("-failed") || e === "crash-loop"),
-        },
-  )
+  const [form, setForm] = useState(() => startForm(events, channel))
   const [tried, setTried] = useState(false)
-  const needed = missing(form, editing)
-  const kept = (field: Field) => editing && STORED_FIELDS.includes(field)
-  const badName = nameProblem(form.name)
-  const ok = !badName && needed.length === 0 && form.events.length > 0
+  const { needed, badName, ok } = checkForm(form, editing)
   const set = (field: Field, value: string) =>
     setForm((f) => ({ ...f, values: { ...f.values, [field]: value } }))
   return (
@@ -468,52 +457,18 @@ function ChannelDialog({
           />
         </FormField>
         {FIELDS[form.kind].map(([field, optional]) => (
-          <FormField
+          <ChannelField
             key={`${form.kind}-${field}`}
-            label={
-              optional
-                ? t("notify.optional", t(`notify.field.${field}`))
-                : t(`notify.field.${field}`)
-            }
-            hint={kept(field) ? t("notify.keptHint") : hintOf(form.kind, field, t)}
-            errors={
-              tried && needed.includes(field)
-                ? [
-                    t(
-                      field === "chatId"
-                        ? "notify.chatIdProblem"
-                        : editing && field === "topic"
-                          ? "notify.topicWithServer"
-                          : "notify.required",
-                    ),
-                  ]
-                : []
-            }
-          >
-            <Input
-              size="sm"
-              type={SECRET_FIELDS.includes(field) ? "password" : "text"}
-              inputMode={field === "chatId" ? "numeric" : undefined}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder={kept(field) ? t("notify.kept") : undefined}
-              value={form.values[field] ?? ""}
-              onChange={(event) => set(field, event.target.value)}
-            />
-          </FormField>
+            kind={form.kind}
+            field={field}
+            optional={optional}
+            kept={editing && STORED_FIELDS.includes(field)}
+            problem={tried && needed.includes(field) ? problemOf(field, editing) : undefined}
+            value={form.values[field] ?? ""}
+            onChange={(value) => set(field, value)}
+          />
         ))}
-        {form.kind === "gotify" ? (
-          <p className="type-meta text-muted-foreground">
-            {t("notify.gotifyBridge")}{" "}
-            <Link
-              to="/cluster/components"
-              search={{ component: GOTIFY_COMPONENT }}
-              className="text-foreground hover:underline"
-            >
-              {t("notify.gotifyInstall")}
-            </Link>
-          </p>
-        ) : null}
+        {form.kind === "gotify" ? <GotifyNote /> : null}
         <EventChoices
           events={events}
           chosen={form.events}
@@ -528,12 +483,90 @@ function ChannelDialog({
   )
 }
 
+/** What the form still needs before it can be reviewed. */
+function checkForm(form: ChannelForm, editing: boolean) {
+  const needed = editing ? missingInEdit(form) : missing(form)
+  const badName = nameProblem(form.name)
+  return { needed, badName, ok: !badName && needed.length === 0 && form.events.length > 0 }
+}
+
+function startForm(events: Event[], channel?: Channel): ChannelForm {
+  if (channel) return formOf(channel)
+  return {
+    name: "",
+    kind: "slack",
+    values: {},
+    events: events.filter((e) => e.endsWith("-failed") || e === "crash-loop"),
+  }
+}
+
+function GotifyNote() {
+  const t = useT()
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t("notify.gotifyBridge")}{" "}
+      <Link
+        to="/cluster/components"
+        search={{ component: GOTIFY_COMPONENT }}
+        className="text-foreground hover:underline"
+      >
+        {t("notify.gotifyInstall")}
+      </Link>
+    </p>
+  )
+}
+
+function ChannelField({
+  kind,
+  field,
+  optional,
+  kept,
+  problem,
+  value,
+  onChange,
+}: {
+  kind: ChannelKind
+  field: Field
+  optional?: boolean
+  kept: boolean
+  problem?: ReturnType<typeof problemOf>
+  value: string
+  onChange: (value: string) => void
+}) {
+  const t = useT()
+  const label = t(`notify.field.${field}`)
+  return (
+    <FormField
+      label={optional ? t("notify.optional", label) : label}
+      hint={kept ? t("notify.keptHint") : hintOf(kind, field, t)}
+      errors={problem ? [t(problem)] : []}
+    >
+      <Input
+        size="sm"
+        type={SECRET_FIELDS.includes(field) ? "password" : "text"}
+        inputMode={field === "chatId" ? "numeric" : undefined}
+        autoComplete="off"
+        spellCheck={false}
+        placeholder={kept ? t("notify.kept") : undefined}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </FormField>
+  )
+}
+
 function hintOf(kind: ChannelKind, field: Field, t: ReturnType<typeof useT>) {
   if (field === "webhookUrl") return t(`notify.hint.${kind as "slack"}`)
   if (field === "server") return t("notify.hint.ntfyServer")
   if (field === "smarthost") return t("notify.hint.smarthost")
   if (field === "chatId") return t("notify.hint.chatId")
   return undefined
+}
+
+/** Why a field the form still needs is wrong. */
+function problemOf(field: Field, editing: boolean) {
+  if (field === "chatId") return "notify.chatIdProblem"
+  return editing && field === "topic" ? "notify.topicWithServer" : "notify.required"
 }
 
 /** What a change writes, and applying it; planning writes nothing. */

@@ -855,6 +855,31 @@ fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError
     })
 }
 
+/// The pods of `classified` that maintenance evicts, with their uids from `pods`.
+fn evictable(classified: &[DrainPod], pods: &[Pod]) -> Vec<Planned> {
+    classified
+        .iter()
+        .filter(|p| p.fate != PodFate::Stays)
+        .map(|p| {
+            let uid = pods
+                .iter()
+                .find(|pod| {
+                    pod.metadata.namespace.as_deref() == Some(p.namespace.as_str())
+                        && pod.metadata.name.as_deref() == Some(p.name.as_str())
+                })
+                .and_then(|pod| pod.metadata.uid.clone())
+                .unwrap_or_default();
+            Planned {
+                namespace: p.namespace.clone(),
+                name: p.name.clone(),
+                uid,
+                fate: p.fate,
+                zeabur: p.zeabur,
+            }
+        })
+        .collect()
+}
+
 /// Works out what stopping scheduling, resuming it or maintenance does to the node and its pods,
 /// and a token to apply it; writes nothing.
 #[utoipa::path(post, path = "/api/v1/cluster/nodes/{node}/maintenance/plan", tag = "cluster",
@@ -918,27 +943,7 @@ pub(crate) async fn plan(
     let now = (state.clock)().as_second();
     let expires_at = now.saturating_add(LIFETIME_SECONDS);
     let evictable = if request.action == NodeAction::Drain {
-        classified
-            .iter()
-            .filter(|p| p.fate != PodFate::Stays)
-            .map(|p| {
-                let uid = pods
-                    .iter()
-                    .find(|pod| {
-                        pod.metadata.namespace.as_deref() == Some(p.namespace.as_str())
-                            && pod.metadata.name.as_deref() == Some(p.name.as_str())
-                    })
-                    .and_then(|pod| pod.metadata.uid.clone())
-                    .unwrap_or_default();
-                Planned {
-                    namespace: p.namespace.clone(),
-                    name: p.name.clone(),
-                    uid,
-                    fate: p.fate,
-                    zeabur: p.zeabur,
-                }
-            })
-            .collect()
+        evictable(&classified, &pods)
     } else {
         Vec::new()
     };

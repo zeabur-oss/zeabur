@@ -24,7 +24,8 @@ import { useClusterGate } from "@/components/gate"
 import { KubeDetails } from "@/components/kube-details"
 import { Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
-import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
+import { useSecondsLeft } from "@/components/plan/expiry"
+import { SealedFooter } from "@/components/plan/sealed-footer"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
 import { YamlBlock } from "@/components/yaml"
@@ -46,12 +47,6 @@ import type { Health } from "@/model/service"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Checkbox } from "@zeabur/design-system/components/checkbox"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@zeabur/design-system/components/dialog"
 import { Label } from "@zeabur/design-system/components/label"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 
@@ -59,6 +54,7 @@ type NodeView = Schemas["NodeView"]
 type NodeAction = Schemas["NodeAction"]
 type DrainProgress = Schemas["DrainProgress"]
 type MaintenancePlan = Schemas["MaintenancePlan"]
+type NodeRemoval = Schemas["NodeRemoval"]
 
 const refresh = () => {
   void queryClient.invalidateQueries({ queryKey: nodesQuery.queryKey })
@@ -166,11 +162,12 @@ export function NodeDialog({
   onClose,
 }: {
   node: string
-  open: NodeOpen
+  open?: NodeOpen
   onOpen: (open: NodeOpen) => void
   onRemoved: (node: string) => void
   onClose: () => void
 }) {
+  if (!open) return null
   return (
     <MaintenanceDialog
       key={open.action}
@@ -271,7 +268,6 @@ function MaintenanceDialog({
   })
 
   const left = useSecondsLeft(progress ? undefined : plan.data?.expiresAt)
-  const expired = left !== undefined && left <= 0
   const ready = plan.data && !plan.isFetching
   const split = fates(plan.data?.pods ?? [])
   const confirmNeeded =
@@ -287,32 +283,15 @@ function MaintenanceDialog({
         wide
         onClose={onClose}
         footer={
-          <div className="flex w-full flex-wrap items-center gap-2">
-            {!running && !progress.done && !zeaburLeaving(progress) ? (
-              <Button
-                variant="outline"
-                size="sm"
-                loading={retry.isPending}
-                onClick={() => plan.data && retry.mutate(plan.data.token)}
-              >
-                {t("maint.retry")}
-              </Button>
-            ) : null}
-            <span className="ml-auto flex gap-2">
-              <Button
-                size="sm"
-                variant={progress.done && !removing ? "default" : "ghost"}
-                onClick={onClose}
-              >
-                {t("common.close")}
-              </Button>
-              {removing && progress.done ? (
-                <Button size="sm" onClick={() => onAction("remove")}>
-                  {t("maint.removeNext")}
-                </Button>
-              ) : null}
-            </span>
-          </div>
+          <ProgressFooter
+            progress={progress}
+            running={running}
+            removing={removing}
+            retrying={retry.isPending}
+            onRetry={() => plan.data && retry.mutate(plan.data.token)}
+            onRemove={() => onAction("remove")}
+            onClose={onClose}
+          />
         }
       >
         <Progress
@@ -335,60 +314,132 @@ function MaintenanceDialog({
       wide={action === "drain"}
       onClose={onClose}
       footer={
-        <div className="flex w-full flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("plan.cancel")}
-          </Button>
-          {ready && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
-            <span className="type-meta text-muted-foreground tabular-nums">
-              {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
-            </span>
-          ) : null}
-          <span className="ml-auto">
-            {expired ? (
-              <Button size="sm" onClick={() => void plan.refetch()}>
-                {t("plan.replan")}
-              </Button>
-            ) : refused === "notDrained" ? (
-              <Button size="sm" onClick={() => onAction("drain")}>
-                {t("maint.removal.drainFirst")}
-              </Button>
-            ) : refused ? null : (
-              <Button
-                size="sm"
-                disabled={!ready || confirmNeeded}
-                loading={apply.isPending}
-                onClick={() => plan.data && apply.mutate(plan.data.token)}
-              >
-                {action === "remove" ? t("maint.remove") : t("plan.apply")}
-              </Button>
-            )}
-          </span>
-        </div>
+        <SealedFooter
+          left={left}
+          ready={Boolean(ready)}
+          back={
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              {t("plan.cancel")}
+            </Button>
+          }
+          onReplan={() => void plan.refetch()}
+        >
+          {refused === "notDrained" ? (
+            <Button size="sm" onClick={() => onAction("drain")}>
+              {t("maint.removal.drainFirst")}
+            </Button>
+          ) : refused ? null : (
+            <Button
+              size="sm"
+              disabled={!ready || confirmNeeded}
+              loading={apply.isPending}
+              onClick={() => plan.data && apply.mutate(plan.data.token)}
+            >
+              {action === "remove" ? t("maint.remove") : t("plan.apply")}
+            </Button>
+          )}
+        </SealedFooter>
       }
     >
       {plan.isPending || plan.isFetching ? (
         <LoadingRows label={t("plan.planning")} rows={3} />
       ) : plan.isError ? (
         <Problem error={plan.error} />
-      ) : action === "drain" ? (
-        <DrainPlan
+      ) : (
+        <PlanBody
           plan={plan.data}
+          action={action}
           includeStuck={includeStuck}
           onIncludeStuck={setIncludeStuck}
           includeDeleted={includeDeleted}
           onIncludeDeleted={setIncludeDeleted}
+          loseData={loseData}
+          onLoseData={setLoseData}
         />
-      ) : action === "remove" ? (
-        <RemovePlan plan={plan.data} loseData={loseData} onLoseData={setLoseData} />
-      ) : (
-        <>
-          <p>{t(`maint.lead.${action}`, node)}</p>
-          <KubeDetails facts={[[t("maint.kube.command"), kubectlCommand(action, node, false)]]} />
-        </>
       )}
       {apply.isError ? <Problem error={apply.error} /> : null}
     </Frame>
+  )
+}
+
+function ProgressFooter({
+  progress,
+  running,
+  removing,
+  retrying,
+  onRetry,
+  onRemove,
+  onClose,
+}: {
+  progress: DrainProgress
+  running: boolean
+  removing?: boolean
+  retrying: boolean
+  onRetry: () => void
+  onRemove: () => void
+  onClose: () => void
+}) {
+  const t = useT()
+  const next = removing && progress.done
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2">
+      {!running && !progress.done && !zeaburLeaving(progress) ? (
+        <Button variant="outline" size="sm" loading={retrying} onClick={onRetry}>
+          {t("maint.retry")}
+        </Button>
+      ) : null}
+      <span className="ml-auto flex gap-2">
+        <Button size="sm" variant={progress.done && !next ? "default" : "ghost"} onClick={onClose}>
+          {t("common.close")}
+        </Button>
+        {next ? (
+          <Button size="sm" onClick={onRemove}>
+            {t("maint.removeNext")}
+          </Button>
+        ) : null}
+      </span>
+    </div>
+  )
+}
+
+/** What a plan does, by its action. */
+function PlanBody({
+  plan,
+  action,
+  includeStuck,
+  onIncludeStuck,
+  includeDeleted,
+  onIncludeDeleted,
+  loseData,
+  onLoseData,
+}: {
+  plan: MaintenancePlan
+  action: NodeAction
+  includeStuck: boolean
+  onIncludeStuck: (value: boolean) => void
+  includeDeleted: boolean
+  onIncludeDeleted: (value: boolean) => void
+  loseData: boolean
+  onLoseData: (value: boolean) => void
+}) {
+  const t = useT()
+  if (action === "drain")
+    return (
+      <DrainPlan
+        plan={plan}
+        includeStuck={includeStuck}
+        onIncludeStuck={onIncludeStuck}
+        includeDeleted={includeDeleted}
+        onIncludeDeleted={onIncludeDeleted}
+      />
+    )
+  if (action === "remove")
+    return <RemovePlan plan={plan} loseData={loseData} onLoseData={onLoseData} />
+  return (
+    <>
+      <p>{t(`maint.lead.${action}`, plan.node)}</p>
+      <KubeDetails facts={[[t("maint.kube.command"), kubectlCommand(action, plan.node, false)]]} />
+    </>
   )
 }
 
@@ -402,54 +453,76 @@ function RemovePlan({
   onLoseData: (value: boolean) => void
 }) {
   const t = useT()
-  const loseId = useId()
   const node = plan.node
   const removal = plan.removal
   if (!removal) return null
-  const lost = fates(plan.pods).stuck.length
-  const control = plan.roles.some((role) => ["control-plane", "master", "etcd"].includes(role))
   return (
     <>
-      {removal.refused === "lastNode" ? (
-        <Note variant="destructive">{t("maint.removal.lastNode", node)}</Note>
-      ) : removal.refused === "lastServer" ? (
-        <Note variant="destructive">{t("maint.removal.lastServer", node)}</Note>
-      ) : removal.refused === "notDrained" ? (
+      {removal.refused === "notDrained" ? (
         <p>{t("maint.removal.notDrained", node)}</p>
+      ) : removal.refused ? (
+        <Note variant="destructive">{t(`maint.removal.${removal.refused}`, node)}</Note>
       ) : (
-        <>
-          <p>{t("maint.lead.remove", node)}</p>
-          {!removal.ready && removal.left > 0 ? (
-            <Note variant="warn">{t("maint.removal.down", node, removal.left)}</Note>
-          ) : null}
-          {lost > 0 ? (
-            <Group
-              health="fail"
-              title={t("maint.removal.lose", lost, node)}
-              groups={byProject(fates(plan.pods).stuck)}
-            >
-              <Choice id={loseId} checked={loseData} onChange={onLoseData}>
-                {t("maint.removal.loseConfirm")}
-              </Choice>
-            </Group>
-          ) : null}
-          {control && removal.otherServers < 3 ? (
-            <Note variant="warn">{t("maint.removal.servers", removal.otherServers)}</Note>
-          ) : null}
-        </>
+        <RemovalNotes plan={plan} removal={removal} loseData={loseData} onLoseData={onLoseData} />
       )}
       <KubeDetails facts={[[t("maint.kube.command"), kubectlCommand("remove", node, false)]]} />
     </>
   )
 }
 
-/** After a node is removed: what to run on its machine. */
-export function Removed({ node, onClose }: { node: string; onClose: () => void }) {
+/** What removing a node that may go costs. */
+function RemovalNotes({
+  plan,
+  removal,
+  loseData,
+  onLoseData,
+}: {
+  plan: MaintenancePlan
+  removal: NodeRemoval
+  loseData: boolean
+  onLoseData: (value: boolean) => void
+}) {
   const t = useT()
+  const loseId = useId()
+  const node = plan.node
+  const stuck = fates(plan.pods).stuck
+  const control = plan.roles.some((role) => ["control-plane", "master", "etcd"].includes(role))
+  return (
+    <>
+      <p>{t("maint.lead.remove", node)}</p>
+      {!removal.ready && removal.left > 0 ? (
+        <Note variant="warn">{t("maint.removal.down", node, removal.left)}</Note>
+      ) : null}
+      {stuck.length > 0 ? (
+        <Group
+          health="fail"
+          title={t("maint.removal.lose", stuck.length, node)}
+          groups={byProject(stuck)}
+        >
+          <Choice id={loseId} checked={loseData} onChange={onLoseData}>
+            {t("maint.removal.loseConfirm")}
+          </Choice>
+        </Group>
+      ) : null}
+      {control && removal.otherServers < 3 ? (
+        <Note variant="warn">{t("maint.removal.servers", removal.otherServers)}</Note>
+      ) : null}
+    </>
+  )
+}
+
+/** After a node is removed: what to run on its machine. */
+export function Removed({ node, onClose }: { node?: string; onClose: () => void }) {
   useEffect(() => {
+    if (!node) return
     refresh()
     void queryClient.invalidateQueries({ queryKey: nodePoliciesQuery.queryKey })
-  }, [])
+  }, [node])
+  return node ? <RemovedFrame node={node} onClose={onClose} /> : null
+}
+
+function RemovedFrame({ node, onClose }: { node: string; onClose: () => void }) {
+  const t = useT()
   return (
     <Frame
       title={t("maint.title.remove", node)}
@@ -484,22 +557,22 @@ function LeaveDialog({
 }) {
   const t = useT()
   return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : onStay())}>
-      <DialogContent variant="compact">
-        <div className="flex flex-col gap-2 px-5 pt-4 pb-3">
-          <DialogTitle>{t("maint.leave.title")}</DialogTitle>
-          <DialogDescription>{t("maint.leave.body", node)}</DialogDescription>
-        </div>
-        <div className="flex justify-end gap-2 border-t px-5 py-3">
+    <Frame
+      title={t("maint.leave.title")}
+      onClose={onStay}
+      footer={
+        <>
           <Button variant="ghost" size="sm" onClick={onLeave}>
             {t("maint.leave.leave")}
           </Button>
           <Button size="sm" onClick={onStay}>
             {t("maint.leave.stay")}
           </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      <p>{t("maint.leave.body", node)}</p>
+    </Frame>
   )
 }
 

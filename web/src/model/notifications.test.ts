@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   fixOf,
   missing,
+  missingInEdit,
   nameProblem,
   settingsOf,
   verdict,
@@ -36,10 +37,10 @@ describe("notification channels", () => {
   })
 
   test("an edit keeps stored fields left empty, but ntfy's topic goes with its server", () => {
-    expect(missing(form({ kind: "webhook", values: {} }), true)).toEqual([])
+    expect(missingInEdit(form({ kind: "webhook", values: {} }))).toEqual([])
     expect(missing(form({ kind: "webhook", values: {} }))).toEqual(["url"])
     expect(
-      missing(form({ kind: "ntfy", values: { server: "https://ntfy.example.com" } }), true),
+      missingInEdit(form({ kind: "ntfy", values: { server: "https://ntfy.example.com" } })),
     ).toEqual(["topic"])
   })
 

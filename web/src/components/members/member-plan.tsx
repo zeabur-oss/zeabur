@@ -11,7 +11,8 @@ import {
 } from "@/api/members"
 import { Consequence, Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
-import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
+import { useSecondsLeft } from "@/components/plan/expiry"
+import { SealedFooter } from "@/components/plan/sealed-footer"
 import { Problem } from "@/components/problem"
 import { YamlDiff } from "@/components/yaml"
 import { projectsQuery } from "@/api/queries"
@@ -67,7 +68,6 @@ export function MemberPlan({
     onError: refreshMembers,
   })
   const left = useSecondsLeft(plan.data?.expiresAt)
-  const expired = left !== undefined && left <= 0
   const writes = plan.data?.writes ?? []
   const nothing = plan.data !== undefined && writes.length === 0
   const ready = plan.data && !plan.isFetching
@@ -77,40 +77,33 @@ export function MemberPlan({
       wide
       onClose={onClose}
       footer={
-        <div className="flex w-full flex-wrap items-center gap-2">
-          {onBack ? (
-            <Button variant="outline" size="sm" onClick={onBack}>
-              <CaretLeftIcon aria-hidden="true" data-icon="inline-start" />
-              {t("plan.back")}
-            </Button>
-          ) : (
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              {t("plan.cancel")}
-            </Button>
-          )}
-          {ready && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
-            <span className="type-meta text-muted-foreground tabular-nums">
-              {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
-            </span>
-          ) : null}
-          <span className="ml-auto">
-            {expired ? (
-              <Button size="sm" onClick={() => void plan.refetch()}>
-                {t("plan.replan")}
+        <SealedFooter
+          left={left}
+          ready={Boolean(ready)}
+          onReplan={() => void plan.refetch()}
+          back={
+            onBack ? (
+              <Button variant="outline" size="sm" onClick={onBack}>
+                <CaretLeftIcon aria-hidden="true" data-icon="inline-start" />
+                {t("plan.back")}
               </Button>
             ) : (
-              <Button
-                size="sm"
-                variant={destructive ? "destructive" : "default"}
-                disabled={!ready || nothing}
-                loading={apply.isPending}
-                onClick={() => plan.data && apply.mutate(plan.data.token)}
-              >
-                {action}
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                {t("plan.cancel")}
               </Button>
-            )}
-          </span>
-        </div>
+            )
+          }
+        >
+          <Button
+            size="sm"
+            variant={destructive ? "destructive" : "default"}
+            disabled={!ready || nothing}
+            loading={apply.isPending}
+            onClick={() => plan.data && apply.mutate(plan.data.token)}
+          >
+            {action}
+          </Button>
+        </SealedFooter>
       }
     >
       {plan.isPending || plan.isFetching ? (

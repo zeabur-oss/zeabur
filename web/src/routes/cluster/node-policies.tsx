@@ -9,7 +9,8 @@ import { applyNodePolicies, nodePoliciesQuery, planNodePolicies, queryClient } f
 import { Frame } from "@/components/members/frame"
 import { useHintGate } from "@/components/gate"
 import { LoadingRows } from "@/components/page"
-import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
+import { useSecondsLeft } from "@/components/plan/expiry"
+import { SealedFooter } from "@/components/plan/sealed-footer"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
 import { YamlDiff } from "@/components/yaml"
@@ -135,7 +136,6 @@ function PoliciesPlan({ onClose }: { onClose: () => void }) {
     onError: refresh,
   })
   const left = useSecondsLeft(plan.data?.expiresAt)
-  const expired = left !== undefined && left <= 0
   const writes = plan.data?.writes ?? []
   const nothing = plan.data !== undefined && writes.length === 0
   const ready = plan.data && !plan.isFetching
@@ -145,32 +145,25 @@ function PoliciesPlan({ onClose }: { onClose: () => void }) {
       wide
       onClose={onClose}
       footer={
-        <div className="flex w-full flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("plan.cancel")}
+        <SealedFooter
+          left={left}
+          ready={Boolean(ready)}
+          back={
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              {t("plan.cancel")}
+            </Button>
+          }
+          onReplan={() => void plan.refetch()}
+        >
+          <Button
+            size="sm"
+            disabled={!ready || nothing}
+            loading={apply.isPending}
+            onClick={() => plan.data && apply.mutate(plan.data.token)}
+          >
+            {t("plan.apply")}
           </Button>
-          {ready && left !== undefined && left < COUNTDOWN_FROM_SECONDS ? (
-            <span className="type-meta text-muted-foreground tabular-nums">
-              {expired ? t("plan.expired") : t("plan.expiresIn", clock(left))}
-            </span>
-          ) : null}
-          <span className="ml-auto">
-            {expired ? (
-              <Button size="sm" onClick={() => void plan.refetch()}>
-                {t("plan.replan")}
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                disabled={!ready || nothing}
-                loading={apply.isPending}
-                onClick={() => plan.data && apply.mutate(plan.data.token)}
-              >
-                {t("plan.apply")}
-              </Button>
-            )}
-          </span>
-        </div>
+        </SealedFooter>
       }
     >
       {plan.isPending || plan.isFetching ? (

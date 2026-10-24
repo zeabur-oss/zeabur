@@ -895,10 +895,15 @@ impl Kept<'_> {
     }
 }
 
-/// What changing a channel to `typed` writes, without reading its Secret's values: a setting
-/// kept in the Secret (a URL, token, password, or ntfy's server and topic) left empty keeps its
-/// value, and `stored` names the Secret's keys. ntfy's server and topic are one value, so the
-/// topic is typed again to change either. Says what to fix when the settings are not valid.
+/// What changing a channel to `typed` writes, without reading its Secret's values.
+///
+/// A setting kept in the Secret (a URL, token, password, or ntfy's server and topic) left empty
+/// keeps its value, and `stored` names the Secret's keys. ntfy's server and topic are one value,
+/// so the topic is typed again to change either.
+///
+/// # Errors
+///
+/// What to fix when the settings are not valid.
 pub fn edit(
     typed: &AlertmanagerChannelSettings,
     stored: &BTreeSet<String>,
@@ -971,7 +976,13 @@ pub fn edit(
         .collect();
     let target = match &settings {
         S::Webhook { .. } | S::Ntfy { .. } if !fresh.contains("url") => None,
-        other => target(other),
+        S::Slack { .. }
+        | S::Discord { .. }
+        | S::Telegram { .. }
+        | S::Email { .. }
+        | S::Webhook { .. }
+        | S::Ntfy { .. }
+        | S::Gotify { .. } => target(&settings),
     };
     Ok(Edited {
         settings,
