@@ -1,5 +1,5 @@
-//! `doctor`: checks the install, with exit codes monitoring plugins use (0 OK, 1 warning,
-//! 2 critical).
+//! `doctor`: checks the install, with the exit codes of the Nagios plugin convention, as
+//! `zeaburctl doctor` uses them: 0 OK, 1 warning, 2 critical, 3 when the checks cannot run.
 
 use std::process::ExitCode;
 use std::time::Duration;
@@ -15,7 +15,22 @@ use zeabur_installer_plan::storage;
 use crate::apply::STATE_CONFIGMAP;
 use crate::out;
 
+/// The exit code when the checks cannot run.
+const UNKNOWN: u8 = 3;
+
+/// Stops before the checks when they cannot read what they need.
+pub(crate) fn cannot_run() -> Option<ExitCode> {
+    if preflight::is_root() {
+        return None;
+    }
+    out::line("UNKNOWN  run doctor as root (sudo): the checks read RKE2's files");
+    Some(ExitCode::from(UNKNOWN))
+}
+
 pub(crate) fn run() -> ExitCode {
+    if let Some(code) = cannot_run() {
+        return code;
+    }
     let mut results: Vec<(Status, String)> = Vec::new();
     if !systemd::is_active("rke2-server") {
         out::line("CRITICAL rke2-server is not running: journalctl -u rke2-server");

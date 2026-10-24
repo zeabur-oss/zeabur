@@ -111,9 +111,14 @@ impl Check {
     }
 }
 
+/// Whether this process runs as root.
+#[must_use]
+pub fn is_root() -> bool {
+    effective_uid(&fs::read_to_string("/proc/self/status").unwrap_or_default()) == Some(0)
+}
+
 fn root() -> Check {
-    let status = fs::read_to_string("/proc/self/status").unwrap_or_default();
-    if effective_uid(&status) == Some(0) {
+    if is_root() {
         check("root", Status::Pass, "running as root").code("root.ok", &[])
     } else {
         check("root", Status::Fail, "run apply as root (sudo)").code("root.no", &[])

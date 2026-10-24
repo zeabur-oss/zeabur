@@ -55,7 +55,11 @@ enum Command {
         #[arg(long, default_value = "127.0.0.1:8085")]
         listen: SocketAddr,
     },
-    /// Check the install. Exits 0 when healthy, 1 with warnings, 2 when something is broken.
+    /// Check the install.
+    ///
+    /// Exit codes, as monitoring plugins (Nagios) and `zeaburctl doctor` use them: 0 when all is
+    /// well, 1 for a warning, 2 for something critical, 3 when the checks cannot run (not root).
+    /// An invalid command line also exits 2.
     Doctor,
     /// Remove Zeabur, or Zeabur and Zeabur Identity. RKE2 itself is removed with
     /// `/usr/local/bin/rke2-uninstall.sh`. On a node that joined a cluster, prints how to take
