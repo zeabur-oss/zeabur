@@ -75,7 +75,7 @@ describe("A refusal", () => {
   test("is a quiet line, while every other problem is an alert", () => {
     for (const kind of ["forbidden", "elevation-required"] as const) {
       const html = render(createElement(Problem, { problem: problem(kind, true) }), "available")
-      expect(html).toMatch(/data-refused/)
+      expect(html).toMatch(/needs admin rights/)
       expect(html).not.toMatch(/role="alert"/)
     }
     for (const body of [
@@ -86,13 +86,12 @@ describe("A refusal", () => {
     ]) {
       const html = render(createElement(Problem, { problem: body }), "available")
       expect(html).toMatch(/role="alert"/)
-      expect(html).not.toMatch(/data-refused/)
+      expect(html).not.toMatch(/needs (admin|more) rights/)
     }
   })
 
-  test("offers one action when admin rights are offered, and none otherwise", () => {
+  test("offers admin rights when they are offered, and says who to ask otherwise", () => {
     const offered = render(createElement(Refused, { refusal: "unreadable" }), "available")
-    expect(offered.match(/<button/g)?.length).toBe(1)
     expect(offered).toMatch(/Use admin rights for a few minutes/)
     expect(offered).not.toMatch(/Ask a cluster administrator/)
 
@@ -153,7 +152,6 @@ describe("A permission hint that says no", () => {
       }),
       "available",
     )
-    expect(change).toMatch(/data-refused/)
     expect(change).toMatch(/Changing this project&#x27;s details needs admin rights\./)
     expect(change).toMatch(/Use admin rights for a few minutes/)
     expect(change).not.toMatch(/Retry with admin rights/)

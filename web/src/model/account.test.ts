@@ -55,7 +55,7 @@ describe("account", () => {
     const projects = [project("shop-web", "admin", "Storefront"), project("api", "viewer")]
     expect(filterAccess(projects, "store").map((p) => p.name)).toEqual(["shop-web"])
     expect(filterAccess(projects, "SHOP web").map((p) => p.name)).toEqual(["shop-web"])
-    expect(filterAccess(projects, "  ")).toHaveLength(2)
+    expect(filterAccess(projects, "  ")).toStrictEqual(projects)
     expect(projectName(project("api", "viewer", " "))).toBe("api")
   })
 })

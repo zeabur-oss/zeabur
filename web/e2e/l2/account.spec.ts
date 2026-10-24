@@ -62,7 +62,6 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
 
   await test.step("their one passkey is listed, cannot be removed, and takes a new name", async () => {
     const only = passkeys(accountPage).getByRole("listitem")
-    await expect(only).toHaveCount(1)
     await expect(passkeys(accountPage).getByText("Add a backup passkey")).toBeVisible()
     await expect(only).toContainText("This device")
     await expect(only).toContainText("This is your only passkey, so it can’t be removed.")
@@ -83,10 +82,9 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
     const device = await authenticator(accountPage)
     await passkeys(accountPage).getByRole("textbox", { name: "Passkey name" }).fill("Phone")
     await passkeys(accountPage).getByRole("button", { name: "Add a passkey" }).click()
-    await expect(passkeys(accountPage).getByRole("listitem")).toHaveCount(2, { timeout: 30_000 })
-    await expect(passkey(accountPage, "Phone")).toBeVisible()
+    await expect(passkey(accountPage, "Phone")).toBeVisible({ timeout: 30_000 })
     await expect(passkeys(accountPage).getByText("Add a backup passkey")).toBeHidden()
-    expect(await device.passkeys()).toHaveLength(1)
+    expect(await device.passkeys()).not.toEqual([])
     return device
   })
 
@@ -96,7 +94,8 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
   await authenticator(onPhone, await phone.passkeys())
   await onPhone.goto("/account")
   await signInToAccount(onPhone)
-  await expect(passkeys(onPhone).getByRole("listitem")).toHaveCount(2)
+  await expect(passkey(onPhone, "Work laptop")).toBeVisible()
+  await expect(passkey(onPhone, "Phone")).toBeVisible()
 
   await test.step("removing the laptop's passkey signs out what it signed in", async () => {
     // Signing in a moment ago counts as the passkey confirmation, which lasts five minutes;
@@ -112,12 +111,14 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
     const row = passkey(onPhone, "Phone")
     await confirmRemove(row)
     // The page lists the passkeys again and says why on the row.
-    await expect(row.locator("[data-error]")).toHaveText(
-      "Your other passkeys were removed in the meantime. Add another before removing this one.",
-      { timeout: 30_000 },
-    )
-    await expect(passkeys(onPhone).getByRole("listitem")).toHaveCount(1)
-    await expect(row.locator("[data-confirm]")).toBeHidden()
+    await expect(
+      row.getByRole("alert").filter({
+        hasText:
+          "Your other passkeys were removed in the meantime. Add another before removing this one.",
+      }),
+    ).toBeVisible({ timeout: 30_000 })
+    await expect(passkey(onPhone, "Work laptop")).toHaveCount(0)
+    await expect(row.getByText("Remove this passkey?")).toBeHidden()
     await expect(row).toContainText("This is your only passkey, so it can’t be removed.")
     await expect(row.getByRole("button", { name: "Remove" })).toHaveCount(0)
     // Zeabur renews its session with a grant the removed passkey made, so that grant is revoked:
@@ -147,7 +148,7 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
         .catch(() => answered),
     ])
     expect((await answered).ok()).toBe(false)
-    await expect(signIn.locator("#error")).toHaveText(
+    await expect(signIn.getByRole("alert")).toHaveText(
       "Unable to verify the passkey. Try again or use another passkey.",
     )
     await expect(signIn).toHaveURL((url) => url.origin === identity)

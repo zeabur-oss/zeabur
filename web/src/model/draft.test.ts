@@ -49,7 +49,7 @@ describe("draft", () => {
       [{ op: "scale", workload, replicas: 2 } as Change],
       [{ op: "scale", workload, replicas: 4 } as Change, env(["A", "1"])],
     )
-    expect(merged).toHaveLength(2)
+    expect(merged.filter((c) => c.op === "scale")).toEqual([{ op: "scale", workload, replicas: 4 }])
     expect(editCount(merged)).toBe(2)
   })
 

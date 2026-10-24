@@ -134,13 +134,19 @@ describe("buildDeletions", () => {
   test("keeps a Build another service runs, and credentials Zeabur did not make or another Build reads", () => {
     const copy = named("copy", [image])
     expect(buildDeletions(web, [web, copy], [build({ credentials: "web-git" })])).toEqual([])
-    expect(buildDeletions(web, [web], [build({ credentials: "github" })])).toHaveLength(1)
+    const kinds = (deletions: ReturnType<typeof buildDeletions>) =>
+      deletions.map((d) => (d.op === "delete" ? d.resource.resource : d.op))
+    expect(kinds(buildDeletions(web, [web], [build({ credentials: "github" })]))).toEqual([
+      "builds",
+    ])
     const api = build({
       name: "api",
       repository: "zot.zot.svc:5000/shop/api",
       credentials: "web-git",
     })
-    expect(buildDeletions(web, [web], [build({ credentials: "web-git" }), api])).toHaveLength(1)
+    expect(kinds(buildDeletions(web, [web], [build({ credentials: "web-git" }), api]))).toEqual([
+      "builds",
+    ])
     expect(buildDeletions(named("redis", ["redis:7"]), [web], [build()])).toEqual([])
   })
 })

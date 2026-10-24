@@ -56,7 +56,6 @@ test("a Developer deploys an image and deletes it with what it made", async ({ p
     if (made)
       await test.step(`the Developer deletes ${name}, its Ingress and its volume`, () =>
         deleteService(developer, project, name, {
-          built: false,
           also: [
             `Service ${name}`,
             `Secret ${name}-env`,

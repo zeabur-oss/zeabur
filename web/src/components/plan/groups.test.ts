@@ -223,7 +223,7 @@ group("bounded", () => {
     })
     const many = bounded(english, names)
     expect(many.text).toBe("svc-00, svc-01, svc-02, and 42 more")
-    expect(many.rest).toHaveLength(42)
+    expect(many.rest).toStrictEqual(names.slice(3))
   })
 })
 

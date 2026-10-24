@@ -262,14 +262,13 @@ test("a command on a page opens in the kubectl terminal, typed in and not run", 
   if (!reused) await dialog.getByRole("button", { name: "Open kubectl terminal" }).click()
   await expect(connected(page)).toBeVisible({ timeout: 60_000 })
   await expect(screen(page)).toContainText(command, { timeout: 10_000 })
-  // Typed, not run: kubectl has said nothing.
-  await page.waitForTimeout(1_500)
-  await expect(screen(page)).not.toContainText(/exposed|couldn't find port|error:/i)
 
   // The keyboard is in the terminal, after the command: Enter runs what was typed. A dry run, so
-  // the cluster keeps no Service.
+  // the cluster keeps no Service. The flag lands on the same line, so the command was typed and
+  // not run.
   await expect.poll(() => inTerminal(page)).toBe(true)
   await page.keyboard.type(" --dry-run=client\n")
+  await expect(screen(page)).toContainText(`${command} --dry-run=client`)
   await expect(screen(page)).toContainText(/exposed \(dry run\)|couldn't find port/)
 })
 

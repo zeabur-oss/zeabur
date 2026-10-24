@@ -75,7 +75,7 @@ describe("members", () => {
       member("ada", { displayName: "Ada Lovelace", groups: ["admins"] }),
       member("bob", { displayName: "Bob Chen" }),
     ]
-    expect(filterMembers(all, "")).toHaveLength(2)
+    expect(filterMembers(all, "")).toStrictEqual(all)
     expect(filterMembers(all, "LOVE").map((m) => m.username)).toStrictEqual(["ada"])
     expect(filterMembers(all, "admins ada").map((m) => m.username)).toStrictEqual(["ada"])
     expect(filterMembers(all, "chen ada")).toHaveLength(0)
@@ -144,8 +144,10 @@ describe("members", () => {
     })
     const now = Date.parse("2026-10-22T00:00:00Z")
     expect(
-      pendingInvitations([at("2026-10-21T00:00:00Z"), at("2026-10-23T00:00:00Z")], now),
-    ).toHaveLength(1)
+      pendingInvitations([at("2026-10-21T00:00:00Z"), at("2026-10-23T00:00:00Z")], now).map(
+        (i) => i.expiresAt,
+      ),
+    ).toStrictEqual(["2026-10-23T00:00:00Z"])
   })
 })
 

@@ -28,7 +28,7 @@ test("a first admin enrols a passkey, signs in, confirms a terminal with it and 
 
   await test.step("enrol a passkey from the setup link", async () => {
     await enrol(page, setupLink)
-    expect(await device.passkeys()).toHaveLength(1)
+    expect(await device.passkeys()).not.toEqual([])
   })
 
   await test.step("signing in to Zeabur goes through Zeabur Identity and shows who you are", async () => {

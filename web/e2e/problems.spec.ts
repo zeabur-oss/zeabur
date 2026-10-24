@@ -91,21 +91,14 @@ async function planRestart(page: Page) {
   return page.getByRole("dialog", { name: `Restart ${service}` })
 }
 
-test("a project's limit says what happened, why with its numbers, and what to do", async ({
+// What the problem says, and what it folds, is in src/components/refused.test.ts.
+test("a project's limit shows in the review, with its evidence and the raw answer on request", async ({
   page,
 }) => {
-  // A quota's refusal never offers admin rights, even when they are available.
-  await stub(page, sessionPath, session("available"))
   await stub(page, planPath, quota, 403)
   const dialog = await planRestart(page)
   const problem = dialog.getByRole("alert")
   await expect(problem).toContainText(`The change to ${service} would go over the project's limit.`)
-  await expect(problem).toContainText(
-    "The project's limit compute allows 4 of requests.cpu, and 3500m is already used.",
-  )
-  await expect(problem).toContainText(`What to do: Run fewer replicas of ${service}`)
-  await expect(problem).not.toContainText("admin rights")
-  await expect(problem).not.toContainText("ResourceQuota/compute")
   await problem.getByRole("button", { name: "Evidence" }).click()
   await expect(problem).toContainText("ResourceQuota/compute status.used.requests.cpu")
   await problem.getByRole("button", { name: "Details for Kubernetes users" }).click()
@@ -121,7 +114,7 @@ test("a policy's refusal quotes the policy's own words", async ({ page }) => {
   const problem = dialog.getByRole("alert")
   await expect(problem).toContainText(`A policy in the cluster refused the change to ${service}.`)
   await expect(problem).toContainText("The policy require-labels.example.com answered:")
-  await expect(problem.locator("blockquote")).toHaveText("label team is required")
+  await expect(problem.getByRole("blockquote")).toHaveText("label team is required")
 })
 
 test("a pod that runs again after a recent crash keeps the service failing, in plain words", async ({

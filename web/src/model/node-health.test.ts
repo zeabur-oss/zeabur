@@ -135,9 +135,9 @@ describe("grouping by outcome", () => {
       node(`n-${i}`, { usage: memoryUse(0.86 + i * 0.001) }),
     )
     const groups = groupIssues(nodes.flatMap(nodeIssues))
-    expect(groups).toHaveLength(1)
-    expect(groups[0]?.issues).toHaveLength(25)
-    expect(groups[0]?.issues[0]?.node).toBe("n-24")
+    expect(groups.map((g) => g.issues.map((i) => i.node))).toEqual([
+      nodes.map((n) => n.name).reverse(),
+    ])
   })
 
   test("a failing group comes before a larger warning one", () => {

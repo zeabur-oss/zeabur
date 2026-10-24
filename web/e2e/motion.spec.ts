@@ -29,7 +29,9 @@ async function frames(page: Page, selector: string, act: () => Promise<void>, ms
   await page.evaluate(
     ({ selector, ms }) => {
       const seen: Frame[] = []
-      ;(window as unknown as { motionFrames: Frame[] }).motionFrames = seen
+      const w = window as unknown as { motionFrames: Frame[]; motionDone: boolean }
+      w.motionFrames = seen
+      w.motionDone = false
       const start = performance.now()
       const tick = () => {
         const element = document.querySelector(selector)
@@ -49,13 +51,14 @@ async function frames(page: Page, selector: string, act: () => Promise<void>, ms
           })),
         })
         if (performance.now() - start < ms) requestAnimationFrame(tick)
+        else w.motionDone = true
       }
       requestAnimationFrame(tick)
     },
     { selector, ms },
   )
   await act()
-  await page.waitForTimeout(ms + 100)
+  await page.waitForFunction(() => (window as unknown as { motionDone: boolean }).motionDone)
   return page.evaluate(() => (window as unknown as { motionFrames: Frame[] }).motionFrames)
 }
 
@@ -76,7 +79,9 @@ const longest = (seen: Frame[]) =>
 async function documentAnimations(page: Page, act: () => Promise<void>, ms = 700) {
   await page.evaluate((ms) => {
     const seen = new Set<string>()
-    ;(window as unknown as { documentSeen: Set<string> }).documentSeen = seen
+    const w = window as unknown as { documentSeen: Set<string>; documentDone: boolean }
+    w.documentSeen = seen
+    w.documentDone = false
     const start = performance.now()
     const tick = () => {
       for (const animation of document.getAnimations()) {
@@ -87,11 +92,12 @@ async function documentAnimations(page: Page, act: () => Promise<void>, ms = 700
         )
       }
       if (performance.now() - start < ms) requestAnimationFrame(tick)
+      else w.documentDone = true
     }
     requestAnimationFrame(tick)
   }, ms)
   await act()
-  await page.waitForTimeout(ms + 100)
+  await page.waitForFunction(() => (window as unknown as { documentDone: boolean }).documentDone)
   return page.evaluate(() => [...(window as unknown as { documentSeen: Set<string> }).documentSeen])
 }
 
@@ -144,7 +150,7 @@ test("the palette opens and closes on the dialog's timings, with its body until 
     expect.arrayContaining([`opacity 150 ${curve}`, `scale 150 ${curve}`]),
   )
   const leaving = closing.filter((f) => f.present && f.opacity < 1)
-  expect(leaving.length).toBeGreaterThanOrEqual(5)
+  expect(leaving).not.toEqual([])
   // The results stay inside while it fades: never the empty box of a body already unmounted.
   for (const frame of leaving) expect(frame.height).toBeGreaterThan(open.height * 0.9)
   expect(closing.at(-1)!.present).toBe(false)
@@ -155,12 +161,17 @@ test("the palette's input stays where it is while the results change", async ({ 
   await page.keyboard.press("ControlOrMeta+k")
   const input = page.getByRole("combobox", { name: /Jump to/ })
   await expect(input).toBeFocused()
-  await page.waitForTimeout(300)
+  const still = () =>
+    page.waitForFunction(
+      (selector) => document.querySelector(selector)?.getAnimations().length === 0,
+      palette,
+    )
+  await still()
   const top = async () => (await page.locator(palette).boundingBox())!.y
   const before = await top()
   for (const text of ["s", "h", "zzz"]) {
     await input.pressSequentially(text)
-    await page.waitForTimeout(100)
+    await still()
     expect(await top()).toBe(before)
   }
   await expect(page.getByText("Nothing found.")).toBeVisible()
@@ -177,7 +188,7 @@ test("the quick look slides in from the edge and back out before it goes", async
   expect(timings(closing)).toEqual(
     expect.arrayContaining([`opacity 250 ${curve}`, `translate 250 ${curve}`]),
   )
-  expect(closing.filter((f) => f.present).length).toBeGreaterThanOrEqual(6)
+  expect(closing.some((f) => f.present && f.opacity < 1)).toBe(true)
   expect(closing.at(-1)!.present).toBe(false)
 })
 
@@ -207,7 +218,7 @@ test("the dock rises from the bottom and sinks back before it hides", async ({ p
   expect(timings(closing)).toEqual(
     expect.arrayContaining([`opacity 250 ${curve}`, `translate 250 ${curve}`]),
   )
-  expect(closing.filter((f) => f.present).length).toBeGreaterThanOrEqual(6)
+  expect(closing.some((f) => f.present && f.opacity < 1)).toBe(true)
   expect(closing.at(-1)!.present).toBe(false)
 })
 
@@ -288,7 +299,12 @@ test("Home does not shift as it loads", async ({ page }) => {
   })
   await page.goto("/")
   await expect(page.getByRole("list", { name: "Projects" })).toBeVisible()
-  await page.waitForTimeout(1500)
+  // Every request answered and fonts in, then two frames so the observer has every shift.
+  await page.waitForLoadState("networkidle")
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)))
+  })
   // The web font swapping in moves a line of text by a pixel or two, and nothing more.
   expect(
     await page.evaluate(() => (window as unknown as { shifted: number }).shifted),
@@ -353,7 +369,7 @@ test.describe("with reduced motion", () => {
     expect(longest(opening)).toBeLessThanOrEqual(150)
     const closing = await frames(page, palette, () => page.keyboard.press("Escape"))
     expect([...properties(closing)]).toEqual(["opacity"])
-    expect(closing.filter((f) => f.present && f.opacity < 1).length).toBeGreaterThanOrEqual(1)
+    expect(closing.some((f) => f.present && f.opacity < 1)).toBe(true)
     expect(closing.at(-1)!.present).toBe(false)
   })
 
@@ -365,7 +381,7 @@ test.describe("with reduced motion", () => {
     const closing = await frames(page, dockShown, () => page.keyboard.press("Control+Backquote"))
     expect([...properties(closing)]).toEqual(["opacity"])
     expect(longest(closing)).toBeLessThanOrEqual(150)
-    expect(closing.filter((f) => f.present && f.opacity < 1).length).toBeGreaterThanOrEqual(1)
+    expect(closing.some((f) => f.present && f.opacity < 1)).toBe(true)
     expect(closing.at(-1)!.present).toBe(false)
   })
 

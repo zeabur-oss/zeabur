@@ -354,25 +354,16 @@ test("the service page has eight tabs and an actions menu, and Logs follows a po
     (url) => url.searchParams.get("tab") === "settings" && !url.searchParams.has("mode"),
   )
 
-  // Links from before the seven tabs still lead to their place.
+  // Links from before the seven tabs still lead to their place: one of each kind of redirect.
+  // src/routes/search.test.ts holds where each old link leads.
   await page.goto(`${project}/services/Deployment/${healthy}?tab=terminal`)
   await expect(page).toHaveURL(
     (url) => url.searchParams.get("tab") === "logs" && !url.searchParams.has("mode"),
   )
   await page.goto(`${project}/services/Deployment/${healthy}?tab=events`)
   await expect(page).toHaveURL(modeUrl("deployments", "events"))
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=yaml`)
-  await expect(page).toHaveURL(modeUrl("settings", "yaml"))
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=metrics`)
-  await expect(page).toHaveURL(tabUrl("usage"))
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=inspect&view=logs`)
-  await expect(page).toHaveURL(tabUrl("logs"))
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=configure#networking`)
-  await expect(page).toHaveURL(tabUrl("networking"))
   await page.goto(`${project}/services/Deployment/${healthy}?tab=compute`)
   await expect(page).toHaveURL(/tab=settings#compute$/)
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=releases`)
-  await expect(page).toHaveURL(tabUrl("deployments"))
   await page.goto(`${project}/services/Deployment/${healthy}?tab=status`)
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${healthy}$`))
   await page.goto(`${project}/architecture`)
@@ -656,7 +647,7 @@ test("variables are edited, added by pasting lines, and saved as one plan", asyn
   const names = panel.getByRole("textbox", { name: "Name", exact: true })
   await names.last().focus()
   await paste(page, 'E2E_ADDED=added-1\nexport E2E_QUOTED="two words"\n# a comment\n\nbad name=1')
-  await expect(names).toHaveCount(4)
+  await expect(panel.getByRole("textbox", { name: "Value of E2E_QUOTED" })).toHaveValue("two words")
   await expect(panel).toContainText("Use letters, digits")
   await expect(page.getByRole("button", { name: "Save", exact: true })).toBeDisabled()
   await names.last().fill("E2E_FIXED")
@@ -977,7 +968,6 @@ test("Networking leads with the short address; the Service sits behind one discl
   await expect(network).toContainText(`${healthy}.${namespace}.svc.cluster.local:80`)
   const service = network.getByText(`Service/${healthy} ClusterIP`)
   await expect(service).toBeHidden()
-  await expect(network.getByRole("button", { name: "Details for Kubernetes users" })).toHaveCount(1)
   await network.getByRole("button", { name: "Details for Kubernetes users" }).click()
   await expect(service).toBeVisible()
 })

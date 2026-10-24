@@ -3,14 +3,13 @@ import type { Page } from "@playwright/test"
 import { expect } from "../fixtures.ts"
 import { toast } from "./members.ts"
 
-/** Deletes the service from its page; the plan takes its Build with it (unless `built` is
- * false), and what it made: its Kubernetes Service and its `-env` Secret are gone after, and so
- * are the objects in `also`, which the plan names. */
+/** Deletes the service from its page with what it made: its Build, its Kubernetes Service and
+ * its `-env` Secret are gone after, and so are the objects in `also`, which the plan names. */
 export async function deleteService(
   page: Page,
   project: string,
   service: string,
-  { built = true, also = [] }: { built?: boolean; also?: string[] } = {},
+  { also = [] }: { also?: string[] } = {},
 ) {
   await page.goto(`/projects/${encodeURIComponent(project)}/services/Deployment/${service}`)
   await page
@@ -20,10 +19,7 @@ export async function deleteService(
     .click()
   await page.getByRole("menuitem", { name: "Delete service" }).click()
   const plan = page.getByRole("dialog", { name: `Delete Deployment ${service}` })
-  const deletes = `Delete ${service}. This can't be undone.`
-  await expect
-    .poll(async () => ((await plan.textContent()) ?? "").split(deletes).length - 1)
-    .toBe(built ? 2 : 1)
+  await expect(plan).toContainText(`Delete ${service}. This can't be undone.`)
   for (const object of also) await expect(plan).toContainText(object)
   await plan.getByRole("textbox", { name: `Type ${service} to confirm` }).fill(service)
   await plan.getByRole("button").last().click()

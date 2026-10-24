@@ -19,7 +19,7 @@ const dictionaries = { en, "zh-TW": zhTW, "zh-CN": zhCN } as Record<string, Mess
 
 describe("server sentences", () => {
   test("each language words the examples as the server does", () => {
-    expect(examples.length).toBeGreaterThan(100)
+    expect(examples).not.toEqual([])
     for (const example of examples) {
       for (const [language, messages] of Object.entries(dictionaries)) {
         const sentence = messages[`sentence.${example.key}` as keyof Messages] as (

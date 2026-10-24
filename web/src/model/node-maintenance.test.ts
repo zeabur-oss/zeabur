@@ -47,6 +47,7 @@ describe("drain passes", () => {
       progress("leaving", "gone"),
       progress("gone", "gone"),
     ]
+    const shown = [...answers]
     const waits: number[] = []
     const seen: Schemas["DrainProgress"][] = []
     const last = await drain({
@@ -59,7 +60,7 @@ describe("drain passes", () => {
       onProgress: (p) => seen.push(p),
     })
     expect(last.done).toBe(true)
-    expect(seen).toHaveLength(4)
+    expect(seen).toEqual(shown)
     expect(waits).toEqual([2_000, 5_000, 10_000, 2_000])
   })
 
@@ -90,7 +91,7 @@ describe("drain passes", () => {
       signal: new AbortController().signal,
       onProgress: () => {},
     })
-    expect(run).rejects.toThrow("409")
+    await expect(run).rejects.toThrow("409")
   })
 })
 
