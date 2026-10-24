@@ -1,0 +1,23 @@
+# A small manifest to try scripts/docs-shots.sh on: scripts/docs-shots.sh web/e2e/shots/fixture.yaml
+- id: home
+  path: /
+  wait: main h1
+- id: project-overview
+  path: /projects/shop
+  wait: main h1
+  clip: main
+- id: service-api
+  path: /projects/shop
+  wait: main h1
+  steps:
+    - hover: 'a[href="/projects/shop/services/Deployment/web"]'
+    - click: 'a[href="/projects/shop/services/Deployment/api"]'
+- id: home-phone
+  path: /
+  wait: main h1
+  viewport: phone
+- id: cluster-forbidden
+  path: /cluster
+  wait: main h1
+  env:
+    ZEABUR_DEMO_FORBID: nodes,pods

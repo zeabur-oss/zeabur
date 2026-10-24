@@ -73,6 +73,8 @@
               # Web interface (web/: dependencies come from bun.lock)
               bun
               brotli
+              # Documentation screenshots (scripts/docs-shots.sh)
+              libavif
 
               # Kubernetes integration tests
               k3d
@@ -99,6 +101,10 @@
               # Mozilla's CA bundle (MPL-2.0), copied into the image for outgoing TLS (Zeabur Identity's
               # discovery and token endpoints); pinned with nixpkgs.
               ZEABUR_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+              # Browser tests (scripts/e2e-ui.sh) and screenshots (scripts/docs-shots.sh): Chromium
+              # from nixpkgs, matching the @playwright/test version pinned in web/package.json
+              # (playwright-driver.version).
+              PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers-chromium}";
             }
             // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux (
               # Static musl builds of the host architecture: aws-lc-sys must be compiled against musl
@@ -112,9 +118,6 @@
                 "CC_${triple}" = "${bin}cc";
                 "AR_${triple}" = "${bin}ar";
                 "CARGO_TARGET_${pkgs.lib.toUpper triple}_LINKER" = "${bin}cc";
-                # Browser tests (scripts/e2e-ui.sh): Chromium from nixpkgs, matching the
-                # @playwright/test version pinned in web/package.json (playwright-driver.version).
-                PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers-chromium}";
                 PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
               }
             );
