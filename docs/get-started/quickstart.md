@@ -11,7 +11,7 @@
   scanning and intrusion prevention.
 - **[Zeabur Identity](https://github.com/zeabur-oss/identity)**. You sign in to the cluster with a
   passkey; no `admin.conf` gets copied around.
-- **[Zeabur](../index.md)**, the web console for the cluster.
+- **[Zeabur](../../README.md)**, the web console for the cluster.
 
 > **Status: v0.0.1 alpha.** Nothing is published yet, so an install names development
 > sources (see [examples/development.yaml](../reference/installer-examples/development.yaml)). It has not been run end

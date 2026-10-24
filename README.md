@@ -109,7 +109,7 @@ step: [Quickstart](docs/get-started/quickstart.md).
 
 ## Learn more
 
-- [Documentation](docs/index.md): installing, deploying, configuring and operating the cluster,
+- [Documentation](docs/): installing, deploying, configuring and operating the cluster,
   and leaving Zeabur.
 - [Releases](docs/reference/releases.md): what a release contains and how to verify it.
 - [Architecture](docs/reference/architecture.md): principles and how Zeabur explains problems.
