@@ -135,7 +135,7 @@ installer 寫入 `/etc/rancher/rke2/audit-policy.yaml`（權限 `0600`），讓 
 - **Secret**：所有人（包括節點）的每個請求都記錄，`get`、`list`、`watch`、`create`、`update`、`patch`、`delete` 都有。每筆有使用者、用 `--as` 代為操作的身分、群組、來源 IP、user agent、操作、Namespace 和名稱。
 - **其他資源**：只記錄人和工作負載的新增、修改和刪除。讀取、Event、Lease、token review、access review、健康檢查，以及節點、API server、controller manager、scheduler 和 kube-proxy 的請求都不記錄。
 
-RKE2 在檔案到 100 MB 時換新檔，最多留 10 個舊檔，最長 30 天。沒什麼操作的單台 server 每 5 分鐘約寫 13 KB。想把紀錄留在別處，用日誌收集工具收這個檔案，Zeabur 不會讀它。
+RKE2 在檔案到 100 MB 時換新檔，最多留 10 個舊檔，最長 30 天。沒什麼操作的單台 server 每 5 分鐘約寫 13 到 23 KB，一天不到 7 MB。想把紀錄留在別處，用日誌收集工具收這個檔案，Zeabur 不會讀它。
 
 ## Installer 的主機與下載權限
 
