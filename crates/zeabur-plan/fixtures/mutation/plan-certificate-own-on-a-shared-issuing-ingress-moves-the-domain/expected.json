@@ -1,0 +1,45 @@
+{
+  "objects": [
+    {
+      "target": {"apiVersion": "networking.k8s.io/v1", "kind": "Ingress", "name": "shop", "plural": "ingresses"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "9"},
+          {"op": "test", "path": "/spec/rules/1/host", "value": "shop.example.test"},
+          {"op": "remove", "path": "/spec/rules/1"},
+          {"op": "remove", "path": "/spec/tls/0"}
+        ]
+      }
+    },
+    {
+      "target": {"kind": "Middleware", "name": "web-shop-example-test-error-pages"},
+      "write": {"type": "create"},
+      "after": {"spec": {"errors": {"status": ["502-504"], "service": {"name": "zeabur-error-pages", "port": 8080}, "query": "/{status}.html"}}}
+    },
+    {
+      "target": {"kind": "Ingress", "name": "web-shop-example-test"},
+      "write": {"type": "create"},
+      "after": {
+        "metadata": {
+          "name": "web-shop-example-test",
+          "labels": {"app.kubernetes.io/name": "web"},
+          "annotations": {"traefik.ingress.kubernetes.io/router.middlewares": "demo-headers@kubernetescrd,demo-web-shop-example-test-error-pages@kubernetescrd"}
+        },
+        "spec": {
+          "ingressClassName": "traefik",
+          "rules": [{"host": "shop.example.test", "http": {"paths": [{"path": "/", "pathType": "Prefix", "backend": {"service": {"name": "web", "port": {"number": 8080}}}}]}}],
+          "tls": [{"hosts": ["shop.example.test"], "secretName": "web-shop-example-test-cert"}]
+        }
+      }
+    },
+    {
+      "target": {"kind": "Secret", "name": "web-shop-example-test-cert"},
+      "write": {"type": "create"}
+    }
+  ],
+  "warnings": [
+    {"code": "domainMoved", "hostname": "shop.example.test", "from": {"kind": "Ingress", "name": "shop"}, "to": {"kind": "Ingress", "name": "web-shop-example-test"}},
+    {"code": "ownCertificate", "hostname": "shop.example.test", "notAfter": "2027-01-01T00:00:00Z"}
+  ]
+}

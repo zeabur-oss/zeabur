@@ -9,9 +9,11 @@
 //!   the Secret, so they go when it goes.
 //! - **On an `HTTPRoute`** a redirect is a `RequestRedirect` filter [gw-redirect]. The filter
 //!   applies to every hostname of the route, and Gateway API refuses it next to `backendRefs`. Thus
-//!   the route must serve only the one hostname, and its rules become one redirect rule. When the
-//!   redirect stops, the route gets one rule to the workload's first Service again. Gateway API has
-//!   no basic auth filter, so basic auth on an `HTTPRoute` is refused.
+//!   a hostname that shares its route first moves to a new route of its own, with the same parents
+//!   and rules, named as "Add domain" names one. Then its rules become one redirect rule. The rules
+//!   from before are kept in the annotation [`REDIRECT_RULES_ANNOTATION`], and stopping the
+//!   redirect writes them back; without it, the route gets one rule to the workload's first
+//!   Service. Gateway API has no basic auth filter, so basic auth on an `HTTPRoute` is refused.
 //!
 //! [traefik-mw]: https://doc.traefik.io/traefik/reference/routing-configuration/kubernetes/ingress/
 //! [gw-redirect]: https://gateway-api.sigs.k8s.io/reference/spec/#httprequestredirectfilter
@@ -21,11 +23,14 @@ use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
+use zeabur_adapters::error_pages::MAINTENANCE_ANNOTATION;
+use zeabur_adapters::gateway::{REDIRECT_RULES_ANNOTATION, redirect_rules};
 use zeabur_adapters::traefik::{self, MIDDLEWARES_ANNOTATION};
 use zeabur_model::WorkloadRef;
 
-use crate::change::{BasicAuthUser, Change, RouteKind, RouteRef, Target, Warning};
+use crate::change::{BasicAuthUser, Change, ObjectName, RouteKind, RouteRef, Target, Warning};
 use crate::checks::ResourceRef;
+use crate::edit::LAST_APPLIED;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
 use crate::plan::{
@@ -121,7 +126,8 @@ impl Planner<'_> {
                 self.redirect_ingress(&route.name, &object, hostname, to.as_deref(), permanent)?;
             }
             RouteKind::HttpRoute => {
-                self.redirect_http_route(&route.name, &object, workload, to.as_deref(), permanent)?;
+                let (name, object) = self.own_http_route(&route.name, object, hostname)?;
+                self.redirect_http_route(&name, &object, workload, to.as_deref(), permanent)?;
             }
         }
         if to.is_some() && permanent {
@@ -350,55 +356,41 @@ impl Planner<'_> {
         to: Option<&str>,
         permanent: bool,
     ) -> Result<(), PlanError> {
-        let count = array(object, "/spec/hostnames").len();
-        if count != 1 {
-            return Err(error(
-                ErrorKind::Invalid,
-                "shared_route",
-                format!(
-                    "HTTPRoute {name} serves {count} hostnames, and its redirect would apply to \
-                     all of them. Move the hostname to a route of its own first."
-                ),
-            ));
-        }
-        let rules = if let Some(to) = to {
-            json!([{"filters": [{"type": "RequestRedirect", "requestRedirect": {
+        let before = array(object, "/spec/rules");
+        let redirecting = before.iter().any(|rule| {
+            array(rule, "/filters")
+                .iter()
+                .any(|f| f.get("type").and_then(Value::as_str) == Some("RequestRedirect"))
+        });
+        let kept = redirect_rules(&meta_of(object));
+        // The rules to write, and the kept rules after: unchanged for `None`, removed for "".
+        let (rules, annotation) = if let Some(to) = to {
+            let rules = json!([{"filters": [{"type": "RequestRedirect", "requestRedirect": {
                 "scheme": "https",
                 "hostname": to,
                 "statusCode": if permanent { 301 } else { 302 },
-            }}]}])
+            }}]}]);
+            let keep = (!redirecting).then(|| Value::Array(before).to_string());
+            (rules, keep)
+        } else if !redirecting {
+            return Err(error(
+                ErrorKind::NotFound,
+                "not_redirected",
+                format!("HTTPRoute {name} does not redirect."),
+            ));
+        } else if let Some(kept) = kept.filter(|k| !k.is_empty()) {
+            (Value::Array(kept), Some(String::new()))
         } else {
-            let redirects = array(object, "/spec/rules").iter().any(|rule| {
-                array(rule, "/filters")
-                    .iter()
-                    .any(|f| f.get("type").and_then(Value::as_str) == Some("RequestRedirect"))
-            });
-            if !redirects {
-                return Err(error(
-                    ErrorKind::NotFound,
-                    "not_redirected",
-                    format!("HTTPRoute {name} does not redirect."),
-                ));
-            }
-            self.workload(workload)?;
-            let endpoint = self
-                .project
-                .services
-                .iter()
-                .find(|s| s.workload.kind == workload.kind && s.workload.name == workload.name)
-                .and_then(|s| self.project.endpoints_of(s).next())
-                .map(|e| (e.name.clone(), e.ports.first().map_or(80, |p| p.port)));
-            let Some((service, port)) = endpoint else {
-                return Err(error(
-                    ErrorKind::Invalid,
-                    "no_service",
-                    format!(
-                        "{} has no Kubernetes Service for HTTPRoute {name} to send requests to.",
-                        workload.name
-                    ),
-                ));
+            let route = RouteRef {
+                kind: RouteKind::HttpRoute,
+                name: name.to_owned(),
             };
-            json!([{"backendRefs": [{"name": service, "port": port}]}])
+            let (service, port) = self.first_endpoint(workload, &route)?;
+            let annotation = redirect_rules(&meta_of(object)).map(|_| String::new());
+            (
+                json!([{"backendRefs": [{"name": service, "port": port}]}]),
+                annotation,
+            )
         };
         let index = self.working(http_route_target(name), object.clone());
         self.claim(index, &[Step::field("spec"), Step::field("rules")], "rules")?;
@@ -409,7 +401,100 @@ impl Planner<'_> {
             ],
             None => vec![add("/spec/rules", rules)],
         };
-        self.patch(index, operations)
+        self.patch(index, operations)?;
+        if let Some(annotation) = annotation {
+            self.set_annotation(index, REDIRECT_RULES_ANNOTATION, &annotation)?;
+        }
+        Ok(())
+    }
+
+    /// `HTTPRoute` `name` as read, when `hostname` is its only hostname. Otherwise the hostname
+    /// moves to a new route of its own, as "Add domain" names one, with the same parents and
+    /// rules: a filter applies to every hostname of a route.
+    pub(crate) fn own_http_route(
+        &mut self,
+        name: &str,
+        object: Value,
+        hostname: &str,
+    ) -> Result<(String, Value), PlanError> {
+        if array(&object, "/spec/hostnames").len() <= 1 {
+            return Ok((name.to_owned(), object));
+        }
+        let services = array(&object, "/spec/rules")
+            .iter()
+            .flat_map(|rule| array(rule, "/backendRefs"))
+            .filter_map(|r| r.get("name").and_then(Value::as_str).map(str::to_owned))
+            .collect();
+        let own = self.own_route_name(&services, name, hostname)?;
+        let meta = meta_of(&object);
+        let mut annotations = meta.annotations.clone().unwrap_or_default();
+        for key in [
+            LAST_APPLIED,
+            MAINTENANCE_ANNOTATION,
+            REDIRECT_RULES_ANNOTATION,
+        ] {
+            annotations.remove(key);
+        }
+        let mut metadata = json!({"name": own, "namespace": self.input.snapshot.namespace});
+        if let Some(map) = metadata.as_object_mut() {
+            if let Some(labels) = &meta.labels {
+                map.insert("labels".to_owned(), json!(labels));
+            }
+            if !annotations.is_empty() {
+                map.insert("annotations".to_owned(), json!(annotations));
+            }
+        }
+        let mut spec = object.get("spec").cloned().unwrap_or_default();
+        if let Some(map) = spec.as_object_mut() {
+            map.insert("hostnames".to_owned(), json!([hostname]));
+        }
+        let body = json!({
+            "apiVersion": "gateway.networking.k8s.io/v1",
+            "kind": "HTTPRoute",
+            "metadata": metadata,
+            "spec": spec,
+        });
+        let route = RouteRef {
+            kind: RouteKind::HttpRoute,
+            name: name.to_owned(),
+        };
+        self.remove_domain(&route, hostname)?;
+        self.created(http_route_target(&own), body.clone());
+        self.warnings.push(Warning::DomainMoved {
+            hostname: hostname.to_owned(),
+            from: ObjectName::of("HTTPRoute", name),
+            to: ObjectName::of("HTTPRoute", &own),
+        });
+        Ok((own, body))
+    }
+
+    /// The first Service of `workload` and its first port, for `route` to send requests to.
+    pub(crate) fn first_endpoint(
+        &self,
+        workload: &WorkloadRef,
+        route: &RouteRef,
+    ) -> Result<(String, i32), PlanError> {
+        self.workload(workload)?;
+        self.project
+            .services
+            .iter()
+            .find(|s| s.workload.kind == workload.kind && s.workload.name == workload.name)
+            .and_then(|s| self.project.endpoints_of(s).next())
+            .map(|e| (e.name.clone(), e.ports.first().map_or(80, |p| p.port)))
+            .ok_or_else(|| {
+                let kind = match route.kind {
+                    RouteKind::Ingress => "Ingress",
+                    RouteKind::HttpRoute => "HTTPRoute",
+                };
+                error(
+                    ErrorKind::Invalid,
+                    "no_service",
+                    format!(
+                        "{} has no Kubernetes Service for {kind} {} to send requests to.",
+                        workload.name, route.name
+                    ),
+                )
+            })
     }
 
     pub(crate) fn fetched_middleware(&self, name: &str) -> Option<Value> {

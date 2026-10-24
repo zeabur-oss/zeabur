@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 pub mod cluster_name;
 pub mod error_pages;
+pub mod gateway;
 pub mod group;
 pub mod images;
 pub mod operators;

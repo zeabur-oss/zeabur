@@ -63,20 +63,26 @@ function useCurrentPages(project: string) {
 }
 
 /** The form, and the changes it asks for once the pages are known. */
-function usePagesForm(project: string, route: Schemas["Route"], host: string) {
+function usePagesForm(
+  project: string,
+  route: Schemas["Route"],
+  host: string,
+  workload: Schemas["WorkloadRef"],
+) {
   const current = useCurrentPages(project)
   const was = {
     maintenance: route.maintenance?.includes(host) ?? false,
     errorPages: route.errorPages != null,
   }
   const [form, setForm] = useState<PagesForm>({ ...was, edited: {} })
-  const routeRef = { kind: "Ingress", name: route.name } as const
+  const routeRef = { kind: route.origin.kind as Schemas["RouteKind"], name: route.name }
   const changes = current.ready
     ? pageChanges(
         routeRef,
         host,
         { ...was, pages: current.pages, defaults: current.defaults },
         form,
+        workload,
       )
     : []
   return {
@@ -102,13 +108,16 @@ export default function DomainPagesDrawer({
   service: Service
   route: Schemas["Route"]
   host: string
-  /** Traefik serves the Ingress, so it can show error pages. */
+  /** Traefik serves the Ingress, so it can show error pages. An HTTPRoute can't. */
   traefik: boolean
   plan: (ask: PlanAsk) => boolean
   onClose: () => void
 }) {
   const t = useT()
-  const { current, form, setForm, changes, large } = usePagesForm(project, route, host)
+  const { current, form, setForm, changes, large } = usePagesForm(project, route, host, {
+    kind: service.kind,
+    name: service.name,
+  })
   const [tried, setTried] = useState(false)
   const review = () => {
     setTried(true)
@@ -134,7 +143,7 @@ export default function DomainPagesDrawer({
       <ReviewForm onReview={review}>
         <Toggle
           label={t("domainPages.maintenance")}
-          hint={t("domainPages.maintenanceHint", host, service.name)}
+          hint={maintenanceHint(t, service, route, host)}
           checked={form.maintenance}
           onChange={(maintenance) => setForm({ ...form, maintenance })}
         />
@@ -145,6 +154,8 @@ export default function DomainPagesDrawer({
             checked={form.errorPages}
             onChange={(errorPages) => setForm({ ...form, errorPages })}
           />
+        ) : route.origin.kind === "HTTPRoute" ? (
+          <p className="type-meta text-muted-foreground">{t("domainPages.gatewayNoErrorPages")}</p>
         ) : null}
         <PageEditor
           pages={current.pages ?? current.defaults}
@@ -153,16 +164,34 @@ export default function DomainPagesDrawer({
           onEdit={(key, html) => setForm({ ...form, edited: { ...form.edited, [key]: html } })}
           errors={errors}
         />
-        <KubeDetails
-          facts={[
-            [t("domainPages.kube.server"), t("domainPages.kube.serverValue", ERROR_PAGE_SERVER)],
-            [t("domainPages.kube.errors"), `Middleware/${route.name}-error-pages errors 502-504`],
-            [t("domainPages.kube.maintenance"), t("domainPages.kube.maintenanceValue")],
-          ]}
-        />
+        <KubeDetails facts={pagesFacts(t, route)} />
       </ReviewForm>
     </FormDrawer>
   )
+}
+
+function pagesFacts(t: Translate, route: Schemas["Route"]): [string, string][] {
+  const server: [string, string] = [
+    t("domainPages.kube.server"),
+    t("domainPages.kube.serverValue", ERROR_PAGE_SERVER),
+  ]
+  const maintenance: [string, string] = [
+    t("domainPages.kube.maintenance"),
+    t("domainPages.kube.maintenanceValue"),
+  ]
+  if (route.origin.kind === "HTTPRoute") return [server, maintenance]
+  const errors: [string, string] = [
+    t("domainPages.kube.errors"),
+    `Middleware/${route.name}-error-pages errors 502-504`,
+  ]
+  return [server, errors, maintenance]
+}
+
+function maintenanceHint(t: Translate, service: Service, route: Schemas["Route"], host: string) {
+  const hint = t("domainPages.maintenanceHint", host, service.name)
+  const others = route.hostnames.filter((h) => h !== host)
+  if (route.origin.kind !== "HTTPRoute" || others.length === 0) return hint
+  return `${hint} ${t("domainPages.gatewayMoves", t("common.list", others))}`
 }
 
 function errorPagesHint(t: Translate, service: Service, route: Schemas["Route"], host: string) {

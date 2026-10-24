@@ -608,6 +608,7 @@ export const zhTW: Messages = {
   "events.forPod": "副本",
   "events.clearPod": "顯示所有副本",
   "domains.https": "已設定 HTTPS",
+  "domains.gatewayHttps": "HTTPS 由 Gateway 決定",
   "resource.unused": "未使用",
   "resource.unusedCount": (n) => `${n} 個未使用`,
   "storage.requestedTotal": (size) => `共申請 ${size}`,
@@ -1744,6 +1745,7 @@ export const zhTW: Messages = {
   "edit.cancel": "取消",
   "edit.edit": (name: string) => `編輯 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
+  "edit.removeWithRoute": (host, route) => `移除 ${host}，連同沒有其他網域的路由 ${route}`,
   "edit.undo": (name: string) => `保留 ${name}`,
   "vars.edit": "編輯",
   "vars.addRow": "新增變數",
@@ -3171,8 +3173,13 @@ export const zhTW: Messages = {
   "domainCert.shared": (hosts) => `同一個簽發者也會簽發 ${hosts} 的憑證。`,
   "domainCert.needsDns": (issuer) =>
     `${issuer} 無法簽發萬用字元網域的憑證，需要支援 DNS-01 的簽發者`,
-  "domainCert.ownShared": (route, hosts) =>
-    `Ingress ${route} 的 ${hosts} 也使用 cert-manager 簽發的憑證。請先移除這個網域，再用你的憑證重新加入。`,
+  "domainCert.ownMoves": (route, hosts) =>
+    `Ingress ${route} 也替 ${hosts} 向 cert-manager 申請憑證，所以這個網域會移到自己的 Ingress。`,
+  "domainCert.ownKept": (route, hosts, first) =>
+    `Ingress ${route} 也替 ${hosts} 向 cert-manager 申請憑證，這個網域得移到自己的 Ingress。請先${first}。`,
+  "domainCert.keptBy.password": (_host) => "取消密碼",
+  "domainCert.keptBy.redirect": (host) => `取消 ${host} 的轉址`,
+  "domainCert.keptBy.maintenance": (host) => `結束 ${host} 的維護`,
   "domainCert.certificate": "憑證（PEM）",
   "domainCert.certificateHint": "先放網站憑證，再放中繼憑證。",
   "domainCert.key": "私密金鑰（PEM）",
@@ -3267,6 +3274,10 @@ export const zhTW: Messages = {
     "訪客要先輸入使用者名稱和密碼才能看到服務。Zeabur 只保存密碼的雜湊值。",
   "domainAccess.passwordShared": (hosts) =>
     `${hosts} 和這個網域共用同一個 Ingress，也會要求同一組密碼。`,
+  "domainAccess.gatewayNoPassword":
+    "Gateway API 沒有要求輸入密碼的 filter，所以這個網域的 HTTPRoute 無法設定密碼。",
+  "domainAccess.gatewayMoves": (hosts) =>
+    `轉址會套用到整個 HTTPRoute，所以這個網域會移到自己的路由，${hosts} 留在原處。`,
   "domainAccess.passwordSet": "已設定密碼。",
   "domainAccess.change": "變更",
   "domainAccess.username": "使用者名稱",
@@ -3278,6 +3289,7 @@ export const zhTW: Messages = {
   "domainAccess.protected": "密碼",
   "domainAccess.kube.annotation": "Middleware 清單",
   "domainAccess.kube.redirect": "轉址",
+  "domainAccess.kube.kept": "原本的規則",
   "domainAccess.kube.password": "密碼",
   "domainAccess.kube.users": "使用者",
   "domainAccess.kube.usersValue": (name) =>
@@ -3293,6 +3305,10 @@ export const zhTW: Messages = {
   "domainPages.errorPagesHint": (service) =>
     `${service} 沒有回應時（502、503 或 504），訪客會看到你的頁面，而不是空白的錯誤訊息。`,
   "domainPages.shared": (hosts) => `${hosts} 和這個網域共用同一個 Ingress，也會顯示錯誤頁面。`,
+  "domainPages.gatewayNoErrorPages":
+    "Gateway API 沒有錯誤頁面的 filter，所以這個網域的 HTTPRoute 只能顯示維護頁。",
+  "domainPages.gatewayMoves": (hosts) =>
+    `維護模式會套用到整個 HTTPRoute，所以這個網域會移到自己的路由，${hosts} 留在原處。`,
   "domainPages.pages": "頁面",
   "domainPages.pagesHint": "專案的每個網域都顯示同一組頁面。",
   "domainPages.firstUse": "Zeabur 會在專案裡加一個小型伺服器來提供這些頁面。",
@@ -3391,6 +3407,10 @@ export const zhTW: Messages = {
   "useShared.kube.whenValue": "Pod 重新啟動時；這個變更會替換 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任務使用 ${service} 目前的映像檔 ${image}；之後 ${service} 換映像檔，任務不會跟著換`,
+  "warn.domainMoved": (host, from, to) => `${host} 從 ${from} 移到自己的路由 ${to}`,
+  "warn.routeDeleted": (route, host) => `${route} 只路由 ${host}，所以會一起刪除`,
+  "warn.maintenanceRestored": (host, service, port) =>
+    `維護期間 ${host} 的規則改過，原本的後端對不上，顯示維護頁的路徑會改送到 ${service}:${port}`,
   "warn.permanentRedirect": (host) =>
     `瀏覽器會記住永久轉址：之後就算取消，來過的訪客清除快取前，開啟 ${host} 仍會轉到舊的網域`,
   "warn.publicDatabase": (name) => `${name} 是資料庫：面對網際網路，只剩它自己的密碼保護資料`,

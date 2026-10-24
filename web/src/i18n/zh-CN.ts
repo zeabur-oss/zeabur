@@ -608,6 +608,7 @@ export const zhCN: Messages = {
   "events.forPod": "副本",
   "events.clearPod": "显示所有副本",
   "domains.https": "已配置 HTTPS",
+  "domains.gatewayHttps": "HTTPS 由 Gateway 决定",
   "resource.unused": "未使用",
   "resource.unusedCount": (n) => `${n} 个未使用`,
   "storage.requestedTotal": (size) => `共申请 ${size}`,
@@ -1742,6 +1743,7 @@ export const zhCN: Messages = {
   "edit.cancel": "取消",
   "edit.edit": (name: string) => `编辑 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
+  "edit.removeWithRoute": (host, route) => `移除 ${host}，连同没有其他域名的路由 ${route}`,
   "edit.undo": (name: string) => `保留 ${name}`,
   "vars.edit": "编辑",
   "vars.addRow": "添加变量",
@@ -3164,8 +3166,13 @@ export const zhCN: Messages = {
   "domainCert.defaultIssuer": (issuer) => `默认（${issuer}）`,
   "domainCert.shared": (hosts) => `同一个签发者也会签发 ${hosts} 的证书。`,
   "domainCert.needsDns": (issuer) => `${issuer} 无法签发通配符域名的证书，需要支持 DNS-01 的签发者`,
-  "domainCert.ownShared": (route, hosts) =>
-    `Ingress ${route} 的 ${hosts} 也使用 cert-manager 签发的证书。请先移除这个域名，再用你的证书重新添加。`,
+  "domainCert.ownMoves": (route, hosts) =>
+    `Ingress ${route} 也为 ${hosts} 向 cert-manager 申请证书，所以这个域名会移到自己的 Ingress。`,
+  "domainCert.ownKept": (route, hosts, first) =>
+    `Ingress ${route} 也为 ${hosts} 向 cert-manager 申请证书，这个域名得移到自己的 Ingress。请先${first}。`,
+  "domainCert.keptBy.password": (_host) => "取消密码",
+  "domainCert.keptBy.redirect": (host) => `取消 ${host} 的重定向`,
+  "domainCert.keptBy.maintenance": (host) => `结束 ${host} 的维护`,
   "domainCert.certificate": "证书（PEM）",
   "domainCert.certificateHint": "先放网站证书，再放中间证书。",
   "domainCert.key": "私钥（PEM）",
@@ -3259,6 +3266,10 @@ export const zhCN: Messages = {
   "domainAccess.passwordHint": "访客要先输入用户名和密码才能看到服务。Zeabur 只保存密码的哈希值。",
   "domainAccess.passwordShared": (hosts) =>
     `${hosts} 和这个域名共用同一个 Ingress，也会要求同一组密码。`,
+  "domainAccess.gatewayNoPassword":
+    "Gateway API 没有要求输入密码的 filter，所以这个域名的 HTTPRoute 无法设置密码。",
+  "domainAccess.gatewayMoves": (hosts) =>
+    `重定向会应用到整个 HTTPRoute，所以这个域名会移到自己的路由，${hosts} 留在原处。`,
   "domainAccess.passwordSet": "已设置密码。",
   "domainAccess.change": "更改",
   "domainAccess.username": "用户名",
@@ -3270,6 +3281,7 @@ export const zhCN: Messages = {
   "domainAccess.protected": "密码",
   "domainAccess.kube.annotation": "Middleware 列表",
   "domainAccess.kube.redirect": "重定向",
+  "domainAccess.kube.kept": "原来的规则",
   "domainAccess.kube.password": "密码",
   "domainAccess.kube.users": "用户",
   "domainAccess.kube.usersValue": (name) =>
@@ -3285,6 +3297,10 @@ export const zhCN: Messages = {
   "domainPages.errorPagesHint": (service) =>
     `${service} 没有响应时（502、503 或 504），访客会看到你的页面，而不是简陋的错误信息。`,
   "domainPages.shared": (hosts) => `${hosts} 和这个域名共用同一个 Ingress，也会显示错误页面。`,
+  "domainPages.gatewayNoErrorPages":
+    "Gateway API 没有错误页面的 filter，所以这个域名的 HTTPRoute 只能显示维护页。",
+  "domainPages.gatewayMoves": (hosts) =>
+    `维护模式会应用到整个 HTTPRoute，所以这个域名会移到自己的路由，${hosts} 留在原处。`,
   "domainPages.pages": "页面",
   "domainPages.pagesHint": "项目的每个域名都显示同一组页面。",
   "domainPages.firstUse": "Zeabur 会在项目里加一个小型服务器来提供这些页面。",
@@ -3383,6 +3399,10 @@ export const zhCN: Messages = {
   "useShared.kube.whenValue": "Pod 重启时；这个更改会替换 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任务使用 ${service} 当前的镜像 ${image}；之后 ${service} 换镜像，任务不会跟着换`,
+  "warn.domainMoved": (host, from, to) => `${host} 从 ${from} 移到自己的路由 ${to}`,
+  "warn.routeDeleted": (route, host) => `${route} 只路由 ${host}，所以会一起删除`,
+  "warn.maintenanceRestored": (host, service, port) =>
+    `维护期间 ${host} 的规则改过，原来的后端对不上，显示维护页的路径会改发到 ${service}:${port}`,
   "warn.permanentRedirect": (host) =>
     `浏览器会记住永久重定向：之后即使取消，来过的访客清除缓存前，打开 ${host} 仍会转到旧的域名`,
   "warn.publicDatabase": (name) => `${name} 是数据库：面对互联网，只剩它自己的密码保护数据`,

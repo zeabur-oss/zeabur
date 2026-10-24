@@ -26,35 +26,24 @@ spec:
     - name: http
       port: 8080
 ---
----
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: shop
   namespace: demo
-  uid: ingress-uid
   resourceVersion: "9"
-  annotations: {cert-manager.io/cluster-issuer: letsencrypt}
+  annotations:
+    zeabur.com/maintenance-backend: '{"shop.example.test":[{"service":{"name":"web","port":{"number":8080}}}]}'
 spec:
-  tls:
-    - hosts: [shop.example.test]
-      secretName: shop-tls
   rules:
-    - host: www.example.test
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: web
-                port: {number: 8080}
     - host: shop.example.test
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
-              service:
-                name: web
-                port: {number: 8080}
+              service: {name: zeabur-error-pages, port: {number: 8081}}
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: {name: web, port: {number: 8080}}

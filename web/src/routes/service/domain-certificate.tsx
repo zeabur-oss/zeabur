@@ -51,6 +51,17 @@ function useChoice(route: Schemas["Route"], host: string) {
 const issuingOthers = (route: Schemas["Route"], others: string[]) =>
   Boolean(route.issuer) && others.length > 0
 
+/** What keeps the domain on its Ingress, which it leaves for an own certificate. */
+function keptBy(
+  route: Schemas["Route"],
+  host: string,
+): "password" | "redirect" | "maintenance" | undefined {
+  if (route.basicAuth) return "password"
+  if (route.redirects?.some((r) => r.host === host)) return "redirect"
+  if (route.maintenance?.includes(host)) return "maintenance"
+  return undefined
+}
+
 const unchanged = (c: Choice) =>
   c.source === "issuer" && c.now.as === "issuer" && c.now.issuer === c.issuer
 
@@ -58,10 +69,10 @@ const unchanged = (c: Choice) =>
 function sourceOf(
   c: Choice,
   host: string,
-  shared: boolean,
+  blocked: boolean,
 ): Schemas["CertificateSource"] | undefined {
   if (c.source === "own") {
-    const ok = !shared && pemProblems(c.certificate, c.key).length === 0
+    const ok = !blocked && pemProblems(c.certificate, c.key).length === 0
     return ok ? { from: "own", certificate: c.certificate, key: c.key } : undefined
   }
   const name = c.issuer.trim()
@@ -78,7 +89,8 @@ export default function DomainCertificateDrawer(props: DomainDrawerProps) {
   const others = route.hostnames.filter((h) => h !== host)
   const review = () => {
     setTried(true)
-    const certificate = sourceOf(choice, host, issuingOthers(route, others))
+    const blocked = issuingOthers(route, others) && keptBy(route, host) !== undefined
+    const certificate = sourceOf(choice, host, blocked)
     if (!certificate) return
     plan({
       title: t("domainCert.planTitle", host),
@@ -123,7 +135,7 @@ export default function DomainCertificateDrawer(props: DomainDrawerProps) {
         {choice.source === "issuer" ? (
           <IssuerField choice={choice} host={host} others={others} />
         ) : (
-          <OwnFields choice={choice} tried={tried} route={route} others={others} />
+          <OwnFields choice={choice} tried={tried} route={route} host={host} others={others} />
         )}
         <KubeDetails
           facts={[
@@ -173,24 +185,38 @@ function OwnFields({
   choice,
   tried,
   route,
+  host,
   others,
 }: {
   choice: Choice
   tried: boolean
   route: Schemas["Route"]
+  host: string
   others: string[]
 }) {
   const t = useT()
   const problems = tried ? pemProblems(choice.certificate, choice.key) : []
-  if (issuingOthers(route, others)) {
+  const moves = issuingOthers(route, others)
+  const kept = moves ? keptBy(route, host) : undefined
+  if (kept) {
     return (
       <p className="type-body text-warn-strong">
-        {t("domainCert.ownShared", route.name, t("common.list", others))}
+        {t(
+          "domainCert.ownKept",
+          route.name,
+          t("common.list", others),
+          t(`domainCert.keptBy.${kept}`, host),
+        )}
       </p>
     )
   }
   return (
     <>
+      {moves ? (
+        <p className="type-body text-secondary">
+          {t("domainCert.ownMoves", route.name, t("common.list", others))}
+        </p>
+      ) : null}
       <TextFile
         label={t("domainCert.certificate")}
         hint={t("domainCert.certificateHint")}

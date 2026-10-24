@@ -1,4 +1,4 @@
-description: "Own certificate for one hostname of an Ingress that asks cert-manager for its other hostnames too is refused: cert-manager would write the Secret."
+description: "Own certificate for one hostname of an Ingress that asks cert-manager for its other hostnames too moves the hostname to an Ingress of its own: cert-manager would write the Secret on the shared one."
 operation: mutation.plan
 params:
   certificates: {"shop.example.test": "2027-01-01T00:00:00Z"}

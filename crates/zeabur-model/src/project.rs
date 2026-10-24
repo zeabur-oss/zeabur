@@ -140,8 +140,8 @@ pub struct Service {
     /// The names of the Kubernetes Services selecting its pods, sorted by name; each is in
     /// the document's `endpoints`.
     pub endpoint_names: Vec<String>,
-    /// The names of the Ingresses routing to those Services, sorted by name; each is in the
-    /// document's `routes`.
+    /// The names of the Ingresses and `HTTPRoute`s routing to those Services, sorted by name;
+    /// each is in the document's `routes`.
     pub route_names: Vec<String>,
     /// What kind of data store it is, when it is one: named like a well-known data store
     /// image, in the `databases` group, or a StatefulSet with persistent storage. Image names

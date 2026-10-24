@@ -103,12 +103,13 @@ pub struct Endpoint {
     pub origin: Origin,
 }
 
-/// An Ingress routing to workloads' Services: how they are reached from outside.
+/// An Ingress or a Gateway API `HTTPRoute` routing to workloads' Services: how they are reached
+/// from outside.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub struct Route {
-    /// The Ingress's name.
+    /// The Ingress's or `HTTPRoute`'s name.
     pub name: String,
     /// The hosts its rules match.
     pub hostnames: Vec<String>,
@@ -179,8 +180,15 @@ pub struct RouteMiddleware {
     /// The host it acts on; absent when it acts on every host of the Ingress.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host: Option<String>,
-    /// The `Middleware`'s name.
+    /// The `Middleware`'s name; on an `HTTPRoute`, which redirects with a filter, the route's.
     pub middleware: String,
+    /// The host a redirect sends to, when the route says it: an `HTTPRoute`'s `RequestRedirect`
+    /// filter. A Traefik redirect says it in its `Middleware`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+    /// Whether that redirect is permanent (status 301 or 308).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permanent: Option<bool>,
 }
 
 /// One backend of an Ingress: the requests that reach a Service port.

@@ -77,6 +77,8 @@ export function pageChanges(
   host: string,
   was: { maintenance: boolean; errorPages: boolean; pages?: Pages; defaults: Pages },
   form: PagesForm,
+  /** Gets the domain back when the rules changed during maintenance. */
+  workload?: Schemas["WorkloadRef"],
 ): Change[] {
   const starts = (form.maintenance && !was.maintenance) || (form.errorPages && !was.errorPages)
   const html = htmlChange(was.pages, was.defaults, form.edited, starts)
@@ -87,7 +89,15 @@ export function pageChanges(
       : [{ op: "errorPages", route, enabled: form.errorPages } as const]),
     ...(form.maintenance === was.maintenance
       ? []
-      : [{ op: "maintenance", route, hostname: host, enabled: form.maintenance } as const]),
+      : [
+          {
+            op: "maintenance",
+            route,
+            hostname: host,
+            enabled: form.maintenance,
+            ...(form.maintenance ? {} : { workload }),
+          } as const,
+        ]),
   ]
 }
 

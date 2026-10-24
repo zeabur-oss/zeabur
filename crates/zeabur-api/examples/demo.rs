@@ -718,6 +718,14 @@ fn shop() -> NamespaceObjects {
                     "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
                 "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
         ],
+        // A Gateway API route: redirects and maintenance work, a password and error pages don't.
+        http_routes: vec![json!({
+            "apiVersion": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute",
+            "metadata": {"name": "web-status", "namespace": "shop", "resourceVersion": "2"},
+            "spec": {"parentRefs": [{"name": "public", "namespace": "gateway"}],
+                "hostnames": ["status.shop.example.com"],
+                "rules": [{"backendRefs": [{"name": "web", "port": 80}]}]}
+        })],
         ..NamespaceObjects::default()
     }
 }

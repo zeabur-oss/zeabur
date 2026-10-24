@@ -9817,6 +9817,13 @@ components:
         route:
           $ref: "#/components/schemas/RouteRef"
           description: The route.
+        workload:
+          oneOf:
+          - $ref: "#/components/schemas/WorkloadRef"
+            description: |-
+              When stopping: the workload whose first Service gets the hostname when the rules changed
+              after maintenance started, so the backends kept then no longer fit.
+          - type: "null"
     MaintenancePlan:
       type: object
       description: What a plan changes, and the token that applies it.
@@ -12276,6 +12283,70 @@ components:
             description: Its name.
       - type: object
         description: |-
+          The hostname moved to a route of its own: for its own certificate, or for a redirect or
+          maintenance that would apply to every hostname of an `HTTPRoute`.
+        required:
+        - hostname
+        - from
+        - to
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - domainMoved
+          from:
+            $ref: "#/components/schemas/ObjectName"
+            description: The route it leaves.
+          hostname:
+            type: string
+            description: The hostname.
+          to:
+            $ref: "#/components/schemas/ObjectName"
+            description: Its new route.
+      - type: object
+        description: The hostname was the route's last, so the route is deleted with it.
+        required:
+        - route
+        - hostname
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - routeDeleted
+          hostname:
+            type: string
+            description: The hostname.
+          route:
+            $ref: "#/components/schemas/ObjectName"
+            description: The route.
+      - type: object
+        description: |-
+          The rules changed after maintenance started, so the hostname goes to this Service port
+          instead of the backends kept then.
+        required:
+        - hostname
+        - service
+        - port
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - maintenanceRestored
+          hostname:
+            type: string
+            description: The hostname.
+          port:
+            type: integer
+            format: int32
+            description: Its port.
+          service:
+            type: string
+            description: The Service.
+      - type: object
+        description: |-
           Browsers keep a permanent redirect: after it stops, visitors who saw it still go to the
           other hostname until their browser forgets it.
         required:
@@ -14236,7 +14307,9 @@ components:
       - waitsForDeletion
     Route:
       type: object
-      description: "An Ingress routing to workloads' Services: how they are reached from outside."
+      description: |-
+        An Ingress or a Gateway API `HTTPRoute` routing to workloads' Services: how they are reached
+        from outside.
       required:
       - name
       - hostnames
@@ -14293,7 +14366,7 @@ components:
           description: The hosts that show the maintenance page instead of their workload, sorted.
         name:
           type: string
-          description: The Ingress's name.
+          description: The Ingress's or `HTTPRoute`'s name.
         origin:
           $ref: "#/components/schemas/Origin"
           description: The Ingress object.
@@ -14348,7 +14421,21 @@ components:
           description: The host it acts on; absent when it acts on every host of the Ingress.
         middleware:
           type: string
-          description: The `Middleware`'s name.
+          description: >-
+            The `Middleware`'s name; on an `HTTPRoute`, which redirects with a filter, the
+            route's.
+        permanent:
+          type:
+          - boolean
+          - "null"
+          description: Whether that redirect is permanent (status 301 or 308).
+        to:
+          type:
+          - string
+          - "null"
+          description: |-
+            The host a redirect sends to, when the route says it: an `HTTPRoute`'s `RequestRedirect`
+            filter. A Traefik redirect says it in its `Middleware`.
     RouteRef:
       type: object
       description: "A route object: an Ingress or a Gateway API `HTTPRoute`."
@@ -15058,8 +15145,8 @@ components:
             items:
               type: string
             description: |-
-              The names of the Ingresses routing to those Services, sorted by name; each is in the
-              document's `routes`.
+              The names of the Ingresses and `HTTPRoute`s routing to those Services, sorted by name;
+              each is in the document's `routes`.
           runAs:
             oneOf:
             - $ref: "#/components/schemas/RunAs"

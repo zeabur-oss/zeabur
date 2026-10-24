@@ -610,6 +610,10 @@ pub struct MaintenanceChange {
     pub hostname: String,
     /// Show the maintenance page when true; send requests to the workload again when false.
     pub enabled: bool,
+    /// When stopping: the workload whose first Service gets the hostname when the rules changed
+    /// after maintenance started, so the backends kept then no longer fit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workload: Option<WorkloadRef>,
 }
 
 /// A CronJob's `concurrencyPolicy` [k8s-concurrency].
@@ -1188,6 +1192,36 @@ pub enum Warning {
         /// Its name.
         pod: String,
     },
+    /// The hostname moved to a route of its own: for its own certificate, or for a redirect or
+    /// maintenance that would apply to every hostname of an `HTTPRoute`.
+    #[serde(rename_all = "camelCase")]
+    DomainMoved {
+        /// The hostname.
+        hostname: String,
+        /// The route it leaves.
+        from: ObjectName,
+        /// Its new route.
+        to: ObjectName,
+    },
+    /// The hostname was the route's last, so the route is deleted with it.
+    #[serde(rename_all = "camelCase")]
+    RouteDeleted {
+        /// The route.
+        route: ObjectName,
+        /// The hostname.
+        hostname: String,
+    },
+    /// The rules changed after maintenance started, so the hostname goes to this Service port
+    /// instead of the backends kept then.
+    #[serde(rename_all = "camelCase")]
+    MaintenanceRestored {
+        /// The hostname.
+        hostname: String,
+        /// The Service.
+        service: String,
+        /// Its port.
+        port: i32,
+    },
     /// Browsers keep a permanent redirect: after it stops, visitors who saw it still go to the
     /// other hostname until their browser forgets it.
     #[serde(rename_all = "camelCase")]
@@ -1254,6 +1288,15 @@ pub struct ObjectName {
     pub kind: String,
     /// The name.
     pub name: String,
+}
+
+impl ObjectName {
+    pub(crate) fn of(kind: &str, name: &str) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            name: name.to_owned(),
+        }
+    }
 }
 
 /// A connection between two services of the project.

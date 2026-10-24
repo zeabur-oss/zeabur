@@ -251,6 +251,7 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
     let http_routes = objects.http_routes.clone();
     let (snapshot, mut unreadable) = snapshot(objects);
     let mut projection = zeabur_graph::project(&snapshot);
+    zeabur_graph::with_http_routes(&mut projection, &http_routes);
     // Diagnoses read the namespace's events too. Without them (refused, or the read failed) the
     // pods' status still tells most of it, so the document is served and the refusal is named.
     let events: Vec<zeabur_gaps::Event> = match events {

@@ -3,7 +3,9 @@
 #[cfg(test)]
 mod tests {
     use serde_json::{from_value, json};
-    use zeabur_graph::{Snapshot, attribution, env_from, project, relations, workloads};
+    use zeabur_graph::{
+        Snapshot, attribution, env_from, project, relations, with_http_routes, workloads,
+    };
     use zeabur_model::{DataStore, Ownership, ReadOnlyReason, RelationKind, Tool};
 
     fn deployment(managed_fields: &serde_json::Value) -> serde_json::Value {
@@ -50,6 +52,50 @@ mod tests {
             ],
             ..Snapshot::default()
         }
+    }
+
+    #[test]
+    fn an_http_route_in_maintenance_or_redirecting_still_names_its_service() {
+        let mut snapshot = snapshot(deployment(&json!([])), &json!({}));
+        snapshot.services = vec![
+            from_value(json!({
+                "apiVersion": "v1",
+                "kind": "Service",
+                "metadata": {"name": "web", "namespace": "demo"},
+                "spec": {"selector": {"app": "web"}, "ports": [{"port": 8080}]}
+            }))
+            .unwrap(),
+        ];
+        let page = json!([{"name": "zeabur-error-pages", "port": 8081}]);
+        let routes = [
+            json!({
+                "metadata": {"name": "down", "namespace": "demo", "annotations": {
+                    "zeabur.com/maintenance-backend":
+                        r#"{"down.example.test":[[{"name":"web","port":8080}]]}"#
+                }},
+                "spec": {"hostnames": ["down.example.test"], "rules": [{"backendRefs": page}]}
+            }),
+            json!({
+                "metadata": {"name": "moved", "namespace": "demo", "annotations": {
+                    "zeabur.com/redirect-rules": r#"[{"backendRefs":[{"name":"web","port":8080}]}]"#
+                }},
+                "spec": {"hostnames": ["moved.example.test"], "rules": [{"filters": [{
+                    "type": "RequestRedirect",
+                    "requestRedirect": {"hostname": "example.test", "statusCode": 301}
+                }]}]}
+            }),
+        ];
+        let mut project = project(&snapshot);
+        with_http_routes(&mut project, &routes);
+        assert_eq!(project.services[0].route_names, ["down", "moved"]);
+        let down = project.route("down").unwrap();
+        assert_eq!(down.origin.kind, "HTTPRoute");
+        assert_eq!(down.maintenance, ["down.example.test"]);
+        assert_eq!(down.rules[0].service, "web");
+        let moved = project.route("moved").unwrap();
+        assert_eq!(moved.rules[0].service, "web");
+        assert_eq!(moved.redirects[0].to.as_deref(), Some("example.test"));
+        assert_eq!(moved.redirects[0].permanent, Some(true));
     }
 
     #[test]
