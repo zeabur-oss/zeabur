@@ -24,7 +24,7 @@ releases:
     namespace: observability
     releaseName: vm
     chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack
-    version: 0.95.2
+    version: 0.96.0
     values: |
       victoria-metrics-operator:
         # The operator is its own component, shared with logs.

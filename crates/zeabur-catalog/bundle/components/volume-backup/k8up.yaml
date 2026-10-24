@@ -19,7 +19,7 @@ releases:
     namespace: k8up-system
     repo: https://k8up-io.github.io/k8up
     chart: k8up
-    version: 4.10.0
+    version: 4.10.1
     values: |
       k8up:
         # Back up only PVCs annotated for backup.

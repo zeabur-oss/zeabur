@@ -36,7 +36,7 @@ releases:
     namespace: tailscale
     repo: https://pkgs.tailscale.com/helmcharts
     chart: tailscale-operator
-    version: 1.104.1
+    version: 1.104.2
     values: |
       oauth:
         # Empty, so the chart renders no Secret; the operator mounts

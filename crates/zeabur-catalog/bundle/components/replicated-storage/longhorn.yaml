@@ -41,7 +41,7 @@ releases:
     namespace: longhorn-system
     repo: https://charts.longhorn.io
     chart: longhorn
-    version: 1.12.1
+    version: 1.13.0
     values: |
       persistence:
         # One copy per node, up to three: losing a node leaves two while the
@@ -86,6 +86,9 @@ releases:
           provisionerReplicaCount: 1
           resizerReplicaCount: 1
           snapshotterReplicaCount: 1
+        longhornGlobalManager:
+          # One node: the chart's three warm standbys gain nothing.
+          replicas: 1
       multi-node: |
         persistence:
           # New volumes without a class survive losing a node. local-path stays

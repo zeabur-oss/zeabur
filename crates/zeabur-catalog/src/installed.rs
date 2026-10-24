@@ -13,7 +13,7 @@
 //!
 //! **Add-ons k3s packages are never flagged.** k3s ships Traefik and metrics-server itself and
 //! upgrades them with k3s [k3s-packaged]; its Traefik chart is a k3s build (`41.6.101+up41.6.1`)
-//! that would otherwise look older than the catalogue's `41.7.1`. They are "managed by k3s",
+//! that would otherwise look older than the catalogue's `42.1.3`. They are "managed by k3s",
 //! and upgrading k3s is the way to upgrade them.
 //!
 //! **Helm release Secrets are never decoded.** The chart and its version are inside the encoded
@@ -244,7 +244,7 @@ mod tests {
             .insert("kube-system/traefik".to_owned(), "traefik".to_owned());
         facts
             .k3s_helm_chart_versions
-            .insert("kube-system/traefik".to_owned(), "41.7.1".to_owned());
+            .insert("kube-system/traefik".to_owned(), "42.1.3".to_owned());
         let found = installation(&component("traefik"), &facts, Some("k3s"));
         assert_eq!(found.source, InstallSource::HelmChart);
         assert_eq!(found.upgrade, Some(ComponentUpgrade::Current));

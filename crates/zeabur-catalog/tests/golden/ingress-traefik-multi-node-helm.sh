@@ -7,7 +7,7 @@
 
 # gateway-api-crds
 if ! kubectl get crd httproutes.gateway.networking.k8s.io >/dev/null 2>&1; then
-  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml
+  kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml
 fi
 
 # traefik
@@ -89,7 +89,7 @@ resources:
   limits: {memory: 512Mi}
 ZEABUR_VALUES
 helm upgrade --install traefik oci://ghcr.io/traefik/helm/traefik \
-  --version 41.7.1 \
+  --version 42.1.3 \
   --namespace traefik --create-namespace \
   --values traefik-values.yaml \
   --values traefik-multi-node.yaml

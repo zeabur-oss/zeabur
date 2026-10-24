@@ -203,7 +203,7 @@ smoke:
             restartPolicy: Never
             containers:
               - name: curl
-                image: curlimages/curl:8.11.1
+                image: curlimages/curl:8.23.0
                 args: [-sSf, --cacert, /tls/ca.crt, "https://zot.zot.svc:5000/v2/"]
                 volumeMounts: [{name: tls, mountPath: /tls}]
             volumes: [{name: tls, secret: {secretName: zot-tls}}]

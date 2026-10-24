@@ -1358,7 +1358,7 @@ mod tests {
         assert_eq!(installed["source"], "helm");
         assert_eq!(installed["version"], "v1.19.1");
         assert_eq!(installed["upgrade"], "behind-minor");
-        assert_eq!(installed["tested"], "v1.21.2");
+        assert_eq!(installed["tested"], "v1.21.3");
     }
 
     #[tokio::test]

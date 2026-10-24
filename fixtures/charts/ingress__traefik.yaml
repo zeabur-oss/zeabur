@@ -6,7 +6,7 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
   annotations:
-    gateway.networking.k8s.io/bundle-version: v1.6.2
+    gateway.networking.k8s.io/bundle-version: v1.6.3
     gateway.networking.k8s.io/channel: standard
   name: "safe-upgrades.gateway.networking.k8s.io"
 spec:
@@ -19,9 +19,9 @@ spec:
       resources:   ["*"]
   validations:
     - expression: "object.spec.group != 'gateway.networking.k8s.io' || oldObject == null || (
-        has(object.metadata.annotations) && object.metadata.annotations.exists(k, k == 'gateway.networking.k8s.io/channel') && 
+        has(object.metadata.annotations) && object.metadata.annotations.exists(k, k == 'gateway.networking.k8s.io/channel') &&
         object.metadata.annotations['gateway.networking.k8s.io/channel'] == 'standard' ) || (
-        oldObject != null && has(oldObject.metadata.annotations) && oldObject.metadata.annotations.exists(k, k == 'gateway.networking.k8s.io/channel') && 
+        oldObject != null && has(oldObject.metadata.annotations) && oldObject.metadata.annotations.exists(k, k == 'gateway.networking.k8s.io/channel') &&
         oldObject.metadata.annotations['gateway.networking.k8s.io/channel'] == 'experimental' )"
       message: "Installing experimental CRDs on top of standard channel CRDs is prohibited by default. Uninstall ValidatingAdmissionPolicy safe-upgrades.gateway.networking.k8s.io to install experimental CRDs on top of standard channel CRDs."
       reason: Invalid
@@ -43,7 +43,7 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
   annotations:
-    gateway.networking.k8s.io/bundle-version: v1.6.2
+    gateway.networking.k8s.io/bundle-version: v1.6.3
     gateway.networking.k8s.io/channel: standard
   name: safe-upgrades.gateway.networking.k8s.io
 spec:
@@ -66,7 +66,7 @@ metadata:
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/instance: traefik-traefik
-    helm.sh/chart: traefik-41.7.1
+    helm.sh/chart: traefik-42.1.3
     app.kubernetes.io/managed-by: Helm
   annotations:
 automountServiceAccountToken: false
@@ -79,7 +79,7 @@ metadata:
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/instance: traefik-traefik
-    helm.sh/chart: traefik-41.7.1
+    helm.sh/chart: traefik-42.1.3
     app.kubernetes.io/managed-by: Helm
 rules:
   - apiGroups:
@@ -198,7 +198,7 @@ metadata:
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/instance: traefik-traefik
-    helm.sh/chart: traefik-41.7.1
+    helm.sh/chart: traefik-42.1.3
     app.kubernetes.io/managed-by: Helm
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -218,7 +218,7 @@ metadata:
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/instance: traefik-traefik
-    helm.sh/chart: traefik-41.7.1
+    helm.sh/chart: traefik-42.1.3
     app.kubernetes.io/managed-by: Helm
   annotations:
 spec:
@@ -246,7 +246,7 @@ metadata:
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/instance: traefik-traefik
-    helm.sh/chart: traefik-41.7.1
+    helm.sh/chart: traefik-42.1.3
     app.kubernetes.io/managed-by: Helm
   annotations:
 spec:
@@ -272,7 +272,7 @@ spec:
         app.kubernetes.io/instance: traefik-traefik
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: traefik
-        helm.sh/chart: traefik-41.7.1
+        helm.sh/chart: traefik-42.1.3
     spec:
       automountServiceAccountToken: true
       containers:
@@ -286,7 +286,7 @@ spec:
         - --metrics.prometheus=true
         - --metrics.prometheus.entrypoint=metrics
         - --experimental.plugins.crowdsec-bouncer.moduleName=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-        - --experimental.plugins.crowdsec-bouncer.version=v1.7.1
+        - --experimental.plugins.crowdsec-bouncer.version=v1.8.1
         - --providers.kubernetescrd
         - --providers.kubernetescrd.allowEmptyServices=true
         - --providers.kubernetesingress
@@ -329,7 +329,7 @@ spec:
           value: traefik
         - name: GOMEMLIMIT
           value: 230MiB
-        image: docker.io/traefik:v3.7.14
+        image: docker.io/traefik:v3.7.16
         imagePullPolicy: IfNotPresent
         lifecycle: null
         livenessProbe:
@@ -411,7 +411,7 @@ metadata:
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/instance: traefik-traefik
-    helm.sh/chart: traefik-41.7.1
+    helm.sh/chart: traefik-42.1.3
     app.kubernetes.io/managed-by: Helm
   name: traefik
 spec:
@@ -425,7 +425,7 @@ metadata:
   labels:
     app.kubernetes.io/name: traefik
     app.kubernetes.io/instance: traefik-traefik
-    helm.sh/chart: traefik-41.7.1
+    helm.sh/chart: traefik-42.1.3
     app.kubernetes.io/managed-by: Helm
 spec:
   controllerName: traefik.io/gateway-controller

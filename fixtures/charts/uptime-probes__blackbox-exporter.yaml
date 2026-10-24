@@ -6,10 +6,10 @@ metadata:
   name: blackbox-exporter-prometheus-blackbox-exporter
   namespace: observability
   labels:
-    helm.sh/chart: prometheus-blackbox-exporter-11.20.0
+    helm.sh/chart: prometheus-blackbox-exporter-11.20.2
     app.kubernetes.io/name: prometheus-blackbox-exporter
     app.kubernetes.io/instance: blackbox-exporter
-    app.kubernetes.io/version: "v0.29.0"
+    app.kubernetes.io/version: "v0.29.1"
     app.kubernetes.io/managed-by: Helm
 
 ---
@@ -20,10 +20,10 @@ metadata:
   name: blackbox-exporter-prometheus-blackbox-exporter
   namespace: observability
   labels:
-    helm.sh/chart: prometheus-blackbox-exporter-11.20.0
+    helm.sh/chart: prometheus-blackbox-exporter-11.20.2
     app.kubernetes.io/name: prometheus-blackbox-exporter
     app.kubernetes.io/instance: blackbox-exporter
-    app.kubernetes.io/version: "v0.29.0"
+    app.kubernetes.io/version: "v0.29.1"
     app.kubernetes.io/managed-by: Helm
 data:
   blackbox.yaml: |
@@ -50,10 +50,10 @@ metadata:
   name: blackbox-exporter-prometheus-blackbox-exporter
   namespace: observability
   labels:
-    helm.sh/chart: prometheus-blackbox-exporter-11.20.0
+    helm.sh/chart: prometheus-blackbox-exporter-11.20.2
     app.kubernetes.io/name: prometheus-blackbox-exporter
     app.kubernetes.io/instance: blackbox-exporter
-    app.kubernetes.io/version: "v0.29.0"
+    app.kubernetes.io/version: "v0.29.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   type: ClusterIP
@@ -75,10 +75,10 @@ metadata:
   name: blackbox-exporter-prometheus-blackbox-exporter
   namespace: observability
   labels:
-    helm.sh/chart: prometheus-blackbox-exporter-11.20.0
+    helm.sh/chart: prometheus-blackbox-exporter-11.20.2
     app.kubernetes.io/name: prometheus-blackbox-exporter
     app.kubernetes.io/instance: blackbox-exporter
-    app.kubernetes.io/version: "v0.29.0"
+    app.kubernetes.io/version: "v0.29.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
@@ -95,10 +95,10 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: prometheus-blackbox-exporter-11.20.0
+        helm.sh/chart: prometheus-blackbox-exporter-11.20.2
         app.kubernetes.io/name: prometheus-blackbox-exporter
         app.kubernetes.io/instance: blackbox-exporter
-        app.kubernetes.io/version: "v0.29.0"
+        app.kubernetes.io/version: "v0.29.1"
         app.kubernetes.io/managed-by: Helm
       annotations:
         checksum/config: 8ef369f00ab117747b758fece2091a5490fa2e9f4766aa96355f95df1e25db78
@@ -110,7 +110,7 @@ spec:
       containers:
       
       - name: blackbox-exporter
-        image: quay.io/prometheus/blackbox-exporter:v0.29.0
+        image: quay.io/prometheus/blackbox-exporter:v0.29.1
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

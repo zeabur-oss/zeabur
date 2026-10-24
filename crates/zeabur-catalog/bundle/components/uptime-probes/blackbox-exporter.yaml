@@ -18,7 +18,7 @@ releases:
   - name: blackbox-exporter
     namespace: observability
     chart: oci://ghcr.io/prometheus-community/charts/prometheus-blackbox-exporter
-    version: 11.20.0
+    version: 11.20.2
     values: |
       config:
         modules:

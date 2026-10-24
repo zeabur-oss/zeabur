@@ -28,10 +28,10 @@ metadata:
   name: falco
   namespace: falco
   labels:
-    helm.sh/chart: falco-9.2.0
+    helm.sh/chart: falco-9.2.1
     app.kubernetes.io/name: falco
     app.kubernetes.io/instance: falco
-    app.kubernetes.io/version: "0.45.0"
+    app.kubernetes.io/version: "0.45.1"
     app.kubernetes.io/managed-by: Helm
 
 ---
@@ -42,7 +42,7 @@ metadata:
   name: falco-falcosidekick
   namespace: falco
   labels:
-    helm.sh/chart: falcosidekick-0.14.0
+    helm.sh/chart: falcosidekick-0.14.1
     app.kubernetes.io/name: falcosidekick
     app.kubernetes.io/instance: falco
     app.kubernetes.io/version: "2.31.1"
@@ -559,10 +559,10 @@ metadata:
   name: falco
   namespace: falco
   labels:
-    helm.sh/chart: falco-9.2.0
+    helm.sh/chart: falco-9.2.1
     app.kubernetes.io/name: falco
     app.kubernetes.io/instance: falco
-    app.kubernetes.io/version: "0.45.0"
+    app.kubernetes.io/version: "0.45.1"
     app.kubernetes.io/managed-by: Helm
 data:
   falco.yaml: |-
@@ -707,10 +707,10 @@ metadata:
   name: falco-falcoctl
   namespace: falco
   labels:
-    helm.sh/chart: falco-9.2.0
+    helm.sh/chart: falco-9.2.1
     app.kubernetes.io/name: falco
     app.kubernetes.io/instance: falco
-    app.kubernetes.io/version: "0.45.0"
+    app.kubernetes.io/version: "0.45.1"
     app.kubernetes.io/managed-by: Helm
 data:
   falcoctl.yaml: |-
@@ -730,7 +730,7 @@ data:
         pluginsDir: /plugins
         refs:
         - falco-rules:5
-        - ghcr.io/falcosecurity/plugins/plugin/container:0.7.4
+        - ghcr.io/falcosecurity/plugins/plugin/container:0.7.5
         resolveDeps: true
         rulesfilesDir: /rulesfiles
         stateDir: /artifactstate
@@ -745,7 +745,7 @@ kind: ClusterRole
 metadata:
   name: falco-falcosidekick
   labels:
-    helm.sh/chart: falcosidekick-0.14.0
+    helm.sh/chart: falcosidekick-0.14.1
     app.kubernetes.io/name: falcosidekick
     app.kubernetes.io/instance: falco
     app.kubernetes.io/version: "2.31.1"
@@ -771,7 +771,7 @@ kind: ClusterRoleBinding
 metadata:
   name: falco-falcosidekick
   labels:
-    helm.sh/chart: falcosidekick-0.14.0
+    helm.sh/chart: falcosidekick-0.14.1
     app.kubernetes.io/name: falcosidekick
     app.kubernetes.io/instance: falco
     app.kubernetes.io/version: "2.31.1"
@@ -795,7 +795,7 @@ metadata:
   name: falco-falcosidekick
   namespace: falco
   labels:
-    helm.sh/chart: falcosidekick-0.14.0
+    helm.sh/chart: falcosidekick-0.14.1
     app.kubernetes.io/name: falcosidekick
     app.kubernetes.io/instance: falco
     app.kubernetes.io/version: "2.31.1"
@@ -819,7 +819,7 @@ metadata:
   name: falco-falcosidekick
   namespace: falco
   labels:
-    helm.sh/chart: falcosidekick-0.14.0
+    helm.sh/chart: falcosidekick-0.14.1
     app.kubernetes.io/name: falcosidekick
     app.kubernetes.io/instance: falco
     app.kubernetes.io/version: "2.31.1"
@@ -842,7 +842,7 @@ metadata:
   name: falco-falcosidekick
   namespace: falco
   labels:
-    helm.sh/chart: falcosidekick-0.14.0
+    helm.sh/chart: falcosidekick-0.14.1
     app.kubernetes.io/name: falcosidekick
     app.kubernetes.io/instance: falco
     app.kubernetes.io/version: "2.31.1"
@@ -875,10 +875,10 @@ metadata:
   name: falco
   namespace: falco
   labels:
-    helm.sh/chart: falco-9.2.0
+    helm.sh/chart: falco-9.2.1
     app.kubernetes.io/name: falco
     app.kubernetes.io/instance: falco
-    app.kubernetes.io/version: "0.45.0"
+    app.kubernetes.io/version: "0.45.1"
     app.kubernetes.io/managed-by: Helm
 spec:
   selector:
@@ -892,7 +892,7 @@ spec:
         app.kubernetes.io/name: falco
         app.kubernetes.io/instance: falco
       annotations:
-        checksum/config: 873082ea9823c1536396b5497ecc71dee4a364a18b358c876f7d5451a728db59
+        checksum/config: fd70112de84999782d86cdf1e3e40f4973d8bc426159a9bb066545b25b008dda
         checksum/rules: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
         checksum/certs: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
     spec:
@@ -904,7 +904,7 @@ spec:
           key: node-role.kubernetes.io/control-plane
       containers:
         - name: falco
-          image: docker.io/falcosecurity/falco:0.45.0
+          image: docker.io/falcosecurity/falco:0.45.1
           imagePullPolicy: IfNotPresent
           resources:
             limits:
@@ -980,6 +980,7 @@ spec:
               name: root-falco-fs
             - mountPath: /host/proc
               name: proc-fs
+              readOnly: true
             - mountPath: /host/etc
               name: etc-fs
               readOnly: true
@@ -1077,7 +1078,7 @@ metadata:
   name: falco-falcosidekick
   namespace: falco
   labels:
-    helm.sh/chart: falcosidekick-0.14.0
+    helm.sh/chart: falcosidekick-0.14.1
     app.kubernetes.io/name: falcosidekick
     app.kubernetes.io/instance: falco
     app.kubernetes.io/version: "2.31.1"
@@ -1095,7 +1096,7 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: falcosidekick-0.14.0
+        helm.sh/chart: falcosidekick-0.14.1
         app.kubernetes.io/name: falcosidekick
         app.kubernetes.io/instance: falco
         app.kubernetes.io/version: "2.31.1"
@@ -1103,7 +1104,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: core
       annotations:
-        checksum/config: 33d73a396f1e7b554e22dd3fa2e7d1f869b871e78b9d8cec3315131fdd8ff35f
+        checksum/config: 44434d13e3072cddedcd080c4573ea8636e7163f2b2e35a25d4133f330867008
     spec:
       serviceAccountName: falco-falcosidekick
       securityContext:
@@ -1170,7 +1171,7 @@ metadata:
   namespace: falco
   labels:
     app.kubernetes.io/name: falcosidekick
-    helm.sh/chart: falcosidekick-0.14.0
+    helm.sh/chart: falcosidekick-0.14.1
     app.kubernetes.io/instance: falco
     app.kubernetes.io/managed-by: Helm
   annotations:

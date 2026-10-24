@@ -6,10 +6,10 @@ metadata:
   name: vpa-vertical-pod-autoscaler-recommender
   namespace: vpa-system
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -28,10 +28,10 @@ metadata:
   name: vpa-vertical-pod-autoscaler-recommender
   namespace: vpa-system
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -42,10 +42,10 @@ kind: ClusterRole
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-metrics-reader
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -65,10 +65,10 @@ kind: ClusterRole
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-actor
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -119,10 +119,10 @@ kind: ClusterRole
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-status-actor
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -142,10 +142,10 @@ kind: ClusterRole
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-checkpoint-actor
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -180,10 +180,10 @@ kind: ClusterRole
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-target-reader
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -230,10 +230,10 @@ kind: ClusterRoleBinding
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-metrics-reader
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -253,10 +253,10 @@ kind: ClusterRoleBinding
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-actor
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -276,10 +276,10 @@ kind: ClusterRoleBinding
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-status-actor
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -299,10 +299,10 @@ kind: ClusterRoleBinding
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-checkpoint-actor
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -322,10 +322,10 @@ kind: ClusterRoleBinding
 metadata:
   name: vpa-vertical-pod-autoscaler-recommender-target-reader
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -345,10 +345,10 @@ metadata:
   name: vpa-vertical-pod-autoscaler-recommender-leader-locking
   namespace: vpa-system
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -378,10 +378,10 @@ metadata:
   name: vpa-vertical-pod-autoscaler-recommender-leader-locking
   namespace: vpa-system
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -401,10 +401,10 @@ metadata:
   name: vpa-vertical-pod-autoscaler-recommender
   namespace: vpa-system
   labels:
-    helm.sh/chart: vertical-pod-autoscaler-0.13.0
+    helm.sh/chart: vertical-pod-autoscaler-0.15.0
     app.kubernetes.io/name: vertical-pod-autoscaler
     app.kubernetes.io/instance: vpa
-    app.kubernetes.io/version: "1.8.0"
+    app.kubernetes.io/version: "1.8.1"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: recommender
     app.kubernetes.io/component-instance: vpa-recommender
@@ -429,7 +429,7 @@ spec:
         runAsUser: 65534
       containers:
         - name: recommender
-          image: registry.k8s.io/autoscaling/vpa-recommender:1.8.0
+          image: registry.k8s.io/autoscaling/vpa-recommender:1.8.1
           imagePullPolicy: IfNotPresent
           env:
             - name: NAMESPACE

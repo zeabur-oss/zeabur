@@ -19,7 +19,7 @@ releases:
   - name: cert-manager
     namespace: cert-manager
     chart: oci://quay.io/jetstack/charts/cert-manager
-    version: v1.21.2
+    version: v1.21.3
     values: |
       crds:
         # Upgrade CRDs with the chart, whatever the installer.

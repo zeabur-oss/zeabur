@@ -5,7 +5,7 @@
 # https://docs.k3s.io/installation/packaged-components
 # Profile: multi-node. Apply in the namespace Argo CD runs in (argocd).
 # gateway-api-crds: apply with `kubectl apply --server-side -f`, or vendor into your repository:
-#   https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml
+#   https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml
 # Argo CD reads OCI Helm charts through a repository with enableOCI.
 apiVersion: v1
 kind: Secret
@@ -30,7 +30,7 @@ spec:
   source:
     repoURL: ghcr.io/traefik/helm
     chart: traefik
-    targetRevision: 41.7.1
+    targetRevision: 42.1.3
     helm:
       releaseName: traefik
       valuesObject:

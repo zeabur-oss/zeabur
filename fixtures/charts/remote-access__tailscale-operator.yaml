@@ -199,7 +199,7 @@ spec:
             requests:
               cpu: 20m
               memory: 64Mi
-          image: tailscale/k8s-operator:v1.104.1
+          image: tailscale/k8s-operator:v1.104.2
           imagePullPolicy: IfNotPresent
           env:
             - name: OPERATOR_INITIAL_TAGS
@@ -227,7 +227,7 @@ spec:
             - name: CLIENT_SECRET_FILE
               value: /oauth/client_secret
             - name: PROXY_IMAGE
-              value: tailscale/tailscale:v1.104.1
+              value: tailscale/tailscale:v1.104.2
             - name: PROXY_TAGS
               value: tag:k8s
             - name: APISERVER_PROXY

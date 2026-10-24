@@ -133,7 +133,7 @@ smoke:
             restartPolicy: Never
             containers:
               - name: curl
-                image: curlimages/curl:8.11.1
+                image: curlimages/curl:8.23.0
                 command: [sh, -c]
                 args:
                   - for i in 1 2 3 4 5 6; do curl -sSf -d '{"name":"registry.k8s.io/pause","tag":"3.10"}' http://keel.keel.svc:9300/v1/webhooks/native; sleep 10; done

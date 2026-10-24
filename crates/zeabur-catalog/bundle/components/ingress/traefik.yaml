@@ -18,16 +18,16 @@ disruptsTraffic: true
 releases:
   - name: gateway-api-crds
     namespace: kube-system
-    # Traefik v3.7.14 targets Gateway API v1.6.2; the chart lacks these CRDs.
+    # Traefik chart 42.1 needs Gateway API v1.6.3; the chart lacks these CRDs.
     skipIfPresent: [httproutes.gateway.networking.k8s.io]
     urls:
       - https://github.com/kubernetes-sigs/gateway-api/releases/download/{version}/standard-install.yaml
-    version: v1.6.2
+    version: v1.6.3
 
   - name: traefik
     namespace: traefik
     chart: oci://ghcr.io/traefik/helm/traefik
-    version: 41.7.1
+    version: 42.1.3
     values: |
       providers:
         kubernetesGateway:

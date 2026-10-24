@@ -33,7 +33,7 @@ cainjector:
     enabled: true
 ZEABUR_VALUES
 helm upgrade --install cert-manager oci://quay.io/jetstack/charts/cert-manager \
-  --version v1.21.2 \
+  --version v1.21.3 \
   --namespace cert-manager --create-namespace \
   --values cert-manager-values.yaml \
   --values cert-manager-multi-node.yaml

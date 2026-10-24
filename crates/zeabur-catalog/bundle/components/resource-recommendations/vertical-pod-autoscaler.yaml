@@ -18,7 +18,7 @@ releases:
     namespace: vpa-system
     repo: https://kubernetes.github.io/autoscaler
     chart: vertical-pod-autoscaler
-    version: 0.13.0
+    version: 0.15.0
     values: |
       recommender:
         # Produces suggestions from metrics.k8s.io.

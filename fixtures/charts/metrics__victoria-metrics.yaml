@@ -43,7 +43,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
     app.kubernetes.io/version: v0.0.17
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 
 ---
 # Source: victoria-metrics-k8s-stack/templates/victoria-metrics-operator/vmalertmanager/vmalertmanager.yaml
@@ -57,8 +57,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 stringData:
   alertmanager.yaml: |
     receivers:
@@ -319,7 +319,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
     app.kubernetes.io/version: v0.0.17
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 data:
   config.yaml: |
     common:
@@ -366,6 +366,8 @@ data:
         kube-apiserver-histogram.rules:
           enabled: false
         kube-apiserver-slos:
+          enabled: false
+        kube-prometheus-general.rules:
           enabled: false
         kube-scheduler.rules:
           enabled: false
@@ -432,7 +434,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
     app.kubernetes.io/version: v0.34.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 data:
   monzo.tmpl: |-
     # This builds the silence URL. We exclude the alertname in the range
@@ -673,7 +675,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
     app.kubernetes.io/version: v0.0.17
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 rules:
   - apiGroups: [""]
     resources: ["serviceaccounts"]
@@ -695,7 +697,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
     app.kubernetes.io/version: v0.0.17
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -774,8 +776,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec:
   clusterIP: None
   ports:
@@ -1046,14 +1048,14 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   externalLabels: {}
   extraArgs:
     promscrape.streamParse: "true"
   image:
-    tag: v1.153.0
+    tag: v1.154.0
   port: "8429"
   remoteWrite:
   - url: http://vmsingle-vm-victoria-metrics-k8s-stack.observability.svc.cluster.local.:8428/api/v1/write
@@ -1078,8 +1080,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   configMaps: []
   datasource:
@@ -1090,7 +1092,7 @@ spec:
     http.pathPrefix: /
     remoteWrite.disablePathAppend: "true"
   image:
-    tag: v1.153.0
+    tag: v1.154.0
   notifiers:
   - url: http://vmalertmanager-vm-victoria-metrics-k8s-stack-0.vmalertmanager-vm-victoria-metrics-k8s-stack.observability.svc.cluster.local.:9093
   port: "8080"
@@ -1118,8 +1120,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   arbitraryFSAccessThroughSMs:
     deny: true
@@ -1153,8 +1155,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
   honorLabels: true
@@ -1196,8 +1198,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
   honorLabels: true
@@ -1238,8 +1240,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
   honorLabels: true
@@ -1281,8 +1283,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
   honorLabels: true
@@ -1324,8 +1326,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   endpoints:
   - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -1351,8 +1353,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   endpoints:
   - honorLabels: true
@@ -1381,8 +1383,8 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   endpoints:
   - metricRelabelConfigs:
@@ -1409,13 +1411,13 @@ metadata:
     app.kubernetes.io/instance: vm
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
-    app.kubernetes.io/version: v1.153.0
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    app.kubernetes.io/version: v1.154.0
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
 spec: 
   extraArgs:
     vmalert.proxyURL: http://vmalert-vm-victoria-metrics-k8s-stack.observability.svc.cluster.local.:8080
   image:
-    tag: v1.153.0
+    tag: v1.154.0
   port: "8428"
   replicaCount: 1
   resources:
@@ -1444,7 +1446,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-k8s-stack
     app.kubernetes.io/version: v0.0.17
-    helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+    helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
   annotations:
     "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-delete-policy": before-hook-creation
@@ -1459,7 +1461,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: victoria-metrics-k8s-stack
         app.kubernetes.io/version: v0.0.17
-        helm.sh/chart: victoria-metrics-k8s-stack-0.95.2
+        helm.sh/chart: victoria-metrics-k8s-stack-0.96.0
     spec:
       serviceAccountName: vm-victoria-metrics-k8s-stack-sync-job
       restartPolicy: OnFailure

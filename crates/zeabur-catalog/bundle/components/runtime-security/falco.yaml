@@ -46,7 +46,7 @@ releases:
   - name: falco
     namespace: falco
     chart: oci://ghcr.io/falcosecurity/charts/falco
-    version: 9.2.0
+    version: 9.2.1
     values: |
       driver:
         # Built-in CO-RE eBPF probe: no kernel module or headers.
@@ -67,6 +67,8 @@ releases:
         # second replica's concurrent update would be refused and its alert lost.
         replicaCount: 1
         image:
+          # The chart's default repository. Renovate reads it to update the tag.
+          repository: falcosecurity/falcosidekick
           # 2.35.0 writes the alert's time; earlier versions only its seconds
           # within the minute.
           tag: 2.35.0
