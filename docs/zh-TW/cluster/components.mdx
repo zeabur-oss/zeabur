@@ -81,7 +81,7 @@ Helm 控制器通常會在幾分鐘內依這些物件裝好 chart。記下物件
 - 畫面說已經安裝、HelmChart 物件在 `kube-system` 裡：直接修改那個 `HelmChart`，不要用同一個名稱再建立一次。
 - 套用後一直沒出現在 **已安裝**：看 Helm 控制器的安裝 Job 和元件工作負載有沒有錯誤。
 
-## 移除測試元件
+## 移除元件
 
 元件頁沒有移除按鈕。由 Zeabur 安裝的元件，到 `kube-system` 刪除當時建立的 `HelmChart` 物件，Helm 控制器就會解除安裝。自己安裝的元件，從原本的 Helm、Flux 或 Argo CD 設定移除。
 
