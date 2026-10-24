@@ -90,23 +90,42 @@ export function UsageSection() {
       {usage.isPending ? (
         <LoadingRows label={t("common.loading")} rows={2} />
       ) : usage.isError ? (
-        isUnreachable(usage.error) ? (
-          <NotRead />
-        ) : isStatus(usage.error, 403) ? (
-          <Forbidden
-            error={usage.error}
-            what={t("clusterUsage.whatPods")}
-            missing={[{ group: "", resources: ["pods"] }]}
-            role={overviewRole}
-          />
-        ) : (
-          <Problem error={usage.error} />
-        )
-      ) : data ? (
-        <Usage data={data} resource={resource} />
-      ) : null}
+        <NotShown error={usage.error} />
+      ) : (
+        <Usage data={usage.data} resource={resource} />
+      )}
     </Section>
   )
+}
+
+function NotShown({ error }: { error: Error }) {
+  const t = useT()
+  if (isUnreachable(error)) return <NotRead />
+  if (!isStatus(error, 403)) return <Problem error={error} />
+  return (
+    <Forbidden
+      error={error}
+      what={t("clusterUsage.whatPods")}
+      missing={[{ group: "", resources: ["pods"] }]}
+      role={overviewRole}
+    />
+  )
+}
+
+type Allocatable = { cpuMillicores: number; memoryBytes: number } | undefined
+
+function scaleOf(data: ClusterUsage, resource: Resource, allocatable: Allocatable): Scale {
+  const top = (r: Resource) =>
+    Math.max(...data.items.map((i) => Math.max(lead(i, r), reserved(i, r))), 1)
+  return {
+    resource,
+    measured: data.metrics === "available",
+    top: { cpu: top("cpu"), memory: top("memory") },
+    cluster: {
+      cpu: allocatable?.cpuMillicores || undefined,
+      memory: allocatable?.memoryBytes || undefined,
+    },
+  }
 }
 
 function Usage({ data, resource }: { data: ClusterUsage; resource: Resource }) {
@@ -114,18 +133,7 @@ function Usage({ data, resource }: { data: ClusterUsage; resource: Resource }) {
   const allocatable = useQuery(nodesQuery).data?.totals.allocatable
   if (data.items.length === 0)
     return <p className="text-muted-foreground">{t("clusterUsage.nothingRunning")}</p>
-  const measured = data.metrics === "available"
-  const top = (r: Resource) =>
-    Math.max(...data.items.map((i) => Math.max(lead(i, r), reserved(i, r))), 1)
-  const scale: Scale = {
-    resource,
-    measured,
-    top: { cpu: top("cpu"), memory: top("memory") },
-    cluster: {
-      cpu: allocatable?.cpuMillicores || undefined,
-      memory: allocatable?.memoryBytes || undefined,
-    },
-  }
+  const scale = scaleOf(data, resource, allocatable)
   const { projects, others, system } = groups(data.items, resource)
   const known = data.items.some((i) => i.adopted !== undefined)
   return (
@@ -339,20 +347,12 @@ function NamespaceRow({ item, scale }: { item: NamespaceUsage; scale: Scale }) {
   )
 }
 
-function Gauge({
-  item,
-  resource,
-  scale,
-}: {
-  item: NamespaceUsage
-  resource: Resource
-  scale: Scale
-}) {
+/** A gauge's heading, the line under its bar, and the whole as one label for assistive tech. */
+function useGaugeText(item: NamespaceUsage, resource: Resource, scale: Scale) {
   const t = useT()
   const { percent } = useQuantityFormat()
   const amount = useAmount()
   const { measured } = scale
-  const whole = scale.top[resource]
   const cluster = scale.cluster[resource]
   const value = lead(item, resource)
   const asked = reserved(item, resource)
@@ -363,33 +363,43 @@ function Gauge({
     measured && asked > 0 ? t("clusterUsage.reserved", amount(resource, asked, false)) : "",
     most ? t("cluster.limits", amount(resource, most, false)) : "",
   ].filter(Boolean)
-  const label = [
-    title,
-    measured
-      ? t("cluster.used", amount(resource, value, true))
-      : t("clusterUsage.reserved", amount(resource, value, false)),
-    ...details,
-  ]
-    .filter(Boolean)
-    .join(t("common.sep"))
+  const now = measured
+    ? t("cluster.used", amount(resource, value, true))
+    : t("clusterUsage.reserved", amount(resource, value, false))
+  const label = [title, now, ...details].join(t("common.sep"))
+  return { title, details: details.join(t("common.sep")), label }
+}
+
+function Gauge({
+  item,
+  resource,
+  scale,
+}: {
+  item: NamespaceUsage
+  resource: Resource
+  scale: Scale
+}) {
+  const amount = useAmount()
+  const { title, details, label } = useGaugeText(item, resource, scale)
+  const whole = scale.top[resource]
+  const value = lead(item, resource)
+  const asked = reserved(item, resource)
   return (
     <div className="flex min-w-0 flex-col gap-1 sm:w-44">
       <div className="flex items-baseline justify-between gap-2 type-meta">
         <span className="text-muted-foreground">{title}</span>
         <span className={cn(resource === scale.resource && "font-medium")}>
-          {amount(resource, value, measured)}
+          {amount(resource, value, scale.measured)}
         </span>
       </div>
       <Meter
         size="sm"
         value={value / whole}
-        mark={measured && asked > 0 ? asked / whole : undefined}
+        mark={scale.measured && asked > 0 ? asked / whole : undefined}
         tone={resource === "memory" && nearMaximum(item) ? "warn" : "ok"}
         label={label}
       />
-      {details.length > 0 ? (
-        <span className="type-meta text-muted-foreground">{details.join(t("common.sep"))}</span>
-      ) : null}
+      {details ? <span className="type-meta text-muted-foreground">{details}</span> : null}
     </div>
   )
 }
