@@ -11,7 +11,6 @@ import {
   buildOptionsChanges,
   buildOptionsOf,
   pathProblem,
-  watchPathsProblem,
 } from "@/model/git-service"
 import { parseEnv } from "@/model/image-service"
 import { Button } from "@zeabur/design-system/components/button"
@@ -76,7 +75,6 @@ function BuildOptionsForm({
   const problems = {
     directory: pathProblem(options.directory),
     dockerfile: pathProblem(options.dockerfile),
-    watchPaths: watchPathsProblem(options.watchPaths),
     env: parsed.bad.length > 0,
   }
   const changes = buildOptionsChanges(build, { ...options, set })
@@ -145,21 +143,6 @@ function BuildOptionsForm({
           </FormField>
         ) : null}
       </div>
-      <FormField
-        label={t("add.field.watchPaths")}
-        hint={t("add.watchPathsHint")}
-        errors={shown(problems.watchPaths, t("add.problem.watchPaths"))}
-      >
-        <Textarea
-          mono
-          rows={3}
-          value={options.watchPaths}
-          placeholder={"apps/web/**\n!**/*.md"}
-          spellCheck={false}
-          disabled={disabled}
-          onChange={(event) => setOptions((o) => ({ ...o, watchPaths: event.target.value }))}
-        />
-      </FormField>
       <div className="flex flex-col gap-2">
         <h4 className="text-sm font-medium">{t("add.buildVariables")}</h4>
         {build.env.length === 0 ? (

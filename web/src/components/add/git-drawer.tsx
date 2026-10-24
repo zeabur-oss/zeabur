@@ -148,14 +148,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   }
 
   const moreOpen =
-    tried &&
-    [
-      problems.directory,
-      problems.dockerfile,
-      problems.watchPaths,
-      problems.env,
-      problems.buildEnv,
-    ].some(Boolean)
+    tried && (!!problems.directory || !!problems.dockerfile || problems.env || problems.buildEnv)
   const keyPage = repo ? deployKeyPage(repo) : undefined
 
   return (
@@ -492,20 +485,6 @@ function MoreFields({
           </FormField>
         ) : null}
       </div>
-      <FormField
-        label={t("add.field.watchPaths")}
-        hint={t("add.watchPathsHint")}
-        errors={shown(problems.watchPaths, () => t("add.problem.watchPaths"))}
-      >
-        <Textarea
-          mono
-          rows={3}
-          value={form.watchPaths}
-          placeholder={"apps/web/**\n!**/*.md"}
-          spellCheck={false}
-          onChange={(event) => set({ watchPaths: event.target.value })}
-        />
-      </FormField>
       <FormField
         label={t("add.variables")}
         hint={t("add.variablesHint")}

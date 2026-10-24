@@ -244,17 +244,6 @@ function Refused({
   )
 }
 
-/** The newest commit that changed no watched path, so it was not built. */
-function Skipped({ revision }: { revision?: string | null }) {
-  const t = useT()
-  if (!revision) return null
-  return (
-    <p className="mt-1 text-sm text-muted-foreground">
-      {t("builds.skipped", shortSha(revision) ?? revision)}
-    </p>
-  )
-}
-
 function Summary({
   project,
   service,
@@ -355,7 +344,6 @@ function Summary({
         {build.suspended ? (
           <p className="mt-1 text-sm text-warn-strong">{t("builds.suspended")}</p>
         ) : null}
-        <Skipped revision={build.skippedRevision} />
         <SummaryCardFacts>
           {build.gitUrl ? (
             <SummaryCardFact label={t("overview.source")}>

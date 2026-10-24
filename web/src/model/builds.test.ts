@@ -22,7 +22,6 @@ const build = (over: Partial<Build> = {}): Build => ({
   latestImage: `zot.zot.svc:5000/shop/web:main-2-bbbbbbb@${digest("b")}`,
   suspended: false,
   keelWebhooks: [],
-  watchPaths: [],
   env: [],
   ...over,
 })

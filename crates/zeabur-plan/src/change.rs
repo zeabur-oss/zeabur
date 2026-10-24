@@ -549,11 +549,6 @@ pub struct BuildOptionsChange {
     /// `secretName` and `key`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<EnvEdit>,
-    /// The watch paths, `spec.triggers.paths`: glob patterns from the repository's root, `!` to
-    /// leave a path out. A new commit builds only when it changes a file they match. Empty:
-    /// every commit builds.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub watch_paths: Option<Vec<String>>,
 }
 
 /// A [`Change::PublicPort`].

@@ -27,8 +27,6 @@ ignore_terms = [
   "一次性",
   # "- 和 .": the characters a name may contain, not a full stop.
   ".",
-  # "開頭加 ! 表示排除": the character that starts a watch path that excludes.
-  "!",
 ]
 
 [glossary]

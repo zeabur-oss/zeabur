@@ -49,8 +49,6 @@ export interface GitService extends Pick<
   method: BuildMethod
   /** For `dockerfile`, relative to `directory`. Empty: `Dockerfile`. */
   dockerfile: string
-  /** The Build's `spec.triggers.paths`, one pattern per line. Empty: every commit builds. */
-  watchPaths: string
   /** Passed to the build as BuildKit secrets, from the Secret `<name>-build-env`. */
   buildVariables: { name: string; value: string }[]
   access: Access
@@ -67,7 +65,6 @@ export const newGitService = (): GitService => ({
   directory: "",
   method: "railpack",
   dockerfile: "",
-  watchPaths: "",
   buildVariables: [],
   access: "public",
   username: "",
@@ -164,26 +161,6 @@ export function pathProblem(path: string): "invalid" | undefined {
   return value.split("/").every((s) => PATH_SEGMENT.test(s)) ? undefined : "invalid"
 }
 
-/** Most watch paths, and longest one, a Build takes. */
-const MAX_WATCH_PATHS = 32
-const MAX_WATCH_PATH = 1024
-
-/** The watch paths of a text with one pattern per line. */
-const watchPathsOf = (text: string): string[] =>
-  text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line !== "")
-
-/** Whether watch paths are too many, too long or empty. */
-export function watchPathsProblem(text: string): boolean {
-  const paths = watchPathsOf(text)
-  return (
-    paths.length > MAX_WATCH_PATHS ||
-    paths.some((p) => p.length > MAX_WATCH_PATH || p.replace(/^!?\/*/, "") === "")
-  )
-}
-
 /** What is wrong with each field of a form whose name, port, host, access and user are already
  * resolved. */
 export function gitProblems(
@@ -203,7 +180,6 @@ export function gitProblems(
     host: form.publicUrl ? hostProblem(form.host) : undefined,
     directory: pathProblem(form.directory),
     dockerfile: pathProblem(form.dockerfile),
-    watchPaths: watchPathsProblem(form.watchPaths),
     env: badEnv,
     buildEnv: badBuildEnv,
     key: form.access === "deployKey" && !hasKey,
@@ -280,7 +256,6 @@ export function gitObjects(
   const directory = cleanPath(form.directory)
   const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
   const envSecret = buildEnvSecret(name)
-  const paths = watchPathsOf(form.watchPaths)
   if (form.buildVariables.length > 0)
     objects.push({
       apiVersion: "v1",
@@ -305,7 +280,6 @@ export function gitObjects(
         ...(credentials ? { credentialsRef: { name: credentials } } : {}),
       },
       output: { image: repository },
-      ...(paths.length > 0 ? { triggers: { paths } } : {}),
       ...(form.buildVariables.length > 0
         ? { env: form.buildVariables.map((v) => fromSecret(envSecret, v.name)) }
         : {}),
@@ -336,8 +310,6 @@ export function createGitService(
 export interface BuildOptions {
   directory: string
   dockerfile: string
-  /** One pattern per line. */
-  watchPaths: string
   /** Variables to remove, by name. */
   removed: string[]
   /** Variables to add, or whose values to replace. */
@@ -347,7 +319,6 @@ export interface BuildOptions {
 export const buildOptionsOf = (build: Build): BuildOptions => ({
   directory: build.contextDir ?? "",
   dockerfile: build.dockerfile ?? "",
-  watchPaths: build.watchPaths.join("\n"),
   removed: [],
   set: [],
 })
@@ -373,12 +344,10 @@ export function buildOptionsChanges(build: Build, options: BuildOptions): Change
   ]
   const directory = cleanPath(options.directory)
   const dockerfile = cleanPath(options.dockerfile)
-  const watchPaths = watchPathsOf(options.watchPaths)
   const changes: Change[] = []
   const edit = {
     ...(directory === (build.contextDir ?? "") ? {} : { contextDir: directory }),
     ...(dockerfile === (build.dockerfile ?? "") ? {} : { dockerfile }),
-    ...(watchPaths.join("\n") === build.watchPaths.join("\n") ? {} : { watchPaths }),
     ...(env.length > 0 ? { env } : {}),
   }
   if (Object.keys(edit).length > 0) changes.push({ op: "buildOptions", build: build.name, ...edit })

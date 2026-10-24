@@ -825,8 +825,6 @@ export const en = {
   "builds.notBuilt": "No Zeabur Builder build makes this service's image.",
   "builds.noImage": "No image has been built yet.",
   "builds.suspended": "Builds are paused on this Build.",
-  "builds.skipped": (commit: string) =>
-    `Commit ${commit} changed no file in the watch paths, so it was not built.`,
   "builds.image": "Newest",
   "builds.container": "Container",
   "builds.builder": "Builder",
@@ -2631,8 +2629,7 @@ export const en = {
   "add.problem.deployKey": "Create the deploy key and add it to the repository.",
   "add.token": "Token",
   "add.problem.token": "Enter the username and token.",
-  "add.gitMoreSummary":
-    "Root directory, watch paths, variables, build variables, size and security.",
+  "add.gitMoreSummary": "Root directory, variables, build variables, size and security.",
   "add.field.directory": "Root directory",
   "add.directoryHint":
     "The folder to build, for a repository with several apps. Empty: the whole repository.",
@@ -2640,10 +2637,6 @@ export const en = {
   "add.field.dockerfile": "Dockerfile",
   "add.dockerfileHint": "Relative to the root directory. Empty: Dockerfile.",
   "add.problem.dockerfile": "A file in the repository, like docker/Dockerfile.prod.",
-  "add.field.watchPaths": "Watch paths",
-  "add.watchPathsHint":
-    "Build a new commit only when it changes a file these match. One pattern per line, from the repository root, like apps/web/**; ! leaves files out. Empty: every commit builds.",
-  "add.problem.watchPaths": "Up to 32 patterns, each a path in the repository.",
   "add.buildVariables": "Build variables",
   "add.buildVariablesHint":
     "KEY=value lines that only the build reads, such as a registry token. They are passed as secrets and are not kept in the image.",
