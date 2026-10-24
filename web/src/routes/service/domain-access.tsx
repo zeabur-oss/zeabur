@@ -5,8 +5,9 @@ import { objectQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
-import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
-import { usePlanStep } from "@/components/plan/planner"
+import { ReviewWord } from "@/components/plan/draft"
+import { FormDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
+import type { PlanAsk } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import type { Translate } from "@/i18n"
 import type { Service } from "@/model/service"
@@ -133,6 +134,8 @@ export interface DomainDrawerProps {
   service: Service
   route: Schemas["Route"]
   host: string
+  /** The page's planner: on a service the changes wait in its draft. */
+  plan: (ask: PlanAsk) => boolean
   onClose: () => void
 }
 
@@ -141,10 +144,10 @@ export default function DomainAccessDrawer({
   service,
   route,
   host,
+  plan,
   onClose,
 }: DomainDrawerProps) {
   const t = useT()
-  const step = usePlanStep(project, onClose)
   const existing = useExisting(project, route, host)
   const [redirectForm, setRedirectForm] = useState<RedirectForm>({
     mode: existing ? "redirect" : "serve",
@@ -171,12 +174,12 @@ export default function DomainAccessDrawer({
   const review = () => {
     setTried(true)
     if (Object.values(problems).some(Boolean) || changes.length === 0) return
-    step.plan({ title: t("domainAccess.planTitle", host), service: workload, changes })
+    plan({ title: t("domainAccess.planTitle", host), service: workload, changes })
+    onClose()
   }
   const shown = (message?: string) => (tried && message ? [message] : [])
   return (
-    <PlanDrawer
-      step={step}
+    <FormDrawer
       onClose={onClose}
       title={t("domainAccess.title", host)}
       description={t("domainAccess.lead")}
@@ -185,6 +188,7 @@ export default function DomainAccessDrawer({
           onCancel={onClose}
           onReview={review}
           note={nothing ? t("domainAccess.nothing") : undefined}
+          label={<ReviewWord />}
         />
       }
     >
@@ -207,7 +211,7 @@ export default function DomainAccessDrawer({
         />
         <AccessDetails route={route} host={host} redirect={existing?.middleware} />
       </ReviewForm>
-    </PlanDrawer>
+    </FormDrawer>
   )
 }
 

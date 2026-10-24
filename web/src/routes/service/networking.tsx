@@ -26,7 +26,7 @@ import { ReviewWord, useDraft } from "@/components/plan/draft"
 import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
 import { OpenInTerminal } from "@/components/dock/open-in-terminal"
-import { usePlanner } from "@/components/plan/planner"
+import { usePlanner, type PlanAsk } from "@/components/plan/planner"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { FilterField } from "@/components/filter-field"
 import { FormField } from "@/components/form-field"
@@ -48,7 +48,7 @@ import { useT } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
 import { domainsLead, filterRoutes, needsSetup, plainFirst } from "@/model/domains"
-import { stagedDomains, type DomainEdit } from "@/model/draft"
+import { stagedDomains, stagedSettings } from "@/model/draft"
 import type { Gate } from "@/model/rights"
 import { canIssue } from "@/model/cluster-issuers"
 import { isLongList } from "@/model/lists"
@@ -115,16 +115,20 @@ export function NetworkingTab({
     workload,
     routes.map((r) => r.ingress),
   )
-  const editOf = (route: PublicRoute) =>
-    route.host ? staged.edits.get(`${route.ingress}/${route.host}`) : undefined
+  /** What the draft changes of a route's host: a domain edit, or its drawers' settings. */
+  const pendingOf = (route: PublicRoute): Schemas["Change"][] => {
+    if (!route.host) return []
+    const edit = staged.edits.get(`${route.ingress}/${route.host}`)
+    return edit ? [edit] : stagedSettings(draft?.changes ?? [], route.ingress, route.host)
+  }
   const listed = routes.length + staged.added.length
   const [query, setQuery] = useState("")
   const [opened, setOpened] = useState<string>()
   const long = isLongList(routes.length, 10)
   const shown = plainFirst(long ? filterRoutes(routes, query) : routes)
   const lead = domainsLead(routes)
-  const undo = (change: DomainEdit) => (
-    <Button variant="ghost" size="xs" onClick={() => draft?.unstage([change])}>
+  const undo = (changes: Schemas["Change"][]) => (
+    <Button variant="ghost" size="xs" onClick={() => draft?.unstage(changes)}>
       <ArrowCounterClockwiseIcon aria-hidden="true" data-icon="inline-start" />
       {t("vars.undo")}
     </Button>
@@ -291,7 +295,8 @@ export function NetworkingTab({
                       </tr>
                     ) : null}
                     {shown.map((route, i) => {
-                      const edit = editOf(route)
+                      const pending = pendingOf(route)
+                      const [edit] = pending
                       const key = `${route.ingress}/${route.host ?? ""}/${route.path ?? ""}/${i}`
                       const folded = opened !== key && !edit && renaming?.from !== route.host
                       const more = folded ? "max-sm:hidden" : undefined
@@ -330,10 +335,8 @@ export function NetworkingTab({
                                     setRenaming(undefined)
                                   }}
                                 />
-                              ) : edit?.op === "renameDomain" ? (
-                                <PendingHost host={edit.to} was={edit.from} state="changed" />
                               ) : edit ? (
-                                <PendingHost host={edit.hostname} state="removed" />
+                                <PendingEdit edit={edit} host={route.host ?? ""} />
                               ) : (
                                 <span className="flex min-w-0 flex-col gap-1 max-sm:w-full">
                                   <span className="flex min-w-0 items-center gap-2">
@@ -392,7 +395,7 @@ export function NetworkingTab({
                             </td>
                             <td className={cn(cell, "pr-4 max-sm:ml-auto", more)}>
                               {edit ? (
-                                <span className="flex justify-end">{undo(edit)}</span>
+                                <span className="flex justify-end">{undo(pending)}</span>
                               ) : route.host ? (
                                 <span className="flex items-center justify-end gap-0.5">
                                   <CertificateButton
@@ -402,6 +405,7 @@ export function NetworkingTab({
                                     gate={domainGate}
                                     project={project}
                                     service={service}
+                                    plan={planner.plan}
                                   />
                                   <PagesButton
                                     route={ingress}
@@ -410,6 +414,7 @@ export function NetworkingTab({
                                     gate={domainGate}
                                     project={project}
                                     service={service}
+                                    plan={planner.plan}
                                   />
                                   <AccessButton
                                     route={traefik}
@@ -418,6 +423,7 @@ export function NetworkingTab({
                                     gate={domainGate}
                                     project={project}
                                     service={service}
+                                    plan={planner.plan}
                                   />
                                   <Managed tool={managed} gate={domainGate}>
                                     <Button
@@ -483,7 +489,7 @@ export function NetworkingTab({
                         <td className={cell} />
                         <td className={cell} />
                         <td className={`${cell} pr-4 max-sm:ml-auto`}>
-                          <span className="flex justify-end">{undo(change)}</span>
+                          <span className="flex justify-end">{undo([change])}</span>
                         </td>
                       </tr>
                     ))}
@@ -716,6 +722,7 @@ function AccessButton({ route, host, ...rest }: RowDrawerProps) {
           service={rest.service}
           route={route}
           host={host}
+          plan={rest.plan}
           onClose={onClose}
         />
       )}
@@ -740,6 +747,7 @@ function PagesButton({ route, host, ...rest }: RowDrawerProps) {
           route={route}
           host={host}
           traefik={servedByTraefik(route)}
+          plan={rest.plan}
           onClose={onClose}
         />
       )}
@@ -766,6 +774,7 @@ function CertificateButton({ route, host, ...rest }: RowDrawerProps) {
             service={rest.service}
             route={route}
             host={host}
+            plan={rest.plan}
             onClose={onClose}
           />
         ) : null
@@ -781,6 +790,7 @@ interface RowDrawerProps {
   gate: Gate
   project: string
   service: Service
+  plan: (ask: PlanAsk) => boolean
 }
 
 /** An icon button on a domain row that opens a lazy drawer. With `off`, the button is off and
@@ -965,6 +975,14 @@ function Table({
 }
 
 /** A domain the draft adds, renames or removes, before it is applied. */
+/** A host the draft changes: renamed, removed, or with changed settings. */
+function PendingEdit({ edit, host }: { edit: Schemas["Change"]; host: string }) {
+  if (edit.op === "renameDomain")
+    return <PendingHost host={edit.to} was={edit.from} state="changed" />
+  if (edit.op === "removeDomain") return <PendingHost host={edit.hostname} state="removed" />
+  return <PendingHost host={host} state="changed" />
+}
+
 function PendingHost({
   host,
   was,

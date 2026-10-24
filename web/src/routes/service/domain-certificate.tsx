@@ -5,8 +5,8 @@ import type { Schemas } from "@/api/client"
 import { certificateDatesQuery, clusterIssuersQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
-import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
-import { usePlanStep } from "@/components/plan/planner"
+import { ReviewWord } from "@/components/plan/draft"
+import { FormDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { TextFile } from "@/components/text-file"
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
@@ -71,9 +71,8 @@ function sourceOf(
 
 /** Where one domain of an Ingress gets its certificate: an issuer, or the person's own. */
 export default function DomainCertificateDrawer(props: DomainDrawerProps) {
-  const { project, service, route, host, onClose } = props
+  const { project, service, route, host, plan, onClose } = props
   const t = useT()
-  const step = usePlanStep(project, onClose)
   const choice = useChoice(route, host)
   const [tried, setTried] = useState(false)
   const others = route.hostnames.filter((h) => h !== host)
@@ -81,7 +80,7 @@ export default function DomainCertificateDrawer(props: DomainDrawerProps) {
     setTried(true)
     const certificate = sourceOf(choice, host, issuingOthers(route, others))
     if (!certificate) return
-    step.plan({
+    plan({
       title: t("domainCert.planTitle", host),
       service: { kind: service.kind, name: service.name },
       changes: [
@@ -93,10 +92,10 @@ export default function DomainCertificateDrawer(props: DomainDrawerProps) {
         },
       ],
     })
+    onClose()
   }
   return (
-    <PlanDrawer
-      step={step}
+    <FormDrawer
       onClose={onClose}
       title={t("domainCert.title", host)}
       description={t("domainCert.lead")}
@@ -105,6 +104,7 @@ export default function DomainCertificateDrawer(props: DomainDrawerProps) {
           onCancel={onClose}
           onReview={review}
           note={tried && unchanged(choice) ? t("domainCert.nothing") : undefined}
+          label={<ReviewWord />}
         />
       }
     >
@@ -133,7 +133,7 @@ export default function DomainCertificateDrawer(props: DomainDrawerProps) {
           ]}
         />
       </ReviewForm>
-    </PlanDrawer>
+    </FormDrawer>
   )
 }
 

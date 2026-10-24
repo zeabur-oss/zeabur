@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
+import { actionOf, describe as describePlan } from "@/components/plan/describe"
+import type { Translate } from "@/i18n"
+
 import {
   allowedVersion,
   backUpNow,
+  backUpNowSummary,
   backupName,
+  backupsSummary,
   canBackUpNow,
   blockedVersions,
   commands,
@@ -589,5 +594,36 @@ describe("MySQL, MariaDB and Dragonfly", () => {
     expect(commands("shop", { ...cache, primary: "db-1" }).shell).toBe(
       `kubectl exec -it -n shop db-1 -c dragonfly -- sh -c 'REDISCLI_AUTH="$DFLY_requirepass" exec redis-cli'`,
     )
+  })
+})
+
+describe("the review of a backup form", () => {
+  const t = ((key: string, ...args: unknown[]) =>
+    args.length > 0 ? `${key}(${args.join(", ")})` : key) as unknown as Translate
+  const empty = { objects: [], impact: [], warnings: [] }
+
+  test("says the schedule, the bucket, the keys and the restart instead of the objects", () => {
+    const ask = {
+      changes: enableBackups(postgres, target),
+      summary: backupsSummary(t, postgres, target),
+    }
+    expect(describePlan(t, ask, empty, () => undefined).lines).toEqual([
+      "db.backup.said(pg, false, s3://backups/pg (http://s3.test:8333))",
+      "db.backup.saidKeep(7)",
+      "db.backup.saidKeys(pg-backups-s3)",
+      "db.backup.saidRestart(pg)",
+    ])
+    expect(actionOf(t, ask)).toBe("db.backup.setUp")
+  })
+
+  test("a backup now names the bucket it goes to", () => {
+    const stored = {
+      ...postgres,
+      backups: { ...postgres.backups, store: { destination: "s3://backups/pg" } },
+    } as Database
+    expect(backUpNowSummary(t, stored)).toEqual({
+      lines: ["db.backup.saidNow(pg, s3://backups/pg)"],
+      action: "db.backup.now",
+    })
   })
 })

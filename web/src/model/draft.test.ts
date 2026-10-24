@@ -8,6 +8,7 @@ import {
   mergeChanges,
   partOf,
   stagedDomains,
+  stagedSettings,
 } from "@/model/draft"
 
 type Change = Schemas["Change"]
@@ -73,5 +74,33 @@ describe("draft", () => {
     )
     expect(added.map((c) => c.hostname)).toEqual(["a.example.com"])
     expect([...edits.keys()]).toEqual(["api/old.example.com"])
+  })
+
+  test("a domain's drawers wait in the draft, and a later setting replaces the earlier one", () => {
+    const route = { kind: "Ingress", name: "api" } as Schemas["RouteRef"]
+    const redirect = (to: string): Change => ({
+      op: "redirect",
+      route,
+      workload,
+      hostname: "a.example.com",
+      to,
+    })
+    const password: Change = { op: "basicAuth", route, user: { username: "u", password: "p" } }
+    const pages: Change = { op: "maintenance", route, hostname: "b.example.com", enabled: true }
+    expect(draftable([redirect("x"), password, pages])).toBe(true)
+    const staged = mergeChanges([redirect("x"), password, pages], [redirect("y")])
+    expect(staged).toEqual([redirect("y"), password, pages])
+    expect(stagedSettings(staged, "api", "a.example.com")).toEqual([redirect("y"), password])
+    expect(stagedSettings(staged, "web", "a.example.com")).toEqual([])
+  })
+
+  test("pages typed in two drawers become one change", () => {
+    const merged = mergeChanges(
+      [{ op: "errorPageHtml", maintenance: "<p>a</p>" }],
+      [{ op: "errorPageHtml", badGateway: "<p>b</p>" }],
+    )
+    expect(merged).toEqual([
+      { op: "errorPageHtml", maintenance: "<p>a</p>", badGateway: "<p>b</p>" },
+    ])
   })
 })

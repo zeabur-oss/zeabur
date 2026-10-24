@@ -24,7 +24,12 @@ rereading; they do not decide it.
    echo a secret, blame, apologise or add "Oops".
 5. **Alert titles describe the situation; buttons name the result.** Never "Error" as a title;
    "Delete PVC" / "Cancel", not "OK" / "Yes". Body text only when it adds a consequence; do not
-   explain the buttons.
+   explain the buttons. The button that applies a review follows one rule, whether a form, YAML,
+   a drawer or the draft asked: one kind of change takes its verb ("Restart 3 services", "Save
+   variables"); changes that only create say "Create", with the count when there are more than
+   one ("Create 3 objects"); several kinds together say "Apply 4 changes". A form whose objects
+   are only the means (database backups) says the change in its own words and takes its own verb
+   ("Set up backups"), not the object edits.
 6. **Limits where they bite.** Warn only before an uncommon or irreversible action, and state the
    real consequence. Whether deleting a PVC deletes data depends on its reclaim policy; say what
    is known.

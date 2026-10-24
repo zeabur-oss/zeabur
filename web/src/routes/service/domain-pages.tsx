@@ -5,8 +5,9 @@ import { configMapsQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
-import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
-import { usePlanStep } from "@/components/plan/planner"
+import { ReviewWord } from "@/components/plan/draft"
+import { FormDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
+import type { PlanAsk } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import type { Translate } from "@/i18n"
 import { useProjectSummary } from "@/lib/project-name"
@@ -94,6 +95,7 @@ export default function DomainPagesDrawer({
   route,
   host,
   traefik,
+  plan,
   onClose,
 }: {
   project: string
@@ -102,30 +104,32 @@ export default function DomainPagesDrawer({
   host: string
   /** Traefik serves the Ingress, so it can show error pages. */
   traefik: boolean
+  plan: (ask: PlanAsk) => boolean
   onClose: () => void
 }) {
   const t = useT()
-  const step = usePlanStep(project, onClose)
   const { current, form, setForm, changes, large } = usePagesForm(project, route, host)
   const [tried, setTried] = useState(false)
   const review = () => {
     setTried(true)
     if (large || changes.length === 0) return
-    step.plan({
+    plan({
       title: t("domainPages.planTitle", host),
       service: { kind: service.kind, name: service.name },
       changes,
     })
+    onClose()
   }
   const note = tried && changes.length === 0 ? t("domainPages.nothing") : undefined
   const errors = tried && large ? [t("domainPages.tooLarge")] : []
   return (
-    <PlanDrawer
-      step={step}
+    <FormDrawer
       onClose={onClose}
       title={t("domainPages.title", host)}
       description={t("domainPages.lead")}
-      footer={<ReviewFooter onCancel={onClose} onReview={review} note={note} />}
+      footer={
+        <ReviewFooter onCancel={onClose} onReview={review} note={note} label={<ReviewWord />} />
+      }
     >
       <ReviewForm onReview={review}>
         <Toggle
@@ -157,7 +161,7 @@ export default function DomainPagesDrawer({
           ]}
         />
       </ReviewForm>
-    </PlanDrawer>
+    </FormDrawer>
   )
 }
 
