@@ -24,6 +24,8 @@ providers:
     enabled: true
     # No references to other namespaces.
     allowCrossNamespace: false
+    # Only the traefik namespace can set the default TLS store.
+    defaultTLSResourcesNamespace: traefik
 gatewayClass:
   # Gateways reference GatewayClass "traefik".
   enabled: true

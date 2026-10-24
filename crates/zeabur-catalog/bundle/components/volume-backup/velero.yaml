@@ -30,6 +30,20 @@ inputs:
     secret: {name: velero-credentials, key: cloud, namespace: velero}
     required: true
     testValue: "[default]\naws_access_key_id=ci\naws_secret_access_key=ci\n"
+  - name: repository-password
+    description: >
+      Kopia encrypts file-system backups with this password. Without the
+      Secret, Velero uses its built-in password, which is public.
+    secret: {name: velero-repo-credentials, key: repository-password, namespace: velero}
+    generate: random
+  - name: backup-key
+    description: >
+      The S3 server encrypts every backup object, Secrets included, with this
+      SSE-C key. The AWS plugin needs exactly 32 bytes.
+    secret: {name: velero-backup-key, key: key, namespace: velero}
+    generate: random
+    generateBytes: 24
+    generateEncoding: base64url
 
 releases:
   - name: velero
@@ -58,6 +72,9 @@ releases:
             config:
               region: us-east-1
               s3ForcePathStyle: "true"
+              # Velero writes Secrets into the backup as they are. The
+              # store encrypts them with the backup-key input (SSE-C).
+              customerKeyEncryptionSecret: velero-backup-key/key
         # Kopia file-system backups work on any storage class, local-path included.
         uploaderType: kopia
         # Back up all volumes unless they opt out.
@@ -90,14 +107,35 @@ security:
   clusterWide: true
   privileged: true
   credentials: required
-  credentialsNote: Needs static S3 credentials; all backups share one Kopia key.
+  credentialsNote: >
+    Needs static S3 credentials. All backups share one Kopia password and one
+    SSE-C key, both in Secrets in the velero namespace.
   tenants: admin-only
   risks:
     - risk: Backups and Restores can include any namespace, including other tenants' Secrets.
       mitigation: Never grant Velero CRDs to tenants.
+    - risk: >
+        SSE-C sends the key with each request, so the S3 server sees the
+        backup before it encrypts it. A store without SSE-C refuses the
+        uploads, or ignores the key and keeps the backups in clear text.
+      mitigation: >
+        Take one backup by hand after install, then download
+        backups/<name>/velero-backup.json without the key: the store must
+        refuse it. SeaweedFS supports SSE-C.
+    - risk: >
+        Without the velero-repo-credentials and velero-backup-key Secrets,
+        nobody can read the backups. Both are also inside the backups that
+        they encrypt.
+      mitigation: Keep a copy of both Secrets outside the cluster. Before a restore into a new cluster, create them first.
 
 leftovers: [customresourcedefinitions]
 
 upgradeNotes:
   - versions: "*"
     note: Upgrade the AWS plugin together with Velero.
+  - versions: "*"
+    note: >
+      If Velero ran before velero-repo-credentials existed, Velero made it with
+      its public default password, and Kopia keeps the password of a
+      repository. Point the location at a new prefix to start encrypted
+      repositories. Backups made before SSE-C stay unencrypted.

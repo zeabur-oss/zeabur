@@ -1254,7 +1254,6 @@ export const en = {
   "cap.config-reload": "Restart on config change",
   "cap.container-registry": "Container registry",
   "cap.databases": "Databases",
-  "cap.dns": "DNS records",
   "cap.event-autoscaling": "Event autoscaling",
   "cap.gotify-notifications": "Gotify notifications",
   "cap.image-updates": "Image updates",

@@ -71,6 +71,7 @@ spec:
     providers:
       kubernetesCRD:
         allowCrossNamespace: false
+        defaultTLSResourcesNamespace: traefik
         enabled: true
       kubernetesGateway:
         enabled: true

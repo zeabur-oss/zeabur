@@ -6,7 +6,7 @@ input the projection covers. One file per component of the
 `<capability>__<component>.yaml`, each holding every release of the component in install
 order as one multi-document YAML stream.
 
-- Source: `zeabur-oss/catalog` at commit `824faf73ab6149e12c92f2b0bb1a02812d271908`.
+- Source: `zeabur-oss/catalog` at commit `3016e41862048402a6c90ca4e4e60683cb3d87d2`.
 - Profile: `single-node`, Kubernetes version `1.37.0` (the newest in its
   `config/kubernetes.yaml`).
 - Rendered by the catalogue's own `recs render`: `helm template --include-crds` with the
@@ -29,7 +29,7 @@ Regenerate with Nix and network access to the chart registries:
 
 ```sh
 git clone https://github.com/zeabur-oss/catalog ~/recs
-RECS_DIR=~/recs RECS_COMMIT=824faf73ab6149e12c92f2b0bb1a02812d271908 scripts/render-chart-corpus.sh
+RECS_DIR=~/recs RECS_COMMIT=3016e41862048402a6c90ca4e4e60683cb3d87d2 scripts/render-chart-corpus.sh
 ```
 
 | Component | File | Releases (name@version) | Licence | Documents | Bytes |
@@ -42,12 +42,12 @@ RECS_DIR=~/recs RECS_COMMIT=824faf73ab6149e12c92f2b0bb1a02812d271908 scripts/ren
 | databases/mariadb-operator | `databases__mariadb-operator.yaml` | mariadb-operator-crds@26.10.1, mariadb-operator@26.10.1 | [MIT](https://github.com/mariadb-operator/mariadb-operator/blob/main/LICENSE), notice in `LICENSE-mariadb-operator.txt` | 16 |    19690 |
 | databases/moco | `databases__moco.yaml` | moco@0.27.0 | [Apache-2.0](https://github.com/cybozu-go/moco/blob/main/LICENSE) | 20 |    17049 |
 | databases/percona-mongodb | `databases__percona-mongodb.yaml` | psmdb-operator@1.23.2 | [Apache-2.0](https://github.com/percona/percona-helm-charts/blob/main/LICENSE) | 4 |     6112 |
-| dns/external-dns | `dns__external-dns.yaml` | external-dns@1.23.0 | [Apache-2.0](https://github.com/kubernetes-sigs/external-dns/blob/master/LICENSE.md) | 5 |     4752 |
 | event-autoscaling/keda-http-add-on | `event-autoscaling__keda-http-add-on.yaml` | http-add-on@0.16.0 | [Apache-2.0](https://github.com/kedacore/charts/blob/main/LICENSE) | 21 |    23081 |
 | event-autoscaling/keda | `event-autoscaling__keda.yaml` | keda@2.21.0 | [Apache-2.0](https://github.com/kedacore/charts/blob/main/LICENSE) | 23 |    30334 |
+| external-secrets/external-secrets | `external-secrets__external-secrets.yaml` | external-secrets@2.12.0 | [Apache-2.0](https://github.com/external-secrets/external-secrets/blob/main/LICENSE) | 20 |    20916 |
 | gotify-notifications/alertmanager-gotify-bridge | `gotify-notifications__alertmanager-gotify-bridge.yaml` | bridge@inline | [Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue) | 3 |     2270 |
 | image-updates/keel | `image-updates__keel.yaml` | keel@v1.2.3 | [MPL-2.0](https://github.com/keel-hq/keel/blob/master/LICENSE) | 6 |     3987 |
-| ingress/traefik | `ingress__traefik.yaml` | gateway-api-crds@v1.6.3, traefik@42.1.3 | gateway-api-crds: [Apache-2.0](https://github.com/kubernetes-sigs/gateway-api/blob/main/LICENSE); traefik: [Apache-2.0](https://github.com/traefik/traefik-helm-chart/blob/master/LICENSE) | 9 |    12426 |
+| ingress/traefik | `ingress__traefik.yaml` | gateway-api-crds@v1.6.3, traefik@42.1.3 | gateway-api-crds: [Apache-2.0](https://github.com/kubernetes-sigs/gateway-api/blob/main/LICENSE); traefik: [Apache-2.0](https://github.com/traefik/traefik-helm-chart/blob/master/LICENSE) | 9 |    12499 |
 | intrusion-prevention/crowdsec | `intrusion-prevention__crowdsec.yaml` | crowdsec@0.24.2, bouncer-middleware@inline | crowdsec: [MIT](https://github.com/crowdsecurity/helm-charts/blob/main/LICENSE), notice in `LICENSE-crowdsec-helm-charts.txt`; bouncer-middleware: [Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue) | 12 |    27539 |
 | logs/victoria-logs | `logs__victoria-logs.yaml` | logs@inline | [Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue) | 3 |     1815 |
 | metrics/metrics-server | `metrics__metrics-server.yaml` | metrics-server@3.14.0 | [Apache-2.0](https://github.com/kubernetes-sigs/metrics-server/blob/master/LICENSE) | 9 |     6972 |
@@ -61,7 +61,7 @@ RECS_DIR=~/recs RECS_COMMIT=824faf73ab6149e12c92f2b0bb1a02812d271908 scripts/ren
 | runtime-security/falco | `runtime-security__falco.yaml` | policy-report-crds@ed0ca5a1c7788055074c7500915b76fc4518ed33, alert-readers@inline, falco@9.2.1 | [Apache-2.0](https://github.com/falcosecurity/charts/blob/master/LICENSE) | 14 |    31924 |
 | uptime-probes/blackbox-exporter | `uptime-probes__blackbox-exporter.yaml` | blackbox-exporter@11.20.2 | [Apache-2.0](https://github.com/prometheus-community/helm-charts/blob/main/LICENSE) | 4 |     4325 |
 | volume-backup/k8up | `volume-backup__k8up.yaml` | k8up@4.10.1 | [Apache-2.0](https://github.com/k8up-io/k8up/blob/master/LICENSE) | 12 |    10372 |
-| volume-backup/velero | `volume-backup__velero.yaml` | velero@12.2.1 | [Apache-2.0](https://github.com/vmware-tanzu/helm-charts/blob/main/LICENSE) | 13 |    12634 |
+| volume-backup/velero | `volume-backup__velero.yaml` | velero@12.2.1 | [Apache-2.0](https://github.com/vmware-tanzu/helm-charts/blob/main/LICENSE) | 13 |    12691 |
 | vulnerability-scanning/trivy-operator | `vulnerability-scanning__trivy-operator.yaml` | trivy-operator@0.37.0 | [Apache-2.0](https://github.com/aquasecurity/trivy-operator/blob/main/LICENSE), NOTICE in `LICENSE-trivy-operator-NOTICE.txt` | 21 |    66828 |
 
-Total:   583692 bytes.
+Total:   599986 bytes.

@@ -61,14 +61,13 @@ host:
 - `standard`：Catalog 為這個 profile 建議的所有元件。
 - `secure`：`standard` 再加上執行期偵測、漏洞掃描和入侵防護。
 
-`enable` 可以寫 capability（例如 `dns`）或完整元件 ID（例如 `dns/external-dns`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。
+`enable` 可以寫 capability（例如 `runtime-security`）或完整元件 ID（例如 `volume-backup/velero`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。
 
 ```yaml
 inputs:
-  dns/external-dns:
-    provider: cloudflare
-    domain-filters: [example.com]
-    owner-id: vps-1
+  volume-backup/velero:
+    bucket: backups
+    s3-url: https://s3.example.com
 ```
 
 每個元件有哪些 input、型別是什麼，由 Catalog 定義。少了必填值時，`plan` 會指出要補哪個欄位。

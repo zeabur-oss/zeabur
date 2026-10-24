@@ -354,6 +354,7 @@ spec:
   objectStorage:
     bucket: "catalog-ci"
   config:
+    customerKeyEncryptionSecret: "velero-backup-key/key"
     region: "us-east-1"
     s3ForcePathStyle: "true"
     s3Url: "http://minio.invalid:9000"

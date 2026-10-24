@@ -1085,7 +1085,7 @@ mod tests {
             assert_eq!(parsed["metadata"]["namespace"], "kube-system");
             assert!(parsed["spec"]["version"].is_string());
         }
-        assert_eq!(here("dns/external-dns").blocked, Some(HereBlocked::Inputs));
+        assert_eq!(here("volume-backup/velero").blocked, Some(HereBlocked::Inputs));
         assert_eq!(
             here("metrics/metrics-server").blocked,
             Some(HereBlocked::K3sPackaged)
@@ -1094,7 +1094,7 @@ mod tests {
             here("certificates/cert-manager").blocked,
             Some(HereBlocked::Manifests)
         );
-        assert_eq!(here("dns/external-dns").objects, Vec::<String>::new());
+        assert_eq!(here("volume-backup/velero").objects, Vec::<String>::new());
         for (capability, id, _) in bundle::FILES {
             let guide = guide(&format!("{capability}/{id}"), "multi-node").unwrap();
             let k3s = &guide.formats[1].text;
@@ -1128,12 +1128,12 @@ mod tests {
     }
 
     /// Representative cases: an OCI chart with a profile (cert-manager), an HTTP repository with
-    /// asked inputs (external-dns), generated inputs stored in Secrets (crowdsec), a manifest
+    /// asked inputs (velero), generated inputs stored in Secrets (crowdsec), a manifest
     /// release before a chart (traefik), and the k3s packaged notes (traefik, metrics-server).
     const GOLDEN: [(&str, &str); 6] = [
         ("certificates/cert-manager", "single-node"),
         ("certificates/cert-manager", "multi-node"),
-        ("dns/external-dns", "single-node"),
+        ("volume-backup/velero", "single-node"),
         ("intrusion-prevention/crowdsec", "single-node"),
         ("ingress/traefik", "multi-node"),
         ("metrics/metrics-server", "single-node"),

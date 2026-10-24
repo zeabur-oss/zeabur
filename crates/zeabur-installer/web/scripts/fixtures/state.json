@@ -30,44 +30,6 @@
         "supported": true
       },
       {
-        "capability": "dns",
-        "default": "optional",
-        "displayName": "ExternalDNS",
-        "distributions": [],
-        "id": "dns/external-dns",
-        "idleMemoryMib": 13,
-        "inputs": [
-          {
-            "default": null,
-            "description": "ExternalDNS writes records through this provider, spelled as ExternalDNS names it, such as cloudflare or route53.",
-            "generated": false,
-            "name": "provider",
-            "required": true,
-            "secret": false
-          },
-          {
-            "default": null,
-            "description": "ExternalDNS changes records only in these zones.",
-            "generated": false,
-            "name": "domain-filters",
-            "required": true,
-            "secret": false
-          },
-          {
-            "default": null,
-            "description": "ExternalDNS marks this cluster's records with this ID, so two clusters never fight over one record.",
-            "generated": false,
-            "name": "owner-id",
-            "required": true,
-            "secret": false
-          }
-        ],
-        "needs": ["ingress/traefik"],
-        "privileged": false,
-        "security": "Reads Services, Ingresses and routes in all namespaces.",
-        "supported": true
-      },
-      {
         "capability": "event-autoscaling",
         "default": "optional",
         "displayName": "KEDA",

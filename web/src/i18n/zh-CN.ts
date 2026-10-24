@@ -1170,7 +1170,6 @@ export const zhCN: Messages = {
   "cap.config-reload": "配置变更时重启",
   "cap.container-registry": "容器镜像仓库",
   "cap.databases": "数据库",
-  "cap.dns": "DNS 记录",
   "cap.event-autoscaling": "事件驱动自动扩缩容",
   "cap.gotify-notifications": "Gotify 通知",
   "cap.image-updates": "镜像自动更新",

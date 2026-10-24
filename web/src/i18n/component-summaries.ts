@@ -50,11 +50,7 @@ export const summaries: Record<string, Summary> = {
     "zh-TW": "執行 MongoDB 資料庫並備份到 S3，採 SSPL 授權。",
     "zh-CN": "运行 MongoDB 数据库并备份到 S3，采用 SSPL 许可。",
   },
-  "dns/external-dns#88abb875": {
-    en: "Creates DNS records for your services' hostnames.",
-    "zh-TW": "為服務的主機名稱建立 DNS 紀錄。",
-    "zh-CN": "为服务的主机名创建 DNS 记录。",
-  },
+
   "event-autoscaling/keda#d2bb368f": {
     en: "Scales services on queues, schedules and other events, down to zero.",
     "zh-TW": "依佇列、排程等事件調整服務的副本數，可降到零。",
@@ -64,6 +60,11 @@ export const summaries: Record<string, Summary> = {
     en: "Scales web services with their traffic, down to zero when idle.",
     "zh-TW": "依流量調整網頁服務的副本數，閒置時可降到零。",
     "zh-CN": "按流量调整 Web 服务的副本数，空闲时可缩到零。",
+  },
+  "external-secrets/external-secrets#d30d68f5": {
+    en: "Copies secrets from a store such as Vault or 1Password into the cluster and keeps them in sync.",
+    "zh-TW": "把 Vault、1Password 等外部儲存的密鑰複製進叢集，並保持同步。",
+    "zh-CN": "把 Vault、1Password 等外部存储的密钥复制进集群，并保持同步。",
   },
   "gotify-notifications/alertmanager-gotify-bridge#15013f81": {
     en: "Lets notification channels send alerts to a Gotify server.",

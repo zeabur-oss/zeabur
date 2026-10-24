@@ -6,7 +6,6 @@ const knownCapabilities = [
   "config-reload",
   "container-registry",
   "databases",
-  "dns",
   "event-autoscaling",
   "gotify-notifications",
   "image-updates",

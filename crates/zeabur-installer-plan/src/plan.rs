@@ -1292,32 +1292,33 @@ mod tests {
     #[test]
     fn required_inputs_name_the_line_to_add() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let err = plan(&index, &config("enable: [dns]\n"), &facts())
+        let err = plan(&index, &config("enable: [volume-backup/velero]\n"), &facts())
             .unwrap_err()
             .to_string();
-        assert!(err.contains("inputs.dns/external-dns.provider"), "{err}");
+        assert!(err.contains("inputs.volume-backup/velero.bucket"), "{err}");
         let ok = plan(
             &index,
             &config(
-                "enable: [dns]\ninputs:\n  dns/external-dns:\n    provider: cloudflare\n    \
-                 domain-filters: [example.com]\n    owner-id: vps-1\n",
+                "enable: [volume-backup/velero]\ninputs:\n  volume-backup/velero:\n    \
+                 bucket: backups\n    s3-url: https://s3.example.com\nsecretFiles:\n  \
+                 volume-backup/velero:\n    credentials: /root/velero-credentials\n",
             ),
             &facts(),
         )
         .unwrap();
-        let dns = ok
+        let velero = ok
             .components
             .iter()
-            .find(|c| c.id == "dns/external-dns")
+            .find(|c| c.id == "volume-backup/velero")
             .unwrap();
-        let ReleasePlan::HelmChart { object, .. } = &dns.releases[0] else {
+        let ReleasePlan::HelmChart { object, .. } = &velero.releases[0] else {
             panic!()
         };
         assert!(
             object["spec"]["valuesContent"]
                 .as_str()
                 .unwrap()
-                .contains(r#""domainFilters":["example.com"]"#)
+                .contains(r#""s3Url":"https://s3.example.com""#)
         );
     }
 

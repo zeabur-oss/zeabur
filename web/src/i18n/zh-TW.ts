@@ -1174,7 +1174,6 @@ export const zhTW: Messages = {
   "cap.config-reload": "設定變更時重新啟動",
   "cap.container-registry": "容器映像檔倉庫",
   "cap.databases": "資料庫",
-  "cap.dns": "DNS 紀錄",
   "cap.event-autoscaling": "事件驅動自動擴縮",
   "cap.gotify-notifications": "Gotify 通知",
   "cap.image-updates": "映像檔自動更新",

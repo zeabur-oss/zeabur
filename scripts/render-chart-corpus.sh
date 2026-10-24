@@ -96,10 +96,10 @@ licence() {
     ;;
   databases/moco) echo "[Apache-2.0]($gh/cybozu-go/moco/blob/main/LICENSE)" ;;
   databases/percona-mongodb) echo "[Apache-2.0]($gh/percona/percona-helm-charts/blob/main/LICENSE)" ;;
-  dns/external-dns) echo "[Apache-2.0]($gh/kubernetes-sigs/external-dns/blob/master/LICENSE.md)" ;;
   event-autoscaling/keda | event-autoscaling/keda-http-add-on)
     echo "[Apache-2.0]($gh/kedacore/charts/blob/main/LICENSE)"
     ;;
+  external-secrets/external-secrets) echo "[Apache-2.0]($gh/external-secrets/external-secrets/blob/main/LICENSE)" ;;
   gotify-notifications/alertmanager-gotify-bridge) echo "$recs" ;;
   image-updates/keel) echo "[MPL-2.0]($gh/keel-hq/keel/blob/master/LICENSE)" ;;
   ingress/traefik)

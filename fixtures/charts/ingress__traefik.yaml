@@ -288,6 +288,7 @@ spec:
         - --experimental.plugins.crowdsec-bouncer.moduleName=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
         - --experimental.plugins.crowdsec-bouncer.version=v1.8.1
         - --providers.kubernetescrd
+        - --providers.kubernetescrd.defaultTLSResourcesNamespace=traefik
         - --providers.kubernetescrd.allowEmptyServices=true
         - --providers.kubernetesingress
         - --providers.kubernetesingress.allowEmptyServices=true

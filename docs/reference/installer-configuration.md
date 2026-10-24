@@ -24,7 +24,7 @@ Pods resolve names through DNS, not through `/etc/hosts`. For a test machine, na
 | Field | Meaning |
 |---|---|
 | `preset` | `minimal`: ingress, certificates and metrics-server. `standard` (default): everything the catalog recommends for the profile. `secure`: `standard` plus runtime detection, vulnerability scanning and intrusion prevention. |
-| `enable` | Capabilities (`dns`) or component ids (`dns/external-dns`) added to the preset. A component's dependencies are added with it. |
+| `enable` | Capabilities (`runtime-security`) or component ids (`volume-backup/velero`) added to the preset. A component's dependencies are added with it. |
 | `disable` | Capabilities or component ids taken out. Disabling one that another chosen component needs is an error that names both. |
 | `profile` | `single-node` (default) or `multi-node`; selects the catalog's values for the profile. |
 
@@ -58,15 +58,14 @@ what was left out and why: a component that runs on k3s only, for example.
 
 ### Inputs
 
-Some components need values, such as external-dns's provider. `plan` stops at a missing one and
+Some components need values, such as Velero's bucket. `plan` stops at a missing one and
 prints the line to add:
 
 ```yaml
 inputs:
-  dns/external-dns:
-    provider: cloudflare
-    domain-filters: [example.com]
-    owner-id: vps-1
+  volume-backup/velero:
+    bucket: backups
+    s3-url: https://s3.example.com
 ```
 
 Secret inputs never go in this file. Name a file holding the value instead; it must have mode
