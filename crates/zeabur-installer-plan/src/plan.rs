@@ -1267,12 +1267,13 @@ mod tests {
             .find(|c| c.id == "intrusion-prevention/crowdsec")
             .unwrap();
         assert_eq!(crowdsec.secrets.len(), 3);
-        assert!(
-            crowdsec
-                .secrets
-                .iter()
-                .all(|s| matches!(s.source, SecretSource::Generate { bytes: 64, encoding: Encoding::Hex }))
-        );
+        assert!(crowdsec.secrets.iter().all(|s| matches!(
+            s.source,
+            SecretSource::Generate {
+                bytes: 64,
+                encoding: Encoding::Hex
+            }
+        )));
         assert!(
             ids(&plan).iter().position(|id| *id == "ingress/traefik")
                 < ids(&plan)

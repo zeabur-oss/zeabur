@@ -244,8 +244,8 @@ pub const EMPTY_AUTHN: &str = "apiVersion: apiserver.config.k8s.io/v1\n\
 /// Metadata only, never bodies, so Secret values stay out of the log. Every request on Secrets
 /// is kept, reads included, with who made it. Of the rest, only changes by people and workloads
 /// are kept: reads, events, leases, token and access reviews, and requests from nodes and
-/// control-plane components are frequent and routine. The first rule that matches decides. RKE2 keeps 30 days, 10 files of
-/// 100 MB, in /var/lib/rancher/rke2/server/logs/audit.log.
+/// control-plane components are frequent and routine. The first rule that matches decides. RKE2
+/// keeps 30 days, 10 files of 100 MB, in /var/lib/rancher/rke2/server/logs/audit.log.
 const AUDIT_POLICY: &str = r#"# Written by zeabur-installer.
 apiVersion: audit.k8s.io/v1
 kind: Policy

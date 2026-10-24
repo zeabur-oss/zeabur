@@ -1061,8 +1061,8 @@ mod tests {
 
     #[test]
     fn generated_values_use_the_encoding() {
-        assert_eq!(encode(&[0xfb, 0xff], Encoding::Hex), "fbff");
-        assert_eq!(encode(&[0xfb, 0xff], Encoding::Base64url), "-_8");
+        assert_eq!(encode(&[0xFB, 0xFF], Encoding::Hex), "fbff");
+        assert_eq!(encode(&[0xFB, 0xFF], Encoding::Base64url), "-_8");
         assert_eq!(encode(&[0; 24], Encoding::Base64url).len(), 32);
     }
 

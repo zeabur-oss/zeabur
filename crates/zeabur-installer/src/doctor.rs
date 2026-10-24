@@ -127,16 +127,17 @@ fn secrets_encryption(config: Option<&str>) -> (Status, String) {
         );
     };
     let config: Value = serde_json::from_str(config).unwrap_or_default();
-    let writer = config["resources"]
-        .as_array()
+    let writer = config
+        .get("resources")
+        .and_then(Value::as_array)
         .into_iter()
         .flatten()
         .find(|r| {
-            r["resources"]
-                .as_array()
+            r.get("resources")
+                .and_then(Value::as_array)
                 .is_some_and(|names| names.iter().any(|n| n == "secrets"))
         })
-        .and_then(|r| r["providers"].get(0))
+        .and_then(|r| r.get("providers")?.get(0))
         .and_then(Value::as_object)
         .and_then(|p| p.keys().next().cloned());
     match writer.as_deref() {

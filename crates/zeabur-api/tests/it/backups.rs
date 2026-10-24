@@ -150,7 +150,11 @@ mod tests {
             .inspect(|s| s.secret_values["velero/velero-backup-key"]["key"].clone())
             .unwrap();
         assert_eq!(key.len(), 32);
-        assert!(!planned.to_string().contains(&String::from_utf8(key).unwrap()));
+        assert!(
+            !planned
+                .to_string()
+                .contains(&String::from_utf8(key).unwrap())
+        );
         let keys = cluster
             .inspect(|s| s.secret_values["velero/zeabur-backup-credentials"]["cloud"].clone())
             .unwrap();
