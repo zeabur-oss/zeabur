@@ -1,0 +1,91 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Template
+metadata:
+  name: Error pages
+  description: >-
+    Serves a maintenance page and error pages (404, 502, 503, 504) from HTML in a
+    ConfigMap, for Traefik errors middlewares and Ingress or HTTPRoute backends
+    in the same namespace.
+  license: BSD-2-Clause AND Apache-2.0
+  # Also: https://github.com/nginx/docker-nginx-unprivileged
+  homepage: https://nginx.org/
+  icon: https://www.svgrepo.com/show/373924/nginx.svg
+  categories: [web-servers]
+
+requires: [ingress/traefik]
+
+services:
+  - name: error-pages
+    securityProfile: restricted
+    # pages: GET /<status>.html. maintenance: status 503 and maintenance.html for every request.
+    ports: [{name: pages, port: 8080}, {name: maintenance, port: 8081}]
+    resources: {requests: {cpu: 5m, memory: 8Mi}, limits: {cpu: 100m, memory: 32Mi}}
+
+security:
+  summary: >-
+    No Kubernetes API access; non-root UID 101, read-only filesystem, no
+    capabilities. Only Traefik may reach the two ports. No outbound connections.
+    The Service and the ConfigMap of pages carry the label
+    zeabur.com/page-server=true, which Zeabur uses to find the page server.
+  egress: []
+  risks:
+    - risk: >-
+        The default-deny NetworkPolicy selects every pod of the namespace. In a
+        namespace that other applications share, it blocks their traffic too.
+      mitigation: >-
+        In a shared namespace, leave out default-deny. The error-pages
+        NetworkPolicy alone isolates the page server for ingress and egress.
+    - risk: Anyone who can edit the ConfigMap changes what visitors see.
+      mitigation: >-
+        Give edit rights on ConfigMaps only to people who may change the site.
+        The server sends the HTML as is and runs no code.
+
+scalability:
+  summary: >-
+    Stateless responses; replicas can scale horizontally. The pages come from
+    the ConfigMap, and the kubelet updates them in every pod.
+  replicas: 1
+  maxReplicas: 10
+  blockers:
+    - >-
+      One replica shows no pages while its pod restarts or moves. Add replicas
+      and a PodDisruptionBudget when the maintenance page must stay up during
+      node drains.
+
+upgradeNotes:
+  - >-
+    Check the nginx configuration in the error-pages-nginx ConfigMap and the
+    image vulnerability reports before you accept a digest update.
+  - No data migration. A rollback only reverts the image.
+
+smoke:
+  - name: pages
+    resource: deployment/error-pages
+    condition: condition=Available
+    timeout: 180s
+    http:
+      service: error-pages
+      port: 8080
+      path: /502.html
+      status: 200
+      contains: Bad gateway
+  - name: maintenance-for-hosts-in-the-query
+    resource: deployment/error-pages
+    condition: condition=Available
+    timeout: 60s
+    http:
+      service: error-pages
+      port: 8080
+      path: /503.html?down=127.0.0.1
+      status: 200
+      contains: Down for maintenance
+  - name: maintenance-port
+    resource: deployment/error-pages
+    condition: condition=Available
+    timeout: 60s
+    http:
+      service: error-pages
+      port: 8081
+      path: /any/path
+      status: 503
+      contains: Down for maintenance

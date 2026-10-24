@@ -15,6 +15,11 @@ pub mod versions;
 
 pub use installed::{ComponentUpgrade, InstallSource, Installation};
 
+/// The `manifests.yaml` of Zeabur Catalog's `error-pages` template, a Go template whose only field
+/// is `{{ .Namespace }}`: the page server for a project's error pages and maintenance page.
+pub const ERROR_PAGES_MANIFESTS: &str =
+    include_str!("../bundle/templates/error-pages/manifests.yaml");
+
 /// The commit of Zeabur Catalog this build carries.
 pub const CATALOGUE_COMMIT: &str = "a0e1cb1d0f5e857459351133d7922cd057a2d19d";
 

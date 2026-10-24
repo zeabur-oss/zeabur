@@ -1,0 +1,280 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-pages
+  namespace: {{ .Namespace }}
+  labels:
+    # Zeabur edits the pages of the ConfigMap with this label.
+    zeabur.com/page-server: "true"
+data:
+  404.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Not found</title>
+    <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; color: #1f1f1f; background: #fafafa; }
+    main { max-width: 32rem; padding: 2rem; text-align: center; }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    p { color: #5c5c5c; }
+    @media (prefers-color-scheme: dark) { body { color: #ededed; background: #141414; } p { color: #a3a3a3; } }
+    </style>
+    </head>
+    <body>
+    <main>
+    <h1>Not found</h1>
+    <p>Check the address and try again.</p>
+    </main>
+    </body>
+    </html>
+  502.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Bad gateway</title>
+    <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; color: #1f1f1f; background: #fafafa; }
+    main { max-width: 32rem; padding: 2rem; text-align: center; }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    p { color: #5c5c5c; }
+    @media (prefers-color-scheme: dark) { body { color: #ededed; background: #141414; } p { color: #a3a3a3; } }
+    </style>
+    </head>
+    <body>
+    <main>
+    <h1>Bad gateway</h1>
+    <p>The site cannot answer right now. Try again in a few minutes.</p>
+    </main>
+    </body>
+    </html>
+  503.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Service unavailable</title>
+    <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; color: #1f1f1f; background: #fafafa; }
+    main { max-width: 32rem; padding: 2rem; text-align: center; }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    p { color: #5c5c5c; }
+    @media (prefers-color-scheme: dark) { body { color: #ededed; background: #141414; } p { color: #a3a3a3; } }
+    </style>
+    </head>
+    <body>
+    <main>
+    <h1>Service unavailable</h1>
+    <p>The site cannot answer right now. Try again in a few minutes.</p>
+    </main>
+    </body>
+    </html>
+  504.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gateway timeout</title>
+    <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; color: #1f1f1f; background: #fafafa; }
+    main { max-width: 32rem; padding: 2rem; text-align: center; }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    p { color: #5c5c5c; }
+    @media (prefers-color-scheme: dark) { body { color: #ededed; background: #141414; } p { color: #a3a3a3; } }
+    </style>
+    </head>
+    <body>
+    <main>
+    <h1>Gateway timeout</h1>
+    <p>The site took too long to answer. Try again in a few minutes.</p>
+    </main>
+    </body>
+    </html>
+  maintenance.html: |
+    <!doctype html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Down for maintenance</title>
+    <style>
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font-family: system-ui, sans-serif; color: #1f1f1f; background: #fafafa; }
+    main { max-width: 32rem; padding: 2rem; text-align: center; }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    p { color: #5c5c5c; }
+    @media (prefers-color-scheme: dark) { body { color: #ededed; background: #141414; } p { color: #a3a3a3; } }
+    </style>
+    </head>
+    <body>
+    <main>
+    <h1>Down for maintenance</h1>
+    <p>The site is back soon.</p>
+    </main>
+    </body>
+    </html>
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-pages-nginx
+  namespace: {{ .Namespace }}
+data:
+  # nginx opens each page on each request, so an edited page needs no restart.
+  # A Traefik errors middleware asks the pages port for /{status}.html?down=<hosts>.
+  # For a host in that comma-separated list, or under a listed *.domain, /503.html
+  # answers with maintenance.html. Other hosts keep their 503 page.
+  nginx.conf: |
+    worker_processes 1;
+    pid /tmp/nginx.pid;
+    error_log /dev/stderr warn;
+    events {
+        worker_connections 256;
+    }
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        charset utf-8;
+        server_tokens off;
+        access_log off;
+        client_body_temp_path /tmp/client_temp;
+        proxy_temp_path /tmp/proxy_temp;
+        fastcgi_temp_path /tmp/fastcgi_temp;
+        uwsgi_temp_path /tmp/uwsgi_temp;
+        scgi_temp_path /tmp/scgi_temp;
+        root /usr/share/nginx/html;
+        server {
+            listen 8080;
+            location = /healthz {
+                default_type text/plain;
+                return 200 "ok\n";
+            }
+            location = /503.html {
+                set $probe "$host ,$arg_down,";
+                if ($probe ~ "^(\S+) .*,\1,") {
+                    rewrite ^ /maintenance.html last;
+                }
+                if ($host ~ "^[^.]+(\..+)$") {
+                    set $probe "*$1 ,$arg_down,";
+                }
+                if ($probe ~ "^(\S+) .*,\1,") {
+                    rewrite ^ /maintenance.html last;
+                }
+            }
+        }
+        server {
+            listen 8081;
+            add_header Cache-Control "no-store" always;
+            error_page 404 503 =503 /maintenance.html;
+            location / {
+                return 503;
+            }
+            location = /maintenance.html {
+                internal;
+            }
+        }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: error-pages
+  namespace: {{ .Namespace }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: error-pages}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: error-pages}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: nginx
+          image: docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim@sha256:7f79f463c6eb0d0bf8782992bb9636434398e3e5848398805aef2c9b025d8609
+          command: [nginx]
+          args: [-g, 'daemon off;']
+          ports:
+            - {name: pages, containerPort: 8080}
+            - {name: maintenance, containerPort: 8081}
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 5m, memory: 8Mi}
+            limits: {cpu: 100m, memory: 32Mi}
+          readinessProbe:
+            httpGet: {path: /healthz, port: pages}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: pages}
+            periodSeconds: 10
+          volumeMounts:
+            - {name: pages, mountPath: /usr/share/nginx/html, readOnly: true}
+            - {name: config, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: pages
+          configMap: {name: error-pages}
+        - name: config
+          configMap: {name: error-pages-nginx}
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 8Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: error-pages
+  namespace: {{ .Namespace }}
+  labels:
+    # Zeabur sends maintenance and error pages to the Service with this label.
+    zeabur.com/page-server: "true"
+spec:
+  selector: {app.kubernetes.io/name: error-pages}
+  ports:
+    - {name: pages, port: 8080, targetPort: pages, appProtocol: http}
+    - {name: maintenance, port: 8081, targetPort: maintenance, appProtocol: http}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+  namespace: {{ .Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# Isolates the page server on its own, also in a namespace without default-deny.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: error-pages
+  namespace: {{ .Namespace }}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: error-pages}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: traefik}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: traefik}
+      ports:
+        - {protocol: TCP, port: 8080}
+        - {protocol: TCP, port: 8081}
