@@ -158,10 +158,10 @@ cluster_env='[select(.kind == "Deployment" and .metadata.name == "zeabur") | .sp
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$cluster_env" ""
 expect full "$(render -f "$chart/ci/full-values.yaml")" "$cluster_env" shop-prod
 
-# New public URLs: a suffix and a ClusterIssuer reach Zeabur only when given.
-domain_env='[select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_DOMAIN_SUFFIX" or .name == "ZEABUR_CLUSTER_ISSUER") | .value] | join(",")'
+# New public URLs: the suffixes and a ClusterIssuer reach Zeabur only when given.
+domain_env='[select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_DOMAIN_SUFFIXES" or .name == "ZEABUR_CLUSTER_ISSUER") | .value] | join(",")'
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$domain_env" ""
-expect full "$(render -f "$chart/ci/full-values.yaml")" "$domain_env" apps.example.test,letsencrypt
+expect full "$(render -f "$chart/ci/full-values.yaml")" "$domain_env" "apps.example.test,example.test,letsencrypt"
 
 # Zeabur Proxy: off unless asked for; on, a locked-down pod with no token that only Zeabur reaches,
 # over TLS whose CA (and only the CA) Zeabur trusts.
@@ -216,8 +216,8 @@ refuse "a metrics store without a port" --set metricsStore.service=observability
 refuse "an unknown value" --set replicas=2
 refuse "a cluster name longer than 63 characters" --set clusterName="$(printf 'x%.0s' {1..64})"
 refuse "a cluster name on two lines" --set-json 'clusterName="a\nb"'
-refuse "a domain suffix that is not a domain" --set domains.suffix=Apps_Example
-refuse "a domain suffix with a wildcard" --set 'domains.suffix=*.apps.example.test'
+refuse "a domain suffix that is not a domain" --set 'domains.suffixes={Apps_Example}'
+refuse "a domain suffix with a wildcard" --set 'domains.suffixes={*.apps.example.test}'
 refuse "a ClusterIssuer that is not a name" --set 'domains.clusterIssuer=Lets Encrypt'
 refuse "a tools pod without a deadline" --set terminal.toolsDeadlineMinutes=0
 refuse "a tools namespace that is not a name" --set terminal.toolsNamespace=Tools

@@ -82,11 +82,11 @@ kubectl -n zeabur rollout status deployment/zeabur
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
   --namespace zeabur --reuse-values \
-  --set domains.suffix=apps.example.com \
+  --set 'domains.suffixes={apps.example.com}' \
   --set domains.clusterIssuer=letsencrypt
 ```
 
-之後部署 `shop` 專案的 `web` 時，表單會建議 `web-shop.apps.example.com`。留空 `domains.suffix` 時需手填完整網域。留空 `domains.clusterIssuer` 時，新服務的公開網址使用 HTTP。
+之後部署 `shop` 專案的 `web` 時，表單會建議 `web-shop.apps.example.com`。可以用逗號列出多個應用程式網域，預設用第一個。之後也能在**叢集**頁的**網域**區塊修改，那裡會檢查 DNS 紀錄並列出要新增的紀錄，做法見[設定 DNS 紀錄](../configure/dns.mdx)。留空 `domains.suffixes` 時需手填完整網域。留空 `domains.clusterIssuer` 時，新服務的公開網址使用 HTTP。
 
 這裡只指定服務使用的簽發者名稱。ClusterIssuer 與 DNS 要先備妥，Zeabur 不會從這兩個值建立它們。
 

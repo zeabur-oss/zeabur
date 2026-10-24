@@ -43,12 +43,24 @@ export function recordsFor(name: string, target: readonly string[]): DnsRecord[]
   return host ? [{ type: "CNAME", name, value: host }] : []
 }
 
-/** The wildcard of `suffix` that covers `host`: one label under it, as a DNS wildcard matches. */
-export function wildcardFor(host: string, suffix: string | undefined): string | undefined {
-  if (!suffix) return undefined
-  const label = host.endsWith(`.${suffix}`) ? host.slice(0, -(suffix.length + 1)) : undefined
-  return label && !label.includes(".") ? `*.${suffix}` : undefined
+/** The wildcard of a suffix that covers `host`: one label under it, as a DNS wildcard matches. */
+export function wildcardFor(host: string, suffixes: readonly string[] = []): string | undefined {
+  for (const suffix of suffixes) {
+    const label = host.endsWith(`.${suffix}`) ? host.slice(0, -(suffix.length + 1)) : undefined
+    if (label && !label.includes(".")) return `*.${suffix}`
+  }
+  return undefined
 }
+
+/** sslip.io and nip.io names resolve to the address they carry, with no record to add. */
+export const isSslip = (host: string) => /\.(sslip|nip)\.io$/.test(host)
+
+/** The sslip.io suffix for `address`: dashes, so URLs under it stay one label deep. */
+export const sslipSuffix = (address: string) => `${address.replaceAll(/[.:]/g, "-")}.sslip.io`
+
+/** Let's Encrypt refused for its rate limit, in cert-manager's words. */
+export const rateLimited = (message?: string | null) =>
+  Boolean(message && /rateLimited|too many (new )?(certificates|orders)/i.test(message))
 
 /** What a domain's DNS needs, Vercel-style: fine, or the records to add and why. */
 export type DnsSetup =
@@ -57,9 +69,9 @@ export type DnsSetup =
   | { as: "elsewhere"; records: DnsRecord[]; resolved: string[] }
   | { as: "unknown"; records: DnsRecord[] }
 
-export function dnsSetup(host: string, check: DomainCheck, suffix?: string): DnsSetup {
+export function dnsSetup(host: string, check: DomainCheck, suffixes?: readonly string[]): DnsSetup {
   if (check.dns === "pointsHere") return { as: "valid" }
-  const records = recordsFor(wildcardFor(host, suffix) ?? host, check.target)
+  const records = recordsFor(wildcardFor(host, suffixes) ?? host, check.target)
   if (check.dns === "missing") return { as: "missing", records }
   if (check.dns === "elsewhere") return { as: "elsewhere", records, resolved: check.resolved ?? [] }
   return { as: "unknown", records }

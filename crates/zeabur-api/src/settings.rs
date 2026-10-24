@@ -1,4 +1,5 @@
-//! Zeabur's own settings: the metrics store and the cluster's name.
+//! Zeabur's own settings: the metrics store, the cluster's name and the domains new URLs are
+//! suggested under ([`domains`]).
 //!
 //! # Where a setting is kept
 //!
@@ -33,6 +34,7 @@
 //! (`ZEABUR_CLUSTER_NAME`) is the default; a name chosen in the settings replaces it.
 
 pub mod cluster_name;
+pub mod domains;
 
 use zeabur_kube::ServicePort;
 
@@ -44,6 +46,9 @@ pub const METRICS_STORE_KEY: &str = "metrics-store";
 
 /// The ConfigMap's key for the cluster's name.
 pub const CLUSTER_NAME_KEY: &str = "cluster-name";
+
+/// The ConfigMap's key for the domains new URLs are suggested under, one per line.
+pub const DOMAIN_SUFFIXES_KEY: &str = "domain-suffixes";
 
 /// Zeabur's settings as the server was started: the defaults, and where people's choices are
 /// kept.
@@ -76,10 +81,11 @@ pub struct Settings {
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DomainSettings {
-    /// The domain a new URL is suggested under, as `<service>-<project>.<suffix>`; a wildcard
-    /// DNS record sends it to the cluster's ingress. `None`: people type the whole host.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub suffix: Option<String>,
+    /// The domains a new URL is suggested under, as `<service>-<project>.<suffix>`, the first by
+    /// default; a wildcard DNS record sends each to the cluster's ingress. Empty: people type the
+    /// whole host. The list chosen on the cluster page, when there is one (see [`domains`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub suffixes: Vec<String>,
     /// The cert-manager `ClusterIssuer` a new URL's certificate comes from. `None`: a new URL
     /// is HTTP only.
     #[serde(default, skip_serializing_if = "Option::is_none")]

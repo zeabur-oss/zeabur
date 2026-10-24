@@ -111,6 +111,26 @@ export const zhCN: Messages = {
   "access.checking": "正在查询…",
   "access.invalid": "只填写域名，不要带 https:// 或路径。",
   "access.same": "请使用两个不同的域名。",
+  "access.suffixes": "应用域名",
+  "access.suffixesLead": (example) =>
+    `新服务的网址会建议成 ${example}。每个域名都要一条泛域名 DNS 记录指向这台服务器。`,
+  "access.suffixesNone": "新服务不会有建议网址，要自己填完整域名。加一个你的域名，就会自动建议。",
+  "access.privateAsk": (address) =>
+    `这台服务器只有内网地址 ${address}。还是要用 sslip.io 网址吗？只有同一个网络里的电脑能访问，证书由这台服务器自建的证书颁发机构签发。`,
+  "access.privateUse": (suffix) => `使用 ${suffix}`,
+  "access.privateDomain": (address) =>
+    `这台服务器只有内网地址 ${address}，Let's Encrypt 检查不到 sslip.io 网址。请加你自己的域名，或改选测试机。`,
+  "access.suffix": (n) => `应用域名 ${n}`,
+  "access.suffixDefault": "默认",
+  "access.suffixRemove": (name) => `移除 ${name}`,
+  "access.suffixAdd": "添加域名",
+  "access.recheck": "重新检查",
+  "access.suffixSslip": "不用设置 DNS 就会指向这台服务器。",
+  "access.suffixMissing": (wildcard) => `还没有 ${wildcard} 记录。`,
+  "access.suffixRecord": "到你的 DNS 服务商添加这条记录：",
+  "access.recordType": "类型",
+  "access.recordName": "名称",
+  "access.recordValue": "值",
 
   "components.title": "选择组件",
   "components.description": "从预设组合开始，再增减组件。组件依赖的其他组件会一并加入。",
@@ -161,6 +181,8 @@ export const zhCN: Messages = {
   "review.rke2": (version) => `RKE2 ${version}`,
   "review.rke2Custom": (version) => `RKE2 ${version}（不受支持）`,
   "review.access": "访问方式",
+  "review.suffixes": "应用域名",
+  "review.suffixesNone": "没有，每个服务都要自己填完整域名。",
   "review.components": "组件",
   "review.memory": "空闲时的内存用量",
   "review.time": "所需时间",
@@ -207,6 +229,10 @@ export const zhCN: Messages = {
   "warning.kubernetes.untested": (version, tested) =>
     `组件目录只在 ${tested} 上测试过，没有测过 Kubernetes ${version}。`,
   "warning.metrics.missing": () => "缺少 VictoriaMetrics，Zeabur 将不显示用量历史。",
+  "warning.domains.none":
+    "这台服务器没有公网地址，新服务不会有建议网址。请加一个你的应用域名，并添加指向服务器的泛域名记录。",
+  "warning.domains.sslip": (suffix) =>
+    `这台服务器没有公网地址，新服务不会有建议网址。可以把 ${suffix} 加成应用域名，网址只有这个网络里能访问。`,
   "warning.local.dns": (identity, zeabur) =>
     `${zeabur} 和 ${identity} 必须在 DNS 上解析到这台服务器，浏览器和服务器本身都要查得到。只改 hosts 文件不够，Pod 不会读取它。`,
   "warning.memory.low": (host) => `RKE2 需要至少 4 GiB 内存，这台服务器只有 ${mib(host)}。`,

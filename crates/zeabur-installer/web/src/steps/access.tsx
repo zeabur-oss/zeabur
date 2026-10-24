@@ -9,12 +9,10 @@ import type { Wizard } from "@/app"
 import { Panel, Segmented } from "@/components/bits"
 import { useT } from "@/i18n"
 import { StepPage } from "@/steps/frame"
+import { hostName, SuffixesPanel, suffixesValid } from "@/steps/suffixes"
 import { Button } from "@zeabur/design-system/components/button"
 import { Field, FieldDescription, FieldLabel } from "@zeabur/design-system/components/field"
 import { Input } from "@zeabur/design-system/components/input"
-
-const hostName =
-  /^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
 
 export function AccessStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
@@ -24,7 +22,11 @@ export function AccessStep({ wizard }: { wizard: Wizard }) {
   const setAccess = (next: Partial<typeof access>) =>
     wizard.setConfig({ ...config, access: { ...access, ...next } })
   const same = access.zeabur !== "" && access.zeabur === access.identity
-  const valid = hostName.test(access.zeabur) && hostName.test(access.identity) && !same
+  const valid =
+    hostName.test(access.zeabur) &&
+    hostName.test(access.identity) &&
+    !same &&
+    suffixesValid(access.suffixes)
   return (
     <StepPage
       title={t("access.title")}
@@ -115,6 +117,13 @@ export function AccessStep({ wizard }: { wizard: Wizard }) {
           ) : null}
         </div>
       </Panel>
+
+      <SuffixesPanel
+        mode={access.mode}
+        suffixes={access.suffixes}
+        addresses={server.addresses}
+        onChange={(suffixes) => setAccess({ suffixes })}
+      />
     </StepPage>
   )
 }

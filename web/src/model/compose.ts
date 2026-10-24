@@ -317,7 +317,7 @@ function imageService(
     port: port ? String(port) : "",
     morePorts,
     publicUrl: Boolean(port && options.publicUrl && host !== undefined),
-    host: host || suggestedHost(service.name, project, domains.suffix),
+    host: host || suggestedHost(service.name, project, domains.suffixes?.[0]),
     variables: firstOfEach(service.variables.flatMap(variable)),
     secretVariables: options.secrets,
     volumes,

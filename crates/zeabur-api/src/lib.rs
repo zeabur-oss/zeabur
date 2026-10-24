@@ -316,6 +316,10 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
             settings::cluster_name::get_setting,
             settings::cluster_name::set
         ))
+        .routes(routes!(
+            settings::domains::get_setting,
+            settings::domains::set
+        ))
         .routes(routes!(account::get))
         .routes(routes!(members::handlers::list))
         .routes(routes!(members::plan::plan))

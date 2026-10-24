@@ -3742,6 +3742,62 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/settings/domains:
+    get:
+      tags:
+      - settings
+      summary: |-
+        The domains new URLs are suggested under, whether a wildcard record sends each to the
+        cluster, the addresses it should point to, and whether you may change them. Readable by
+        everyone signed in; each request looks the suffixes up again.
+      operationId: getDomains
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainsSetting"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    put:
+      tags:
+      - settings
+      summary: |-
+        Changes the domains new URLs are suggested under, or goes back to the ones Zeabur was
+        installed with (`null`), by writing the settings ConfigMap as you. Existing URLs keep their
+        names. Who may: whoever may update (and create) the ConfigMap `zeabur-settings` in Zeabur's
+        namespace.
+      operationId: setDomains
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DomainsChange"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DomainsSetting"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/settings/metrics-store:
     get:
       tags:
@@ -7689,13 +7745,81 @@ components:
           description: |-
             The cert-manager `ClusterIssuer` a new URL's certificate comes from. `None`: a new URL
             is HTTP only.
-        suffix:
+        suffixes:
+          type: array
+          items:
+            type: string
+          description: |-
+            The domains a new URL is suggested under, as `<service>-<project>.<suffix>`, the first by
+            default; a wildcard DNS record sends each to the cluster's ingress. Empty: people type the
+            whole host. The list chosen on the cluster page, when there is one (see [`domains`]).
+    DomainsChange:
+      type: object
+      description: A change of the suffixes.
+      properties:
+        suffixes:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+          description: >-
+            The suffixes, the default first; `null` goes back to the ones Zeabur was
+            installed with.
+      additionalProperties: false
+    DomainsSetting:
+      type: object
+      description: The domains new URLs are suggested under.
+      required:
+      - id
+      - suffixes
+      - source
+      - default
+      - target
+      - canChange
+      - unreadable
+      properties:
+        canChange:
+          $ref: "#/components/schemas/Permission"
+          description: Whether the person may change them.
+        clusterIssuer:
           type:
           - string
           - "null"
+          description: "The `ClusterIssuer` a new URL's certificate comes from; absent: new URLs are HTTP only."
+        default:
+          type: array
+          items:
+            type: string
+          description: The suffixes Zeabur was installed with (`ZEABUR_DOMAIN_SUFFIXES`).
+        id:
+          type: string
+          description: "`settings/domains`."
+        source:
+          $ref: "#/components/schemas/SettingSource"
+          description: Whether they were chosen on the cluster page or come from the install.
+        storedIn:
+          oneOf:
+          - $ref: "#/components/schemas/Origin"
+            description: The ConfigMap a change is kept in; absent where Zeabur keeps no settings.
+          - type: "null"
+        suffixes:
+          type: array
+          items:
+            $ref: "#/components/schemas/SuffixCheck"
+          description: The suffixes in use, the default first, each with its check.
+        target:
+          type: array
+          items:
+            type: string
           description: |-
-            The domain a new URL is suggested under, as `<service>-<project>.<suffix>`; a wildcard
-            DNS record sends it to the cluster's ingress. `None`: people type the whole host.
+            The addresses the cluster's Ingresses are served on: what a wildcard record points to.
+            Empty when none could be read.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
     DrainCapacity:
       type: object
       description: The moving pods against the room on the other nodes.
@@ -15832,6 +15956,33 @@ components:
       - podSecurity
       - deadlineExceeded
       - replicaFailure
+    SuffixCheck:
+      type: object
+      description: How DNS answers for one suffix.
+      required:
+      - name
+      - probe
+      - dns
+      properties:
+        dns:
+          $ref: "#/components/schemas/DnsState"
+          description: Whether it resolves to an address of the cluster's ingress.
+        name:
+          type: string
+          description: The suffix, such as `apps.example.com`.
+        probe:
+          type: string
+          description: "The name looked up: one no one uses, so only a wildcard record answers it."
+        resolved:
+          type: array
+          items:
+            type: string
+          description: The addresses it resolved to.
+        sslip:
+          type:
+          - string
+          - "null"
+          description: For an sslip.io or nip.io suffix, the address it carries.
     Suggestion:
       type: string
       description: How strongly the catalogue suggests a missing capability.

@@ -93,7 +93,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
       : ""
   const port = options.port ? form.port.trim() : ""
   const publicUrl = options.publicUrl && port !== "" && form.publicUrl
-  const host = hosted ? form.host : suggestedHost(name, project, domains.suffix)
+  const host = hosted ? form.host : suggestedHost(name, project, domains.suffixes?.[0])
   const variables = parseEnv(env)
   const buildVariables = parseEnv(buildEnv)
   const dockerfile = form.method === "dockerfile" ? form.dockerfile : ""
@@ -266,7 +266,9 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
                 hideLabel
                 hint={
                   <>
-                    {domains.suffix ? null : <span className="block">{t("add.hostHint")}</span>}
+                    {domains.suffixes?.length ? null : (
+                      <span className="block">{t("add.hostHint")}</span>
+                    )}
                     <span className="block">
                       {domains.clusterIssuer
                         ? t("add.https", domains.clusterIssuer)
@@ -282,7 +284,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
                   size="sm"
                   mono
                   value={host}
-                  placeholder={domains.suffix ? undefined : "web.example.com"}
+                  placeholder={domains.suffixes?.length ? undefined : "web.example.com"}
                   autoComplete="off"
                   spellCheck={false}
                   onChange={(event) => {

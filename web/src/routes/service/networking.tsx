@@ -146,14 +146,14 @@ export function NetworkingTab({
     ...traceQuery(project, service.kind, service.name),
     enabled: routes.length > 0 || adding !== undefined,
   })
-  const suffix = useQuery(clusterQuery).data?.domains?.suffix ?? undefined
+  const suffixes = useQuery(clusterQuery).data?.domains?.suffixes
   const checkOf = (host?: string) =>
     host
       ? (trace.data?.routes.find((r) => r.kind === "domain" && r.address === host)?.domain ??
         undefined)
       : undefined
   const hint = (host: string) => (
-    <DnsHint host={host} addresses={trace.data?.ingressAddresses ?? []} suffix={suffix} />
+    <DnsHint host={host} addresses={trace.data?.ingressAddresses ?? []} suffixes={suffixes} />
   )
 
   const scheduled = service.kind === "CronJob" || service.kind === "Job"
@@ -479,7 +479,13 @@ export function NetworkingTab({
                           {check && firstOfHost && route.host && needsSetup(check) ? (
                             <tr className="max-sm:block">
                               <td colSpan={4} className="px-4 pt-1 pb-3 max-sm:block">
-                                <DomainSetup host={route.host} check={check} suffix={suffix} />
+                                <DomainSetup
+                                  host={route.host}
+                                  check={check}
+                                  suffixes={suffixes}
+                                  checking={trace.isFetching}
+                                  onCheck={() => void trace.refetch()}
+                                />
                               </td>
                             </tr>
                           ) : null}

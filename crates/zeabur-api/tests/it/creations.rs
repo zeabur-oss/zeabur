@@ -230,7 +230,7 @@ stringData:
         });
         let settings = Settings {
             domains: DomainSettings {
-                suffix: None,
+                suffixes: Vec::new(),
                 cluster_issuer: Some("letsencrypt".to_owned()),
             },
             ..Settings::default()

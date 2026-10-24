@@ -77,6 +77,11 @@ pub struct Access {
     /// their groups are managed only from version control.
     #[serde(default = "yes")]
     pub invitations: bool,
+    /// The domains new services' URLs are suggested under, the first one by default, such as
+    /// `apps.example.com`. Each needs a wildcard record, `*.apps.example.com`, pointing at the
+    /// server. Absent: the server's sslip.io name when its address is public, else none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suffixes: Option<Vec<String>>,
 }
 
 /// Where certificates come from.
@@ -446,6 +451,7 @@ impl Config {
                 identity: format!("login.{name}.sslip.io"),
                 zeabur: format!("zeabur.{name}.sslip.io"),
                 invitations: true,
+                suffixes: None,
             },
             zeabur: true,
             inputs: BTreeMap::new(),
@@ -487,6 +493,14 @@ impl Config {
             if !is_host_name(host) {
                 return Err(PlanError::Config(format!(
                     "{what} `{host}` is not a host name: write it without https:// or a path"
+                )));
+            }
+        }
+        for suffix in self.access.suffixes.iter().flatten() {
+            if !is_host_name(suffix) {
+                return Err(PlanError::Config(format!(
+                    "access.suffixes: `{suffix}` is not a domain name such as apps.example.com; \
+                     write it without `*.`"
                 )));
             }
         }
@@ -545,6 +559,8 @@ mod tests {
         assert_eq!(c.issuer(), "https://login.example.com");
         let off = MINIMAL.replace('}', ", invitations: false}");
         assert!(!Config::parse(&off).unwrap().access.invitations);
+        let wildcard = MINIMAL.replace('}', ", suffixes: ['*.apps.example.com']}");
+        assert!(Config::parse(&wildcard).is_err());
     }
 
     #[test]

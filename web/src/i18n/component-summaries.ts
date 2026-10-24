@@ -63,7 +63,7 @@ export const summaries: Record<string, Summary> = {
   },
   "external-secrets/external-secrets#d30d68f5": {
     en: "Copies secrets from a store such as Vault or 1Password into the cluster and keeps them in sync.",
-    "zh-TW": "把 Vault、1Password 等外部儲存的密鑰複製進叢集，並保持同步。",
+    "zh-TW": "把 Vault、1Password 等外部儲存的機密複製進叢集，並保持同步。",
     "zh-CN": "把 Vault、1Password 等外部存储的密钥复制进集群，并保持同步。",
   },
   "gotify-notifications/alertmanager-gotify-bridge#15013f81": {

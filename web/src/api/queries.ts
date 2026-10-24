@@ -811,6 +811,11 @@ export const clusterNameQuery = queryOptions({
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/settings/cluster-name", { signal })),
 })
 
+export const domainsQuery = queryOptions({
+  queryKey: ["settings", "domains"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/settings/domains", { signal })),
+})
+
 export const metricsStoreQuery = queryOptions({
   queryKey: ["settings", "metrics-store"],
   queryFn: async ({ signal }) =>

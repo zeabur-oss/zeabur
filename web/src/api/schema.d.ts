@@ -2057,6 +2057,33 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/settings/domains": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The domains new URLs are suggested under, whether a wildcard record sends each to the
+     *     cluster, the addresses it should point to, and whether you may change them. Readable by
+     *     everyone signed in; each request looks the suffixes up again.
+     */
+    get: operations["getDomains"]
+    /**
+     * Changes the domains new URLs are suggested under, or goes back to the ones Zeabur was
+     *     installed with (`null`), by writing the settings ConfigMap as you. Existing URLs keep their
+     *     names. Who may: whoever may update (and create) the ConfigMap `zeabur-settings` in Zeabur's
+     *     namespace.
+     */
+    put: operations["setDomains"]
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/settings/metrics-store": {
     parameters: {
       query?: never
@@ -4028,10 +4055,39 @@ export interface components {
        */
       clusterIssuer?: string | null
       /**
-       * @description The domain a new URL is suggested under, as `<service>-<project>.<suffix>`; a wildcard
-       *     DNS record sends it to the cluster's ingress. `None`: people type the whole host.
+       * @description The domains a new URL is suggested under, as `<service>-<project>.<suffix>`, the first by
+       *     default; a wildcard DNS record sends each to the cluster's ingress. Empty: people type the
+       *     whole host. The list chosen on the cluster page, when there is one (see [`domains`]).
        */
-      suffix?: string | null
+      suffixes?: string[]
+    }
+    /** @description A change of the suffixes. */
+    DomainsChange: {
+      /** @description The suffixes, the default first; `null` goes back to the ones Zeabur was installed with. */
+      suffixes?: string[] | null
+    }
+    /** @description The domains new URLs are suggested under. */
+    DomainsSetting: {
+      /** @description Whether the person may change them. */
+      canChange: components["schemas"]["Permission"]
+      /** @description The `ClusterIssuer` a new URL's certificate comes from; absent: new URLs are HTTP only. */
+      clusterIssuer?: string | null
+      /** @description The suffixes Zeabur was installed with (`ZEABUR_DOMAIN_SUFFIXES`). */
+      default: string[]
+      /** @description `settings/domains`. */
+      id: string
+      /** @description Whether they were chosen on the cluster page or come from the install. */
+      source: components["schemas"]["SettingSource"]
+      storedIn?: components["schemas"]["Origin"] | null
+      /** @description The suffixes in use, the default first, each with its check. */
+      suffixes: components["schemas"]["SuffixCheck"][]
+      /**
+       * @description The addresses the cluster's Ingresses are served on: what a wildcard record points to.
+       *     Empty when none could be read.
+       */
+      target: string[]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
     }
     /** @description The moving pods against the room on the other nodes. */
     DrainCapacity: {
@@ -8204,6 +8260,19 @@ export interface components {
       | "podSecurity"
       | "deadlineExceeded"
       | "replicaFailure"
+    /** @description How DNS answers for one suffix. */
+    SuffixCheck: {
+      /** @description Whether it resolves to an address of the cluster's ingress. */
+      dns: components["schemas"]["DnsState"]
+      /** @description The suffix, such as `apps.example.com`. */
+      name: string
+      /** @description The name looked up: one no one uses, so only a wildcard record answers it. */
+      probe: string
+      /** @description The addresses it resolved to. */
+      resolved?: string[]
+      /** @description For an sslip.io or nip.io suffix, the address it carries. */
+      sslip?: string | null
+    }
     /**
      * @description How strongly the catalogue suggests a missing capability.
      * @enum {string}
@@ -12993,6 +13062,80 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["ClusterNameSetting"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getDomains: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["DomainsSetting"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  setDomains: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DomainsChange"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["DomainsSetting"]
         }
       }
       400: {

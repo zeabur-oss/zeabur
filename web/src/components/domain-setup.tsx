@@ -1,3 +1,4 @@
+import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import type { Schemas } from "@/api/client"
@@ -11,7 +12,16 @@ import {
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { configuration, dnsSetup, recordsFor, wildcardFor, type DnsRecord } from "@/model/domains"
+import {
+  configuration,
+  dnsSetup,
+  isSslip,
+  rateLimited,
+  recordsFor,
+  wildcardFor,
+  type DnsRecord,
+} from "@/model/domains"
+import { Button } from "@zeabur/design-system/components/button"
 import { severity } from "@/model/severity"
 
 type DomainCheck = Schemas["DomainCheck"]
@@ -60,21 +70,26 @@ export function DomainState({
 export function DomainSetup({
   host,
   check,
-  suffix,
+  suffixes,
+  checking,
+  onCheck,
 }: {
   host: string
   check: DomainCheck
-  suffix?: string
+  suffixes?: readonly string[]
+  checking?: boolean
+  onCheck?: () => void
 }) {
   const t = useT()
-  const dns = dnsSetup(host, check, suffix)
+  const dns = dnsSetup(host, check, suffixes)
   const certificate = check.certificate
   const certTrouble =
     certificate && (certificate.state === "failed" || certificate.state === "issuing")
       ? certificate
       : undefined
   if (dns.as === "valid" && !certTrouble) return null
-  const wildcard = wildcardFor(host, suffix)
+  const wildcard = wildcardFor(host, suffixes)
+  const limited = certTrouble?.state === "failed" && rateLimited(certTrouble.message)
   return (
     <div className="flex flex-col gap-3 text-sm">
       {dns.as === "valid" ? null : (
@@ -100,6 +115,7 @@ export function DomainSetup({
               <Records records={dns.records} />
             </>
           )}
+          {onCheck ? <CheckAgain checking={checking} onCheck={onCheck} /> : null}
         </div>
       )}
       {certTrouble ? (
@@ -117,6 +133,11 @@ export function DomainSetup({
               <span className="font-normal text-secondary">{t("domain.cert.retries")}</span>
             ) : null}
           </p>
+          {limited ? (
+            <p className="text-secondary">
+              {isSslip(host) ? t("domain.cert.rateLimitedShared") : t("domain.cert.rateLimited")}
+            </p>
+          ) : null}
           {certTrouble.message ? (
             <Collapsible>
               <CollapsibleTrigger variant="disclosure">
@@ -136,18 +157,32 @@ export function DomainSetup({
   )
 }
 
+/** Looks the domain up again now instead of at the next poll. */
+export function CheckAgain({ checking, onCheck }: { checking?: boolean; onCheck: () => void }) {
+  const t = useT()
+  return (
+    <div>
+      <Button size="xs" variant="outline" disabled={checking} onClick={onCheck}>
+        <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+        {checking ? t("domain.checking") : t("domain.checkAgain")}
+      </Button>
+    </div>
+  )
+}
+
 /** Under the field that adds a domain: what its DNS will need. */
 export function DnsHint({
   host,
   addresses,
-  suffix,
+  suffixes,
 }: {
   host: string
   addresses: string[]
-  suffix?: string
+  suffixes?: readonly string[]
 }) {
   const t = useT()
-  const wildcard = wildcardFor(host, suffix)
+  if (isSslip(host)) return null
+  const wildcard = wildcardFor(host, suffixes)
   if (wildcard) return <p className="type-meta text-secondary">{t("domain.wildcard", wildcard)}</p>
   const records = recordsFor(host, addresses)
   if (records.length === 0)
@@ -160,7 +195,7 @@ export function DnsHint({
   )
 }
 
-function Records({ records }: { records: DnsRecord[] }) {
+export function Records({ records }: { records: DnsRecord[] }) {
   const t = useT()
   const cell = "flex min-w-0 items-center gap-1 font-mono text-xs"
   return (

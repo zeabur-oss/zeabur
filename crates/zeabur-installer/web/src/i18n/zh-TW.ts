@@ -111,6 +111,26 @@ export const zhTW: Messages = {
   "access.checking": "正在查詢…",
   "access.invalid": "只填網域，不要加 https:// 或路徑。",
   "access.same": "請使用兩個不同的網域。",
+  "access.suffixes": "應用程式網域",
+  "access.suffixesLead": (example) =>
+    `新服務的網址會建議成 ${example}。每個網域都要一筆萬用字元 DNS 紀錄指向這台伺服器。`,
+  "access.suffixesNone": "新服務不會有建議網址，要自己填完整網域。加一個你的網域，就會自動建議。",
+  "access.privateAsk": (address) =>
+    `這台伺服器只有內部位址 ${address}。還是要用 sslip.io 網址嗎？只有同一個網路裡的電腦連得到，憑證由這台伺服器自建的憑證授權單位簽發。`,
+  "access.privateUse": (suffix) => `使用 ${suffix}`,
+  "access.privateDomain": (address) =>
+    `這台伺服器只有內部位址 ${address}，Let's Encrypt 檢查不到 sslip.io 網址。請加你自己的網域，或改選測試機。`,
+  "access.suffix": (n) => `應用程式網域 ${n}`,
+  "access.suffixDefault": "預設",
+  "access.suffixRemove": (name) => `移除 ${name}`,
+  "access.suffixAdd": "新增網域",
+  "access.recheck": "重新檢查",
+  "access.suffixSslip": "不用設定 DNS 就會指向這台伺服器。",
+  "access.suffixMissing": (wildcard) => `還沒有 ${wildcard} 紀錄。`,
+  "access.suffixRecord": "到你的 DNS 服務商新增這筆紀錄：",
+  "access.recordType": "類型",
+  "access.recordName": "名稱",
+  "access.recordValue": "值",
 
   "components.title": "選擇元件",
   "components.description": "從預設組合開始，再增減元件。元件需要的其他元件會一起加入。",
@@ -161,6 +181,8 @@ export const zhTW: Messages = {
   "review.rke2": (version) => `RKE2 ${version}`,
   "review.rke2Custom": (version) => `RKE2 ${version}（不受支援）`,
   "review.access": "連線方式",
+  "review.suffixes": "應用程式網域",
+  "review.suffixesNone": "沒有，每個服務都要自己填完整網域。",
   "review.components": "元件",
   "review.memory": "閒置時的記憶體用量",
   "review.time": "所需時間",
@@ -207,6 +229,10 @@ export const zhTW: Messages = {
   "warning.kubernetes.untested": (version, tested) =>
     `元件目錄只在 ${tested} 上測試過，沒有測過 Kubernetes ${version}。`,
   "warning.metrics.missing": () => "少了 VictoriaMetrics，Zeabur 就不會顯示用量歷史。",
+  "warning.domains.none":
+    "這台伺服器沒有公開位址，新服務不會有建議網址。請加一個你的應用程式網域，並新增指向伺服器的萬用字元紀錄。",
+  "warning.domains.sslip": (suffix) =>
+    `這台伺服器沒有公開位址，新服務不會有建議網址。可以把 ${suffix} 加成應用程式網域，網址只有這個網路裡連得到。`,
   "warning.local.dns": (identity, zeabur) =>
     `${zeabur} 和 ${identity} 必須在 DNS 上解析到這台伺服器，瀏覽器和伺服器本身都要查得到。只改 hosts 檔不夠，Pod 不會讀它。`,
   "warning.memory.low": (host) => `RKE2 需要至少 4 GiB 記憶體，這台伺服器只有 ${mib(host)}。`,

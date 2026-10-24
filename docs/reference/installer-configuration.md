@@ -14,6 +14,7 @@ How people reach Zeabur and Zeabur Identity.
 | `identity` | Zeabur Identity's host name, without `https://`. Its issuer is `https://<identity>`. |
 | `zeabur` | Zeabur's host name. It must differ from `identity`: an OpenID Connect issuer is a whole origin. |
 | `invitations` | Default `true`: Zeabur Identity accepts invitation links, which Zeabur's Members page and `zeabur-identityctl invite` make. Set `false` when people and their groups come only from version control; `zeabur-identityctl setup-link` still works. |
+| `suffixes` | The app domains new services' URLs are suggested under, the first one by default, such as `[apps.example.com]`. Each needs a wildcard record, `*.apps.example.com`, pointing at the server; the cluster page checks it and can change the list later. Default: `<address>.sslip.io` when the server's address is public (`203-0-113-7.sslip.io`), else none. `[]` means none. |
 
 In both modes the two names must resolve to the server, for browsers and for the server itself.
 Pods resolve names through DNS, not through `/etc/hosts`. For a test machine, names such as

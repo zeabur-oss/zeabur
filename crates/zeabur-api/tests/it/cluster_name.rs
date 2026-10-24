@@ -154,7 +154,7 @@ mod tests {
     async fn the_cluster_says_how_new_public_urls_are_made() {
         let settings = Settings {
             domains: zeabur_api::settings::DomainSettings {
-                suffix: Some("apps.example.com".to_owned()),
+                suffixes: vec!["apps.example.com".to_owned()],
                 cluster_issuer: Some("letsencrypt".to_owned()),
             },
             ..Settings::default()
@@ -162,7 +162,7 @@ mod tests {
         let about = call(&cluster(), settings, "GET", "/api/v1/cluster", None).await;
         assert_eq!(
             about["domains"],
-            json!({"suffix": "apps.example.com", "clusterIssuer": "letsencrypt"})
+            json!({"suffixes": ["apps.example.com"], "clusterIssuer": "letsencrypt"})
         );
     }
 }

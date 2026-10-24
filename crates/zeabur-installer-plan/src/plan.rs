@@ -5,6 +5,7 @@
 //! Secret key and where its value comes from.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::IpAddr;
 
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -596,7 +597,9 @@ fn products(
             ),
         ));
     }
-    let values = zeabur_values(config, facts, tls_issuer, &zeabur_image);
+    let suffixes = suffixes(config, facts);
+    warn_no_suffixes(config, facts, &suffixes, warnings);
+    let values = zeabur_values(config, facts, tls_issuer, &zeabur_image, &suffixes);
     Ok((
         Some(identity),
         Some(ZeaburPlan {
@@ -1086,8 +1089,86 @@ pub fn local_ca_objects(cert_manager_namespace: &str, hostname: &str) -> Vec<Val
     ]
 }
 
+/// When no app domain is configured and none could be chosen: what line to add.
+fn warn_no_suffixes(
+    config: &Config,
+    facts: &Facts,
+    suffixes: &[String],
+    warnings: &mut Vec<Warning>,
+) {
+    if suffixes.is_empty() && config.access.suffixes.is_none() {
+        let sslip = facts.node_ips.first().map(|a| sslip_suffix(a));
+        warnings.push(match (config.access.mode, sslip) {
+            (AccessMode::Local, Some(sslip)) => warning(
+                "domains.sslip",
+                &[&sslip],
+                format!(
+                    "This server has no public address, so new services get no suggested URL. \
+                     Add `suffixes: [{sslip}]` under access for URLs only this network reaches, \
+                     signed by the local CA."
+                ),
+            ),
+            _ => warning(
+                "domains.none",
+                &[],
+                "This server has no public address, so new services get no suggested URL. Add \
+                 `suffixes: [apps.example.com]` under access, with a wildcard record \
+                 `*.apps.example.com` pointing at the server."
+                    .to_owned(),
+            ),
+        });
+    }
+}
+
+/// `domains.suffixes`: the configured ones, else the node's sslip.io name when its address is
+/// public. Let's Encrypt cannot reach a private address.
+fn suffixes(config: &Config, facts: &Facts) -> Vec<String> {
+    config.access.suffixes.clone().unwrap_or_else(|| {
+        facts
+            .node_ips
+            .iter()
+            .find(|a| is_public(a))
+            .map_or_else(Vec::new, |a| vec![sslip_suffix(a)])
+    })
+}
+
+/// The sslip.io domain that resolves to `address`: `203-0-113-7.sslip.io`, `2001-db8--1.sslip.io`.
+#[must_use]
+pub fn sslip_suffix(address: &str) -> String {
+    format!("{}.sslip.io", address.replace(['.', ':'], "-"))
+}
+
+/// An address the internet can reach: not private, shared, loopback, link-local or for
+/// documentation.
+#[must_use]
+pub fn is_public(address: &str) -> bool {
+    match address.parse::<IpAddr>() {
+        Ok(IpAddr::V4(a)) => {
+            let [first, second, ..] = a.octets();
+            !(a.is_private()
+                || a.is_loopback()
+                || a.is_link_local()
+                || a.is_documentation()
+                || a.is_unspecified()
+                || a.is_broadcast()
+                || (first == 100 && second & 0xC0 == 64))
+        }
+        Ok(IpAddr::V6(a)) => {
+            let [first, second, ..] = a.segments();
+            first & 0xE000 == 0x2000 && !(first == 0x2001 && second == 0x0DB8)
+        }
+        Err(_) => false,
+    }
+}
+
 /// The chart values of docs/get-started/install.md, with the Secrets the installer creates.
-fn zeabur_values(config: &Config, facts: &Facts, issuer: &str, image: &str) -> Value {
+fn zeabur_values(
+    config: &Config,
+    facts: &Facts,
+    issuer: &str,
+    image: &str,
+    suffixes: &[String],
+) -> Value {
     let (repository, digest) = image
         .split_once('@')
         .map_or((image, None), |(r, d)| (r, Some(d)));
@@ -1120,7 +1201,7 @@ fn zeabur_values(config: &Config, facts: &Facts, issuer: &str, image: &str) -> V
         "publicUrl": config.zeabur_url(),
         "issuer": issuer_values,
         "planKey": {"existingSecret": "zeabur-plan-key"},
-        "domains": {"clusterIssuer": issuer},
+        "domains": {"suffixes": suffixes, "clusterIssuer": issuer},
         "ingress": {
             "enabled": true,
             "className": "traefik",
@@ -1425,6 +1506,50 @@ mod tests {
             "letsencrypt"
         );
         assert_eq!(values["domains"]["clusterIssuer"], "letsencrypt");
+        assert_eq!(values["domains"]["suffixes"], json!([]));
+    }
+
+    #[test]
+    fn suffixes_default_to_sslip_for_a_public_address() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let mut public = facts();
+        public.node_ips = vec!["203.0.114.7".to_owned(), "2a01:4f8::1".to_owned()];
+        let p = plan(&index, &config(""), &public).unwrap();
+        assert_eq!(
+            p.zeabur.unwrap().values["domains"]["suffixes"],
+            json!(["203-0-114-7.sslip.io"])
+        );
+        assert!(p.warnings.iter().all(|w| !w.code.starts_with("domains.")));
+
+        let p = plan(&index, &config(""), &facts()).unwrap();
+        assert!(p.warnings.iter().any(|w| w.code == "domains.none"));
+
+        let mut given = config("");
+        given.access.suffixes = Some(vec!["apps.example.com".to_owned()]);
+        let p = plan(&index, &given, &facts()).unwrap();
+        assert_eq!(
+            p.zeabur.unwrap().values["domains"]["suffixes"],
+            json!(["apps.example.com"])
+        );
+    }
+
+    #[test]
+    fn public_addresses() {
+        for a in ["203.0.114.7", "2a01:4f8::1"] {
+            assert!(is_public(a), "{a}");
+        }
+        for a in [
+            "10.0.0.5",
+            "192.168.1.2",
+            "100.64.0.1",
+            "127.0.0.1",
+            "fd00::5",
+            "2001:db8::1",
+            "x",
+        ] {
+            assert!(!is_public(a), "{a}");
+        }
+        assert_eq!(sslip_suffix("2a01:4f8::1"), "2a01-4f8--1.sslip.io");
     }
 
     #[test]

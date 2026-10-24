@@ -492,8 +492,8 @@ impl Transport for Registry {
     }
 }
 
-/// What the demo's DNS answers: shop points at the cluster, its API not yet, billing behind a
-/// CDN, and the rest nowhere.
+/// What the demo's DNS answers: shop and the app domain point at the cluster, its API not yet,
+/// billing behind a CDN, an old sslip.io address elsewhere, and the rest nowhere.
 fn dns() -> zeabur_api::resolve::Fixed {
     zeabur_api::resolve::Fixed(BTreeMap::from(
         [
@@ -502,6 +502,8 @@ fn dns() -> zeabur_api::resolve::Fixed {
             ("billing.example.com", "198.51.100.24"),
             ("pay.example.com", ENTRY),
             ("stats.example.com", ENTRY),
+            ("*.apps.example.com", ENTRY),
+            ("*.203-0-113-7.sslip.io", "203.0.113.7"),
         ]
         .map(|(name, address)| (name.to_owned(), vec![address.to_owned()])),
     ))
@@ -4044,7 +4046,7 @@ async fn main() -> std::io::Result<()> {
             zeabur_api::settings::DomainSettings::default()
         } else {
             zeabur_api::settings::DomainSettings {
-                suffix: Some("apps.example.com".to_owned()),
+                suffixes: vec!["apps.example.com".to_owned()],
                 cluster_issuer: Some("letsencrypt".to_owned()),
             }
         },

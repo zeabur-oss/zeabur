@@ -14,6 +14,7 @@ mod common;
 mod creations;
 mod databases;
 mod deploy_from_git;
+mod domains;
 mod durability;
 mod evidence;
 mod exec;

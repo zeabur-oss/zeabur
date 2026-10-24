@@ -93,7 +93,9 @@ async function answer(request: IncomingMessage, response: ServerResponse) {
   if (url.pathname === "/api/plan") return json(fixture("plan.json"))
   if (url.pathname === "/api/resolve") {
     const name = url.searchParams.get("name") ?? ""
-    const address = /\.(\d+\.\d+\.\d+\.\d+)\.sslip\.io$/.exec(name)?.[1]
+    const address =
+      /\.(\d+\.\d+\.\d+\.\d+)\.sslip\.io$/.exec(name)?.[1] ??
+      /\.(\d+-\d+-\d+-\d+)\.sslip\.io$/.exec(name)?.[1]?.replaceAll("-", ".")
     return json(JSON.stringify({ name, addresses: address ? [address] : [] }))
   }
   response.statusCode = 404

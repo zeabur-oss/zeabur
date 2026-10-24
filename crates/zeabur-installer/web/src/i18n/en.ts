@@ -123,6 +123,27 @@ export const en = {
   "access.checking": "Looking up…",
   "access.invalid": "Write a domain only, without https:// or a path.",
   "access.same": "Use two different domains.",
+  "access.suffixes": "App domains",
+  "access.suffixesLead": (example: string) =>
+    `A new service's URL is suggested as ${example}. Each domain needs a wildcard DNS record pointing at this server.`,
+  "access.suffixesNone":
+    "New services get no suggested URL, so people type the whole domain. Add a domain you own to suggest one.",
+  "access.privateAsk": (address: string) =>
+    `This server only has the private address ${address}. Use sslip.io URLs anyway? Only computers on the same network reach them, and the CA made on this server signs their certificates.`,
+  "access.privateUse": (suffix: string) => `Use ${suffix}`,
+  "access.privateDomain": (address: string) =>
+    `This server only has the private address ${address}, so Let's Encrypt can't check sslip.io URLs. Add a domain you own, or choose Test machine.`,
+  "access.suffix": (n: number) => `App domain ${n}`,
+  "access.suffixDefault": "Default",
+  "access.suffixRemove": (name: string) => `Remove ${name}`,
+  "access.suffixAdd": "Add a domain",
+  "access.recheck": "Check again",
+  "access.suffixSslip": "Points at this server with no DNS setup.",
+  "access.suffixMissing": (wildcard: string) => `No ${wildcard} record yet.`,
+  "access.suffixRecord": "Add this record at your DNS provider:",
+  "access.recordType": "Type",
+  "access.recordName": "Name",
+  "access.recordValue": "Value",
 
   // Components
   "components.title": "Choose components",
@@ -177,6 +198,8 @@ export const en = {
   "review.rke2": (version: string) => `RKE2 ${version}`,
   "review.rke2Custom": (version: string) => `RKE2 ${version} (unsupported)`,
   "review.access": "Access",
+  "review.suffixes": "App domains",
+  "review.suffixesNone": "None: people type each service's whole domain.",
   "review.components": "Components",
   "review.memory": "Memory at idle",
   "review.time": "Time",
@@ -225,6 +248,10 @@ export const en = {
   "warning.kubernetes.untested": (version: string, tested: string) =>
     `The catalog was tested on ${tested}, not on Kubernetes ${version}.`,
   "warning.metrics.missing": () => "Without VictoriaMetrics, Zeabur shows no usage history.",
+  "warning.domains.none":
+    "This server has no public address, so new services get no suggested URL. Add an app domain you own, with a wildcard record pointing at the server.",
+  "warning.domains.sslip": (suffix: string) =>
+    `This server has no public address, so new services get no suggested URL. Add ${suffix} as an app domain for URLs only this network reaches.`,
   "warning.local.dns": (identity: string, zeabur: string) =>
     `${zeabur} and ${identity} must resolve to this server through DNS, for browsers and for the server itself. A hosts file is not enough: pods do not read it.`,
   "warning.memory.low": (host: string) =>

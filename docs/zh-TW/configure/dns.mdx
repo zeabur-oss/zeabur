@@ -1,0 +1,144 @@
+---
+title: 設定 DNS 紀錄
+description: 用一筆萬用字元紀錄讓所有產生網址連到叢集，並在 Cloudflare、Route 53 或註冊商的 DNS 新增紀錄。
+---
+
+應用程式網域是產生網址共用的網域，只要替它設定一次萬用字元紀錄，之後每個新服務的網址都會解析到叢集。例如應用程式網域是 `apps.example.com`，就新增一筆 `*.apps.example.com` 的 A 紀錄，指向伺服器的 IPv4 位址。伺服器有 IPv6 位址的話，再加一筆 AAAA 紀錄。之後 `web-shop.apps.example.com` 這類新網址不用再新增紀錄。
+
+HTTPS 憑證由 Let's Encrypt 用 HTTP-01 驗證，每個網址各簽一張，所以網際網路要能連到伺服器的 TCP 80 連接埠。Zeabur 不會替你修改 DNS，紀錄要到自己的 DNS 供應商新增。
+
+## 選擇應用程式網域
+
+應用程式網域可以是任何子網域，例如 `apps.example.com`，也可以是網域本身 `example.com`。
+
+| 應用程式網域 | 要新增的萬用字元紀錄 | 服務網址範例 |
+| --- | --- | --- |
+| `apps.example.com` | `*.apps.example.com` | `web-shop.apps.example.com` |
+| `example.com` | `*.example.com` | `web-shop.example.com` |
+
+萬用字元只涵蓋一層名稱。`*.example.com` 涵蓋 `web-shop.example.com`，不涵蓋 `example.com` 本身，也不涵蓋 `a.b.example.com`。
+
+## 在 Zeabur 看要新增的紀錄
+
+到 **叢集** 頁的 **網域** 區塊，每個應用程式網域都列出要新增的紀錄，包括類型、名稱和值，旁邊有複製按鈕，也寫出目前有沒有解析到叢集。到 DNS 供應商新增紀錄後，回來按 **重新檢查**。
+
+剛開始設定時，TTL 用 300 秒，填錯時改正後比較快生效。確認沒問題後可以再拉長。
+
+## 在 DNS 供應商新增紀錄
+
+以下用網域 `example.com`、應用程式網域 `apps.example.com` 舉例。A 紀錄的值填伺服器的 IPv4 位址，有 IPv6 位址再用同樣的名稱新增 AAAA 紀錄。
+
+### Cloudflare
+
+<Steps>
+<Step>
+
+#### 開啟紀錄頁
+
+在 Cloudflare 選這個網域，進入 **DNS** 的 **Records**，按 **Add record**。
+
+</Step>
+<Step>
+
+#### 填入紀錄
+
+| 欄位 | 填法 |
+| --- | --- |
+| Type | `A` |
+| Name | `*.apps`，應用程式網域就是網域本身時填 `*` |
+| IPv4 address | 伺服器的 IPv4 位址 |
+| Proxy status | 關掉，變成 **DNS only**（灰色雲朵） |
+| TTL | Auto |
+
+</Step>
+<Step>
+
+#### 儲存並檢查
+
+按 **Save**，再回到 Zeabur 的 **網域** 區塊按 **重新檢查**。
+
+</Step>
+</Steps>
+
+用灰色雲朵時，Let's Encrypt 驗證 HTTP-01 會直接連到伺服器，Zeabur 檢查時也會查到伺服器的位址。
+
+想開橘色雲朵（**Proxied**）讓流量經過 Cloudflare，就把 Cloudflare 的 SSL/TLS 模式設成 **Full (strict)**。這時 DNS 回傳 Cloudflare 位址，Zeabur 會把網域顯示成 **指向別處**。
+
+### Route 53
+
+<Steps>
+<Step>
+
+#### 開啟 hosted zone
+
+在 Route 53 主控台選 **Hosted zones**，點這個網域的 hosted zone，按 **Create record**。
+
+</Step>
+<Step>
+
+#### 填入紀錄
+
+| 欄位 | 填法 |
+| --- | --- |
+| Record name | `*.apps`，應用程式網域就是網域本身時填 `*` |
+| Record type | `A` |
+| Value | 伺服器的 IPv4 位址 |
+| TTL (seconds) | `300` |
+| Routing policy | Simple routing |
+
+</Step>
+<Step>
+
+#### 儲存並檢查
+
+按 **Create records**，再回到 Zeabur 的 **網域** 區塊按 **重新檢查**。Route 53 通常一分鐘內就會生效。
+
+</Step>
+</Steps>
+
+### 註冊商的 DNS
+
+Gandi、Namecheap、HiNet 這類註冊商的 DNS 管理頁，欄位名稱各家不同，大致這樣填：
+
+| 欄位 | 填法 |
+| --- | --- |
+| 類型 | `A`，有 IPv6 位址再加 `AAAA` |
+| 主機或名稱 | 應用程式網域是 `apps.example.com` 時填 `*.apps`，是 `example.com` 時填 `*` |
+| 值 | 伺服器的 IP 位址 |
+| TTL | `300` 到 `3600` 秒，剛開始設定用 `300` |
+
+網域本身 `example.com` 的紀錄，名稱通常填 `@`。
+
+有些面板要填完整名稱，有些會自動在後面加上網域。存檔前看一下面板顯示的完整名稱，避免變成 `*.apps.example.com.example.com`。
+
+## 自訂網域
+
+每個自訂網域各新增一筆 A 或 AAAA 紀錄，指向伺服器 IP。也可以新增 CNAME，指向應用程式網域底下的名稱，例如 `web-shop.apps.example.com`。服務 **網路** 分頁會列出這個網域要新增的紀錄，加網域的步驟見[加上公開網域與 HTTPS](./domains.mdx)。
+
+網域本身（例如 `example.com`）只能用 A 或 AAAA 紀錄，多數 DNS 供應商不允許在這裡用 CNAME。Cloudflare 例外，它會把網域本身的 CNAME 攤平成 A 紀錄（CNAME flattening）。在 Route 53 新增網域本身的紀錄時，**Record name** 留空，不要填 `@`。
+
+## 沒有自己的網域
+
+安裝時沒有填應用程式網域，而伺服器有公開 IP，產生網址會用 `<IP 破折號>.sslip.io`，不用設定 DNS。伺服器 IP 是 `203.0.113.7` 時，網址長這樣：
+
+```text
+web-shop.203-0-113-7.sslip.io
+```
+
+這種網址包含伺服器 IP，簽發的憑證也會出現在公開的憑證透明度（CT）紀錄裡。Let's Encrypt 給 `sslip.io` 的簽發額度由所有使用者共用，遇到限流時憑證會晚一點簽好，cert-manager 會自己重試。正式上線的服務，換成自己的網域。
+
+## 確認 DNS 已生效
+
+用 `dig` 查應用程式網域底下任一個名稱：
+
+```sh
+dig +short anything.apps.example.com
+```
+
+| 結果 | 代表什麼 |
+| --- | --- |
+| 回傳伺服器 IP | 已經解析到伺服器 |
+| 沒有輸出，或查到 `NXDOMAIN` | 紀錄還沒生效，或名稱打錯 |
+| 回傳其他 IP | 紀錄指到別處，或前面有 Cloudflare 橘色雲朵這類代理 |
+
+改了紀錄之後，其他 DNS 伺服器要等手上的舊答案過期才會查到新值，最久要等舊紀錄的 TTL。新增的名稱如果之前已經查過、得到「不存在」，也要等這個答案過期。

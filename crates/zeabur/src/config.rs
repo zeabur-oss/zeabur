@@ -71,11 +71,12 @@ pub(crate) struct Args {
     /// `shop-prod`. Empty: a name read from the nodes, else the public URL's host.
     #[arg(long, env = "ZEABUR_CLUSTER_NAME", default_value = "")]
     pub(crate) cluster_name: String,
-    /// The domain a new service's public URL is suggested under, as
-    /// `<service>-<project>.<suffix>`, such as `apps.example.com`; it needs a wildcard DNS record.
+    /// The domains a new service's public URL is suggested under, as
+    /// `<service>-<project>.<suffix>`, comma-separated, such as `apps.example.com`, the first by
+    /// default; each needs a wildcard DNS record. A list chosen on the cluster page replaces it.
     /// Empty: people type the whole host.
-    #[arg(long, env = "ZEABUR_DOMAIN_SUFFIX", default_value = "")]
-    pub(crate) domain_suffix: String,
+    #[arg(long, env = "ZEABUR_DOMAIN_SUFFIXES", default_value = "")]
+    pub(crate) domain_suffixes: String,
     /// The cert-manager `ClusterIssuer` that signs a new public URL's certificate. Empty: a new
     /// URL is HTTP only.
     #[arg(long, env = "ZEABUR_CLUSTER_ISSUER", default_value = "")]
@@ -248,20 +249,8 @@ impl Args {
 /// How new public URLs are made, from `args`.
 fn domains(args: &Args) -> Result<zeabur_api::settings::DomainSettings, String> {
     let mut domains = zeabur_api::settings::DomainSettings::default();
-    let suffix = args
-        .domain_suffix
-        .trim()
-        .trim_start_matches("*.")
-        .trim_end_matches('.');
-    if !suffix.is_empty() {
-        if !zeabur_plan::checks::is_dns_subdomain(suffix) {
-            return Err(format!(
-                "--domain-suffix: {:?} is not a domain name",
-                args.domain_suffix
-            ));
-        }
-        domains.suffix = Some(suffix.to_owned());
-    }
+    domains.suffixes = zeabur_api::settings::domains::parse_suffixes(&args.domain_suffixes)
+        .map_err(|e| format!("--domain-suffixes: {e}"))?;
     let issuer = args.cluster_issuer.trim();
     if !issuer.is_empty() {
         if !zeabur_plan::checks::is_dns_subdomain(issuer) {
@@ -575,8 +564,8 @@ mod tests {
         let config = args(
             &files,
             &[
-                "--domain-suffix",
-                "*.apps.example.com",
+                "--domain-suffixes",
+                "*.apps.example.com, example.com",
                 "--cluster-issuer",
                 "letsencrypt",
             ],
@@ -585,12 +574,12 @@ mod tests {
         assert_eq!(
             config.settings.domains,
             zeabur_api::settings::DomainSettings {
-                suffix: Some("apps.example.com".to_owned()),
+                suffixes: vec!["apps.example.com".to_owned(), "example.com".to_owned()],
                 cluster_issuer: Some("letsencrypt".to_owned()),
             }
         );
-        let error = args(&files, &["--domain-suffix", "Apps_example"]).unwrap_err();
-        assert!(error.starts_with("--domain-suffix:"), "{error}");
+        let error = args(&files, &["--domain-suffixes", "Apps_example"]).unwrap_err();
+        assert!(error.starts_with("--domain-suffixes:"), "{error}");
         let error = args(&files, &["--cluster-issuer", "Let's Encrypt"]).unwrap_err();
         assert!(error.starts_with("--cluster-issuer:"), "{error}");
         let config = args(&files, &["--build-registry", "zot.zot.svc:5000/"]).unwrap();

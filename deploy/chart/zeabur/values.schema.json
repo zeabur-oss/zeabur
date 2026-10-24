@@ -99,11 +99,14 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "suffix": {
-          "description": "A domain name new URLs are suggested under, or empty.",
-          "type": "string",
-          "pattern": "^([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*)?$",
-          "maxLength": 253
+        "suffixes": {
+          "description": "Domain names new URLs are suggested under, the first by default.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$",
+            "maxLength": 253
+          }
         },
         "clusterIssuer": {
           "description": "The cert-manager ClusterIssuer for new URLs, or empty for HTTP only.",

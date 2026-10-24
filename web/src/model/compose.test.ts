@@ -74,7 +74,7 @@ const conversion: Conversion = {
 
 const context: ComposeContext = {
   project: "shop",
-  domains: { suffix: "apps.example.com" },
+  domains: { suffixes: ["apps.example.com"] },
   enforced: "restricted",
   options: { port: true, publicUrl: true, secrets: true, volume: true },
   nodes: 1,

@@ -190,7 +190,7 @@ export function ComposeDrawer({ project, onClose }: { project: string; onClose: 
             offered={offered.length}
             diffs={diffs}
             choices={choices}
-            suffix={context.domains.suffix}
+            suffix={context.domains.suffixes?.[0]}
             publicUrl={context.options.publicUrl}
             problems={tried ? problems : new Map()}
             onManaged={(name, on) => setUnmanaged((names) => toggled(names, name, !on))}

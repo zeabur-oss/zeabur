@@ -14,7 +14,7 @@ issuer:
     configMap: zeabur-identity-ca
   accountUrl: https://identity.example.test:8443/account
 domains:
-  suffix: apps.example.test
+  suffixes: [apps.example.test, example.test]
   clusterIssuer: letsencrypt
 elevation:
   enabled: false

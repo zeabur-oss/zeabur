@@ -44,13 +44,14 @@ issuer:
   # the `manage` URL the issuer publishes at /.well-known/passkey-endpoints, else no link.
   accountUrl: ""
 
-# New public URLs. suffix: the domain a new service's URL is suggested under, as
-# <service>-<project>.<suffix>, such as apps.example.com; point a wildcard DNS record
-# (*.apps.example.com) at the cluster's ingress. Empty: people type the whole host.
+# New public URLs. suffixes: the domains a new service's URL is suggested under, as
+# <service>-<project>.<suffix>, such as apps.example.com, the first by default; point a wildcard
+# DNS record (*.apps.example.com) at the cluster's ingress. An administrator can change them on
+# the cluster page. Empty: people type the whole host.
 # clusterIssuer: the cert-manager ClusterIssuer that signs a new URL's certificate; Zeabur adds its
 # annotation and a tls block to the Ingress, shown in the plan. Empty: new URLs are HTTP only.
 domains:
-  suffix: ""
+  suffixes: []
   clusterIssuer: ""
 
 # Services deployed from Git. registry: where Zeabur Builder pushes and nodes pull, the same as the

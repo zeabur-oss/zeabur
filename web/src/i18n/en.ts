@@ -908,6 +908,12 @@ export const en = {
   "domain.cert.failed": "Certificate failed",
   "domain.cert.retries": "cert-manager retries on its own.",
   "domain.cert.says": "cert-manager says",
+  "domain.cert.rateLimited":
+    "Let's Encrypt has a limit on new certificates for this domain and turned this one down for now.",
+  "domain.cert.rateLimitedShared":
+    "Let's Encrypt has a limit on new certificates for sslip.io, shared by everyone who uses it, and turned this one down for now. For a site people rely on, use your own domain.",
+  "domain.checkAgain": "Check again",
+  "domain.checking": "Checking…",
   "pod.pods": "Replicas",
   "pod.named": (pod: string) => `Replica ${pod}`,
   "pod.none": "No replicas are running.",
@@ -3543,6 +3549,34 @@ export const en = {
   "domainCert.kube.ownValue": (route: string) =>
     `kubernetes.io/tls Secret, owned by Ingress/${route}`,
   "domainCert.kube.tls": "Where it's served",
+  "domains.title": "Domains",
+  "domains.lead": "A new service's URL is suggested as",
+  "domains.none":
+    "New services have no suggested URL, so people type the whole domain. Add a domain you own, then point its wildcard record at the cluster.",
+  "domains.default": "Default",
+  "domains.edit": "Edit",
+  "domains.editLead":
+    "New URLs go under these domains, the first one by default. A domain can be a subdomain such as apps.example.com or the domain itself. URLs already made keep their names.",
+  "domains.suffix": (n: number) => `Domain ${n}`,
+  "domains.add": "Add a domain",
+  "domains.remove": (name: string) => `Remove ${name}`,
+  "domains.invalid": (list: string) => `${list} isn't a domain name.`,
+  "domains.save": "Save",
+  "domains.saved": "Domains saved",
+  "domains.reset": "Go back to the install's domains",
+  "domains.state.pointsHere": "Points to this cluster",
+  "domains.state.sslip": "No DNS setup needed",
+  "domains.state.missing": "No record yet",
+  "domains.state.elsewhere": "Points elsewhere",
+  "domains.state.unknown": "Not confirmed",
+  "domains.missing": (wildcard: string) =>
+    `No ${wildcard} record yet, so URLs under this domain don't reach the cluster.`,
+  "domains.moved": (from: string, to: string) =>
+    `The server's address changed from ${from} to ${to}. This domain still points to ${from}, and so do URLs made under it.`,
+  "domains.useNew": (suffix: string) => `Use ${suffix} for new URLs`,
+  "domains.kube.stored": "Kept in",
+  "domains.kube.default": "Install's domains",
+  "domains.kube.issuer": "Certificates from",
   "issuers.title": "Certificates",
   "issuers.add": "Add DNS-01 issuer",
   "issuers.wildcardsBy": (issuer: string) =>

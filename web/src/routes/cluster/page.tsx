@@ -19,6 +19,7 @@ import { useT } from "@/i18n"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { AttentionRow, useAttention } from "@/routes/cluster/attention"
+import { DomainsSection } from "@/routes/cluster/domains"
 import { HealthSection } from "@/routes/cluster/health"
 import { IssuersSection } from "@/routes/cluster/issuers"
 import { NodesSection } from "@/routes/cluster/nodes"
@@ -32,6 +33,7 @@ export function ClusterPage() {
       <HealthSection />
       <NodesSection />
       <WarningsSection />
+      <DomainsSection />
       <IssuersSection />
       <NodeAlerts />
     </ClusterFrame>

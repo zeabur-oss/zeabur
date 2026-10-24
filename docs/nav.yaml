@@ -9,7 +9,7 @@
   pages: [git, image, compose, databases, object-storage, cron-jobs]
 - group: configure
   label: Configure
-  pages: [variables, domains, maintenance, volumes]
+  pages: [variables, domains, dns, maintenance, volumes]
 - group: cluster
   label: Operate the cluster
   pages: [members, tokens, notifications, backups, nodes, components, external-secrets, s3-destinations]

@@ -62,9 +62,9 @@ spec:
             - name: ZEABUR_CLUSTER_NAME
               value: {{ . | quote }}
             {{- end }}
-            {{- with .Values.domains.suffix }}
-            - name: ZEABUR_DOMAIN_SUFFIX
-              value: {{ . | quote }}
+            {{- with .Values.domains.suffixes }}
+            - name: ZEABUR_DOMAIN_SUFFIXES
+              value: {{ join "," . | quote }}
             {{- end }}
             {{- with .Values.domains.clusterIssuer }}
             - name: ZEABUR_CLUSTER_ISSUER

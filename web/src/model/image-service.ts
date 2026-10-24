@@ -57,7 +57,7 @@ export interface ImageService {
 }
 
 export interface DomainSettings {
-  suffix?: string | null
+  suffixes?: string[]
   clusterIssuer?: string | null
 }
 

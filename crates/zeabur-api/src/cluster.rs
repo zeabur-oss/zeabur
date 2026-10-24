@@ -148,8 +148,12 @@ pub(crate) async fn get(
     Person(cluster): Person,
     headers: HeaderMap,
 ) -> Result<Json<Cluster>, ApiError> {
-    let (version, rules) =
-        futures_util::future::join(cluster.version(), cluster.access_rules("kube-system")).await;
+    let (version, rules, (suffixes, ..)) = futures_util::future::join3(
+        cluster.version(),
+        cluster.access_rules("kube-system"),
+        crate::settings::domains::effective(cluster.as_ref(), &state.settings),
+    )
+    .await;
     let version = version.map_err(|e| ApiError::from(e.into_problem("the cluster's version")))?;
     let named = cluster_name::resolve(cluster.as_ref(), &state.settings, &headers).await;
     Ok(Json(Cluster {
@@ -158,7 +162,10 @@ pub(crate) async fn get(
         name_provider: named.provider,
         distribution: distribution(&version),
         kubernetes_version: version,
-        domains: state.settings.domains.clone(),
+        domains: crate::settings::DomainSettings {
+            suffixes,
+            ..state.settings.domains.clone()
+        },
         builds: state.settings.builds.clone(),
         can: crate::projects::rights::ClusterRights::of(rules.as_ref().ok()),
     }))

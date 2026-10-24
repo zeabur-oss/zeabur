@@ -20,6 +20,7 @@
   pages:
     variables: 設定環境變數
     domains: 加上公開網域與 HTTPS
+    dns: 設定 DNS 紀錄
     maintenance: 顯示維護與錯誤頁面
     volumes: 儲存檔案與備份磁碟區
 - group: cluster

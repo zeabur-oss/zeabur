@@ -164,6 +164,17 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
                 </span>
               </div>
             </Row>
+            {plan.zeabur ? (
+              <Row label={t("review.suffixes")}>
+                {plan.zeabur.values?.domains?.suffixes?.length ? (
+                  <span className="font-mono text-xs break-all">
+                    {plan.zeabur.values.domains.suffixes.join(", ")}
+                  </span>
+                ) : (
+                  t("review.suffixesNone")
+                )}
+              </Row>
+            ) : null}
             <Row label={t("review.time")}>{t("review.timeValue")}</Row>
           </Rows>
         </Panel>

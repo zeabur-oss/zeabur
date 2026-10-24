@@ -103,7 +103,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const note = portNote(portValue, inspection)
   const port = options.port ? portValue.trim() : ""
   const publicUrl = options.publicUrl && port !== "" && form.publicUrl
-  const host = hosted ? form.host : suggestedHost(name, project, domains.suffix)
+  const host = hosted ? form.host : suggestedHost(name, project, domains.suffixes?.[0])
   const env = parseEnv(extras.env)
   const secrets = options.secrets
   const volume = options.volume && extras.volume
@@ -265,7 +265,9 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                 hideLabel
                 hint={
                   <>
-                    {domains.suffix ? null : <span className="block">{t("add.hostHint")}</span>}
+                    {domains.suffixes?.length ? null : (
+                      <span className="block">{t("add.hostHint")}</span>
+                    )}
                     <span className="block">
                       {domains.clusterIssuer
                         ? t("add.https", domains.clusterIssuer)
@@ -281,7 +283,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                   size="sm"
                   mono
                   value={host}
-                  placeholder={domains.suffix ? undefined : "web.example.com"}
+                  placeholder={domains.suffixes?.length ? undefined : "web.example.com"}
                   autoComplete="off"
                   spellCheck={false}
                   onChange={(event) => {

@@ -45,7 +45,7 @@ export interface Config {
   enable: string[]
   disable: string[]
   profile: string
-  access: { mode: AccessMode; identity: string; zeabur: string }
+  access: { mode: AccessMode; identity: string; zeabur: string; suffixes?: string[] }
   zeabur: boolean
   inputs: Record<string, Record<string, unknown>>
   secretFiles: Record<string, Record<string, string>>
@@ -90,7 +90,7 @@ export interface Plan {
   leftOut: Record<string, string>
   access: AccessMode
   identity: { issuer: string; host: string } | null
-  zeabur: { url: string } | null
+  zeabur: { url: string; values?: { domains?: { suffixes?: string[] } } } | null
   memory: { rke2Mib: number; componentsMib: number; unmeasured: number; hostMib: number }
   warnings: Warning[]
 }

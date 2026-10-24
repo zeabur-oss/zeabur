@@ -5,8 +5,11 @@ import {
   dnsSetup,
   domainsLead,
   filterRoutes,
+  isSslip,
   plainFirst,
+  rateLimited,
   recordsFor,
+  sslipSuffix,
   wildcardFor,
 } from "@/model/domains"
 import type { PublicRoute } from "@/model/service"
@@ -101,13 +104,31 @@ describe("recordsFor", () => {
 
 describe("wildcardFor", () => {
   test("one label under the suffix is covered by its wildcard", () => {
-    expect(wildcardFor("web-shop.apps.example.com", "apps.example.com")).toBe("*.apps.example.com")
+    expect(wildcardFor("web-shop.apps.example.com", ["example.com", "apps.example.com"])).toBe(
+      "*.apps.example.com",
+    )
   })
   test("deeper names, the suffix itself and other domains are not", () => {
-    expect(wildcardFor("a.b.apps.example.com", "apps.example.com")).toBeUndefined()
-    expect(wildcardFor("apps.example.com", "apps.example.com")).toBeUndefined()
-    expect(wildcardFor("shop.example.com", "apps.example.com")).toBeUndefined()
-    expect(wildcardFor("shop.example.com", undefined)).toBeUndefined()
+    expect(wildcardFor("a.b.apps.example.com", ["apps.example.com"])).toBeUndefined()
+    expect(wildcardFor("apps.example.com", ["apps.example.com"])).toBeUndefined()
+    expect(wildcardFor("shop.example.com", ["apps.example.com"])).toBeUndefined()
+    expect(wildcardFor("shop.example.com")).toBeUndefined()
+  })
+})
+
+describe("sslip.io", () => {
+  test("a suffix keeps the address in one label", () => {
+    expect(sslipSuffix("203.0.113.7")).toBe("203-0-113-7.sslip.io")
+    expect(sslipSuffix("2001:db8::1")).toBe("2001-db8--1.sslip.io")
+    expect(isSslip("web-shop.203-0-113-7.sslip.io")).toBe(true)
+    expect(isSslip("web.example.com")).toBe(false)
+  })
+  test("a rate limit is told from other failures", () => {
+    expect(rateLimited("429 urn:ietf:params:acme:error:rateLimited: too many certificates")).toBe(
+      true,
+    )
+    expect(rateLimited("connection refused")).toBe(false)
+    expect(rateLimited(undefined)).toBe(false)
   })
 })
 
@@ -122,7 +143,7 @@ describe("dnsSetup", () => {
     })
   })
   test("a name under the suffix needs the wildcard, not its own record", () => {
-    expect(dnsSetup("web.apps.example.com", check(), "apps.example.com")).toEqual({
+    expect(dnsSetup("web.apps.example.com", check(), ["apps.example.com"])).toEqual({
       as: "missing",
       records: [{ type: "A", name: "*.apps.example.com", value: "203.0.113.10" }],
     })

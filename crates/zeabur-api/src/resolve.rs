@@ -38,13 +38,19 @@ impl Resolve for System {
     }
 }
 
-/// Fixed answers, for tests; a name it does not know is not found.
+/// Fixed answers, for tests; a name it does not know is not found. A `*.` name answers for one
+/// label under it, as a wildcard record does.
 #[derive(Debug, Clone, Default)]
 pub struct Fixed(pub BTreeMap<String, Vec<String>>);
 
 impl Resolve for Fixed {
     fn resolve<'a>(&'a self, name: &'a str) -> Pin<Box<dyn Future<Output = Resolved> + Send + 'a>> {
-        let answer = self.0.get(name).map_or_else(
+        let wildcard = name.split_once('.').map(|(_, rest)| format!("*.{rest}"));
+        let found = self
+            .0
+            .get(name)
+            .or_else(|| wildcard.and_then(|w| self.0.get(&w)));
+        let answer = found.map_or_else(
             || Resolved::NotFound(format!("no such host: {name}")),
             |addresses| Resolved::Addresses(addresses.clone()),
         );
