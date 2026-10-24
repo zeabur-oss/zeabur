@@ -772,7 +772,20 @@ fn identity(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError> {
     let before = reloads(kubectl);
     // RKE2 runs k3s's server, so its file is k3s's (see `EMPTY_AUTHN`).
     let config = identityctl(kubectl, plan, &["kube-config", "--distro", "k3s"], None)?.stdout;
-    // Servers that join later copy it from here.
+    if trust(kubectl, &config)? {
+        out::err("    waiting for kube-apiserver to trust Zeabur Identity (up to a few minutes)");
+        kubectl::poll(
+            Duration::from_secs(300),
+            "kube-apiserver to load Zeabur Identity's configuration",
+            || reloads(kubectl) > before,
+        )?;
+    }
+    Ok(())
+}
+
+/// Writes kube-apiserver's authentication configuration on this server and in the cluster, where
+/// the other servers copy it from (`join::sync_authn`). Returns whether this server's file changed.
+pub(crate) fn trust(kubectl: &Kubectl, config: &str) -> Result<bool, InstallError> {
     kubectl.apply_object(&json!({
         "apiVersion": "v1",
         "kind": "ConfigMap",
@@ -783,15 +796,11 @@ fn identity(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError> {
         },
         "data": {"authn.yaml": config},
     }))?;
-    if files::write(Path::new(AUTHN_FILE), 0o600, config.as_bytes())? {
-        out::err("    waiting for kube-apiserver to trust Zeabur Identity (up to a few minutes)");
-        kubectl::poll(
-            Duration::from_secs(300),
-            "kube-apiserver to load Zeabur Identity's configuration",
-            || reloads(kubectl) > before,
-        )?;
-    }
-    Ok(())
+    Ok(files::write(
+        Path::new(AUTHN_FILE),
+        0o600,
+        config.as_bytes(),
+    )?)
 }
 
 /// The sum of kube-apiserver's successful authentication-configuration reloads.

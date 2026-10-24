@@ -5,13 +5,13 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use zeabur_installer_host::files;
+use zeabur_installer_host::facts;
 use zeabur_installer_host::kubectl::Kubectl;
 use zeabur_installer_plan::plan::{IDENTITY_NAMESPACE, ZEABUR_NAMESPACE};
-use zeabur_installer_plan::rke2::{AUTHN_FILE, EMPTY_AUTHN, PREFIX};
+use zeabur_installer_plan::rke2::{EMPTY_AUTHN, PREFIX};
 use zeabur_installer_plan::storage::{MODULES_FILE, MULTIPATH_FILE};
 
-use crate::apply::STATE_DIR;
+use crate::apply::{self, STATE_DIR};
 use crate::{InstallError, Product, out};
 
 /// Where local-path volumes live; never removed by the installer.
@@ -60,7 +60,7 @@ pub(crate) fn run(config: &Path, what: Product) -> Result<(), InstallError> {
     if matches!(what, Product::Identity) {
         out::step("Removing Zeabur Identity");
         // Stop trusting its tokens first.
-        files::write(Path::new(AUTHN_FILE), 0o600, EMPTY_AUTHN.as_bytes())?;
+        apply::trust(&kubectl, EMPTY_AUTHN)?;
         kubectl.run(
             &[
                 "delete",
@@ -74,6 +74,14 @@ pub(crate) fn run(config: &Path, what: Product) -> Result<(), InstallError> {
         out::line(
             "Zeabur Identity's custom resource definitions are kept; they hold no data once its namespace is gone.",
         );
+        let others = other_servers(&kubectl)?;
+        if !others.is_empty() {
+            out::line(&format!(
+                "The other servers trust Zeabur Identity's tokens until you run \
+                 `sudo zeabur-installer apply` on each of them: {}",
+                others.join(", ")
+            ));
+        }
     }
     out::line(&format!(
         "RKE2 and the catalog's components stay; {PREFIX}/bin/rke2-uninstall.sh removes them."
@@ -83,6 +91,25 @@ pub(crate) fn run(config: &Path, what: Product) -> Result<(), InstallError> {
         out::line(&left);
     }
     Ok(())
+}
+
+/// The server nodes other than this one.
+fn other_servers(kubectl: &Kubectl) -> Result<Vec<String>, InstallError> {
+    let names = kubectl.run(
+        &[
+            "get",
+            "nodes",
+            "--selector=node-role.kubernetes.io/control-plane",
+            "--output=jsonpath={.items[*].metadata.name}",
+        ],
+        None,
+    )?;
+    let own = facts::read()?.hostname.to_ascii_lowercase();
+    Ok(names
+        .split_whitespace()
+        .filter(|name| *name != own)
+        .map(str::to_owned)
+        .collect())
 }
 
 /// RKE2 is still installed: `rke2-uninstall.sh` removes its binary.

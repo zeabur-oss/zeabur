@@ -63,7 +63,8 @@ enum Command {
     Doctor,
     /// Remove Zeabur, or Zeabur and Zeabur Identity. RKE2 itself is removed with
     /// `/usr/local/bin/rke2-uninstall.sh`. On a node that joined a cluster, prints how to take
-    /// the node out. Says which of the installer's files stay after that.
+    /// the node out. Says which of the installer's files stay after that. After Zeabur Identity
+    /// is removed, the other servers stop trusting it once `apply` runs on each of them.
     Uninstall {
         /// What to remove; required on a server installed with Zeabur, unless with `--purge`.
         #[arg(value_enum)]
