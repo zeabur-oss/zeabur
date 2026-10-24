@@ -74,5 +74,4 @@
     - click: '[role="dialog"] [data-slot="collapsible-trigger"]'
     - wait: '[role="dialog"] pre, [role="dialog"] code'
   clip: '[role="dialog"]'
-  locales: [zh-TW]
   themes: [light, dark]
