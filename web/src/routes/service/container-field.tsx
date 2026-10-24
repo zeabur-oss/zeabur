@@ -6,16 +6,18 @@ import { Select } from "@zeabur/design-system/components/select"
 export function ContainerField({
   containers,
   value,
+  label,
   onChange,
 }: {
   containers: readonly { name: string }[]
   value: string
+  label?: string
   onChange: (name: string) => void
 }) {
   const t = useT()
   if (containers.length < 2) return null
   return (
-    <FormField label={t("tasks.container")}>
+    <FormField label={label ?? t("tasks.container")}>
       <Select
         size="sm"
         translate="no"

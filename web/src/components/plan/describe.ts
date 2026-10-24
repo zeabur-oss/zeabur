@@ -136,7 +136,7 @@ function sentenceOf(
     case "expandVolume":
       return t("confirm.noShrink")
     case "addVolume":
-      return t("confirm.addVolume", change.volume.size, change.workload.name)
+      return addVolumeSentence(t, change)
     case "removeVolume":
       return t("confirm.removeVolume", change.workload.name, change.mountPath)
     case "editMount": {
@@ -240,6 +240,11 @@ function editTaskWords(t: Translate, change: Extract<Change, { op: "editTask" }>
     ? { sentence: t("confirm.pauseTask", change.cronJob), action: t("action.pause") }
     : { sentence: t("confirm.resumeTask", change.cronJob), action: t("action.resume") }
 }
+
+const addVolumeSentence = (t: Translate, change: Extract<Change, { op: "addVolume" }>) =>
+  change.container
+    ? t("confirm.addVolumeIn", change.volume.size, change.workload.name, change.container)
+    : t("confirm.addVolume", change.volume.size, change.workload.name)
 
 function accessSentence(t: Translate, change: AccessChange | ServiceChange): string {
   switch (change.op) {

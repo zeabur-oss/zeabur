@@ -1070,6 +1070,7 @@ export const zhCN: Messages = {
   "storage.about.local": "最快，但固定在一个节点上：用到它的副本只能在那里运行。",
   "storage.about.replicated": "数据复制到多个节点，副本换节点时会跟着移动。",
   "storage.about.other": "行为由它的驱动决定。",
+  "storage.container": "挂载到容器",
   "storage.grows": "之后可以扩容，不能缩小。",
   "storage.fixedSize": "之后不能扩容，请一次选好需要的大小。",
   "storage.growUnknown": "之后能否扩容，由集群的存储类决定。",
@@ -1549,6 +1550,8 @@ export const zhCN: Messages = {
   "confirm.notRolledBack": "回滚不会改动 ConfigMap 和 Secret 的内容。",
   "confirm.noShrink": "卷扩容后就无法缩小。",
   "confirm.addVolume": (size, service) => `${service} 会多一个 ${size} 的卷。`,
+  "confirm.addVolumeIn": (size, service, container) =>
+    `${service} 会多一个 ${size} 的卷，挂载到容器 ${container}。`,
   "confirm.moveMount": (service, from, to) => `把 ${service} 的挂载从 ${from} 移到 ${to}。`,
   "confirm.readOnly": (path, service) => `把 ${service} 的 ${path} 设为只读。`,
   "confirm.writable": (path, service) => `把 ${service} 的 ${path} 设为可写。`,

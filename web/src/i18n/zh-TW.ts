@@ -1072,6 +1072,7 @@ export const zhTW: Messages = {
   "storage.about.local": "最快，但固定在一個節點上：用到它的副本只能在那裡執行。",
   "storage.about.replicated": "資料複寫到多個節點，副本換節點時會跟著移動。",
   "storage.about.other": "行為由它的驅動程式決定。",
+  "storage.container": "掛載到容器",
   "storage.grows": "之後可以擴充，不能縮小。",
   "storage.fixedSize": "之後不能擴充，請一次選好需要的大小。",
   "storage.growUnknown": "之後能否擴充，由叢集的儲存類別決定。",
@@ -1551,6 +1552,8 @@ export const zhTW: Messages = {
   "confirm.notRolledBack": "回滾不會改動 ConfigMap 和 Secret 的內容。",
   "confirm.noShrink": "磁碟區擴充後就無法縮小。",
   "confirm.addVolume": (size, service) => `${service} 會多一個 ${size} 的磁碟區。`,
+  "confirm.addVolumeIn": (size, service, container) =>
+    `${service} 會多一個 ${size} 的磁碟區，掛載到容器 ${container}。`,
   "confirm.moveMount": (service, from, to) => `把 ${service} 的掛載從 ${from} 移到 ${to}。`,
   "confirm.readOnly": (path, service) => `把 ${service} 的 ${path} 設為唯讀。`,
   "confirm.writable": (path, service) => `把 ${service} 的 ${path} 設為可寫入。`,

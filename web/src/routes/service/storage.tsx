@@ -47,6 +47,7 @@ import { Input } from "@zeabur/design-system/components/input"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Select } from "@zeabur/design-system/components/select"
 import { Switch } from "@zeabur/design-system/components/switch"
+import { ContainerField } from "@/routes/service/container-field"
 import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
@@ -254,6 +255,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                       problem={problems.get(row.id)}
                       focus={focus === row.id}
                       removable={addable}
+                      containers={multi ? containers : undefined}
                       onChange={(change) => update(row.id, change)}
                     />
                   ))
@@ -518,6 +520,7 @@ function EditRow({
   problem,
   focus,
   removable,
+  containers,
   onChange,
 }: {
   row: VolumeRow
@@ -528,6 +531,8 @@ function EditRow({
   problem?: VolumeProblem
   focus: boolean
   removable: boolean
+  /** The containers a new volume can go into, when there are several. */
+  containers?: readonly { name: string }[]
   onChange: (change: (row: VolumeRow) => VolumeRow | undefined) => void
 }) {
   const t = useT()
@@ -645,15 +650,7 @@ function EditRow({
     <li className="grid grid-cols-2 items-center gap-x-3 gap-y-1.5 px-5 py-2.5 sm:grid-cols-volume">
       {fields}
       {message}
-      <div className="col-span-full">
-        <StorageClassField
-          storage={storage}
-          value={row.storageClass}
-          details={false}
-          growth
-          onChange={(name) => onChange((r) => ({ ...r, storageClass: chosenClass(storage, name) }))}
-        />
-      </div>
+      <NewVolumePlace row={row} storage={storage} containers={containers} onChange={onChange} />
       <Collapsible className="col-span-full">
         <CollapsibleTrigger variant="disclosure">
           <CaretRightIcon aria-hidden="true" />
@@ -664,6 +661,38 @@ function EditRow({
         </CollapsibleContent>
       </Collapsible>
     </li>
+  )
+}
+
+/** The container and the storage class of a new volume. */
+function NewVolumePlace({
+  row,
+  storage,
+  containers = [],
+  onChange,
+}: {
+  row: VolumeRow
+  storage: ProjectStorage | undefined
+  containers?: readonly { name: string }[]
+  onChange: (change: (row: VolumeRow) => VolumeRow | undefined) => void
+}) {
+  const t = useT()
+  return (
+    <div className="col-span-full flex flex-col gap-3">
+      <ContainerField
+        containers={containers}
+        value={row.container ?? ""}
+        label={t("storage.container")}
+        onChange={(container) => onChange((r) => ({ ...r, container }))}
+      />
+      <StorageClassField
+        storage={storage}
+        value={row.storageClass}
+        details={false}
+        growth
+        onChange={(name) => onChange((r) => ({ ...r, storageClass: chosenClass(storage, name) }))}
+      />
+    </div>
   )
 }
 

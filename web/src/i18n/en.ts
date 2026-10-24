@@ -1153,6 +1153,7 @@ export const en = {
   "storage.about.local": "Fastest, but kept on one node: replicas that use it run only there.",
   "storage.about.replicated": "Copied to several nodes, so it moves with its replicas.",
   "storage.about.other": "How it behaves is up to its driver.",
+  "storage.container": "Mount in container",
   "storage.grows": "It can grow later, not shrink.",
   "storage.fixedSize": "It can't grow later, so choose the size it needs.",
   "storage.growUnknown": "Whether it can grow later is up to the cluster's storage class.",
@@ -1682,6 +1683,8 @@ export const en = {
   "confirm.notRolledBack": "A rollback leaves ConfigMap and Secret contents as they are.",
   "confirm.noShrink": "A volume can't shrink after it grows.",
   "confirm.addVolume": (size: string, service: string) => `${service} gets a new ${size} volume.`,
+  "confirm.addVolumeIn": (size: string, service: string, container: string) =>
+    `${service} gets a new ${size} volume, mounted in its container ${container}.`,
   "confirm.moveMount": (service: string, from: string, to: string) =>
     `Move ${service}'s mount from ${from} to ${to}.`,
   "confirm.readOnly": (path: string, service: string) => `Make ${path} read-only in ${service}.`,
