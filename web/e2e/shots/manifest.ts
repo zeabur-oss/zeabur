@@ -1,6 +1,6 @@
 // The screenshot manifest (docs/shots.yaml), as JSON from `yq -o=json`. Run by
 // scripts/docs-shots.sh: `bun e2e/shots/manifest.ts <shots.json> [name]` checks it and prints each
-// distinct demo environment as one line of JSON.
+// distinct demo server (its app and environment) as one line of JSON.
 import { readFileSync } from "node:fs"
 
 export type Step =
@@ -8,9 +8,14 @@ export type Step =
   | { fill: string; value: string }
   | { hover: string }
   | { press: string }
+  | { wait: string }
+
+export const apps = ["zeabur", "installer"] as const
+export type App = (typeof apps)[number]
 
 export type Shot = {
   id: string
+  app: App
   path: string
   wait?: string
   steps: Step[]
@@ -31,12 +36,24 @@ export const viewports = {
   phone: { width: 390, height: 844 },
 }
 
-const shotKeys = ["id", "path", "wait", "steps", "clip", "viewport", "env", "locales", "themes"]
+const shotKeys = [
+  "id",
+  "app",
+  "path",
+  "wait",
+  "steps",
+  "clip",
+  "viewport",
+  "env",
+  "locales",
+  "themes",
+]
 const stepKeys: Record<string, string[]> = {
   click: ["click"],
   fill: ["fill", "value"],
   hover: ["hover"],
   press: ["press"],
+  wait: ["wait"],
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -87,12 +104,13 @@ function shot(value: unknown, index: number): Shot {
   if (!isRecord(value)) throw new Error(`shot ${index}: expected a mapping`)
   const at = typeof value.id === "string" ? value.id : `shot ${index}`
   for (const key of Object.keys(value)) check(shotKeys.includes(key), `${at}: unknown key "${key}"`)
-  const { id, path, wait, clip, viewport = "desktop", steps = [] } = value
+  const { id, app = "zeabur", path, wait, clip, viewport = "desktop", steps = [] } = value
   const { locales: shotLocales = Object.keys(locales), themes: shotThemes = ["light"] } = value
   check(
     typeof id === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id),
     `${at}: id must be kebab-case`,
   )
+  check(apps.includes(app as App), `${at}: app must be ${apps.join(" or ")}`)
   check(typeof path === "string" && path.startsWith("/"), `${at}: path must start with /`)
   check(isSelector(wait), `${at}: wait must be a CSS selector`)
   check(isSelector(clip), `${at}: clip must be a CSS selector`)
@@ -100,6 +118,7 @@ function shot(value: unknown, index: number): Shot {
   if (!Array.isArray(steps)) throw new Error(`${at}: steps must be a list`)
   return {
     id: id as string,
+    app: app as App,
     path: path as string,
     wait: wait as string | undefined,
     steps: steps.map((s, i) => step(s, `${at}: step ${i + 1}`)),
@@ -111,9 +130,9 @@ function shot(value: unknown, index: number): Shot {
   }
 }
 
-/** The environment as one canonical line, for grouping shots by demo server. */
-export function envKey(env: Record<string, string>): string {
-  return JSON.stringify(Object.fromEntries(Object.entries(env).sort()))
+/** The demo server a shot needs as one canonical line, for grouping shots by server. */
+export function serverKey({ app, env }: Pick<Shot, "app" | "env">): string {
+  return JSON.stringify({ app, env: Object.fromEntries(Object.entries(env).sort()) })
 }
 
 export function readManifest(file: string): Shot[] {
@@ -131,7 +150,7 @@ export function readManifest(file: string): Shot[] {
 if (import.meta.main) {
   try {
     const shots = readManifest(process.argv[2])
-    for (const key of new Set(shots.map((s) => envKey(s.env)))) console.log(key)
+    for (const key of new Set(shots.map(serverKey))) console.log(key)
   } catch (error) {
     console.error(`${process.argv[3] ?? process.argv[2]}: ${(error as Error).message}`)
     process.exit(1)

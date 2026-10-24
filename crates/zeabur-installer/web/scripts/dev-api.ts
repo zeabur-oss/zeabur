@@ -3,14 +3,18 @@
 // show a real host and catalog; without them, the captured responses in fixtures/ answer.
 // Installing is always simulated: the log replays fixtures/apply.log (INSTALLER_FAIL=1, or an
 // `installer_fail=1` cookie, stops it partway), so nothing changes on the server.
+// `vite preview` serves the built pages with the same API, for scripts/docs-shots.sh. There,
+// ZEABUR_DEMO_INSTALL gives the whole log at the first read: `done`, `running` (stops before
+// Zeabur) or `fail`.
 import { readFileSync } from "node:fs"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { resolve } from "node:path"
-import type { Plugin } from "vite"
+import type { Connect, Plugin } from "vite"
 
 const fixtures = resolve(import.meta.dirname, "fixtures")
 const fixture = (name: string) => readFileSync(resolve(fixtures, name), "utf8")
 const backend = process.env.INSTALLER_GUI
+const demo = process.env.ZEABUR_DEMO_INSTALL
 const token = process.env.INSTALLER_TOKEN ?? ""
 
 async function forward(path: string, body?: string): Promise<string> {
@@ -47,7 +51,9 @@ const log = (fail: boolean) => {
 async function answer(request: IncomingMessage, response: ServerResponse) {
   const url = new URL(request.url ?? "/", "http://localhost")
   const fail =
-    process.env.INSTALLER_FAIL === "1" || /\binstaller_fail=1\b/.test(request.headers.cookie ?? "")
+    demo === "fail" ||
+    process.env.INSTALLER_FAIL === "1" ||
+    /\binstaller_fail=1\b/.test(request.headers.cookie ?? "")
   const json = (text: string) => {
     response.setHeader("Content-Type", "application/json")
     response.end(text)
@@ -58,11 +64,13 @@ async function answer(request: IncomingMessage, response: ServerResponse) {
     return json(JSON.stringify({ started: true }))
   }
   if (url.pathname === "/api/apply") {
-    const lines = log(fail)
+    const all = log(fail)
+    const lines = demo === "running" ? all.slice(0, all.indexOf("==> Zeabur")) : all
     // One line every 120 ms, so a run takes about as long as reading it.
-    const shown = started ? Math.min(lines.length, Math.floor((Date.now() - started) / 120)) : 0
+    const paced = Math.min(lines.length, Math.floor((Date.now() - started) / 120))
+    const shown = started ? (demo ? lines.length : paced) : 0
     const from = Number(url.searchParams.get("from") ?? 0)
-    const running = started > 0 && shown < lines.length
+    const running = started > 0 && (demo === "running" || shown < lines.length)
     const code = started && !running ? (fail ? 1 : 0) : null
     return json(
       JSON.stringify({
@@ -92,15 +100,16 @@ async function answer(request: IncomingMessage, response: ServerResponse) {
   response.end("not found")
 }
 
+const middleware: Connect.NextHandleFunction = (request, response, next) => {
+  if (!request.url?.startsWith("/api/")) return next()
+  answer(request, response).catch((error: unknown) => {
+    response.statusCode = 502
+    response.end(String(error))
+  })
+}
+
 export const devApi: Plugin = {
   name: "installer-dev-api",
-  configureServer(server) {
-    server.middlewares.use((request, response, next) => {
-      if (!request.url?.startsWith("/api/")) return next()
-      answer(request, response).catch((error: unknown) => {
-        response.statusCode = 502
-        response.end(String(error))
-      })
-    })
-  },
+  configureServer: (server) => void server.middlewares.use(middleware),
+  configurePreviewServer: (server) => void server.middlewares.use(middleware),
 }

@@ -25,7 +25,9 @@ export function StepPage({
       {back || next ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-v2-border pt-5">
           {back}
-          <div className="ml-auto flex flex-wrap items-center gap-2">{next}</div>
+          <div data-testid="step-next" className="ml-auto flex flex-wrap items-center gap-2">
+            {next}
+          </div>
         </div>
       ) : null}
     </>

@@ -12,7 +12,7 @@ nix develop -c scripts/docs-shots.sh web/e2e/shots/fixture.yaml target/docs-shot
 ```
 
 The script builds the web interface and the demo (`crates/zeabur-api/examples/demo.rs`), starts
-one demo server for each distinct `env`, and takes each shot in every locale (`en`, `zh-TW`, `zh-CN`) and the light theme at twice the pixel
+one demo server for each distinct `app` and `env`, and takes each shot in every locale (`en`, `zh-TW`, `zh-CN`) and the light theme at twice the pixel
 density, with reduced motion. A shot that a dark-theme `<picture>` needs lists `themes`; a shot
 that only one page uses can list fewer `locales`. It writes:
 
@@ -29,6 +29,7 @@ fails, Playwright's trace is in `target/docs-shots-results`.
 
 ```yaml
 - id: project-overview          # kebab-case, unique; the file name
+  app: zeabur                   # optional: zeabur (default) or installer
   path: /projects/shop          # route in the demo
   wait: 'main h1'               # optional: CSS selector to wait for
   steps:                        # optional, in order
@@ -37,6 +38,7 @@ fails, Playwright's trace is in `target/docs-shots-results`.
       value: shop-2
     - hover: 'a[href="/projects/shop/settings"]'
     - press: Escape
+    - wait: '[role="alert"]'
   clip: main                    # optional: CSS selector to crop to
   viewport: desktop             # desktop (1440×900) or phone (390×844); default desktop
   locales: [en]                 # optional: en, zh-TW, zh-CN; default all three
@@ -50,8 +52,12 @@ attribute, or a `data-testid` added to the component. A selector that matches se
 uses the first. After the steps the pointer moves to the corner of the page, unless the last step
 is `hover`.
 
+With `app: installer` the script builds the installer's pages and serves them with `vite
+preview` and the captured responses in `crates/zeabur-installer/web/scripts/dev-api.ts`.
+`ZEABUR_DEMO_INSTALL` shows the install as `running`, `done` or `fail` at once.
+
 The script checks the manifest before it builds anything: unknown keys, ids that are not
-kebab-case or not unique, steps other than `click`, `fill`, `hover` and `press`, and `env`
+kebab-case or not unique, steps other than `click`, `fill`, `hover`, `press` and `wait`, an unknown `app`, and `env`
 variables outside `ZEABUR_DEMO_*`.
 
 ## Same input, same pixels

@@ -1,7 +1,7 @@
-// Documentation screenshots (e2e/shots/), run by scripts/docs-shots.sh against the demo server:
+// Documentation screenshots (e2e/shots/), run by scripts/docs-shots.sh against a demo server:
 //   ZEABUR_SHOTS_URL       the demo's origin, http://127.0.0.1:<port>
 //   ZEABUR_SHOTS_MANIFEST  docs/shots.yaml as JSON
-//   ZEABUR_SHOTS_ENV       the demo's environment (e2e/shots/manifest.ts): only its shots run
+//   ZEABUR_SHOTS_SERVER    the demo's app and environment (e2e/shots/manifest.ts): only its shots run
 //   ZEABUR_SHOTS_OUT       receives <locale>/<theme>/<id>.png
 import { defineConfig, devices } from "@playwright/test"
 import { locales, themes } from "./e2e/shots/manifest.ts"

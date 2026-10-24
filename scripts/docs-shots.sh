@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Takes the documentation screenshots that the manifest declares (docs/internal/screenshots.md),
-# from the demo server (crates/zeabur-api/examples/demo.rs), in each locale and theme, as AVIF.
+# from the demo server (crates/zeabur-api/examples/demo.rs) or the installer's pages with captured
+# responses, in each locale and theme, as AVIF.
 # Run inside `nix develop`.
 #   scripts/docs-shots.sh [manifest] [out] [version]
 # <out> receives <locale>/<theme>/<id>.avif and manifest.json; with a version, also
@@ -28,40 +29,54 @@ cleanup() {
 trap cleanup EXIT
 
 yq -o=json '.' "$manifest" >"$work/shots.json"
-envs="$(cd "$root/web" && bun e2e/shots/manifest.ts "$work/shots.json" "$manifest")"
+servers="$(cd "$root/web" && bun e2e/shots/manifest.ts "$work/shots.json" "$manifest")"
 
 mkdir -p "$work/png"
 touch "$work/sizes.tsv"
-if [[ -n "$envs" ]]; then
+if grep -q '"app":"zeabur"' <<<"$servers"; then
   "$root/scripts/build-ui.sh"
   ZEABUR_UI_DIST="$root/web/dist" cargo build --locked -p zeabur-api --example demo
   demo="${CARGO_TARGET_DIR:-$root/target}/debug/examples/demo"
-
-  # One demo server for each distinct environment.
-  while IFS= read -r env; do
-    mapfile -t vars < <(jq -r 'to_entries[] | "\(.key)=\(.value)"' <<<"$env")
-    env "${vars[@]}" ZEABUR_DEMO_ADDR="127.0.0.1:$port" "$demo" >"$work/demo.log" 2>&1 &
-    server=$!
-    for _ in $(seq 1 100); do
-      if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then break; fi
-      sleep 0.1
-    done
-    if ! kill -0 "$server" 2>/dev/null; then
-      echo "error: the demo server did not start ($env):" >&2
-      cat "$work/demo.log" >&2
-      exit 1
-    fi
-    (
-      cd "$root/web"
-      ZEABUR_SHOTS_URL="http://127.0.0.1:$port" ZEABUR_SHOTS_MANIFEST="$work/shots.json" \
-        ZEABUR_SHOTS_ENV="$env" ZEABUR_SHOTS_OUT="$work/png" \
-        bunx playwright test -c playwright.shots.config.ts --output="$root/target/docs-shots-results"
-    )
-    kill "$server"
-    wait "$server" 2>/dev/null || true
-    server=""
-  done <<<"$envs"
 fi
+if grep -q '"app":"installer"' <<<"$servers"; then
+  "$root/scripts/build-installer-ui.sh"
+fi
+
+# One demo server for each distinct app and environment. The installer's is Vite's preview
+# server with the captured responses of crates/zeabur-installer/web/scripts/dev-api.ts.
+while IFS= read -r line; do
+  [[ -n "$line" ]] || continue
+  app="$(jq -r .app <<<"$line")"
+  mapfile -t vars < <(jq -r '.env | to_entries[] | "\(.key)=\(.value)"' <<<"$line")
+  if [[ "$app" == installer ]]; then
+    (
+      cd "$root/crates/zeabur-installer/web"
+      exec env "${vars[@]}" bun node_modules/vite/bin/vite.js preview \
+        --host 127.0.0.1 --port "$port" --strictPort
+    ) >"$work/demo.log" 2>&1 &
+  else
+    env "${vars[@]}" ZEABUR_DEMO_ADDR="127.0.0.1:$port" "$demo" >"$work/demo.log" 2>&1 &
+  fi
+  server=$!
+  for _ in $(seq 1 100); do
+    if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then break; fi
+    sleep 0.1
+  done
+  if ! kill -0 "$server" 2>/dev/null; then
+    echo "error: the demo server did not start ($line):" >&2
+    cat "$work/demo.log" >&2
+    exit 1
+  fi
+  (
+    cd "$root/web"
+    ZEABUR_SHOTS_URL="http://127.0.0.1:$port" ZEABUR_SHOTS_MANIFEST="$work/shots.json" \
+      ZEABUR_SHOTS_SERVER="$line" ZEABUR_SHOTS_OUT="$work/png" \
+      bunx playwright test -c playwright.shots.config.ts --output="$root/target/docs-shots-results"
+  )
+  kill "$server"
+  wait "$server" 2>/dev/null || true
+  server=""
+done <<<"$servers"
 
 rm -rf "$out"/{en,zh-TW,zh-CN} "$out/manifest.json" "$out"/docs-shots-*.tar
 mkdir -p "$out"/{en,zh-TW,zh-CN}

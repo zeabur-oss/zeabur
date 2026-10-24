@@ -1,10 +1,5 @@
 {
-  "addresses": [
-    "10.211.55.114",
-    "172.17.0.1",
-    "fdb2:2c26:f4e4:0:34f2:140:d5f4:f89b",
-    "fdb2:2c26:f4e4:0:50df:1d4c:e8b6:6f05"
-  ],
+  "addresses": ["203.0.113.10", "2001:db8::10"],
   "applying": false,
   "catalog": {
     "components": [
@@ -12,8 +7,11 @@
         "capability": "certificates",
         "default": "recommended",
         "displayName": "cert-manager",
+        "distributions": [],
         "id": "certificates/cert-manager",
+        "idleMemoryMib": 51,
         "inputs": [],
+        "needs": ["ingress/traefik"],
         "privileged": false,
         "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
         "supported": true
@@ -22,8 +20,11 @@
         "capability": "config-reload",
         "default": "optional",
         "displayName": "Stakater Reloader",
+        "distributions": [],
         "id": "config-reload/reloader",
+        "idleMemoryMib": null,
         "inputs": [],
+        "needs": [],
         "privileged": false,
         "security": "ClusterRole: reads, lists and watches every Secret and ConfigMap; reads, updates and patches Deployments, StatefulSets and DaemonSets; creates Events. Role in its namespace: lists, reads, watches, creates and updates every ConfigMap there, not only its own, and on multi-node the leader-election Lease.\n",
         "supported": true
@@ -32,7 +33,9 @@
         "capability": "dns",
         "default": "optional",
         "displayName": "ExternalDNS",
+        "distributions": [],
         "id": "dns/external-dns",
+        "idleMemoryMib": 13,
         "inputs": [
           {
             "default": null,
@@ -59,6 +62,7 @@
             "secret": false
           }
         ],
+        "needs": ["ingress/traefik"],
         "privileged": false,
         "security": "Reads Services, Ingresses and routes in all namespaces.",
         "supported": true
@@ -67,8 +71,11 @@
         "capability": "event-autoscaling",
         "default": "optional",
         "displayName": "KEDA",
+        "distributions": [],
         "id": "event-autoscaling/keda",
+        "idleMemoryMib": 69,
         "inputs": [],
+        "needs": [],
         "privileged": false,
         "security": "Reads scale targets and trigger secrets cluster-wide; serves the external metrics API.",
         "supported": true
@@ -77,8 +84,11 @@
         "capability": "event-autoscaling",
         "default": "optional",
         "displayName": "KEDA HTTP Add-on",
+        "distributions": [],
         "id": "event-autoscaling/keda-http-add-on",
+        "idleMemoryMib": 34,
         "inputs": [],
+        "needs": ["event-autoscaling/keda"],
         "privileged": false,
         "security": "Reads HTTPScaledObjects, Services and EndpointSlices cluster-wide; creates ScaledObjects.",
         "supported": true
@@ -87,8 +97,11 @@
         "capability": "ingress",
         "default": "recommended",
         "displayName": "Traefik Proxy",
+        "distributions": [],
         "id": "ingress/traefik",
+        "idleMemoryMib": 23,
         "inputs": [],
+        "needs": [],
         "privileged": false,
         "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
         "supported": true
@@ -97,7 +110,9 @@
         "capability": "intrusion-prevention",
         "default": "optional",
         "displayName": "CrowdSec",
+        "distributions": [],
         "id": "intrusion-prevention/crowdsec",
+        "idleMemoryMib": 76,
         "inputs": [
           {
             "default": null,
@@ -124,6 +139,7 @@
             "secret": true
           }
         ],
+        "needs": ["ingress/traefik"],
         "privileged": true,
         "security": "The agent reads node log files read-only and makes no API writes.",
         "supported": true
@@ -132,8 +148,15 @@
         "capability": "logs",
         "default": "recommended",
         "displayName": "VictoriaLogs",
+        "distributions": [],
         "id": "logs/victoria-logs",
+        "idleMemoryMib": 38,
         "inputs": [],
+        "needs": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator"
+        ],
         "privileged": true,
         "security": "The collector reads pod metadata and node log files.",
         "supported": true
@@ -142,8 +165,11 @@
         "capability": "metrics",
         "default": "recommended",
         "displayName": "Kubernetes Metrics Server",
+        "distributions": [],
         "id": "metrics/metrics-server",
+        "idleMemoryMib": 17,
         "inputs": [],
+        "needs": [],
         "privileged": false,
         "security": "Reads kubelet metrics; registers an aggregated API.",
         "supported": true
@@ -152,8 +178,15 @@
         "capability": "metrics",
         "default": "recommended",
         "displayName": "VictoriaMetrics (k8s stack)",
+        "distributions": [],
         "id": "metrics/victoria-metrics",
+        "idleMemoryMib": 207,
         "inputs": [],
+        "needs": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator"
+        ],
         "privileged": false,
         "security": "Manages VictoriaMetrics objects and scrapes pods in all namespaces.",
         "supported": true
@@ -162,8 +195,11 @@
         "capability": "node-updates",
         "default": "recommended",
         "displayName": "System Upgrade Controller",
+        "distributions": ["k3s"],
         "id": "node-updates/system-upgrade-controller",
+        "idleMemoryMib": 12,
         "inputs": [],
+        "needs": [],
         "privileged": true,
         "security": "Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.",
         "supported": false
@@ -172,8 +208,11 @@
         "capability": "observability-operator",
         "default": "recommended",
         "displayName": "VictoriaMetrics operator",
+        "distributions": [],
         "id": "observability-operator/victoria-metrics-operator",
+        "idleMemoryMib": 20,
         "inputs": [],
+        "needs": ["ingress/traefik", "certificates/cert-manager"],
         "privileged": false,
         "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.",
         "supported": true
@@ -182,7 +221,9 @@
         "capability": "remote-access",
         "default": "optional",
         "displayName": "Tailscale Kubernetes operator",
+        "distributions": [],
         "id": "remote-access/tailscale-operator",
+        "idleMemoryMib": null,
         "inputs": [
           {
             "default": null,
@@ -201,16 +242,33 @@
             "secret": true
           }
         ],
+        "needs": [],
         "privileged": true,
         "security": "Creates, updates and deletes Services and Ingresses (and their status) in every namespace; reads nodes and EndpointSlices; manages ValidatingAdmissionPolicies and their bindings. In its own namespace it manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments, Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs, peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders, tailnets) and the IngressClass tailscale.\n",
+        "supported": true
+      },
+      {
+        "capability": "replicated-storage",
+        "default": "optional",
+        "displayName": "Longhorn",
+        "distributions": [],
+        "id": "replicated-storage/longhorn",
+        "idleMemoryMib": null,
+        "inputs": [],
+        "needs": [],
+        "privileged": true,
+        "security": "Privileged pods on every node: they mount /dev, /proc, /boot, /etc and /var/lib/longhorn from the host, run iscsiadm and mount in the host's namespaces, and manage pods, PVs and storage classes cluster-wide.\n",
         "supported": true
       },
       {
         "capability": "resource-recommendations",
         "default": "optional",
         "displayName": "Vertical Pod Autoscaler (recommender only)",
+        "distributions": [],
         "id": "resource-recommendations/vertical-pod-autoscaler",
+        "idleMemoryMib": 17,
         "inputs": [],
+        "needs": ["metrics/metrics-server"],
         "privileged": false,
         "security": "Reads pods, workloads and metrics in all namespaces; writes VPA status.",
         "supported": true
@@ -219,8 +277,11 @@
         "capability": "runtime-security",
         "default": "optional",
         "displayName": "Falco",
+        "distributions": [],
         "id": "runtime-security/falco",
+        "idleMemoryMib": 53,
         "inputs": [],
+        "needs": [],
         "privileged": true,
         "security": "Reads pod and node metadata to enrich alerts.",
         "supported": true
@@ -229,8 +290,16 @@
         "capability": "uptime-probes",
         "default": "optional",
         "displayName": "Prometheus Blackbox Exporter",
+        "distributions": [],
         "id": "uptime-probes/blackbox-exporter",
+        "idleMemoryMib": 4,
         "inputs": [],
+        "needs": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "metrics/victoria-metrics"
+        ],
         "privileged": false,
         "security": "Has no API access and only makes outbound probes.",
         "supported": true
@@ -239,8 +308,11 @@
         "capability": "volume-backup",
         "default": "optional",
         "displayName": "K8up",
+        "distributions": [],
         "id": "volume-backup/k8up",
+        "idleMemoryMib": 11,
         "inputs": [],
+        "needs": [],
         "privileged": false,
         "security": "Watches K8up objects cluster-wide; backup Jobs mount PVCs in their own namespace.",
         "supported": true
@@ -249,7 +321,9 @@
         "capability": "volume-backup",
         "default": "optional",
         "displayName": "Velero",
+        "distributions": [],
         "id": "volume-backup/velero",
+        "idleMemoryMib": 38,
         "inputs": [
           {
             "default": null,
@@ -276,6 +350,7 @@
             "secret": true
           }
         ],
+        "needs": [],
         "privileged": true,
         "security": "Bound to cluster-admin; reads and restores every object.",
         "supported": true
@@ -284,8 +359,11 @@
         "capability": "vulnerability-scanning",
         "default": "optional",
         "displayName": "Trivy Operator",
+        "distributions": [],
         "id": "vulnerability-scanning/trivy-operator",
+        "idleMemoryMib": 125,
         "inputs": [],
+        "needs": [],
         "privileged": false,
         "security": "Reads workloads cluster-wide, runs scan Jobs and writes reports next to workloads.",
         "supported": true
@@ -316,6 +394,13 @@
       "values": []
     },
     {
+      "code": "swap.off",
+      "detail": "swap is off",
+      "name": "swap",
+      "status": "pass",
+      "values": []
+    },
+    {
       "code": "others.none",
       "detail": "none found",
       "name": "other Kubernetes",
@@ -331,10 +416,10 @@
     },
     {
       "code": "disk.ok",
-      "detail": "41 GiB free under /var/lib",
+      "detail": "152.3 GiB free under /var/lib",
       "name": "disk space",
       "status": "pass",
-      "values": ["41", "/var/lib"]
+      "values": ["152.3", "/var/lib"]
     },
     {
       "code": "crypt.no",
@@ -346,32 +431,38 @@
   ],
   "config": {
     "access": {
-      "identity": "login.10.211.55.114.sslip.io",
+      "identity": "login.203.0.113.10.sslip.io",
+      "invitations": true,
       "mode": "local",
-      "zeabur": "zeabur.10.211.55.114.sslip.io"
+      "zeabur": "zeabur.203.0.113.10.sslip.io"
     },
     "disable": [],
     "enable": [],
-    "host": { "requireEncryptedDisk": false, "tlsSan": [] },
+    "host": {
+      "requireEncryptedDisk": false,
+      "tlsSan": []
+    },
     "inputs": {},
     "preset": "standard",
     "profile": "single-node",
     "rke2Version": null,
     "secretFiles": {},
     "sources": {
-      "catalog": "/home/parallels/index.json",
-      "identityImage": "docker.io/library/zeabur-identity:dev",
-      "identityctl": "/home/parallels/bin/zeabur-identityctl",
-      "imageArchives": [
-        "/home/parallels/images/zeabur.tar",
-        "/home/parallels/images/zeabur-identity.tar"
-      ],
-      "zeaburChart": "/home/parallels/zeabur/deploy/chart/zeabur",
-      "zeaburImage": "docker.io/library/zeabur:dev"
+      "catalog": null,
+      "identityImage": null,
+      "identityctl": null,
+      "imageArchives": [],
+      "zeaburChart": null,
+      "zeaburImage": null
     },
     "zeabur": true
   },
-  "configExists": true,
-  "configPath": "/home/parallels/demo/config.yaml",
-  "facts": { "arch": "arm64", "hostname": "zeabur-installer-demo", "memoryMib": 7397 }
+  "configExists": false,
+  "configPath": "/etc/zeabur-installer/config.yaml",
+  "facts": {
+    "arch": "amd64",
+    "hostname": "vps-1",
+    "memoryMib": 7936,
+    "nodeIps": ["203.0.113.10"]
+  }
 }

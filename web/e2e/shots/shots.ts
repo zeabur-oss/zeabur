@@ -1,20 +1,28 @@
 import type { Page } from "@playwright/test"
 import { test } from "../fixtures.ts"
-import { envKey, readManifest, viewports, type Locale, type Step, type Theme } from "./manifest.ts"
+import {
+  readManifest,
+  serverKey,
+  viewports,
+  type Locale,
+  type Step,
+  type Theme,
+} from "./manifest.ts"
 
 const manifest = process.env.ZEABUR_SHOTS_MANIFEST
 const out = process.env.ZEABUR_SHOTS_OUT
 if (!manifest || !out) throw new Error("ZEABUR_SHOTS_MANIFEST and ZEABUR_SHOTS_OUT must be set")
-const env = process.env.ZEABUR_SHOTS_ENV ?? envKey({})
+const server = process.env.ZEABUR_SHOTS_SERVER ?? serverKey({ app: "zeabur", env: {} })
 
 async function run(page: Page, step: Step) {
   if ("click" in step) await page.locator(step.click).first().click()
   else if ("fill" in step) await page.locator(step.fill).first().fill(step.value)
   else if ("hover" in step) await page.locator(step.hover).first().hover()
+  else if ("wait" in step) await page.locator(step.wait).first().waitFor()
   else await page.keyboard.press(step.press)
 }
 
-for (const shot of readManifest(manifest).filter((s) => envKey(s.env) === env)) {
+for (const shot of readManifest(manifest).filter((s) => serverKey(s) === server)) {
   test.describe(() => {
     test.use({ viewport: viewports[shot.viewport] })
 
