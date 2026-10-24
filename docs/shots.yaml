@@ -127,6 +127,7 @@
   path: /cluster/components
   wait: '#cluster-installed'
   clip: main
+  until: '[aria-labelledby="components-catalogue"] section:nth-of-type(2)'
 # Adding a worker node (docs/zh-TW/cluster/nodes.mdx, tokens.mdx). The join token's ID and
 # expiry differ from run to run. vps-4 joins a few seconds after a join token is created.
 - id: node-add
@@ -481,4 +482,3 @@
     - click: '[data-slot="draft-bar"] button:last-child'
     - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
   clip: '[data-slot="dialog-content"]'
-  until: '[aria-labelledby="components-catalogue"] section:nth-of-type(2)'
