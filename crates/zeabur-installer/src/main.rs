@@ -40,9 +40,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Show what `apply` would install, without changing anything.
+    /// Show what `apply` would install and run its host checks, without changing anything.
     Plan {
-        /// Print the plan as JSON.
+        /// Print the plan as JSON, without the host checks.
         #[arg(long)]
         json: bool,
     },
@@ -220,6 +220,13 @@ fn show_plan(cli: &Cli, json: bool) -> Result<(), InstallError> {
         out::line(&text);
     } else {
         out::line(render::plan(&plan).trim_end());
+        if apply::show_checks(
+            apply::UNIT,
+            config.host.require_encrypted_disk,
+            plan.node_prep.as_ref(),
+        ) {
+            out::line("apply stops until what failed is fixed.");
+        }
     }
     Ok(())
 }

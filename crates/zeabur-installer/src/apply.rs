@@ -28,7 +28,7 @@ use crate::{InstallError, load, out, render};
 pub(crate) const STATE_DIR: &str = "/var/lib/rancher/zeabur-installer";
 /// The `ConfigMap` recording what was installed.
 pub(crate) const STATE_CONFIGMAP: &str = "zeabur-installer";
-const UNIT: &str = "rke2-server";
+pub(crate) const UNIT: &str = "rke2-server";
 const RELOADS_METRIC: &str = "apiserver_authentication_config_controller_automatic_reloads_total";
 
 pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
@@ -128,6 +128,20 @@ pub(crate) fn check_host(
     require_encrypted_disk: bool,
     prep: Option<&NodePrep>,
 ) -> Result<(), InstallError> {
+    if show_checks(unit, require_encrypted_disk, prep) {
+        return Err(InstallError::Message(
+            "the host is not ready; fix what failed and run apply again".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// Runs and prints the preflight checks, which only read the host. Returns whether one failed.
+pub(crate) fn show_checks(
+    unit: &str,
+    require_encrypted_disk: bool,
+    prep: Option<&NodePrep>,
+) -> bool {
     out::step("Checking the host");
     let mut checks = preflight::run(preflight::Options {
         rke2_running: systemd::is_active(unit),
@@ -145,12 +159,7 @@ pub(crate) fn check_host(
         };
         out::err(&format!("    {mark} {:<18} {}", check.name, check.detail));
     }
-    if checks.iter().any(|c| c.status == Status::Fail) {
-        return Err(InstallError::Message(
-            "the host is not ready; fix what failed and run apply again".to_owned(),
-        ));
-    }
-    Ok(())
+    checks.iter().any(|c| c.status == Status::Fail)
 }
 
 /// Installs and starts what the planned components need on this node, before RKE2 runs their pods
