@@ -603,6 +603,7 @@ fn map_at<'a>(value: &'a mut Value, path: &[&str]) -> Option<&'a mut Map<String,
 }
 
 /// The location as it will be: `current` with the request's fields, or a new default location.
+///
 /// `credential` names the Secret with its keys, or keeps the one it names (none: Velero's own).
 /// A new location has the store encrypt every object with the key in [`BACKUP_KEY`] (SSE-C).
 /// A current location keeps its encryption: a key added later makes older objects unreadable
