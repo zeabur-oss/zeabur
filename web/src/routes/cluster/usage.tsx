@@ -41,13 +41,15 @@ import {
 import { Meter } from "@zeabur/design-system/components/meter"
 
 const ROWS_SHOWN = 8
+const SERVICES_SHOWN = 5
 
 interface Scale {
   resource: Resource
   measured: boolean
-  /** The nodes' allocatable, when known; else the largest row, so bars still compare. */
-  whole: number
-  ofCluster: boolean
+  /** The largest row's use or reservation; every bar is drawn against it. */
+  top: Record<Resource, number>
+  /** The nodes' allocatable, when known. */
+  cluster: Partial<Record<Resource, number>>
 }
 
 /** Amounts as the page writes them: measured CPU with two decimals, reserved CPU with one. */
@@ -113,14 +115,16 @@ function Usage({ data, resource }: { data: ClusterUsage; resource: Resource }) {
   if (data.items.length === 0)
     return <p className="text-muted-foreground">{t("clusterUsage.nothingRunning")}</p>
   const measured = data.metrics === "available"
-  const field = resource === "memory" ? "memoryBytes" : "cpuMillicores"
-  const cluster = allocatable?.[field]
-  const top = Math.max(...data.items.map((i) => lead(i, resource)), 1)
+  const top = (r: Resource) =>
+    Math.max(...data.items.map((i) => Math.max(lead(i, r), reserved(i, r))), 1)
   const scale: Scale = {
     resource,
     measured,
-    whole: cluster || top,
-    ofCluster: Boolean(cluster),
+    top: { cpu: top("cpu"), memory: top("memory") },
+    cluster: {
+      cpu: allocatable?.cpuMillicores || undefined,
+      memory: allocatable?.memoryBytes || undefined,
+    },
   }
   const { projects, others, system } = groups(data.items, resource)
   const known = data.items.some((i) => i.adopted !== undefined)
@@ -172,7 +176,9 @@ function Summary({ data, scale }: { data: ClusterUsage; scale: Scale }) {
             key,
             shownName(first),
             amount(resource, lead(first, resource), measured),
-            scale.ofCluster ? percent(lead(first, resource) / scale.whole) : undefined,
+            scale.cluster[resource]
+              ? percent(lead(first, resource) / scale.cluster[resource])
+              : undefined,
           )}
         </p>
       ) : null}
@@ -345,12 +351,15 @@ function Gauge({
   const t = useT()
   const { percent } = useQuantityFormat()
   const amount = useAmount()
-  const { measured, whole } = scale
+  const { measured } = scale
+  const whole = scale.top[resource]
+  const cluster = scale.cluster[resource]
   const value = lead(item, resource)
   const asked = reserved(item, resource)
   const most = maximum(item, resource)
   const title = resource === "memory" ? t("cluster.memory") : t("cluster.cpu")
   const details = [
+    cluster ? t("clusterUsage.ofCluster", percent(value / cluster)) : "",
     measured && asked > 0 ? t("clusterUsage.reserved", amount(resource, asked, false)) : "",
     most ? t("cluster.limits", amount(resource, most, false)) : "",
   ].filter(Boolean)
@@ -360,7 +369,6 @@ function Gauge({
       ? t("cluster.used", amount(resource, value, true))
       : t("clusterUsage.reserved", amount(resource, value, false)),
     ...details,
-    scale.ofCluster ? t("clusterUsage.ofCluster", percent(value / whole)) : "",
   ]
     .filter(Boolean)
     .join(t("common.sep"))
@@ -390,6 +398,7 @@ function Gauge({
 function Services({ project, resource }: { project: string; resource: Resource }) {
   const t = useT()
   const amount = useAmount()
+  const [all, setAll] = useState(false)
   const read = useQuery(projectQuery(project, { poll: false }))
   const usage = useQuery(usageQuery(project))
   if (read.isPending || usage.isPending)
@@ -412,39 +421,50 @@ function Services({ project, resource }: { project: string; resource: Resource }
     )
   if (rows.length === 0)
     return <p className="pt-3 type-meta text-muted-foreground">{t("clusterUsage.noServices")}</p>
+  const shown = all ? rows : rows.slice(0, SERVICES_SHOWN)
   return (
-    <ul
-      aria-label={t("project.services")}
-      className="mt-3 flex flex-col rounded-lg bg-plane px-4 py-1"
-    >
-      {rows.map(({ service, used }) => (
-        <li
-          key={serviceId(service)}
-          className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-rule py-2 type-meta first:border-t-0"
-        >
-          <Link
-            {...serviceLink(project, service)}
-            className="min-w-0 flex-1 truncate font-medium hover:underline"
-            translate="no"
+    <div className="mt-3 flex flex-col gap-1">
+      <ul
+        aria-label={t("project.services")}
+        className="flex flex-col rounded-lg bg-plane px-4 py-1"
+      >
+        {shown.map(({ service, used }) => (
+          <li
+            key={serviceId(service)}
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-rule py-2 type-meta first:border-t-0"
           >
-            {service.name}
-          </Link>
-          {used?.nearLimit ? (
-            <span className="flex items-center gap-1.5 text-warn-strong">
-              <StatusDot health="warn" />
-              {t("clusterUsage.nearMaximum")}
-            </span>
-          ) : null}
-          {used ? (
-            <span className="flex gap-4 tabular-nums">
-              <span className="w-20 text-right">{amount("cpu", used.cpu ?? 0, true)}</span>
-              <span className="w-20 text-right">{amount("memory", used.memory ?? 0, true)}</span>
-            </span>
-          ) : (
-            <span className="text-muted-foreground">{t("usage.noSampleShort")}</span>
-          )}
-        </li>
-      ))}
-    </ul>
+            <Link
+              {...serviceLink(project, service)}
+              className="min-w-0 flex-1 truncate font-medium hover:underline"
+              translate="no"
+            >
+              {service.name}
+            </Link>
+            {used?.nearLimit ? (
+              <span className="flex items-center gap-1.5 text-warn-strong">
+                <StatusDot health="warn" />
+                {t("clusterUsage.nearMaximum")}
+              </span>
+            ) : null}
+            {used ? (
+              <span className="flex gap-4 tabular-nums">
+                <span className="w-20 text-right">{amount("cpu", used.cpu ?? 0, true)}</span>
+                <span className="w-20 text-right">{amount("memory", used.memory ?? 0, true)}</span>
+              </span>
+            ) : (
+              <span className="text-muted-foreground">{t("usage.noSampleShort")}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {rows.length > SERVICES_SHOWN ? (
+        <div>
+          <Button variant="ghost" size="sm" onClick={() => setAll(!all)} aria-expanded={all}>
+            <CaretDownIcon aria-hidden="true" data-icon="inline-start" />
+            {all ? t("cluster.fewer") : t("cluster.more", rows.length - SERVICES_SHOWN)}
+          </Button>
+        </div>
+      ) : null}
+    </div>
   )
 }
