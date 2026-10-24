@@ -73,6 +73,8 @@ if [[ -n "$installer" ]]; then
 else
   "$root/scripts/build-ui.sh"
 fi
+# Release binaries are always compiled, never taken from the kache compiler cache (flake.nix).
+unset RUSTC_WRAPPER
 # cargo-auditable records the dependency tree in the binary, so a scanner reads exactly what was
 # compiled in (https://github.com/rust-secure-code/cargo-auditable).
 packages=()

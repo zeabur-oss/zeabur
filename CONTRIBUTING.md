@@ -81,6 +81,9 @@ written in English.
   both, choosing the newest nightly of the last week with every listed component and target.
 - `.github/workflows/update-toolchain.yml` runs that script with `nix flake update` on the 1st
   and 15th of each month and opens one pull request.
+- `nix develop` sets `RUSTC_WRAPPER=kache`, a compiler cache (https://github.com/kunobi-ninja/kache)
+  shared by every checkout and worktree on the machine. `scripts/release-build.sh` turns it off, so
+  release binaries are always compiled. kache is pinned to a release tag in `flake.nix`.
 
 Release binaries are built with `trim-paths = "all"`, so they carry no build-host paths.
 

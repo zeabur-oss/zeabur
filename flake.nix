@@ -15,6 +15,11 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.fenix.follows = "fenix";
     };
+    # Compiler cache, built from source at a release tag.
+    kache = {
+      url = "github:kunobi-ninja/kache/v1.2.2";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -35,6 +40,7 @@
             pkgs = import inputs.nixpkgs {
               inherit system;
               overlays = [
+                inputs.kache.overlays.default
                 inputs.self.overlays.default
               ];
             };
@@ -48,6 +54,8 @@
           file = ./rust-toolchain.toml;
           sha256 = "sha256-SUC7eX/vmyHDmHLVrNomnduz4S8jrxBCoSaOkQawgTw=";
         };
+        # kache's own CI tests each release. Its 4,500 tests take 6 min here and some are timing-sensitive.
+        kache = prev.kache.overrideAttrs { doCheck = false; };
       };
 
       devShells = forEachSupportedSystem (
@@ -60,6 +68,7 @@
               # Quality and supply chain
               cargo-deny
               cargo-nextest
+              kache
               cargo-auditable
               cargo-cyclonedx
               # Mutation testing, weekly in CI (.github/workflows/mutants.yml); a report, not a gate
@@ -96,6 +105,8 @@
             ];
 
             env = {
+              # Compiler cache shared by every checkout and worktree; release builds turn it off.
+              RUSTC_WRAPPER = "kache";
               # Required by rust-analyzer
               RUST_SRC_PATH = "${pkgs.rustToolchain}/lib/rustlib/src/rust/library";
               # Mozilla's CA bundle (MPL-2.0), copied into the image for outgoing TLS (Zeabur Identity's

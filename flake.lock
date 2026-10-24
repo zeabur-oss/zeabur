@@ -20,6 +20,29 @@
         "url": "https://flakehub.com/f/nix-community/fenix/0.1"
       }
     },
+    "kache": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "rust-overlay": "rust-overlay",
+        "treefmt-nix": "treefmt-nix"
+      },
+      "locked": {
+        "lastModified": 1792081631,
+        "narHash": "sha256-thzKe50UE6CKYYfKNrVyNdgQdAqr0bLRYOZzvWwlxW8=",
+        "owner": "kunobi-ninja",
+        "repo": "kache",
+        "rev": "96052b4842239bb216f6c4812054203c21550788",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kunobi-ninja",
+        "ref": "v1.2.2",
+        "repo": "kache",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1791594108,
@@ -37,6 +60,7 @@
     "root": {
       "inputs": {
         "fenix": "fenix",
+        "kache": "kache",
         "nixpkgs": "nixpkgs",
         "zhtw-mcp": "zhtw-mcp"
       }
@@ -55,6 +79,48 @@
         "owner": "rust-lang",
         "ref": "nightly",
         "repo": "rust-analyzer",
+        "type": "github"
+      }
+    },
+    "rust-overlay": {
+      "inputs": {
+        "nixpkgs": [
+          "kache",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1791101754,
+        "narHash": "sha256-y/GF+9B0t0TZ0nQiSRMqDXpr76yT7sdDbS/3GNLhzkE=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "dbc715a4b7c0ace63b9769a032d1dd34cd89e5bd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "treefmt-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "kache",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1784369104,
+        "narHash": "sha256-47cxbcZODibHv3rELFQ9vZly0vUNkND/atn/U7HLeb0=",
+        "owner": "numtide",
+        "repo": "treefmt-nix",
+        "rev": "df3c0640565d04a0261253cdd89fce78ec50168a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "treefmt-nix",
         "type": "github"
       }
     },
