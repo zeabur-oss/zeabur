@@ -1192,6 +1192,17 @@ pub enum Warning {
         /// Its name.
         pod: String,
     },
+    /// The hostname moved to an Ingress of its own, so its certificate can differ from the
+    /// issued certificates of the others.
+    #[serde(rename_all = "camelCase")]
+    DomainMoved {
+        /// The hostname.
+        hostname: String,
+        /// The Ingress it leaves.
+        from: String,
+        /// Its new Ingress.
+        to: String,
+    },
     /// The hostname was the route's last, so the route is deleted with it.
     #[serde(rename_all = "camelCase")]
     RouteDeleted {

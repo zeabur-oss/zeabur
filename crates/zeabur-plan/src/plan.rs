@@ -1515,7 +1515,11 @@ impl<'a> Planner<'a> {
         self.patch(index, operations)
     }
 
-    fn remove_domain(&mut self, route: &RouteRef, hostname: &str) -> Result<(), PlanError> {
+    pub(crate) fn remove_domain(
+        &mut self,
+        route: &RouteRef,
+        hostname: &str,
+    ) -> Result<(), PlanError> {
         if self.last_host(route, hostname)? {
             return self.delete_route(route, hostname);
         }

@@ -6329,6 +6329,16 @@ export interface components {
         }
       | {
           /** @enum {string} */
+          code: "domainMoved"
+          /** @description The Ingress it leaves. */
+          from: string
+          /** @description The hostname. */
+          hostname: string
+          /** @description Its new Ingress. */
+          to: string
+        }
+      | {
+          /** @enum {string} */
           code: "routeDeleted"
           /** @description The hostname. */
           hostname: string

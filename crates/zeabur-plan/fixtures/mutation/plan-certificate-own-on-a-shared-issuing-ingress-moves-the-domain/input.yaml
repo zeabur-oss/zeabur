@@ -34,8 +34,12 @@ metadata:
   namespace: demo
   uid: ingress-uid
   resourceVersion: "9"
-  annotations: {cert-manager.io/cluster-issuer: letsencrypt}
+  labels: {app.kubernetes.io/name: web}
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: demo-shop-error-pages@kubernetescrd,demo-headers@kubernetescrd
 spec:
+  ingressClassName: traefik
   tls:
     - hosts: [shop.example.test]
       secretName: shop-tls

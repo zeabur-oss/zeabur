@@ -818,11 +818,18 @@ function httpOnlySentence(
   }
 }
 
-function certificateWarning(
+function routeWarning(
   t: Translate,
   warning: Extract<
     Schemas["PlanWarning"],
-    { code: "ownCertificate" | "issuerShared" | "maintenanceRestored" | "routeDeleted" }
+    {
+      code:
+        | "ownCertificate"
+        | "issuerShared"
+        | "maintenanceRestored"
+        | "routeDeleted"
+        | "domainMoved"
+    }
   >,
 ): string {
   switch (warning.code) {
@@ -837,6 +844,8 @@ function certificateWarning(
       )
     case "maintenanceRestored":
       return t("warn.maintenanceRestored", warning.hostname, warning.service, warning.port)
+    case "domainMoved":
+      return t("warn.domainMoved", warning.hostname, warning.from, warning.to)
     case "routeDeleted":
       return t("warn.routeDeleted", `${warning.route.kind} ${warning.route.name}`, warning.hostname)
   }
@@ -857,6 +866,7 @@ function accessWarning(
         | "issuerShared"
         | "maintenanceRestored"
         | "routeDeleted"
+        | "domainMoved"
     }
   >,
 ): string {
@@ -874,6 +884,6 @@ function accessWarning(
     case "publicPortBlocked":
       return t("warn.publicPortBlocked", warning.port, t("common.list", warning.policies))
     default:
-      return certificateWarning(t, warning)
+      return routeWarning(t, warning)
   }
 }

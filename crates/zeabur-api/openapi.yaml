@@ -12222,6 +12222,29 @@ components:
             type: string
             description: Its name.
       - type: object
+        description: |-
+          The hostname moved to an Ingress of its own, so its certificate can differ from the
+          issued certificates of the others.
+        required:
+        - hostname
+        - from
+        - to
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - domainMoved
+          from:
+            type: string
+            description: The Ingress it leaves.
+          hostname:
+            type: string
+            description: The hostname.
+          to:
+            type: string
+            description: Its new Ingress.
+      - type: object
         description: The hostname was the route's last, so the route is deleted with it.
         required:
         - route

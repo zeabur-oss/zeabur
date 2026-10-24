@@ -3412,8 +3412,13 @@ export const en = {
   "domainCert.shared": (hosts: string) => `The same issuer also signs ${hosts}.`,
   "domainCert.needsDns": (issuer: string) =>
     `${issuer} can't sign a wildcard domain: that needs a DNS-01 issuer`,
-  "domainCert.ownShared": (route: string, hosts: string) =>
-    `Ingress ${route} also serves ${hosts} with a certificate from cert-manager. Remove this domain and add it again with your certificate.`,
+  "domainCert.ownMoves": (route: string, hosts: string) =>
+    `Ingress ${route} asks cert-manager for the certificates of ${hosts} too, so this domain moves to an Ingress of its own.`,
+  "domainCert.ownKept": (route: string, hosts: string, first: string) =>
+    `Ingress ${route} asks cert-manager for the certificates of ${hosts} too, so this domain has to move to an Ingress of its own. ${first} first.`,
+  "domainCert.keptBy.password": (_host: string) => "Remove the password",
+  "domainCert.keptBy.redirect": (host: string) => `Stop redirecting ${host}`,
+  "domainCert.keptBy.maintenance": (host: string) => `End maintenance on ${host}`,
   "domainCert.certificate": "Certificate (PEM)",
   "domainCert.certificateHint": "The certificate first, then any intermediate certificates.",
   "domainCert.key": "Private key (PEM)",
@@ -3644,6 +3649,8 @@ export const en = {
   "useShared.kube.whenValue": "When the pods restart; this change replaces them",
   "warn.taskImageCopied": (service: string, image: string) =>
     `The task runs ${image}, ${service}'s image now; a later image change to ${service} doesn't reach it`,
+  "warn.domainMoved": (host: string, from: string, to: string) =>
+    `${host} moves from Ingress ${from} to its own Ingress ${to}`,
   "warn.routeDeleted": (route: string, host: string) =>
     `${route} routes only ${host}, so it is deleted with it`,
   "warn.maintenanceRestored": (host: string, service: string, port: number) =>

@@ -3147,8 +3147,13 @@ export const zhTW: Messages = {
   "domainCert.shared": (hosts) => `同一個簽發者也會簽發 ${hosts} 的憑證。`,
   "domainCert.needsDns": (issuer) =>
     `${issuer} 無法簽發萬用字元網域的憑證，需要支援 DNS-01 的簽發者`,
-  "domainCert.ownShared": (route, hosts) =>
-    `Ingress ${route} 的 ${hosts} 也使用 cert-manager 簽發的憑證。請先移除這個網域，再用你的憑證重新加入。`,
+  "domainCert.ownMoves": (route, hosts) =>
+    `Ingress ${route} 也替 ${hosts} 向 cert-manager 申請憑證，所以這個網域會移到自己的 Ingress。`,
+  "domainCert.ownKept": (route, hosts, first) =>
+    `Ingress ${route} 也替 ${hosts} 向 cert-manager 申請憑證，這個網域得移到自己的 Ingress。請先${first}。`,
+  "domainCert.keptBy.password": (_host) => "取消密碼",
+  "domainCert.keptBy.redirect": (host) => `取消 ${host} 的轉址`,
+  "domainCert.keptBy.maintenance": (host) => `結束 ${host} 的維護`,
   "domainCert.certificate": "憑證（PEM）",
   "domainCert.certificateHint": "先放網站憑證，再放中繼憑證。",
   "domainCert.key": "私密金鑰（PEM）",
@@ -3367,6 +3372,7 @@ export const zhTW: Messages = {
   "useShared.kube.whenValue": "Pod 重新啟動時；這個變更會替換 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任務使用 ${service} 目前的映像檔 ${image}；之後 ${service} 換映像檔，任務不會跟著換`,
+  "warn.domainMoved": (host, from, to) => `${host} 從 Ingress ${from} 移到自己的 Ingress ${to}`,
   "warn.routeDeleted": (route, host) => `${route} 只路由 ${host}，所以會一起刪除`,
   "warn.maintenanceRestored": (host, service, port) =>
     `維護期間 ${host} 的規則改過，原本的後端對不上，顯示維護頁的路徑會改送到 ${service}:${port}`,

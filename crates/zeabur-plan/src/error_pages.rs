@@ -155,6 +155,15 @@ fn query<'h>(down: impl IntoIterator<Item = &'h String>) -> String {
     }
 }
 
+/// The `errors` middleware spec of an Ingress whose hostnames `down` are in maintenance.
+pub(crate) fn errors_spec<'h>(down: impl IntoIterator<Item = &'h String>) -> Value {
+    json!({"errors": {
+        "status": ["502-504"],
+        "service": {"name": SERVER, "port": PAGES_PORT},
+        "query": query(down),
+    }})
+}
+
 fn bad_annotation(name: &str) -> PlanError {
     error(
         ErrorKind::Invalid,
@@ -258,12 +267,7 @@ impl Planner<'_> {
         self.ensure_server()?;
         if middleware.is_none() {
             let down = maintenance(&meta).ok_or_else(|| bad_annotation(ingress))?;
-            let spec = json!({"errors": {
-                "status": ["502-504"],
-                "service": {"name": SERVER, "port": PAGES_PORT},
-                "query": query(down.keys()),
-            }});
-            self.created_middleware(&name, owner_of(&meta).as_ref(), &spec);
+            self.created_middleware(&name, owner_of(&meta).as_ref(), &errors_spec(down.keys()));
         }
         if !listed {
             self.list(index, &name, false)?;

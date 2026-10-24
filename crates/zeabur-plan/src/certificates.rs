@@ -8,8 +8,11 @@
 //! - **The person's own certificate.** It goes into a `kubernetes.io/tls` Secret [k8s-tls] named by
 //!   [`own_secret_name`], and the hostname's `tls` entry names it. cert-manager writes the Secret
 //!   of every `tls` entry of an Ingress that names an issuer, so the Ingress stops naming one. When
-//!   it also serves other hostnames, the change is refused. The `Certificate` that cert-manager
-//!   made for the hostname's previous Secret is deleted.
+//!   it also serves other hostnames, the hostname moves to a new Ingress of its own, named as "Add
+//!   domain" names one. The new Ingress keeps the hostname's rules, class, labels and annotations,
+//!   and gets its own error pages when the old one showed them. A password, a redirect or
+//!   maintenance belongs to the old Ingress, so the move is refused until they stop. The
+//!   `Certificate` that cert-manager made for the hostname's previous Secret is deleted.
 //! - Only an Ingress names its certificates. The certificates of an `HTTPRoute` come from the
 //!   listener of its Gateway, which is the cluster's, not the project's: such a change is refused.
 //!
@@ -21,11 +24,16 @@
 //! [k8s-tls]: https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets
 
 use base64::Engine as _;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Map, Value, json};
+use zeabur_adapters::error_pages::{MAINTENANCE_ANNOTATION, maintenance};
+use zeabur_adapters::traefik;
 
 use crate::access::{meta_of, owner_of};
 use crate::change::{CertificateSource, RouteKind, RouteRef, Target, Warning};
 use crate::checks::ResourceRef;
+use crate::edit::LAST_APPLIED;
+use crate::error_pages::errors_spec;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
 use crate::plan::{ErrorKind, PlanError, Planner, Working, array, error, ingress_target, to_json};
@@ -154,6 +162,115 @@ fn with_own_entry(tls: &[Value], hostname: &str, secret: &str) -> Vec<Value> {
     entries
 }
 
+/// Whether Ingress `object` names an issuer and routes hostnames other than `hostname`.
+fn issuing_others(object: &Value, hostname: &str) -> bool {
+    let named = [CLUSTER_ISSUER, ISSUER].iter().any(|key| {
+        object
+            .pointer(&pointer(&["metadata", "annotations", key]))
+            .is_some()
+    });
+    named && rule_hosts(object).iter().any(|h| h != hostname)
+}
+
+/// Refuses to move `hostname` off Ingress `ingress` while the Ingress asks for a password, or
+/// the hostname redirects or is in maintenance: the middlewares for these belong to the Ingress.
+fn refuse_move(meta: &ObjectMeta, ingress: &str, hostname: &str) -> Result<(), PlanError> {
+    let listed = traefik::middlewares(meta);
+    let first = if listed.contains(&traefik::basic_auth_name(ingress)) {
+        format!("Stop asking for a password on {ingress}")
+    } else if listed.contains(&traefik::redirect_name(ingress, hostname)) {
+        format!("Stop redirecting {hostname}")
+    } else if maintenance(meta).is_some_and(|down| down.contains_key(hostname)) {
+        format!("End maintenance on {hostname}")
+    } else {
+        return Ok(());
+    };
+    Err(error(
+        ErrorKind::Invalid,
+        "certificate_shared",
+        format!(
+            "Ingress {ingress} asks cert-manager for the certificates of its other hostnames, so \
+             {hostname} moves to an Ingress of its own for your certificate. {first} first."
+        ),
+    ))
+}
+
+/// Ingress `name` for `hostname` alone, from Ingress `from`: its rules for the hostname, its
+/// class, labels and annotations, without the issuer, the maintenance backends and the
+/// middlewares Zeabur made for `from`. `pages` is the new Ingress's own errors middleware.
+fn moved_ingress(
+    from: &Value,
+    namespace: &str,
+    name: &str,
+    hostname: &str,
+    pages: Option<&str>,
+) -> Value {
+    let meta = meta_of(from);
+    let ingress = meta.name.as_deref().unwrap_or_default();
+    let made = [
+        traefik::reference(namespace, &traefik::error_pages_name(ingress)),
+        format!("{namespace}-{ingress}-redirect-"),
+    ];
+    let mut annotations = meta.annotations.clone().unwrap_or_default();
+    let mut middlewares: Vec<String> = annotations
+        .get(traefik::MIDDLEWARES_ANNOTATION)
+        .into_iter()
+        .flat_map(|list| list.split(','))
+        .map(str::trim)
+        .filter(|entry| !entry.is_empty() && !made.iter().any(|m| entry.starts_with(m.as_str())))
+        .map(str::to_owned)
+        .collect();
+    middlewares.extend(pages.map(|p| traefik::reference(namespace, p)));
+    for key in [CLUSTER_ISSUER, ISSUER, LAST_APPLIED, MAINTENANCE_ANNOTATION] {
+        annotations.remove(key);
+    }
+    annotations.remove(traefik::MIDDLEWARES_ANNOTATION);
+    if !middlewares.is_empty() {
+        annotations.insert(
+            traefik::MIDDLEWARES_ANNOTATION.to_owned(),
+            middlewares.join(","),
+        );
+    }
+    let rules: Vec<Value> = array(from, "/spec/rules")
+        .into_iter()
+        .filter(|r| r.get("host").and_then(Value::as_str) == Some(hostname))
+        .collect();
+    let mut body = json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "Ingress",
+        "metadata": {"name": name, "namespace": namespace},
+        "spec": {"rules": rules},
+    });
+    let fields = [
+        ("/metadata", "labels", meta.labels.map(|l| json!(l))),
+        (
+            "/metadata",
+            "annotations",
+            (!annotations.is_empty()).then(|| json!(annotations)),
+        ),
+        (
+            "/spec",
+            "ingressClassName",
+            from.pointer("/spec/ingressClassName").cloned(),
+        ),
+    ];
+    for (at, key, value) in fields {
+        if let (Some(value), Some(map)) =
+            (value, body.pointer_mut(at).and_then(Value::as_object_mut))
+        {
+            map.insert(key.to_owned(), value);
+        }
+    }
+    body
+}
+
+/// The Secret the `tls` entry of `hostname` names.
+fn listed_secret(object: &Value, hostname: &str) -> Option<String> {
+    listed(&array(object, "/spec/tls"), hostname)
+        .as_ref()
+        .and_then(secret_of)
+}
+
 fn rule_hosts(object: &Value) -> Vec<String> {
     array(object, "/spec/rules")
         .iter()
@@ -255,8 +372,77 @@ impl Planner<'_> {
                 self.check_chosen_issuer(name, &hostname)?;
                 self.use_issuer(index, &route.name, &hostname, name)
             }
+            CertificateSource::Own { .. } if issuing_others(&self.current(index), &hostname) => {
+                self.move_to_own(route, index, &hostname)
+            }
             CertificateSource::Own { .. } => self.use_own(index, &route.name, &hostname),
         }
+    }
+
+    /// Moves `hostname` from Ingress `index`, which asks an issuer for its other hostnames too,
+    /// to an Ingress of its own, and serves it there with the person's own certificate.
+    fn move_to_own(
+        &mut self,
+        route: &RouteRef,
+        index: usize,
+        hostname: &str,
+    ) -> Result<(), PlanError> {
+        let current = self.current(index);
+        let meta = meta_of(&current);
+        let ingress = route.name.as_str();
+        refuse_move(&meta, ingress, hostname)?;
+        // Named as "Add domain" names a route, so the service's deletion takes it along.
+        let services = array(&current, "/spec/rules")
+            .iter()
+            .filter(|r| r.get("host").and_then(Value::as_str) == Some(hostname))
+            .flat_map(|r| array(r, "/http/paths"))
+            .filter_map(|p| {
+                p.pointer("/backend/service/name")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            })
+            .collect();
+        let workload = self.behind(&services).into_iter().next();
+        let name = route_name(
+            workload.as_ref().map_or(ingress, |w| w.name.as_str()),
+            hostname,
+        );
+        let target = ingress_target(&name);
+        let taken = self
+            .input
+            .snapshot
+            .ingresses
+            .iter()
+            .any(|i| i.metadata.name.as_deref() == Some(name.as_str()))
+            || self.objects.iter().any(|w| w.target == target);
+        if taken {
+            return Err(error(
+                ErrorKind::Conflict,
+                "route_name_taken",
+                format!("A route named {name} already exists."),
+            ));
+        }
+        let pages = traefik::middlewares(&meta)
+            .contains(&traefik::error_pages_name(ingress))
+            .then(|| traefik::error_pages_name(&name));
+        if let Some(pages) = &pages {
+            self.created_middleware(pages, None, &errors_spec([]));
+        }
+        let namespace = self.input.snapshot.namespace.clone();
+        let body = moved_ingress(&current, &namespace, &name, hostname, pages.as_deref());
+        let issued = listed_secret(&current, hostname);
+        self.remove_domain(route, hostname)?;
+        if let Some(issued) = issued {
+            self.delete_issued(&issued, ingress);
+        }
+        self.created(target, body);
+        self.warnings.push(Warning::DomainMoved {
+            hostname: hostname.to_owned(),
+            from: ingress.to_owned(),
+            to: name.clone(),
+        });
+        let moved = self.objects.len() - 1;
+        self.use_own(moved, &name, hostname)
     }
 
     /// Makes Ingress `index` ask `issuer` for the certificate of `hostname`.
@@ -333,8 +519,7 @@ impl Planner<'_> {
                 "certificate_shared",
                 format!(
                     "Ingress {ingress} asks cert-manager for the certificates of all its \
-                     hostnames, also {}. Remove {hostname} and add it again with your own \
-                     certificate, so it gets an Ingress of its own.",
+                     hostnames, also {}.",
                     others.join(", ")
                 ),
             ));

@@ -3140,8 +3140,13 @@ export const zhCN: Messages = {
   "domainCert.defaultIssuer": (issuer) => `默认（${issuer}）`,
   "domainCert.shared": (hosts) => `同一个签发者也会签发 ${hosts} 的证书。`,
   "domainCert.needsDns": (issuer) => `${issuer} 无法签发通配符域名的证书，需要支持 DNS-01 的签发者`,
-  "domainCert.ownShared": (route, hosts) =>
-    `Ingress ${route} 的 ${hosts} 也使用 cert-manager 签发的证书。请先移除这个域名，再用你的证书重新添加。`,
+  "domainCert.ownMoves": (route, hosts) =>
+    `Ingress ${route} 也为 ${hosts} 向 cert-manager 申请证书，所以这个域名会移到自己的 Ingress。`,
+  "domainCert.ownKept": (route, hosts, first) =>
+    `Ingress ${route} 也为 ${hosts} 向 cert-manager 申请证书，这个域名得移到自己的 Ingress。请先${first}。`,
+  "domainCert.keptBy.password": (_host) => "取消密码",
+  "domainCert.keptBy.redirect": (host) => `取消 ${host} 的重定向`,
+  "domainCert.keptBy.maintenance": (host) => `结束 ${host} 的维护`,
   "domainCert.certificate": "证书（PEM）",
   "domainCert.certificateHint": "先放网站证书，再放中间证书。",
   "domainCert.key": "私钥（PEM）",
@@ -3359,6 +3364,7 @@ export const zhCN: Messages = {
   "useShared.kube.whenValue": "Pod 重启时；这个更改会替换 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任务使用 ${service} 当前的镜像 ${image}；之后 ${service} 换镜像，任务不会跟着换`,
+  "warn.domainMoved": (host, from, to) => `${host} 从 Ingress ${from} 移到自己的 Ingress ${to}`,
   "warn.routeDeleted": (route, host) => `${route} 只路由 ${host}，所以会一起删除`,
   "warn.maintenanceRestored": (host, service, port) =>
     `维护期间 ${host} 的规则改过，原来的后端对不上，显示维护页的路径会改发到 ${service}:${port}`,
