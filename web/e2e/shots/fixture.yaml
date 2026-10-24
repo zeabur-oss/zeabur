@@ -2,6 +2,8 @@
 - id: home
   path: /
   wait: main h1
+  locales: [en, zh-TW, zh-CN]
+  themes: [light, dark]
 - id: project-overview
   path: /projects/shop
   wait: main h1

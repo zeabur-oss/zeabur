@@ -12,8 +12,9 @@ nix develop -c scripts/docs-shots.sh web/e2e/shots/fixture.yaml target/docs-shot
 ```
 
 The script builds the web interface and the demo (`crates/zeabur-api/examples/demo.rs`), starts
-one demo server for each distinct `env`, and takes every shot in each locale (`en`, `zh-TW`,
-`zh-CN`) and theme (`light`, `dark`) at twice the pixel density, with reduced motion. It writes:
+one demo server for each distinct `env`, and takes each shot in English and the light theme at
+twice the pixel density, with reduced motion. A shot that a localized page or a dark-theme
+`<picture>` needs lists more locales or themes. It writes:
 
 ```text
 <out>/<locale>/<theme>/<id>.avif
@@ -38,6 +39,8 @@ fails, Playwright's trace is in `target/docs-shots-results`.
     - press: Escape
   clip: main                    # optional: CSS selector to crop to
   viewport: desktop             # desktop (1440×900) or phone (390×844); default desktop
+  locales: [en, zh-TW]          # optional: en, zh-TW, zh-CN; default [en]
+  themes: [light, dark]         # optional: light, dark; default [light]
   env:                          # optional: the demo's ZEABUR_DEMO_* variables, as strings
     ZEABUR_DEMO_FORBID: nodes,pods
 ```

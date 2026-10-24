@@ -17,14 +17,21 @@ export type Shot = {
   clip?: string
   viewport: "desktop" | "phone"
   env: Record<string, string>
+  locales: Locale[]
+  themes: Theme[]
 }
+
+export const locales = { en: "en-US", "zh-TW": "zh-TW", "zh-CN": "zh-CN" }
+export const themes = ["light", "dark"] as const
+export type Locale = keyof typeof locales
+export type Theme = (typeof themes)[number]
 
 export const viewports = {
   desktop: { width: 1440, height: 900 },
   phone: { width: 390, height: 844 },
 }
 
-const shotKeys = ["id", "path", "wait", "steps", "clip", "viewport", "env"]
+const shotKeys = ["id", "path", "wait", "steps", "clip", "viewport", "env", "locales", "themes"]
 const stepKeys: Record<string, string[]> = {
   click: ["click"],
   fill: ["fill", "value"],
@@ -68,11 +75,20 @@ function environment(value: unknown, at: string): Record<string, string> {
   return env as Record<string, string>
 }
 
+function subset<T extends string>(value: unknown, allowed: readonly T[], at: string): T[] {
+  check(
+    Array.isArray(value) && value.length > 0 && value.every((item) => allowed.includes(item as T)),
+    `${at} must be a list of ${allowed.join(", ")}`,
+  )
+  return value as T[]
+}
+
 function shot(value: unknown, index: number): Shot {
   if (!isRecord(value)) throw new Error(`shot ${index}: expected a mapping`)
   const at = typeof value.id === "string" ? value.id : `shot ${index}`
   for (const key of Object.keys(value)) check(shotKeys.includes(key), `${at}: unknown key "${key}"`)
   const { id, path, wait, clip, viewport = "desktop", steps = [] } = value
+  const { locales: shotLocales = ["en"], themes: shotThemes = ["light"] } = value
   check(
     typeof id === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id),
     `${at}: id must be kebab-case`,
@@ -90,6 +106,8 @@ function shot(value: unknown, index: number): Shot {
     clip: clip as string | undefined,
     viewport: viewport as Shot["viewport"],
     env: environment(value.env, at),
+    locales: subset(shotLocales, Object.keys(locales) as Locale[], `${at}: locales`),
+    themes: subset(shotThemes, themes, `${at}: themes`),
   }
 }
 

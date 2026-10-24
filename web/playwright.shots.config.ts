@@ -4,12 +4,10 @@
 //   ZEABUR_SHOTS_ENV       the demo's environment (e2e/shots/manifest.ts): only its shots run
 //   ZEABUR_SHOTS_OUT       receives <locale>/<theme>/<id>.png
 import { defineConfig, devices } from "@playwright/test"
+import { locales, themes } from "./e2e/shots/manifest.ts"
 
 const url = process.env.ZEABUR_SHOTS_URL
 if (!url) throw new Error("ZEABUR_SHOTS_URL is not set")
-
-const locales = { en: "en-US", "zh-TW": "zh-TW", "zh-CN": "zh-CN" }
-const themes = ["light", "dark"] as const
 
 export default defineConfig({
   testDir: "e2e/shots",

@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test"
 import { test } from "../fixtures.ts"
-import { envKey, readManifest, viewports, type Step } from "./manifest.ts"
+import { envKey, readManifest, viewports, type Locale, type Step, type Theme } from "./manifest.ts"
 
 const manifest = process.env.ZEABUR_SHOTS_MANIFEST
 const out = process.env.ZEABUR_SHOTS_OUT
@@ -19,6 +19,8 @@ for (const shot of readManifest(manifest).filter((s) => envKey(s.env) === env)) 
     test.use({ viewport: viewports[shot.viewport] })
 
     test(shot.id, async ({ page }, info) => {
+      const [locale, theme] = info.project.name.split("/") as [Locale, Theme]
+      test.skip(!shot.locales.includes(locale) || !shot.themes.includes(theme))
       await page.goto(shot.path, { waitUntil: "networkidle" })
       if (shot.wait) await page.locator(shot.wait).first().waitFor()
       for (const step of shot.steps) await run(page, step)
