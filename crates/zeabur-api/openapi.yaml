@@ -12222,6 +12222,23 @@ components:
             type: string
             description: Its name.
       - type: object
+        description: The hostname was the route's last, so the route is deleted with it.
+        required:
+        - route
+        - hostname
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - routeDeleted
+          hostname:
+            type: string
+            description: The hostname.
+          route:
+            $ref: "#/components/schemas/ObjectName"
+            description: The route.
+      - type: object
         description: |-
           The rules changed after maintenance started, so the hostname goes to this Service port
           instead of the backends kept then.

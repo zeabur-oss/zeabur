@@ -304,6 +304,10 @@ export function NetworkingTab({
                       const firstOfHost = shown.findIndex((r) => r.host === route.host) === i
                       const ingress = ingressOf(network, service, route)
                       const traefik = traefikOnly(ingress)
+                      const removeLabel =
+                        route.host && lastHost(network, service, route, route.host)
+                          ? t("edit.removeWithRoute", route.host, route.ingress)
+                          : t("edit.remove", route.host ?? "")
                       return (
                         <Fragment key={key}>
                           <tr
@@ -446,8 +450,8 @@ export function NetworkingTab({
                                       variant="muted"
                                       size="icon-xs"
                                       disabled={Boolean(managed)}
-                                      aria-label={t("edit.remove", route.host)}
-                                      title={t("edit.remove", route.host)}
+                                      aria-label={removeLabel}
+                                      title={removeLabel}
                                       onClick={() =>
                                         route.host
                                           ? planner.plan({
@@ -662,6 +666,12 @@ function ingressOf(
 ): Schemas["Route"] | undefined {
   const route = routesOf(network, service).find((r) => r.name === publicRoute.ingress)
   return route?.origin.kind === "Ingress" ? route : undefined
+}
+
+/** Whether `host` is all the route routes, so removing it deletes the route. */
+function lastHost(network: Network, service: Service, publicRoute: PublicRoute, host: string) {
+  const route = routesOf(network, service).find((r) => r.name === publicRoute.ingress)
+  return route?.rules.every((rule) => rule.host === host) ?? false
 }
 
 /** Maintenance first: the domain does not reach the service. */

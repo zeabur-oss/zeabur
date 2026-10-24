@@ -45,8 +45,8 @@ use crate::certificates::{
     CLUSTER_ISSUER, CheckedCertificate, ISSUER, IssuerRead, issued_secret_name,
 };
 use crate::change::{
-    CertificateSource, Change, DataEdit, DataKind, FieldOwners, HttpOnlyReason, Plan, PlanRequest,
-    PlannedObject, RouteKind, RouteRef, Target, Warning, Write,
+    CertificateSource, Change, DataEdit, DataKind, FieldOwners, HttpOnlyReason, ObjectName, Plan,
+    PlanRequest, PlannedObject, RouteKind, RouteRef, Target, Warning, Write,
 };
 use crate::checks::ResourceRef;
 use crate::create::ServedKind;
@@ -1516,6 +1516,9 @@ impl<'a> Planner<'a> {
     }
 
     fn remove_domain(&mut self, route: &RouteRef, hostname: &str) -> Result<(), PlanError> {
+        if self.last_host(route, hostname)? {
+            return self.delete_route(route, hostname);
+        }
         let index = self.route_index(route)?;
         let current = self.current(index);
         let mut operations = Vec::new();
@@ -1533,18 +1536,6 @@ impl<'a> Planner<'a> {
                         ErrorKind::NotFound,
                         "unknown_host",
                         format!("{} does not route {hostname}.", route.name),
-                    ));
-                }
-                if matching.len() == rules.len()
-                    && current.pointer("/spec/defaultBackend").is_none()
-                {
-                    return Err(error(
-                        ErrorKind::Invalid,
-                        "last_hostname",
-                        format!(
-                            "{hostname} is the only host of Ingress {}; delete the Ingress instead.",
-                            route.name
-                        ),
                     ));
                 }
                 for at in matching.iter().rev() {
@@ -1575,21 +1566,74 @@ impl<'a> Planner<'a> {
                         format!("{} does not route {hostname}.", route.name),
                     ));
                 };
-                if hostnames.len() == 1 {
-                    return Err(error(
-                        ErrorKind::Invalid,
-                        "last_hostname",
-                        format!(
-                            "{hostname} is the only hostname of HTTPRoute {}; without it the route would answer every host.",
-                            route.name
-                        ),
-                    ));
-                }
                 operations.push(test(&format!("/spec/hostnames/{at}"), json!(hostname)));
                 operations.push(remove(&format!("/spec/hostnames/{at}")));
             }
         }
         self.patch(index, operations)
+    }
+
+    /// Whether `hostname` is all that `route` routes: an Ingress whose every rule is for it and
+    /// that has no default backend, or an HTTPRoute with only this hostname. Without it the
+    /// Ingress would be invalid and the HTTPRoute would answer every host.
+    fn last_host(&self, route: &RouteRef, hostname: &str) -> Result<bool, PlanError> {
+        let target = match route.kind {
+            RouteKind::Ingress => ingress_target(&route.name),
+            RouteKind::HttpRoute => http_route_target(&route.name),
+        };
+        let current = match self.objects.iter().find(|w| w.target == target) {
+            Some(working) => working.current.clone(),
+            None => self.route(route)?.0,
+        };
+        let host = Some(hostname);
+        Ok(match route.kind {
+            RouteKind::Ingress => {
+                let rules = array(&current, "/spec/rules");
+                !rules.is_empty()
+                    && rules
+                        .iter()
+                        .all(|r| r.get("host").and_then(Value::as_str) == host)
+                    && current.pointer("/spec/defaultBackend").is_none()
+            }
+            RouteKind::HttpRoute => {
+                let hostnames = array(&current, "/spec/hostnames");
+                matches!(hostnames.as_slice(), [only] if only.as_str() == host)
+            }
+        })
+    }
+
+    /// Deletes `route`, whose last hostname is `hostname`.
+    fn delete_route(&mut self, route: &RouteRef, hostname: &str) -> Result<(), PlanError> {
+        let (_, _, services) = self.route(route)?;
+        let (kind, resource) = match route.kind {
+            RouteKind::Ingress => (
+                "Ingress",
+                ResourceRef {
+                    group: "networking.k8s.io".to_owned(),
+                    version: "v1".to_owned(),
+                    resource: "ingresses".to_owned(),
+                },
+            ),
+            RouteKind::HttpRoute => (
+                "HTTPRoute",
+                ResourceRef {
+                    group: "gateway.networking.k8s.io".to_owned(),
+                    version: "v1".to_owned(),
+                    resource: "httproutes".to_owned(),
+                },
+            ),
+        };
+        self.delete(&resource, &route.name, None)?;
+        let behind = self.behind(&services);
+        self.impact.extend(behind);
+        self.warnings.push(Warning::RouteDeleted {
+            route: ObjectName {
+                kind: kind.to_owned(),
+                name: route.name.clone(),
+            },
+            hostname: hostname.to_owned(),
+        });
+        Ok(())
     }
 
     // ── Restarts and the result ──────────────────────────────────────────────────────────────

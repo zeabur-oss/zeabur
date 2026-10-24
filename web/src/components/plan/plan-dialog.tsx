@@ -822,7 +822,7 @@ function certificateWarning(
   t: Translate,
   warning: Extract<
     Schemas["PlanWarning"],
-    { code: "ownCertificate" | "issuerShared" | "maintenanceRestored" }
+    { code: "ownCertificate" | "issuerShared" | "maintenanceRestored" | "routeDeleted" }
   >,
 ): string {
   switch (warning.code) {
@@ -837,6 +837,8 @@ function certificateWarning(
       )
     case "maintenanceRestored":
       return t("warn.maintenanceRestored", warning.hostname, warning.service, warning.port)
+    case "routeDeleted":
+      return t("warn.routeDeleted", `${warning.route.kind} ${warning.route.name}`, warning.hostname)
   }
 }
 
@@ -854,6 +856,7 @@ function accessWarning(
         | "ownCertificate"
         | "issuerShared"
         | "maintenanceRestored"
+        | "routeDeleted"
     }
   >,
 ): string {

@@ -6329,6 +6329,14 @@ export interface components {
         }
       | {
           /** @enum {string} */
+          code: "routeDeleted"
+          /** @description The hostname. */
+          hostname: string
+          /** @description The route. */
+          route: components["schemas"]["ObjectName"]
+        }
+      | {
+          /** @enum {string} */
           code: "maintenanceRestored"
           /** @description The hostname. */
           hostname: string

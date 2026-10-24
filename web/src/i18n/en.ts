@@ -1883,6 +1883,8 @@ export const en = {
   "edit.cancel": "Cancel",
   "edit.edit": (name: string) => `Edit ${name}`,
   "edit.remove": (name: string) => `Remove ${name}`,
+  "edit.removeWithRoute": (host: string, route: string) =>
+    `Remove ${host} and route ${route}, which has no other domain`,
   "edit.undo": (name: string) => `Keep ${name}`,
   "vars.edit": "Edit",
   "vars.addRow": "Add a variable",
@@ -3642,6 +3644,8 @@ export const en = {
   "useShared.kube.whenValue": "When the pods restart; this change replaces them",
   "warn.taskImageCopied": (service: string, image: string) =>
     `The task runs ${image}, ${service}'s image now; a later image change to ${service} doesn't reach it`,
+  "warn.routeDeleted": (route: string, host: string) =>
+    `${route} routes only ${host}, so it is deleted with it`,
   "warn.maintenanceRestored": (host: string, service: string, port: number) =>
     `The rules of ${host} changed during maintenance, so the paths that show the maintenance page go to ${service}:${port}, not to the backends they had before`,
   "warn.permanentRedirect": (host: string) =>

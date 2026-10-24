@@ -1,4 +1,4 @@
-description: "Removing the only hostname of an Ingress is refused: the Ingress would be invalid, and deleting it is a separate decision."
+description: "Removing the only hostname of an Ingress deletes the Ingress: without a rule it would be invalid. Review names the route that goes."
 operation: mutation.plan
 params:
   request:

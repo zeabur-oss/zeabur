@@ -1192,6 +1192,14 @@ pub enum Warning {
         /// Its name.
         pod: String,
     },
+    /// The hostname was the route's last, so the route is deleted with it.
+    #[serde(rename_all = "camelCase")]
+    RouteDeleted {
+        /// The route.
+        route: ObjectName,
+        /// The hostname.
+        hostname: String,
+    },
     /// The rules changed after maintenance started, so the hostname goes to this Service port
     /// instead of the backends kept then.
     #[serde(rename_all = "camelCase")]

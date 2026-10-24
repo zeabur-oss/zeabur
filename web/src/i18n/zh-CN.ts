@@ -1738,6 +1738,7 @@ export const zhCN: Messages = {
   "edit.cancel": "取消",
   "edit.edit": (name: string) => `编辑 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
+  "edit.removeWithRoute": (host, route) => `移除 ${host}，连同没有其他域名的路由 ${route}`,
   "edit.undo": (name: string) => `保留 ${name}`,
   "vars.edit": "编辑",
   "vars.addRow": "添加变量",
@@ -3358,6 +3359,7 @@ export const zhCN: Messages = {
   "useShared.kube.whenValue": "Pod 重启时；这个更改会替换 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任务使用 ${service} 当前的镜像 ${image}；之后 ${service} 换镜像，任务不会跟着换`,
+  "warn.routeDeleted": (route, host) => `${route} 只路由 ${host}，所以会一起删除`,
   "warn.maintenanceRestored": (host, service, port) =>
     `维护期间 ${host} 的规则改过，原来的后端对不上，显示维护页的路径会改发到 ${service}:${port}`,
   "warn.permanentRedirect": (host) =>

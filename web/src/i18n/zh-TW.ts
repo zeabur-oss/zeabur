@@ -1740,6 +1740,7 @@ export const zhTW: Messages = {
   "edit.cancel": "取消",
   "edit.edit": (name: string) => `編輯 ${name}`,
   "edit.remove": (name: string) => `移除 ${name}`,
+  "edit.removeWithRoute": (host, route) => `移除 ${host}，連同沒有其他網域的路由 ${route}`,
   "edit.undo": (name: string) => `保留 ${name}`,
   "vars.edit": "編輯",
   "vars.addRow": "新增變數",
@@ -3366,6 +3367,7 @@ export const zhTW: Messages = {
   "useShared.kube.whenValue": "Pod 重新啟動時；這個變更會替換 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任務使用 ${service} 目前的映像檔 ${image}；之後 ${service} 換映像檔，任務不會跟著換`,
+  "warn.routeDeleted": (route, host) => `${route} 只路由 ${host}，所以會一起刪除`,
   "warn.maintenanceRestored": (host, service, port) =>
     `維護期間 ${host} 的規則改過，原本的後端對不上，顯示維護頁的路徑會改送到 ${service}:${port}`,
   "warn.permanentRedirect": (host) =>
