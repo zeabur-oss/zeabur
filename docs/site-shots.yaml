@@ -46,6 +46,8 @@
     - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
     - wait: '[data-slot="checkbox"][data-checked]'
+  clip: main > *
+  until: 'main div:has(> h3) >> nth=4'
   locales: [zh-TW]
   themes: [light, dark]
 - id: installer-done
