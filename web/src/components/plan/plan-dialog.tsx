@@ -773,7 +773,7 @@ function warningSentence(
         ? t("warn.claimStillMounted", warning.target.name, names(t, warning.workloads))
         : t("warn.stillUsed", warning.target.name, names(t, warning.workloads))
     case "networkPolicyRemoved":
-      return [
+      return t("common.sentences", [
         warning.ingressOpened.length > 0
           ? t("warn.ingressOpened", names(t, warning.ingressOpened))
           : undefined,
@@ -789,9 +789,7 @@ function warningSentence(
               ).text,
             )
           : undefined,
-      ]
-        .filter(Boolean)
-        .join(" ")
+      ])
     case "toolsCredentialExposed":
       return t("warn.toolsCredentialExposed", warning.namespace)
     case "debugContainerStays":

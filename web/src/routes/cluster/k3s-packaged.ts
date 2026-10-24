@@ -5,14 +5,14 @@ import type { Translate } from "@/i18n"
 
 /** One sentence per packaged component: how to disable it, then what that removes. */
 export function k3sPackagedNotes(addons: readonly string[], t: Translate): string[] {
-  return addons.map(
-    (addon) =>
-      `${t("install.k3sPackaged", addon)} ${
-        addon === "traefik"
-          ? t("install.k3sPackagedTraefik")
-          : addon === "metrics-server"
-            ? t("install.k3sPackagedMetrics")
-            : t("install.k3sPackagedOther")
-      }`,
+  return addons.map((addon) =>
+    t("common.sentences", [
+      t("install.k3sPackaged", addon),
+      addon === "traefik"
+        ? t("install.k3sPackagedTraefik")
+        : addon === "metrics-server"
+          ? t("install.k3sPackagedMetrics")
+          : t("install.k3sPackagedOther"),
+    ]),
   )
 }

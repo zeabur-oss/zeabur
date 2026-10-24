@@ -60,28 +60,34 @@ export function useIssueText() {
       case "memoryFull":
         return {
           text: t("node.memoryFull", n, node, share),
-          detail: `${severe ? t("node.memoryFull.fail") : t("node.memoryFull.warn")} ${t("node.memoryFull.fix")}`,
+          detail: t("common.sentences", [
+            severe ? t("node.memoryFull.fail") : t("node.memoryFull.warn"),
+            t("node.memoryFull.fix"),
+          ]),
         }
       case "diskFull":
         return {
           text: t("node.diskFull", n, node, share),
-          detail: `${severe ? t("node.diskFull.fail") : t("node.diskFull.warn")} ${t("node.diskFull.fix")}`,
+          detail: t("common.sentences", [
+            severe ? t("node.diskFull.fail") : t("node.diskFull.warn"),
+            t("node.diskFull.fix"),
+          ]),
         }
       case "cordoned":
         return {
           text: t("node.cordoned", n, node),
-          detail: `${t("node.cordoned.why")} ${t("node.cordoned.fix", n, node)}`,
+          detail: t("common.sentences", [t("node.cordoned.why"), t("node.cordoned.fix", n, node)]),
         }
       case "reservedMemory":
       case "reservedCpu":
         return {
           text: t(`node.${group.kind}`, n, node, share),
-          detail: `${t(`node.${group.kind}.why`)} ${t(`node.${group.kind}.fix`)}`,
+          detail: t("common.sentences", [t(`node.${group.kind}.why`), t(`node.${group.kind}.fix`)]),
         }
       default:
         return {
           text: t(`node.${group.kind}`, n, node),
-          detail: `${t(`node.${group.kind}.why`)} ${t(`node.${group.kind}.fix`)}`,
+          detail: t("common.sentences", [t(`node.${group.kind}.why`), t(`node.${group.kind}.fix`)]),
         }
     }
   }
@@ -106,7 +112,7 @@ export function useAttention(): Attention {
       key: "eol",
       health: "fail",
       text: eol ? t("cluster.attEolPast", minor, date(eol)) : t("cluster.attEolOld", minor),
-      detail: `${t("cluster.attEol.why")} ${t("cluster.attEol.fix")}`,
+      detail: t("common.sentences", [t("cluster.attEol.why"), t("cluster.attEol.fix")]),
       nodes: [],
       problem: false,
     })
@@ -115,7 +121,7 @@ export function useAttention(): Attention {
       key: "eol",
       health: "warn",
       text: t("cluster.attEolSoon", minor, date(eol)),
-      detail: `${t("cluster.attEolSoon.why")} ${t("cluster.attEol.fix")}`,
+      detail: t("common.sentences", [t("cluster.attEolSoon.why"), t("cluster.attEol.fix")]),
       nodes: [],
       problem: false,
     })
@@ -128,7 +134,7 @@ export function useAttention(): Attention {
         skewed.length === 1
           ? t("cluster.attSkew", skewed[0]?.node ?? "", skewed[0]?.kubeletVersion ?? "")
           : t("cluster.attSkewMany", skewed.length),
-      detail: `${t("cluster.attSkew.why")} ${t("cluster.attSkew.fix")}`,
+      detail: t("common.sentences", [t("cluster.attSkew.why"), t("cluster.attSkew.fix")]),
       members:
         skewed.length > 1
           ? skewed.map((s) => ({ key: s.node, label: s.node, note: s.kubeletVersion }))
@@ -181,7 +187,7 @@ export function useAttention(): Attention {
               behind[0]?.tested ?? "",
             )
           : t("cluster.attComponents", behind.length),
-      detail: `${t("cluster.attComponent.why")} ${t("cluster.attComponent.fix")}`,
+      detail: t("common.sentences", [t("cluster.attComponent.why"), t("cluster.attComponent.fix")]),
       members:
         behind.length > 1
           ? behind.map((i) => ({

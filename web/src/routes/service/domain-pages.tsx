@@ -211,7 +211,7 @@ function maintenanceHint(t: Translate, service: Service, route: Schemas["Route"]
   const hint = t("domainPages.maintenanceHint", host, service.name)
   const others = route.hostnames.filter((h) => h !== host)
   if (route.origin.kind !== "HTTPRoute" || others.length === 0) return hint
-  return `${hint} ${t("domainPages.gatewayMoves", t("common.list", others))}`
+  return t("common.sentences", [hint, t("domainPages.gatewayMoves", t("common.list", others))])
 }
 
 function errorPagesHint(t: Translate, service: Service, route: Schemas["Route"], host: string) {

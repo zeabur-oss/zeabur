@@ -127,7 +127,7 @@ export function StorageClassField({
         />
         <p className="type-meta text-secondary">
           {growth
-            ? `${t("storage.onDefault")} ${t("storage.growUnknown")}`
+            ? t("common.sentences", [t("storage.onDefault"), t("storage.growUnknown")])
             : t("storage.onDefault")}
         </p>
       </div>
@@ -135,13 +135,11 @@ export function StorageClassField({
   const classes = offeredClasses(storage)
   const chosen = classNamed(storage, value)
   if (classes.length === 0 || !chosen) return null
-  const hint = [
+  const hint = t("common.sentences", [
     aboutWords(t, chosen),
     growth ? growthWords(t, storage, value) : undefined,
     engine && classes.length > 1 ? t("storage.selfReplicating", engine) : undefined,
-  ]
-    .filter(Boolean)
-    .join(" ")
+  ])
   return (
     <div className="flex flex-col gap-2">
       <FormField label={t("storage.class")} hint={hint}>

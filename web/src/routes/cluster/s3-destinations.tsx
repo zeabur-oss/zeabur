@@ -314,7 +314,7 @@ function KeptCopies({ plan }: { plan: Schemas["S3DestinationsPlan"] }) {
   return (
     <Alert variant="warn">
       <WarningIcon aria-hidden="true" />
-      <AlertDescription>{lines.join(" ")}</AlertDescription>
+      <AlertDescription>{t("common.sentences", lines)}</AlertDescription>
     </Alert>
   )
 }

@@ -570,7 +570,8 @@ function Backups({
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
           <AlertDescription>
-            {t("db.backup.pluginMissing")}{" "}
+            {t("db.backup.pluginMissing")}
+            {t("common.gap")}
             <Link to="/cluster/components" className="underline">
               {t("backups.seeComponents")}
             </Link>

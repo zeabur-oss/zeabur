@@ -292,7 +292,7 @@ function StateLine({
     <section aria-label={t("home.status")} className="flex flex-wrap items-center gap-x-4 gap-y-1">
       <p className="flex items-center gap-2 font-medium">
         <StatusDot health={health} />
-        {parts.join(" ")}
+        {t("common.sentences", parts)}
       </p>
       <ClusterFacts />
     </section>

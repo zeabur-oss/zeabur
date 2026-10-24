@@ -68,6 +68,10 @@ export const en = {
   "common.copied": "Copied",
   "common.status": "Status",
   "common.sep": ", ",
+  /** Between a sentence and what follows it, such as a link. */
+  "common.gap": " ",
+  /** Whole sentences, one after another. */
+  "common.sentences": (sentences: (string | undefined)[]) => sentences.filter(Boolean).join(" "),
   "common.list": (items: string[]) => new Intl.ListFormat("en").format(items),
   "common.more": (n: number) => `${n} more`,
   "common.domains": "Domains",

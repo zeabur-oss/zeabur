@@ -87,7 +87,8 @@ export function VolumeBackups({
       </ul>
       {state === "not-installed" ? (
         <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
-          {t("backups.volume.notInstalled")}{" "}
+          {t("backups.volume.notInstalled")}
+          {t("common.gap")}
           <Link
             to="/cluster/components"
             search={{ component: K8UP_COMPONENT }}
@@ -113,7 +114,8 @@ export function VolumeBackups({
       ) : null}
       {scheduled ? (
         <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
-          {t("backups.volume.restore")}{" "}
+          {t("backups.volume.restore")}
+          {t("common.gap")}
           <a
             href={RESTORE_GUIDE}
             target="_blank"
@@ -339,7 +341,8 @@ function ScheduleDrawer({
           <Alert variant="warn">
             <WarningIcon aria-hidden="true" />
             <AlertDescription>
-              {t("backups.volume.restricted")}{" "}
+              {t("backups.volume.restricted")}
+              {t("common.gap")}
               <a
                 href="#security"
                 onClick={(event) => {

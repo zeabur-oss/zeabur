@@ -85,7 +85,8 @@ export function IssuersSection() {
         />
       ) : (
         <p className="type-meta text-muted-foreground">
-          {t("issuers.notInstalled")}{" "}
+          {t("issuers.notInstalled")}
+          {t("common.gap")}
           <Link to="/cluster/components" className={buttonVariants({ variant: "link" })}>
             {t("issuers.install")}
           </Link>

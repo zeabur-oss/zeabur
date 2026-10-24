@@ -273,7 +273,7 @@ export function AccessDialog({
     ].filter(Boolean)
     const consequence =
       consequences.length > 0
-        ? `${consequences.join(" ")} ${t("roles.openTerminals")}`
+        ? t("common.sentences", [...consequences, t("roles.openTerminals")])
         : gained.admin
           ? t("roles.becomesAdmin", name)
           : undefined

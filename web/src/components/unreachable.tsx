@@ -111,7 +111,8 @@ export function UnreachableBanner() {
               {t("common.sep")}
             </>
           ) : null}
-          {state.retrying ? t("unreachable.retrying") : t("unreachable.every")}{" "}
+          {state.retrying ? t("unreachable.retrying") : t("unreachable.every")}
+          {t("common.gap")}
           {local ? text.fix : t("problem.fix.unavailable")}
         </p>
       </AlertDescription>

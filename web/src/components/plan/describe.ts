@@ -150,7 +150,7 @@ function sentenceOf(
           : change.readOnly === false
             ? t("confirm.writable", change.newMountPath ?? change.mountPath, change.workload.name)
             : undefined
-      return [moved, mode].filter(Boolean).join(" ") || t("confirm.mount", change.workload.name)
+      return t("common.sentences", [moved, mode]) || t("confirm.mount", change.workload.name)
     }
     case "probe":
       return probeSentence(t, change.probe, change.set ?? undefined)
@@ -504,7 +504,7 @@ export function describe(
       ),
     )
   return {
-    consequence: consequences.length > 0 ? consequences.join(" ") : undefined,
+    consequence: consequences.length > 0 ? t("common.sentences", consequences) : undefined,
     risk: ask.changes.length > 1 ? riskOf(t, reasons, ask, podsOf, named) : undefined,
     lines,
     more,
@@ -605,7 +605,7 @@ function riskOf(
         return risks[reason](t, ask)
     }
   })
-  return sentences.length > 0 ? sentences.join(" ") : undefined
+  return sentences.length > 0 ? t("common.sentences", sentences) : undefined
 }
 
 /** Whether data stays and whether it can be undone, where that is not obvious. */
@@ -629,7 +629,7 @@ function costOf(
         : t("plan.cost.dataStays", keeping.length),
     )
   if (undoOf(ask.changes, podsOf)) parts.push(t("plan.cost.undo"))
-  return parts.length > 0 ? parts.join(" ") : undefined
+  return parts.length > 0 ? t("common.sentences", parts) : undefined
 }
 
 /** What happens when the new pods do not fit, and how to make room; undefined when they fit. */
@@ -917,7 +917,7 @@ export function failureOf(t: Translate, locale: Locale, problem: Schemas["Proble
   const text = problemText(t, locale, problem)
   return {
     title: text.headline,
-    description: [text.why, text.fix].filter(Boolean).join(" "),
+    description: t("common.sentences", [text.why, text.fix]),
     review: problem.kind === "conflict" || problem.kind === "plan-expired",
   }
 }

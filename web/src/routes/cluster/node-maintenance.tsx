@@ -628,7 +628,8 @@ function DrainPlan({
         <Note variant="destructive">{t("maint.noOther")}</Note>
       ) : capacity?.status === "short" ? (
         <Note variant="warn">
-          {t("maint.short", capacity.unplaced.length)}{" "}
+          {t("maint.short", capacity.unplaced.length)}
+          {t("common.gap")}
           {capacity.room
             ? t("maint.shortDetail", amounts(capacity.needs), amounts(capacity.room))
             : null}

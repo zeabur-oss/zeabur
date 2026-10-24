@@ -95,7 +95,8 @@ function NoDestinations() {
   const t = useT()
   return (
     <p className="type-meta text-muted-foreground">
-      {t("s3d.none")}{" "}
+      {t("s3d.none")}
+      {t("common.gap")}
       <Link
         to="/cluster/backups"
         hash="s3-destinations"

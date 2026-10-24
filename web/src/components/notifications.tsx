@@ -504,7 +504,8 @@ function GotifyNote() {
   const t = useT()
   return (
     <p className="type-meta text-muted-foreground">
-      {t("notify.gotifyBridge")}{" "}
+      {t("notify.gotifyBridge")}
+      {t("common.gap")}
       <Link
         to="/cluster/components"
         search={{ component: GOTIFY_COMPONENT }}

@@ -320,7 +320,7 @@ group("describe", () => {
       pods({}),
       ["isolates"],
     )
-    expect(d.consequence).toBe("confirm.isolates(api)")
+    expect(d.consequence).toBe("common.sentences([confirm.isolates(api)])")
     expect(d.lines).toStrictEqual(["confirm.create(NetworkPolicy, zeabur-isolate-api)"])
     expect(d.action).toBe("action.isolate")
   })

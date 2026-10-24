@@ -95,7 +95,8 @@ export function ProviderNotes({ data }: { data: Schemas["ProjectBackups"] }) {
     <>
       {installed.length === 0 && refused.length === 0 ? (
         <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
-          {t("backups.noProvider")}{" "}
+          {t("backups.noProvider")}
+          {t("common.gap")}
           <Link to="/cluster/components" className="text-foreground hover:underline">
             {t("backups.seeComponents")}
           </Link>

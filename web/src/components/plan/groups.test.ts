@@ -303,7 +303,7 @@ group("describe at 1, 5 and 45 changes", () => {
       "plan.outcome.up.count(18)",
     ])
     const risk = "risk.fewPods(common.list([svc-00, svc-01, svc-02, common.more(24)]), 27)"
-    expect(d.risk).toBe(risk)
+    expect(d.risk).toBe(`common.sentences([${risk}])`)
     expect(d.more[risk]).toHaveLength(27)
     expect(d.action).toBe("action.restartMany(45)")
   })
@@ -316,8 +316,8 @@ group("describe at 1, 5 and 45 changes", () => {
     }))
     const d = describe(t, { changes }, plan(), pods(known), ["scaleToZero"])
     expect(d.action).toBe("action.pauseMany(45)")
-    expect(d.risk).toStartWith("risk.scaleToZero(")
-    expect(d.cost).toBe("plan.cost.undo")
+    expect(d.risk).toStartWith("common.sentences([risk.scaleToZero(")
+    expect(d.cost).toBe("common.sentences([plan.cost.undo])")
     expect(d.facts?.map((f) => f.text)).toStrictEqual(["plan.outcome.stops.count(45)"])
     expect(undoTitle(t, changes, changes)).toBe("undo.scaleUp(45)")
   })
@@ -332,7 +332,7 @@ group("describe at 1, 5 and 45 changes", () => {
       ["fewPods"],
       () => ["/data"],
     )
-    expect(d.cost).toBe("plan.cost.dataStaysOne(db, common.list([/data]))")
+    expect(d.cost).toBe("common.sentences([plan.cost.dataStaysOne(db, common.list([/data]))])")
   })
 
   test("resources say what each value was", () => {

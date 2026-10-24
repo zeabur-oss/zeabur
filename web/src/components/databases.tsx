@@ -117,7 +117,8 @@ export function OperatorNotes({ data }: { data: Schemas["ProjectDatabases"] }) {
     <>
       {installed.length === 0 && refused.length === 0 ? (
         <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
-          {t("db.noOperator")}{" "}
+          {t("db.noOperator")}
+          {t("common.gap")}
           <Link to="/cluster/components" className="text-foreground hover:underline">
             {t("backups.seeComponents")}
           </Link>

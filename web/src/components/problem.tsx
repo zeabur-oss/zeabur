@@ -45,7 +45,9 @@ function Failure({
   const t = useT()
   const { locale } = useI18n()
   const text = problemText(t, locale, body)
-  const fix = !retryAfter ? text.fix : `${text.fix} ${t("problem.retryAfter", retryAfter)}`
+  const fix = !retryAfter
+    ? text.fix
+    : t("common.sentences", [text.fix, t("problem.retryAfter", retryAfter)])
   const status = body.kubernetes ?? undefined
   // The sentence is often kube-apiserver's own message; say it once.
   const folded = text.folded.filter((sentence) => sentence !== status?.message)

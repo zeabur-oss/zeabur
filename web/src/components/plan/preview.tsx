@@ -34,7 +34,7 @@ function rolloutText(t: Translate, rollout: Rollout): string {
         return t("preview.pendingRestart", name)
     }
   })
-  return parts.join(" ")
+  return t("common.sentences", parts)
 }
 
 function Line({ health, children }: { health: Health; children: ReactNode }) {

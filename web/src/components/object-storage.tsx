@@ -83,7 +83,8 @@ export function ObjectStorageNotes({ data }: { data: Data }) {
   if (data.state !== "not-installed") return null
   return (
     <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
-      {t("s3.noOperator")}{" "}
+      {t("s3.noOperator")}
+      {t("common.gap")}
       <Link to="/cluster/components" className="text-foreground hover:underline">
         {t("backups.seeComponents")}
       </Link>

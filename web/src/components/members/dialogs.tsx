@@ -94,7 +94,10 @@ function LinkShown({ link, lead }: { link: SetupLink; lead: string }) {
       <p>{lead}</p>
       <CopyInput value={link.url} copyLabel={t("link.copy")} />
       <p className="text-muted-foreground">
-        {t("link.expires", formatTime(link.expiresAt, locale))} {t("link.once")}
+        {t("common.sentences", [
+          t("link.expires", formatTime(link.expiresAt, locale)),
+          t("link.once"),
+        ])}
       </p>
     </>
   )

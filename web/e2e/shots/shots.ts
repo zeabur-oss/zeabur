@@ -32,22 +32,38 @@ async function settle(page: Page) {
   )
 }
 
-// A scroll area as tall as the window (the app's main), or a page at least as tall as the window,
-// cuts its content off at the window's edge or ends in empty space. Make the window as tall as
-// the content.
+// A scroll area as tall as the window (the app's main, a drawer's body), or a page at least as
+// tall as the window, cuts its content off at the window's edge or ends in empty space. Make the
+// window as tall as the content.
 async function fit(page: Page, selector = "html") {
-  const element = page.locator(selector).first()
-  const scrolls = await element.evaluate(
-    (el) => el === document.documentElement || /auto|scroll/.test(getComputedStyle(el).overflowY),
-  )
-  if (!scrolls) return
+  // A drawer is as tall as the window and scrolls in its body; it then ends at its footer.
+  const inner = await page
+    .locator(selector)
+    .first()
+    .evaluate((el) => {
+      const scrolls = (e: Element) => /auto|scroll/.test(getComputedStyle(e).overflowY)
+      if (el === document.documentElement || scrolls(el)) return false
+      const drawer =
+        getComputedStyle(el).position === "fixed" &&
+        el.getBoundingClientRect().height >= window.innerHeight - 1
+      const body = drawer
+        ? [...el.querySelectorAll("*")]
+            .filter((e) => scrolls(e) && e.clientHeight > 0)
+            .sort((a, b) => b.clientHeight - a.clientHeight)[0]
+        : undefined
+      body?.setAttribute("data-shot-fit", "")
+      return body !== undefined
+    })
+  if (inner === false && !(await isScrollArea(page, selector))) return
+  const element = page.locator(inner ? "[data-shot-fit]" : selector).first()
   const { width, height } = page.viewportSize()!
   const chrome = height - (await element.evaluate((el) => el.clientHeight))
   await page.setViewportSize({ width, height: 200 })
   await settle(page)
   // Down to the lowest box that shows something: wrappers and margins below it are left out,
-  // since the crop adds its own space.
-  const content = await element.evaluate((el) => {
+  // since the crop adds its own space. A drawer's body keeps its own bottom padding above the
+  // footer.
+  const content = await element.evaluate((el, inner) => {
     const top = el.getBoundingClientRect().top - el.scrollTop
     let bottom = 0
     for (const e of el.querySelectorAll("*")) {
@@ -62,10 +78,21 @@ async function fit(page: Page, selector = "html") {
         s.boxShadow !== "none"
       if (painted && s.visibility !== "hidden") bottom = Math.max(bottom, r.bottom - top)
     }
-    return Math.ceil(bottom)
-  })
-  await page.setViewportSize({ width, height: content + chrome })
+    const padding = inner ? parseFloat(getComputedStyle(el).paddingBottom) : 0
+    return Math.ceil(bottom + padding)
+  }, inner)
+  const fitted = content + chrome
+  await page.setViewportSize({ width, height: inner ? Math.min(fitted, 2400) : fitted })
   await settle(page)
+}
+
+async function isScrollArea(page: Page, selector: string) {
+  return page
+    .locator(selector)
+    .first()
+    .evaluate(
+      (el) => el === document.documentElement || /auto|scroll/.test(getComputedStyle(el).overflowY),
+    )
 }
 
 // Content must not touch the edge of the image. Take the element alone, then put it on its

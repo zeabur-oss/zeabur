@@ -10,10 +10,10 @@ const t = ((key: string, ...args: unknown[]) =>
 
 test("a component k3s packages gets one warning per add-on, with what disabling it removes", () => {
   expect(k3sPackagedNotes(["traefik"], t)).toStrictEqual([
-    "install.k3sPackaged(traefik) install.k3sPackagedTraefik",
+    "common.sentences(install.k3sPackaged(traefik),install.k3sPackagedTraefik)",
   ])
   expect(k3sPackagedNotes(["metrics-server"], t)).toStrictEqual([
-    "install.k3sPackaged(metrics-server) install.k3sPackagedMetrics",
+    "common.sentences(install.k3sPackaged(metrics-server),install.k3sPackagedMetrics)",
   ])
 })
 

@@ -481,7 +481,8 @@ function NextStep({ project }: { project: string }) {
             ) : null}
             {choices && !choices.none && installed.length === 0 && choices.databases.length > 0 ? (
               <p className="type-meta text-muted-foreground">
-                {t("db.noOperator")}{" "}
+                {t("db.noOperator")}
+                {t("common.gap")}
                 <Link to="/cluster/components" className="text-foreground hover:underline">
                   {t("backups.seeComponents")}
                 </Link>
