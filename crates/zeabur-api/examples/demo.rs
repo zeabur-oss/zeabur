@@ -3355,7 +3355,8 @@ fn joining(cluster: MemoryCluster) {
 /// ReplicaSets, a DaemonSet's pod on each node, Zeabur's own pod and a pod without a controller on
 /// `vps-3`, a `worker` with scratch space, the `db` whose volume local-path keeps on `vps-3`, and
 /// a budget that holds a `web` pod for a few seconds once eviction starts.
-/// One S3 destination on the cluster's list, `r2-backups`.
+/// One S3 destination on the cluster's list, `r2-backups`, whose keys shop's Redis volume backups
+/// copied.
 fn s3_destinations(s: &mut State) {
     let namespace = "zeabur-s3-destinations";
     let labels = json!({"zeabur.com/s3-destination": "r2-backups"});
@@ -3382,6 +3383,19 @@ fn s3_destinations(s: &mut State) {
             ..NamespaceObjects::default()
         },
     );
+    if let Some(shop) = s.objects.get_mut("shop") {
+        shop.secrets.push(SecretSummary {
+            secret: from(json!({
+                "metadata": {"name": "data-redis-0-backup", "namespace": "shop", "labels": labels,
+                             "annotations": {
+                                 "zeabur.com/s3-destination-keys":
+                                     "AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY"},
+                             "resourceVersion": "22"},
+                "type": "Opaque"
+            })),
+            key_count: 3,
+        });
+    }
     s.secret_values.insert(
         format!("{namespace}/r2-backups"),
         [

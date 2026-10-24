@@ -2541,7 +2541,13 @@ export const zhTW: Messages = {
     "備份會存到你提供的 S3 相容儲存貯體。金鑰會以 Secret 的形式存放在這個專案。",
   "s3d.title": "S3 目的地",
   "s3d.body":
-    "整個叢集的備份表單都能選用這些儲存空間。選用時會把金鑰複製到專案，所以備份不依賴這份清單。在這裡更換金鑰，不會更新已複製的金鑰。",
+    "整個叢集的備份表單都能選用這些儲存空間。選用時會把金鑰複製到專案，所以備份不依賴這份清單。在這裡更換金鑰時，會一起更新你有權限修改的複本。",
+  "s3d.save": "儲存目的地",
+  "s3d.plan.copy": (name, namespace) => `更新 ${namespace} 裡複製的金鑰 ${name}`,
+  "s3d.plan.keptDenied": (copies) =>
+    `你無權修改 ${copies}，它們會繼續用舊金鑰。等有權限的成員再儲存一次，就會換成新金鑰。`,
+  "s3d.plan.keptUnknown": (copies) => `${copies} 沒有標明金鑰欄位，所以會沿用舊金鑰。`,
+  "s3d.plan.unsearched": "你無權列出所有命名空間的 Secret，其他地方的金鑰複本會沿用舊金鑰。",
   "s3d.add": "新增目的地",
   "s3d.plan.save": (name) => `儲存 S3 目的地 ${name}`,
   "s3d.plan.remove": (name) => `移除 S3 目的地 ${name}`,
@@ -2549,7 +2555,7 @@ export const zhTW: Messages = {
   "s3d.pick": "S3 目的地",
   "s3d.manual": "手動輸入",
   "s3d.copied": (name) =>
-    `套用時會把 ${name} 的金鑰複製到這個專案。之後 ${name} 換了金鑰，這份複本不會跟著更新。`,
+    `套用時會把 ${name} 的金鑰複製到這個專案。之後 ${name} 換了金鑰，這份複本也會一起更新。`,
   "s3d.denied": (namespace) =>
     `你無權讀取 ${namespace} 裡的 Secret，無法複製這些目的地的金鑰，請自行輸入。`,
   "s3d.from": (name) => `金鑰複製自 ${name}`,

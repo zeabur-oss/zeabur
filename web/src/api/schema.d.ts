@@ -3517,6 +3517,11 @@ export interface components {
       /** @description The image of the init containers that wait for a dependency (`depends_on`). */
       waitImage: string
     }
+    /**
+     * @description Why a plan does not update a copy.
+     * @enum {string}
+     */
+    CopyKept: "denied" | "unknownKeys"
     /** @description The Secret of a [`Change::CopyS3Keys`]. */
     CopyS3KeysChange: {
       /** @description The key the access key ID goes under. */
@@ -4973,6 +4978,15 @@ export interface components {
       name: string
       /** @description The `keel.sh/policy` annotation: `force`, `major`, `minor`, `patch`, `all`, `glob:…`. */
       policy: string
+    }
+    /** @description A copy of a destination's keys that a plan does not update. */
+    KeptCopy: {
+      /** @description The Secret. */
+      name: string
+      /** @description The Secret's namespace. */
+      namespace: string
+      /** @description Why. */
+      reason: components["schemas"]["CopyKept"]
     }
     /**
      * @description Why an object a deleted service uses or made stays.
@@ -7531,6 +7545,8 @@ export interface components {
       kind: string
       /** @description Its name. */
       name: string
+      /** @description Its namespace; empty for a Namespace. */
+      namespace: string
     }
     /**
      * @description What a write does.
@@ -7562,8 +7578,12 @@ export interface components {
     }
     /** @description A plan, and the token that applies it. */
     S3DestinationsPlan: {
+      /** @description The person may not list Secrets in every namespace, so the plan did not look for copies. */
+      copiesUnknown?: boolean
       /** @description When the token stops working, RFC 3339. */
       expiresAt: string
+      /** @description Copies of the keys that the plan leaves with the old keys. */
+      keptCopies: components["schemas"]["KeptCopy"][]
       /** @description Send this to `apply` to carry out exactly this plan. */
       token: string
       /** @description The writes, in order; empty when nothing changes. */

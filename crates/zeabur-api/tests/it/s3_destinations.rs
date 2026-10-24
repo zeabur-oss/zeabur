@@ -1,6 +1,7 @@
 //! S3 destinations: an administrator registers one through a plan and no answer shows its keys,
 //! a project plan copies the keys into a Secret of the project that names its source, a person
-//! who may not read the keys is refused, and a Velero location takes them too.
+//! who may not read the keys is refused, a Velero location takes them too, and new keys reach
+//! every copy the person may change.
 
 #[cfg(test)]
 mod tests {
@@ -11,7 +12,7 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{NamespaceObjects, ServedResource};
+    use zeabur_kube::{NamespaceObjects, ServedResource, WriteBody};
 
     use crate::common::{app, send};
 
@@ -168,5 +169,80 @@ mod tests {
         assert!(String::from_utf8(keys).unwrap().contains(SECRET_KEY));
         let (_, found) = send(&app, "GET", "/api/v1/cluster/backups", None).await;
         assert_eq!(found["keysFrom"], "r2", "{found}");
+    }
+
+    async fn copied_twice(app: &Router) {
+        register(app).await;
+        applied(app, "/api/v1/projects/shop", &copy("db-backups-s3")).await;
+        let request = json!({"op": "location", "bucket": "backups", "prefix": "velero",
+            "endpoint": "https://r2.example.com", "destination": "r2"});
+        applied(app, "/api/v1/cluster/backups", &request).await;
+    }
+
+    fn rotate() -> Value {
+        json!({"op": "save", "name": "r2", "endpoint": "https://r2.example.com",
+            "bucket": "backups", "accessKeyId": "AKIA2", "secretAccessKey": "rotated-secret"})
+    }
+
+    #[tokio::test]
+    async fn new_keys_reach_every_copy() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        copied_twice(&app).await;
+        let (planned, _) = applied(&app, BASE, &rotate()).await;
+        assert!(!planned.to_string().contains("rotated-secret"), "{planned}");
+        assert_eq!(planned["keptCopies"], json!([]), "{planned}");
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        let written = |namespace: &str, name: &str| {
+            writes
+                .iter()
+                .rev()
+                .find(|w| {
+                    (w.target.namespace.as_str(), w.target.name.as_str()) == (namespace, name)
+                })
+                .and_then(|w| {
+                    let WriteBody::JsonPatch(ops) = &w.body else {
+                        return None;
+                    };
+                    ops.as_array()?
+                        .iter()
+                        .find(|op| op["path"] == "/stringData")
+                        .map(|op| op["value"].clone())
+                })
+                .unwrap()
+        };
+        assert_eq!(
+            written("shop", "db-backups-s3"),
+            json!({"ACCESS_KEY_ID": "AKIA2", "ACCESS_SECRET_KEY": "rotated-secret"})
+        );
+        let file = written("velero", "zeabur-backup-credentials");
+        assert!(
+            file["cloud"]
+                .as_str()
+                .unwrap()
+                .contains("aws_access_key_id=AKIA2")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_plan_names_the_copies_it_cannot_change() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        copied_twice(&app).await;
+        cluster.update(|s| {
+            s.forbidden_namespaces.insert("velero".to_owned());
+        });
+        let (status, planned) = send(&app, "POST", &format!("{BASE}/plan"), Some(&rotate())).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        assert_eq!(
+            planned["keptCopies"],
+            json!([{"namespace": "velero", "name": "zeabur-backup-credentials",
+                    "reason": "denied"}])
+        );
+        cluster.update(|s| {
+            s.forbidden_resources.insert("secrets".to_owned());
+        });
+        let (_, planned) = send(&app, "POST", &format!("{BASE}/plan"), Some(&rotate())).await;
+        assert_eq!(planned["copiesUnknown"], true, "{planned}");
     }
 }

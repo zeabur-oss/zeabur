@@ -795,6 +795,20 @@ impl Cluster for UserClient {
         })
     }
 
+    fn list_labelled<'a>(
+        &'a self,
+        resource: &'a ResourceRef,
+        namespace: Option<&'a str>,
+        key: &'a str,
+        value: &'a str,
+    ) -> Answer<'a, Vec<ObjectMeta>> {
+        Box::pin(async move {
+            names::optional_namespace(namespace)?;
+            objects::list_labelled(self.kube(), resource, namespace, &format!("{key}={value}"))
+                .await
+        })
+    }
+
     fn get_object<'a>(
         &'a self,
         resource: &'a ResourceRef,

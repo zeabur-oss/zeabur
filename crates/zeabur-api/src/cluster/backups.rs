@@ -367,25 +367,6 @@ fn secrets() -> ResourceRef {
     ResourceRef::new("", "v1", "secrets", "Secret")
 }
 
-/// The JSON Patch operations that set the credentials Secret's [`s3_destinations::LABEL`]
-/// annotation to `destination`, or remove it.
-fn annotation_ops(existing: &Value, destination: Option<&str>) -> Vec<Value> {
-    let annotations = existing.pointer("/metadata/annotations");
-    let path = format!(
-        "/metadata/annotations/{}",
-        s3_destinations::LABEL.replace('/', "~1")
-    );
-    match (destination, annotations) {
-        (Some(name), Some(_)) => vec![json!({"op": "add", "path": path, "value": name})],
-        (Some(name), None) => vec![json!({"op": "add", "path": "/metadata/annotations",
-                                          "value": {s3_destinations::LABEL: name}})],
-        (None, Some(a)) if a.get(s3_destinations::LABEL).is_some() => {
-            vec![json!({"op": "remove", "path": path})]
-        }
-        (None, _) => Vec::new(),
-    }
-}
-
 fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Denied {
     let group = if resource == "secrets" { "" } else { GROUP };
     Denied {
@@ -552,11 +533,7 @@ async fn location_writes(
         let file = v::credentials_file(access, secret);
         let annotated = |mut secret: Value| {
             if let Some(name) = destination {
-                s3_destinations::set(
-                    &mut secret,
-                    &["metadata", "annotations", s3_destinations::LABEL],
-                    name.to_owned(),
-                );
+                s3_destinations::mark(&mut secret, name, v::CREDENTIALS_KEY);
             }
             secret
         };
@@ -575,7 +552,11 @@ async fn location_writes(
                     json!({"op": "add", "path": "/stringData",
                            "value": { v::CREDENTIALS_KEY: &file }}),
                 ];
-                operations.extend(annotation_ops(existing, destination));
+                operations.extend(s3_destinations::mark_ops(
+                    existing,
+                    destination,
+                    v::CREDENTIALS_KEY,
+                ));
                 (
                     WriteBody::JsonPatch(Value::Array(operations)),
                     BackupWriteAction::Patch,

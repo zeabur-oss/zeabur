@@ -278,6 +278,17 @@ pub trait Cluster: Send + Sync {
         namespace: Option<&'a str>,
     ) -> Answer<'a, Vec<DynamicObject>>;
 
+    /// Only the metadata of the objects of a built-in kind in `namespace` (every namespace when
+    /// `None`) that carry the label `key` with `value`: one list with a label selector, no
+    /// discovery check first, and a refusal is an error.
+    fn list_labelled<'a>(
+        &'a self,
+        resource: &'a ResourceRef,
+        namespace: Option<&'a str>,
+        key: &'a str,
+        value: &'a str,
+    ) -> Answer<'a, Vec<ObjectMeta>>;
+
     /// One object of `resource`; `None` when its API is not installed, a `404` error when the
     /// object does not exist ([`ClusterExt::find_object`] makes that `None` too). A Secret's
     /// values are hidden ([`crate::objects`]). `resource.kind` may be empty.

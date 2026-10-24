@@ -295,8 +295,8 @@ pub enum Change {
     },
     /// Create a Secret with the keys of an S3 destination from the cluster's list. The API reads
     /// the destination's Secret as the person and plans the Secret as a `create`, so the keys
-    /// never travel through the browser. The new Secret does not change when the destination's
-    /// keys change.
+    /// never travel through the browser. The Secret is labelled with the destination and names
+    /// its keys, so a plan that changes the destination's keys can update it.
     CopyS3Keys(CopyS3KeysChange),
     /// Delete one object of the project, as `kubectl delete` does: what it owns goes after it
     /// (background propagation). Refused for an object Helm, Argo CD or Flux manages, and for one

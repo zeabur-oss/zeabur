@@ -5496,8 +5496,8 @@ components:
           description: |-
             Create a Secret with the keys of an S3 destination from the cluster's list. The API reads
             the destination's Secret as the person and plans the Secret as a `create`, so the keys
-            never travel through the browser. The new Secret does not change when the destination's
-            keys change.
+            never travel through the browser. The Secret is labelled with the destination and names
+            its keys, so a plan that changes the destination's keys can update it.
         - type: object
           required:
           - op
@@ -5509,8 +5509,8 @@ components:
         description: |-
           Create a Secret with the keys of an S3 destination from the cluster's list. The API reads
           the destination's Secret as the person and plans the Secret as a `create`, so the keys
-          never travel through the browser. The new Secret does not change when the destination's
-          keys change.
+          never travel through the browser. The Secret is labelled with the destination and names
+          its keys, so a plan that changes the destination's keys can update it.
       - type: object
         description: |-
           Delete one object of the project, as `kubectl delete` does: what it owns goes after it
@@ -6705,6 +6705,12 @@ components:
         waitImage:
           type: string
           description: The image of the init containers that wait for a dependency (`depends_on`).
+    CopyKept:
+      type: string
+      description: Why a plan does not update a copy.
+      enum:
+      - denied
+      - unknownKeys
     CopyS3KeysChange:
       type: object
       description: The Secret of a [`Change::CopyS3Keys`].
@@ -9496,6 +9502,23 @@ components:
         policy:
           type: string
           description: "The `keel.sh/policy` annotation: `force`, `major`, `minor`, `patch`, `all`, `glob:…`."
+    KeptCopy:
+      type: object
+      description: A copy of a destination's keys that a plan does not update.
+      required:
+      - namespace
+      - name
+      - reason
+      properties:
+        name:
+          type: string
+          description: The Secret.
+        namespace:
+          type: string
+          description: The Secret's namespace.
+        reason:
+          $ref: "#/components/schemas/CopyKept"
+          description: Why.
     KeptReason:
       type: string
       description: Why an object a deleted service uses or made stays.
@@ -14522,6 +14545,7 @@ components:
       - action
       - kind
       - name
+      - namespace
       properties:
         action:
           $ref: "#/components/schemas/S3DestinationWriteAction"
@@ -14542,6 +14566,9 @@ components:
         name:
           type: string
           description: Its name.
+        namespace:
+          type: string
+          description: Its namespace; empty for a Namespace.
     S3DestinationWriteAction:
       type: string
       description: What a write does.
@@ -14605,10 +14632,21 @@ components:
       - token
       - expiresAt
       - writes
+      - keptCopies
       properties:
+        copiesUnknown:
+          type: boolean
+          description: >-
+            The person may not list Secrets in every namespace, so the plan did not look
+            for copies.
         expiresAt:
           type: string
           description: When the token stops working, RFC 3339.
+        keptCopies:
+          type: array
+          items:
+            $ref: "#/components/schemas/KeptCopy"
+          description: Copies of the keys that the plan leaves with the old keys.
         token:
           type: string
           description: Send this to `apply` to carry out exactly this plan.

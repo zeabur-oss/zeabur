@@ -294,6 +294,28 @@ pub(crate) async fn list_kind(
     Ok(items)
 }
 
+/// The metadata of the objects of a built-in kind that carry `key=value` (see
+/// [`Cluster::list_labelled`](crate::Cluster::list_labelled)).
+pub(crate) async fn list_labelled(
+    client: &kube::Client,
+    resource: &ResourceRef,
+    namespace: Option<&str>,
+    selector: &str,
+) -> Result<Vec<ObjectMeta>, ClusterError> {
+    let list = api(client, resource, namespace)
+        .list_metadata(&ListParams::default().labels(selector))
+        .await?;
+    Ok(list
+        .items
+        .into_iter()
+        .map(|item| {
+            let mut metadata = item.metadata;
+            hide_metadata(resource, &mut metadata);
+            metadata
+        })
+        .collect())
+}
+
 pub(crate) async fn list_metadata(
     client: &kube::Client,
     resource: &ResourceRef,

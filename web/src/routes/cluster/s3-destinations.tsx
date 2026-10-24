@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
+import WarningIcon from "~icons/ph/warning"
 
 import { api, unwrap, type Schemas } from "@/api/client"
 import { queryClient } from "@/api/queries"
@@ -19,6 +20,7 @@ import {
   saveRequest,
 } from "@/model/s3-destinations"
 import { Section } from "@/routes/cluster/section"
+import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
 
@@ -30,7 +32,8 @@ const refresh = () => {
 }
 
 /** The S3 destinations backup forms offer. Each is a ConfigMap and a Secret of its own
- * namespace; a plan copies the keys into a project, so no backup reads them here. */
+ * namespace; a plan copies the keys into a project, so no backup reads them here. New keys go to
+ * the copies in the same plan. */
 export function S3DestinationsSection() {
   const t = useT()
   const data = useQuery(s3DestinationsQuery).data
@@ -90,13 +93,7 @@ export function S3DestinationsSection() {
           [t("s3d.title"), "ConfigMap/<name>, Secret/<name>, zeabur.com/s3-destination=<name>"],
         ]}
       />
-      {plan ? (
-        <DestinationsPlan
-          planned={plan}
-          namespace={data.namespace}
-          onClose={() => setPlan(undefined)}
-        />
-      ) : null}
+      {plan ? <DestinationsPlan planned={plan} onClose={() => setPlan(undefined)} /> : null}
     </Section>
   )
 }
@@ -256,15 +253,7 @@ const writeText = {
   delete: "notify.plan.delete",
 } as const
 
-function DestinationsPlan({
-  planned,
-  namespace,
-  onClose,
-}: {
-  planned: Planned
-  namespace: string
-  onClose: () => void
-}) {
+function DestinationsPlan({ planned, onClose }: { planned: Planned; onClose: () => void }) {
   const t = useT()
   const plan = useQuery({
     queryKey: ["s3-destinations-plan", planned.request],
@@ -290,7 +279,7 @@ function DestinationsPlan({
       title={planned.title}
       plan={plan}
       apply={apply}
-      action={planned.destructive ? t("projectSettings.removeAction") : t("plan.apply")}
+      action={planned.destructive ? t("projectSettings.removeAction") : t("s3d.save")}
       destructive={planned.destructive}
       ready={(data) => (data?.writes.length ?? 0) > 0}
       onClose={onClose}
@@ -300,18 +289,41 @@ function DestinationsPlan({
           {data.writes.length === 0 ? <p>{t("clusterBackups.plan.nothing")}</p> : null}
           <ul className="flex flex-col gap-1">
             {data.writes.map((w) => (
-              <li key={`${w.kind}/${w.name}`}>{t(writeText[w.action], `${w.kind}/${w.name}`)}</li>
+              <li key={`${w.namespace}/${w.kind}/${w.name}`}>
+                {w.kind === "Secret" && w.namespace !== S3D_NAMESPACE
+                  ? t("s3d.plan.copy", w.name, w.namespace)
+                  : t(writeText[w.action], `${w.kind}/${w.name}`)}
+              </li>
             ))}
           </ul>
+          <KeptCopies plan={data} />
           <p className="type-meta text-muted-foreground">{t("clusterBackups.plan.keysHidden")}</p>
-          <PlanDiffs
-            writes={data.writes.map((w) => ({
-              ...w,
-              namespace: w.kind === "Namespace" ? "" : namespace,
-            }))}
-          />
+          <PlanDiffs writes={data.writes} />
         </>
       )}
     </PlanFrame>
+  )
+}
+
+const S3D_NAMESPACE = "zeabur-s3-destinations"
+
+/** The copies that keep the old keys, and why. */
+function KeptCopies({ plan }: { plan: Schemas["S3DestinationsPlan"] }) {
+  const t = useT()
+  const names = (reason: Schemas["CopyKept"]) =>
+    plan.keptCopies.filter((c) => c.reason === reason).map((c) => `${c.namespace}/${c.name}`)
+  const denied = names("denied")
+  const unknown = names("unknownKeys")
+  const lines = [
+    plan.copiesUnknown ? t("s3d.plan.unsearched") : undefined,
+    denied.length > 0 ? t("s3d.plan.keptDenied", t("common.list", denied)) : undefined,
+    unknown.length > 0 ? t("s3d.plan.keptUnknown", t("common.list", unknown)) : undefined,
+  ].filter((line) => line !== undefined)
+  if (lines.length === 0) return null
+  return (
+    <Alert variant="warn">
+      <WarningIcon aria-hidden="true" />
+      <AlertDescription>{lines.join(" ")}</AlertDescription>
+    </Alert>
   )
 }

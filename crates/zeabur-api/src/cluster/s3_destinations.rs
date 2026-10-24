@@ -15,9 +15,14 @@
 //! Secrets.
 //!
 //! The list is only a picker. A backup never reads a destination: a plan copies the keys into a
-//! Secret of the backup's own namespace (`open` and `keys`), and annotates that Secret with
-//! [`LABEL`] and the destination's name. A change of the destination's keys does not reach the
-//! copies, and backups keep running when Zeabur or the list is removed.
+//! Secret of the backup's own namespace (`open` and `keys`), labels that Secret with [`LABEL`] and
+//! the destination's name, and names the keys that hold them in the annotation [`KEYS`]. Backups
+//! keep running when Zeabur or the list is removed.
+//!
+//! A plan that changes a destination's keys finds the copies with one list of Secrets in every
+//! namespace by that label, and updates each copy in a namespace where the person may patch
+//! Secrets. It names the other copies, and says when the person may not list Secrets in every
+//! namespace, so copies were not looked for.
 //!
 //! The plan token is sealed, so the keys a person types travel in it unreadable. It binds the
 //! person, the request and the `resourceVersion` of every object the plan reads. Apply reads
@@ -38,9 +43,10 @@ use zeabur_kube::{
     WriteRequest,
 };
 use zeabur_model::Origin;
+use zeabur_modules::velero::cluster as v;
 use zeabur_plan::{Change, CopyS3KeysChange, PlanRequest};
 
-use crate::error::{ApiError, get_read, read_problem};
+use crate::error::{ApiError, get_read, list_read, read_problem};
 use crate::handlers::{AppState, Everyday, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::projects::namespace::Permission;
@@ -52,6 +58,9 @@ pub const NAMESPACE: &str = "zeabur-s3-destinations";
 /// The label of a destination's objects, and the annotation of a Secret its keys were copied
 /// into; the value is the destination's name.
 pub const LABEL: &str = "zeabur.com/s3-destination";
+/// The annotation of a copy that names the keys holding the access key ID and the secret access
+/// key, `ID,SECRET`; one key holds an AWS shared credentials file.
+pub const KEYS: &str = "zeabur.com/s3-destination-keys";
 const ACCESS_KEY_ID: &str = "AWS_ACCESS_KEY_ID";
 const SECRET_ACCESS_KEY: &str = "AWS_SECRET_ACCESS_KEY";
 const PREFIX: &str = "s3d1.";
@@ -150,6 +159,8 @@ pub struct S3DestinationWrite {
     pub kind: String,
     /// Its name.
     pub name: String,
+    /// Its namespace; empty for a Namespace.
+    pub namespace: String,
     /// The object as it is, YAML; absent for a creation and for a Secret.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub before_yaml: Option<String>,
@@ -168,6 +179,33 @@ pub struct S3DestinationsPlan {
     pub expires_at: String,
     /// The writes, in order; empty when nothing changes.
     pub writes: Vec<S3DestinationWrite>,
+    /// Copies of the keys that the plan leaves with the old keys.
+    pub kept_copies: Vec<KeptCopy>,
+    /// The person may not list Secrets in every namespace, so the plan did not look for copies.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub copies_unknown: bool,
+}
+
+/// A copy of a destination's keys that a plan does not update.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct KeptCopy {
+    /// The Secret's namespace.
+    pub namespace: String,
+    /// The Secret.
+    pub name: String,
+    /// Why.
+    pub reason: CopyKept,
+}
+
+/// Why a plan does not update a copy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum CopyKept {
+    /// The person may not patch Secrets in its namespace.
+    Denied,
+    /// Its annotation [`KEYS`] is missing, so the keys that hold the copy are not known.
+    UnknownKeys,
 }
 
 /// The token of a plan to apply.
@@ -320,11 +358,50 @@ pub(crate) async fn keys(cluster: &dyn Cluster, name: &str) -> Result<(String, S
         })
 }
 
-/// The destination a Secret's keys were copied from, by its annotation.
+/// The destination a Secret's keys were copied from, by its label.
 pub(crate) fn copied_from(
     meta: &zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
 ) -> Option<String> {
-    meta.annotations.as_ref()?.get(LABEL).cloned()
+    meta.labels.as_ref()?.get(LABEL).cloned()
+}
+
+/// Marks `object`, a Secret to create, as a copy of `destination` with the keys in `keys`.
+pub(crate) fn mark(object: &mut Value, destination: &str, keys: &str) {
+    set(
+        object,
+        &["metadata", "labels", LABEL],
+        destination.to_owned(),
+    );
+    set(object, &["metadata", "annotations", KEYS], keys.to_owned());
+}
+
+/// The JSON Patch operations that mark the Secret `existing` as a copy of `destination` with the
+/// keys in `keys`, or remove the marks when `destination` is `None`.
+pub(crate) fn mark_ops(existing: &Value, destination: Option<&str>, keys: &str) -> Vec<Value> {
+    let mut ops = Vec::new();
+    for (field, key, value) in [
+        ("labels", LABEL, destination),
+        ("annotations", KEYS, destination.map(|_| keys)),
+    ] {
+        let mut map = existing
+            .pointer(&format!("/metadata/{field}"))
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        let before = map.clone();
+        match value {
+            Some(value) => {
+                map.insert(key.to_owned(), Value::String(value.to_owned()));
+            }
+            None => {
+                map.remove(key);
+            }
+        }
+        if map != before {
+            ops.push(json!({"op": "add", "path": format!("/metadata/{field}"), "value": map}));
+        }
+    }
+    ops
 }
 
 /// `request` with each `copyS3Keys` change opened into the `create` of its Secret, with the
@@ -425,10 +502,10 @@ async fn copied(cluster: &dyn Cluster, copy: CopyS3KeysChange) -> Result<Value, 
         return Err(invalid("The keys of an S3 destination go into a Secret."));
     }
     let (access, secret) = keys(cluster, &destination).await?;
-    set(
+    mark(
         &mut object,
-        &["metadata", "annotations", LABEL],
-        destination,
+        &destination,
+        &format!("{access_key_id},{secret_access_key}"),
     );
     set(&mut object, &["stringData", &access_key_id], access);
     set(&mut object, &["stringData", &secret_access_key], secret);
@@ -514,19 +591,18 @@ struct Planned {
     shown: Option<Value>,
 }
 
-fn target(kind: &str, name: &str) -> ObjectTarget {
-    let resource = resource(kind);
+fn target(kind: &str, namespace: &str, name: &str) -> ObjectTarget {
     ObjectTarget {
         api_version: "v1".to_owned(),
         kind: kind.to_owned(),
-        plural: resource.resource,
-        namespace: if kind == "Namespace" {
-            String::new()
-        } else {
-            NAMESPACE.to_owned()
-        },
+        plural: resource(kind).resource,
+        namespace: namespace.to_owned(),
         name: name.to_owned(),
     }
+}
+
+fn own(kind: &str, name: &str) -> ObjectTarget {
+    target(kind, if kind == "Namespace" { "" } else { NAMESPACE }, name)
 }
 
 fn version(object: Option<&Value>) -> String {
@@ -539,7 +615,7 @@ fn version(object: Option<&Value>) -> String {
 
 fn create(kind: &str, name: &str, body: Value, shown: Value) -> Planned {
     Planned {
-        target: target(kind, name),
+        target: own(kind, name),
         body: WriteBody::Create(body),
         action: S3DestinationWriteAction::Create,
         before: None,
@@ -553,7 +629,7 @@ fn patch(kind: &str, before: &Value, path: &str, value: &Value, shown: Value) ->
         .and_then(Value::as_str)
         .unwrap_or_default();
     Planned {
-        target: target(kind, name),
+        target: own(kind, name),
         body: WriteBody::JsonPatch(json!([
             {"op": "test", "path": "/metadata/resourceVersion", "value": version(Some(before))},
             {"op": "add", "path": path, "value": value},
@@ -572,7 +648,7 @@ fn delete(kind: &str, before: &Value) -> Planned {
             .map(str::to_owned)
     };
     Planned {
-        target: target(kind, &field("/metadata/name").unwrap_or_default()),
+        target: own(kind, &field("/metadata/name").unwrap_or_default()),
         body: WriteBody::Delete(Preconditions {
             uid: field("/metadata/uid"),
             resource_version: field("/metadata/resourceVersion"),
@@ -582,6 +658,103 @@ fn delete(kind: &str, before: &Value) -> Planned {
         before: (kind != "Secret").then(|| before.clone()),
         shown: None,
     }
+}
+
+/// A copy of a destination's keys in another namespace.
+struct Copy {
+    namespace: String,
+    name: String,
+    version: String,
+    /// The annotation [`KEYS`].
+    keys: Option<String>,
+    /// The person may patch Secrets in its namespace.
+    writable: bool,
+}
+
+/// The copies of a destination's keys; `None` when the person may not list Secrets in every
+/// namespace.
+async fn copies(cluster: &dyn Cluster, name: &str) -> Result<Option<Vec<Copy>>, ApiError> {
+    let found = match cluster
+        .list_labelled(&resource("Secret"), None, LABEL, name)
+        .await
+    {
+        Ok(found) => found,
+        Err(error) if error.is_refused() => return Ok(None),
+        Err(error) => {
+            return Err(read_problem(
+                error,
+                &format!("the copies of S3 destination {name}"),
+                list_read("", "secrets", None),
+            ));
+        }
+    };
+    let mut writable = BTreeMap::new();
+    let mut out = Vec::new();
+    for meta in found {
+        let (Some(namespace), Some(secret)) = (meta.namespace, meta.name) else {
+            continue;
+        };
+        if namespace == NAMESPACE {
+            continue;
+        }
+        if !writable.contains_key(&namespace) {
+            let review = Denied {
+                verb: "patch".to_owned(),
+                group: String::new(),
+                resource: "secrets".to_owned(),
+                name: None,
+                namespace: Some(namespace.clone()),
+            };
+            let allowed = matches!(cluster.review_access(&review).await, Ok(true));
+            writable.insert(namespace.clone(), allowed);
+        }
+        out.push(Copy {
+            writable: writable.get(&namespace).copied().unwrap_or(false),
+            keys: meta.annotations.and_then(|mut a| a.remove(KEYS)),
+            version: meta.resource_version.unwrap_or_default(),
+            namespace,
+            name: secret,
+        });
+    }
+    Ok(Some(out))
+}
+
+/// The write that puts the keys into `copy`, or why there is none.
+fn rotate(copy: &Copy, access: &str, key: &str) -> Result<Planned, CopyKept> {
+    if !copy.writable {
+        return Err(CopyKept::Denied);
+    }
+    let names: Vec<&str> = copy
+        .keys
+        .as_deref()
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .collect();
+    let (data, shown) = match names.as_slice() {
+        [file] => (
+            json!({*file: v::credentials_file(access, key)}),
+            json!({*file: HIDDEN}),
+        ),
+        [id, secret] => (
+            json!({*id: access, *secret: key}),
+            json!({*id: HIDDEN, *secret: HIDDEN}),
+        ),
+        _ => return Err(CopyKept::UnknownKeys),
+    };
+    Ok(Planned {
+        target: target("Secret", &copy.namespace, &copy.name),
+        body: WriteBody::JsonPatch(json!([
+            {"op": "test", "path": "/metadata/resourceVersion", "value": copy.version},
+            {"op": "add", "path": "/stringData", "value": data},
+        ])),
+        action: S3DestinationWriteAction::Patch,
+        before: None,
+        shown: Some(json!({"apiVersion": "v1", "kind": "Secret",
+            "metadata": {"name": copy.name, "namespace": copy.namespace},
+            "stringData": shown})),
+    })
 }
 
 /// What a plan reads: the namespace, and the destination's ConfigMap and Secret.
@@ -623,7 +796,12 @@ impl Current {
         ])
     }
 
-    fn save(&self, fields: &S3DestinationFields) -> Result<Vec<Planned>, ApiError> {
+    fn save(
+        &self,
+        fields: &S3DestinationFields,
+        copies: Option<&[Copy]>,
+        kept: &mut Vec<KeptCopy>,
+    ) -> Result<Vec<Planned>, ApiError> {
         if let Some(problem) = fields_problem(fields) {
             return Err(invalid(problem));
         }
@@ -669,6 +847,16 @@ impl Current {
                     shown,
                 ),
             });
+            for copy in copies.unwrap_or_default() {
+                match rotate(copy, access, key) {
+                    Ok(write) => writes.push(write),
+                    Err(reason) => kept.push(KeptCopy {
+                        namespace: copy.namespace.clone(),
+                        name: copy.name.clone(),
+                        reason,
+                    }),
+                }
+            }
         }
         Ok(writes)
     }
@@ -686,20 +874,52 @@ impl Current {
     }
 }
 
+/// What a plan reads and writes.
+struct Computed {
+    versions: BTreeMap<String, String>,
+    writes: Vec<Planned>,
+    kept: Vec<KeptCopy>,
+    copies_unknown: bool,
+}
+
 async fn compute(
     cluster: &dyn Cluster,
     request: &S3DestinationsPlanRequest,
-) -> Result<(BTreeMap<String, String>, Vec<Planned>), ApiError> {
+) -> Result<Computed, ApiError> {
     let name = match request {
         S3DestinationsPlanRequest::Save(fields) => &fields.name,
         S3DestinationsPlanRequest::Remove { name } => name,
     };
     let current = Current::read(cluster, name).await?;
+    let mut versions = current.versions();
+    let mut kept = Vec::new();
+    let mut copies_unknown = false;
     let writes = match request {
-        S3DestinationsPlanRequest::Save(fields) => current.save(fields)?,
+        S3DestinationsPlanRequest::Save(fields) => {
+            let rotates = !fields.access_key_id.trim().is_empty()
+                && !fields.secret_access_key.trim().is_empty();
+            let found = if rotates {
+                copies(cluster, name).await?
+            } else {
+                Some(Vec::new())
+            };
+            copies_unknown = found.is_none();
+            for copy in found.iter().flatten() {
+                versions.insert(
+                    format!("Secret/{}/{}", copy.namespace, copy.name),
+                    copy.version.clone(),
+                );
+            }
+            current.save(fields, found.as_deref(), &mut kept)?
+        }
         S3DestinationsPlanRequest::Remove { name } => current.remove(name)?,
     };
-    Ok((current.versions(), writes))
+    Ok(Computed {
+        versions,
+        writes,
+        kept,
+        copies_unknown,
+    })
 }
 
 fn yaml(object: &Value) -> Option<String> {
@@ -734,7 +954,12 @@ pub(crate) async fn plan(
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
-    let (versions, writes) = compute(cluster.as_ref(), &request).await?;
+    let Computed {
+        versions,
+        writes,
+        kept,
+        copies_unknown,
+    } = compute(cluster.as_ref(), &request).await?;
     let expires_at = (state.clock)().as_second().saturating_add(LIFETIME_SECONDS);
     let claims = Claims {
         person: identity.username,
@@ -760,10 +985,13 @@ pub(crate) async fn plan(
                 action: w.action,
                 kind: w.target.kind.clone(),
                 name: w.target.name.clone(),
+                namespace: w.target.namespace.clone(),
                 before_yaml: w.before.as_ref().and_then(yaml),
                 after_yaml: w.shown.as_ref().and_then(yaml),
             })
             .collect(),
+        kept_copies: kept,
+        copies_unknown,
     }))
 }
 
@@ -784,14 +1012,14 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
         &target.plural,
         (write.action != S3DestinationWriteAction::Create).then_some(target.name.as_str()),
     );
-    if target.kind == "Namespace" {
-        denied.namespace = None;
-    }
-    cluster
-        .write(&request)
-        .await
-        .map(|_| ())
-        .map_err(|error| read_problem(error, &format!("{} {}", target.kind, target.name), denied))
+    denied.namespace = (!target.namespace.is_empty()).then(|| target.namespace.clone());
+    cluster.write(&request).await.map(|_| ()).map_err(|error| {
+        read_problem(
+            error,
+            &format!("{} {} in {}", target.kind, target.name, target.namespace),
+            denied,
+        )
+    })
 }
 
 /// Carries out a destinations plan by its token: checks it, dry-runs every write, then writes.
@@ -825,11 +1053,13 @@ pub(crate) async fn apply(
             "Someone else made this plan, or you made it with other group memberships.",
         )));
     }
-    let (versions, writes) = compute(cluster.as_ref(), &claims.request).await?;
+    let Computed {
+        versions, writes, ..
+    } = compute(cluster.as_ref(), &claims.request).await?;
     if versions != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Conflict,
-            "The destination changed after the plan was made.",
+            "The destination or a copy of its keys changed after the plan was made.",
         )));
     }
     for write in &writes {

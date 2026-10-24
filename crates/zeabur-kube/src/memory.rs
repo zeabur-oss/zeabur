@@ -1155,6 +1155,34 @@ impl Cluster for MemoryCluster {
         })
     }
 
+    fn list_labelled<'a>(
+        &'a self,
+        resource: &'a ResourceRef,
+        namespace: Option<&'a str>,
+        key: &'a str,
+        value: &'a str,
+    ) -> Answer<'a, Vec<ObjectMeta>> {
+        Box::pin(async move {
+            Ok(self
+                .list_kind(resource, namespace)
+                .await?
+                .into_iter()
+                .filter(|o| {
+                    o.metadata
+                        .labels
+                        .as_ref()
+                        .and_then(|l| l.get(key))
+                        .is_some_and(|v| v == value)
+                })
+                .map(|o| {
+                    let mut metadata = o.metadata;
+                    hide_metadata(resource, &mut metadata);
+                    metadata
+                })
+                .collect())
+        })
+    }
+
     fn get_object<'a>(
         &'a self,
         resource: &'a ResourceRef,

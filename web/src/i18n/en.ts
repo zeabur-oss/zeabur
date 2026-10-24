@@ -2751,7 +2751,16 @@ export const en = {
     "Backups go to an S3-compatible bucket you provide. The keys are kept as a Secret in this project.",
   "s3d.title": "S3 destinations",
   "s3d.body":
-    "Backup forms offer these. Choosing one copies its keys into the project; later changes here do not reach the copies.",
+    "Backup forms offer these. Choosing one copies its keys into the project. New keys saved here go to the copies you may change.",
+  "s3d.save": "Save destination",
+  "s3d.plan.copy": (name: string, namespace: string) =>
+    `Update copied keys ${name} in ${namespace}`,
+  "s3d.plan.keptDenied": (copies: string) =>
+    `You cannot change ${copies}. They keep the old keys until someone who can saves the destination again.`,
+  "s3d.plan.keptUnknown": (copies: string) =>
+    `${copies} do not name their keys, so they keep the old keys.`,
+  "s3d.plan.unsearched":
+    "You cannot list Secrets in every namespace, so copies of these keys elsewhere keep the old keys.",
   "s3d.add": "Add destination",
   "s3d.plan.save": (name: string) => `Save S3 destination ${name}`,
   "s3d.plan.remove": (name: string) => `Remove S3 destination ${name}`,
@@ -2759,7 +2768,7 @@ export const en = {
   "s3d.pick": "S3 destination",
   "s3d.manual": "Enter manually",
   "s3d.copied": (name: string) =>
-    `The plan copies the keys of ${name} here. Later changes to them do not reach this copy.`,
+    `The plan copies the keys of ${name} here. New keys saved to ${name} go to this copy too.`,
   "s3d.denied": (namespace: string) =>
     `You may not read the keys (Secrets in ${namespace}). Enter them yourself.`,
   "s3d.from": (name: string) => `Keys copied from ${name}`,

@@ -2535,7 +2535,13 @@ export const zhCN: Messages = {
   "db.backup.setUpBody": "备份会存到你提供的 S3 兼容存储桶。密钥会以 Secret 的形式存放在这个项目。",
   "s3d.title": "S3 目的地",
   "s3d.body":
-    "整个集群的备份表单都能选用这些存储空间。选用时会把密钥复制到项目，所以备份不依赖这份列表。在这里更换密钥，不会更新已复制的密钥。",
+    "整个集群的备份表单都能选用这些存储空间。选用时会把密钥复制到项目，所以备份不依赖这份列表。在这里更换密钥时，会一并更新你有权限修改的副本。",
+  "s3d.save": "保存目的地",
+  "s3d.plan.copy": (name, namespace) => `更新 ${namespace} 中复制的密钥 ${name}`,
+  "s3d.plan.keptDenied": (copies) =>
+    `你无权修改 ${copies}，它们会沿用旧密钥，直到有权限的人再保存一次这个目的地。`,
+  "s3d.plan.keptUnknown": (copies) => `${copies} 没有标明密钥字段，所以会沿用旧密钥。`,
+  "s3d.plan.unsearched": "你无权列出所有命名空间的 Secret，其他地方的密钥副本会沿用旧密钥。",
   "s3d.add": "添加目的地",
   "s3d.plan.save": (name) => `保存 S3 目的地 ${name}`,
   "s3d.plan.remove": (name) => `移除 S3 目的地 ${name}`,
@@ -2543,7 +2549,7 @@ export const zhCN: Messages = {
   "s3d.pick": "S3 目的地",
   "s3d.manual": "手动输入",
   "s3d.copied": (name) =>
-    `应用时会把 ${name} 的密钥复制到这个项目。之后 ${name} 更换密钥，这份副本不会随之更新。`,
+    `应用时会把 ${name} 的密钥复制到这个项目。之后 ${name} 更换密钥，这份副本也会一并更新。`,
   "s3d.denied": (namespace) =>
     `你没有权限读取集群 S3 目的地的密钥（${namespace} 中的 Secret），请自行输入密钥。`,
   "s3d.from": (name) => `密钥复制自 ${name}`,
