@@ -14,8 +14,8 @@ use zeabur_installer_host::preflight::{self, Status};
 use zeabur_installer_host::{archive, cloud, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::plan::{
-    self, ComponentPlan, IDENTITY_NAMESPACE, LOCAL_ISSUER, MANAGER, NAMESPACE_MANAGER, Plan,
-    ReleasePlan, Rke2Plan, SecretSource, ZEABUR_NAMESPACE,
+    self, ComponentPlan, Download, IDENTITY_NAMESPACE, IdentityPlan, LOCAL_ISSUER, MANAGER,
+    NAMESPACE_MANAGER, Plan, ReleasePlan, Rke2Plan, SecretSource, Source, ZEABUR_NAMESPACE,
 };
 use zeabur_installer_plan::rke2::{
     self, AUTHN_CONFIGMAP, AUTHN_FILE, ETCD_USER, HostFile, IMAGES_DIR, PREFIX,
@@ -92,6 +92,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
     let mut report = Vec::new();
     let mut link_issued = !first_install(&kubectl)?;
     if config.zeabur {
+        fetch_pinned(&plan)?;
         if config.access.mode == AccessMode::Local {
             local_ca(&kubectl, &plan)?;
         }
@@ -658,6 +659,50 @@ fn local_ca_pem(kubectl: &Kubectl, namespace: &str) -> Result<String, InstallErr
         })
 }
 
+/// Where `apply` keeps a file of a pinned release.
+fn pinned_path(download: &Download) -> PathBuf {
+    Path::new(STATE_DIR).join("downloads").join(&download.file)
+}
+
+/// The `zeabur-identityctl` that `apply` runs.
+fn identityctl_path(identity: &IdentityPlan) -> PathBuf {
+    match &identity.identityctl {
+        Source::Local(path) => PathBuf::from(path),
+        Source::Pinned(archive) => {
+            let dir = archive.file.trim_end_matches(".tar.gz");
+            Path::new(STATE_DIR)
+                .join("downloads")
+                .join(dir)
+                .join("zeabur-identityctl")
+        }
+    }
+}
+
+/// Downloads the planned files of pinned releases and checks their digests.
+fn fetch_pinned(plan: &Plan) -> Result<(), InstallError> {
+    let agent = download::agent();
+    let fetch = |d: &Download| -> Result<PathBuf, InstallError> {
+        let dest = pinned_path(d);
+        out::err(&format!("    {}", d.url));
+        download::fetch(&agent, &d.url, &dest, d.sha256.as_deref())?;
+        Ok(dest)
+    };
+    if let Some(identity) = &plan.identity
+        && let Source::Pinned(d) = &identity.identityctl
+    {
+        let archive = fetch(d)?;
+        if let Some(dir) = identityctl_path(identity).parent() {
+            archive::unpack_tar_gz(&archive, dir)?;
+        }
+    }
+    if let Some(zeabur) = &plan.zeabur
+        && let Source::Pinned(d) = &zeabur.chart
+    {
+        fetch(d)?;
+    }
+    Ok(())
+}
+
 fn identityctl(
     kubectl: &Kubectl,
     plan: &Plan,
@@ -670,7 +715,7 @@ fn identityctl(
         .ok_or_else(|| InstallError::Message("no identity in the plan".to_owned()))?;
     let kubeconfig = kubectl.kubeconfig().display().to_string();
     Ok(cmd::run_with(
-        &identity.identityctl,
+        identityctl_path(identity),
         args,
         &[
             ("KUBECONFIG", &kubeconfig),
@@ -778,7 +823,14 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
         }))?;
     }
 
-    let chart = chart_content(&zeabur.chart)?;
+    let chart = match &zeabur.chart {
+        Source::Local(path) => chart_content(path)?,
+        Source::Pinned(d) => {
+            let path = pinned_path(d);
+            fs::read(&path)
+                .map_err(|e| InstallError::Message(format!("{}: {e}", path.display())))?
+        }
+    };
     let object = json!({
         "apiVersion": "helm.cattle.io/v1",
         "kind": "HelmChart",
@@ -906,9 +958,14 @@ fn setup_link(kubectl: &Kubectl, plan: &Plan) -> Result<String, InstallError> {
         &["setup-link", "--username", "admin", "--valid-for", "24h"],
         None,
     )?;
+    let program = plan
+        .identity
+        .as_ref()
+        .map_or_else(PathBuf::new, identityctl_path);
     Ok(format!(
-        "\nEnroll the first admin's passkey (works once, for 24 hours):\n  {}\nA new link: zeabur-identityctl setup-link --username admin",
-        link.stdout.trim()
+        "\nEnroll the first admin's passkey (works once, for 24 hours):\n  {}\nA new link: {} setup-link --username admin",
+        link.stdout.trim(),
+        program.display()
     ))
 }
 

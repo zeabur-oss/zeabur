@@ -146,6 +146,26 @@ pub struct Download {
     pub sha256: Option<String>,
 }
 
+/// Where `apply` takes a file from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
+pub enum Source {
+    /// A path on this server, from `sources`.
+    Local(String),
+    /// A file of a pinned release, checked against its digest.
+    Pinned(Download),
+}
+
+impl From<pins::Asset> for Download {
+    fn from(asset: pins::Asset) -> Self {
+        Self {
+            file: asset.file,
+            url: asset.url,
+            sha256: Some(asset.sha256.to_owned()),
+        }
+    }
+}
+
 /// A namespace and its Pod Security level.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -258,8 +278,8 @@ pub struct IdentityPlan {
     pub host: String,
     /// Image reference.
     pub image: String,
-    /// The `zeabur-identityctl` binary.
-    pub identityctl: String,
+    /// The `zeabur-identityctl` binary, or its release archive.
+    pub identityctl: Source,
     /// The Ingress exposing it.
     pub ingress: Value,
     /// Whether it accepts invitation links.
@@ -272,8 +292,8 @@ pub struct IdentityPlan {
 pub struct ZeaburPlan {
     /// Public URL.
     pub url: String,
-    /// The chart: a local directory or `.tgz`, or an OCI reference.
-    pub chart: String,
+    /// The chart: a local directory or `.tgz`, or the released `.tgz`.
+    pub chart: Source,
     /// Helm values, except the generated Secrets' names, which are fixed.
     pub values: Value,
 }
@@ -366,10 +386,6 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
         }
     }
 
-    let tls_issuer = match config.access.mode {
-        AccessMode::Domain => ACME_ISSUER,
-        AccessMode::Local => LOCAL_ISSUER,
-    };
     if !chosen.contains("certificates/cert-manager") && config.zeabur {
         return Err(PlanError::NeedsDisabled {
             component: "zeabur".to_owned(),
@@ -380,8 +396,8 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
     let (identity, zeabur) = products(
         config,
         facts,
+        pins::PRODUCTS.as_ref(),
         &chosen,
-        tls_issuer,
         &mut namespaces,
         &mut warnings,
     )?;
@@ -485,14 +501,18 @@ fn packaged_to_disable(chosen: &BTreeSet<&str>) -> Vec<String> {
 fn products(
     config: &Config,
     facts: &Facts,
+    pins: Option<&pins::Products>,
     chosen: &BTreeSet<&str>,
-    tls_issuer: &str,
     namespaces: &mut BTreeMap<String, Namespace>,
     warnings: &mut Vec<Warning>,
 ) -> Result<(Option<IdentityPlan>, Option<ZeaburPlan>), PlanError> {
     if !config.zeabur {
         return Ok((None, None));
     }
+    let tls_issuer = match config.access.mode {
+        AccessMode::Domain => ACME_ISSUER,
+        AccessMode::Local => LOCAL_ISSUER,
+    };
     for name in [IDENTITY_NAMESPACE, ZEABUR_NAMESPACE] {
         namespaces.insert(
             name.to_owned(),
@@ -503,26 +523,38 @@ fn products(
             },
         );
     }
-    let image = config
-        .sources
+    let sources = &config.sources;
+    let image = sources
         .identity_image
         .clone()
-        .ok_or(PlanError::Unpublished("identityImage"))?;
-    let identityctl = config
-        .sources
-        .identityctl
-        .clone()
-        .ok_or(PlanError::Unpublished("identityctl"))?;
-    let chart = config
-        .sources
+        .or_else(|| pins.map(|p| p.identity.image.to_owned()));
+    let identityctl = sources.identityctl.clone().map(Source::Local).or_else(|| {
+        pins.and_then(|p| p.identity.identityctl(&facts.arch))
+            .map(|a| Source::Pinned(a.into()))
+    });
+    let chart = sources
         .zeabur_chart
         .clone()
-        .ok_or(PlanError::Unpublished("zeaburChart"))?;
-    let zeabur_image = config
-        .sources
+        .map(Source::Local)
+        .or_else(|| pins.map(|p| Source::Pinned(p.zeabur.chart().into())));
+    let zeabur_image = sources
         .zeabur_image
         .clone()
-        .ok_or(PlanError::Unpublished("zeaburImage"))?;
+        .or_else(|| pins.map(|p| p.zeabur.image.to_owned()));
+    let missing: Vec<&'static str> = [
+        ("identityImage", image.is_none()),
+        ("identityctl", identityctl.is_none()),
+        ("zeaburImage", zeabur_image.is_none()),
+        ("zeaburChart", chart.is_none()),
+    ]
+    .into_iter()
+    .filter_map(|(key, missing)| missing.then_some(key))
+    .collect();
+    let (Some(image), Some(identityctl), Some(chart), Some(zeabur_image)) =
+        (image, identityctl, chart, zeabur_image)
+    else {
+        return Err(PlanError::Unpublished(missing));
+    };
     let identity = IdentityPlan {
         issuer: config.issuer(),
         host: config.access.identity.clone(),
@@ -1374,5 +1406,74 @@ mod tests {
             "letsencrypt"
         );
         assert_eq!(values["domains"]["clusterIssuer"], "letsencrypt");
+    }
+
+    #[test]
+    fn products_come_from_sources_or_else_the_pinned_releases() {
+        let pinned = pins::Products {
+            catalog: pins::Catalog {
+                version: "v0.1.0",
+                index_sha256: "aa",
+            },
+            identity: pins::Identity {
+                version: "v0.2.0",
+                image: "ghcr.io/zeabur-oss/identity@sha256:bb",
+                identityctl_amd64: "cc",
+                identityctl_arm64: "dd",
+            },
+            zeabur: pins::Zeabur {
+                version: "v0.3.0",
+                image: "ghcr.io/zeabur-oss/zeabur@sha256:ee",
+                chart_sha256: "ff",
+            },
+        };
+        let only_access = Config::parse(
+            "access: {mode: domain, identity: login.example.com, zeabur: zeabur.example.com}\n\
+             sources: {zeaburImage: zeabur:dev}",
+        )
+        .unwrap();
+        let products = |pins| {
+            products(
+                &only_access,
+                &facts(),
+                pins,
+                &BTreeSet::new(),
+                &mut BTreeMap::new(),
+                &mut Vec::new(),
+            )
+        };
+
+        let (identity, zeabur) = products(Some(&pinned)).unwrap();
+        let (identity, zeabur) = (identity.unwrap(), zeabur.unwrap());
+        assert_eq!(identity.image, "ghcr.io/zeabur-oss/identity@sha256:bb");
+        assert_eq!(
+            identity.identityctl,
+            Source::Pinned(Download {
+                file: "zeabur-identityctl-v0.2.0-linux-arm64.tar.gz".to_owned(),
+                url: "https://github.com/zeabur-oss/identity/releases/download/v0.2.0/\
+                      zeabur-identityctl-v0.2.0-linux-arm64.tar.gz"
+                    .to_owned(),
+                sha256: Some("dd".to_owned()),
+            })
+        );
+        assert_eq!(
+            zeabur.chart,
+            Source::Pinned(Download {
+                file: "zeabur-0.3.0.tgz".to_owned(),
+                url:
+                    "https://github.com/zeabur-oss/zeabur/releases/download/v0.3.0/zeabur-0.3.0.tgz"
+                        .to_owned(),
+                sha256: Some("ff".to_owned()),
+            })
+        );
+        assert_eq!(
+            zeabur.values["image"],
+            json!({"repository": "zeabur", "tag": "dev", "pullPolicy": "IfNotPresent"})
+        );
+
+        let Err(PlanError::Unpublished(keys)) = products(None) else {
+            panic!("a development build needs sources");
+        };
+        assert_eq!(keys, ["identityImage", "identityctl", "zeaburChart"]);
     }
 }

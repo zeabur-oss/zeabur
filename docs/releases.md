@@ -5,8 +5,9 @@ tag `v<version>`. The workflow publishes the image and the chart, and leaves a *
 release; a maintainer checks the draft and publishes it by hand. CI never publishes a release.
 
 ```text
-tag v0.0.2 ─▶ CI ─▶ build (Linux amd64/arm64, macOS arm64) ─▶ smoke ─▶ publish by digest,
-  sign, attest ─▶ draft release ─▶ verify the draft ─▶ a maintainer publishes it
+tag v0.0.2 ─▶ CI ─▶ build (Linux amd64/arm64, macOS arm64) ─▶ smoke ─▶ publish the image and
+  the chart by digest, sign, attest ─▶ build the installer with those digests ─▶ draft release
+  ─▶ verify the draft ─▶ a maintainer publishes it
 ```
 
 ## What a release contains
@@ -17,7 +18,7 @@ tag v0.0.2 ─▶ CI ─▶ build (Linux amd64/arm64, macOS arm64) ─▶ smoke 
 | Helm chart, its default image pinned to that digest | `oci://ghcr.io/zeabur-oss/charts/zeabur`, version `<version>`; also the asset `zeabur-<version>.tgz` |
 | `zeaburctl`, Linux amd64 and arm64 (static, musl), macOS arm64 (Apple silicon) | `zeaburctl-v<version>-<os>-<arch>.tar.gz` |
 | `zeabur`, the server binary in the image, Linux amd64 and arm64 | `zeabur-v<version>-linux-<arch>.tar.gz` |
-| `zeabur-installer`, which installs a cluster with Zeabur on one server ([guide](installer/README.md)), Linux amd64 and arm64 (static, musl) | `zeabur-installer-v<version>-linux-<arch>.tar.gz` |
+| `zeabur-installer`, which installs a cluster with Zeabur on one server ([guide](installer/README.md)), Linux amd64 and arm64 (static, musl). It pins this release's image and chart, and the catalog and Zeabur Identity releases, by digest | `zeabur-installer-v<version>-linux-<arch>.tar.gz` |
 | Documentation screenshots, AVIF, in each locale and theme ([how they are taken](internal/screenshots.md)) | `docs-shots-v<version>.tar` |
 | Digests of the image index, each platform's image and the chart | `digests.txt` |
 | Checksums of every asset above, and their signature | `SHA256SUMS`, `SHA256SUMS.sigstore.json` |
@@ -64,7 +65,9 @@ The image and the chart: [Install in a cluster](install.md), step 1.
    `nix develop -c cargo update --workspace` for `Cargo.lock`) and in
    `deploy/chart/zeabur/Chart.yaml` (`version` and `appVersion`, without the `v`). Rename
    `## [Unreleased]` in `CHANGELOG.md` to `## [<version>] - <date>` and add its link at the end;
-   that section becomes the release notes. Merge the pull request to `main`.
+   that section becomes the release notes. In `.github/workflows/release.yml`, set
+   `CATALOG_VERSION` and `IDENTITY_VERSION` to the catalog and Zeabur Identity releases the
+   installer installs; both must be published. Merge the pull request to `main`.
 2. Rehearse: **Actions → Release → Run workflow** on `main` with the version, `v<version>`. It
    runs all of CI and the three builds with their smoke tests and publishes nothing.
 3. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).
@@ -105,8 +108,9 @@ These are repository and organisation settings, not files; a maintainer sets the
 - **Immutable releases** (repository settings → **Releases**): once published, a release's tag
   and assets cannot be changed. A draft stays editable until then.
 - **Workflow permissions** can stay read-only by default: each job asks for what it needs.
-  `publish` has `contents: write` (the draft), `packages: write`, `id-token: write` (keyless
-  signing) and `attestations: write`; `verify` has `contents: write`, because GitHub shows a
+  `publish` has `packages: write`, `id-token: write` (keyless signing) and
+  `attestations: write`; `release` has `contents: write` (the draft), `id-token: write` and
+  `attestations: write`; `verify` has `contents: write`, because GitHub shows a
   draft release only to a token that can push, and `attestations: read`.
 
 ## When a release run fails
@@ -129,7 +133,7 @@ already exists.
 
   It builds and publishes nothing, uses the tag's Nix shell, and keeps the tag's signing
   identity. Re-running the failed run instead would reuse its old workflow file and permissions.
-- **In `publish`**: look at what it left (`gh release view`, the packages' versions on
+- **In `publish`, `installer` or `release`**: look at what it left (`gh release view`, the packages' versions on
   ghcr.io) before anything else. A draft can be deleted; image and chart versions already
   pushed have to be deleted in the package settings before the same version can be published
   again, and only if nobody can have pulled them yet. Otherwise release the next patch version.

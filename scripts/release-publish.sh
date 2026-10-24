@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 # Publishes the candidates that release-build.sh built and release-smoke.sh tried, compiling
-# nothing: the image by digest and the chart pinned to that digest, each signed, and the release
-# assets (archives, chart, documentation screenshots, digests, signed checksums) with the release
-# notes. Every signature is keyless (Sigstore, with the workflow's identity token). The workflow
-# then attests the provenance and creates the draft release; a maintainer publishes it
-# (docs/releases.md).
+# nothing: the image by digest and the chart pinned to that digest, each signed. The installer is
+# built next with these digests, and release-assets.sh then makes the release assets. Every
+# signature is keyless (Sigstore, with the workflow's identity token). A maintainer publishes the
+# draft release (docs/releases.md).
 # CI only, from .github/workflows/release.yml, inside `nix develop`; Docker is the runner's.
-#   scripts/release-publish.sh v0.0.2 candidates release
+#   scripts/release-publish.sh v0.0.2 candidates published
 #
 # <candidates> holds one directory per build (release-linux-amd64, release-darwin-arm64, …) and
-# release-docs-shots; <out> receives assets/ and notes.md.
+# release-docs-shots; <out> receives notes.md and assets/ with digests.txt and the chart.
 set -euo pipefail
 
 version="${1:?usage: release-publish.sh <vVERSION> <candidates> <out>}"
@@ -74,17 +73,12 @@ for arch in amd64 arm64; do
   refs+=("$image@$digest")
   cosign sign --yes "$image@$digest"
   printf '%s  %s\n' "linux/$arch" "$image@$digest" >>"$assets/digests.txt"
-  cp "$dir/zeaburctl-$version-linux-$arch.tar.gz" "$dir/zeabur-$version-linux-$arch.tar.gz" \
-    "$dir/zeabur-installer-$version-linux-$arch.tar.gz" "$assets/"
 done
 docker manifest create "$image:$plain" "${refs[@]}"
 docker manifest push "$image:$plain"
 index="sha256:$(skopeo inspect --raw "${auth[@]}" "docker://$image:$plain" | sha256sum | cut -d ' ' -f 1)"
 cosign sign --yes "$image@$index"
 printf 'index  %s\n' "$image@$index" >>"$assets/digests.txt"
-
-cp "$candidates/release-darwin-arm64/zeaburctl-$version-darwin-arm64.tar.gz" "$assets/"
-cp "$candidates/release-docs-shots/docs-shots-$version.tar" "$assets/"
 
 # The chart: the image pinned to the index above, at the version of Chart.yaml (checked equal to
 # the release's by the workflow).
@@ -101,42 +95,10 @@ chart_digest="sha256:$(skopeo inspect --raw "${auth[@]}" "docker://$charts/zeabu
 cosign sign --yes "$charts/zeabur@$chart_digest"
 printf 'chart  %s\n' "$charts/zeabur@$chart_digest" >>"$assets/digests.txt"
 
-(
-  cd "$assets"
-  sha256sum -- *.tar.gz *.tar *.tgz digests.txt >SHA256SUMS
-  cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
-)
-
-cat >>"$out/notes.md" <<EOF
-
-Source commit: $GITHUB_SHA
-
-## Install
-
-The chart, pinned to the image below; [Install in a cluster](https://github.com/$GITHUB_REPOSITORY/blob/$version/docs/install.md)
-shows how to verify both first and which values to set.
-
-\`\`\`sh
-helm install zeabur oci://$charts/zeabur --version $plain --namespace zeabur ...
-\`\`\`
-
-On a fresh Linux server, \`zeabur-installer\` installs RKE2, Zeabur Identity and Zeabur in one
-step: see [Zeabur Installer](https://github.com/$GITHUB_REPOSITORY/blob/$version/docs/installer/README.md).
-
-## Digests
-
-\`\`\`text
-$(cat "$assets/digests.txt")
-\`\`\`
-
-The macOS build of zeaburctl (Apple silicon) is signed with Sigstore but not notarized by
-Apple: a browser download is quarantined (\`xattr -d com.apple.quarantine zeaburctl\`);
-\`gh release download\` and \`curl\` are not.
-EOF
-
 {
   echo "image=$image"
   echo "image-digest=$index"
   echo "chart=$charts/zeabur"
   echo "chart-digest=$chart_digest"
+  echo "chart-sha256=$(sha256sum "$assets/zeabur-$plain.tgz" | cut -d ' ' -f 1)"
 } >>"${GITHUB_OUTPUT:?}"

@@ -6,17 +6,22 @@
 #   scripts/release-build.sh v0.0.2 arm64 dist
 #
 # On Linux (native architecture only; Docker for the image):
-#   zeaburctl-<version>-linux-<arch>.tar.gz, zeabur-<version>-linux-<arch>.tar.gz,
-#     zeabur-installer-<version>-linux-<arch>.tar.gz: one static musl binary each, with LICENSE;
+#   zeaburctl-<version>-linux-<arch>.tar.gz, zeabur-<version>-linux-<arch>.tar.gz: one static musl
+#     binary each, with LICENSE;
 #   image.tar: the image of Containerfile around that same `zeabur` binary (`docker image save`).
 # On macOS, arm64 only (Apple silicon):
 #   zeaburctl-<version>-darwin-arm64.tar.gz. The server only runs in a pod
-#   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`. The installer installs on a
-#   Linux server only.
+#   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`.
+#
+# With `installer` (Linux only): zeabur-installer-<version>-linux-<arch>.tar.gz. The installer pins
+# the image and the chart that release-publish.sh published, so the workflow builds it after that
+# step. It compiles in the ZEABUR_PIN_* variables (release-pins.sh): all of them, or none for a
+# development build.
+#   scripts/release-build.sh v0.0.2 arm64 dist installer
 set -euo pipefail
 
-if [[ $# != 3 ]]; then
-  echo "usage: release-build.sh <vVERSION> <amd64|arm64> <output-dir>" >&2
+if [[ $# != 3 && ! ($# == 4 && "$4" == installer) ]]; then
+  echo "usage: release-build.sh <vVERSION> <amd64|arm64> <output-dir> [installer]" >&2
   exit 2
 fi
 version="$1"
@@ -37,7 +42,24 @@ case "$(uname -s):$arch:$(uname -m)" in
   *) echo "cannot build $arch here: each build is native, and macOS is arm64 only" >&2; exit 2 ;;
 esac
 binaries=(zeaburctl)
-[[ "$os" == linux ]] && binaries+=(zeabur zeabur-installer)
+[[ "$os" == linux ]] && binaries+=(zeabur)
+installer="${4:-}"
+if [[ -n "$installer" ]]; then
+  [[ "$os" == linux ]] || { echo "the installer installs on a Linux server only" >&2; exit 2; }
+  binaries=(zeabur-installer)
+  pins=(ZEABUR_PIN_CATALOG_VERSION ZEABUR_PIN_CATALOG_SHA256 ZEABUR_PIN_IDENTITY_VERSION
+    ZEABUR_PIN_IDENTITY_IMAGE ZEABUR_PIN_IDENTITYCTL_AMD64_SHA256 ZEABUR_PIN_IDENTITYCTL_ARM64_SHA256
+    ZEABUR_PIN_ZEABUR_IMAGE ZEABUR_PIN_ZEABUR_CHART_SHA256)
+  # The compiler reads an empty variable as a value, so an empty one is removed.
+  set_pins=0
+  for pin in "${pins[@]}"; do
+    if [[ -n "${!pin:-}" ]]; then set_pins=$((set_pins + 1)); else unset "$pin"; fi
+  done
+  if [[ "$set_pins" != 0 && "$set_pins" != "${#pins[@]}" ]]; then
+    echo "set all of ${pins[*]}, or none" >&2
+    exit 2
+  fi
+fi
 
 mkdir -p "$3"
 output="$(cd "$3" && pwd)"
@@ -46,8 +68,11 @@ trap 'rm -rf "$work"' EXIT
 target_dir="${CARGO_TARGET_DIR:-$root/target}"
 
 # Zeabur's web interface is embedded in zeabur and zeaburctl, the installer's in zeabur-installer.
-"$root/scripts/build-ui.sh"
-[[ "$os" == linux ]] && "$root/scripts/build-installer-ui.sh"
+if [[ -n "$installer" ]]; then
+  "$root/scripts/build-installer-ui.sh"
+else
+  "$root/scripts/build-ui.sh"
+fi
 # cargo-auditable records the dependency tree in the binary, so a scanner reads exactly what was
 # compiled in (https://github.com/rust-secure-code/cargo-auditable).
 packages=()
@@ -95,7 +120,7 @@ for binary in "${binaries[@]}"; do
     gzip -n -9 >"$output/$binary-$version-$os-$arch.tar.gz"
 done
 
-if [[ "$os" == linux ]]; then
+if [[ "$os" == linux && -z "$installer" ]]; then
   # The same context as scripts/build-image.sh: explicit modes, which COPY keeps.
   context="$work/image"
   install -D -m 0555 "$target_dir/$target/release/zeabur" "$context/zeabur"

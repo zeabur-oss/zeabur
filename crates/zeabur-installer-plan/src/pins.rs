@@ -67,27 +67,147 @@ pub fn rke2_url(version: &str, file: &str) -> String {
     )
 }
 
-/// A product release published with a signed checksum list, or `None` while unpublished.
+/// The releases that a release build pins.
+///
+/// `scripts/release-pins.sh` reads their signed checksum lists, and the release workflow passes
+/// the digests to the compiler. A development build pins none of them, so its configuration names
+/// each one in `sources`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Product {
-    /// The release tag.
-    pub version: &'static str,
-    /// Image by digest.
-    pub image: Option<&'static str>,
+pub struct Products {
+    /// The catalog release whose `index.json` the installer reads.
+    pub catalog: Catalog,
+    /// Zeabur Identity.
+    pub identity: Identity,
+    /// Zeabur, of this installer's own release.
+    pub zeabur: Zeabur,
 }
 
-/// The catalog release whose `index.json` the installer reads. Unpublished: development installs
-/// name an `index.json` in `sources.catalog`.
-pub const CATALOG: Option<(&str, &str)> = None;
+/// A catalog release.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Catalog {
+    /// The release tag.
+    pub version: &'static str,
+    /// SHA-256 of its `index.json`.
+    pub index_sha256: &'static str,
+}
 
-/// Zeabur Identity. Unpublished: `sources.identityImage` and `sources.identityctl`.
-pub const IDENTITY: Product = Product {
-    version: "v0.0.1",
-    image: None,
-};
+/// A Zeabur Identity release.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Identity {
+    /// The release tag.
+    pub version: &'static str,
+    /// The image index by digest.
+    pub image: &'static str,
+    /// SHA-256 of `zeabur-identityctl-<version>-linux-amd64.tar.gz`.
+    pub identityctl_amd64: &'static str,
+    /// SHA-256 of `zeabur-identityctl-<version>-linux-arm64.tar.gz`.
+    pub identityctl_arm64: &'static str,
+}
 
-/// Zeabur. Unpublished: `sources.zeaburImage` and `sources.zeaburChart`.
-pub const ZEABUR: Product = Product {
-    version: "v0.0.1",
-    image: None,
+/// The Zeabur release of this installer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Zeabur {
+    /// The release tag.
+    pub version: &'static str,
+    /// The image index by digest.
+    pub image: &'static str,
+    /// SHA-256 of the packaged chart, `zeabur-<version>.tgz`.
+    pub chart_sha256: &'static str,
+}
+
+/// A file of a GitHub release and its SHA-256.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Asset {
+    /// The file name.
+    pub file: String,
+    /// The download URL.
+    pub url: String,
+    /// The expected SHA-256.
+    pub sha256: &'static str,
+}
+
+fn asset(repository: &str, version: &str, file: String, sha256: &'static str) -> Asset {
+    Asset {
+        url: format!(
+            "https://github.com/zeabur-oss/{repository}/releases/download/{version}/{file}"
+        ),
+        file,
+        sha256,
+    }
+}
+
+impl Catalog {
+    /// The release's `index.json`.
+    #[must_use]
+    pub fn index(&self) -> Asset {
+        asset(
+            "catalog",
+            self.version,
+            "index.json".to_owned(),
+            self.index_sha256,
+        )
+    }
+}
+
+impl Identity {
+    /// The `zeabur-identityctl` archive of an architecture (`amd64`, `arm64`).
+    #[must_use]
+    pub fn identityctl(&self, arch: &str) -> Option<Asset> {
+        let sha256 = match arch {
+            "amd64" => self.identityctl_amd64,
+            "arm64" => self.identityctl_arm64,
+            _ => return None,
+        };
+        let file = format!("zeabur-identityctl-{}-linux-{arch}.tar.gz", self.version);
+        Some(asset("identity", self.version, file, sha256))
+    }
+}
+
+impl Zeabur {
+    /// The packaged chart.
+    #[must_use]
+    pub fn chart(&self) -> Asset {
+        let file = format!("zeabur-{}.tgz", self.version.trim_start_matches('v'));
+        asset("zeabur", self.version, file, self.chart_sha256)
+    }
+}
+
+/// The pinned releases, or `None` in a development build.
+pub const PRODUCTS: Option<Products> = match (
+    option_env!("ZEABUR_PIN_CATALOG_VERSION"),
+    option_env!("ZEABUR_PIN_CATALOG_SHA256"),
+    option_env!("ZEABUR_PIN_IDENTITY_VERSION"),
+    option_env!("ZEABUR_PIN_IDENTITY_IMAGE"),
+    option_env!("ZEABUR_PIN_IDENTITYCTL_AMD64_SHA256"),
+    option_env!("ZEABUR_PIN_IDENTITYCTL_ARM64_SHA256"),
+    option_env!("ZEABUR_PIN_ZEABUR_IMAGE"),
+    option_env!("ZEABUR_PIN_ZEABUR_CHART_SHA256"),
+) {
+    (
+        Some(catalog_version),
+        Some(index_sha256),
+        Some(identity_version),
+        Some(identity_image),
+        Some(identityctl_amd64),
+        Some(identityctl_arm64),
+        Some(zeabur_image),
+        Some(chart_sha256),
+    ) => Some(Products {
+        catalog: Catalog {
+            version: catalog_version,
+            index_sha256,
+        },
+        identity: Identity {
+            version: identity_version,
+            image: identity_image,
+            identityctl_amd64,
+            identityctl_arm64,
+        },
+        zeabur: Zeabur {
+            version: concat!("v", env!("CARGO_PKG_VERSION")),
+            image: zeabur_image,
+            chart_sha256,
+        },
+    }),
+    _ => None,
 };

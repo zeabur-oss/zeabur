@@ -27,6 +27,9 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  # The releases that zeabur-installer installs with this one (scripts/release-pins.sh).
+  CATALOG_VERSION: v0.1.0
+  IDENTITY_VERSION: v0.0.1
 
 jobs:
   # The whole of CI on this commit, the cluster jobs included.
@@ -127,8 +130,11 @@ jobs:
     if: github.event_name == 'push'
     needs: [prepare, build, shots]
     runs-on: ubuntu-26.04-arm
+    outputs:
+      image: ${{ steps.publish.outputs.image }}@${{ steps.publish.outputs.image-digest }}
+      chart-sha256: ${{ steps.publish.outputs.chart-sha256 }}
     permissions:
-      contents: write # the draft release
+      contents: read
       packages: write # the image and the chart on ghcr.io
       id-token: write # keyless signatures and attestations
       attestations: write
@@ -142,11 +148,11 @@ jobs:
           pattern: release-*
           path: candidates
       - id: publish
-        name: Publish the image and the chart by digest, sign them and the checksums
+        name: Publish the image and the chart by digest and sign them
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.prepare.outputs.version }}
-        run: nix develop -c ./scripts/release-publish.sh "$VERSION" candidates release
+        run: nix develop -c ./scripts/release-publish.sh "$VERSION" candidates published
       - name: Attest the image's provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -157,6 +163,71 @@ jobs:
         with:
           subject-name: ${{ steps.publish.outputs.chart }}
           subject-digest: ${{ steps.publish.outputs.chart-digest }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-published
+          path: published/
+          if-no-files-found: error
+          retention-days: 7
+
+  # The installer pins the image and the chart that publish pushed. A rehearsal publishes nothing,
+  # so it builds a development installer without pins.
+  installer:
+    name: installer (linux-${{ matrix.arch }})
+    needs: [prepare, build, publish]
+    if: >-
+      ${{ !cancelled() && !inputs.verify_only && needs.build.result == 'success' &&
+          (needs.publish.result == 'success' || github.event_name != 'push') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-26.04 }
+          - { arch: arm64, runner: ubuntu-26.04-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - name: Pin the catalog and Zeabur Identity releases
+        if: github.event_name == 'push'
+        run: nix develop -c ./scripts/release-pins.sh "$CATALOG_VERSION" "$IDENTITY_VERSION" >>"$GITHUB_ENV"
+      - name: Build the installer
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          ZEABUR_PIN_ZEABUR_IMAGE: ${{ needs.publish.outputs.image }}
+          ZEABUR_PIN_ZEABUR_CHART_SHA256: ${{ needs.publish.outputs.chart-sha256 }}
+        run: nix develop -c ./scripts/release-build.sh "$VERSION" "$ARCH" dist installer
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-installer-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    if: github.event_name == 'push'
+    needs: [prepare, publish, installer]
+    runs-on: ubuntu-26.04-arm
+    permissions:
+      contents: write # the draft
+      id-token: write # keyless signatures and attestations
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@d0c908e6cbe9f89f36ed8205a3ab6f092636916a # v3.23.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          path: candidates
+      - name: Make the release assets and sign their checksums
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: nix develop -c ./scripts/release-assets.sh "$VERSION" candidates release
       - name: Attest the release assets' provenance
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -174,8 +245,8 @@ jobs:
     name: verify (${{ matrix.platform }})
     if: >-
       ${{ !cancelled() && needs.prepare.result == 'success' &&
-          (needs.publish.result == 'success' || inputs.verify_only) }}
-    needs: [prepare, publish]
+          (needs.release.result == 'success' || inputs.verify_only) }}
+    needs: [prepare, release]
     permissions:
       # GitHub shows a draft release only to a token that can push.
       contents: write
