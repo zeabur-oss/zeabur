@@ -36,8 +36,8 @@ for values in "$chart"/ci/*-values.yaml; do
   out=$(render -f "$values")
 
   # Zeabur has no rights of its own: no binding to a ServiceAccount, no ClusterRoleBinding, and no
-  # token in the pod. The one Role the chart may render lets people read Zeabur's settings: `get`
-  # on the ConfigMap zeabur-settings, nothing else. The ClusterRoles are the member roles, which
+  # token in the pod. The Roles let people read Zeabur's settings (`get` on the ConfigMap
+  # zeabur-settings) and the S3 destinations (the ConfigMaps of their namespace). The ClusterRoles are the member roles, which
   # Zeabur binds per member, the rule sets the project roles aggregate, and Zeabur Proxy's logs
   # reader.
   expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
@@ -82,8 +82,8 @@ for values in "$chart"/ci/*-values.yaml; do
     zeabur-project-developer-rules
   expect "$name" "$out" '[select(.kind == "RoleBinding") | .subjects[] | select(.kind == "ServiceAccount")] | length' 0
   expect "$name" "$out" \
-    'select(.kind == "Role") | .rules[] | [.apiGroups, .resources, .resourceNames, .verbs] | map(join(",")) | join("|")' \
-    '|configmaps|zeabur-settings|get'
+    '[select(.kind == "Role") | .metadata.namespace + "/" + .metadata.name + ":" + (.rules[] | [.apiGroups, .resources, .resourceNames // [], .verbs] | map(join(",")) | join("|"))] | sort | join(" ")' \
+    'zeabur-s3-destinations/zeabur-s3-destinations-reader:|configmaps||get,list zeabur/zeabur-settings-reader:|configmaps|zeabur-settings|get'
   expect "$name" "$out" '[select(.kind == "ServiceAccount") | .automountServiceAccountToken == false] | all' true
   expect "$name" "$out" '[select(.kind == "Deployment") | .spec.template.spec.automountServiceAccountToken == false] | all' true
   dep='select(.kind == "Deployment" and .metadata.name == "zeabur")'
@@ -135,9 +135,10 @@ expect digest "$(render -f "$chart/ci/minimal-values.yaml" --set image.tag=ignor
 
 # Everyone signed in reads the settings unless that is turned off.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
-  'select(.kind == "RoleBinding") | .subjects[] | .kind + "/" + .name' Group/system:authenticated
+  'select(.kind == "RoleBinding" and .metadata.name == "zeabur-settings-reader") | .subjects[] | .kind + "/" + .name' \
+  Group/system:authenticated
 expect "everyoneReads=false" "$(render -f "$chart/ci/minimal-values.yaml" --set metricsStore.everyoneReads=false)" \
-  '[select(.kind == "Role" or .kind == "RoleBinding")] | length' 0
+  '[select((.kind == "Role" or .kind == "RoleBinding") and .metadata.name == "zeabur-settings-reader")] | length' 0
 
 # Without the member roles there is no ClusterRole, and Zeabur offers only admin or no rights.
 out=$(render -f "$chart/ci/minimal-values.yaml" --set memberRoles.enabled=false)
