@@ -1,9 +1,9 @@
 name: Release
 
 # A tag v* builds, smokes, publishes by digest, signs and attests, then leaves a draft release
-# that a maintainer checks and publishes (docs/releases.md); this workflow never publishes it.
+# that a maintainer checks and publishes (docs/internal/releasing.md); this workflow never publishes it.
 # Run by hand, it rehearses: CI, the builds and their smoke tests, nothing published. With
-# verify_only it checks an existing draft again with this commit's scripts (docs/releases.md,
+# verify_only it checks an existing draft again with this commit's scripts (docs/internal/releasing.md,
 # "When a release run fails").
 on:
   push:

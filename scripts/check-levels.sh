@@ -6,7 +6,7 @@
 # [workspace.metadata.modules], pure crates in [workspace.metadata.pure], isolated crates in
 # [workspace.metadata.isolated]; normal
 # and build dependencies count, dev-dependencies do not (tests may use test helpers). See
-# docs/architecture.md.
+# docs/internal/crates.md.
 set -euo pipefail
 
 errors=$(cargo metadata --format-version 1 --no-deps --locked | jq -r '

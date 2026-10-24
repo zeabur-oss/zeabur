@@ -1,4 +1,4 @@
-// The one place a section names its Kubernetes objects and fields, folded away (docs/wording.md,
+// The one place a section names its Kubernetes objects and fields, folded away (docs/internal/wording.md,
 // "Kubernetes terms").
 import type { ReactElement, ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"

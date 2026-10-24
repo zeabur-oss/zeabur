@@ -89,7 +89,7 @@ Not yet: creating new workloads, editing or deleting objects that Helm, Argo CD 
 
 On your machine, with your kubeconfig. Download `zeaburctl` for Linux or macOS (Apple silicon)
 from a [release](https://github.com/zeabur-oss/zeabur/releases) and verify it
-([Releases](docs/releases.md#download-and-verify-zeaburctl)), or build it from source in the
+([Releases](docs/reference/releases.md#download-and-verify-zeaburctl)), or build it from source in the
 [Nix](https://nixos.org) dev shell, which provides every tool:
 
 ```sh
@@ -103,18 +103,18 @@ ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeaburctl
 `zeaburctl ui` listens on a random loopback port, opens the browser, and makes every request
 with your current kubeconfig context. `zeaburctl doctor` and `zeaburctl mcp` use it the same way.
 
-In a cluster, for everyone who signs in through Zeabur Identity: [Install in a cluster](docs/install.md).
+In a cluster, for everyone who signs in through Zeabur Identity: [Install on an existing cluster](docs/get-started/install.md).
 On a fresh Linux server, `zeabur-installer` installs RKE2, Zeabur Identity and Zeabur in one
-step: [Zeabur Installer](docs/installer/README.md).
+step: [Quickstart](docs/get-started/quickstart.md).
 
 ## Learn more
 
-- [Install in a cluster](docs/install.md): the Helm chart, signing in through Zeabur Identity.
-- [Zeabur Installer](docs/installer/README.md): a cluster with Zeabur on it, from one Linux server.
-- [Releases](docs/releases.md): what a release contains, verifying it, publishing one.
-- [Architecture](docs/architecture.md): principles, layers, crates.
+- [Documentation](docs/index.md): installing, deploying, configuring and operating the cluster,
+  and leaving Zeabur.
+- [Releases](docs/reference/releases.md): what a release contains and how to verify it.
+- [Architecture](docs/reference/architecture.md): principles and how Zeabur explains problems.
 - [Contributing](CONTRIBUTING.md): environment, checks, dependency policy, tests.
-- [Testing](docs/testing.md): what is tested at which level, and what is not.
+- [Developer docs](docs/internal/): crates, testing, wording, releasing.
 
 ## Licence and credits
 

@@ -2,7 +2,7 @@
 # Makes the release assets from the candidates, compiling nothing: the archives, the chart, the
 # documentation screenshots and digests.txt that release-publish.sh wrote, and the checksums of all
 # of them, signed keyless (Sigstore). It completes the release notes. The workflow then attests
-# the assets and creates the draft release (docs/releases.md).
+# the assets and creates the draft release (docs/internal/releasing.md).
 # CI only, from .github/workflows/release.yml, inside `nix develop`.
 #   scripts/release-assets.sh v0.0.2 candidates release
 #
@@ -53,7 +53,7 @@ Source commit: $GITHUB_SHA
 
 ## Install
 
-The chart, pinned to the image below; [Install in a cluster](https://github.com/$GITHUB_REPOSITORY/blob/$version/docs/install.md)
+The chart, pinned to the image below; [Install in a cluster](https://github.com/$GITHUB_REPOSITORY/blob/$version/docs/get-started/install.md)
 shows how to verify both first and which values to set.
 
 \`\`\`sh
@@ -61,7 +61,7 @@ helm install zeabur oci://$charts/zeabur --version $plain --namespace zeabur ...
 \`\`\`
 
 On a fresh Linux server, \`zeabur-installer\` installs RKE2, Zeabur Identity and Zeabur in one
-step: see [Zeabur Installer](https://github.com/$GITHUB_REPOSITORY/blob/$version/docs/installer/README.md).
+step: see [Zeabur Installer](https://github.com/$GITHUB_REPOSITORY/blob/$version/docs/get-started/quickstart.md).
 
 ## Digests
 

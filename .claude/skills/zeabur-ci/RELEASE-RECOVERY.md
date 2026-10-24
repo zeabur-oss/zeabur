@@ -1,6 +1,6 @@
 # When a release run fails
 
-Read `docs/releases.md` ("When a release run fails"), `.github/workflows/release.yml` and the
+Read `docs/internal/releasing.md` ("When a release run fails"), `.github/workflows/release.yml` and the
 `scripts/release-*.sh` it calls first: they are the recovery path. Never push or move a tag,
 publish a release, dispatch the workflow or change a package's settings yourself; those are the
 maintainers'. Propose the command or the setting instead.

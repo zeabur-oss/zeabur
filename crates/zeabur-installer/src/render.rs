@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn a_worker_in_the_same_region() {
         let p = plan(
-            include_str!("../../../docs/installer/examples/join.yaml"),
+            include_str!("../../../docs/reference/installer-examples/join.yaml"),
             &[640, 610, 700, 900, 650],
             Some(hetzner("fsn1")),
         );
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn an_unreachable_server_is_an_error() {
         let p = plan(
-            include_str!("../../../docs/installer/examples/join.yaml"),
+            include_str!("../../../docs/reference/installer-examples/join.yaml"),
             &[],
             None,
         );

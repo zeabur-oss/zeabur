@@ -11,11 +11,11 @@
   scanning and intrusion prevention.
 - **[Zeabur Identity](https://github.com/zeabur-oss/identity)**. You sign in to the cluster with a
   passkey; no `admin.conf` gets copied around.
-- **[Zeabur](../../README.md)**, the web console for the cluster.
+- **[Zeabur](../index.md)**, the web console for the cluster.
 
 > **Status: v0.0.1 alpha.** Nothing is published yet, so an install names development
-> sources (see [examples/development.yaml](examples/development.yaml)). It has not been run end
-> to end on a fresh server yet; see [What is verified](how-it-works.md#what-is-verified).
+> sources (see [examples/development.yaml](../reference/installer-examples/development.yaml)). It has not been run end
+> to end on a fresh server yet; see [What is verified](../reference/installer.md#what-is-verified).
 
 ## Quick start
 
@@ -23,7 +23,7 @@ On a fresh server running systemd, as root:
 
 ```sh
 mkdir -p /etc/zeabur-installer
-cp docs/installer/examples/domain.yaml /etc/zeabur-installer/config.yaml   # then edit the host names
+cp docs/reference/installer-examples/domain.yaml /etc/zeabur-installer/config.yaml   # then edit the host names
 zeabur-installer plan     # what will be installed, and warnings; changes nothing
 zeabur-installer apply    # install; safe to run again
 ```
@@ -60,7 +60,7 @@ access:
   zeabur: zeabur.example.com
 ```
 
-[configuration.md](configuration.md) describes every field: presets, adding and
+[configuration.md](../reference/installer-configuration.md) describes every field: presets, adding and
 removing components, component inputs, secret files, the RKE2 version and host settings.
 
 ## Multiple servers
@@ -98,11 +98,11 @@ Things to know:
   installs an iSCSI initiator and an NFS client on every node for it, and `node add` tells the
   new node to do the same.
 
-[examples/join.yaml](examples/join.yaml) is a join configuration with comments.
+[examples/join.yaml](../reference/installer-examples/join.yaml) is a join configuration with comments.
 
 ## Learn more
 
-- [How it works](how-it-works.md): the steps of `apply`, the security defaults, and what has
+- [How it works](../reference/installer.md): the steps of `apply`, the security defaults, and what has
   and has not been tested.
 - [Contributing](../../CONTRIBUTING.md#installer) and the [security policy](../../SECURITY.md).
 

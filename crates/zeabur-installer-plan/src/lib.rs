@@ -58,7 +58,7 @@ pub enum PlanError {
     /// This build pins no release, and `sources` does not name these keys.
     #[error(
         "this installer is a development build and pins no release: set {} in the configuration \
-         (docs/installer/configuration.md)",
+         (docs/reference/installer-configuration.md)",
         .0.iter().map(|k| format!("sources.{k}")).collect::<Vec<_>>().join(", ")
     )]
     Unpublished(Vec<&'static str>),

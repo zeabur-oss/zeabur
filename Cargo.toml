@@ -16,7 +16,7 @@ publish = false
 
 # Crate levels, checked by scripts/check-levels.sh: a crate may depend (normal and build
 # dependencies) only on workspace crates of a lower level. Test crates are dev-dependencies only.
-# (Levels order crates; the product layers L0-L4 in docs/architecture.md are a different thing.)
+# (Levels order crates; the product layers L0-L4 in docs/reference/architecture.md are a different thing.)
 [workspace.metadata.levels]
 zeabur-kernel = 0
 zeabur-fixtures = 0

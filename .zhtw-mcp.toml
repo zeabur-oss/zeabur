@@ -30,7 +30,7 @@ ignore_terms = [
 ]
 
 [glossary]
-# The terms docs/wording.md chose; a change to one is a change to this list too.
+# The terms docs/internal/wording.md chose; a change to one is a change to this list too.
 preferred = [
   "副本", "機密", "設定檔", "日誌", "叢集", "專案", "服務", "連接埠", "通行密鑰", "檢視",
   "重新啟動", "設定", "變數", "網域", "元件", "權杖", "憑證", "認證資訊", "映像檔", "容器",

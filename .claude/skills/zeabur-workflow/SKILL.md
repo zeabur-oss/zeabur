@@ -29,7 +29,7 @@ agreement on the shape before it is built; propose it in an issue first.
 ## Releases
 A maintainer releases: they bump the version (`Cargo.toml`, `Chart.yaml`, a `CHANGELOG.md`
 section), merge it, push the tag `v<version>`, check the draft release the workflow leaves and
-publish it by hand (`docs/releases.md`). Never push a tag, create, edit or publish a release,
+publish it by hand (`docs/internal/releasing.md`). Never push a tag, create, edit or publish a release,
 dispatch `release.yml` or change a repository or package setting yourself; prepare the pull
 request and name the step that is theirs. A change to a `scripts/release-*.sh` is checked with
 `shellcheck` and `actionlint`, and on Linux by running `release-build.sh` and

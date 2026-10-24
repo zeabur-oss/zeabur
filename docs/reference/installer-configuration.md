@@ -134,7 +134,7 @@ one. `zeabur-installer node add` on a server prints it. Only `rke2Version`, `hos
 
 ## Examples
 
-- [examples/domain.yaml](examples/domain.yaml): a server with public DNS names.
-- [examples/local.yaml](examples/local.yaml): a test machine.
-- [examples/development.yaml](examples/development.yaml): unpublished builds.
-- [examples/join.yaml](examples/join.yaml): another node for an existing cluster.
+- [examples/domain.yaml](installer-examples/domain.yaml): a server with public DNS names.
+- [examples/local.yaml](installer-examples/local.yaml): a test machine.
+- [examples/development.yaml](installer-examples/development.yaml): unpublished builds.
+- [examples/join.yaml](installer-examples/join.yaml): another node for an existing cluster.

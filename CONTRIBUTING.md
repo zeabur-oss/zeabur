@@ -46,7 +46,7 @@ a dev shell of its own (it builds from source; the pin and how to bump it are in
 CI's `wording` job does: `nix develop .#zh -c ./scripts/check-zh-tw.sh`. `web/scripts/zh-tw-strings.ts` prints every zh-TW
 string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen terms and the reason
 for each rule or term it relaxes. Any warning fails the check. How the interface's text reads in
-every locale, and the term chosen for each concept, is in [docs/wording.md](docs/wording.md).
+every locale, and the term chosen for each concept, is in [docs/internal/wording.md](docs/internal/wording.md).
 
 When you change the vendored recommendations or their pin, also run the check that compares them
 with their upstream (it downloads it; `.github/workflows/vendored.yml` runs it only for such
@@ -153,7 +153,7 @@ is a review signal, not an audit.
 
 ## Tests
 
-What to test, at which level, and what not to test: [docs/testing.md](docs/testing.md).
+What to test, at which level, and what not to test: [docs/internal/testing.md](docs/internal/testing.md).
 
 - **Unit and integration tests** run anywhere: `cargo nextest run --workspace`. They include the
   language-neutral cases in [`fixtures/`](fixtures/README.md).
@@ -233,7 +233,7 @@ pins; install those with `npx skills experimental_install` (they are not kept in
 ## Installer
 
 `zeabur-installer` installs RKE2, Zeabur Catalog components, Zeabur Identity and Zeabur on a
-Linux server ([guide](docs/installer/README.md)). It is three crates, each depending only on the
+Linux server ([guide](docs/get-started/quickstart.md)). It is three crates, each depending only on the
 ones above it:
 
 - `zeabur-installer-plan`: configuration, catalog, selection, values and the plan. No I/O.

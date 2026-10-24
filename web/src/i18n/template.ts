@@ -1,6 +1,6 @@
 // The server sentences' templates (crates/zeabur-gaps/messages): `${name}`, and `${name, kind, …}`
 // with cases in braces. `zeabur_gaps::messages` renders the same templates the same way; the
-// format is described in docs/wording.md.
+// format is described in docs/internal/wording.md.
 
 /** A sentence's parameters, by name. */
 export type Params = Record<string, string>

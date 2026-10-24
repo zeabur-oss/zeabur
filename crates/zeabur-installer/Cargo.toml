@@ -7,7 +7,7 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 repository.workspace = true
-readme = "../../docs/installer/README.md"
+readme = "../../docs/get-started/quickstart.md"
 keywords = ["kubernetes", "rke2", "installer"]
 categories = ["command-line-utilities"]
 

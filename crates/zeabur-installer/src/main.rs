@@ -213,7 +213,7 @@ fn show_plan(cli: &Cli, json: bool) -> Result<(), InstallError> {
     if defaults && !json {
         out::line(&format!(
             "No configuration at {}; planning with the defaults: a test machine at {} and {}, \
-             standard components. Write the file to change them (docs/installer/configuration.md).\n",
+             standard components. Write the file to change them (docs/reference/installer-configuration.md).\n",
             cli.config.display(),
             config.access.zeabur,
             config.access.identity

@@ -1,0 +1,7 @@
+# Old path: new path, both without .md. Add a line when a published page moves or is removed.
+install: get-started/install
+installer/README: get-started/quickstart
+installer/configuration: reference/installer-configuration
+installer/how-it-works: reference/installer
+architecture: reference/architecture
+releases: reference/releases

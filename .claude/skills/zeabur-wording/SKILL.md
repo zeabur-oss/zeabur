@@ -5,11 +5,11 @@ description: Write or revise any text people read in Zeabur — interface string
 
 # Wording
 
-`docs/wording.md` is the rulebook; read it before writing. This skill is the order of work.
+`docs/internal/wording.md` is the rulebook; read it before writing. This skill is the order of work.
 
 1. **Start from what the reader sees and wants to do**, not from how Zeabur or Kubernetes works.
    Name the thing by its plain term first; the Kubernetes term follows as secondary text only
-   where a professional needs it (`docs/wording.md`, "Terms"). Never invent a term; use the
+   where a professional needs it (`docs/internal/wording.md`, "Terms"). Never invent a term; use the
    glossary's (通行密鑰, 機密, 磁碟區, 用量, 概覽 …).
 2. **Write English first** (`web/src/i18n/en.ts` is the source; zh-TW and zh-CN are typed against
    it). Sentence case, the verb on the button, a label that names its content.

@@ -1,5 +1,5 @@
 # cargo-mutants (https://mutants.rs), run weekly by .github/workflows/mutants.yml. A mutant no
-# test catches is a prompt to look at the tests of that code, not a failure: see docs/testing.md.
+# test catches is a prompt to look at the tests of that code, not a failure: see docs/internal/testing.md.
 
 # The features and test runner CI's test job uses.
 all_features = true

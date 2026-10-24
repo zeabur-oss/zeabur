@@ -3,7 +3,7 @@
 # nothing: the image by digest and the chart pinned to that digest, each signed. The installer is
 # built next with these digests, and release-assets.sh then makes the release assets. Every
 # signature is keyless (Sigstore, with the workflow's identity token). A maintainer publishes the
-# draft release (docs/releases.md).
+# draft release (docs/internal/releasing.md).
 # CI only, from .github/workflows/release.yml, inside `nix develop`; Docker is the runner's.
 #   scripts/release-publish.sh v0.0.2 candidates published
 #
@@ -42,7 +42,7 @@ if ! awk -v heading="## [$plain]" '
   exit 1
 fi
 # A release, an image tag or a chart version once published is never replaced: recovering from a
-# failed run is a maintainer's decision (docs/releases.md).
+# failed run is a maintainer's decision (docs/internal/releasing.md).
 if gh release view "$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
   echo "release $version already exists; inspect it before trying again" >&2
   exit 1

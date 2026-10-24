@@ -66,7 +66,7 @@ After:  fix(api): list the services of a namespace once
 
 ## 2. Tests
 
-`docs/testing.md` sets the levels, what we do not test, and the promises that always keep a test.
+`docs/internal/testing.md` sets the levels, what we do not test, and the promises that always keep a test.
 In addition, delete or rewrite a test that:
 - asserts internal interactions (which helper, a harmless call order) where output or state is
   observable. Keep a call count or order that is itself the requirement;

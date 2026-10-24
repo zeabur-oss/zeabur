@@ -2,7 +2,7 @@ name: Mutation testing
 
 # cargo-mutants changes the code one small edit at a time (a condition negated, a value replaced)
 # and runs the tests; a mutant no test fails on is code the tests do not check. The report is read
-# by people (docs/testing.md); it gates nothing. Settings are in .cargo/mutants.toml. The cluster
+# by people (docs/internal/testing.md); it gates nothing. Settings are in .cargo/mutants.toml. The cluster
 # tests are #[ignore]d and do not run here.
 #
 # About 2,400 mutants, each rebuilding its crate: the run is split into shards that each fit in a

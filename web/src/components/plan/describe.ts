@@ -759,7 +759,7 @@ const secretName = (object: unknown): string => {
   return typeof meta?.name === "string" ? meta.name : ""
 }
 
-/** The confirm button, the same whether a form, YAML or a drawer asked (`docs/wording.md`). */
+/** The confirm button, the same whether a form, YAML or a drawer asked (`docs/internal/wording.md`). */
 export function actionOf(t: Translate, ask: Asked): string {
   const [change] = ask.changes
   if (!change) return t("plan.apply")

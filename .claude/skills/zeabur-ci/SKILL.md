@@ -47,7 +47,7 @@ state that makes it happen. Do not fix what you have not explained.
 - **Timing.** A test that asserts one state of something that changes on its own (a pod, a
   watch, a poll every few seconds) fails whenever it looks at the wrong moment. Poll with a
   deadline for what must eventually hold, and accept every state the system may legitimately be
-  in (`docs/testing.md`, "Waiting and isolation"). Known cases are in `zeabur-cluster-tests`.
+  in (`docs/internal/testing.md`, "Waiting and isolation"). Known cases are in `zeabur-cluster-tests`.
 - **Shell pipelines under `pipefail`.** GitHub runs `run:` steps with `bash -eo pipefail`, and
   the scripts set it too. `producer | grep -q pattern` can fail although the pattern is there:
   `grep -q` exits at the first match, the producer gets `SIGPIPE`, and the pipeline reports the

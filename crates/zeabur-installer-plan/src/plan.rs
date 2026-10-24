@@ -1078,7 +1078,7 @@ pub fn local_ca_objects(cert_manager_namespace: &str, hostname: &str) -> Vec<Val
     ]
 }
 
-/// The chart values of docs/install.md, with the Secrets the installer creates.
+/// The chart values of docs/get-started/install.md, with the Secrets the installer creates.
 fn zeabur_values(config: &Config, facts: &Facts, issuer: &str, image: &str) -> Value {
     let (repository, digest) = image
         .split_once('@')

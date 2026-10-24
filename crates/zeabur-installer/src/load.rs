@@ -47,7 +47,7 @@ pub(crate) fn join(path: &Path) -> Option<JoinConfig> {
 fn read(path: &Path) -> Result<String, InstallError> {
     fs::read_to_string(path).map_err(|e| {
         InstallError::Message(format!(
-            "{}: {e}; see docs/installer/configuration.md",
+            "{}: {e}; see docs/reference/installer-configuration.md",
             path.display()
         ))
     })
@@ -62,7 +62,7 @@ pub(crate) fn config_or_defaults(path: &Path) -> Result<(Config, bool), InstallE
     let address = facts::addresses().into_iter().next().ok_or_else(|| {
         InstallError::Message(format!(
             "{} does not exist and the server has no global address to make sslip.io names \
-             from; see docs/installer/configuration.md",
+             from; see docs/reference/installer-configuration.md",
             path.display()
         ))
     })?;

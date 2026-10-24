@@ -1,7 +1,7 @@
 //! The words for the sentences this crate sends, in each language an interface shows.
 //!
 //! The catalogs in `messages/` hold one template per key; the web renders the same templates. The
-//! format is described in `docs/wording.md`.
+//! format is described in `docs/internal/wording.md`.
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;

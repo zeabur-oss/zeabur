@@ -173,7 +173,7 @@ reason (`CrashLoopBackOff`) and its restarts are in the pill's tooltip and in th
 the fold a Pod is a replica, a probe a check (traffic, restart, startup); the Kubernetes words
 stay in the YAML tab and in the one "Details for Kubernetes users" disclosure at the end of a
 section (`components/kube-details.tsx`), never as kind tags beside titles, rows or values
-(docs/wording.md, "Section titles and terms").
+(docs/internal/wording.md, "Section titles and terms").
 Counts are short ("8/9 ready", "14 restarts") and shown once: not in a heading, a pill and the
 list below it all at the same time. No sentences explaining a chart or restating a title; an
 explanation a first-time user needs goes in a tooltip or an (i). Empty states are one short line.
