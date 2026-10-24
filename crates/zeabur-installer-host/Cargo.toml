@@ -1,0 +1,31 @@
+[package]
+name = "zeabur-installer-host"
+description = "Host operations for zeabur-installer: facts, preflight checks, verified downloads, files, systemd and kubectl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+readme = false
+keywords = ["kubernetes", "rke2", "installer"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+zeabur-installer-plan.workspace = true
+base64.workspace = true
+flate2.workspace = true
+hex.workspace = true
+rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2 = { workspace = true, features = ["std"] }
+tar.workspace = true
+thiserror.workspace = true
+ureq.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

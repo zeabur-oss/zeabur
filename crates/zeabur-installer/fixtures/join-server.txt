@@ -1,0 +1,40 @@
+Join https://10.0.0.5:9345 as a server (control plane and etcd)
+RKE2 server <rke2> (pinned, checked against this installer's digests), CIS profile, on vps-2 (amd64, 8192 MiB)
+Installs RKE2 only: Zeabur, Zeabur Identity and the catalog's components are already in the cluster.
+Node addresses   10.0.0.6, fd00::6 (temporary IPv6 addresses left out)
+
+Files
+  /etc/sysctl.d/60-rke2-cis.conf
+  /etc/rancher/rke2/audit-policy.yaml
+  /etc/rancher/rke2/config.yaml
+  /etc/rancher/rke2/config.yaml.d/50-zeabur-identity.yaml
+  /etc/rancher/rke2/zeabur-identity/authn.yaml
+  /etc/rancher/rke2/config.yaml.d/10-join.yaml
+  /etc/rancher/rke2/config.yaml.d/20-node-ip.yaml
+  /etc/rancher/rke2/zeabur-join-token (the token, mode 0600)
+
+Location         this VM: hetzner hel1 (hel1-dc14); the server: hetzner fsn1
+Distance         24.0 ms to the server (median of 5 TCP connects; 23.5 to 25.1)
+Node labels      installer.zeabur.com/provider=hetzner, topology.kubernetes.io/region=hel1, topology.kubernetes.io/zone=hel1-dc14
+Ports on the server
+  open    TCP 9345  RKE2 supervisor
+  open    TCP 6443  Kubernetes API
+  open    TCP 10250 kubelet
+  open    TCP 2379  etcd client
+  CLOSED  TCP 2380  etcd peer
+  unknown UDP 8472  Canal VXLAN
+Ports on this VM, free before RKE2 starts (apply checks them)
+  TCP 80    HTTP ingress: ServiceLB holds it on every node, for when Traefik runs there
+  TCP 443   HTTPS ingress: ServiceLB holds it on every node, for when Traefik runs there
+  TCP 6443  Kubernetes API
+  TCP 9345  RKE2 supervisor
+  TCP 10250 kubelet
+
+warning: Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.
+warning: This VM is in hetzner hel1, the server in hetzner fsn1. Nodes need the same region; a different availability zone is fine.
+warning: The server is 24.0 ms away (median of 5 TCP connects to port 9345); within a region it is usually under 10.0 ms.
+warning: TCP 2380 on 10.0.0.5 cannot be reached from this VM; check the firewall or security group.
+warning: Allow these between the nodes: TCP 9345 and 6443 to the servers, TCP 10250 and 9099 and UDP 8472 (Canal VXLAN) between all nodes, and TCP 2379 to 2381 between servers. Keep UDP 8472 closed to the internet.
+warning: UDP 8472 cannot be checked from here. If it is blocked, pods on different nodes cannot reach each other.
+warning: The control plane survives losing a server only with three or more servers: etcd needs a majority. With two, losing either one stops the cluster, so add a third.
+warning: Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.

@@ -1,0 +1,377 @@
+{
+  "addresses": [
+    "10.211.55.114",
+    "172.17.0.1",
+    "fdb2:2c26:f4e4:0:34f2:140:d5f4:f89b",
+    "fdb2:2c26:f4e4:0:50df:1d4c:e8b6:6f05"
+  ],
+  "applying": false,
+  "catalog": {
+    "components": [
+      {
+        "capability": "certificates",
+        "default": "recommended",
+        "displayName": "cert-manager",
+        "id": "certificates/cert-manager",
+        "inputs": [],
+        "privileged": false,
+        "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
+        "supported": true
+      },
+      {
+        "capability": "config-reload",
+        "default": "optional",
+        "displayName": "Stakater Reloader",
+        "id": "config-reload/reloader",
+        "inputs": [],
+        "privileged": false,
+        "security": "ClusterRole: reads, lists and watches every Secret and ConfigMap; reads, updates and patches Deployments, StatefulSets and DaemonSets; creates Events. Role in its namespace: lists, reads, watches, creates and updates every ConfigMap there, not only its own, and on multi-node the leader-election Lease.\n",
+        "supported": true
+      },
+      {
+        "capability": "dns",
+        "default": "optional",
+        "displayName": "ExternalDNS",
+        "id": "dns/external-dns",
+        "inputs": [
+          {
+            "default": null,
+            "description": "ExternalDNS writes records through this provider, spelled as ExternalDNS names it, such as cloudflare or route53.",
+            "generated": false,
+            "name": "provider",
+            "required": true,
+            "secret": false
+          },
+          {
+            "default": null,
+            "description": "ExternalDNS changes records only in these zones.",
+            "generated": false,
+            "name": "domain-filters",
+            "required": true,
+            "secret": false
+          },
+          {
+            "default": null,
+            "description": "ExternalDNS marks this cluster's records with this ID, so two clusters never fight over one record.",
+            "generated": false,
+            "name": "owner-id",
+            "required": true,
+            "secret": false
+          }
+        ],
+        "privileged": false,
+        "security": "Reads Services, Ingresses and routes in all namespaces.",
+        "supported": true
+      },
+      {
+        "capability": "event-autoscaling",
+        "default": "optional",
+        "displayName": "KEDA",
+        "id": "event-autoscaling/keda",
+        "inputs": [],
+        "privileged": false,
+        "security": "Reads scale targets and trigger secrets cluster-wide; serves the external metrics API.",
+        "supported": true
+      },
+      {
+        "capability": "event-autoscaling",
+        "default": "optional",
+        "displayName": "KEDA HTTP Add-on",
+        "id": "event-autoscaling/keda-http-add-on",
+        "inputs": [],
+        "privileged": false,
+        "security": "Reads HTTPScaledObjects, Services and EndpointSlices cluster-wide; creates ScaledObjects.",
+        "supported": true
+      },
+      {
+        "capability": "ingress",
+        "default": "recommended",
+        "displayName": "Traefik Proxy",
+        "id": "ingress/traefik",
+        "inputs": [],
+        "privileged": false,
+        "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
+        "supported": true
+      },
+      {
+        "capability": "intrusion-prevention",
+        "default": "optional",
+        "displayName": "CrowdSec",
+        "id": "intrusion-prevention/crowdsec",
+        "inputs": [
+          {
+            "default": null,
+            "description": "The Traefik bouncer uses this key to call the CrowdSec local API.",
+            "generated": true,
+            "name": "bouncer-key",
+            "required": false,
+            "secret": true
+          },
+          {
+            "default": null,
+            "description": "The local API (LAPI) signs agent sessions with this shared secret.",
+            "generated": true,
+            "name": "lapi-secret",
+            "required": false,
+            "secret": true
+          },
+          {
+            "default": null,
+            "description": "Agents register with the local API using this token.",
+            "generated": true,
+            "name": "registration-token",
+            "required": false,
+            "secret": true
+          }
+        ],
+        "privileged": true,
+        "security": "The agent reads node log files read-only and makes no API writes.",
+        "supported": true
+      },
+      {
+        "capability": "logs",
+        "default": "recommended",
+        "displayName": "VictoriaLogs",
+        "id": "logs/victoria-logs",
+        "inputs": [],
+        "privileged": true,
+        "security": "The collector reads pod metadata and node log files.",
+        "supported": true
+      },
+      {
+        "capability": "metrics",
+        "default": "recommended",
+        "displayName": "Kubernetes Metrics Server",
+        "id": "metrics/metrics-server",
+        "inputs": [],
+        "privileged": false,
+        "security": "Reads kubelet metrics; registers an aggregated API.",
+        "supported": true
+      },
+      {
+        "capability": "metrics",
+        "default": "recommended",
+        "displayName": "VictoriaMetrics (k8s stack)",
+        "id": "metrics/victoria-metrics",
+        "inputs": [],
+        "privileged": false,
+        "security": "Manages VictoriaMetrics objects and scrapes pods in all namespaces.",
+        "supported": true
+      },
+      {
+        "capability": "node-updates",
+        "default": "recommended",
+        "displayName": "System Upgrade Controller",
+        "id": "node-updates/system-upgrade-controller",
+        "inputs": [],
+        "privileged": true,
+        "security": "Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.",
+        "supported": false
+      },
+      {
+        "capability": "observability-operator",
+        "default": "recommended",
+        "displayName": "VictoriaMetrics operator",
+        "id": "observability-operator/victoria-metrics-operator",
+        "inputs": [],
+        "privileged": false,
+        "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.",
+        "supported": true
+      },
+      {
+        "capability": "remote-access",
+        "default": "optional",
+        "displayName": "Tailscale Kubernetes operator",
+        "id": "remote-access/tailscale-operator",
+        "inputs": [
+          {
+            "default": null,
+            "description": "The operator uses the Tailscale OAuth client with this ID. The client needs write scope for Services, Devices Core and Auth Keys, and the tag tag:k8s-operator. The tailnet policy must make tag:k8s-operator an owner of tag:k8s, the proxies' default tag.\n",
+            "generated": false,
+            "name": "oauth-client-id",
+            "required": true,
+            "secret": true
+          },
+          {
+            "default": null,
+            "description": "The operator authenticates with this OAuth client secret.",
+            "generated": false,
+            "name": "oauth-client-secret",
+            "required": true,
+            "secret": true
+          }
+        ],
+        "privileged": true,
+        "security": "Creates, updates and deletes Services and Ingresses (and their status) in every namespace; reads nodes and EndpointSlices; manages ValidatingAdmissionPolicies and their bindings. In its own namespace it manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments, Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs, peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders, tailnets) and the IngressClass tailscale.\n",
+        "supported": true
+      },
+      {
+        "capability": "resource-recommendations",
+        "default": "optional",
+        "displayName": "Vertical Pod Autoscaler (recommender only)",
+        "id": "resource-recommendations/vertical-pod-autoscaler",
+        "inputs": [],
+        "privileged": false,
+        "security": "Reads pods, workloads and metrics in all namespaces; writes VPA status.",
+        "supported": true
+      },
+      {
+        "capability": "runtime-security",
+        "default": "optional",
+        "displayName": "Falco",
+        "id": "runtime-security/falco",
+        "inputs": [],
+        "privileged": true,
+        "security": "Reads pod and node metadata to enrich alerts.",
+        "supported": true
+      },
+      {
+        "capability": "uptime-probes",
+        "default": "optional",
+        "displayName": "Prometheus Blackbox Exporter",
+        "id": "uptime-probes/blackbox-exporter",
+        "inputs": [],
+        "privileged": false,
+        "security": "Has no API access and only makes outbound probes.",
+        "supported": true
+      },
+      {
+        "capability": "volume-backup",
+        "default": "optional",
+        "displayName": "K8up",
+        "id": "volume-backup/k8up",
+        "inputs": [],
+        "privileged": false,
+        "security": "Watches K8up objects cluster-wide; backup Jobs mount PVCs in their own namespace.",
+        "supported": true
+      },
+      {
+        "capability": "volume-backup",
+        "default": "optional",
+        "displayName": "Velero",
+        "id": "volume-backup/velero",
+        "inputs": [
+          {
+            "default": null,
+            "description": "Velero stores backups in this S3 bucket.",
+            "generated": false,
+            "name": "bucket",
+            "required": true,
+            "secret": false
+          },
+          {
+            "default": null,
+            "description": "Velero connects to this S3 endpoint URL; any S3-compatible service works.",
+            "generated": false,
+            "name": "s3-url",
+            "required": true,
+            "secret": false
+          },
+          {
+            "default": null,
+            "description": "Velero reads the bucket's credentials from this AWS-style credentials file.",
+            "generated": false,
+            "name": "credentials",
+            "required": true,
+            "secret": true
+          }
+        ],
+        "privileged": true,
+        "security": "Bound to cluster-admin; reads and restores every object.",
+        "supported": true
+      },
+      {
+        "capability": "vulnerability-scanning",
+        "default": "optional",
+        "displayName": "Trivy Operator",
+        "id": "vulnerability-scanning/trivy-operator",
+        "inputs": [],
+        "privileged": false,
+        "security": "Reads workloads cluster-wide, runs scan Jobs and writes reports next to workloads.",
+        "supported": true
+      }
+    ]
+  },
+  "catalogError": null,
+  "checks": [
+    {
+      "code": "root.ok",
+      "detail": "running as root",
+      "name": "root",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "systemd.ok",
+      "detail": "systemd is the init system",
+      "name": "systemd",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "time.ok",
+      "detail": "the clock is synchronised",
+      "name": "time",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "others.none",
+      "detail": "none found",
+      "name": "other Kubernetes",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "ports.free",
+      "detail": "80, 443, 6443, 9345 and 10250 are free",
+      "name": "ports",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "disk.ok",
+      "detail": "41 GiB free under /var/lib",
+      "name": "disk space",
+      "status": "pass",
+      "values": ["41", "/var/lib"]
+    },
+    {
+      "code": "crypt.no",
+      "detail": "/var/lib is not on an encrypted device; Secrets are encrypted in etcd, volumes are not",
+      "name": "disk encryption",
+      "status": "warn",
+      "values": ["/var/lib"]
+    }
+  ],
+  "config": {
+    "access": {
+      "identity": "login.10.211.55.114.sslip.io",
+      "mode": "local",
+      "zeabur": "zeabur.10.211.55.114.sslip.io"
+    },
+    "disable": [],
+    "enable": [],
+    "host": { "requireEncryptedDisk": false, "tlsSan": [] },
+    "inputs": {},
+    "preset": "standard",
+    "profile": "single-node",
+    "rke2Version": null,
+    "secretFiles": {},
+    "sources": {
+      "catalog": "/home/parallels/index.json",
+      "identityImage": "docker.io/library/zeabur-identity:dev",
+      "identityctl": "/home/parallels/bin/zeabur-identityctl",
+      "imageArchives": [
+        "/home/parallels/images/zeabur.tar",
+        "/home/parallels/images/zeabur-identity.tar"
+      ],
+      "zeaburChart": "/home/parallels/zeabur/deploy/chart/zeabur",
+      "zeaburImage": "docker.io/library/zeabur:dev"
+    },
+    "zeabur": true
+  },
+  "configExists": true,
+  "configPath": "/home/parallels/demo/config.yaml",
+  "facts": { "arch": "arm64", "hostname": "zeabur-installer-demo", "memoryMib": 7397 }
+}

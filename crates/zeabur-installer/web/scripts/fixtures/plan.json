@@ -1,0 +1,356 @@
+{
+  "plan": {
+    "access": "local",
+    "components": [
+      {
+        "contributedBy": [],
+        "displayName": "Traefik Proxy",
+        "id": "ingress/traefik",
+        "idleMemoryMib": 22,
+        "releases": [
+          {
+            "kind": "urls",
+            "name": "gateway-api-crds",
+            "namespace": "kube-system",
+            "skip_if_present": ["httproutes.gateway.networking.k8s.io"],
+            "urls": [
+              "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml"
+            ]
+          },
+          {
+            "kind": "helmChart",
+            "name": "traefik",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": { "installer.zeabur.com/component": "ingress/traefik" },
+                "labels": { "app.kubernetes.io/managed-by": "zeabur-installer" },
+                "name": "traefik",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://ghcr.io/traefik/helm/traefik",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "traefik",
+                "timeout": "10m0s",
+                "valuesContent": "{\"accessLog\":{\"enabled\":true,\"fields\":{\"defaultMode\":\"drop\",\"headers\":{\"defaultMode\":\"drop\"},\"names\":{\"DownstreamContentSize\":\"keep\",\"DownstreamStatus\":\"keep\",\"Duration\":\"keep\",\"RequestContentSize\":\"keep\",\"RequestHost\":\"keep\",\"RequestMethod\":\"keep\",\"RequestPath\":\"keep\",\"RequestProtocol\":\"keep\",\"RouterName\":\"keep\",\"StartUTC\":\"keep\"},\"queryParameters\":{\"defaultMode\":\"drop\"}},\"format\":\"json\"},\"api\":{\"dashboard\":false},\"deployment\":{\"replicas\":1},\"gateway\":{\"enabled\":false},\"gatewayClass\":{\"enabled\":true,\"name\":\"traefik\"},\"providers\":{\"kubernetesCRD\":{\"allowCrossNamespace\":false,\"enabled\":true},\"kubernetesGateway\":{\"enabled\":true},\"kubernetesIngress\":{\"enabled\":true}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}},\"service\":{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}}",
+                "version": "41.7.1"
+              }
+            }
+          }
+        ],
+        "secrets": [],
+        "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
+        "smoke": [["gatewayclass/traefik", "--for=condition=Accepted"]],
+        "why": "preset"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "cert-manager",
+        "id": "certificates/cert-manager",
+        "idleMemoryMib": 50,
+        "releases": [
+          {
+            "kind": "helmChart",
+            "name": "cert-manager",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": { "installer.zeabur.com/component": "certificates/cert-manager" },
+                "labels": { "app.kubernetes.io/managed-by": "zeabur-installer" },
+                "name": "cert-manager",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://quay.io/jetstack/charts/cert-manager",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "cert-manager",
+                "timeout": "10m0s",
+                "valuesContent": "{\"cainjector\":{\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}},\"config\":{\"apiVersion\":\"controller.config.cert-manager.io/v1alpha1\",\"enableGatewayAPI\":true,\"kind\":\"ControllerConfiguration\"},\"crds\":{\"enabled\":true,\"keep\":true},\"enableCertificateOwnerRef\":true,\"prometheus\":{\"enabled\":true,\"servicemonitor\":{\"enabled\":false}},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}},\"startupapicheck\":{\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"16Mi\"}}},\"webhook\":{\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"24Mi\"}}}}",
+                "version": "v1.21.2"
+              }
+            }
+          },
+          {
+            "kind": "manifests",
+            "name": "issuers",
+            "namespace": "cert-manager",
+            "yaml": "# Try here first; production rate limits are far lower. Staging\n# certificates are not trusted by browsers.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt-staging\nspec:\n  acme:\n    server: https://acme-staging-v02.api.letsencrypt.org/directory\n    # No email: ACME accounts need no contact, and Let's Encrypt sends\n    # no expiry emails since 2025. Setting spec.acme.email later updates\n    # the registered account.\n    # Account key, created by cert-manager in its own namespace.\n    privateKeySecretRef:\n      name: letsencrypt-staging-account-key\n    solvers:\n      # HTTP-01 through Traefik's Ingress support; needs no Gateway, and\n      # also answers for names served by Gateway listeners. The name\n      # must reach port 80 of the cluster from the internet.\n      - http01:\n          ingress:\n            ingressClassName: traefik\n---\n# Trusted certificates; same settings as staging.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt\nspec:\n  acme:\n    server: https://acme-v02.api.letsencrypt.org/directory\n    privateKeySecretRef:\n      name: letsencrypt-account-key\n    solvers:\n      - http01:\n          ingress:\n            ingressClassName: traefik\n"
+          }
+        ],
+        "secrets": [],
+        "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
+        "smoke": [
+          ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"],
+          ["clusterissuer/letsencrypt", "--for=condition=Ready"]
+        ],
+        "why": "preset"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "VictoriaMetrics operator",
+        "id": "observability-operator/victoria-metrics-operator",
+        "idleMemoryMib": 20,
+        "releases": [
+          {
+            "kind": "helmChart",
+            "name": "victoria-metrics-operator",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": {
+                  "installer.zeabur.com/component": "observability-operator/victoria-metrics-operator"
+                },
+                "labels": { "app.kubernetes.io/managed-by": "zeabur-installer" },
+                "name": "victoria-metrics-operator",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "observability",
+                "timeout": "10m0s",
+                "valuesContent": "{\"admissionWebhooks\":{\"certManager\":{\"enabled\":true}},\"crds\":{\"cleanup\":{\"enabled\":true}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"48Mi\"}}}",
+                "version": "0.68.1"
+              }
+            }
+          }
+        ],
+        "secrets": [],
+        "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.",
+        "smoke": [],
+        "why": "preset"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "VictoriaLogs",
+        "id": "logs/victoria-logs",
+        "idleMemoryMib": 35,
+        "releases": [
+          {
+            "kind": "manifests",
+            "name": "logs",
+            "namespace": "observability",
+            "yaml": "# The log store.\napiVersion: operator.victoriametrics.com/v1\nkind: VLSingle\nmetadata:\n  name: victoria-logs\n  namespace: observability\nspec:\n  # Two weeks, or less when the volume reaches 8GiB of its 10Gi.\n  retentionPeriod: 14d\n  retentionMaxDiskSpaceUsageBytes: 8GiB\n  storage:\n    resources:\n      requests: {storage: 10Gi}\n  resources:\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 1Gi}\n---\n# One collector per node, reading container logs.\napiVersion: operator.victoriametrics.com/v1\nkind: VLAgent\nmetadata:\n  name: collector\n  namespace: observability\nspec:\n  k8sCollector:\n    enabled: true\n    # Namespace, pod and container suffice; labels add cardinality.\n    includePodLabels: false\n  remoteWrite:\n    - url: http://vlsingle-victoria-logs.observability.svc:9428/internal/insert\n  resources:\n    requests: {cpu: 20m, memory: 32Mi}\n    limits: {memory: 256Mi}\n"
+          }
+        ],
+        "secrets": [],
+        "security": "The collector reads pod metadata and node log files.",
+        "smoke": [
+          [
+            "-n",
+            "observability",
+            "vlsingle/victoria-logs",
+            "--for=jsonpath={.status.updateStatus}=operational"
+          ],
+          [
+            "-n",
+            "observability",
+            "vlagent/collector",
+            "--for=jsonpath={.status.updateStatus}=operational"
+          ]
+        ],
+        "why": "preset"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "Kubernetes Metrics Server",
+        "id": "metrics/metrics-server",
+        "idleMemoryMib": 17,
+        "releases": [
+          {
+            "kind": "helmChart",
+            "name": "metrics-server",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": { "installer.zeabur.com/component": "metrics/metrics-server" },
+                "labels": { "app.kubernetes.io/managed-by": "zeabur-installer" },
+                "name": "metrics-server",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "metrics-server",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "repo": "https://kubernetes-sigs.github.io/metrics-server",
+                "targetNamespace": "kube-system",
+                "timeout": "10m0s",
+                "valuesContent": "{\"args\":[\"--metric-resolution=15s\"],\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"20m\",\"memory\":\"48Mi\"}}}",
+                "version": "3.14.0"
+              }
+            }
+          }
+        ],
+        "secrets": [],
+        "security": "Reads kubelet metrics; registers an aggregated API.",
+        "smoke": [],
+        "why": "preset"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "VictoriaMetrics (k8s stack)",
+        "id": "metrics/victoria-metrics",
+        "idleMemoryMib": 206,
+        "releases": [
+          {
+            "kind": "helmChart",
+            "name": "vm",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": { "installer.zeabur.com/component": "metrics/victoria-metrics" },
+                "labels": { "app.kubernetes.io/managed-by": "zeabur-installer" },
+                "name": "vm",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "observability",
+                "timeout": "10m0s",
+                "valuesContent": "{\"alertmanager\":{\"spec\":{\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}}},\"defaultDashboards\":{\"enabled\":false},\"grafana\":{\"enabled\":false},\"kube-state-metrics\":{\"collectors\":[\"pods\",\"replicasets\",\"deployments\",\"statefulsets\",\"daemonsets\",\"jobs\",\"cronjobs\",\"nodes\",\"persistentvolumeclaims\",\"namespaces\"],\"enabled\":true,\"metricLabelsAllowlist\":[\"pods=[app.kubernetes.io/name,app.kubernetes.io/component]\"]},\"kubeApiServer\":{\"enabled\":false},\"kubeControllerManager\":{\"enabled\":false},\"kubeEtcd\":{\"enabled\":false},\"kubeScheduler\":{\"enabled\":false},\"kubelet\":{\"vmScrape\":{\"spec\":{\"metricRelabelConfigs\":[{\"action\":\"labeldrop\",\"regex\":\"(uid)\"},{\"action\":\"labeldrop\",\"regex\":\"(id|name)\"},{\"action\":\"drop\",\"regex\":\".+_bucket|(apiserver|etcd|kine|rest_client|workqueue|scheduler|authentication|authorization|aggregator|admission|watch_cache|storage)_.+\",\"source_labels\":[\"__name__\"]}]}}},\"prometheus-node-exporter\":{\"enabled\":false},\"victoria-metrics-operator\":{\"enabled\":false},\"vmagent\":{\"spec\":{\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"20m\",\"memory\":\"64Mi\"}},\"scrapeInterval\":\"30s\"}},\"vmalert\":{\"spec\":{\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}}},\"vmsingle\":{\"spec\":{\"resources\":{\"limits\":{\"memory\":\"512Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"128Mi\"}},\"retentionPeriod\":\"7d\",\"storage\":{\"resources\":{\"requests\":{\"storage\":\"5Gi\"}}}}}}",
+                "version": "0.95.2"
+              }
+            }
+          }
+        ],
+        "secrets": [],
+        "security": "Manages VictoriaMetrics objects and scrapes pods in all namespaces.",
+        "smoke": [
+          [
+            "-n",
+            "observability",
+            "vmsingle",
+            "--all",
+            "--for=jsonpath={.status.updateStatus}=operational"
+          ]
+        ],
+        "why": "preset"
+      }
+    ],
+    "facts": { "arch": "arm64", "hostname": "zeabur-installer-demo", "memoryMib": 7397 },
+    "hostFilePaths": [
+      "/etc/sysctl.d/60-rke2-cis.conf",
+      "/etc/rancher/rke2/audit-policy.yaml",
+      "/etc/rancher/rke2/config.yaml",
+      "/etc/rancher/rke2/config.yaml.d/50-zeabur-identity.yaml",
+      "/etc/rancher/rke2/zeabur-identity/authn.yaml"
+    ],
+    "identity": {
+      "host": "login.10.211.55.114.sslip.io",
+      "identityctl": "/home/parallels/bin/zeabur-identityctl",
+      "image": "docker.io/library/zeabur-identity:dev",
+      "ingress": {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "Ingress",
+        "metadata": {
+          "annotations": { "cert-manager.io/cluster-issuer": "zeabur-local-ca" },
+          "labels": { "app.kubernetes.io/managed-by": "zeabur-installer" },
+          "name": "zeabur-identity",
+          "namespace": "zeabur-identity"
+        },
+        "spec": {
+          "ingressClassName": "traefik",
+          "rules": [
+            {
+              "host": "login.10.211.55.114.sslip.io",
+              "http": {
+                "paths": [
+                  {
+                    "backend": {
+                      "service": { "name": "zeabur-identity", "port": { "name": "http" } }
+                    },
+                    "path": "/",
+                    "pathType": "Prefix"
+                  }
+                ]
+              }
+            }
+          ],
+          "tls": [
+            { "hosts": ["login.10.211.55.114.sslip.io"], "secretName": "zeabur-identity-tls" }
+          ]
+        }
+      },
+      "issuer": "https://login.10.211.55.114.sslip.io"
+    },
+    "leftOut": { "node-updates/system-upgrade-controller": "runs on k3s only" },
+    "memory": { "componentsMib": 350, "hostMib": 7397, "rke2Mib": 1300, "unmeasured": 0 },
+    "namespaces": [
+      { "name": "cert-manager", "privileged": null, "public": false },
+      {
+        "name": "observability",
+        "privileged": "logs/victoria-logs is privileged",
+        "public": false
+      },
+      { "name": "traefik", "privileged": null, "public": true },
+      { "name": "zeabur", "privileged": null, "public": false },
+      { "name": "zeabur-identity", "privileged": null, "public": false }
+    ],
+    "rke2": {
+      "downloads": [
+        {
+          "file": "rke2.linux-arm64.tar.gz",
+          "sha256": "244454bed11d9525452e10a2e5055da5d5fc6b61928ca3fae778bc4254ce467f",
+          "url": "https://github.com/rancher/rke2/releases/download/v1.36.5%2Brke2r1/rke2.linux-arm64.tar.gz"
+        },
+        {
+          "file": "rke2-images-core.linux-arm64.tar.zst",
+          "sha256": "5030039486973fc679224bf297116df99972cb41ef4dc3387334685c6e1f170f",
+          "url": "https://github.com/rancher/rke2/releases/download/v1.36.5%2Brke2r1/rke2-images-core.linux-arm64.tar.zst"
+        },
+        {
+          "file": "rke2-images-canal.linux-arm64.tar.zst",
+          "sha256": "626bb4dc147d51b909aa73fbdaaad4104001ec6a92680be04ed2e974fb3a145c",
+          "url": "https://github.com/rancher/rke2/releases/download/v1.36.5%2Brke2r1/rke2-images-canal.linux-arm64.tar.zst"
+        }
+      ],
+      "pinned": true,
+      "version": "v1.36.5+rke2r1"
+    },
+    "warnings": [
+      {
+        "code": "local.dns",
+        "text": "Local access: login.10.211.55.114.sslip.io and zeabur.10.211.55.114.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.",
+        "values": ["login.10.211.55.114.sslip.io", "zeabur.10.211.55.114.sslip.io"]
+      }
+    ],
+    "zeabur": {
+      "chart": "/home/parallels/zeabur/deploy/chart/zeabur",
+      "url": "https://zeabur.10.211.55.114.sslip.io",
+      "values": {
+        "clusterName": "zeabur-installer-demo",
+        "image": {
+          "pullPolicy": "IfNotPresent",
+          "repository": "docker.io/library/zeabur",
+          "tag": "dev"
+        },
+        "ingress": {
+          "annotations": { "cert-manager.io/cluster-issuer": "zeabur-local-ca" },
+          "className": "traefik",
+          "enabled": true,
+          "tls": { "secretName": "zeabur-tls" }
+        },
+        "issuer": {
+          "caBundle": { "configMap": "zeabur-identity-ca" },
+          "clientSecret": { "existingSecret": "zeabur-oidc" },
+          "url": "https://login.10.211.55.114.sslip.io"
+        },
+        "planKey": { "existingSecret": "zeabur-plan-key" },
+        "publicUrl": "https://zeabur.10.211.55.114.sslip.io"
+      }
+    }
+  },
+  "text": "RKE2 v1.36.5+rke2r1 (pinned, checked against this installer's digests), CIS profile, on zeabur-installer-demo (arm64, 7397 MiB)\n\nComponents\n  ingress/traefik                                  preset     22 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 41.7.1\n  certificates/cert-manager                        preset     50 MiB\n      chart cert-manager v1.21.2\n      manifests issuers\n  observability-operator/victoria-metrics-operator preset     20 MiB\n      chart victoria-metrics-operator 0.68.1\n  logs/victoria-logs                               preset     35 MiB\n      manifests logs\n  metrics/metrics-server                           preset     17 MiB\n      chart metrics-server 3.14.0\n  metrics/victoria-metrics                         preset     206 MiB\n      chart vm 0.95.2\n  node-updates/system-upgrade-controller           left out: runs on k3s only\n\nNamespaces exempt from the restricted Pod Security level\n  observability (logs/victoria-logs is privileged)\n\nZeabur           https://zeabur.10.211.55.114.sslip.io (certificates from a CA made on this server)\nZeabur Identity  https://login.10.211.55.114.sslip.io\n\nMemory at idle   about 1650 MiB of 7397 (RKE2 1300, components 350)\nwarning: Local access: login.10.211.55.114.sslip.io and zeabur.10.211.55.114.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.\n",
+  "yaml": "preset: standard\nenable: []\ndisable: []\nprofile: single-node\naccess:\n  mode: local\n  identity: login.10.211.55.114.sslip.io\n  zeabur: zeabur.10.211.55.114.sslip.io\nzeabur: true\ninputs: {}\nsecretFiles: {}\nrke2Version: null\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: /home/parallels/index.json\n  imageArchives:\n  - /home/parallels/images/zeabur.tar\n  - /home/parallels/images/zeabur-identity.tar\n  identityImage: docker.io/library/zeabur-identity:dev\n  identityctl: /home/parallels/bin/zeabur-identityctl\n  zeaburImage: docker.io/library/zeabur:dev\n  zeaburChart: /home/parallels/zeabur/deploy/chart/zeabur\n"
+}

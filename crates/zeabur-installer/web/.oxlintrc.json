@@ -1,0 +1,44 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "jsPlugins": ["@shadcn/lint", "@zeabur/design-system/lint"],
+  "settings": {
+    "shadcn": {
+      "note": "See Zeabur's web/DESIGN.md (Lint): give the component a variant or size in @zeabur/design-system rather than restyling it; use the type-* roles, the spacing scale or a named token (the design system's tokens, or src/styles/app.css); dynamic values are custom properties.",
+      "componentImports": ["^@zeabur/design-system/components/"]
+    }
+  },
+  "rules": {
+    "shadcn/no-restyle": [
+      "error",
+      {
+        "allow": ["layout"]
+      }
+    ],
+    "shadcn/no-raw-colors": "error",
+    "shadcn/no-arbitrary-values": "error",
+    "shadcn/no-inline-styles": "error",
+    "shadcn/no-unknown-classes": "error",
+    "shadcn/require-static-classes": "error",
+    "zeabur/no-unguarded-motion": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          {
+            "group": [
+              "@base-ui/react",
+              "@base-ui/react/*",
+              "@radix-ui/*",
+              "radix-ui",
+              "@headlessui/*",
+              "framer-motion",
+              "motion",
+              "motion/*"
+            ],
+            "message": "Use the @zeabur/design-system component (web/DESIGN.md, \"Lint\"); a missing one is added there."
+          }
+        ]
+      }
+    ]
+  }
+}

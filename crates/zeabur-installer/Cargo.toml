@@ -1,0 +1,27 @@
+[package]
+name = "zeabur-installer"
+description = "Installs RKE2, Zeabur Catalog components, Zeabur Identity and Zeabur on one Linux server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+repository.workspace = true
+readme = "../../docs/installer/README.md"
+keywords = ["kubernetes", "rke2", "installer"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+zeabur-installer-host.workspace = true
+zeabur-installer-plan.workspace = true
+base64.workspace = true
+clap.workspace = true
+serde-saphyr = { workspace = true, features = ["serialize"] }
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

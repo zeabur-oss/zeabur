@@ -1,0 +1,30 @@
+Add a worker to this cluster through https://10.0.1.10:9345.
+This server: aws ap-northeast-1 (ap-northeast-1a).
+
+Before you start
+  - Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.
+  - Allow these between the nodes: TCP 9345 and 6443 to the servers, TCP 10250 and 9099 and UDP 8472 (Canal VXLAN) between all nodes, and TCP 2379 to 2381 between servers. Keep UDP 8472 closed to the internet.
+  - Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.
+  - /etc/zeabur-installer/config.yaml says profile: single-node. Set profile: multi-node and run apply here to use the catalog's values for several nodes.
+
+On the new VM, as root, with the same zeabur-installer copied to it:
+
+install -d -m 0700 /etc/zeabur-installer
+(umask 077; cat > /etc/zeabur-installer/config.yaml) <<'EOF'
+join:
+  server: https://10.0.1.10:9345
+  role: worker
+  token: K10aa::abcdef.0123456789abcdef
+  expect:
+    provider: aws
+    region: ap-northeast-1
+EOF
+zeabur-installer plan    # what it installs, the distance to this server and warnings
+zeabur-installer apply   # installs RKE2 and waits until the node is Ready
+
+The token joins workers until 2026-10-23T09:00:00Z. Revoke it as soon as the node is Ready; the node keeps working without it.
+
+When the node is Ready, here:
+  /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes -o wide
+  zeabur-installer node sync   # lets the new node's traffic through the network policies
+  /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml --namespace kube-system delete secret bootstrap-token-abcdef   # revokes the token

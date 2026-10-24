@@ -37,6 +37,9 @@ zeabur-mcp = 4
 zeabur = 5
 zeaburctl = 5
 zeabur-test-support = 6
+zeabur-installer-plan = 0
+zeabur-installer-host = 1
+zeabur-installer = 5
 
 # Integrations with installed components (see zeabur-modules' README), also checked by
 # scripts/check-levels.sh: only the composers may depend on a module crate, so the core crates
@@ -81,6 +84,8 @@ zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
 zeabur-fixtures = { path = "crates/zeabur-fixtures", version = "0.0.1" }
+zeabur-installer-plan = { path = "crates/zeabur-installer-plan" }
+zeabur-installer-host = { path = "crates/zeabur-installer-host" }
 
 # Third-party crates.
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }
@@ -90,8 +95,11 @@ base64 = { version = "0.22", default-features = false, features = ["alloc"] }
 bcrypt = { version = "0.17", default-features = false, features = ["alloc"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "tracing", "json", "ws"] }
 clap = { version = "4", default-features = false, features = ["std", "derive", "env", "help", "usage", "error-context"] }
+# Unpacking the RKE2 release and packing a local chart (zeabur-installer-host).
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 form_urlencoded = "1"
 futures-util = { version = "0.3", default-features = false, features = ["std", "io", "async-await-macro"] }
+hex = "0.4"
 http = "1"
 http-body = "1"
 http-body-util = "0.1"
@@ -122,6 +130,8 @@ serde-saphyr = { version = "0.0.29", default-features = false, features = ["dese
 serde_json = "1"
 # SHA-256 for derived names in the pure crates (zeabur-kernel), which hold no C library.
 sha2 = { version = "0.10", default-features = false }
+tar = { version = "0.4", default-features = false }
+tempfile = "3"
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "io-util"] }
 # A WebSocket client for the terminal's tests; the server side comes with axum's `ws` feature.
@@ -134,6 +144,9 @@ tracing = "0.1"
 # c2rust libyaml); the spec is written with serde-saphyr. Never enable `config`.
 utoipa = { version = "=6.0.0", default-features = false, features = ["macros"] }
 utoipa-axum = "=0.3.0"
+# The installer's downloads: rustls with aws-lc-rs and the system's CA store. ureq's own `rustls`
+# feature would bring ring and webpki-roots, both banned in deny.toml.
+ureq = { version = "3", default-features = false, features = ["rustls-no-provider", "platform-verifier"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
 
 [workspace.lints.rust]

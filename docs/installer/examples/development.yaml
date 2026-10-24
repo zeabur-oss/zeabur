@@ -1,0 +1,14 @@
+# Until Zeabur, Zeabur Identity and the catalog publish releases, an install names its sources.
+access:
+  mode: local
+  identity: login.10.211.55.20.sslip.io
+  zeabur: zeabur.10.211.55.20.sslip.io
+
+sources:
+  catalog: /root/catalog/index.json
+  # `docker save` archives; RKE2 imports them when it starts.
+  imageArchives: [/root/images/zeabur.tar, /root/images/zeabur-identity.tar]
+  identityImage: docker.io/library/zeabur-identity:dev
+  identityctl: /root/bin/zeabur-identityctl
+  zeaburImage: docker.io/library/zeabur:dev
+  zeaburChart: /root/zeabur/deploy/chart/zeabur

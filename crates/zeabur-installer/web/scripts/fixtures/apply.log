@@ -1,0 +1,77 @@
+RKE2 v1.36.5+rke2r1 (pinned, checked against this installer's digests), CIS profile, on zeabur-installer-demo (arm64, 7397 MiB)
+
+Components
+  ingress/traefik                                  preset     22 MiB
+      manifests gateway-api-crds (1 URLs)
+      chart traefik 41.7.1
+  certificates/cert-manager                        preset     50 MiB
+      chart cert-manager v1.21.2
+      manifests issuers
+  observability-operator/victoria-metrics-operator preset     20 MiB
+      chart victoria-metrics-operator 0.68.1
+  logs/victoria-logs                               preset     35 MiB
+      manifests logs
+  metrics/metrics-server                           preset     17 MiB
+      chart metrics-server 3.14.0
+  metrics/victoria-metrics                         preset     206 MiB
+      chart vm 0.95.2
+  node-updates/system-upgrade-controller           left out: runs on k3s only
+
+Namespaces exempt from the restricted Pod Security level
+  observability (logs/victoria-logs is privileged)
+
+Zeabur           https://zeabur.10.211.55.114.sslip.io (certificates from a CA made on this server)
+Zeabur Identity  https://login.10.211.55.114.sslip.io
+
+Memory at idle   about 1650 MiB of 7397 (RKE2 1300, components 350)
+warning: Local access: login.10.211.55.114.sslip.io and zeabur.10.211.55.114.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.
+==> Checking the host
+    ok   root               running as root
+    ok   systemd            systemd is the init system
+    ok   time               the clock is synchronised
+    ok   other Kubernetes   none found
+    ok   ports              80, 443, 6443, 9345 and 10250 are free
+    ok   disk space         41 GiB free under /var/lib
+    warn disk encryption    /var/lib is not on an encrypted device; Secrets are encrypted in etcd, volumes are not
+==> RKE2 v1.36.5+rke2r1
+    https://github.com/rancher/rke2/releases/download/v1.36.5%2Brke2r1/rke2.linux-arm64.tar.gz
+    https://github.com/rancher/rke2/releases/download/v1.36.5%2Brke2r1/sha256sum-arm64.txt
+    https://github.com/rancher/rke2/releases/download/v1.36.5%2Brke2r1/rke2-images-core.linux-arm64.tar.zst
+    https://github.com/rancher/rke2/releases/download/v1.36.5%2Brke2r1/rke2-images-canal.linux-arm64.tar.zst
+    starting rke2-server; the first start takes a few minutes
+==> Namespaces and network policies
+==> Storage
+namespace/local-path-storage serverside-applied
+storageclass.storage.k8s.io/local-path serverside-applied
+deployment.apps/local-path-provisioner serverside-applied
+==> Traefik Proxy (ingress/traefik)
+helmchart.helm.cattle.io/traefik serverside-applied
+==> cert-manager (certificates/cert-manager)
+helmchart.helm.cattle.io/cert-manager serverside-applied
+==> VictoriaMetrics operator (observability-operator/victoria-metrics-operator)
+helmchart.helm.cattle.io/victoria-metrics-operator serverside-applied
+==> VictoriaLogs (logs/victoria-logs)
+helmchart.helm.cattle.io/victoria-logs serverside-applied
+==> Kubernetes Metrics Server (metrics/metrics-server)
+helmchart.helm.cattle.io/metrics-server serverside-applied
+==> VictoriaMetrics (k8s stack) (metrics/victoria-metrics)
+helmchart.helm.cattle.io/victoria-metrics serverside-applied
+==> Local certificate authority
+clusterissuer.cert-manager.io/zeabur-local-root serverside-applied
+certificate.cert-manager.io/zeabur-local-ca serverside-applied
+clusterissuer.cert-manager.io/zeabur-local-ca serverside-applied
+==> Zeabur Identity
+customresourcedefinition.apiextensions.k8s.io/oauthclients.identity.zeabur.com serverside-applied
+deployment.apps/zeabur-identity serverside-applied
+    waiting for kube-apiserver to trust Zeabur Identity (up to a few minutes)
+==> Zeabur
+helmchart.helm.cattle.io/zeabur serverside-applied
+deployment.apps/zeabur condition met
+==> Done
+Zeabur:          https://zeabur.10.211.55.114.sslip.io
+Zeabur Identity: https://login.10.211.55.114.sslip.io
+The local CA is in /var/lib/rancher/zeabur-installer/local-ca.crt: browsers trust these sites once it is imported.
+
+Enroll the first admin's passkey (works once, for 24 hours):
+  https://login.10.211.55.114.sslip.io/setup#token=Zk3pQ9vT2mXw8LrA5nBc7YdE
+A new link: zeabur-identityctl setup-link --username admin

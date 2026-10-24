@@ -1,0 +1,13 @@
+# A server with public DNS names: certificates from Let's Encrypt.
+# Both names must point at this server, and ports 80 and 443 must be reachable from the internet.
+access:
+  mode: domain
+  identity: login.example.com
+  zeabur: zeabur.example.com
+
+# minimal | standard (default) | secure
+preset: standard
+
+host:
+  # Extra names for the Kubernetes API certificate, to reach it from your laptop.
+  tlsSan: [k8s.example.com]

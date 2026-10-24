@@ -1,0 +1,2416 @@
+{
+  "budget": {
+    "singleNode": {
+      "budgetMiB": 512
+    }
+  },
+  "capabilities": {
+    "certificates": {
+      "multi-node": [
+        "certificates/cert-manager"
+      ],
+      "single-node": [
+        "certificates/cert-manager"
+      ]
+    },
+    "config-reload": {},
+    "dns": {},
+    "event-autoscaling": {
+      "multi-node": [
+        "event-autoscaling/keda"
+      ]
+    },
+    "ingress": {
+      "multi-node": [
+        "ingress/traefik"
+      ],
+      "single-node": [
+        "ingress/traefik"
+      ]
+    },
+    "intrusion-prevention": {},
+    "logs": {
+      "multi-node": [
+        "logs/victoria-logs"
+      ],
+      "single-node": [
+        "logs/victoria-logs"
+      ]
+    },
+    "metrics": {
+      "multi-node": [
+        "metrics/metrics-server",
+        "metrics/victoria-metrics"
+      ],
+      "single-node": [
+        "metrics/metrics-server",
+        "metrics/victoria-metrics"
+      ]
+    },
+    "node-updates": {
+      "multi-node": [
+        "node-updates/system-upgrade-controller"
+      ],
+      "single-node": [
+        "node-updates/system-upgrade-controller"
+      ]
+    },
+    "observability-operator": {
+      "multi-node": [
+        "observability-operator/victoria-metrics-operator"
+      ],
+      "single-node": [
+        "observability-operator/victoria-metrics-operator"
+      ]
+    },
+    "remote-access": {},
+    "replicated-storage": {
+      "multi-node": [
+        "replicated-storage/longhorn"
+      ]
+    },
+    "resource-recommendations": {},
+    "runtime-security": {},
+    "uptime-probes": {
+      "multi-node": [
+        "uptime-probes/blackbox-exporter"
+      ]
+    },
+    "volume-backup": {},
+    "vulnerability-scanning": {}
+  },
+  "components": [
+    {
+      "id": "certificates/cert-manager",
+      "capability": "certificates",
+      "displayName": "cert-manager",
+      "homepage": "https://cert-manager.io",
+      "license": "Apache-2.0",
+      "maturity": "cncf-graduated",
+      "rationale": "cert-manager is the standard Kubernetes certificate controller (CNCF graduated). Its issuers live in the cluster, so it renews certificates itself.\n",
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "recommended"
+      },
+      "dependsOn": [
+        "ingress"
+      ],
+      "releases": [
+        {
+          "name": "cert-manager",
+          "namespace": "cert-manager",
+          "chart": "oci://quay.io/jetstack/charts/cert-manager",
+          "version": "v1.21.2",
+          "values": "crds:\n  # Upgrade CRDs with the chart, whatever the installer.\n  enabled: true\n  # Keep CRDs on uninstall; deleting them deletes every Certificate.\n  keep: true\nenableCertificateOwnerRef: true # Delete the TLS Secret with its Certificate.\nconfig:\n  # Typed controller config for the setting below.\n  apiVersion: controller.config.cert-manager.io/v1alpha1\n  kind: ControllerConfiguration\n  # Issue certificates for Gateway listeners.\n  enableGatewayAPI: true\n",
+          "profiles": {
+            "multi-node": "# Two replicas; leader election keeps one active.\nreplicaCount: 2\npodDisruptionBudget:\n  # Keep a controller during drains.\n  enabled: true\nwebhook:\n  # Gates every cert-manager write; stay available during drains.\n  replicaCount: 2\n  podDisruptionBudget:\n    enabled: true\ncainjector:\n  # Same reason as the controller.\n  replicaCount: 2\n  podDisruptionBudget:\n    enabled: true\n",
+            "single-node": "prometheus:\n  # Metrics on the pod port; no Prometheus operator assumed.\n  enabled: true\n  servicemonitor:\n    enabled: false\n# Idles at 20-40Mi; small requests fit a 2 GB node.\nresources:\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 128Mi}\nwebhook:\n  # Same sizing as the controller.\n  resources:\n    requests: {cpu: 10m, memory: 24Mi}\n    limits: {memory: 64Mi}\ncainjector:\n  # Caches watched Secrets; the limit bounds it.\n  resources:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\nstartupapicheck:\n  # Short-lived post-install Job.\n  resources:\n    requests: {cpu: 10m, memory: 16Mi}\n    limits: {memory: 64Mi}\n"
+          }
+        },
+        {
+          "name": "issuers",
+          "namespace": "cert-manager",
+          "manifests": "# Try here first; production rate limits are far lower. Staging\n# certificates are not trusted by browsers.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt-staging\nspec:\n  acme:\n    server: https://acme-staging-v02.api.letsencrypt.org/directory\n    # No email: ACME accounts need no contact, and Let's Encrypt sends\n    # no expiry emails since 2025. Setting spec.acme.email later updates\n    # the registered account.\n    # Account key, created by cert-manager in its own namespace.\n    privateKeySecretRef:\n      name: letsencrypt-staging-account-key\n    solvers:\n      # HTTP-01 through Traefik's Ingress support; needs no Gateway, and\n      # also answers for names served by Gateway listeners. The name\n      # must reach port 80 of the cluster from the internet.\n      - http01:\n          ingress:\n            ingressClassName: traefik\n---\n# Trusted certificates; same settings as staging.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt\nspec:\n  acme:\n    server: https://acme-v02.api.letsencrypt.org/directory\n    privateKeySecretRef:\n      name: letsencrypt-account-key\n    solvers:\n      - http01:\n          ingress:\n            ingressClassName: traefik\n"
+        }
+      ],
+      "detection": {
+        "crds": [
+          "certificates.cert-manager.io",
+          "clusterissuers.cert-manager.io"
+        ],
+        "helmCharts": [
+          "cert-manager"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "cert-manager"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "credentials": "optional",
+        "credentialsNote": "Only DNS-01 issuers need a DNS provider token.",
+        "egress": [
+          "acme-v02.api.letsencrypt.org",
+          "acme-staging-v02.api.letsencrypt.org"
+        ],
+        "risks": [
+          {
+            "mitigation": "Offer tenants HTTP-01 ClusterIssuers only; keep DNS-01 admin-only.",
+            "risk": "Any namespace can use a ClusterIssuer for a hostname it does not own."
+          },
+          {
+            "mitigation": "Scope the token to the tenant's own zones and namespace.",
+            "risk": "A tenant DNS-01 Issuer can issue certificates for any name in its zone."
+          }
+        ],
+        "summary": "Writes Secrets in all namespaces and manages webhook CA bundles.",
+        "tenantCRDs": [
+          "Certificate",
+          "Issuer"
+        ],
+        "tenants": "namespaced"
+      },
+      "smoke": [
+        {
+          "name": "self-signed-certificate",
+          "manifest": "apiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata: {name: smoke, namespace: catalog-smoke}\nspec: {selfSigned: {}}\n---\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata: {name: smoke, namespace: catalog-smoke}\nspec:\n  secretName: smoke-tls\n  dnsNames: [smoke.example.test]\n  issuerRef: {kind: Issuer, name: smoke}\n",
+          "wait": [
+            "-n catalog-smoke certificate/smoke --for=condition=Ready"
+          ]
+        },
+        {
+          "name": "acme-issuers",
+          "wait": [
+            "clusterissuer/letsencrypt-staging --for=condition=Ready",
+            "clusterissuer/letsencrypt --for=condition=Ready"
+          ]
+        }
+      ],
+      "leftovers": [
+        "customresourcedefinitions",
+        "secrets/letsencrypt-staging-account-key",
+        "secrets/letsencrypt-account-key"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "certificates/cert-manager"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "certificates/cert-manager"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 88,
+          "idleCPUm": 2,
+          "versions": {
+            "cert-manager": "v1.21.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 92,
+          "idleCPUm": 2,
+          "versions": {
+            "cert-manager": "v1.21.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 51,
+          "idleCPUm": 1,
+          "versions": {
+            "cert-manager": "v1.21.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 50,
+          "idleCPUm": 1,
+          "versions": {
+            "cert-manager": "v1.21.2"
+          },
+          "measuredAt": "2026-10-13"
+        }
+      }
+    },
+    {
+      "id": "config-reload/reloader",
+      "capability": "config-reload",
+      "displayName": "Stakater Reloader",
+      "homepage": "https://github.com/stakater/Reloader",
+      "license": "Apache-2.0",
+      "maturity": "independent",
+      "rationale": "Rolls Deployments, StatefulSets and DaemonSets when a ConfigMap or Secret they use changes, whoever changed it. Optional: only workloads that opt in with an annotation restart.\n",
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "releases": [
+        {
+          "name": "reloader",
+          "namespace": "reloader",
+          "chart": "reloader",
+          "repo": "https://stakater.github.io/stakater-charts",
+          "version": "2.2.18",
+          "values": "reloader:\n  # Only workloads annotated reloader.stakater.com/auto or */reload restart.\n  autoReloadAll: false\n  # Marks the pod template with an annotation instead of adding an\n  # environment variable, which the upstream README prefers for Flux and Argo CD.\n  reloadStrategy: annotations\n  # Leave Jobs alone and never create Jobs from CronJobs; this also drops\n  # the chart's batch RBAC rules.\n  ignoreJobs: true\n  ignoreCronJobs: true\n  # Tenants opt in per workload; a namespace list would differ per cluster.\n  watchGlobally: true\n",
+          "profiles": {
+            "multi-node": "reloader:\n  # Leader election, so a standby takes over when the leader's node\n  # drains. A change made before it holds the Lease (up to 15s) is\n  # missed: syncAfterRestart would cover it by rolling every tracked\n  # workload on each handoff, so it stays off.\n  enableHA: true\n  deployment:\n    # One leader and one standby.\n    replicas: 2\n    resources:\n      # More ConfigMaps and Secrets to cache.\n      requests: {cpu: 20m, memory: 128Mi}\n      limits: {memory: 512Mi}\n",
+            "single-node": "reloader:\n  deployment:\n    resources:\n      # Caches every ConfigMap and Secret; grows with their count.\n      requests: {cpu: 10m, memory: 64Mi}\n      limits: {memory: 256Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "helmCharts": [
+          "reloader"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "reloader"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "risks": [
+          {
+            "mitigation": "Set watchGlobally to false and list namespaces: the chart then creates a Role per listed namespace and no ClusterRole. resourceLabelSelector narrows what it caches, not its RBAC.\n",
+            "risk": "It reads every Secret in the cluster, so its token exposes all of them."
+          },
+          {
+            "mitigation": "Keep its namespace admin-only; it runs as non-root with the RuntimeDefault seccomp profile.",
+            "risk": "It can rewrite the pod template of any Deployment, StatefulSet or DaemonSet, including kube-system's."
+          }
+        ],
+        "summary": "ClusterRole: reads, lists and watches every Secret and ConfigMap; reads, updates and patches Deployments, StatefulSets and DaemonSets; creates Events. Role in its namespace: lists, reads, watches, creates and updates every ConfigMap there, not only its own, and on multi-node the leader-election Lease.\n",
+        "tenants": "namespaced"
+      },
+      "smoke": [
+        {
+          "name": "deployment-ready",
+          "manifest": "apiVersion: v1\nkind: ConfigMap\nmetadata: {name: smoke, namespace: catalog-smoke}\ndata: {revision: \"1\"}\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: smoke\n  namespace: catalog-smoke\n  annotations: {reloader.stakater.com/auto: \"true\"}\nspec:\n  selector: {matchLabels: {app: smoke}}\n  template:\n    metadata: {labels: {app: smoke}}\n    spec:\n      containers:\n        - name: pause\n          image: registry.k8s.io/pause:3.10\n          envFrom: [{configMapRef: {name: smoke}}]\n",
+          "wait": [
+            "-n catalog-smoke deployment/smoke --for=condition=Available"
+          ]
+        },
+        {
+          "name": "rolls-on-configmap-change",
+          "manifest": "apiVersion: v1\nkind: ConfigMap\nmetadata: {name: smoke, namespace: catalog-smoke}\ndata: {revision: \"2\"}\n",
+          "wait": [
+            "-n catalog-smoke deployment/smoke --for=jsonpath={.spec.template.metadata.annotations.reloader\\.stakater\\.com/last-reloaded-from}",
+            "-n catalog-smoke deployment/smoke --for=jsonpath={.metadata.generation}=2",
+            "-n catalog-smoke deployment/smoke --for=condition=Available"
+          ]
+        }
+      ],
+      "leftovers": [
+        "configmaps/reloader-meta-info"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "config-reload/reloader"
+        ],
+        "single-node": [
+          "config-reload/reloader"
+        ]
+      }
+    },
+    {
+      "id": "dns/external-dns",
+      "capability": "dns",
+      "displayName": "ExternalDNS",
+      "homepage": "https://kubernetes-sigs.github.io/external-dns/",
+      "license": "Apache-2.0",
+      "maturity": "kubernetes-sig",
+      "rationale": "Creates DNS records for route hostnames (Kubernetes SIG). Optional: it needs a provider token, and a wildcard record often suffices.\n",
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "dependsOn": [
+        "ingress"
+      ],
+      "inputs": [
+        {
+          "name": "provider",
+          "description": "ExternalDNS writes records through this provider, spelled as ExternalDNS names it, such as cloudflare or route53.",
+          "path": "provider.name",
+          "required": true,
+          "testValue": "inmemory"
+        },
+        {
+          "name": "domain-filters",
+          "description": "ExternalDNS changes records only in these zones.",
+          "path": "domainFilters",
+          "required": true,
+          "testValue": [
+            "example.test"
+          ]
+        },
+        {
+          "name": "owner-id",
+          "description": "ExternalDNS marks this cluster's records with this ID, so two clusters never fight over one record.",
+          "path": "txtOwnerId",
+          "required": true,
+          "testValue": "catalog-ci"
+        }
+      ],
+      "releases": [
+        {
+          "name": "external-dns",
+          "namespace": "external-dns",
+          "chart": "external-dns",
+          "repo": "https://kubernetes-sigs.github.io/external-dns",
+          "version": "1.23.0",
+          "values": "sources:\n  # Hostnames from HTTPRoutes and Ingresses.\n  - gateway-httproute\n  - ingress\n# Never delete records others may rely on.\npolicy: upsert-only\n# Touch only records it created.\nregistry: txt\n",
+          "profiles": {
+            "multi-node": "resources:\n  # More routes to reconcile.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 256Mi}\n",
+            "single-node": "resources:\n  # A small polling loop; idles under 30Mi.\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 128Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "helmCharts": [
+          "external-dns"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "external-dns"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "credentials": "required",
+        "credentialsNote": "Needs a DNS provider token scoped to domainFilters.",
+        "risks": [
+          {
+            "mitigation": "Admit only verified hostnames; domainFilters limits the zones.",
+            "risk": "A tenant route can publish a name in another tenant's domain."
+          }
+        ],
+        "summary": "Reads Services, Ingresses and routes in all namespaces."
+      },
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "dns/external-dns"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "dns/external-dns"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 13,
+          "idleCPUm": 0,
+          "versions": {
+            "external-dns": "1.23.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 13,
+          "idleCPUm": 0,
+          "versions": {
+            "external-dns": "1.23.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 13,
+          "idleCPUm": 0,
+          "versions": {
+            "external-dns": "1.23.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 13,
+          "idleCPUm": 0,
+          "versions": {
+            "external-dns": "1.23.0"
+          },
+          "measuredAt": "2026-10-13"
+        }
+      }
+    },
+    {
+      "id": "event-autoscaling/keda",
+      "capability": "event-autoscaling",
+      "displayName": "KEDA",
+      "homepage": "https://keda.sh",
+      "license": "Apache-2.0",
+      "maturity": "cncf-graduated",
+      "rationale": "Scales workloads on events, down to zero, with scaling configured per namespace. Optional on a single node: there it costs more memory than scaling saves.\n",
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "optional"
+      },
+      "releases": [
+        {
+          "name": "keda",
+          "namespace": "keda",
+          "chart": "keda",
+          "repo": "https://kedacore.github.io/charts",
+          "version": "2.21.0",
+          "profiles": {
+            "multi-node": "operator:\n  # Leader-elected standby survives node drains.\n  replicaCount: 2\nresources:\n  # Room for a few hundred ScaledObjects.\n  operator:\n    requests: {cpu: 50m, memory: 128Mi}\n    limits: {memory: 512Mi}\n  metricServer:\n    requests: {cpu: 50m, memory: 96Mi}\n    limits: {memory: 512Mi}\n  webhooks:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n",
+            "single-node": "resources:\n  # Chart defaults (100Mi/1000Mi) far exceed idle use.\n  operator:\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n  metricServer:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n  webhooks:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "apiServices": [
+          "v1beta1.external.metrics.k8s.io"
+        ],
+        "crds": [
+          "scaledobjects.keda.sh"
+        ],
+        "helmCharts": [
+          "keda"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "keda-operator"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "credentials": "optional",
+        "credentialsNote": "Queue and cloud triggers use a TriggerAuthentication in the tenant namespace.",
+        "risks": [
+          {
+            "mitigation": "Reject tenant references to ClusterTriggerAuthentication with an admission policy.",
+            "risk": "A ScaledObject can use cluster-level credentials through ClusterTriggerAuthentication."
+          },
+          {
+            "mitigation": "Reject private and link-local trigger addresses with the same policy.",
+            "risk": "URL-based triggers make the operator call any address (SSRF)."
+          }
+        ],
+        "summary": "Reads scale targets and trigger secrets cluster-wide; serves the external metrics API.",
+        "tenantCRDs": [
+          "ScaledObject",
+          "ScaledJob",
+          "TriggerAuthentication"
+        ],
+        "tenants": "namespaced"
+      },
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "event-autoscaling/keda"
+        ],
+        "single-node": [
+          "event-autoscaling/keda"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 92,
+          "idleCPUm": 4,
+          "versions": {
+            "keda": "2.21.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 96,
+          "idleCPUm": 3,
+          "versions": {
+            "keda": "2.21.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 69,
+          "idleCPUm": 3,
+          "versions": {
+            "keda": "2.21.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 74,
+          "idleCPUm": 4,
+          "versions": {
+            "keda": "2.21.0"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    },
+    {
+      "id": "event-autoscaling/keda-http-add-on",
+      "capability": "event-autoscaling",
+      "displayName": "KEDA HTTP Add-on",
+      "homepage": "https://github.com/kedacore/http-add-on",
+      "license": "Apache-2.0",
+      "maturity": "cncf-graduated",
+      "stability": "beta",
+      "rationale": "Scales HTTP services on request rate, including to zero; the interceptor holds the first request while the workload wakes. It is pre-1.0, so it is marked beta.\n",
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "dependsOn": [
+        "event-autoscaling/keda"
+      ],
+      "releases": [
+        {
+          "name": "http-add-on",
+          "namespace": "keda",
+          "releaseName": "keda-add-ons-http",
+          "chart": "keda-add-ons-http",
+          "repo": "https://kedacore.github.io/charts",
+          "version": "0.16.0",
+          "profiles": {
+            "multi-node": "interceptor:\n  replicas:\n    # All scaled traffic passes the interceptor; keep the chart's floor.\n    min: 3\n    max: 50\nscaler:\n  # Keeps scaling during node drains.\n  replicas: 2\n",
+            "single-node": "interceptor:\n  replicas:\n    # Three interceptors add nothing on one node.\n    min: 1\n    max: 3\n  # On one node a PDB only blocks maintenance.\n  pdb:\n    enabled: false\nscaler:\n  # One scaler is enough on one node.\n  replicas: 1\n"
+          }
+        }
+      ],
+      "detection": {
+        "crds": [
+          "httpscaledobjects.http.keda.sh"
+        ],
+        "helmCharts": [
+          "keda-add-ons-http"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/component": "interceptor",
+              "app.kubernetes.io/part-of": "keda-add-ons-http"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "risks": [
+          {
+            "mitigation": "Admit only hosts the namespace's own HTTPRoutes serve.",
+            "risk": "An HTTPScaledObject can claim another tenant's hostname."
+          }
+        ],
+        "summary": "Reads HTTPScaledObjects, Services and EndpointSlices cluster-wide; creates ScaledObjects.",
+        "tenantCRDs": [
+          "HTTPScaledObject"
+        ],
+        "tenants": "namespaced"
+      },
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "upgradeNotes": [
+        {
+          "note": "HTTPScaledObject fields change between minor versions; read the release notes before upgrading.",
+          "versions": "\u003c1.0.0"
+        }
+      ],
+      "installOrder": {
+        "multi-node": [
+          "event-autoscaling/keda",
+          "event-autoscaling/keda-http-add-on"
+        ],
+        "single-node": [
+          "event-autoscaling/keda",
+          "event-autoscaling/keda-http-add-on"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 70,
+          "idleCPUm": 11,
+          "versions": {
+            "http-add-on": "0.16.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 102,
+          "idleCPUm": 6,
+          "versions": {
+            "http-add-on": "0.16.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 34,
+          "idleCPUm": 3,
+          "versions": {
+            "http-add-on": "0.16.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 34,
+          "idleCPUm": 4,
+          "versions": {
+            "http-add-on": "0.16.0"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    },
+    {
+      "id": "ingress/traefik",
+      "capability": "ingress",
+      "displayName": "Traefik Proxy",
+      "homepage": "https://traefik.io/traefik/",
+      "license": "MIT",
+      "maturity": "independent",
+      "rationale": "Serves Gateway API and Ingress, and hosts the CrowdSec bouncer. Ingress NGINX was retired in March 2026.\n",
+      "alternatives": {
+        "envoy-gateway": "Serves Gateway API on Envoy; an existing installation is reused."
+      },
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "recommended"
+      },
+      "disruptsTraffic": true,
+      "releases": [
+        {
+          "name": "gateway-api-crds",
+          "namespace": "kube-system",
+          "skipIfPresent": [
+            "httproutes.gateway.networking.k8s.io"
+          ],
+          "urls": [
+            "https://github.com/kubernetes-sigs/gateway-api/releases/download/{version}/standard-install.yaml"
+          ],
+          "version": "v1.6.2"
+        },
+        {
+          "name": "traefik",
+          "namespace": "traefik",
+          "chart": "oci://ghcr.io/traefik/helm/traefik",
+          "version": "41.7.1",
+          "values": "providers:\n  kubernetesGateway:\n    # Route web services with HTTPRoute.\n    enabled: true\n  kubernetesIngress:\n    # Many charts still ship Ingress objects.\n    enabled: true\n  kubernetesCRD:\n    # Middleware objects, such as the CrowdSec bouncer.\n    enabled: true\n    # No references to other namespaces.\n    allowCrossNamespace: false\ngatewayClass:\n  # Gateways reference GatewayClass \"traefik\".\n  enabled: true\n  name: traefik\ngateway:\n  # Gateways and listeners are created per domain, not by the chart.\n  enabled: false\napi:\n  # Unauthenticated surface; not needed.\n  dashboard: false\nservice:\n  spec:\n    # Skip source NAT so Traefik sees client addresses (CrowdSec, rate\n    # limits, logs); only nodes running Traefik serve traffic.\n    externalTrafficPolicy: Local\naccessLog:\n  # JSON access logs for metrics, log search and CrowdSec.\n  enabled: true\n  format: json\n  fields:\n    # Keep only the fields below; secrets live in headers and queries.\n    defaultMode: drop\n    names:\n      RequestHost: keep\n      RequestMethod: keep\n      RequestPath: keep\n      RequestProtocol: keep\n      DownstreamStatus: keep\n      DownstreamContentSize: keep\n      RequestContentSize: keep\n      Duration: keep\n      RouterName: keep\n      StartUTC: keep\n    headers:\n      # Headers carry cookies and bearer tokens.\n      defaultMode: drop\n    queryParameters:\n      # Query strings carry OAuth codes and signed-URL secrets.\n      defaultMode: drop\n",
+          "profiles": {
+            "multi-node": "deployment:\n  # One pod per node, so every node keeps client addresses under the\n  # Local traffic policy; k3s ServiceLB source-NATs on nodes without one.\n  # From a Deployment, annotate it helm.sh/resource-policy=keep before the\n  # upgrade and delete it after, or ingress drops for a few seconds.\n  kind: DaemonSet\ntolerations:\n  # The taints k3s ServiceLB tolerates, so Traefik runs wherever it listens.\n  - key: node-role.kubernetes.io/control-plane\n    operator: Exists\n    effect: NoSchedule\n  - key: CriticalAddonsOnly\n    operator: Exists\nmetrics:\n  prometheus:\n    # Request rate and latency metrics.\n    service:\n      enabled: true\nresources:\n  # Headroom for higher request rates.\n  requests: {cpu: 100m, memory: 128Mi}\n  limits: {memory: 512Mi}\n",
+            "single-node": "deployment:\n  # A second copy gains nothing on one node.\n  replicas: 1\nresources:\n  # Idles near 40Mi; the limit contains leaks.\n  requests: {cpu: 50m, memory: 64Mi}\n  limits: {memory: 256Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "crds": [
+          "ingressroutes.traefik.io",
+          "middlewares.traefik.io"
+        ],
+        "gatewayControllers": [
+          "traefik.io/gateway-controller"
+        ],
+        "helmCharts": [
+          "traefik"
+        ],
+        "ingressControllers": [
+          "traefik.io/ingress-controller"
+        ],
+        "k3sAddons": [
+          "traefik"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "traefik"
+            }
+          },
+          {
+            "kind": "DaemonSet",
+            "labels": {
+              "app.kubernetes.io/name": "traefik"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "risks": [
+          {
+            "mitigation": "Use one listener per verified domain, with allowedRoutes limited to its namespace.",
+            "risk": "A tenant HTTPRoute can claim another tenant's hostname on a shared listener."
+          },
+          {
+            "mitigation": "allowCrossNamespace is false and tenants get no Traefik CRDs.",
+            "risk": "Traefik CRDs can reference other namespaces."
+          }
+        ],
+        "summary": "Reads Services, Secrets and routes cluster-wide; writes route status.",
+        "tenantCRDs": [
+          "HTTPRoute",
+          "GRPCRoute"
+        ],
+        "tenants": "namespaced"
+      },
+      "smoke": [
+        {
+          "name": "gateway-class-accepted",
+          "wait": [
+            "gatewayclass/traefik --for=condition=Accepted"
+          ]
+        }
+      ],
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik"
+        ],
+        "single-node": [
+          "ingress/traefik"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 45,
+          "idleCPUm": 0,
+          "versions": {
+            "gateway-api-crds": "v1.6.2",
+            "traefik": "41.7.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 56,
+          "idleCPUm": 0,
+          "versions": {
+            "gateway-api-crds": "v1.6.2",
+            "traefik": "41.7.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 23,
+          "idleCPUm": 0,
+          "versions": {
+            "gateway-api-crds": "v1.6.2",
+            "traefik": "41.7.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 22,
+          "idleCPUm": 0,
+          "versions": {
+            "gateway-api-crds": "v1.6.2",
+            "traefik": "41.7.1"
+          },
+          "measuredAt": "2026-10-13"
+        }
+      }
+    },
+    {
+      "id": "intrusion-prevention/crowdsec",
+      "capability": "intrusion-prevention",
+      "displayName": "CrowdSec",
+      "homepage": "https://www.crowdsec.net",
+      "license": "MIT",
+      "maturity": "independent",
+      "rationale": "Blocks brute-force attempts and scanners that show up in Traefik's access logs, for every app behind the ingress. It fails open, and the online API is off by default.\n",
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "persistsData": true,
+      "dependsOn": [
+        "ingress/traefik"
+      ],
+      "inputs": [
+        {
+          "name": "bouncer-key",
+          "description": "The Traefik bouncer uses this key to call the CrowdSec local API.",
+          "secret": {
+            "name": "crowdsec-bouncer-key",
+            "key": "key",
+            "namespace": "crowdsec"
+          },
+          "generate": "random"
+        },
+        {
+          "name": "lapi-secret",
+          "description": "The local API (LAPI) signs agent sessions with this shared secret.",
+          "secret": {
+            "name": "crowdsec-lapi",
+            "key": "csLapiSecret",
+            "namespace": "crowdsec"
+          },
+          "generate": "random"
+        },
+        {
+          "name": "registration-token",
+          "description": "Agents register with the local API using this token.",
+          "secret": {
+            "name": "crowdsec-lapi",
+            "key": "registrationToken",
+            "namespace": "crowdsec"
+          },
+          "generate": "random"
+        }
+      ],
+      "releases": [
+        {
+          "name": "crowdsec",
+          "namespace": "crowdsec",
+          "chart": "oci://ghcr.io/crowdsecurity/helm-charts/crowdsec",
+          "version": "0.24.2",
+          "values": "# The runtime on k3s and mainstream distributions.\ncontainer_runtime: containerd\nsecrets:\n  externalSecret:\n    # Inputs, not chart-generated, so every render is identical.\n    name: crowdsec-lapi\nagent:\n  acquisition:\n    # Traefik's JSON access log.\n    - namespace: traefik\n      podName: traefik-*\n      program: traefik\n  env:\n    # Parsers and scenarios for Traefik plus generic HTTP attacks.\n    - name: COLLECTIONS\n      value: crowdsecurity/traefik\nlapi:\n  env:\n    # No data leaves the cluster unless the user opts in.\n    - name: DISABLE_ONLINE_API\n      value: \"true\"\n    # Registers the Traefik bouncer (input bouncer-key).\n    - name: BOUNCER_KEY_traefik\n      valueFrom:\n        secretKeyRef: {name: crowdsec-bouncer-key, key: key}\n  persistentVolume:\n    data:\n      # SQLite decisions and bouncer registrations.\n      enabled: true\n    config:\n      # Keeps machine credentials stable across restarts.\n      enabled: true\n",
+          "profiles": {
+            "multi-node": "agent:\n  resources:\n    # One agent per node; busier logs than single-node.\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 256Mi}\nlapi:\n  resources:\n    # Headroom for more agents and decisions.\n    requests: {cpu: 50m, memory: 96Mi}\n    limits: {memory: 384Mi}\n",
+            "single-node": "agent:\n  resources:\n    # Chart asks 250Mi; an idle agent uses under 100Mi.\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 192Mi}\nlapi:\n  resources:\n    # Chart asks 500Mi; LAPI on SQLite idles far below.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
+          }
+        },
+        {
+          "name": "bouncer-middleware",
+          "namespace": "crowdsec",
+          "manifests": "# Referenced from Traefik's entrypoints as crowdsec-bouncer@kubernetescrd.\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: bouncer\n  namespace: crowdsec\nspec:\n  plugin:\n    crowdsec-bouncer:\n      enabled: true\n      # Local copy of decisions; requests never wait on LAPI.\n      crowdsecMode: stream\n      crowdsecLapiScheme: http\n      crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080\n      # Read from the Secret in the Middleware's namespace.\n      crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:key\n      # Fail open: if LAPI is unreachable, keep serving traffic.\n      updateMaxFailure: -1\n"
+        }
+      ],
+      "contributes": [
+        {
+          "target": "ingress/traefik",
+          "release": "traefik",
+          "values": "experimental:\n  plugins:\n    # Downloaded from plugins.traefik.io at start.\n    crowdsec-bouncer:\n      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin\n      version: v1.7.1\nports:\n  web:\n    http:\n      # Every request passes the bouncer; no app opts in.\n      middlewares: [crowdsec-bouncer@kubernetescrd]\n  websecure:\n    http:\n      # Same as web.\n      middlewares: [crowdsec-bouncer@kubernetescrd]\naccessLog:\n  fields:\n    names:\n      # CrowdSec's scenarios key on the client address.\n      ClientHost: keep\n    headers:\n      names:\n        # Bot scenarios match on the user agent.\n        User-Agent: keep\n"
+        }
+      ],
+      "detection": {
+        "helmCharts": [
+          "crowdsec"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "k8s-app": "crowdsec",
+              "type": "lapi"
+            }
+          }
+        ]
+      },
+      "security": {
+        "egress": [
+          "hub-data.crowdsec.net",
+          "plugins.traefik.io",
+          "github.com"
+        ],
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "Only administrators manage decisions. Configure trusted proxies before running CrowdSec behind a CDN.",
+            "risk": "A ban on a shared IP (NAT, CDN) blocks it for every tenant."
+          }
+        ],
+        "summary": "The agent reads node log files read-only and makes no API writes.",
+        "tenants": "admin-only"
+      },
+      "leftovers": [
+        "persistentvolumeclaims"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "intrusion-prevention/crowdsec"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "intrusion-prevention/crowdsec"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 117,
+          "idleCPUm": 2,
+          "versions": {
+            "crowdsec": "0.24.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 119,
+          "idleCPUm": 1,
+          "versions": {
+            "crowdsec": "0.24.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 76,
+          "idleCPUm": 1,
+          "versions": {
+            "crowdsec": "0.24.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 82,
+          "idleCPUm": 1,
+          "versions": {
+            "crowdsec": "0.24.2"
+          },
+          "measuredAt": "2026-10-13"
+        }
+      }
+    },
+    {
+      "id": "logs/victoria-logs",
+      "capability": "logs",
+      "displayName": "VictoriaLogs",
+      "homepage": "https://docs.victoriametrics.com/victorialogs/",
+      "license": "Apache-2.0",
+      "maturity": "independent",
+      "rationale": "Keeps and searches log history with low memory and disk use. It is Apache-2.0, unlike Loki, and runs on the VictoriaMetrics operator.\n",
+      "alternatives": {
+        "loki": "Licensed AGPL-3.0; an existing installation is reused."
+      },
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "recommended"
+      },
+      "persistsData": true,
+      "dependsOn": [
+        "observability-operator/victoria-metrics-operator"
+      ],
+      "releases": [
+        {
+          "name": "logs",
+          "namespace": "observability",
+          "manifests": "# The log store.\napiVersion: operator.victoriametrics.com/v1\nkind: VLSingle\nmetadata:\n  name: victoria-logs\n  namespace: observability\nspec:\n  # Two weeks, or less when the volume reaches 8GiB of its 10Gi.\n  retentionPeriod: 14d\n  retentionMaxDiskSpaceUsageBytes: 8GiB\n  storage:\n    resources:\n      requests: {storage: 10Gi}\n  resources:\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 1Gi}\n---\n# One collector per node, reading container logs.\napiVersion: operator.victoriametrics.com/v1\nkind: VLAgent\nmetadata:\n  name: collector\n  namespace: observability\nspec:\n  k8sCollector:\n    enabled: true\n    # Namespace, pod and container suffice; labels add cardinality.\n    includePodLabels: false\n  remoteWrite:\n    - url: http://vlsingle-victoria-logs.observability.svc:9428/internal/insert\n  resources:\n    requests: {cpu: 20m, memory: 32Mi}\n    limits: {memory: 256Mi}\n"
+        }
+      ],
+      "detection": {
+        "crds": [
+          "vlsingles.operator.victoriametrics.com"
+        ],
+        "helmCharts": [
+          "victoria-logs-single",
+          "victoria-logs-collector"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "vlsingle"
+            }
+          },
+          {
+            "kind": "StatefulSet",
+            "labels": {
+              "app.kubernetes.io/name": "victoria-logs-single"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "Don't expose it to tenants; query through a layer that filters by namespace.",
+            "risk": "The log store holds every tenant's logs in one place."
+          }
+        ],
+        "summary": "The collector reads pod metadata and node log files."
+      },
+      "smoke": [
+        {
+          "name": "operational",
+          "wait": [
+            "-n observability vlsingle/victoria-logs --for=jsonpath={.status.updateStatus}=operational",
+            "-n observability vlagent/collector --for=jsonpath={.status.updateStatus}=operational"
+          ]
+        }
+      ],
+      "leftovers": [
+        "persistentvolumeclaims"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "logs/victoria-logs"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "logs/victoria-logs"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 32,
+          "idleCPUm": 5,
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 38,
+          "idleCPUm": 3,
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 38,
+          "idleCPUm": 3,
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 35,
+          "idleCPUm": 2,
+          "measuredAt": "2026-10-13"
+        }
+      }
+    },
+    {
+      "id": "metrics/metrics-server",
+      "capability": "metrics",
+      "displayName": "Kubernetes Metrics Server",
+      "homepage": "https://github.com/kubernetes-sigs/metrics-server",
+      "license": "Apache-2.0",
+      "maturity": "kubernetes-sig",
+      "rationale": "Serves metrics.k8s.io for HPA and `kubectl top`. It keeps no history, so it is the cheapest source of live CPU and memory.\n",
+      "alternatives": {
+        "victoria-metrics": "Adds history and alerts at a few hundred MiB."
+      },
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "recommended"
+      },
+      "releases": [
+        {
+          "name": "metrics-server",
+          "namespace": "kube-system",
+          "chart": "metrics-server",
+          "repo": "https://kubernetes-sigs.github.io/metrics-server",
+          "version": "3.14.0",
+          "values": "args:\n  # 15s is fresh enough for live views; the default is 60s.\n  - --metric-resolution=15s\n",
+          "profiles": {
+            "multi-node": "# HPA stops while metrics.k8s.io is down; two replicas.\nreplicas: 2\npodDisruptionBudget:\n  # Keep one replica during node drains.\n  enabled: true\n  minAvailable: 1\nresources:\n  # Covers clusters of a few dozen nodes.\n  requests: {cpu: 50m, memory: 96Mi}\n  limits: {memory: 256Mi}\n",
+            "single-node": "resources:\n  # The chart's 200Mi request is sized for 100+ nodes.\n  requests: {cpu: 20m, memory: 48Mi}\n  limits: {memory: 128Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "apiServices": [
+          "v1beta1.metrics.k8s.io"
+        ],
+        "helmCharts": [
+          "metrics-server"
+        ],
+        "k3sAddons": [
+          "metrics-server"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "metrics-server"
+            }
+          },
+          {
+            "kind": "Deployment",
+            "labels": {
+              "k8s-app": "metrics-server"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "summary": "Reads kubelet metrics; registers an aggregated API."
+      },
+      "installOrder": {
+        "multi-node": [
+          "metrics/metrics-server"
+        ],
+        "single-node": [
+          "metrics/metrics-server"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 33,
+          "idleCPUm": 4,
+          "versions": {
+            "metrics-server": "3.14.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 35,
+          "idleCPUm": 3,
+          "versions": {
+            "metrics-server": "3.14.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 17,
+          "idleCPUm": 1,
+          "versions": {
+            "metrics-server": "3.14.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 17,
+          "idleCPUm": 2,
+          "versions": {
+            "metrics-server": "3.14.0"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    },
+    {
+      "id": "metrics/victoria-metrics",
+      "capability": "metrics",
+      "displayName": "VictoriaMetrics (k8s stack)",
+      "homepage": "https://victoriametrics.com",
+      "license": "Apache-2.0",
+      "maturity": "independent",
+      "rationale": "Keeps metrics history and evaluates alerts with a fraction of Prometheus' memory. On one node it is tuned to about 200Mi.\n",
+      "alternatives": {
+        "kube-prometheus-stack": "An existing installation is reused, but its memory use keeps it from being recommended.",
+        "metrics-server": "Serves live CPU and memory only; it is installed alongside for the metrics API."
+      },
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "recommended"
+      },
+      "persistsData": true,
+      "dependsOn": [
+        "observability-operator/victoria-metrics-operator"
+      ],
+      "releases": [
+        {
+          "name": "k8s-stack",
+          "namespace": "observability",
+          "releaseName": "vm",
+          "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack",
+          "version": "0.95.2",
+          "values": "victoria-metrics-operator:\n  # The operator is its own component, shared with logs.\n  enabled: false\ngrafana:\n  # Grafana adds ~150Mi; install it separately if needed.\n  enabled: false\ndefaultDashboards:\n  # Dashboards only matter with Grafana.\n  enabled: false\nkube-state-metrics:\n  # Maps pods to workloads and exposes requests, limits and object state.\n  enabled: true\nvmagent:\n  spec:\n    # 30s cuts scrape cost by a third versus the chart's 20s.\n    scrapeInterval: 30s\n",
+          "profiles": {
+            "multi-node": "prometheus-node-exporter:\n  # Node disk and network metrics for capacity planning.\n  enabled: true\nvmsingle:\n  spec:\n    # Two weeks of history; the volume is sized for it.\n    retentionPeriod: 14d\n    storage:\n      resources:\n        requests: {storage: 20Gi}\n    resources:\n      requests: {cpu: 100m, memory: 512Mi}\n      limits: {memory: 2Gi}\nvmagent:\n  spec:\n    # More targets across nodes.\n    resources:\n      requests: {cpu: 50m, memory: 128Mi}\n      limits: {memory: 1Gi}\n",
+            "single-node": "prometheus-node-exporter:\n  # cAdvisor already covers containers; little gain on one node.\n  enabled: false\nkube-state-metrics:\n  # Only the objects needed to map pods to workloads.\n  collectors: [pods, replicasets, deployments, statefulsets, daemonsets, jobs, cronjobs, nodes, persistentvolumeclaims, namespaces]\n  metricLabelsAllowlist:\n    - pods=[app.kubernetes.io/name,app.kubernetes.io/component]\nkubeControllerManager:\n  # Embedded in k3s; nothing to scrape.\n  enabled: false\nkubeScheduler:\n  # Embedded in k3s; nothing to scrape.\n  enabled: false\nkubeEtcd:\n  # k3s single-node uses SQLite (kine), not etcd.\n  enabled: false\nkubeApiServer:\n  # Its histograms are ~half of all series; its alert rules go with it.\n  enabled: false\nkubelet:\n  vmScrape:\n    spec:\n      metricRelabelConfigs:\n        # Chart defaults: UIDs and cgroup ids only multiply series.\n        - action: labeldrop\n          regex: (uid)\n        - action: labeldrop\n          regex: (id|name)\n        # k3s kubelet also exports API server and kine histograms (~45% of series).\n        - action: drop\n          source_labels: [__name__]\n          regex: .+_bucket|(apiserver|etcd|kine|rest_client|workqueue|scheduler|authentication|authorization|aggregator|admission|watch_cache|storage)_.+\nvmsingle:\n  spec:\n    # A week of history fits 5Gi on one node.\n    retentionPeriod: 7d\n    storage:\n      resources:\n        requests: {storage: 5Gi}\n    resources:\n      requests: {cpu: 50m, memory: 128Mi}\n      limits: {memory: 512Mi}\nvmagent:\n  spec:\n    # Small scrape set on one node.\n    resources:\n      requests: {cpu: 20m, memory: 64Mi}\n      limits: {memory: 256Mi}\nvmalert:\n  spec:\n    # Evaluates the default alert rules.\n    resources:\n      requests: {cpu: 10m, memory: 32Mi}\n      limits: {memory: 128Mi}\nalertmanager:\n  spec:\n    # Routes alerts to configured receivers.\n    resources:\n      requests: {cpu: 10m, memory: 32Mi}\n      limits: {memory: 128Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "crds": [
+          "vmsingles.operator.victoriametrics.com"
+        ],
+        "helmCharts": [
+          "victoria-metrics-k8s-stack"
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "risks": [
+          {
+            "mitigation": "Keep rules admin-only until vmalert enforces a namespace label.",
+            "risk": "VMRule and PrometheusRule queries see every tenant's metrics."
+          },
+          {
+            "mitigation": "Admit only the namespace's own hostnames or public URLs with an admission policy.",
+            "risk": "Probe targets can reach any address (SSRF), including cloud metadata."
+          },
+          {
+            "mitigation": "Restrict tenant scrapes to their own namespace with an admission policy.",
+            "risk": "Scrape objects can select pods in other namespaces."
+          }
+        ],
+        "summary": "Manages VictoriaMetrics objects and scrapes pods in all namespaces.",
+        "tenantCRDs": [
+          "VMServiceScrape",
+          "VMPodScrape",
+          "VMRule",
+          "VMProbe"
+        ],
+        "tenants": "admin-only"
+      },
+      "smoke": [
+        {
+          "name": "vmsingle-operational",
+          "wait": [
+            "-n observability vmsingle --all --for=jsonpath={.status.updateStatus}=operational"
+          ]
+        }
+      ],
+      "leftovers": [
+        "persistentvolumeclaims"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "metrics/victoria-metrics"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "metrics/victoria-metrics"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 443,
+          "idleCPUm": 52,
+          "versions": {
+            "k8s-stack": "0.95.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 448,
+          "idleCPUm": 33,
+          "versions": {
+            "k8s-stack": "0.95.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 207,
+          "idleCPUm": 28,
+          "versions": {
+            "k8s-stack": "0.95.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 206,
+          "idleCPUm": 26,
+          "versions": {
+            "k8s-stack": "0.95.2"
+          },
+          "measuredAt": "2026-10-13"
+        }
+      }
+    },
+    {
+      "id": "node-updates/system-upgrade-controller",
+      "capability": "node-updates",
+      "displayName": "System Upgrade Controller",
+      "homepage": "https://github.com/rancher/system-upgrade-controller",
+      "license": "Apache-2.0",
+      "maturity": "independent",
+      "rationale": "Upgrades k3s and node packages one node at a time from declarative Plans, with cordon, drain and concurrency limits. The catalog installs it from upstream manifests because the Rancher chart lags behind releases.\n",
+      "alternatives": {
+        "kured": "If installed, kured keeps handling reboots."
+      },
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "recommended"
+      },
+      "distributions": [
+        "k3s"
+      ],
+      "releases": [
+        {
+          "name": "crds",
+          "namespace": "system-upgrade",
+          "urls": [
+            "https://github.com/rancher/system-upgrade-controller/releases/download/{version}/crd.yaml"
+          ],
+          "version": "v0.20.2"
+        },
+        {
+          "name": "controller",
+          "namespace": "system-upgrade",
+          "urls": [
+            "https://github.com/rancher/system-upgrade-controller/releases/download/{version}/system-upgrade-controller.yaml"
+          ],
+          "version": "v0.20.2"
+        }
+      ],
+      "detection": {
+        "crds": [
+          "plans.upgrade.cattle.io"
+        ],
+        "helmCharts": [
+          "system-upgrade-controller"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "upgrade.cattle.io/controller": "system-upgrade-controller"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "Restrict Plan writes to administrators and use only signed, digest-pinned images.",
+            "risk": "A Plan runs any image as root on the host, so whoever writes Plans owns every node."
+          }
+        ],
+        "summary": "Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.",
+        "tenants": "admin-only"
+      },
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "node-updates/system-upgrade-controller"
+        ],
+        "single-node": [
+          "node-updates/system-upgrade-controller"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 11,
+          "idleCPUm": 0,
+          "versions": {
+            "controller": "v0.20.2",
+            "crds": "v0.20.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 11,
+          "idleCPUm": 0,
+          "versions": {
+            "controller": "v0.20.2",
+            "crds": "v0.20.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 12,
+          "idleCPUm": 0,
+          "versions": {
+            "controller": "v0.20.2",
+            "crds": "v0.20.2"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 11,
+          "idleCPUm": 0,
+          "versions": {
+            "controller": "v0.20.2",
+            "crds": "v0.20.2"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    },
+    {
+      "id": "observability-operator/victoria-metrics-operator",
+      "capability": "observability-operator",
+      "displayName": "VictoriaMetrics operator",
+      "homepage": "https://docs.victoriametrics.com/operator/",
+      "license": "Apache-2.0",
+      "maturity": "independent",
+      "rationale": "One operator runs both the metrics and the logs stack from CRDs, and accepts Prometheus operator objects so existing app manifests keep working.\n",
+      "alternatives": {
+        "prometheus-operator": "An existing installation is reused, and the VictoriaMetrics operator converts its objects."
+      },
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "recommended"
+      },
+      "dependsOn": [
+        "certificates"
+      ],
+      "releases": [
+        {
+          "name": "operator",
+          "namespace": "observability",
+          "releaseName": "victoria-metrics-operator",
+          "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator",
+          "version": "0.68.1",
+          "values": "admissionWebhooks:\n  certManager:\n    # cert-manager issues the webhook certificate, so every render is identical.\n    enabled: true\ncrds:\n  # Delete VM objects before uninstall so finalizers don't block the namespace.\n  cleanup:\n    enabled: true\n",
+          "profiles": {
+            "single-node": "resources:\n  # The operator idles near 40Mi.\n  requests: {cpu: 10m, memory: 48Mi}\n  limits: {memory: 256Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "crds": [
+          "vmsingles.operator.victoriametrics.com",
+          "vlsingles.operator.victoriametrics.com"
+        ],
+        "helmCharts": [
+          "victoria-metrics-operator"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "victoria-metrics-operator"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "summary": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.",
+        "tenants": "admin-only"
+      },
+      "leftovers": [
+        "customresourcedefinitions",
+        "clusterroles/victoria-metrics-operator-cleanup-hook",
+        "clusterrolebindings/victoria-metrics-operator-cleanup-hook"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 20,
+          "idleCPUm": 2,
+          "versions": {
+            "operator": "0.68.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 19,
+          "idleCPUm": 1,
+          "versions": {
+            "operator": "0.68.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 20,
+          "idleCPUm": 2,
+          "versions": {
+            "operator": "0.68.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 20,
+          "idleCPUm": 2,
+          "versions": {
+            "operator": "0.68.1"
+          },
+          "measuredAt": "2026-10-13"
+        }
+      }
+    },
+    {
+      "id": "remote-access/tailscale-operator",
+      "capability": "remote-access",
+      "displayName": "Tailscale Kubernetes operator",
+      "homepage": "https://tailscale.com/kb/1236/kubernetes-operator",
+      "license": "BSD-3-Clause",
+      "maturity": "independent",
+      "rationale": "Puts a Service or Ingress on the tailnet with no port open to the internet. An Ingress gets a MagicDNS name with a Let's Encrypt certificate, so a host without a domain still serves trusted HTTPS; a Service is proxied as it is, without TLS. Optional: it needs a Tailscale account, and an Ingress needs HTTPS and MagicDNS enabled on the tailnet.\n",
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "inputs": [
+        {
+          "name": "oauth-client-id",
+          "description": "The operator uses the Tailscale OAuth client with this ID. The client needs write scope for Services, Devices Core and Auth Keys, and the tag tag:k8s-operator. The tailnet policy must make tag:k8s-operator an owner of tag:k8s, the proxies' default tag.\n",
+          "secret": {
+            "name": "operator-oauth",
+            "key": "client_id",
+            "namespace": "tailscale"
+          },
+          "required": true,
+          "testValue": "catalog-ci"
+        },
+        {
+          "name": "oauth-client-secret",
+          "description": "The operator authenticates with this OAuth client secret.",
+          "secret": {
+            "name": "operator-oauth",
+            "key": "client_secret",
+            "namespace": "tailscale"
+          },
+          "required": true,
+          "testValue": "catalog-ci"
+        }
+      ],
+      "releases": [
+        {
+          "name": "tailscale-operator",
+          "namespace": "tailscale",
+          "chart": "tailscale-operator",
+          "repo": "https://pkgs.tailscale.com/helmcharts",
+          "version": "1.104.1",
+          "values": "oauth:\n  # Empty, so the chart renders no Secret; the operator mounts\n  # operator-oauth, created from the inputs before install.\n  clientId: \"\"\n  clientSecret: \"\"\noperatorConfig:\n  image:\n    # The tag is pinned to the chart's appVersion; Always pulls on every restart.\n    pullPolicy: IfNotPresent\napiServerProxyConfig:\n  # No Kubernetes API proxy and no impersonation ClusterRole.\n  mode: \"false\"\n  allowImpersonation: \"false\"\n",
+          "profiles": {
+            "multi-node": "operatorConfig:\n  resources:\n    # More Services and Ingresses to reconcile.\n    requests: {cpu: 50m, memory: 128Mi}\n    limits: {memory: 512Mi}\n",
+            "single-node": "operatorConfig:\n  resources:\n    # Chart sets none; one controller and one tailnet node.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "crds": [
+          "proxyclasses.tailscale.com",
+          "connectors.tailscale.com"
+        ],
+        "helmCharts": [
+          "tailscale-operator"
+        ],
+        "ingressControllers": [
+          "tailscale.com/ts-ingress"
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "credentials": "required",
+        "credentialsNote": "A Tailscale OAuth client; the operator mints auth keys for itself and every proxy, tagged tag:k8s-operator and tag:k8s.\n",
+        "egress": [
+          "*.tailscale.com",
+          "acme-v02.api.letsencrypt.org",
+          "docker.io"
+        ],
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "Tailnet ACLs limit what tag:k8s may reach and who may reach it; a ValidatingAdmissionPolicy can reserve those annotations, the class and the IngressClass for approved namespaces.\n",
+            "risk": "Anyone who can create a Service or Ingress in any namespace can put it on the tailnet (annotation tailscale.com/expose, loadBalancerClass tailscale, or IngressClass tailscale), or reach a tailnet device through an egress Service (annotation tailscale.com/tailnet-fqdn).\n"
+          },
+          {
+            "mitigation": "Label only the tailscale namespace with Pod Security privileged; tenant namespaces keep restricted, since proxies never run there.\n",
+            "risk": "Proxies for Services, egress and ProxyGroups run a privileged container and a privileged init container that turns on IP forwarding, in the operator's namespace. Ingress proxies run in userspace mode with no added privileges.\n"
+          },
+          {
+            "mitigation": "A DNSConfig and a CoreDNS stub domain for ts.net resolve names that have an egress proxy; an Ingress needs the experimental annotation tailscale.com/experimental-forward-cluster-traffic-via-ingress, which makes its proxy privileged. Calling the in-cluster Service avoids both.\n",
+            "risk": "Pods in the cluster cannot resolve *.ts.net names by default, so an app cannot call another app's tailnet name (an OIDC issuer, for example).\n"
+          }
+        ],
+        "summary": "Creates, updates and deletes Services and Ingresses (and their status) in every namespace; reads nodes and EndpointSlices; manages ValidatingAdmissionPolicies and their bindings. In its own namespace it manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments, Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs, peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders, tailnets) and the IngressClass tailscale.\n"
+      },
+      "smoke": [
+        {
+          "name": "crds-established",
+          "wait": [
+            "crd/proxyclasses.tailscale.com --for=condition=Established",
+            "crd/connectors.tailscale.com --for=condition=Established"
+          ]
+        }
+      ],
+      "installOrder": {
+        "multi-node": [
+          "remote-access/tailscale-operator"
+        ],
+        "single-node": [
+          "remote-access/tailscale-operator"
+        ]
+      }
+    },
+    {
+      "id": "replicated-storage/longhorn",
+      "capability": "replicated-storage",
+      "displayName": "Longhorn",
+      "homepage": "https://longhorn.io",
+      "license": "Apache-2.0",
+      "maturity": "cncf-incubating",
+      "rationale": "Block storage replicated across nodes: a volume survives losing its node, follows its pod to another node, and can be expanded in place. Recommended on multi-node, where it becomes the default storage class. Optional on single-node, where a replica has nowhere else to go; it still gives expandable volumes and snapshots there.\n",
+      "alternatives": {
+        "local-path": "What the cluster has without it. Faster, but a volume stays on the node that created it. Still the better class for databases that replicate themselves (CloudNativePG, MongoDB): a second layer of copies costs write latency and disk for nothing.\n"
+      },
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "optional"
+      },
+      "persistsData": true,
+      "disruptsTraffic": true,
+      "releases": [
+        {
+          "name": "longhorn",
+          "namespace": "longhorn-system",
+          "chart": "longhorn",
+          "repo": "https://charts.longhorn.io",
+          "version": "1.12.1",
+          "values": "persistence:\n  # PVCs can grow without moving data; local-path cannot.\n  defaultClassReplicaCount: 3\n  # Volumes outlive their claims only when a person asks for it, as with local-path.\n  reclaimPolicy: Delete\ndefaultSettings:\n  # With fewer nodes than replicas, volumes still attach (degraded) and gain\n  # their missing replicas as nodes join, so a class asking for 3 gives\n  # min(3, nodes) copies.\n  allowVolumeCreationWithDegradedAvailability: true\n  # Spread existing replicas onto nodes that join later.\n  replicaAutoBalance: best-effort\n  # No calls to Longhorn's upgrade server; versions change with the catalog.\n  upgradeChecker: false\n  allowCollectingLonghornUsageMetrics: false\n  # After a Longhorn upgrade, move attached volumes to the new engine one\n  # node at a time; otherwise they stay on the old one until done by hand.\n  concurrentAutomaticEngineUpgradePerNodeLimit: 1\nlonghornUI:\n  # No login: it acts as Longhorn's admin. ClusterIP only (the chart's\n  # default, no Ingress); reach it with kubectl port-forward.\n  replicas: 1\nlonghornManager:\n  resources:\n    # Idles near 100Mi per node; the chart sets none. No limit: killing\n    # the manager stalls attach and detach on its node.\n    requests: {cpu: 25m, memory: 128Mi}\n",
+          "profiles": {
+            "multi-node": "persistence:\n  # New volumes without a class survive losing a node. local-path stays\n  # available for databases that replicate themselves.\n  defaultClass: true\ndefaultSettings:\n  # A pod on a dead node otherwise holds its volume until someone\n  # force-deletes it; this lets it start elsewhere.\n  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod\n",
+            "single-node": "persistence:\n  # local-path stays the default: on one node it is faster, and\n  # Longhorn is for volumes that need to grow.\n  defaultClass: false\n  # One node: a second replica would sit on the same disk.\n  defaultClassReplicaCount: 1\ncsi:\n  # One node: the chart's three replicas of each sidecar gain nothing.\n  attacherReplicaCount: 1\n  provisionerReplicaCount: 1\n  resizerReplicaCount: 1\n  snapshotterReplicaCount: 1\n"
+          }
+        },
+        {
+          "name": "ui-policy",
+          "namespace": "longhorn-system",
+          "manifests": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: longhorn-ui-port-forward-only\n  namespace: longhorn-system\nspec:\n  podSelector:\n    matchLabels: {app: longhorn-ui}\n  policyTypes: [Ingress]\n"
+        }
+      ],
+      "detection": {
+        "crds": [
+          "volumes.longhorn.io",
+          "engines.longhorn.io"
+        ],
+        "helmCharts": [
+          "longhorn"
+        ],
+        "workloads": [
+          {
+            "kind": "DaemonSet",
+            "labels": {
+              "app": "longhorn-manager"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "egress": [
+          "docker.io"
+        ],
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "The chart's policies (restrictInternalTraffic) admit only Longhorn's own pods to the manager; the ui-policy release closes the UI to every pod.\n",
+            "risk": "The UI and the manager API have no authentication; either can delete any volume."
+          },
+          {
+            "mitigation": "Put /var/lib/longhorn on an encrypted disk, or use Longhorn's encrypted volumes (cryptsetup on every node).",
+            "risk": "Replicas are plain files under /var/lib/longhorn on each node, readable by root there."
+          },
+          {
+            "mitigation": "The chart refuses to uninstall until the deleting-confirmation-flag setting is set to true by hand.",
+            "risk": "Uninstalling deletes every Longhorn volume and its data."
+          }
+        ],
+        "summary": "Privileged pods on every node: they mount /dev, /proc, /boot, /etc and /var/lib/longhorn from the host, run iscsiadm and mount in the host's namespaces, and manage pods, PVs and storage classes cluster-wide.\n",
+        "tenants": "admin-only"
+      },
+      "smoke": [
+        {
+          "name": "driver",
+          "wait": [
+            "-n longhorn-system deployment/longhorn-driver-deployer --for=condition=Available"
+          ]
+        },
+        {
+          "name": "provision",
+          "manifest": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata: {name: smoke, namespace: catalog-smoke}\nspec:\n  accessModes: [ReadWriteOnce]\n  storageClassName: longhorn\n  resources:\n    requests: {storage: 1Gi}\n",
+          "wait": [
+            "-n catalog-smoke pvc/smoke --for=jsonpath={.status.phase}=Bound",
+            "storageclass/longhorn --for=jsonpath={.allowVolumeExpansion}=true"
+          ],
+          "timeout": "600s"
+        }
+      ],
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "upgradeNotes": [
+        {
+          "note": "Upgrade one minor version at a time (1.12 to 1.13, never 1.11 to 1.13); the chart's pre-upgrade job refuses a skip. 1.13 needs Kubernetes 1.34 or later.\n",
+          "versions": "*"
+        }
+      ],
+      "installOrder": {
+        "multi-node": [
+          "replicated-storage/longhorn"
+        ],
+        "single-node": [
+          "replicated-storage/longhorn"
+        ]
+      }
+    },
+    {
+      "id": "resource-recommendations/vertical-pod-autoscaler",
+      "capability": "resource-recommendations",
+      "displayName": "Vertical Pod Autoscaler (recommender only)",
+      "homepage": "https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler",
+      "license": "Apache-2.0",
+      "maturity": "kubernetes-sig",
+      "rationale": "Suggests CPU and memory requests from observed usage. Recommender only: nothing changes pods unless you apply a suggestion.\n",
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "dependsOn": [
+        "metrics/metrics-server"
+      ],
+      "releases": [
+        {
+          "name": "vpa",
+          "namespace": "vpa-system",
+          "chart": "vertical-pod-autoscaler",
+          "repo": "https://kubernetes.github.io/autoscaler",
+          "version": "0.13.0",
+          "values": "recommender:\n  # Produces suggestions from metrics.k8s.io.\n  enabled: true\nupdater:\n  # Evicts pods to apply suggestions; keep changes manual.\n  enabled: false\nadmissionController:\n  # Rewrites pod resources at admission; same reason.\n  enabled: false\n"
+        }
+      ],
+      "detection": {
+        "crds": [
+          "verticalpodautoscalers.autoscaling.k8s.io"
+        ],
+        "helmCharts": [
+          "vertical-pod-autoscaler"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/component": "recommender"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "risks": [
+          {
+            "mitigation": "targetRef has no namespace field, so a VPA only targets its own namespace.",
+            "risk": "A VPA's targetRef could name a workload in another namespace."
+          }
+        ],
+        "summary": "Reads pods, workloads and metrics in all namespaces; writes VPA status.",
+        "tenantCRDs": [
+          "VerticalPodAutoscaler"
+        ],
+        "tenants": "namespaced"
+      },
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "metrics/metrics-server",
+          "resource-recommendations/vertical-pod-autoscaler"
+        ],
+        "single-node": [
+          "metrics/metrics-server",
+          "resource-recommendations/vertical-pod-autoscaler"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 18,
+          "idleCPUm": 1,
+          "versions": {
+            "vpa": "0.13.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 16,
+          "idleCPUm": 1,
+          "versions": {
+            "vpa": "0.13.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 17,
+          "idleCPUm": 1,
+          "versions": {
+            "vpa": "0.13.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 17,
+          "idleCPUm": 1,
+          "versions": {
+            "vpa": "0.13.0"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    },
+    {
+      "id": "runtime-security/falco",
+      "capability": "runtime-security",
+      "displayName": "Falco",
+      "homepage": "https://falco.org",
+      "license": "Apache-2.0",
+      "maturity": "cncf-graduated",
+      "rationale": "Flags suspicious runtime behavior (container shells, privilege escalation) from kernel events as JSON logs. Optional: it needs a privileged eBPF probe and a BTF kernel (5.8+).\n",
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "releases": [
+        {
+          "name": "falco",
+          "namespace": "falco",
+          "chart": "oci://ghcr.io/falcosecurity/charts/falco",
+          "version": "9.2.0",
+          "values": "driver:\n  # Built-in CO-RE eBPF probe: no kernel module or headers.\n  kind: modern_ebpf\nfalco:\n  # JSON alerts so the log store can index fields.\n  json_output: true\n  json_include_output_property: true\nfalcoctl:\n  artifact:\n    follow:\n      # Rules change only with chart upgrades; no background downloads.\n      enabled: false\n",
+          "profiles": {
+            "multi-node": "resources:\n  # Busier nodes mean more syscalls to evaluate.\n  requests: {cpu: 100m, memory: 256Mi}\n  limits: {memory: 1Gi}\n",
+            "single-node": "resources:\n  # The chart asks 512Mi; one node idles well below that.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 768Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "helmCharts": [
+          "falco"
+        ],
+        "workloads": [
+          {
+            "kind": "DaemonSet",
+            "labels": {
+              "app.kubernetes.io/name": "falco"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "egress": [
+          "ghcr.io"
+        ],
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "Expose alerts to cluster administrators only.",
+            "risk": "Alerts include command lines and file paths from every tenant's containers."
+          }
+        ],
+        "summary": "Reads pod and node metadata to enrich alerts."
+      },
+      "installOrder": {
+        "multi-node": [
+          "runtime-security/falco"
+        ],
+        "single-node": [
+          "runtime-security/falco"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 154,
+          "idleCPUm": 30,
+          "versions": {
+            "falco": "9.2.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 169,
+          "idleCPUm": 17,
+          "versions": {
+            "falco": "9.2.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 53,
+          "idleCPUm": 4,
+          "versions": {
+            "falco": "9.2.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 55,
+          "idleCPUm": 4,
+          "versions": {
+            "falco": "9.2.0"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    },
+    {
+      "id": "uptime-probes/blackbox-exporter",
+      "capability": "uptime-probes",
+      "displayName": "Prometheus Blackbox Exporter",
+      "homepage": "https://github.com/prometheus/blackbox_exporter",
+      "license": "Apache-2.0",
+      "maturity": "cncf-graduated",
+      "rationale": "Probes HTTP, TCP and DNS targets; it comes from the Prometheus project, and uptime alerts are plain rules. It needs VictoriaMetrics, so it follows VictoriaMetrics' defaults.\n",
+      "defaults": {
+        "multi-node": "recommended",
+        "single-node": "optional"
+      },
+      "dependsOn": [
+        "metrics/victoria-metrics"
+      ],
+      "releases": [
+        {
+          "name": "blackbox-exporter",
+          "namespace": "observability",
+          "chart": "oci://ghcr.io/prometheus-community/charts/prometheus-blackbox-exporter",
+          "version": "11.20.0",
+          "values": "config:\n  modules:\n    # Uptime: a 2xx after redirects, IPv6 then IPv4.\n    http_2xx:\n      prober: http\n      timeout: 5s\n      http:\n        valid_http_versions: [\"HTTP/1.1\", \"HTTP/2.0\"]\n        follow_redirects: true\n        preferred_ip_protocol: ip6\n        ip_protocol_fallback: true\n    # Port checks for TCP services.\n    tcp_connect:\n      prober: tcp\n      timeout: 5s\n",
+          "profiles": {
+            "multi-node": "# Two replicas, so a failure means the target is down.\nreplicas: 2\nresources:\n  # More probes per interval.\n  requests: {cpu: 20m, memory: 32Mi}\n  limits: {memory: 128Mi}\n",
+            "single-node": "resources:\n  # Idles around 15Mi.\n  requests: {cpu: 10m, memory: 16Mi}\n  limits: {memory: 64Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "helmCharts": [
+          "prometheus-blackbox-exporter"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "prometheus-blackbox-exporter"
+            }
+          }
+        ]
+      },
+      "security": {
+        "risks": [
+          {
+            "mitigation": "Admit only the namespace's own hostnames or public URLs with an admission policy.",
+            "risk": "Probe targets can reach cloud metadata or private services (SSRF)."
+          }
+        ],
+        "summary": "Has no API access and only makes outbound probes.",
+        "tenantCRDs": [
+          "VMProbe"
+        ],
+        "tenants": "admin-only"
+      },
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "metrics/victoria-metrics",
+          "uptime-probes/blackbox-exporter"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "metrics/victoria-metrics",
+          "uptime-probes/blackbox-exporter"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 8,
+          "idleCPUm": 0,
+          "versions": {
+            "blackbox-exporter": "11.20.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 9,
+          "idleCPUm": 0,
+          "versions": {
+            "blackbox-exporter": "11.20.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 4,
+          "idleCPUm": 0,
+          "versions": {
+            "blackbox-exporter": "11.20.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 4,
+          "idleCPUm": 0,
+          "versions": {
+            "blackbox-exporter": "11.20.0"
+          },
+          "measuredAt": "2026-10-13"
+        }
+      }
+    },
+    {
+      "id": "volume-backup/k8up",
+      "capability": "volume-backup",
+      "displayName": "K8up",
+      "homepage": "https://k8up.io",
+      "license": "Apache-2.0",
+      "maturity": "cncf-sandbox",
+      "rationale": "Backs up each namespace with restic to any S3-compatible store, so tenants can safely manage their own backups.\n",
+      "alternatives": {
+        "velero": "Backs up the whole cluster; for administrators only."
+      },
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "releases": [
+        {
+          "name": "k8up",
+          "namespace": "k8up-system",
+          "chart": "k8up",
+          "repo": "https://k8up-io.github.io/k8up",
+          "version": "4.10.0",
+          "values": "k8up:\n  # Back up only PVCs annotated for backup.\n  skipWithoutAnnotation: true\n",
+          "profiles": {
+            "multi-node": "# Keeps schedules firing through node drains.\nreplicaCount: 2\nresources:\n  # More schedules on bigger clusters.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n",
+            "single-node": "k8up:\n  # No leader election with a single replica.\n  enableLeaderElection: false\nresources:\n  # Idle between schedules; backup Jobs have their own requests.\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 256Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "crds": [
+          "schedules.k8up.io",
+          "backups.k8up.io"
+        ],
+        "helmCharts": [
+          "k8up"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "k8up"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "credentials": "required",
+        "credentialsNote": "S3 credentials and a restic password, stored in the tenant namespace.",
+        "risks": [
+          {
+            "mitigation": "Use one repository path and password per tenant.",
+            "risk": "A Restore can read any repository whose credentials the tenant holds."
+          },
+          {
+            "mitigation": "It is subject to the namespace's Pod Security level.",
+            "risk": "PreBackupPod runs an arbitrary pod spec before each backup."
+          }
+        ],
+        "summary": "Watches K8up objects cluster-wide; backup Jobs mount PVCs in their own namespace.",
+        "tenantCRDs": [
+          "Schedule",
+          "Backup",
+          "Restore",
+          "Check",
+          "Prune",
+          "Archive",
+          "Snapshot"
+        ],
+        "tenants": "namespaced"
+      },
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "volume-backup/k8up"
+        ],
+        "single-node": [
+          "volume-backup/k8up"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 21,
+          "idleCPUm": 2,
+          "versions": {
+            "k8up": "4.10.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 21,
+          "idleCPUm": 1,
+          "versions": {
+            "k8up": "4.10.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 11,
+          "idleCPUm": 1,
+          "versions": {
+            "k8up": "4.10.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 11,
+          "idleCPUm": 1,
+          "versions": {
+            "k8up": "4.10.0"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    },
+    {
+      "id": "volume-backup/velero",
+      "capability": "volume-backup",
+      "displayName": "Velero",
+      "homepage": "https://velero.io",
+      "license": "Apache-2.0",
+      "maturity": "cncf-sandbox",
+      "rationale": "Backs up the whole cluster to S3 for disaster recovery. It can touch any namespace, so it is for administrators only.\n",
+      "alternatives": {
+        "k8up": "Backs up each namespace on its own, so tenants can use it."
+      },
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "inputs": [
+        {
+          "name": "bucket",
+          "description": "Velero stores backups in this S3 bucket.",
+          "path": "configuration.backupStorageLocation.0.bucket",
+          "required": true,
+          "testValue": "catalog-ci"
+        },
+        {
+          "name": "s3-url",
+          "description": "Velero connects to this S3 endpoint URL; any S3-compatible service works.",
+          "path": "configuration.backupStorageLocation.0.config.s3Url",
+          "required": true,
+          "testValue": "http://minio.invalid:9000"
+        },
+        {
+          "name": "credentials",
+          "description": "Velero reads the bucket's credentials from this AWS-style credentials file.",
+          "secret": {
+            "name": "velero-credentials",
+            "key": "cloud",
+            "namespace": "velero"
+          },
+          "required": true,
+          "testValue": "[default]\naws_access_key_id=ci\naws_secret_access_key=ci\n"
+        }
+      ],
+      "releases": [
+        {
+          "name": "velero",
+          "namespace": "velero",
+          "chart": "velero",
+          "repo": "https://vmware-tanzu.github.io/helm-charts",
+          "version": "12.2.1",
+          "values": "initContainers:\n  # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.\n  - name: velero-plugin-for-aws\n    image: velero/velero-plugin-for-aws:v1.14.4\n    volumeMounts:\n      - mountPath: /target\n        name: plugins\ncredentials:\n  # Secret comes from the credentials input, not the chart.\n  useSecret: true\n  existingSecret: velero-credentials\nconfiguration:\n  backupStorageLocation:\n    # One S3 location; bucket and URL are inputs.\n    - name: default\n      provider: aws\n      default: true\n      config:\n        region: us-east-1\n        s3ForcePathStyle: \"true\"\n  # Kopia file-system backups work on any storage class, local-path included.\n  uploaderType: kopia\n  # Back up all volumes unless they opt out.\n  defaultVolumesToFsBackup: true\n# CSI snapshots need per-driver setup; use file-system backups instead.\nsnapshotsEnabled: false\n# Needed for file-system backups.\ndeployNodeAgent: true\n",
+          "profiles": {
+            "multi-node": "resources:\n  # Bigger clusters, bigger backup item lists.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 1Gi}\n",
+            "single-node": "resources:\n  # Idle between backups; chart sets none.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "crds": [
+          "backups.velero.io",
+          "schedules.velero.io"
+        ],
+        "helmCharts": [
+          "velero"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "velero"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "credentials": "required",
+        "credentialsNote": "Needs static S3 credentials; all backups share one Kopia key.",
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "Never grant Velero CRDs to tenants.",
+            "risk": "Backups and Restores can include any namespace, including other tenants' Secrets."
+          }
+        ],
+        "summary": "Bound to cluster-admin; reads and restores every object.",
+        "tenants": "admin-only"
+      },
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "upgradeNotes": [
+        {
+          "note": "Upgrade the AWS plugin together with Velero.",
+          "versions": "*"
+        }
+      ],
+      "installOrder": {
+        "multi-node": [
+          "volume-backup/velero"
+        ],
+        "single-node": [
+          "volume-backup/velero"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 52,
+          "idleCPUm": 1,
+          "versions": {
+            "velero": "12.2.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 78,
+          "idleCPUm": 1,
+          "versions": {
+            "velero": "12.2.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 38,
+          "idleCPUm": 1,
+          "versions": {
+            "velero": "12.2.1"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 38,
+          "idleCPUm": 1,
+          "versions": {
+            "velero": "12.2.1"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    },
+    {
+      "id": "vulnerability-scanning/trivy-operator",
+      "capability": "vulnerability-scanning",
+      "displayName": "Trivy Operator",
+      "homepage": "https://aquasecurity.github.io/trivy-operator/",
+      "license": "Apache-2.0",
+      "maturity": "independent",
+      "rationale": "Scans running images and workload configs and writes namespaced reports next to each workload. Optional: scan jobs cost noticeable CPU and memory.\n",
+      "defaults": {
+        "multi-node": "optional",
+        "single-node": "optional"
+      },
+      "releases": [
+        {
+          "name": "trivy-operator",
+          "namespace": "trivy-system",
+          "chart": "trivy-operator",
+          "repo": "https://aquasecurity.github.io/helm-charts",
+          "version": "0.37.0",
+          "values": "operator:\n  # Reading every Secret is too broad; list pull secrets explicitly.\n  accessGlobalSecretsAndServiceAccount: false\n  # Compliance scans run privileged collectors; opt in explicitly.\n  infraAssessmentScannerEnabled: false\n  clusterComplianceEnabled: false\n  # SBOMs duplicate vulnerability reports and inflate operator memory.\n  sbomGenerationEnabled: false\ntrivy:\n  # Only fixable findings are actionable.\n  ignoreUnfixed: true\n",
+          "profiles": {
+            "multi-node": "operator:\n  # A few parallel scans keep reports fresh without flooding nodes.\n  scanJobsConcurrentLimit: 3\nresources:\n  # More workloads to track.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 1Gi}\n",
+            "single-node": "operator:\n  # One scan at a time; each job loads an image and the DB.\n  scanJobsConcurrentLimit: 1\n  # One report per (mostly system) role; RBAC review is an admin task.\n  rbacAssessmentScannerEnabled: false\ntrivy:\n  # Low severity is noise on a small cluster.\n  severity: MEDIUM,HIGH,CRITICAL\nresources:\n  # The operator idles under 100Mi; scan jobs set their own.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
+          }
+        }
+      ],
+      "detection": {
+        "crds": [
+          "vulnerabilityreports.aquasecurity.github.io"
+        ],
+        "helmCharts": [
+          "trivy-operator"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "app.kubernetes.io/name": "trivy-operator"
+            }
+          }
+        ]
+      },
+      "security": {
+        "clusterWide": true,
+        "egress": [
+          "mirror.gcr.io",
+          "ghcr.io"
+        ],
+        "risks": [
+          {
+            "mitigation": "Tenants get read-only access to report objects.",
+            "risk": "A tenant with write access could fake a clean report."
+          },
+          {
+            "mitigation": "The report is readable only in the image's own namespace.",
+            "risk": "ExposedSecretReport lists secrets found inside images."
+          }
+        ],
+        "summary": "Reads workloads cluster-wide, runs scan Jobs and writes reports next to workloads.",
+        "tenantCRDs": [
+          "VulnerabilityReport",
+          "ConfigAuditReport",
+          "ExposedSecretReport"
+        ],
+        "tenants": "namespaced"
+      },
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "installOrder": {
+        "multi-node": [
+          "vulnerability-scanning/trivy-operator"
+        ],
+        "single-node": [
+          "vulnerability-scanning/trivy-operator"
+        ]
+      },
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 127,
+          "idleCPUm": 17,
+          "versions": {
+            "trivy-operator": "0.37.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 314,
+          "idleCPUm": 25,
+          "versions": {
+            "trivy-operator": "0.37.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleMemoryMiB": 125,
+          "idleCPUm": 4,
+          "versions": {
+            "trivy-operator": "0.37.0"
+          },
+          "measuredAt": "2026-10-11"
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleMemoryMiB": 123,
+          "idleCPUm": 4,
+          "versions": {
+            "trivy-operator": "0.37.0"
+          },
+          "measuredAt": "2026-10-11"
+        }
+      }
+    }
+  ],
+  "indexVersion": 1,
+  "kubernetes": [
+    "1.34.0",
+    "1.35.0",
+    "1.36.0",
+    "1.37.0"
+  ],
+  "profiles": [
+    "single-node",
+    "multi-node"
+  ]
+}

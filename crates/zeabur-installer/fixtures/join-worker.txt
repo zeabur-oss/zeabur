@@ -1,0 +1,29 @@
+Join https://10.0.0.5:9345 as a worker
+RKE2 agent <rke2> (pinned, checked against this installer's digests), CIS profile, on vps-2 (amd64, 8192 MiB)
+Installs RKE2 only: Zeabur, Zeabur Identity and the catalog's components are already in the cluster.
+Node addresses   10.0.0.6, fd00::6 (temporary IPv6 addresses left out)
+
+Files
+  /etc/sysctl.d/60-rke2-cis.conf
+  /etc/rancher/rke2/config.yaml
+  /etc/rancher/rke2/config.yaml.d/10-join.yaml
+  /etc/rancher/rke2/config.yaml.d/20-node-ip.yaml
+  /etc/rancher/rke2/zeabur-join-token (the token, mode 0600)
+
+Location         this VM: hetzner fsn1 (fsn1-dc14); the server: hetzner fsn1
+Distance         0.7 ms to the server (median of 5 TCP connects; 0.6 to 0.9)
+Node labels      installer.zeabur.com/provider=hetzner, topology.kubernetes.io/region=fsn1, topology.kubernetes.io/zone=fsn1-dc14
+Ports on the server
+  open    TCP 9345  RKE2 supervisor
+  open    TCP 6443  Kubernetes API
+  open    TCP 10250 kubelet
+  unknown UDP 8472  Canal VXLAN
+Ports on this VM, free before RKE2 starts (apply checks them)
+  TCP 80    HTTP ingress: ServiceLB holds it on every node, for when Traefik runs there
+  TCP 443   HTTPS ingress: ServiceLB holds it on every node, for when Traefik runs there
+  TCP 10250 kubelet
+
+warning: Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.
+warning: Allow these between the nodes: TCP 9345 and 6443 to the servers, TCP 10250 and 9099 and UDP 8472 (Canal VXLAN) between all nodes, and TCP 2379 to 2381 between servers. Keep UDP 8472 closed to the internet.
+warning: UDP 8472 cannot be checked from here. If it is blocked, pods on different nodes cannot reach each other.
+warning: Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.
