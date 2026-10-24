@@ -31,3 +31,46 @@
     - click: '[data-testid="step-next"] button:last-child'
     - wait: '[role="alert"]'
   themes: [light, dark]
+
+# The blog post "重新做好 Zeabur" (zh-TW only).
+- id: installer-host
+  app: installer
+  path: /
+  wait: '[data-testid="step-next"]'
+  locales: [zh-TW]
+  themes: [light, dark]
+- id: installer-components
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="checkbox"][data-checked]'
+  locales: [zh-TW]
+  themes: [light, dark]
+- id: installer-done
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="copy-input"]'
+  env:
+    ZEABUR_DEMO_INSTALL: done
+  locales: [zh-TW]
+  themes: [light, dark]
+# Change NODE_ENV, save, and open the technical details of the review.
+- id: change-review
+  path: /projects/shop/services/Deployment/web?tab=variables
+  steps:
+    - click: '[data-slot="tabs-content"] [data-slot="section-header"] button[data-slot="button"]:nth-of-type(3)'
+    - fill: '[data-slot="tabs-content"] input[data-slot="input"] >> nth=1'
+      value: staging
+    - click: '[data-slot="draft-bar"] button[data-slot="button"]:last-child'
+    - click: '[role="dialog"] [data-slot="collapsible-trigger"]'
+    - wait: '[role="dialog"] pre, [role="dialog"] code'
+  clip: '[role="dialog"]'
+  locales: [zh-TW]
+  themes: [light, dark]
