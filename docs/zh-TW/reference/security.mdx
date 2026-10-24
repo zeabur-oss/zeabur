@@ -80,13 +80,70 @@ tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur
 
 Zeabur Proxy（chart 預設 `proxy.enabled: false`）啟用後，使用者要能在該 Namespace `get logs.proxy.zeabur.com`，才讀得到它的歷史日誌，查詢也只限於這個 Namespace。VictoriaLogs 本身如果能直接連線，就能繞過這層檢查，要另外限制。
 
+## 機密的加密與存取紀錄
+
+### etcd 裡的加密
+
+RKE2 一律加密 etcd 裡的 Secret，加密方式是 AES-CBC（`aescbc`）。有人拿到上傳到 S3 的 etcd 快照，或複製走 etcd 的資料目錄，只要沒有金鑰和 server token，看到的機密都是密文，值以 `k8s:enc:aescbc:v1:<金鑰名稱>:` 開頭。
+
+金鑰放在每台 server 的 `/var/lib/rancher/rke2/server/cred/encryption-config.json`，權限 `0600`，和 etcd 在同一顆磁碟。拿到 server 磁碟或 root 權限的人，也拿得到金鑰，這部分靠磁碟加密（`host.requireEncryptedDisk`）。透過 API 讀取時，Kubernetes 會自動解密，RBAC 允許 `get`、`list` 或 `watch` Secret 的人都看得到值，這部分靠[成員權限](./permissions.mdx)。
+
+`sudo zeabur-installer doctor` 會檢查加密：找不到金鑰檔，或 Secret 的第一個 provider 是 `identity` 時回報 `CRITICAL`，有加密時顯示 `Secrets in etcd are encrypted (aescbc)`。也可以在 server 上執行：
+
+```sh
+sudo rke2 secrets-encrypt status
+```
+
+正常時會看到 `Encryption Status: Enabled`、`Server Encryption Hashes: All hashes match`，以及目前使用的金鑰。
+
+### 更換加密金鑰
+
+更換前先拍 etcd 快照。快照裡帶著拍攝當時的金鑰，並用 server token 加密，所以還原到其他主機時要提供當時的 token（`/var/lib/rancher/rke2/server/token`），見 [RKE2 的備份與還原](https://docs.rke2.io/datastore/backup_restore)。token 和快照分開保管，外流的快照才只有密文。
+
+1. 在其中一台 server 拍快照並更換金鑰：
+
+   ```sh
+   sudo rke2 etcd-snapshot save
+   sudo rke2 secrets-encrypt rotate-keys
+   ```
+
+   `rotate-keys` 會產生新金鑰，並用它重新加密所有 Secret。
+
+2. 重複執行 `sudo rke2 secrets-encrypt status`，直到 `Current Rotation Stage` 顯示 `reencrypt_finished`。
+3. 有多台 server 時，逐台重新啟動每台 server，包括剛才那台。等指令結束再換下一台：
+
+   ```sh
+   sudo systemctl restart rke2-server
+   ```
+
+完成後，`status` 顯示的金鑰名稱會變成 `aescbckey-<時間>`，etcd 裡的值也改用新金鑰。完整步驟見 [RKE2 的 Secrets Encryption](https://docs.rke2.io/security/secrets_encryption)。
+
+### 誰讀過 Secret（稽核紀錄）
+
+想知道誰讀過 `db-password`，在 server 上執行：
+
+```sh
+sudo grep '"resource":"secrets"' /var/lib/rancher/rke2/server/logs/audit.log \
+  | grep '"name":"db-password"' \
+  | jq -c 'select(.stage=="ResponseComplete") | {time: .stageTimestamp, user: .user.username, as: .impersonatedUser.username, verb, ns: .objectRef.namespace}'
+```
+
+`watch` 開始時記一筆 `ResponseStarted`，結束時才有 `ResponseComplete`。一次 `list` 或 `watch` 整個 Namespace 的 Secret 時，紀錄裡沒有名稱，要拿掉名稱那一行，改用 Namespace 篩選。
+
+installer 寫入 `/etc/rancher/rke2/audit-policy.yaml`（權限 `0600`），讓 RKE2 依它記錄。紀錄在每台 server 的 `/var/lib/rancher/rke2/server/logs/audit.log`，只有 root 能讀。每筆只有請求的 metadata，沒有請求和回應的內容，所以 Secret 的值不會出現在紀錄裡。
+
+- **Secret**：所有人（包括節點）的每個請求都記錄，`get`、`list`、`watch`、`create`、`update`、`patch`、`delete` 都有。每筆有使用者、用 `--as` 代為操作的身分、群組、來源 IP、user agent、操作、Namespace 和名稱。
+- **其他資源**：只記錄人和工作負載的新增、修改和刪除。讀取、Event、Lease、token review、access review、健康檢查，以及節點、API server、controller manager、scheduler 和 kube-proxy 的請求都不記錄。
+
+RKE2 在檔案到 100 MB 時換新檔，最多留 10 個舊檔，最長 30 天。沒什麼操作的單台 server 每 5 分鐘約寫 13 KB。想把紀錄留在別處，用日誌收集工具收這個檔案，Zeabur 不會讀它。
+
 ## Installer 的主機與下載權限
 
 installer 以 root 寫入 RKE2 設定和 systemd unit、調整 kernel 參數、建立 `etcd` 使用者。選了 Longhorn 時還會安裝主機套件。GUI 以明文 HTTP 提供，讓它只監聽 loopback，透過 SSH tunnel 連線。
 
 預設的 RKE2 版本用編譯進 installer 的 SHA-256 digest 驗證，信任來自 installer 本身的簽章。指定其他 `rke2Version` 時，只能用該 release 頁面上的 checksum 清單驗證。`sources` 指定的檔案、映像檔和 chart 不在釘選範圍內，內容由提供的人負責，使用前先依[發行檔與驗證](./releases.mdx)確認來源。
 
-RKE2 以 CIS profile 安裝，並加密 etcd 裡的 Secret。主機磁碟有沒有加密另外檢查。設 `host.requireEncryptedDisk: true` 時，沒加密就不安裝。備份目的地的存取權和加密，在備份工具和儲存服務那邊設定。
+RKE2 以 CIS profile 安裝，並加密 etcd 裡的 Secret，見[機密的加密與存取紀錄](#機密的加密與存取紀錄)。主機磁碟有沒有加密另外檢查。設 `host.requireEncryptedDisk: true` 時，沒加密就不安裝。備份目的地的存取權和加密，在備份工具和儲存服務那邊設定。
 
 ## 私下回報漏洞
 

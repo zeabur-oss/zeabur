@@ -155,8 +155,14 @@ are backed up.
 - **RKE2's `cis` profile**: Secrets are encrypted at rest, Pod Security `restricted` applies
   outside the exempt namespaces, NetworkPolicies cover the system namespaces, and the kubelet
   protects kernel defaults.
-- **Audit log**: request metadata for every API call except health checks; bodies are never
-  logged, so Secret values stay out of it. RKE2's own default policy logs nothing.
+- **Audit log**: request metadata only, so Secret values stay out of it. Every request on
+  Secrets is kept, from anyone. Of the rest, only writes by people and workloads are kept: reads,
+  Events, Leases, access reviews, health checks and requests from nodes and the control plane are
+  dropped. The log is `/var/lib/rancher/rke2/server/logs/audit.log` on each server; RKE2 keeps
+  10 files of 100 MB for at most 30 days. RKE2's own default policy logs nothing.
+- **Secrets encryption**: `doctor` on the first server fails when Secrets in etcd are not encrypted.
+  Rotate the key with `rke2 secrets-encrypt rotate-keys`
+  ([RKE2 docs](https://docs.rke2.io/security/secrets_encryption)).
 - **`kubeconfig` mode 0600** and a PID limit per pod.
 - **No long-lived admin credential handed out.** People reach the cluster through Zeabur
   Identity. Their everyday tokens can read the cluster; changing it takes a fresh passkey tap.

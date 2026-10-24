@@ -42,7 +42,7 @@ sudo zeabur-installer doctor
 建立叢集時依序執行：
 
 1. 為選定的元件準備主機套件，例如 Longhorn 要用的 iSCSI 和 NFS client。
-2. 寫入 RKE2 設定、CIS 要求的 kernel 參數，以及只記錄請求 metadata 的稽核政策。
+2. 寫入 RKE2 設定、CIS 要求的 kernel 參數，以及稽核政策。稽核紀錄只有請求的 metadata，記下每個 Secret 請求，見[機密的加密與存取紀錄](./security.mdx#機密的加密與存取紀錄)。
 3. 下載 RKE2 到 `/var/lib/rancher/zeabur-installer/downloads`，用 installer 釘選的 SHA-256 核對，啟動 `rke2-server`，等待 API 與節點就緒。
 4. 建立元件的 Namespace、基準 NetworkPolicy 和儲存類別。
 5. 依 Catalog 順序安裝元件並等待就緒。
@@ -81,7 +81,7 @@ GUI 以 root 修改這台主機。讓它只監聽 loopback，透過 SSH tunnel �
 sudo zeabur-installer doctor
 ```
 
-在建立叢集的 server 上，`doctor` 檢查 RKE2 unit、API、安裝紀錄裡的元件、預設儲存類別、Zeabur 和 Zeabur Identity 的 Deployment、節點位址、基準網路政策，以及 `/var/lib/rancher` 有沒有加密。它比對的是上次 `apply` 的紀錄，改過的 YAML 要重跑 `apply` 才算數。
+在建立叢集的 server 上，`doctor` 檢查 RKE2 unit、API、安裝紀錄裡的元件、預設儲存類別、Zeabur 和 Zeabur Identity 的 Deployment、節點位址、基準網路政策、etcd 裡的 Secret 有沒有加密，以及 `/var/lib/rancher` 有沒有加密。它比對的是上次 `apply` 的紀錄，改過的 YAML 要重跑 `apply` 才算數。
 
 在加入既有叢集的節點上，它檢查自己的 RKE2 unit、Node 是否就緒、到 server 的連線和延遲、磁碟加密。如果是 server，還會比對 Zeabur Identity 的驗證設定。
 

@@ -31,6 +31,7 @@
     backups: 備份叢集並從備份還原
     nodes: 新增與維護節點
     components: 檢查並安裝叢集元件
+    external-secrets: 從外部機密庫同步機密
     s3-destinations: 登錄共用的 S3 備份目的地
 - group: reference
   label: 參考

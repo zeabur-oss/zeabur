@@ -12,7 +12,7 @@
   pages: [variables, domains, maintenance, volumes]
 - group: cluster
   label: Operate the cluster
-  pages: [members, tokens, notifications, backups, nodes, components, s3-destinations]
+  pages: [members, tokens, notifications, backups, nodes, components, external-secrets, s3-destinations]
 - group: reference
   label: Reference
   pages: [zeaburctl, installer-configuration, installer, permissions, api, architecture, releases, security]
