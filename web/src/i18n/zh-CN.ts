@@ -3358,6 +3358,8 @@ export const zhCN: Messages = {
   "useShared.kube.whenValue": "Pod 重启时；这个更改会替换 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任务使用 ${service} 当前的镜像 ${image}；之后 ${service} 换镜像，任务不会跟着换`,
+  "warn.maintenanceRestored": (host, service, port) =>
+    `维护期间 ${host} 的规则改过，原来的后端对不上，显示维护页的路径会改发到 ${service}:${port}`,
   "warn.permanentRedirect": (host) =>
     `浏览器会记住永久重定向：之后即使取消，来过的访客清除缓存前，打开 ${host} 仍会转到旧的域名`,
   "warn.publicDatabase": (name) => `${name} 是数据库：面对互联网，只剩它自己的密码保护数据`,

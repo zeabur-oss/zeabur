@@ -441,9 +441,12 @@ impl<'a> Planner<'a> {
             Change::BasicAuth(auth) => self.basic_auth(&auth.route, auth.user.as_ref()),
             Change::ErrorPageHtml(pages) => self.error_page_html(pages),
             Change::ErrorPages(pages) => self.error_pages(&pages.route, pages.enabled),
-            Change::Maintenance(change) => {
-                self.maintenance(&change.route, &change.hostname, change.enabled)
-            }
+            Change::Maintenance(change) => self.maintenance(
+                &change.route,
+                &change.hostname,
+                change.enabled,
+                change.workload.as_ref(),
+            ),
             Change::EnvImport(import) => self.env_import(import),
             Change::PublicPort(public) => self.public_port(public),
             Change::Create { .. } => self.create(change, index),

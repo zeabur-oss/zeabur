@@ -610,6 +610,10 @@ pub struct MaintenanceChange {
     pub hostname: String,
     /// Show the maintenance page when true; send requests to the workload again when false.
     pub enabled: bool,
+    /// When stopping: the workload whose first Service gets the hostname when the rules changed
+    /// after maintenance started, so the backends kept then no longer fit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workload: Option<WorkloadRef>,
 }
 
 /// A CronJob's `concurrencyPolicy` [k8s-concurrency].
@@ -1187,6 +1191,17 @@ pub enum Warning {
         namespace: String,
         /// Its name.
         pod: String,
+    },
+    /// The rules changed after maintenance started, so the hostname goes to this Service port
+    /// instead of the backends kept then.
+    #[serde(rename_all = "camelCase")]
+    MaintenanceRestored {
+        /// The hostname.
+        hostname: String,
+        /// The Service.
+        service: String,
+        /// Its port.
+        port: i32,
     },
     /// Browsers keep a permanent redirect: after it stops, visitors who saw it still go to the
     /// other hostname until their browser forgets it.

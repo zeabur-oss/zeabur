@@ -380,24 +380,11 @@ impl Planner<'_> {
                     format!("HTTPRoute {name} does not redirect."),
                 ));
             }
-            self.workload(workload)?;
-            let endpoint = self
-                .project
-                .services
-                .iter()
-                .find(|s| s.workload.kind == workload.kind && s.workload.name == workload.name)
-                .and_then(|s| self.project.endpoints_of(s).next())
-                .map(|e| (e.name.clone(), e.ports.first().map_or(80, |p| p.port)));
-            let Some((service, port)) = endpoint else {
-                return Err(error(
-                    ErrorKind::Invalid,
-                    "no_service",
-                    format!(
-                        "{} has no Kubernetes Service for HTTPRoute {name} to send requests to.",
-                        workload.name
-                    ),
-                ));
+            let route = RouteRef {
+                kind: RouteKind::HttpRoute,
+                name: name.to_owned(),
             };
+            let (service, port) = self.first_endpoint(workload, &route)?;
             json!([{"backendRefs": [{"name": service, "port": port}]}])
         };
         let index = self.working(http_route_target(name), object.clone());
@@ -410,6 +397,35 @@ impl Planner<'_> {
             None => vec![add("/spec/rules", rules)],
         };
         self.patch(index, operations)
+    }
+
+    /// The first Service of `workload` and its first port, for `route` to send requests to.
+    pub(crate) fn first_endpoint(
+        &self,
+        workload: &WorkloadRef,
+        route: &RouteRef,
+    ) -> Result<(String, i32), PlanError> {
+        self.workload(workload)?;
+        self.project
+            .services
+            .iter()
+            .find(|s| s.workload.kind == workload.kind && s.workload.name == workload.name)
+            .and_then(|s| self.project.endpoints_of(s).next())
+            .map(|e| (e.name.clone(), e.ports.first().map_or(80, |p| p.port)))
+            .ok_or_else(|| {
+                let kind = match route.kind {
+                    RouteKind::Ingress => "Ingress",
+                    RouteKind::HttpRoute => "HTTPRoute",
+                };
+                error(
+                    ErrorKind::Invalid,
+                    "no_service",
+                    format!(
+                        "{} has no Kubernetes Service for {kind} {} to send requests to.",
+                        workload.name, route.name
+                    ),
+                )
+            })
     }
 
     pub(crate) fn fetched_middleware(&self, name: &str) -> Option<Value> {

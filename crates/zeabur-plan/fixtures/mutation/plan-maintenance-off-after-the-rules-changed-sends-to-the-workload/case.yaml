@@ -1,0 +1,10 @@
+description: "Stopping maintenance after a path was added to the hostname: the kept backends no longer fit, so the paths that show the maintenance page go to the named workload's first Service, and the plan says so."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: shop.example.test
+        enabled: false
+        workload: {kind: Deployment, name: web}

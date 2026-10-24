@@ -820,11 +820,24 @@ function httpOnlySentence(
 
 function certificateWarning(
   t: Translate,
-  warning: Extract<Schemas["PlanWarning"], { code: "ownCertificate" | "issuerShared" }>,
+  warning: Extract<
+    Schemas["PlanWarning"],
+    { code: "ownCertificate" | "issuerShared" | "maintenanceRestored" }
+  >,
 ): string {
-  return warning.code === "ownCertificate"
-    ? t("warn.ownCertificate", warning.hostname, warning.notAfter.slice(0, 10))
-    : t("warn.issuerShared", warning.route, warning.issuer, t("common.list", warning.hostnames))
+  switch (warning.code) {
+    case "ownCertificate":
+      return t("warn.ownCertificate", warning.hostname, warning.notAfter.slice(0, 10))
+    case "issuerShared":
+      return t(
+        "warn.issuerShared",
+        warning.route,
+        warning.issuer,
+        t("common.list", warning.hostnames),
+      )
+    case "maintenanceRestored":
+      return t("warn.maintenanceRestored", warning.hostname, warning.service, warning.port)
+  }
 }
 
 function accessWarning(
@@ -840,6 +853,7 @@ function accessWarning(
         | "publicPortBlocked"
         | "ownCertificate"
         | "issuerShared"
+        | "maintenanceRestored"
     }
   >,
 ): string {

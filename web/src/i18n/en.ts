@@ -3642,6 +3642,8 @@ export const en = {
   "useShared.kube.whenValue": "When the pods restart; this change replaces them",
   "warn.taskImageCopied": (service: string, image: string) =>
     `The task runs ${image}, ${service}'s image now; a later image change to ${service} doesn't reach it`,
+  "warn.maintenanceRestored": (host: string, service: string, port: number) =>
+    `The rules of ${host} changed during maintenance, so the paths that show the maintenance page go to ${service}:${port}, not to the backends they had before`,
   "warn.permanentRedirect": (host: string) =>
     `Browsers remember a permanent redirect: if you remove it later, earlier visitors of ${host} still go to the old target until they clear their cache`,
   "warn.publicDatabase": (name: string) =>

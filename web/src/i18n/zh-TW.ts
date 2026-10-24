@@ -3366,6 +3366,8 @@ export const zhTW: Messages = {
   "useShared.kube.whenValue": "Pod 重新啟動時；這個變更會替換 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任務使用 ${service} 目前的映像檔 ${image}；之後 ${service} 換映像檔，任務不會跟著換`,
+  "warn.maintenanceRestored": (host, service, port) =>
+    `維護期間 ${host} 的規則改過，原本的後端對不上，顯示維護頁的路徑會改送到 ${service}:${port}`,
   "warn.permanentRedirect": (host) =>
     `瀏覽器會記住永久轉址：之後就算取消，來過的訪客清除快取前，開啟 ${host} 仍會轉到舊的網域`,
   "warn.publicDatabase": (name) => `${name} 是資料庫：面對網際網路，只剩它自己的密碼保護資料`,

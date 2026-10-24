@@ -63,7 +63,12 @@ function useCurrentPages(project: string) {
 }
 
 /** The form, and the changes it asks for once the pages are known. */
-function usePagesForm(project: string, route: Schemas["Route"], host: string) {
+function usePagesForm(
+  project: string,
+  route: Schemas["Route"],
+  host: string,
+  workload: Schemas["WorkloadRef"],
+) {
   const current = useCurrentPages(project)
   const was = {
     maintenance: route.maintenance?.includes(host) ?? false,
@@ -77,6 +82,7 @@ function usePagesForm(project: string, route: Schemas["Route"], host: string) {
         host,
         { ...was, pages: current.pages, defaults: current.defaults },
         form,
+        workload,
       )
     : []
   return {
@@ -108,7 +114,10 @@ export default function DomainPagesDrawer({
   onClose: () => void
 }) {
   const t = useT()
-  const { current, form, setForm, changes, large } = usePagesForm(project, route, host)
+  const { current, form, setForm, changes, large } = usePagesForm(project, route, host, {
+    kind: service.kind,
+    name: service.name,
+  })
   const [tried, setTried] = useState(false)
   const review = () => {
     setTried(true)

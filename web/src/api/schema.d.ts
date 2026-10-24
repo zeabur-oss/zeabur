@@ -5124,6 +5124,7 @@ export interface components {
       hostname: string
       /** @description The route. */
       route: components["schemas"]["RouteRef"]
+      workload?: components["schemas"]["WorkloadRef"] | null
     }
     /** @description What a plan changes, and the token that applies it. */
     MaintenancePlan: {
@@ -6325,6 +6326,19 @@ export interface components {
           namespace: string
           /** @description Its name. */
           pod: string
+        }
+      | {
+          /** @enum {string} */
+          code: "maintenanceRestored"
+          /** @description The hostname. */
+          hostname: string
+          /**
+           * Format: int32
+           * @description Its port.
+           */
+          port: number
+          /** @description The Service. */
+          service: string
         }
       | {
           /** @enum {string} */

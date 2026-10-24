@@ -9757,6 +9757,13 @@ components:
         route:
           $ref: "#/components/schemas/RouteRef"
           description: The route.
+        workload:
+          oneOf:
+          - $ref: "#/components/schemas/WorkloadRef"
+            description: |-
+              When stopping: the workload whose first Service gets the hostname when the rules changed
+              after maintenance started, so the backends kept then no longer fit.
+          - type: "null"
     MaintenancePlan:
       type: object
       description: What a plan changes, and the token that applies it.
@@ -12214,6 +12221,30 @@ components:
           pod:
             type: string
             description: Its name.
+      - type: object
+        description: |-
+          The rules changed after maintenance started, so the hostname goes to this Service port
+          instead of the backends kept then.
+        required:
+        - hostname
+        - service
+        - port
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - maintenanceRestored
+          hostname:
+            type: string
+            description: The hostname.
+          port:
+            type: integer
+            format: int32
+            description: Its port.
+          service:
+            type: string
+            description: The Service.
       - type: object
         description: |-
           Browsers keep a permanent redirect: after it stops, visitors who saw it still go to the

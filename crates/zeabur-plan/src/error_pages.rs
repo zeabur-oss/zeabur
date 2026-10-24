@@ -35,9 +35,10 @@ use zeabur_adapters::error_pages::{
     MAINTENANCE_ANNOTATION, MAINTENANCE_PORT, PAGES_PORT, SERVER, ingress_services, maintenance,
 };
 use zeabur_adapters::traefik;
+use zeabur_model::WorkloadRef;
 
 use crate::access::{meta_of, middleware_resource, middleware_target, owner_of};
-use crate::change::{Change, ErrorPageHtml, RouteKind, RouteRef, Target};
+use crate::change::{Change, ErrorPageHtml, RouteKind, RouteRef, Target, Warning};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::json::{add, pointer, replace, test};
@@ -275,6 +276,7 @@ impl Planner<'_> {
         route: &RouteRef,
         hostname: &str,
         enabled: bool,
+        workload: Option<&WorkloadRef>,
     ) -> Result<(), PlanError> {
         let object = self.checked_route(route, hostname)?;
         let target = match route.kind {
@@ -307,23 +309,40 @@ impl Planner<'_> {
         }
         self.claim(index, &[Step::field("spec"), Step::field("rules")], "rules")?;
         let rules = array(&current, "/spec/rules");
-        let (operations, had) = match route.kind {
-            RouteKind::Ingress => ingress_swap(&rules, hostname, kept.get(hostname))?,
-            RouteKind::HttpRoute => {
-                let count = array(&current, "/spec/hostnames").len();
-                if count != 1 {
-                    return Err(error(
-                        ErrorKind::Invalid,
-                        "shared_route",
-                        format!(
-                            "HTTPRoute {} serves {count} hostnames, and maintenance would apply \
-                             to all of them. Move the hostname to a route of its own first.",
-                            route.name
-                        ),
-                    ));
-                }
-                http_route_swap(&rules, kept.get(hostname))?
+        if route.kind == RouteKind::HttpRoute {
+            let count = array(&current, "/spec/hostnames").len();
+            if count != 1 {
+                return Err(error(
+                    ErrorKind::Invalid,
+                    "shared_route",
+                    format!(
+                        "HTTPRoute {} serves {count} hostnames, and maintenance would apply to \
+                         all of them. Move the hostname to a route of its own first.",
+                        route.name
+                    ),
+                ));
             }
+        }
+        let swapped = match route.kind {
+            RouteKind::Ingress => ingress_swap(&rules, hostname, kept.get(hostname)),
+            RouteKind::HttpRoute => http_route_swap(&rules, kept.get(hostname)),
+        };
+        let (operations, had) = match (swapped, workload) {
+            (Err(e), Some(workload)) if !enabled && e.code == "maintenance_changed" => {
+                let (service, port) = self.first_endpoint(workload, route)?;
+                self.impact.insert(workload.clone());
+                self.warnings.push(Warning::MaintenanceRestored {
+                    hostname: hostname.to_owned(),
+                    service: service.clone(),
+                    port,
+                });
+                let operations = match route.kind {
+                    RouteKind::Ingress => ingress_back(&rules, hostname, &service, port),
+                    RouteKind::HttpRoute => http_route_back(&rules, &service, port),
+                };
+                (operations, Value::Null)
+            }
+            (swapped, _) => swapped?,
         };
         self.patch(index, operations)?;
         if enabled {
@@ -567,6 +586,49 @@ fn http_route_swap(
     finish_swap(operations, had, back.as_ref())
 }
 
+/// The patch that sends the paths of `hostname` that show the maintenance page to `service`.
+fn ingress_back(rules: &[Value], hostname: &str, service: &str, port: i32) -> Vec<Value> {
+    let back = json!({"service": {"name": service, "port": {"number": port}}});
+    let mut operations = Vec::new();
+    for (r, rule) in rules.iter().enumerate() {
+        if rule.get("host").and_then(Value::as_str) != Some(hostname) {
+            continue;
+        }
+        for (p, path) in array(rule, "/http/paths").iter().enumerate() {
+            let Some(backend) = path
+                .get("backend")
+                .filter(|b| shows_page(b, "/service/name"))
+            else {
+                continue;
+            };
+            let at = format!("/spec/rules/{r}/http/paths/{p}/backend");
+            operations.extend([test(&at, backend.clone()), replace(&at, back.clone())]);
+        }
+    }
+    operations
+}
+
+/// As [`ingress_back`], for the `backendRefs` of each rule of an `HTTPRoute`.
+fn http_route_back(rules: &[Value], service: &str, port: i32) -> Vec<Value> {
+    let back = json!([{"name": service, "port": port}]);
+    let mut operations = Vec::new();
+    for (r, rule) in rules.iter().enumerate() {
+        let Some(refs) = rule
+            .get("backendRefs")
+            .filter(|refs| elements(refs).iter().any(|b| shows_page(b, "/name")))
+        else {
+            continue;
+        };
+        let at = format!("/spec/rules/{r}/backendRefs");
+        operations.extend([test(&at, refs.clone()), replace(&at, back.clone())]);
+    }
+    operations
+}
+
+fn shows_page(backend: &Value, name: &str) -> bool {
+    backend.pointer(name).and_then(Value::as_str) == Some(SERVER)
+}
+
 fn finish_swap(
     operations: Vec<Value>,
     had: Vec<Value>,
@@ -595,7 +657,7 @@ fn changed() -> PlanError {
         "maintenance_changed",
         format!(
             "The rules changed after maintenance started, so {MAINTENANCE_ANNOTATION} no longer \
-             fits them. Restore the backends by hand."
+             fits them. Name the workload to send the hostname to its first Service."
         ),
     )
 }
