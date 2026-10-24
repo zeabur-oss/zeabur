@@ -15,6 +15,9 @@
 //! - A backup now: a `Backup` with the schedule's template and its `velero.io/schedule-name` label,
 //!   named `<schedule>-<UTC time>`, as `velero backup create --from-schedule` makes one
 //!   [velero-cli].
+//! - A restore: a `Restore` of one backup into the namespaces chosen, named `<backup>-<UTC time>`
+//!   as `velero restore create --from-backup` names one [velero-restore]. Velero skips an object
+//!   that is already there, so a restore puts back what was deleted and changes nothing else.
 //!
 //! # Sizes
 //!
@@ -28,6 +31,7 @@
 //! [velero-fsb]: https://velero.io/docs/v1.17/file-system-backup/
 //! [velero-aws]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/v1.13.0/backupstoragelocation.md
 //! [velero-cli]: https://velero.io/docs/v1.17/backup-reference/
+//! [velero-restore]: https://velero.io/docs/v1.17/restore-reference/
 
 use std::collections::BTreeMap;
 
@@ -53,6 +57,14 @@ pub const POD_VOLUME_BACKUPS: Read = Read {
     version: "v1",
     resource: "podvolumebackups",
     kind: "PodVolumeBackup",
+};
+
+/// `velero.io/v1` `Restore`, cluster-wide.
+pub const RESTORES: Read = Read {
+    group: "velero.io",
+    version: "v1",
+    resource: "restores",
+    kind: "Restore",
 };
 
 /// Velero's namespace when none of its objects says otherwise, as its chart installs it.
@@ -224,6 +236,37 @@ impl BackupView {
     pub fn time(&self) -> Option<&str> {
         self.started.as_deref().or(self.finished.as_deref())
     }
+}
+
+/// One restore.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = VeleroRestore)]
+pub struct RestoreView {
+    /// Its name.
+    pub name: String,
+    /// The backup it restores.
+    pub backup: String,
+    /// The namespaces it restores; empty for every namespace of the backup.
+    pub namespaces: Vec<String>,
+    /// Velero's phase.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    /// How it went.
+    pub outcome: Outcome,
+    /// When it started, RFC 3339.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started: Option<String>,
+    /// When it finished, RFC 3339.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finished: Option<String>,
+    /// Errors Velero counted.
+    pub errors: u64,
+    /// Warnings Velero counted, such as objects that were already there.
+    pub warnings: u64,
+    /// Velero's own words when it failed (`failureReason`, `validationErrors`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
 }
 
 fn namespace(object: &DynamicObject) -> String {
@@ -398,6 +441,41 @@ pub fn backup(object: &DynamicObject, bytes: &BTreeMap<String, u64>) -> BackupVi
         bytes: bytes.get(&name).copied(),
         reason,
         name,
+    }
+}
+
+/// A restore as the interface shows it; one without a phase is new, not yet taken up.
+#[must_use]
+pub fn restore(object: &DynamicObject) -> RestoreView {
+    let phase = text(object, "/status/phase");
+    let outcome = match phase.as_deref() {
+        Some("Completed") => Outcome::Succeeded,
+        Some("PartiallyFailed") => Outcome::PartiallyFailed,
+        Some("Failed" | "FailedValidation") => Outcome::Failed,
+        Some(
+            "New"
+            | "InProgress"
+            | "WaitingForPluginOperations"
+            | "WaitingForPluginOperationsPartiallyFailed"
+            | "Finalizing"
+            | "FinalizingPartiallyFailed",
+        )
+        | None => Outcome::Running,
+        _ => Outcome::Unknown,
+    };
+    let validation = strings(object, "/status/validationErrors");
+    RestoreView {
+        name: name(object),
+        backup: text(object, "/spec/backupName").unwrap_or_default(),
+        namespaces: covered(object, "/spec"),
+        outcome,
+        started: text(object, "/status/startTimestamp"),
+        finished: text(object, "/status/completionTimestamp"),
+        errors: number(object, "/status/errors").unwrap_or(0),
+        warnings: number(object, "/status/warnings").unwrap_or(0),
+        reason: text(object, "/status/failureReason")
+            .or_else(|| (!validation.is_empty()).then(|| validation.join("; "))),
+        phase,
     }
 }
 
@@ -664,6 +742,37 @@ pub fn backup_now(schedule: &Value, name: &str) -> Value {
     })
 }
 
+/// What is wrong with restoring `namespaces` from a backup of `covered` (empty for every
+/// namespace); `None` when nothing is.
+#[must_use]
+pub fn restore_problem(covered: &[String], namespaces: &[String]) -> Option<String> {
+    if namespaces.is_empty() {
+        return Some("Choose at least one namespace to restore.".to_owned());
+    }
+    let missing: Vec<&str> = namespaces
+        .iter()
+        .filter(|n| !covered.is_empty() && !covered.contains(n))
+        .map(String::as_str)
+        .collect();
+    (!missing.is_empty()).then(|| {
+        format!(
+            "The backup does not hold these namespaces: {}.",
+            missing.join(", ")
+        )
+    })
+}
+
+/// A restore of `backup` into `namespaces`, in Velero's namespace `namespace`.
+#[must_use]
+pub fn restore_object(namespace: &str, name: &str, backup: &str, namespaces: &[String]) -> Value {
+    json!({
+        "apiVersion": API_VERSION,
+        "kind": "Restore",
+        "metadata": {"name": name, "namespace": namespace},
+        "spec": {"backupName": backup, "includedNamespaces": namespaces},
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -875,6 +984,24 @@ mod tests {
             (partly.outcome, partly.failure, partly.errors),
             (Outcome::PartiallyFailed, Some(Failure::ItemsFailed), 2)
         );
+    }
+
+    #[test]
+    fn a_restore_names_its_backup_and_namespaces_and_only_those_the_backup_holds() {
+        let made = restore_object("velero", "zeabur-1-2", "zeabur-1", &["shop".to_owned()]);
+        let mut read = object(made);
+        read.data["status"] = json!({"phase": "PartiallyFailed", "warnings": 3, "errors": 1});
+        let view = restore(&read);
+        assert_eq!(view.backup, "zeabur-1");
+        assert_eq!(view.namespaces, ["shop"]);
+        assert_eq!(view.outcome, Outcome::PartiallyFailed);
+        assert_eq!((view.errors, view.warnings), (1, 3));
+
+        let shop = ["shop".to_owned()];
+        assert!(restore_problem(&[], &shop).is_none());
+        assert!(restore_problem(&shop, &shop).is_none());
+        assert!(restore_problem(&shop, &[]).is_some());
+        assert!(restore_problem(&shop, &["blog".to_owned()]).is_some());
     }
 
     #[test]

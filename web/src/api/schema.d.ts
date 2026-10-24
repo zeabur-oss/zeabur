@@ -2429,6 +2429,8 @@ export interface components {
     BackupsApplied: {
       /** @description The backup a `backupNow` plan created. */
       backup?: string | null
+      /** @description The restore a `restore` plan created. */
+      restore?: string | null
       /** @description The objects written, `Kind/name`. */
       written: string[]
     }
@@ -2443,6 +2445,8 @@ export interface components {
       backup?: string | null
       /** @description When the token stops working, RFC 3339. */
       expiresAt: string
+      /** @description The restore a `restore` plan creates. */
+      restore?: string | null
       /** @description Send this to `apply` to carry out exactly this plan. */
       token: string
       /** @description The writes, in order; empty when nothing changes. */
@@ -2493,6 +2497,14 @@ export interface components {
       | {
           /** @enum {string} */
           op: "backupNow"
+        }
+      | {
+          /** @description The backup. */
+          backup: string
+          /** @description The namespaces to restore. */
+          namespaces: string[]
+          /** @enum {string} */
+          op: "restore"
         }
     /** @description A baseline policy and the node addresses it does not let in. */
     BaselinePolicy: {
@@ -3091,6 +3103,8 @@ export interface components {
       locations: components["schemas"]["VeleroLocation"][]
       /** @description Velero's namespace. */
       namespace: string
+      /** @description The newest restores, newest first, a hundred at most. */
+      restores: components["schemas"]["VeleroRestore"][]
       /** @description When they run. */
       schedules: components["schemas"]["VeleroSchedule"][]
       /** @description Whether Velero is installed and its objects could be read. */
@@ -8411,6 +8425,35 @@ export interface components {
      * @enum {string}
      */
     VeleroLocationPhase: "available" | "unavailable" | "unknown"
+    /** @description One restore. */
+    VeleroRestore: {
+      /** @description The backup it restores. */
+      backup: string
+      /**
+       * Format: int64
+       * @description Errors Velero counted.
+       */
+      errors: number
+      /** @description When it finished, RFC 3339. */
+      finished?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description The namespaces it restores; empty for every namespace of the backup. */
+      namespaces: string[]
+      /** @description How it went. */
+      outcome: components["schemas"]["BackupOutcome"]
+      /** @description Velero's phase. */
+      phase?: string | null
+      /** @description Velero's own words when it failed (`failureReason`, `validationErrors`). */
+      reason?: string | null
+      /** @description When it started, RFC 3339. */
+      started?: string | null
+      /**
+       * Format: int64
+       * @description Warnings Velero counted, such as objects that were already there.
+       */
+      warnings: number
+    }
     /** @description When backups run and what they take. */
     VeleroSchedule: {
       /** @description The cron expression, in the Velero server's clock (UTC unless set otherwise). */

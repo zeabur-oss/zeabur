@@ -1,6 +1,7 @@
 //! The cluster's backups through Velero: not installed is an answer, setting the location keeps
-//! its keys out of every answer, the schedule is created, paused and backed up from, and the
-//! refusals: someone RBAC does not let write, a plan the cluster moved past.
+//! its keys out of every answer, the schedule is created, paused and backed up from, a finished
+//! backup is restored into the namespaces it holds, and the refusals: someone RBAC does not let
+//! write, a plan the cluster moved past.
 
 #[cfg(test)]
 mod tests {
@@ -20,6 +21,7 @@ mod tests {
             ("schedules", "Schedule"),
             ("backups", "Backup"),
             ("podvolumebackups", "PodVolumeBackup"),
+            ("restores", "Restore"),
         ]
         .into_iter()
         .map(|(resource, kind)| ServedResource::readable("velero.io", "v1", resource, kind, true))
@@ -299,6 +301,48 @@ mod tests {
         assert_eq!(found["backups"][1]["bytes"], 2048);
         assert_eq!(found["totalBackups"], 2);
         assert_eq!(found["canChange"], "allowed");
+    }
+
+    #[tokio::test]
+    async fn a_finished_backup_is_restored_into_namespaces_it_holds() {
+        let backup = |name: &str, phase: &str| {
+            object(json!({
+                "apiVersion": "velero.io/v1", "kind": "Backup",
+                "metadata": {"name": name, "namespace": "velero", "resourceVersion": "4"},
+                "spec": {"includedNamespaces": ["shop", "blog"]}, "status": {"phase": phase}
+            }))
+        };
+        let cluster = velero(vec![
+            location(),
+            schedule(),
+            backup("zeabur-1", "Completed"),
+            backup("zeabur-2", "InProgress"),
+        ]);
+        let app = app(&cluster);
+        let (planned, done) = applied(
+            &app,
+            &json!({"op": "restore", "backup": "zeabur-1", "namespaces": ["shop"]}),
+        )
+        .await;
+        let name = done["restore"].as_str().unwrap();
+        assert_eq!(planned["restore"], name);
+        assert!(name.starts_with("zeabur-1-"), "{name}");
+        let made = stored(&cluster, "Restore", name).unwrap();
+        assert_eq!(
+            made["spec"],
+            json!({"backupName": "zeabur-1", "includedNamespaces": ["shop"]})
+        );
+        let (_, found) = send(&app, "GET", "/api/v1/cluster/backups", None).await;
+        assert_eq!(found["restores"][0]["backup"], "zeabur-1");
+
+        for request in [
+            json!({"op": "restore", "backup": "zeabur-2", "namespaces": ["shop"]}),
+            json!({"op": "restore", "backup": "zeabur-1", "namespaces": ["payments"]}),
+            json!({"op": "restore", "backup": "zeabur-1", "namespaces": []}),
+        ] {
+            let (status, problem) = plan(&app, &request).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        }
     }
 
     #[tokio::test]

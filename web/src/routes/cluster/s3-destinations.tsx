@@ -19,7 +19,7 @@ import {
   destinationProblems,
   saveRequest,
 } from "@/model/s3-destinations"
-import { Section } from "@/routes/cluster/section"
+import { FormButtons, Section } from "@/routes/cluster/section"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
@@ -233,16 +233,7 @@ function DestinationEditor({
           />
         </FormField>
       </div>
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
-          {t("clusterBackups.cancel")}
-        </Button>
-        <GateTip gate={gate}>
-          <Button size="sm" type="submit">
-            {t("edit.review")}
-          </Button>
-        </GateTip>
-      </div>
+      <FormButtons gate={gate} onCancel={onCancel} />
     </form>
   )
 }

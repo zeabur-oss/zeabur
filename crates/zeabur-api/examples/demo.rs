@@ -2411,6 +2411,7 @@ fn velero_served() -> Vec<ServedResource> {
         ("schedules", "Schedule"),
         ("backups", "Backup"),
         ("podvolumebackups", "PodVolumeBackup"),
+        ("restores", "Restore"),
     ]
     .into_iter()
     .map(|(resource, kind)| ServedResource::readable("velero.io", "v1", resource, kind, true))
@@ -2418,7 +2419,7 @@ fn velero_served() -> Vec<ServedResource> {
 }
 
 /// A daily schedule kept a week, its backups (the newest failed to reach the bucket, one before
-/// it copied all but two volumes) and what their file-system backups copied.
+/// it copied all but two volumes), what their file-system backups copied, and a restore.
 fn velero() -> Vec<DynamicObject> {
     let mode = velero_mode();
     if mode == "none" {
@@ -2513,6 +2514,14 @@ fn velero() -> Vec<DynamicObject> {
         "shop-uploads",
         1_852_000_000,
     ));
+    // Yesterday's restore of the blog: one object was already there.
+    objects.push(from(json!({
+        "apiVersion": "velero.io/v1", "kind": "Restore",
+        "metadata": {"name": "zeabur-20261021030000-20261023091500", "namespace": "velero"},
+        "spec": {"backupName": "zeabur-20261021030000", "includedNamespaces": ["blog"]},
+        "status": {"phase": "Completed", "warnings": 1,
+            "startTimestamp": minutes_ago(day - 120), "completionTimestamp": minutes_ago(day - 122)}
+    })));
     objects
 }
 

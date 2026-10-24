@@ -4,15 +4,15 @@
 //! | Route | What it does |
 //! |---|---|
 //! | `GET /api/v1/cluster/backups` | Velero's locations, schedules and backups, or that it is not installed |
-//! | `POST /api/v1/cluster/backups/plan` | what setting the location or the schedule, pausing it, or backing up now writes, and a token; writes nothing |
+//! | `POST /api/v1/cluster/backups/plan` | what setting the location or the schedule, pausing it, backing up now or restoring a backup writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/backups/apply` | carries out that plan by its token |
 //!
 //! Everything is read and written as the person; RBAC on `velero.io` and on Secrets in Velero's
 //! namespace decides. Velero's API not being served is an answer (`not-installed`), not an error.
 //! The token is sealed, so the keys a person types travel in it unreadable; it binds the person,
-//! Velero's namespace, the request, the name of a backup made now and the `resourceVersion` of
-//! every object the plan reads. Apply reads them again, refuses when one moved, dry-runs every
-//! write, then writes. A plan's YAML never holds the keys.
+//! Velero's namespace, the request, the name of a backup or restore made now and the
+//! `resourceVersion` of every object the plan reads. Apply reads them again, refuses when one
+//! moved, dry-runs every write, then writes. A plan's YAML never holds the keys.
 
 use std::collections::BTreeMap;
 
@@ -28,6 +28,7 @@ use zeabur_kube::{
     WriteRequest,
 };
 use zeabur_modules::Reading;
+use zeabur_modules::backups::Outcome;
 use zeabur_modules::velero::{self, cluster as v};
 
 use crate::cluster::s3_destinations;
@@ -61,6 +62,8 @@ pub struct ClusterBackups {
     pub schedules: Vec<v::ScheduleView>,
     /// The newest backups, newest first, a hundred at most.
     pub backups: Vec<v::BackupView>,
+    /// The newest restores, newest first, a hundred at most.
+    pub restores: Vec<v::RestoreView>,
     /// How many backups there are.
     pub total_backups: usize,
     /// Whether the person may create schedules in Velero's namespace.
@@ -118,6 +121,13 @@ pub enum BackupsPlanRequest {
     },
     /// Back up now with Zeabur's schedule's settings.
     BackupNow,
+    /// Restore a backup into some of its namespaces. Velero skips objects that are there.
+    Restore {
+        /// The backup.
+        backup: String,
+        /// The namespaces to restore.
+        namespaces: Vec<String>,
+    },
 }
 
 /// What a write does.
@@ -163,6 +173,9 @@ pub struct BackupsPlan {
     /// The backup a `backupNow` plan creates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup: Option<String>,
+    /// The restore a `restore` plan creates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restore: Option<String>,
 }
 
 /// The token of a plan to apply.
@@ -180,6 +193,9 @@ pub struct BackupsApplied {
     /// The backup a `backupNow` plan created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup: Option<String>,
+    /// The restore a `restore` plan created.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restore: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -190,7 +206,8 @@ struct Claims {
     namespace: String,
     request: BackupsPlanRequest,
     versions: BTreeMap<String, String>,
-    backup: Option<String>,
+    /// The backup or restore the plan creates.
+    made: Option<String>,
     expires_at: i64,
 }
 
@@ -282,6 +299,7 @@ fn empty(state: ProviderState, unreadable: Vec<UnreadableView>) -> ClusterBackup
         locations: Vec::new(),
         schedules: Vec::new(),
         backups: Vec::new(),
+        restores: Vec::new(),
         total_backups: 0,
         can_change: Permission::Unknown,
         keys_from: None,
@@ -311,6 +329,9 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
     let volumes = reading(cluster, &v::POD_VOLUME_BACKUPS, &mut unreadable)
         .await?
         .unwrap_or_default();
+    let restores = reading(cluster, &v::RESTORES, &mut unreadable)
+        .await?
+        .unwrap_or_default();
     if refused == 3 {
         return Ok(Json(empty(ProviderState::Refused, unreadable)));
     }
@@ -320,6 +341,16 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
     listed.sort_by(|a, b| b.time().cmp(&a.time()).then_with(|| a.name.cmp(&b.name)));
     let total_backups = listed.len();
     listed.truncate(SHOWN);
+    let mut restores: Vec<v::RestoreView> = restores
+        .iter()
+        .filter(|r| r.metadata.namespace.as_deref() == Some(namespace.as_str()))
+        .map(v::restore)
+        .collect();
+    // Newest first; one Velero has not started yet is the newest.
+    restores.sort_by(|a, b| {
+        (b.started.is_none(), &b.started, &b.name).cmp(&(a.started.is_none(), &a.started, &a.name))
+    });
+    restores.truncate(SHOWN);
     let mut locations: Vec<v::Location> = locations.iter().map(v::location).collect();
     locations.sort_by(|a, b| (!a.default, &a.name).cmp(&(!b.default, &b.name)));
     let keys_from = keys_from(cluster, &namespace, &locations).await;
@@ -339,6 +370,7 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
         locations,
         schedules,
         backups: listed,
+        restores,
         total_backups,
         can_change,
         keys_from,
@@ -398,6 +430,7 @@ fn target(kind: &str, namespace: &str, name: &str) -> ObjectTarget {
         "Secret" => ("v1", "secrets"),
         "BackupStorageLocation" => ("velero.io/v1", "backupstoragelocations"),
         "Schedule" => ("velero.io/v1", "schedules"),
+        "Restore" => ("velero.io/v1", "restores"),
         _ => ("velero.io/v1", "backups"),
     };
     ObjectTarget {
@@ -592,12 +625,54 @@ async fn location_writes(
     Ok(writes)
 }
 
-/// The writes of `request`; `backup` names the backup a `backupNow` plan creates.
+/// The restore of `backup` into `namespaces`, named `made`; the backup must have finished.
+async fn restore_writes(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    backup: &str,
+    namespaces: &[String],
+    made: Option<&str>,
+    versions: &mut BTreeMap<String, String>,
+) -> Result<Vec<Planned>, ApiError> {
+    let found = cluster
+        .find_object(&velero::BACKUPS.resource(), Some(namespace), backup)
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("backup {backup}"),
+                get_read(GROUP, "backups", Some(namespace), backup),
+            )
+        })?
+        .ok_or_else(|| {
+            ApiError::from(Problem::new(
+                Kind::NotFound,
+                format!("Velero has no backup {backup:?}."),
+            ))
+        })?;
+    let view = v::backup(&found, &BTreeMap::new());
+    if !matches!(view.outcome, Outcome::Succeeded | Outcome::PartiallyFailed) {
+        return Err(invalid(format!(
+            "Backup {backup} has not finished, so it cannot be restored."
+        )));
+    }
+    if let Some(problem) = v::restore_problem(&view.namespaces, namespaces) {
+        return Err(invalid(problem));
+    }
+    versions.insert(format!("Backup/{backup}"), version(Some(&value(&found)?)));
+    let name = made.unwrap_or_default();
+    let object = v::restore_object(namespace, name, backup, namespaces);
+    Ok(change("Restore", namespace, name, None, object)
+        .into_iter()
+        .collect())
+}
+
+/// The writes of `request`; `made` names the backup or restore the plan creates.
 async fn compute(
     cluster: &dyn Cluster,
     objects: &Objects,
     request: &BackupsPlanRequest,
-    backup: Option<&str>,
+    made: Option<&str>,
 ) -> Result<Computed, ApiError> {
     let namespace = objects.namespace.as_str();
     let mut versions = BTreeMap::new();
@@ -677,11 +752,14 @@ async fn compute(
         BackupsPlanRequest::BackupNow => {
             let current = schedule.ok_or_else(no_schedule)?;
             versions.insert(format!("Schedule/{}", v::SCHEDULE), version(Some(&current)));
-            let name = backup.unwrap_or_default();
+            let name = made.unwrap_or_default();
             let made = v::backup_now(&current, name);
             change("Backup", namespace, name, None, made)
                 .into_iter()
                 .collect()
+        }
+        BackupsPlanRequest::Restore { backup, namespaces } => {
+            restore_writes(cluster, namespace, backup, namespaces, made, &mut versions).await?
         }
     };
     Ok(Computed { versions, writes })
@@ -724,9 +802,21 @@ pub(crate) async fn plan(
         return Err(not_installed());
     };
     let now = (state.clock)();
-    let backup = matches!(request, BackupsPlanRequest::BackupNow)
-        .then(|| v::backup_name(v::SCHEDULE, &now.strftime("%Y%m%d%H%M%S").to_string()));
-    let computed = compute(cluster.as_ref(), &objects, &request, backup.as_deref()).await?;
+    let at = now.strftime("%Y%m%d%H%M%S").to_string();
+    let made = match &request {
+        BackupsPlanRequest::BackupNow => Some(v::backup_name(v::SCHEDULE, &at)),
+        BackupsPlanRequest::Restore { backup, .. } => Some(v::backup_name(backup, &at)),
+        BackupsPlanRequest::Location { .. }
+        | BackupsPlanRequest::Schedule { .. }
+        | BackupsPlanRequest::Pause { .. } => None,
+    };
+    let computed = compute(cluster.as_ref(), &objects, &request, made.as_deref()).await?;
+    let restoring = matches!(request, BackupsPlanRequest::Restore { .. });
+    let (backup, restore) = if restoring {
+        (None, made.clone())
+    } else {
+        (made.clone(), None)
+    };
     let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
     let claims = Claims {
         person: identity.username,
@@ -734,7 +824,7 @@ pub(crate) async fn plan(
         namespace: objects.namespace.clone(),
         request,
         versions: computed.versions,
-        backup: backup.clone(),
+        made,
         expires_at,
     };
     let token = token::sign_as(&sealing, PREFIX, &claims).map_err(|_random| {
@@ -761,6 +851,7 @@ pub(crate) async fn plan(
             })
             .collect(),
         backup,
+        restore,
     }))
 }
 
@@ -828,13 +919,14 @@ pub(crate) async fn apply(
     let Found::Read(objects) = objects(cluster, Some(&claims.namespace)).await? else {
         return Err(not_installed());
     };
-    let computed = compute(cluster, &objects, &claims.request, claims.backup.as_deref()).await?;
+    let computed = compute(cluster, &objects, &claims.request, claims.made.as_deref()).await?;
     if computed.versions != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Conflict,
-            "Velero's location, schedule or keys changed after the plan was made.",
+            "Velero's location, schedule, keys or backup changed after the plan was made.",
         )));
     }
+    let restoring = matches!(claims.request, BackupsPlanRequest::Restore { .. });
     for write in &computed.writes {
         send(cluster, write, true).await?;
     }
@@ -847,6 +939,7 @@ pub(crate) async fn apply(
             .iter()
             .map(|w| format!("{}/{}", w.target.kind, w.target.name))
             .collect(),
-        backup: claims.backup,
+        backup: claims.made.clone().filter(|_| !restoring),
+        restore: claims.made.filter(|_| restoring),
     }))
 }

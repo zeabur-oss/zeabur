@@ -10,8 +10,6 @@ type Location = Schemas["VeleroLocation"]
 type Schedule = Schemas["VeleroSchedule"]
 
 export const VELERO_COMPONENT = "volume-backup/velero"
-export const RESTORE_COMMAND = "velero restore create --from-backup <backup>"
-
 export type Verdict =
   | { as: "notInstalled" }
   | { as: "refused" }

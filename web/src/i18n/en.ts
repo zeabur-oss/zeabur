@@ -2234,8 +2234,17 @@ export const en = {
   "clusterBackups.failure.interrupted":
     "Velero restarted while this backup ran. The next one runs on schedule.",
   "clusterBackups.failure.other": "The backup failed.",
-  "clusterBackups.restore": (command: string) =>
-    `To restore, run ${command} with the velero command-line tool.`,
+  "clusterBackups.restoreAction": "Restore",
+  "clusterBackups.restoreInto": "Namespaces to restore",
+  "clusterBackups.restoreSkips":
+    "Velero skips objects that are already there, so a restore puts back what was deleted and leaves the rest as it is. Delete an object first to get the backed-up one back.",
+  "clusterBackups.problem.restoreNone": "Choose at least one namespace.",
+  "clusterBackups.restores": "Restores",
+  "clusterBackups.restoredFrom": (backup: string) => `From ${backup}`,
+  "clusterBackups.plan.restore": (backup: string) => `Restore ${backup}`,
+  "clusterBackups.plan.restoreInto": (namespaces: string) =>
+    `It restores ${namespaces} and skips the objects already there.`,
+  "clusterBackups.thing.Restore": (name: string) => `restore ${name}, which starts now`,
   "clusterBackups.plan.location": "Set where backups go",
   "clusterBackups.plan.schedule": "Set the backup schedule",
   "clusterBackups.plan.pause": "Pause backups",

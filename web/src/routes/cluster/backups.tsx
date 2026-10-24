@@ -1,6 +1,6 @@
-// Cluster → Backups: Velero's backups of every object and the files in volumes. Restoring is
-// left to the velero command-line tool.
-import { useMutation, useQuery } from "@tanstack/react-query"
+// Cluster → Backups: Velero's backups of every object and the files in volumes, and restoring
+// one into the namespaces it holds.
+import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useId, useState, type ReactNode } from "react"
 import InfoIcon from "~icons/ph/info"
@@ -39,7 +39,6 @@ import {
   mainLocation,
   mainSchedule,
   outcomeHealth,
-  RESTORE_COMMAND,
   scheduleForm,
   scheduleProblems,
   scheduleRequest,
@@ -48,13 +47,15 @@ import {
   verdict,
   verdictHealth,
   type LocationForm,
+  type LocationProblem,
   type ScheduleForm,
+  type ScheduleProblem,
 } from "@/model/cluster-backups"
 import type { Gate } from "@/model/rights"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, type Role } from "@/routes/cluster/forbidden"
 import { S3DestinationsSection } from "@/routes/cluster/s3-destinations"
-import { Section } from "@/routes/cluster/section"
+import { FormButtons, Section } from "@/routes/cluster/section"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { Checkbox } from "@zeabur/design-system/components/checkbox"
@@ -74,13 +75,14 @@ import { Select } from "@zeabur/design-system/components/select"
 
 type Data = Schemas["ClusterBackups"]
 type Request = Schemas["BackupsPlanRequest"]
+type OnPlan = (request: Request, title: string, action?: string) => void
 
 export const backupsRole: Role = {
   name: "zeabur-cluster-backups",
   rules: [
     {
       group: "velero.io",
-      resources: ["backupstoragelocations", "schedules", "backups", "podvolumebackups"],
+      resources: ["backupstoragelocations", "schedules", "backups", "podvolumebackups", "restores"],
     },
   ],
 }
@@ -90,31 +92,34 @@ const refresh = () => {
 }
 
 export function BackupsPage() {
-  const t = useT()
   const backups = useQuery(clusterBackupsQuery)
-  const data = backups.data
-  const refused = data?.state === "refused" || (backups.isError && isStatus(backups.error, 403))
   return (
     <ClusterFrame tab="backups">
-      {refused ? (
-        <Forbidden
-          error={backups.error ?? undefined}
-          what={t("clusterBackups.what")}
-          missing={backupsRole.rules}
-          role={backupsRole}
-        />
-      ) : backups.isPending ? (
-        <LoadingRows label={t("cluster.backups")} rows={4} />
-      ) : backups.isError ? (
-        <Problem error={backups.error} />
-      ) : data?.state === "not-installed" ? (
-        <NotInstalled />
-      ) : data ? (
-        <Installed data={data} />
-      ) : null}
-      {data?.state === "installed" ? null : <S3DestinationsSection />}
+      <BackupsBody backups={backups} />
+      {backups.data?.state === "installed" ? null : <S3DestinationsSection />}
     </ClusterFrame>
   )
+}
+
+const refusedRead = (backups: UseQueryResult<Data>) =>
+  backups.data?.state === "refused" || (backups.isError && isStatus(backups.error, 403))
+
+function BackupsBody({ backups }: { backups: UseQueryResult<Data> }) {
+  const t = useT()
+  const data = backups.data
+  if (refusedRead(backups))
+    return (
+      <Forbidden
+        error={backups.error ?? undefined}
+        what={t("clusterBackups.what")}
+        missing={backupsRole.rules}
+        role={backupsRole}
+      />
+    )
+  if (backups.isPending) return <LoadingRows label={t("cluster.backups")} rows={4} />
+  if (backups.isError) return <Problem error={backups.error} />
+  if (data?.state === "not-installed") return <NotInstalled />
+  return data ? <Installed data={data} /> : null
 }
 
 function DatabasesNote() {
@@ -157,8 +162,9 @@ function NotInstalled() {
 function Installed({ data }: { data: Data }) {
   const t = useT()
   const gate = useHintGate("changeBackups", data.canChange)
-  const [plan, setPlan] = useState<{ request: Request; title: string }>()
-  const open = (request: Request, title: string) => setPlan({ request, title })
+  const [plan, setPlan] = useState<{ request: Request; title: string; action?: string }>()
+  const open = (request: Request, title: string, action?: string) =>
+    setPlan({ request, title, action })
   const location = mainLocation(data)
   const schedule = mainSchedule(data)
   return (
@@ -167,11 +173,9 @@ function Installed({ data }: { data: Data }) {
       <S3DestinationsSection />
       <LocationSection data={data} gate={gate} onPlan={open} />
       <ScheduleSection data={data} gate={gate} onPlan={open} />
-      <BackupList data={data} />
+      <BackupList data={data} gate={gate} onPlan={open} />
+      <RestoreList restores={data.restores} />
       <div className="flex flex-col gap-3">
-        <p className="type-meta text-muted-foreground">
-          <WithCode text={t("clusterBackups.restore", RESTORE_COMMAND)} code={RESTORE_COMMAND} />
-        </p>
         <KubeDetails
           facts={[
             [t("clusterBackups.kube.namespace"), data.namespace],
@@ -199,35 +203,18 @@ function Installed({ data }: { data: Data }) {
         />
       </div>
       {plan ? (
-        <PlanDialog request={plan.request} title={plan.title} onClose={() => setPlan(undefined)} />
+        <PlanDialog
+          request={plan.request}
+          title={plan.title}
+          action={plan.action}
+          onClose={() => setPlan(undefined)}
+        />
       ) : null}
     </>
   )
 }
 
-/** A sentence with a command in it, set as code. */
-function WithCode({ text, code }: { text: string; code: string }) {
-  const [before, after] = text.split(code)
-  return (
-    <span>
-      {before}
-      <code className="type-mono text-foreground" translate="no">
-        {code}
-      </code>
-      {after}
-    </span>
-  )
-}
-
-function Verdict({
-  data,
-  gate,
-  onPlan,
-}: {
-  data: Data
-  gate: Gate
-  onPlan: (request: Request, title: string) => void
-}) {
+function Verdict({ data, gate, onPlan }: { data: Data; gate: Gate; onPlan: OnPlan }) {
   const t = useT()
   const v = verdict(data)
   const good = lastGood(data.backups)
@@ -251,7 +238,9 @@ function Verdict({
             <Button
               size="sm"
               variant="outline"
-              onClick={() => onPlan({ op: "backupNow" }, t("clusterBackups.plan.now"))}
+              onClick={() =>
+                onPlan({ op: "backupNow" }, t("clusterBackups.plan.now"), t("clusterBackups.now"))
+              }
             >
               {t("clusterBackups.now")}
             </Button>
@@ -282,15 +271,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 const phaseHealth = { available: "ok", unavailable: "fail", unknown: "idle" } as const
 
-function LocationSection({
-  data,
-  gate,
-  onPlan,
-}: {
-  data: Data
-  gate: Gate
-  onPlan: (request: Request, title: string) => void
-}) {
+function LocationSection({ data, gate, onPlan }: { data: Data; gate: Gate; onPlan: OnPlan }) {
   const t = useT()
   const location = mainLocation(data)
   const [editing, setEditing] = useState(false)
@@ -427,12 +408,9 @@ function LocationEditor({
   onReview: (request: Request) => void
 }) {
   const t = useT()
-  const [form, setForm] = useState(initial)
-  const [tried, setTried] = useState(false)
-  const problems = locationProblems(form, editing)
-  const set = (patch: Partial<LocationForm>) => setForm((v) => ({ ...v, ...patch }))
-  const error = (problem: (typeof problems)[number]) =>
-    tried && problems.includes(problem) ? [t(`clusterBackups.problem.${problem}`)] : []
+  const { form, set, setTried, problems, error } = useCheckedForm(initial, (f) =>
+    locationProblems(f, editing),
+  )
   const text = (field: keyof LocationForm, placeholder?: string) => ({
     size: "sm" as const,
     mono: true,
@@ -488,18 +466,7 @@ function LocationEditor({
           <Input {...text("region", "us-east-1")} />
         </FormField>
       </div>
-      <div className="flex justify-end gap-2">
-        {onCancel ? (
-          <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
-            {t("clusterBackups.cancel")}
-          </Button>
-        ) : null}
-        <GateTip gate={gate}>
-          <Button size="sm" type="submit">
-            {t("edit.review")}
-          </Button>
-        </GateTip>
-      </div>
+      <FormButtons gate={gate} onCancel={onCancel} />
     </form>
   )
 }
@@ -512,15 +479,7 @@ function useScope() {
       : t("common.list", namespaces)
 }
 
-function ScheduleSection({
-  data,
-  gate,
-  onPlan,
-}: {
-  data: Data
-  gate: Gate
-  onPlan: (request: Request, title: string) => void
-}) {
+function ScheduleSection({ data, gate, onPlan }: { data: Data; gate: Gate; onPlan: OnPlan }) {
   const t = useT()
   const scope = useScope()
   const schedule = mainSchedule(data)
@@ -643,13 +602,8 @@ function ScheduleEditor({
 }) {
   const t = useT()
   const id = useId()
-  const [form, setForm] = useState(initial)
-  const [tried, setTried] = useState(false)
+  const { form, set, setTried, problems, error } = useCheckedForm(initial, scheduleProblems)
   const projects = useQuery(projectsQuery)
-  const problems = scheduleProblems(form)
-  const set = (patch: Partial<ScheduleForm>) => setForm((v) => ({ ...v, ...patch }))
-  const error = (problem: (typeof problems)[number]) =>
-    tried && problems.includes(problem) ? [t(`clusterBackups.problem.${problem}`)] : []
   const custom = current && hourOf(current.cron) === undefined ? current.cron : undefined
   const hours = [
     ...(custom ? [{ value: "custom", label: <CustomLabel cron={custom} /> }] : []),
@@ -743,18 +697,7 @@ function ScheduleEditor({
           </>
         ) : null}
       </fieldset>
-      <div className="flex justify-end gap-2">
-        {onCancel ? (
-          <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
-            {t("clusterBackups.cancel")}
-          </Button>
-        ) : null}
-        <GateTip gate={gate}>
-          <Button size="sm" type="submit">
-            {t("edit.review")}
-          </Button>
-        </GateTip>
-      </div>
+      <FormButtons gate={gate} onCancel={onCancel} />
     </form>
   )
 }
@@ -764,7 +707,7 @@ function CustomLabel({ cron }: { cron: string }) {
   return <>{t("clusterBackups.asSet", cron)}</>
 }
 
-function BackupList({ data }: { data: Data }) {
+function BackupList({ data, gate, onPlan }: { data: Data; gate: Gate; onPlan: OnPlan }) {
   const t = useT()
   const shown = data.backups
   return (
@@ -778,7 +721,7 @@ function BackupList({ data }: { data: Data }) {
       ) : (
         <ul className="flex flex-col">
           {shown.map((b) => (
-            <BackupRow key={b.name} backup={b} />
+            <BackupRow key={b.name} backup={b} gate={gate} onPlan={onPlan} />
           ))}
         </ul>
       )}
@@ -791,19 +734,19 @@ function BackupList({ data }: { data: Data }) {
   )
 }
 
-function BackupRow({ backup }: { backup: Schemas["VeleroBackup"] }) {
+function BackupRow({
+  backup,
+  gate,
+  onPlan,
+}: {
+  backup: Schemas["VeleroBackup"]
+  gate: Gate
+  onPlan: OnPlan
+}) {
   const t = useT()
-  const { locale } = useI18n()
-  const scope = useScope()
-  const { memory } = useQuantityFormat()
-  const facts = [
-    scope(backup.namespaces),
-    backup.items != null ? t("clusterBackups.items", backup.items, backup.totalItems) : "",
-    backup.bytes ? memory(backup.bytes) : "",
-    backup.errors > 0 ? t("clusterBackups.errors", backup.errors) : "",
-    backup.warnings > 0 ? t("clusterBackups.warnings", backup.warnings) : "",
-    backup.expires ? t("clusterBackups.keptUntil", formatDate(backup.expires, locale)) : "",
-  ].filter(Boolean)
+  const [restoring, setRestoring] = useState(false)
+  const restorable = backup.outcome === "succeeded" || backup.outcome === "partiallyFailed"
+  const facts = useBackupFacts(backup)
   return (
     <li className="flex flex-col gap-0.5 border-t border-rule py-2.5">
       <div className="flex min-w-0 items-center gap-2.5">
@@ -817,25 +760,207 @@ function BackupRow({ backup }: { backup: Schemas["VeleroBackup"] }) {
           iso={takenAt(backup)}
           className="shrink-0 text-right type-meta text-muted-foreground sm:w-24"
         />
+        {/* Kept when empty, so the times of every row line up. */}
+        <span className="flex w-12 shrink-0 justify-end">
+          {restorable ? (
+            <GateTip gate={gate}>
+              <Button
+                size="xs"
+                variant="ghost"
+                aria-expanded={restoring}
+                onClick={() => setRestoring((v) => !v)}
+              >
+                {t("clusterBackups.restoreAction")}
+              </Button>
+            </GateTip>
+          ) : null}
+        </span>
       </div>
       <span className="type-meta text-muted-foreground">{facts.join(t("common.sep"))}</span>
-      {backup.failure ? (
-        <p
-          className={cn(
-            "type-meta",
-            backup.outcome === "failed" ? "text-fail-strong" : "text-warn-strong",
-          )}
-        >
-          {t(`clusterBackups.failure.${backup.failure}`)}
-          {backup.reason && backup.failure !== "itemsFailed" ? (
-            <span className="text-muted-foreground" translate="no">
-              {" "}
-              {backup.reason}
-            </span>
-          ) : null}
-        </p>
+      <BackupFailure backup={backup} />
+      {restoring ? (
+        <RestoreForm
+          backup={backup}
+          gate={gate}
+          onCancel={() => setRestoring(false)}
+          onReview={(namespaces) => {
+            setRestoring(false)
+            onPlan(
+              { op: "restore", backup: backup.name, namespaces },
+              t("clusterBackups.plan.restore", backup.name),
+              t("clusterBackups.restoreAction"),
+            )
+          }}
+        />
       ) : null}
     </li>
+  )
+}
+
+/** A form's values and its problems. A problem shows on its field after the first submit. */
+function useCheckedForm<F, P extends LocationProblem | ScheduleProblem>(
+  initial: F,
+  problemsOf: (form: F) => P[],
+) {
+  const t = useT()
+  const [form, setForm] = useState(initial)
+  const [tried, setTried] = useState(false)
+  const problems = problemsOf(form)
+  const set = (patch: Partial<F>) => setForm((v) => ({ ...v, ...patch }))
+  const error = (problem: P) =>
+    tried && problems.includes(problem)
+      ? [t(`clusterBackups.problem.${problem as LocationProblem | ScheduleProblem}`)]
+      : []
+  return { form, set, setTried, problems, error }
+}
+
+function useBackupFacts(backup: Schemas["VeleroBackup"]) {
+  const t = useT()
+  const { locale } = useI18n()
+  const scope = useScope()
+  const { memory } = useQuantityFormat()
+  return [
+    scope(backup.namespaces),
+    backup.items != null ? t("clusterBackups.items", backup.items, backup.totalItems) : "",
+    backup.bytes ? memory(backup.bytes) : "",
+    backup.errors > 0 ? t("clusterBackups.errors", backup.errors) : "",
+    backup.warnings > 0 ? t("clusterBackups.warnings", backup.warnings) : "",
+    backup.expires ? t("clusterBackups.keptUntil", formatDate(backup.expires, locale)) : "",
+  ].filter(Boolean)
+}
+
+function BackupFailure({ backup }: { backup: Schemas["VeleroBackup"] }) {
+  const t = useT()
+  if (!backup.failure) return null
+  return (
+    <p
+      className={cn(
+        "type-meta",
+        backup.outcome === "failed" ? "text-fail-strong" : "text-warn-strong",
+      )}
+    >
+      {t(`clusterBackups.failure.${backup.failure}`)}
+      {backup.reason && backup.failure !== "itemsFailed" ? (
+        <span className="text-muted-foreground" translate="no">
+          {" "}
+          {backup.reason}
+        </span>
+      ) : null}
+    </p>
+  )
+}
+
+/** The namespaces to restore: those the backup holds, or the projects when it holds them all. */
+function RestoreForm({
+  backup,
+  gate,
+  onCancel,
+  onReview,
+}: {
+  backup: Schemas["VeleroBackup"]
+  gate: Gate
+  onCancel: () => void
+  onReview: (namespaces: string[]) => void
+}) {
+  const t = useT()
+  const id = useId()
+  const projects = useQuery(projectsQuery)
+  const choices =
+    backup.namespaces.length > 0
+      ? [...backup.namespaces].sort()
+      : (projects.data?.items ?? [])
+          .filter((p) => p.adopted && !p.system)
+          .map((p) => p.name)
+          .sort()
+  const [chosen, setChosen] = useState<string[]>(choices.length === 1 ? choices : [])
+  const [tried, setTried] = useState(false)
+  return (
+    <form
+      className={cn(formBox, "mt-2")}
+      onSubmit={(event) => {
+        event.preventDefault()
+        setTried(true)
+        if (chosen.length > 0) onReview(chosen)
+      }}
+    >
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 type-body font-medium text-main">
+          {t("clusterBackups.restoreInto")}
+        </legend>
+        <ul className="max-h-56 divide-y divide-main overflow-y-auto rounded-lg border border-main">
+          {choices.map((name) => (
+            <li key={name} className="flex h-10 min-w-0 items-center gap-2.5 px-3">
+              <Checkbox
+                id={`${id}-${name}`}
+                checked={chosen.includes(name)}
+                onCheckedChange={(on) =>
+                  setChosen((c) => (on ? [...c, name] : c.filter((n) => n !== name)))
+                }
+              />
+              <Label htmlFor={`${id}-${name}`} className="min-w-0 flex-1">
+                <span className="truncate type-mono" translate="no">
+                  {name}
+                </span>
+              </Label>
+            </li>
+          ))}
+        </ul>
+        {tried && chosen.length === 0 ? (
+          <p className="type-meta text-destructive">{t("clusterBackups.problem.restoreNone")}</p>
+        ) : null}
+      </fieldset>
+      <p className="type-meta text-muted-foreground">{t("clusterBackups.restoreSkips")}</p>
+      <FormButtons gate={gate} onCancel={onCancel} />
+    </form>
+  )
+}
+
+function RestoreList({ restores }: { restores: Schemas["VeleroRestore"][] }) {
+  const t = useT()
+  const scope = useScope()
+  if (restores.length === 0) return null
+  return (
+    <Section id="restore-list" title={t("clusterBackups.restores")} count={restores.length}>
+      <ul className="flex flex-col">
+        {restores.map((r) => (
+          <li key={r.name} className="flex flex-col gap-0.5 border-t border-rule py-2.5">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="min-w-0 flex-1 truncate type-mono" translate="no">
+                {r.name}
+              </span>
+              <StatusPill health={outcomeHealth[r.outcome]} size="sm">
+                {t(`backups.${r.outcome}`)}
+              </StatusPill>
+              {r.started ? (
+                <Ago
+                  iso={r.started}
+                  className="shrink-0 text-right type-meta text-muted-foreground sm:w-24"
+                />
+              ) : (
+                <span className="shrink-0 sm:w-24" />
+              )}
+              {/* In line with the backups above, which have an action here. */}
+              <span className="w-12 shrink-0" />
+            </div>
+            <span className="type-meta text-muted-foreground">
+              {[
+                t("clusterBackups.restoredFrom", r.backup),
+                scope(r.namespaces),
+                r.errors > 0 ? t("clusterBackups.errors", r.errors) : "",
+                r.warnings > 0 ? t("clusterBackups.warnings", r.warnings) : "",
+              ]
+                .filter(Boolean)
+                .join(t("common.sep"))}
+            </span>
+            {r.reason ? (
+              <p className="type-meta text-fail-strong" translate="no">
+                {r.reason}
+              </p>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </Section>
   )
 }
 
@@ -843,10 +968,12 @@ function BackupRow({ backup }: { backup: Schemas["VeleroBackup"] }) {
 function PlanDialog({
   request,
   title,
+  action,
   onClose,
 }: {
   request: Request
   title: string
+  action?: string
   onClose: () => void
 }) {
   const t = useT()
@@ -870,11 +997,18 @@ function PlanDialog({
       title={title}
       plan={plan}
       apply={apply}
-      action={t("plan.apply")}
+      action={action ?? t("plan.apply")}
       ready={(data) => (data?.writes.length ?? 0) > 0}
       onClose={onClose}
     >
-      {(data) => <Planned writes={data.writes} />}
+      {(data) => (
+        <>
+          <Planned writes={data.writes} />
+          {request.op === "restore" ? (
+            <p>{t("clusterBackups.plan.restoreInto", t("common.list", request.namespaces))}</p>
+          ) : null}
+        </>
+      )}
     </PlanFrame>
   )
 }
@@ -885,7 +1019,9 @@ function Planned({ writes }: { writes: Schemas["BackupWrite"][] }) {
   const thing = (write: Schemas["BackupWrite"]) =>
     write.kind === "Backup"
       ? t("clusterBackups.thing.Backup", write.name)
-      : t(`clusterBackups.thing.${write.kind as "Secret"}`)
+      : write.kind === "Restore"
+        ? t("clusterBackups.thing.Restore", write.name)
+        : t(`clusterBackups.thing.${write.kind as "Secret"}`)
   return (
     <>
       <ul className="flex flex-col gap-1">

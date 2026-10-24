@@ -2,6 +2,11 @@
 // section's own content, loading, empty or permission state.
 import type { ReactNode, Ref } from "react"
 
+import { GateTip } from "@/components/gate"
+import { useT } from "@/i18n"
+import type { Gate } from "@/model/rights"
+import { Button } from "@zeabur/design-system/components/button"
+
 export function Section({
   id,
   title,
@@ -30,5 +35,24 @@ export function Section({
       </div>
       {children}
     </section>
+  )
+}
+
+/** A section form's buttons: cancel, when it can be closed, and review. */
+export function FormButtons({ gate, onCancel }: { gate: Gate; onCancel?: () => void }) {
+  const t = useT()
+  return (
+    <div className="flex justify-end gap-2">
+      {onCancel ? (
+        <Button size="sm" variant="ghost" type="button" onClick={onCancel}>
+          {t("clusterBackups.cancel")}
+        </Button>
+      ) : null}
+      <GateTip gate={gate}>
+        <Button size="sm" type="submit">
+          {t("edit.review")}
+        </Button>
+      </GateTip>
+    </div>
   )
 }

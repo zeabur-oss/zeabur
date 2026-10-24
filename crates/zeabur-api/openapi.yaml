@@ -4424,6 +4424,11 @@ components:
           - string
           - "null"
           description: The backup a `backupNow` plan created.
+        restore:
+          type:
+          - string
+          - "null"
+          description: The restore a `restore` plan created.
         written:
           type: array
           items:
@@ -4454,6 +4459,11 @@ components:
         expiresAt:
           type: string
           description: When the token stops working, RFC 3339.
+        restore:
+          type:
+          - string
+          - "null"
+          description: The restore a `restore` plan creates.
         token:
           type: string
           description: Send this to `apply` to carry out exactly this plan.
@@ -4545,6 +4555,27 @@ components:
             type: string
             enum:
             - backupNow
+      - type: object
+        description: >-
+          Restore a backup into some of its namespaces. Velero skips objects that are
+          there.
+        required:
+        - backup
+        - namespaces
+        - op
+        properties:
+          backup:
+            type: string
+            description: The backup.
+          namespaces:
+            type: array
+            items:
+              type: string
+            description: The namespaces to restore.
+          op:
+            type: string
+            enum:
+            - restore
       description: What to plan.
     BaselinePolicy:
       type: object
@@ -5857,6 +5888,7 @@ components:
       - locations
       - schedules
       - backups
+      - restores
       - totalBackups
       - canChange
       - unreadable
@@ -5882,6 +5914,11 @@ components:
         namespace:
           type: string
           description: Velero's namespace.
+        restores:
+          type: array
+          items:
+            $ref: "#/components/schemas/VeleroRestore"
+          description: The newest restores, newest first, a hundred at most.
         schedules:
           type: array
           items:
@@ -16183,6 +16220,61 @@ components:
       - available
       - unavailable
       - unknown
+    VeleroRestore:
+      type: object
+      description: One restore.
+      required:
+      - name
+      - backup
+      - namespaces
+      - outcome
+      - errors
+      - warnings
+      properties:
+        backup:
+          type: string
+          description: The backup it restores.
+        errors:
+          type: integer
+          format: int64
+          description: Errors Velero counted.
+          minimum: 0
+        finished:
+          type:
+          - string
+          - "null"
+          description: When it finished, RFC 3339.
+        name:
+          type: string
+          description: Its name.
+        namespaces:
+          type: array
+          items:
+            type: string
+          description: The namespaces it restores; empty for every namespace of the backup.
+        outcome:
+          $ref: "#/components/schemas/BackupOutcome"
+          description: How it went.
+        phase:
+          type:
+          - string
+          - "null"
+          description: Velero's phase.
+        reason:
+          type:
+          - string
+          - "null"
+          description: Velero's own words when it failed (`failureReason`, `validationErrors`).
+        started:
+          type:
+          - string
+          - "null"
+          description: When it started, RFC 3339.
+        warnings:
+          type: integer
+          format: int64
+          description: Warnings Velero counted, such as objects that were already there.
+          minimum: 0
     VeleroSchedule:
       type: object
       description: When backups run and what they take.
