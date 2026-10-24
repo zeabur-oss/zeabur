@@ -1,0 +1,12 @@
+# Screenshots the docs use, taken from the in-memory demo (crates/zeabur-api/examples/demo.rs).
+# A page shows one as ![alt](https://zeabur.com/oss/shots/zeabur/en/light/<id>.avif).
+#
+# - id: project-overview        # kebab-case, unique, the file name
+#   path: /projects/shop        # route in the demo UI
+#   wait: '[data-testid="services-table"]'   # optional selector to wait for
+#   steps:                      # optional; selectors only, never visible text
+#     - click: '[data-testid="deploy-button"]'
+#   clip: main                  # optional selector to crop to
+#   viewport: desktop           # desktop (1440x900) or phone (390x844); default desktop
+#   env: {}                     # optional demo env vars, e.g. ZEABUR_DEMO_FORBID
+[]

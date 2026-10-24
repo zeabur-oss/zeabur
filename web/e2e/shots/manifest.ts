@@ -100,7 +100,7 @@ export function envKey(env: Record<string, string>): string {
 
 export function readManifest(file: string): Shot[] {
   const data: unknown = JSON.parse(readFileSync(file, "utf8"))
-  if (!Array.isArray(data) || data.length === 0) throw new Error("expected a list of shots")
+  if (!Array.isArray(data)) throw new Error("expected a list of shots")
   const shots = data.map(shot)
   const seen = new Set<string>()
   for (const { id } of shots) {
