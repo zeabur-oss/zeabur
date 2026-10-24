@@ -3272,6 +3272,10 @@ export const zhCN: Messages = {
   "domainPages.errorPagesHint": (service) =>
     `${service} 没有响应时（502、503 或 504），访客会看到你的页面，而不是简陋的错误信息。`,
   "domainPages.shared": (hosts) => `${hosts} 和这个域名共用同一个 Ingress，也会显示错误页面。`,
+  "domainPages.gatewayNoErrorPages":
+    "Gateway API 没有错误页面的 filter，所以这个域名的 HTTPRoute 只能显示维护页。",
+  "domainPages.gatewayMoves": (hosts) =>
+    `维护模式会应用到整个 HTTPRoute，所以这个域名会移到自己的路由，${hosts} 留在原处。`,
   "domainPages.pages": "页面",
   "domainPages.pagesHint": "项目的每个域名都显示同一组页面。",
   "domainPages.firstUse": "Zeabur 会在项目里加一个小型服务器来提供这些页面。",

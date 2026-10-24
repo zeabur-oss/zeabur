@@ -3551,6 +3551,10 @@ export const en = {
     `When ${service} doesn't answer (502, 503 or 504), visitors see your page instead of a bare error.`,
   "domainPages.shared": (hosts: string) =>
     `The error pages also cover ${hosts}, because they share this Ingress.`,
+  "domainPages.gatewayNoErrorPages":
+    "Gateway API has no filter for error pages, so this domain's HTTPRoute shows only the maintenance page.",
+  "domainPages.gatewayMoves": (hosts: string) =>
+    `Maintenance applies to the whole HTTPRoute, so this domain moves to a route of its own. ${hosts} stay where they are.`,
   "domainPages.pages": "Pages",
   "domainPages.pagesHint": "Every domain of the project shows the same pages.",
   "domainPages.firstUse": "Zeabur adds a small server to the project to serve them.",

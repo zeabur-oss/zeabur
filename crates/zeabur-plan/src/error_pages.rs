@@ -14,9 +14,10 @@
 //! - **Maintenance** sends the hostname's requests to the maintenance port, and the workload keeps
 //!   running. [`MAINTENANCE_ANNOTATION`] keeps the backends the hostname had, and stopping writes
 //!   them back. On an Ingress these are the backends of the hostname's paths. On an `HTTPRoute`
-//!   they are the `backendRefs` of its rules, and the route must serve only that hostname, as for a
-//!   redirect. When the rules changed since, the kept backends no longer fit, and stopping sends
-//!   the hostname to the workload's first Service instead.
+//!   they are the `backendRefs` of its rules. A filter applies to every hostname of the route, so a
+//!   hostname that shares one moves to a route of its own first, as for a redirect. When the rules
+//!   changed since, the kept backends no longer fit, and stopping sends the hostname to the
+//!   workload's first Service instead.
 //! - The `errors` middleware catches the maintenance port's 503 too, and asks for `503.html` with
 //!   the original `Host` header [traefik-errors-source]. Its query lists the hostnames in
 //!   maintenance (`?down=a.example.com,*.example.org`), and for those hosts the pages port answers
@@ -283,6 +284,18 @@ impl Planner<'_> {
         workload: Option<&WorkloadRef>,
     ) -> Result<(), PlanError> {
         let object = self.checked_route(route, hostname)?;
+        let (route, object) = match route.kind {
+            RouteKind::Ingress => (route.clone(), object),
+            RouteKind::HttpRoute => {
+                let (name, object) = self.own_http_route(&route.name, object, hostname)?;
+                let route = RouteRef {
+                    kind: RouteKind::HttpRoute,
+                    name,
+                };
+                (route, object)
+            }
+        };
+        let route = &route;
         let target = match route.kind {
             RouteKind::Ingress => ingress_target(&route.name),
             RouteKind::HttpRoute => http_route_target(&route.name),
@@ -313,20 +326,6 @@ impl Planner<'_> {
         }
         self.claim(index, &[Step::field("spec"), Step::field("rules")], "rules")?;
         let rules = array(&current, "/spec/rules");
-        if route.kind == RouteKind::HttpRoute {
-            let count = array(&current, "/spec/hostnames").len();
-            if count != 1 {
-                return Err(error(
-                    ErrorKind::Invalid,
-                    "shared_route",
-                    format!(
-                        "HTTPRoute {} serves {count} hostnames, and maintenance would apply to \
-                         all of them. Move the hostname to a route of its own first.",
-                        route.name
-                    ),
-                ));
-            }
-        }
         let swapped = match route.kind {
             RouteKind::Ingress => ingress_swap(&rules, hostname, kept.get(hostname)),
             RouteKind::HttpRoute => http_route_swap(&rules, kept.get(hostname)),

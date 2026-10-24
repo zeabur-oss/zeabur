@@ -1,0 +1,9 @@
+description: "Maintenance on an HTTPRoute that also serves another hostname first moves the hostname to a route of its own, with the same parents and rules, and swaps the backendRefs there."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: HTTPRoute, name: web-www}
+        hostname: www.shop.example.test
+        enabled: true

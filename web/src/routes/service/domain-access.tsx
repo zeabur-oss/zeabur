@@ -73,14 +73,19 @@ function userProblems(t: Translate, form: PasswordForm) {
 /** The redirect Zeabur wrote for `host`, with its target once the Middleware loads. */
 function useExisting(project: string, route: Schemas["Route"], host: string) {
   const redirect = route.redirects?.find((r) => r.host === host)
-  // An HTTPRoute's redirect is a filter of the route, which the document already has.
-  const said = redirect?.to ? { to: redirect.to, permanent: redirect.permanent ?? true } : undefined
+  const said = filterRedirect(redirect)
   const current = useQuery({
     ...objectQuery(project, middlewareAddress(redirect?.middleware ?? "")),
     enabled: redirect !== undefined && !said,
   })
   const was = said ?? redirectOf(current.data?.yaml)
   return redirect && { middleware: redirect.middleware, to: was?.to, permanent: was?.permanent }
+}
+
+/** An HTTPRoute's redirect is a filter of the route, which the document already has. */
+function filterRedirect(redirect: Schemas["RouteMiddleware"] | undefined) {
+  if (!redirect?.to) return undefined
+  return { to: redirect.to, permanent: redirect.permanent ?? true }
 }
 
 type Existing = ReturnType<typeof useExisting>
@@ -168,15 +173,12 @@ export default function DomainAccessDrawer({
   const workload = { kind: service.kind, name: service.name }
   const others = route.hostnames.filter((h) => h !== host)
 
-  const problems = problemsOf(
-    t,
-    host,
-    target,
-    gateway ? { ...passwordForm, on: false } : passwordForm,
-  )
+  // An HTTPRoute has no password to set or remove.
+  const password = gateway ? { ...passwordForm, on: false } : passwordForm
+  const problems = problemsOf(t, host, target, password)
   const changes = [
     ...redirectChanges(routeRef, workload, host, existing, target),
-    ...(gateway ? [] : passwordChanges(routeRef, passwordForm, protectedNow)),
+    ...passwordChanges(routeRef, password, protectedNow),
   ]
   const nothing = tried && changes.length === 0
   const review = () => {
@@ -213,27 +215,36 @@ export default function DomainAccessDrawer({
           errors={shown(problems.to)}
         />
         {gateway ? (
-          <p className="type-meta text-muted-foreground">{t("domainAccess.gatewayNoPassword")}</p>
+          <GatewayAccess route={route.name} />
         ) : (
-          <PasswordFields
-            others={others}
-            form={passwordForm}
-            onChange={setPasswordForm}
-            errors={{ username: shown(problems.username), password: shown(problems.password) }}
-          />
-        )}
-        {gateway ? (
-          <KubeDetails
-            facts={[
-              [t("domainAccess.kube.redirect"), `HTTPRoute/${route.name} RequestRedirect`],
-              [t("domainAccess.kube.kept"), `HTTPRoute/${route.name} zeabur.com/redirect-rules`],
-            ]}
-          />
-        ) : (
-          <AccessDetails route={route} host={host} redirect={existing?.middleware} />
+          <>
+            <PasswordFields
+              others={others}
+              form={passwordForm}
+              onChange={setPasswordForm}
+              errors={{ username: shown(problems.username), password: shown(problems.password) }}
+            />
+            <AccessDetails route={route} host={host} redirect={existing?.middleware} />
+          </>
         )}
       </ReviewForm>
     </FormDrawer>
+  )
+}
+
+/** Gateway API has no password filter; a redirect is the route's own filter. */
+function GatewayAccess({ route }: { route: string }) {
+  const t = useT()
+  return (
+    <>
+      <p className="type-meta text-muted-foreground">{t("domainAccess.gatewayNoPassword")}</p>
+      <KubeDetails
+        facts={[
+          [t("domainAccess.kube.redirect"), `HTTPRoute/${route} RequestRedirect`],
+          [t("domainAccess.kube.kept"), `HTTPRoute/${route} zeabur.com/redirect-rules`],
+        ]}
+      />
+    </>
   )
 }
 

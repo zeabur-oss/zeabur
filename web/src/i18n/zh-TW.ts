@@ -3280,6 +3280,10 @@ export const zhTW: Messages = {
   "domainPages.errorPagesHint": (service) =>
     `${service} 沒有回應時（502、503 或 504），訪客會看到你的頁面，而不是空白的錯誤訊息。`,
   "domainPages.shared": (hosts) => `${hosts} 和這個網域共用同一個 Ingress，也會顯示錯誤頁面。`,
+  "domainPages.gatewayNoErrorPages":
+    "Gateway API 沒有錯誤頁面的 filter，所以這個網域的 HTTPRoute 只能顯示維護頁。",
+  "domainPages.gatewayMoves": (hosts) =>
+    `維護模式會套用到整個 HTTPRoute，所以這個網域會移到自己的路由，${hosts} 留在原處。`,
   "domainPages.pages": "頁面",
   "domainPages.pagesHint": "專案的每個網域都顯示同一組頁面。",
   "domainPages.firstUse": "Zeabur 會在專案裡加一個小型伺服器來提供這些頁面。",
