@@ -9,7 +9,7 @@ description: 設定 Zeabur Identity 用戶端並以 Helm 安裝可用通行密�
 
 - 可管理目標叢集的 kubeconfig，以及 `kubectl`、Helm 4 和 `zeabur-identityctl`。
 - Kubernetes 1.30 以上。chart 預設會建立專案成員角色，並用 `ValidatingAdmissionPolicy` 限制開發者能改的 Namespace 欄位；這個 API 從 1.30 起正式提供。
-- 已可透過 HTTPS 登入的 Zeabur Identity，且 kube-apiserver 已信任它簽發的 Kubernetes token。安裝方式見 [Zeabur Identity 入門](https://zeabur.com/oss/docs/identity/get-started)。
+- 已可透過 HTTPS 登入的 Zeabur Identity，且 kube-apiserver 已信任它簽發的 Kubernetes token。安裝方式見 [Zeabur Identity 入門](https://oss.zeabur.com/docs/identity/get-started)。
 - Zeabur 的 HTTPS 網域、可用的 Ingress controller，以及該網域的 TLS Secret。以下使用 Traefik、`zeabur.example.com` 和 `zeabur-tls`。
 - 要安裝的 Zeabur 版本。chart 發布在 `oci://ghcr.io/zeabur-oss/charts/zeabur`，預設映像檔已釘選到同一版的 digest；下載與驗證方式見[發布成品](../reference/releases.mdx)。以下用 `<version>` 代表版本號。
 
