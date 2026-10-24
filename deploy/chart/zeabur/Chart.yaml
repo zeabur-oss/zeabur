@@ -6,6 +6,6 @@ description: >-
 type: application
 version: 0.0.1
 appVersion: "0.0.1"
-home: https://github.com/zeabur/zeabur
+home: https://github.com/zeabur-oss/zeabur
 sources:
-  - https://github.com/zeabur/zeabur
+  - https://github.com/zeabur-oss/zeabur

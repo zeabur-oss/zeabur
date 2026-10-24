@@ -22,7 +22,7 @@ packages or artifacts.
 ```sh
 gh run view <run> --json headSha,headBranch,event,jobs \
   --jq '{headSha,headBranch,event,jobs:[.jobs[]|{name,conclusion,databaseId}]}'
-gh api repos/zeabur/zeabur/actions/jobs/<job>/logs | sed 's/\x1b\[[0-9;]*m//g' > job.log
+gh api repos/zeabur-oss/zeabur/actions/jobs/<job>/logs | sed 's/\x1b\[[0-9;]*m//g' > job.log
 grep -nE 'panicked|FAILED|Error:|error\[|failed' job.log | head
 ```
 - `gh run view --log` prints nothing while another job of the run is still going; the job's

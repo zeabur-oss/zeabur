@@ -6,7 +6,7 @@
 # zeaburctl. Run inside `nix develop` on Linux amd64/arm64 or macOS arm64; `gh` must be signed in
 # (the attestations are read from GitHub's API).
 #   scripts/release-verify.sh v0.0.2 downloaded \
-#     https://github.com/zeabur/zeabur/.github/workflows/release.yml@refs/tags/v0.0.2
+#     https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v0.0.2
 set -euo pipefail
 
 if [[ $# != 3 ]]; then
@@ -29,7 +29,7 @@ case "$(uname -s):$(uname -m)" in
   *) echo "release verification runs on Linux amd64/arm64 or macOS arm64" >&2; exit 2 ;;
 esac
 plain="${version#v}"
-repository="${GITHUB_REPOSITORY:-zeabur/zeabur}"
+repository="${GITHUB_REPOSITORY:-zeabur-oss/zeabur}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 # A fresh, empty registry configuration: a publisher's login must not hide a private package.

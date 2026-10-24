@@ -6,7 +6,7 @@
 # Run inside `nix develop` on Linux amd64 or arm64 with Docker; it never touches the caller's
 # kubeconfig.
 #   scripts/release-smoke.sh dist/zeaburctl-v0.0.2-linux-arm64.tar.gz deploy/chart/zeabur zeabur:release-arm64
-#   scripts/release-smoke.sh zeaburctl-v0.0.2-linux-arm64.tar.gz oci://ghcr.io/zeabur/charts/zeabur@sha256:…
+#   scripts/release-smoke.sh zeaburctl-v0.0.2-linux-arm64.tar.gz oci://ghcr.io/zeabur-oss/charts/zeabur@sha256:…
 set -euo pipefail
 
 if [[ $# != 2 && $# != 3 ]]; then

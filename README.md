@@ -32,7 +32,7 @@ than you have, and keeps no state of its own: no database, no custom resources.
 ## Principles
 
 - **Your rights, not Zeabur's.** Every request is made with your own credential (a token from
-  [Zeabur Identity](https://github.com/zeabur/identity), or your kubeconfig on your machine);
+  [Zeabur Identity](https://github.com/zeabur-oss/identity), or your kubeconfig on your machine);
   kube-apiserver decides. In a cluster, admin rights are asked for only when your everyday ones
   are refused; they need your passkey again and last a few minutes.
 - **Kubernetes objects are the only state.** No database and no custom resources: a project is
@@ -69,7 +69,7 @@ than you have, and keeps no state of its own: no database, no custom resources.
   store such as VictoriaMetrics).
 - **Suggested installs** for missing components, as a `helm` command, a Flux `HelmRelease`, an
   Argo CD `Application` or a k3s `HelmChart`, from
-  [Zeabur Catalog](https://github.com/zeabur/catalog).
+  [Zeabur Catalog](https://github.com/zeabur-oss/catalog).
 - **In a cluster**, with its Helm chart: sign-in through Zeabur Identity with a passkey, admin rights
   confirmed with the passkey again, and nothing left behind after uninstalling.
 - **`zeaburctl mcp`**: a read-only [Model Context Protocol](https://modelcontextprotocol.io)
@@ -84,12 +84,12 @@ Not yet: creating new workloads, editing or deleting objects that Helm, Argo CD 
 ## Quick start
 
 On your machine, with your kubeconfig. Download `zeaburctl` for Linux or macOS (Apple silicon)
-from a [release](https://github.com/zeabur/zeabur/releases) and verify it
+from a [release](https://github.com/zeabur-oss/zeabur/releases) and verify it
 ([Releases](docs/releases.md#download-and-verify-zeaburctl)), or build it from source in the
 [Nix](https://nixos.org) dev shell, which provides every tool:
 
 ```sh
-git clone https://github.com/zeabur/zeabur && cd zeabur
+git clone https://github.com/zeabur-oss/zeabur && cd zeabur
 nix develop
 ./scripts/build-ui.sh
 ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeaburctl
@@ -118,7 +118,7 @@ Apache-2.0. Contributions are accepted under the [Developer Certificate of Origi
 
 Third-party content in this repository:
 
-- [Zeabur Catalog](https://github.com/zeabur/catalog) in
+- [Zeabur Catalog](https://github.com/zeabur-oss/catalog) in
   `crates/zeabur-catalog/bundle` (Apache-2.0, `bundle/LICENSE`).
 - Kubernetes' release schedule in `crates/zeabur-catalog/src/versions.rs`, from
   [kubernetes/website](https://github.com/kubernetes/website) `data/releases` (CC BY 4.0, The
@@ -126,7 +126,7 @@ Third-party content in this repository:
 - Rendered manifests of upstream Helm charts in `fixtures/charts`, test input only, each under
   its chart's licence (Apache-2.0 or MIT; listed in `fixtures/charts/README.md`).
 
-The web interface is built with [@zeabur/design-system](https://github.com/zeabur/design-system)
+The web interface is built with [@zeabur/design-system](https://github.com/zeabur-oss/design-system)
 (Apache-2.0), which contains shadcn/ui's components, theme and base styles (MIT), the Inter and
 JetBrains Mono fonts (SIL Open Font License 1.1) and the Zeabur logo; its README lists their
 notices. The built interface, embedded in the binary and the image, includes those fonts and

@@ -4,14 +4,14 @@
 
 Please report vulnerabilities privately through GitHub's private vulnerability reporting:
 "Report a vulnerability" on the
-[Security tab of zeabur/zeabur](https://github.com/zeabur/zeabur/security/advisories/new).
+[Security tab of zeabur-oss/zeabur](https://github.com/zeabur-oss/zeabur/security/advisories/new).
 Do not open public issues, discussions or pull requests for security problems.
 
 Useful in a report: the version or commit, how Zeabur runs (`zeaburctl ui`, in a cluster with
 Zeabur Identity, or installed by `zeabur-installer`), the Kubernetes distribution and version, and
 the steps that show the problem. A
 vulnerability in Zeabur Identity itself belongs to
-[zeabur/identity](https://github.com/zeabur/identity/security/advisories/new).
+[zeabur-oss/identity](https://github.com/zeabur-oss/identity/security/advisories/new).
 
 ## Supported versions
 

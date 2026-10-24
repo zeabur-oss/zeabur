@@ -13,8 +13,8 @@ tag v0.0.2 ─▶ CI ─▶ build (Linux amd64/arm64, macOS arm64) ─▶ smoke 
 
 | Artifact | Where |
 |---|---|
-| Image, linux/amd64 and linux/arm64 | `ghcr.io/zeabur/zeabur:<version>`; install by the index digest in `digests.txt` |
-| Helm chart, its default image pinned to that digest | `oci://ghcr.io/zeabur/charts/zeabur`, version `<version>`; also the asset `zeabur-<version>.tgz` |
+| Image, linux/amd64 and linux/arm64 | `ghcr.io/zeabur-oss/zeabur:<version>`; install by the index digest in `digests.txt` |
+| Helm chart, its default image pinned to that digest | `oci://ghcr.io/zeabur-oss/charts/zeabur`, version `<version>`; also the asset `zeabur-<version>.tgz` |
 | `zeaburctl`, Linux amd64 and arm64 (static, musl), macOS arm64 (Apple silicon) | `zeaburctl-v<version>-<os>-<arch>.tar.gz` |
 | `zeabur`, the server binary in the image, Linux amd64 and arm64 | `zeabur-v<version>-linux-<arch>.tar.gz` |
 | `zeabur-installer`, which installs a cluster with Zeabur on one server ([guide](installer/README.md)), Linux amd64 and arm64 (static, musl) | `zeabur-installer-v<version>-linux-<arch>.tar.gz` |
@@ -41,15 +41,15 @@ With `gh`, `cosign` 3 and GNU `sha256sum` (all in `nix develop`):
 ```sh
 version=0.0.2
 platform=darwin-arm64     # linux-amd64, linux-arm64
-identity="https://github.com/zeabur/zeabur/.github/workflows/release.yml@refs/tags/v$version"
-gh release download "v$version" --repo zeabur/zeabur --dir "zeabur-$version" \
+identity="https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v$version"
+gh release download "v$version" --repo zeabur-oss/zeabur --dir "zeabur-$version" \
   --pattern SHA256SUMS --pattern SHA256SUMS.sigstore.json \
   --pattern "zeaburctl-v$version-$platform.tar.gz"
 cd "zeabur-$version"
 cosign verify-blob --bundle SHA256SUMS.sigstore.json --certificate-identity "$identity" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com SHA256SUMS
 sha256sum --check --ignore-missing SHA256SUMS
-gh attestation verify "zeaburctl-v$version-$platform.tar.gz" --repo zeabur/zeabur \
+gh attestation verify "zeaburctl-v$version-$platform.tar.gz" --repo zeabur-oss/zeabur \
   --cert-identity "$identity"
 tar -xzf "zeaburctl-v$version-$platform.tar.gz" zeaburctl
 ./zeaburctl --version
@@ -84,7 +84,7 @@ The image and the chart: [Install in a cluster](install.md), step 1.
 6. Check the draft: the notes, the asset list, the digests. Optionally install it on a cluster of
    your own as [Install in a cluster](install.md) describes.
 7. Publish it: on the release page, **Edit → Publish release**, or
-   `gh release edit v0.0.2 --repo zeabur/zeabur --draft=false`. It stays marked as a
+   `gh release edit v0.0.2 --repo zeabur-oss/zeabur --draft=false`. It stays marked as a
    pre-release while Zeabur is before 1.0. Then download it once without signing in and repeat
    the checks above against the public release.
 
@@ -122,7 +122,7 @@ already exists.
   `main`), then run a new verification with the scripts of `main` against the existing assets:
 
   ```sh
-  gh workflow run release.yml --repo zeabur/zeabur --ref main \
+  gh workflow run release.yml --repo zeabur-oss/zeabur --ref main \
     -f version=v0.0.2 -F verify_only=true
   ```
 

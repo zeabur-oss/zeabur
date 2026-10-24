@@ -1,7 +1,7 @@
 # Zeabur interface design
 
 Rules for the web interface. Components, tokens and fonts come from
-[@zeabur/design-system](https://github.com/zeabur/design-system) (its README lists the tokens;
+[@zeabur/design-system](https://github.com/zeabur-oss/design-system) (its README lists the tokens;
 preview them in its Storybook). Build from its components and their variants rather than
 look-alikes; `src/styles/app.css` imports it and adds only this interface's layout tokens.
 

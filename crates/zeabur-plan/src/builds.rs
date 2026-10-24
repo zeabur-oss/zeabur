@@ -14,7 +14,7 @@
 //!   Builder passes each variable to the build as a `BuildKit` secret, never as a build argument,
 //!   so a value does not stay in the image. A value from a Secret names the Secret and the key.
 //!
-//! [builder]: https://github.com/zeabur/builder
+//! [builder]: https://github.com/zeabur-oss/builder
 //! [keel]: https://keel.sh/docs/#policies
 
 use serde_json::{Value, json};

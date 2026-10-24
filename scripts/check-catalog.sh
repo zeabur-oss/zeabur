@@ -16,7 +16,7 @@ if [[ -n "${RECS_DIR:-}" ]]; then
   git -C "$RECS_DIR" archive "$commit" capabilities LICENSE | tar -x -C "$tmp/upstream"
 else
   curl --fail --silent --show-error --location --proto '=https' \
-    "https://codeload.github.com/zeabur/catalog/tar.gz/$commit" |
+    "https://codeload.github.com/zeabur-oss/catalog/tar.gz/$commit" |
     tar -xz -C "$tmp/upstream" --strip-components=1 "catalog-$commit/capabilities" \
       "catalog-$commit/LICENSE"
 fi

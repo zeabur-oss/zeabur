@@ -51,7 +51,7 @@ every locale, and the term chosen for each concept, is in [docs/wording.md](docs
 When you change the vendored recommendations or their pin, also run the check that compares them
 with their upstream (it downloads it; `.github/workflows/vendored.yml` runs it only for such
 changes). The files vendored for the interface's styles are checked in
-[zeabur/design-system](https://github.com/zeabur/design-system).
+[zeabur-oss/design-system](https://github.com/zeabur-oss/design-system).
 
 ```sh
 ./scripts/check-catalog.sh
@@ -211,12 +211,12 @@ The example's documentation (`crates/zeabur-api/examples/demo.rs`) lists the var
 refuse reads or offer admin rights, to see those states.
 
 Components, tokens and fonts come from
-[zeabur/design-system](https://github.com/zeabur/design-system), a Git dependency pinned to a
+[zeabur-oss/design-system](https://github.com/zeabur-oss/design-system), a Git dependency pinned to a
 commit in `web/package.json`. It ships its sources, which Vite compiles like the interface's own
 (`web/vite.config.ts`). To change a component, change it there, then move the pin:
 
 ```sh
-(cd web && bun add 'github:zeabur/design-system#<commit>')
+(cd web && bun add 'github:zeabur-oss/design-system#<commit>')
 ```
 
 To try a design-system change here before it is pushed, link a checkout next to this one with

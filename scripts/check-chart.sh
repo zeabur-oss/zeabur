@@ -128,10 +128,10 @@ expect full "$out" 'select(.kind == "Deployment" and .metadata.name == "zeabur")
 # (scripts/release-publish.sh).
 image='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].image'
 app_version=$(yq '.appVersion' "$chart/Chart.yaml")
-expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/zeabur/zeabur:$app_version"
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/zeabur-oss/zeabur:$app_version"
 digest="sha256:$(printf '%064d' 0)"
 expect digest "$(render -f "$chart/ci/minimal-values.yaml" --set image.tag=ignored --set image.digest="$digest")" \
-  "$image" "ghcr.io/zeabur/zeabur@$digest"
+  "$image" "ghcr.io/zeabur-oss/zeabur@$digest"
 
 # Everyone signed in reads the settings unless that is turned off.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \

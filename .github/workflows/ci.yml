@@ -141,7 +141,7 @@ jobs:
       # refuses a shallow clone.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: zeabur/identity
+          repository: zeabur-oss/identity
           ref: ${{ steps.zeabur-identity.outputs.rev }}
           path: .zeabur-identity
           fetch-depth: 0

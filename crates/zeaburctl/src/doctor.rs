@@ -40,7 +40,7 @@ const KUBERNETES_AUDIENCE: &str = "kubernetes";
 /// The prefix Zeabur Identity's `AuthenticationConfiguration` gives usernames.
 const ZEABUR_IDENTITY_USER_PREFIX: &str = "zeabur:";
 const ZEABUR_IDENTITY_GET_STARTED: &str =
-    "https://github.com/zeabur/identity/blob/main/docs/get-started.md";
+    "https://github.com/zeabur-oss/identity/blob/main/docs/get-started.md";
 const VERSION_SKEW_POLICY: &str = "https://kubernetes.io/releases/version-skew-policy/";
 
 /// Options of `zeaburctl doctor`.

@@ -36,10 +36,10 @@ request and name the step that is theirs. A change to a `scripts/release-*.sh` i
 `release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.
 
 ## Issues
-- **Where.** Zeabur itself: `zeabur/zeabur`. A component in the catalogue (a chart, its
-  version, values, detection, security notes, its e2e): `zeabur/catalog`; Zeabur
+- **Where.** Zeabur itself: `zeabur-oss/zeabur`. A component in the catalogue (a chart, its
+  version, values, detection, security notes, its e2e): `zeabur-oss/catalog`; Zeabur
   vendors its signed bundle (`crates/zeabur-catalog/bundle`, pin in `PINNED`) and moves the pin
-  after a release. Sign-in, tokens, passkeys: `zeabur/identity`. When work spans repositories,
+  after a release. Sign-in, tokens, passkeys: `zeabur-oss/identity`. When work spans repositories,
   open one issue in each and link them both ways.
 - **Type.** Bug, Feature or Task (GitHub issue types; set with
   `gh api -X PATCH repos/<owner>/<repo>/issues/<n> -f type=Feature`).

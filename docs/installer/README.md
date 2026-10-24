@@ -6,10 +6,10 @@
 
 - **[RKE2](https://docs.rke2.io)** with its CIS profile. Secrets are encrypted at rest, Pod
   Security `restricted` applies outside the system namespaces, and an audit log is kept.
-- The **[Zeabur Catalog](https://github.com/zeabur/catalog)** components you choose: ingress,
+- The **[Zeabur Catalog](https://github.com/zeabur-oss/catalog)** components you choose: ingress,
   certificates, metrics, logs and, with `preset: secure`, runtime detection, vulnerability
   scanning and intrusion prevention.
-- **[Zeabur Identity](https://github.com/zeabur/identity)**. You sign in to the cluster with a
+- **[Zeabur Identity](https://github.com/zeabur-oss/identity)**. You sign in to the cluster with a
   passkey; no `admin.conf` gets copied around.
 - **[Zeabur](../../README.md)**, the web console for the cluster.
 

@@ -10,8 +10,8 @@ minor or patch release may break the API.
 
 ### Added
 
-- Releases from CI only: the image `ghcr.io/zeabur/zeabur` (linux/amd64, linux/arm64), the
-  chart `oci://ghcr.io/zeabur/charts/zeabur` pinned to the image's digest, and `zeaburctl`
+- Releases from CI only: the image `ghcr.io/zeabur-oss/zeabur` (linux/amd64, linux/arm64), the
+  chart `oci://ghcr.io/zeabur-oss/charts/zeabur` pinned to the image's digest, and `zeaburctl`
   for Linux (amd64, arm64) and macOS (arm64), all signed with Sigstore and attested
   ([docs/releases.md](docs/releases.md)). The chart's new `image.digest` value pins any image
   by content.
@@ -39,7 +39,7 @@ The first public release, pre-alpha.
   backups (K8up, Velero, CloudNativePG), NetworkPolicy reachability, and the cluster's nodes,
   Kubernetes version support and upgrades.
 - Install suggestions for missing components from the
-  [Zeabur Catalog](https://github.com/zeabur/catalog), as a `helm`
+  [Zeabur Catalog](https://github.com/zeabur-oss/catalog), as a `helm`
   command, a Flux `HelmRelease`, an Argo CD `Application` or a k3s `HelmChart`.
 - The web interface in English and Traditional Chinese (zh-TW), embedded in the binaries.
 - `zeaburctl ui` (local mode with the kubeconfig), `zeaburctl mcp` (a read-only Model Context
@@ -64,4 +64,4 @@ The first public release, pre-alpha.
   seven-day minimum age for new crate and package releases, and a reviewed allowlist for
   shipped `unsafe` and native code.
 
-[0.0.1]: https://github.com/zeabur/zeabur/releases/tag/v0.0.1
+[0.0.1]: https://github.com/zeabur-oss/zeabur/releases/tag/v0.0.1

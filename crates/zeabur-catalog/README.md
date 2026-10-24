@@ -18,7 +18,7 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
 ## Design
 
 - **The catalogue is embedded.** `bundle/` is the
-  [Zeabur Catalog](https://github.com/zeabur/catalog) at the commit in
+  [Zeabur Catalog](https://github.com/zeabur-oss/catalog) at the commit in
   `bundle/PINNED` (Apache-2.0, `bundle/LICENSE`); `scripts/check-catalog.sh` fails CI if a
   change makes it differ from that commit. The binary carries the catalogue it was built with and
   fetches nothing at run time. Once the catalogue publishes signed releases, the pin moves to a

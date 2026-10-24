@@ -3,7 +3,7 @@
 
 image:
   # Published for linux/amd64 and linux/arm64 by the release workflow, signed (docs/releases.md).
-  repository: ghcr.io/zeabur/zeabur
+  repository: ghcr.io/zeabur-oss/zeabur
   # Defaults to the chart's appVersion. Ignored when digest is set.
   tag: ""
   # The image by content: sha256:<64 hex digits>. A released chart sets it to the image index
@@ -129,7 +129,7 @@ proxy:
   enabled: false
   image:
     # Published next to Zeabur's image, from the same commit.
-    repository: ghcr.io/zeabur/proxy
+    repository: ghcr.io/zeabur-oss/proxy
     # Defaults to the chart's appVersion. Ignored when digest is set.
     tag: ""
     digest: ""

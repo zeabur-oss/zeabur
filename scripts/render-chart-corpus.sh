@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Renders the chart corpus in fixtures/charts/ from Zeabur Catalog
-# (github.com/zeabur/catalog): every component's single-node profile, rendered by
+# (github.com/zeabur-oss/catalog): every component's single-node profile, rendered by
 # the catalogue's own `recs render` (helm template with the release values, the profile, CI
 # test inputs and contributions; `urls` releases downloaded, `manifests` releases as written),
 # for the newest Kubernetes version in its config/kubernetes.yaml. CustomResourceDefinitions
@@ -80,7 +80,7 @@ filter() {
 # is looked up before it joins the corpus. Releases written inline in the catalogue are the
 # catalogue's (Apache-2.0).
 licence() {
-  local gh=https://github.com recs="[Apache-2.0](https://github.com/zeabur/catalog/blob/main/LICENSE) (catalogue)"
+  local gh=https://github.com recs="[Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue)"
   case $1 in
   certificates/cert-manager) echo "[Apache-2.0]($gh/cert-manager/cert-manager/blob/master/LICENSE)" ;;
   config-reload/reloader) echo "[Apache-2.0]($gh/stakater/Reloader/blob/master/LICENSE)" ;;
@@ -182,11 +182,11 @@ total=$(cat "$out_dir"/*.yaml | wc -c)
 
 Rendered Kubernetes manifests of real Helm charts, used to measure how much of real-world
 input the projection covers. One file per component of the
-[Zeabur Catalog](https://github.com/zeabur/catalog), named
+[Zeabur Catalog](https://github.com/zeabur-oss/catalog), named
 \`<capability>__<component>.yaml\`, each holding every release of the component in install
 order as one multi-document YAML stream.
 
-- Source: \`zeabur/catalog\` at commit \`$RECS_COMMIT\`.
+- Source: \`zeabur-oss/catalog\` at commit \`$RECS_COMMIT\`.
 - Profile: \`$PROFILE\`, Kubernetes version \`$kube_version\` (the newest in its
   \`config/kubernetes.yaml\`).
 - Rendered by the catalogue's own \`recs render\`: \`helm template --include-crds\` with the
@@ -208,7 +208,7 @@ the Apache-2.0 text is in the \`LICENSE\` at the root.
 Regenerate with Nix and network access to the chart registries:
 
 \`\`\`sh
-git clone https://github.com/zeabur/catalog ~/recs
+git clone https://github.com/zeabur-oss/catalog ~/recs
 RECS_DIR=~/recs RECS_COMMIT=$RECS_COMMIT scripts/render-chart-corpus.sh
 \`\`\`
 

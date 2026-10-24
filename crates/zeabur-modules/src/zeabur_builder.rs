@@ -7,7 +7,7 @@
 //! A `BuildRun` is one build of one commit, labelled with its `Build`; its Job and pod are named
 //! after it and live next to it.
 //!
-//! [builder]: https://github.com/zeabur/builder
+//! [builder]: https://github.com/zeabur-oss/builder
 
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
 use serde::Serialize;

@@ -7,7 +7,7 @@ version = "0.0.1"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
-repository = "https://github.com/zeabur/zeabur"
+repository = "https://github.com/zeabur-oss/zeabur"
 # Only the pure crates and their fixture loader are published ([workspace.metadata.pure]).
 publish = false
 

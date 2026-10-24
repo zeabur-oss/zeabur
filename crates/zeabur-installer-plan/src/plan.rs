@@ -1094,7 +1094,7 @@ mod tests {
     fn config(extra: &str) -> Config {
         Config::parse(&format!(
             "access: {{mode: domain, identity: login.example.com, zeabur: zeabur.example.com}}\n\
-             sources:\n  identityImage: ghcr.io/zeabur/identity@sha256:aa\n  identityctl: /tmp/ctl\n  \
+             sources:\n  identityImage: ghcr.io/zeabur-oss/identity@sha256:aa\n  identityctl: /tmp/ctl\n  \
              zeaburImage: zeabur:dev\n  zeaburChart: /tmp/chart\n{extra}"
         ))
         .unwrap()

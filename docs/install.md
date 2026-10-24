@@ -1,7 +1,7 @@
 # Install Zeabur in a cluster
 
 Zeabur runs as one pod in its own namespace. People sign in through
-[Zeabur Identity](https://github.com/zeabur/identity) with their passkey, and every request Zeabur makes
+[Zeabur Identity](https://github.com/zeabur-oss/identity) with their passkey, and every request Zeabur makes
 to kube-apiserver carries that person's token: Zeabur's service account has no Role, no
 ClusterRole and no token of its own. What someone can see and change in Zeabur is exactly what
 their Kubernetes RBAC allows. The chart's one Role lets everyone signed in read Zeabur's settings
@@ -24,7 +24,7 @@ The examples use these names; replace them with yours:
 - Kubernetes 1.30 or later, for the member roles' admission policy (`ValidatingAdmissionPolicy`
   is GA from 1.30). With `memberRoles.enabled=false` the chart installs none.
 - A cluster whose kube-apiserver trusts Zeabur Identity's tokens, with Zeabur Identity's sign-in page published
-  over HTTPS: Zeabur Identity's [Get started](https://github.com/zeabur/identity/blob/main/docs/get-started.md)
+  over HTTPS: Zeabur Identity's [Get started](https://github.com/zeabur-oss/identity/blob/main/docs/get-started.md)
   sets this up on k3s. Run `zeabur-identityctl` and `kubectl` below with the cluster admin's kubeconfig.
 - An ingress controller (an `Ingress` or a Gateway API `Gateway`) and a TLS certificate for
   Zeabur's host name, for example from cert-manager. Browsers offer passkeys only on pages they
@@ -35,9 +35,9 @@ The examples use these names; replace them with yours:
 
 ## 1. Choose a release and verify it
 
-There is nothing to build. Each [release](https://github.com/zeabur/zeabur/releases) publishes
-the image `ghcr.io/zeabur/zeabur` (linux/amd64 and linux/arm64) and the chart
-`oci://ghcr.io/zeabur/charts/zeabur`, whose default image is that image's digest. Both are
+There is nothing to build. Each [release](https://github.com/zeabur-oss/zeabur/releases) publishes
+the image `ghcr.io/zeabur-oss/zeabur` (linux/amd64 and linux/arm64) and the chart
+`oci://ghcr.io/zeabur-oss/charts/zeabur`, whose default image is that image's digest. Both are
 signed by the release workflow at the release's tag (keyless, with
 [Sigstore](https://docs.sigstore.dev/)) and carry a
 [build provenance attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds).
@@ -45,9 +45,9 @@ The release lists their digests in `digests.txt`, covered by the signed `SHA256S
 
 ```sh
 version=0.0.2
-identity="https://github.com/zeabur/zeabur/.github/workflows/release.yml@refs/tags/v$version"
+identity="https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v$version"
 issuer=https://token.actions.githubusercontent.com
-gh release download "v$version" --repo zeabur/zeabur --dir "zeabur-$version" \
+gh release download "v$version" --repo zeabur-oss/zeabur --dir "zeabur-$version" \
   --pattern digests.txt --pattern SHA256SUMS --pattern SHA256SUMS.sigstore.json
 cd "zeabur-$version"
 cosign verify-blob --bundle SHA256SUMS.sigstore.json --certificate-identity "$identity" \
@@ -57,7 +57,7 @@ image=$(awk '$1 == "index" { print $2 }' digests.txt)
 chart=$(awk '$1 == "chart" { print $2 }' digests.txt)
 for ref in "$image" "$chart"; do
   cosign verify --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" "$ref" >/dev/null
-  gh attestation verify "oci://$ref" --repo zeabur/zeabur --cert-identity "$identity"
+  gh attestation verify "oci://$ref" --repo zeabur-oss/zeabur --cert-identity "$identity"
 done
 helm show values "oci://$chart" | grep -A6 '^image:'              # digest: the image above
 ```
@@ -90,7 +90,7 @@ unset CLIENT_SECRET
 
 Without `--allow-elevation`, set `elevation.enabled=false` below: people then see and change
 only what their everyday rights allow. See Zeabur Identity's
-[Registering clients](https://github.com/zeabur/identity/blob/main/docs/clients.md) for the
+[Registering clients](https://github.com/zeabur-oss/identity/blob/main/docs/clients.md) for the
 options.
 
 ## 3. Install the chart
