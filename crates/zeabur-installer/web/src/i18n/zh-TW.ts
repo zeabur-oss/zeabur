@@ -33,7 +33,7 @@ export const zhTW: Messages = {
   "step.of": (n, total) => `第 ${n} 步，共 ${total} 步`,
 
   "host.title": "檢查伺服器",
-  "host.description": "按下安裝之前不會變更任何東西。未通過的項目要先修正，警告建議看一下。",
+  "host.description": "按下安裝之前不會變更任何東西。未通過的項目要先修正，警告最好也看一下。",
   "host.server": "這台伺服器",
   "host.name": "主機名稱",
   "host.arch": "架構",
@@ -64,7 +64,7 @@ export const zhTW: Messages = {
   "code.systemd.no": () => "RKE2 以 systemd 服務執行，但這台伺服器沒有使用 systemd。",
   "code.time.ok": () => "時鐘已同步。",
   "code.time.drift": () =>
-    "時鐘沒有同步；時間偏移時，憑證與登入都會失敗。請執行 timedatectl set-ntp true。",
+    "時鐘沒有同步。時間一有偏差，憑證和登入都會失敗。請執行 timedatectl set-ntp true。",
   "code.time.unknown": () => "無法判斷時鐘是否已同步。請執行 timedatectl，確認系統時鐘已同步。",
   "code.swap.off": () => "Swap 已關閉。",
   "code.swap.on": () =>
@@ -78,13 +78,13 @@ export const zhTW: Messages = {
   "code.disk.unknown": (path) => `讀不到 ${path} 的可用空間。請執行 df -h ${path} 確認。`,
   "code.disk.low": (gib, path, need) => `${path} 只剩 ${gib} GiB，需要 ${need} GiB。`,
   "code.disk.tight": (gib, path, need) =>
-    `${path} 剩 ${gib} GiB，建議 ${need} GiB 以上，才有空間放記錄、指標和應用程式。`,
+    `${path} 剩 ${gib} GiB，建議 ${need} GiB 以上，才有空間放日誌、指標和應用程式。`,
   "code.disk.ok": (gib, path) => `${path} 剩 ${gib} GiB。`,
   "code.crypt.yes": (path) => `${path} 位於加密的裝置上。`,
   "code.crypt.requiredPlain": (path) => `${path} 不在加密的裝置上，但設定要求加密。`,
   "code.crypt.requiredUnknown": (path) => `無法判斷 ${path} 是否加密，但設定要求加密。`,
   "code.crypt.no": (path) =>
-    `${path} 不在加密的裝置上。叢集裡的 Secret 會加密，磁碟區則不會。測試機沒關係；正式資料請裝在加密的磁碟上。`,
+    `${path} 不在加密的裝置上。叢集裡的 Secret 會加密，磁碟區則不會。測試機無妨，正式環境的資料請裝在加密的磁碟上。`,
   "code.crypt.unknown": (path) =>
     `無法判斷 ${path} 是否加密。請執行 lsblk，看它底下有沒有 crypt 裝置。`,
 
@@ -95,12 +95,12 @@ export const zhTW: Messages = {
   "access.local": "測試機",
   "access.domainHint": "憑證由 Let's Encrypt 簽發，所以網際網路要能連到 80 和 443 埠。",
   "access.localHint":
-    "憑證由這台伺服器上建立的憑證授權單位簽發。把它匯入瀏覽器後就會受信任，最後一步會提供下載。",
+    "憑證由這台伺服器自建的憑證授權單位簽發。最後一步可以下載它，匯入瀏覽器後就不會再出現警告。",
   "access.names": "網域",
   "access.zeabur": "Zeabur",
-  "access.zeaburHint": "大家開啟 Zeabur 的網址。",
+  "access.zeaburHint": "開啟 Zeabur 用的網址。",
   "access.identity": "登入",
-  "access.identityHint": "Zeabur Identity，大家在這裡用通行密鑰登入。",
+  "access.identityHint": "Zeabur Identity，使用者在這裡用通行密鑰登入。",
   "access.sslip": "使用 sslip.io 網域",
   "access.sslipHint": (address) =>
     `${address}.sslip.io 底下的名稱不用設定 DNS 就會解析到 ${address}。`,
@@ -108,7 +108,7 @@ export const zhTW: Messages = {
   "access.elsewhere": (addresses) =>
     `指向 ${addresses}，不是這台伺服器的位址。如果那是它的公開位址就沒問題。`,
   "access.unresolved": "目前還解析不到。請新增一筆指向這台伺服器的 DNS 紀錄。",
-  "access.checking": "查詢中…",
+  "access.checking": "正在查詢…",
   "access.invalid": "只填網域，不要加 https:// 或路徑。",
   "access.same": "請使用兩個不同的網域。",
 
@@ -124,7 +124,8 @@ export const zhTW: Messages = {
   "components.chosen": (n) => `已選 ${n} 個元件`,
   "components.needed": "其他元件需要",
   "components.privileged": "特權",
-  "components.privilegedHint": "以主機權限執行，所以它的命名空間不套用 restricted Pod 安全等級。",
+  "components.privilegedHint":
+    "以主機權限執行，所以它的 Namespace 不套用 restricted Pod 安全等級。",
   "components.unsupported": "不支援 RKE2",
   "components.runsOn": (where) => `只能在 ${where} 上執行`,
   "components.unsupportedOn": (profile) => `不支援 ${profile}`,
@@ -133,15 +134,15 @@ export const zhTW: Messages = {
   "components.settings": "設定",
   "components.required": "必填",
   "components.generated": "留空會自動產生。",
-  "components.list": "清單：[a, b]。",
+  "components.list": "格式為清單：[a, b]。",
   "components.secret": "只存進僅 root 可讀的檔案，不會寫進設定檔。",
   "capability.certificates": "憑證",
-  "capability.config-reload": "設定重新載入",
+  "capability.config-reload": "自動重新載入設定",
   "capability.dns": "DNS",
   "capability.event-autoscaling": "事件驅動的自動擴充",
   "capability.ingress": "Ingress",
   "capability.intrusion-prevention": "入侵防護",
-  "capability.logs": "記錄",
+  "capability.logs": "日誌",
   "capability.metrics": "指標",
   "capability.node-updates": "節點更新",
   "capability.observability-operator": "監控 Operator",
@@ -161,11 +162,11 @@ export const zhTW: Messages = {
   "review.rke2Custom": (version) => `RKE2 ${version}（不受支援）`,
   "review.access": "連線方式",
   "review.components": "元件",
-  "review.memory": "閒置時記憶體",
+  "review.memory": "閒置時的記憶體用量",
   "review.time": "所需時間",
   "review.timeValue": "10 到 20 分鐘",
   "review.warnings": "安裝前請注意",
-  "review.plan": "完整計畫",
+  "review.plan": "完整安裝步驟",
   "review.config": "設定檔",
   "review.install": "安裝",
   "review.blocked": "請先修正伺服器檢查中未通過的項目。",
@@ -175,7 +176,7 @@ export const zhTW: Messages = {
   "review.backToChecks": "回到伺服器檢查",
   "review.details": "詳細資料",
   "review.charts": "Chart 與版本",
-  "review.leftOut": "未安裝",
+  "review.leftOut": "不安裝",
   "review.leftOutItem": (name, reason) => `${name}（${reason}）`,
   "review.privileged": (n) => `特權：${n} 個`,
   "review.fromPreset": (n) => `${n} 個來自預設組合`,
@@ -184,12 +185,12 @@ export const zhTW: Messages = {
   "review.group.preset": "來自預設組合",
   "review.group.enabled": "你加的",
   "review.group.dependency": "其他元件需要",
-  "review.group.leftOut": "未安裝",
+  "review.group.leftOut": "不安裝",
   "review.col.component": "元件",
   "review.col.chart": "Chart",
   "review.col.version": "版本",
-  "review.col.memory": "閒置記憶體",
-  "review.manifests": "清單檔",
+  "review.col.memory": "閒置時用量",
+  "review.manifests": "YAML 檔案",
 
   "memory.fits": "夠用",
   "memory.tight": "快不夠了",
@@ -204,15 +205,15 @@ export const zhTW: Messages = {
   "memory.unmeasured": (n) => `有 ${n} 個元件還沒有量測資料，實際用量可能更多。`,
 
   "warning.kubernetes.untested": (version, tested) =>
-    `元件目錄沒有在 Kubernetes ${version} 上測試過；它列出的是 ${tested}。`,
+    `元件目錄只在 ${tested} 上測試過，沒有測過 Kubernetes ${version}。`,
   "warning.metrics.missing": () => "少了 VictoriaMetrics，Zeabur 就不會顯示用量歷史。",
   "warning.local.dns": (identity, zeabur) =>
-    `${zeabur} 和 ${identity} 必須透過 DNS 解析到這台伺服器，瀏覽器和伺服器本身都是。只改 hosts 檔不夠：Pod 不會讀它。`,
-  "warning.memory.low": (host) => `RKE2 需要記憶體至少 4 GiB 的伺服器，這台只有 ${mib(host)}。`,
+    `${zeabur} 和 ${identity} 必須在 DNS 上解析到這台伺服器，瀏覽器和伺服器本身都要查得到。只改 hosts 檔不夠，Pod 不會讀它。`,
+  "warning.memory.low": (host) => `RKE2 需要至少 4 GiB 記憶體，這台伺服器只有 ${mib(host)}。`,
   "warning.memory.tight": (idle, host) =>
     `閒置時，RKE2 和元件約使用 ${mib(idle)}，這台伺服器共有 ${mib(host)}。`,
   "warning.rke2.unsupported": (version) =>
-    `這個安裝程式不支援 RKE2 ${version}：它的下載檔只會用該版本自己的檢查碼驗證。`,
+    `這個安裝程式不支援 RKE2 ${version}：下載的檔案只能用該版本自己附的檢查碼驗證。`,
   "warning.join.sameRegion": () =>
     "所有節點都要在同一家主機服務商的同一個區域。同一區域內的不同可用區域沒有問題；跨服務商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存，甚至讓叢集不穩定。",
   "warning.join.provider.differs": (here, server) =>
@@ -224,7 +225,7 @@ export const zhTW: Messages = {
   "warning.join.rtt.high": (median, limit) =>
     `到伺服器的延遲是 ${median} 毫秒（連到 9345 埠 5 次 TCP 連線的中位數）；同一區域內通常低於 ${limit} 毫秒。`,
   "warning.join.rtt.critical": (median, limit) =>
-    `到伺服器的延遲是 ${median} 毫秒（連到 9345 埠 5 次 TCP 連線的中位數）。超過 ${limit} 毫秒，叢集會變慢又不穩定；看起來是在另一個區域。`,
+    `到伺服器的延遲是 ${median} 毫秒（連到 9345 埠 5 次 TCP 連線的中位數）。超過 ${limit} 毫秒，叢集會變慢又不穩定，伺服器看起來在另一個區域。`,
   "warning.join.port.closed": (ports, host) =>
     `這台 VM 連不到 ${host} 的 TCP ${ports}，請檢查防火牆或安全群組。`,
   "warning.join.ports": () =>
@@ -240,16 +241,16 @@ export const zhTW: Messages = {
   "warning.join.server.unreachable": (server) =>
     `連不到 ${server}。請檢查位址，以及這台 VM 能不能連到 TCP 9345。`,
 
-  "install.title": "安裝中",
+  "install.title": "正在安裝",
   "install.description":
     "大約需要 10 到 20 分鐘。關掉這個頁面不會中斷安裝，再開啟連結就能繼續看進度。",
-  "install.failedTitle": "安裝中止",
+  "install.failedTitle": "安裝已停止",
   "install.failed":
     "再安裝一次會從頭開始，略過已經就緒的部分，不會移除任何東西，包括你現在不裝的元件。",
   "install.again": "再安裝一次",
-  "install.log": "記錄",
-  "install.showLog": "顯示記錄",
-  "install.hideLog": "隱藏記錄",
+  "install.log": "日誌",
+  "install.showLog": "顯示日誌",
+  "install.hideLog": "隱藏日誌",
   "install.running": "進行中",
   "install.waiting": "等待中",
   "install.done": "完成",
@@ -268,11 +269,11 @@ export const zhTW: Messages = {
   "install.next.host": "在伺服器上修正後，再安裝一次。",
   "install.cause.timeout": (phase) => `${phase} 沒有在時限內就緒。`,
   "install.cause.other": (phase) => `安裝停在 ${phase}。`,
-  "install.next.log": "出錯的原因寫在記錄的最後幾行。",
+  "install.next.log": "出錯的原因寫在日誌的最後幾行。",
   "install.toComponents": "選擇元件",
   "phase.host": "檢查伺服器",
   "phase.rke2": (version) => `安裝 Kubernetes（RKE2 ${version}）`,
-  "phase.namespaces": "命名空間和網路政策",
+  "phase.namespaces": "Namespace 和連線規則",
   "phase.storage": "儲存空間",
   "phase.ca": "憑證授權單位",
   "phase.identity": "Zeabur Identity",
@@ -289,7 +290,7 @@ export const zhTW: Messages = {
   "done.zeabur": "Zeabur",
   "done.identity": "登入",
   "done.ca": "憑證授權單位",
-  "done.caHint": "匯入瀏覽器或系統並設為信任網站，否則瀏覽器會對這些網站顯示警告。",
+  "done.caHint": "匯入瀏覽器或系統，並設為信任，否則瀏覽器會對這些網站顯示警告。",
   "done.caDownload": "下載憑證",
   "done.noLink":
     "Zeabur 先前已經設定過，所以沒有產生新連結。需要時請執行 zeabur-identityctl setup-link --username admin。",

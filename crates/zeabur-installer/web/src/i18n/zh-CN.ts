@@ -33,7 +33,7 @@ export const zhCN: Messages = {
   "step.of": (n, total) => `第 ${n} 步，共 ${total} 步`,
 
   "host.title": "检查服务器",
-  "host.description": "点击安装之前不会做任何更改。未通过的项目需要先修复，警告建议看一下。",
+  "host.description": "点击安装之前不会做任何更改。未通过的项目需要先修复，警告最好也看一下。",
   "host.server": "这台服务器",
   "host.name": "主机名",
   "host.arch": "架构",
@@ -64,7 +64,7 @@ export const zhCN: Messages = {
   "code.systemd.no": () => "RKE2 以 systemd 服务运行，但这台服务器没有使用 systemd。",
   "code.time.ok": () => "时钟已同步。",
   "code.time.drift": () =>
-    "时钟未同步；时间漂移时，证书和登录都会失败。请运行 timedatectl set-ntp true。",
+    "时钟未同步。时间一有偏差，证书和登录都会失败。请运行 timedatectl set-ntp true。",
   "code.time.unknown": () => "无法判断时钟是否已同步。请运行 timedatectl，确认系统时钟已同步。",
   "code.swap.off": () => "Swap 已关闭。",
   "code.swap.on": () =>
@@ -84,7 +84,7 @@ export const zhCN: Messages = {
   "code.crypt.requiredPlain": (path) => `${path} 不在加密设备上，但配置要求加密。`,
   "code.crypt.requiredUnknown": (path) => `无法判断 ${path} 是否加密，但配置要求加密。`,
   "code.crypt.no": (path) =>
-    `${path} 不在加密设备上。集群中的 Secret 会加密，存储卷不会。测试机没关系；生产数据请安装在加密磁盘上。`,
+    `${path} 不在加密设备上。集群中的 Secret 会加密，卷不会。测试机没关系，生产数据请装在加密磁盘上。`,
   "code.crypt.unknown": (path) =>
     `无法判断 ${path} 是否加密。请运行 lsblk，查看它下面有没有 crypt 设备。`,
 
@@ -95,12 +95,12 @@ export const zhCN: Messages = {
   "access.local": "测试机",
   "access.domainHint": "证书由 Let's Encrypt 签发，因此互联网需要能访问 80 和 443 端口。",
   "access.localHint":
-    "证书由这台服务器上创建的证书颁发机构签发。将它导入浏览器后即可受信任，最后一步会提供下载。",
+    "证书由这台服务器自建的证书颁发机构签发。最后一步可以下载它，导入浏览器后就不会再出现警告。",
   "access.names": "域名",
   "access.zeabur": "Zeabur",
-  "access.zeaburHint": "大家打开 Zeabur 的地址。",
+  "access.zeaburHint": "打开 Zeabur 用的地址。",
   "access.identity": "登录",
-  "access.identityHint": "Zeabur Identity，大家在这里用通行密钥登录。",
+  "access.identityHint": "Zeabur Identity，用户在这里用通行密钥登录。",
   "access.sslip": "使用 sslip.io 域名",
   "access.sslipHint": (address) =>
     `${address}.sslip.io 下的名称无需配置 DNS 即可解析到 ${address}。`,
@@ -122,9 +122,10 @@ export const zhCN: Messages = {
   "presetHint.standard": "单台服务器推荐安装的所有组件。",
   "presetHint.secure": "标准组合，外加运行时威胁检测、漏洞扫描和入侵防护。",
   "components.chosen": (n) => `已选 ${n} 个组件`,
-  "components.needed": "被其他组件依赖",
+  "components.needed": "其他组件需要",
   "components.privileged": "特权",
-  "components.privilegedHint": "以主机权限运行，因此它的命名空间不适用 restricted Pod 安全级别。",
+  "components.privilegedHint":
+    "以主机权限运行，因此它的 Namespace 不适用 restricted Pod 安全级别。",
   "components.unsupported": "不支持 RKE2",
   "components.runsOn": (where) => `仅能在 ${where} 上运行`,
   "components.unsupportedOn": (profile) => `不支持 ${profile}`,
@@ -133,10 +134,10 @@ export const zhCN: Messages = {
   "components.settings": "设置",
   "components.required": "必填",
   "components.generated": "留空将自动生成。",
-  "components.list": "列表：[a, b]。",
+  "components.list": "格式为列表：[a, b]。",
   "components.secret": "只保存到仅 root 可读的文件，不会写入配置文件。",
   "capability.certificates": "证书",
-  "capability.config-reload": "配置重新加载",
+  "capability.config-reload": "自动重新加载配置",
   "capability.dns": "DNS",
   "capability.event-autoscaling": "事件驱动自动扩缩",
   "capability.ingress": "Ingress",
@@ -149,47 +150,47 @@ export const zhCN: Messages = {
   "capability.resource-recommendations": "资源建议",
   "capability.runtime-security": "运行时安全",
   "capability.uptime-probes": "可用性探测",
-  "capability.volume-backup": "存储卷备份",
+  "capability.volume-backup": "卷备份",
   "capability.vulnerability-scanning": "漏洞扫描",
 
   "review.title": "确认",
   "review.description": (path) =>
     `以下是将要安装的内容。配置会保存到 ${path}，之后也可以在命令行重复同样的安装。`,
-  "review.summary": "概览",
+  "review.summary": "摘要",
   "review.kubernetes": "Kubernetes",
   "review.rke2": (version) => `RKE2 ${version}`,
   "review.rke2Custom": (version) => `RKE2 ${version}（不受支持）`,
   "review.access": "访问方式",
   "review.components": "组件",
-  "review.memory": "空闲时内存",
+  "review.memory": "空闲时的内存用量",
   "review.time": "所需时间",
   "review.timeValue": "10 到 20 分钟",
   "review.warnings": "安装前请注意",
-  "review.plan": "完整计划",
+  "review.plan": "完整安装步骤",
   "review.config": "配置文件",
   "review.install": "安装",
   "review.blocked": "请先修复服务器检查中未通过的项目。",
-  "review.blockedMemory": "这个计划需要的内存超过了这台服务器的容量。",
+  "review.blockedMemory": "这台服务器的内存不够安装这些组件。",
   "review.blockedTitle": (n) => `${n} 项服务器检查未通过`,
   "review.blockedHint": "在服务器上修复后，再重新检查。",
   "review.backToChecks": "返回服务器检查",
   "review.details": "详细信息",
   "review.charts": "Chart 与版本",
-  "review.leftOut": "未安装",
+  "review.leftOut": "不安装",
   "review.leftOutItem": (name, reason) => `${name}（${reason}）`,
   "review.privileged": (n) => `特权：${n} 个`,
   "review.fromPreset": (n) => `${n} 个来自预设组合`,
   "review.added": (n) => `${n} 个由你添加`,
-  "review.needed": (n) => `${n} 个被其他组件依赖`,
+  "review.needed": (n) => `${n} 个是其他组件需要的`,
   "review.group.preset": "来自预设组合",
   "review.group.enabled": "由你添加",
-  "review.group.dependency": "被其他组件依赖",
-  "review.group.leftOut": "未安装",
+  "review.group.dependency": "其他组件需要",
+  "review.group.leftOut": "不安装",
   "review.col.component": "组件",
   "review.col.chart": "Chart",
   "review.col.version": "版本",
-  "review.col.memory": "空闲内存",
-  "review.manifests": "清单文件",
+  "review.col.memory": "空闲时用量",
+  "review.manifests": "YAML 文件",
 
   "memory.fits": "够用",
   "memory.tight": "快不够了",
@@ -204,15 +205,15 @@ export const zhCN: Messages = {
   "memory.unmeasured": (n) => `有 ${n} 个组件还没有测量数据，实际用量可能更多。`,
 
   "warning.kubernetes.untested": (version, tested) =>
-    `组件目录未在 Kubernetes ${version} 上测试；它列出的是 ${tested}。`,
+    `组件目录只在 ${tested} 上测试过，没有测过 Kubernetes ${version}。`,
   "warning.metrics.missing": () => "缺少 VictoriaMetrics，Zeabur 将不显示用量历史。",
   "warning.local.dns": (identity, zeabur) =>
-    `${zeabur} 和 ${identity} 必须通过 DNS 解析到这台服务器，浏览器和服务器本身都需要。只改 hosts 文件不够：Pod 不会读取它。`,
-  "warning.memory.low": (host) => `RKE2 需要内存至少 4 GiB 的服务器，这台只有 ${mib(host)}。`,
+    `${zeabur} 和 ${identity} 必须在 DNS 上解析到这台服务器，浏览器和服务器本身都要查得到。只改 hosts 文件不够，Pod 不会读取它。`,
+  "warning.memory.low": (host) => `RKE2 需要至少 4 GiB 内存，这台服务器只有 ${mib(host)}。`,
   "warning.memory.tight": (idle, host) =>
     `空闲时，RKE2 和组件约使用 ${mib(idle)}，这台服务器共有 ${mib(host)}。`,
   "warning.rke2.unsupported": (version) =>
-    `此安装程序不支持 RKE2 ${version}：它的下载文件只会用该版本自己的校验和验证。`,
+    `此安装程序不支持 RKE2 ${version}：下载的文件只能用该版本自带的校验和验证。`,
   "warning.join.sameRegion": () =>
     "所有节点都要在同一家云服务商的同一个区域。同一区域内的不同可用区没有问题；跨服务商或跨区域时，延迟会拖慢 etcd、Kubernetes API 和存储，甚至让集群不稳定。",
   "warning.join.provider.differs": (here, server) =>
@@ -224,7 +225,7 @@ export const zhCN: Messages = {
   "warning.join.rtt.high": (median, limit) =>
     `到服务器的延迟是 ${median} 毫秒（连接 9345 端口 5 次 TCP 连接的中位数）；同一区域内通常低于 ${limit} 毫秒。`,
   "warning.join.rtt.critical": (median, limit) =>
-    `到服务器的延迟是 ${median} 毫秒（连接 9345 端口 5 次 TCP 连接的中位数）。超过 ${limit} 毫秒，集群会变慢且不稳定；看起来是在另一个区域。`,
+    `到服务器的延迟是 ${median} 毫秒（连接 9345 端口 5 次 TCP 连接的中位数）。超过 ${limit} 毫秒，集群会变慢且不稳定，服务器看起来在另一个区域。`,
   "warning.join.port.closed": (ports, host) =>
     `这台 VM 连不上 ${host} 的 TCP ${ports}，请检查防火墙或安全组。`,
   "warning.join.ports": () =>
@@ -243,7 +244,7 @@ export const zhCN: Messages = {
   "install.title": "正在安装",
   "install.description":
     "大约需要 10 到 20 分钟。关闭此页面不会中断安装，重新打开链接即可继续查看。",
-  "install.failedTitle": "安装已中止",
+  "install.failedTitle": "安装已停止",
   "install.failed":
     "重新安装会从头开始，跳过已经就绪的部分，不会删除任何东西，包括你现在不安装的组件。",
   "install.again": "重新安装",
@@ -272,7 +273,7 @@ export const zhCN: Messages = {
   "install.toComponents": "选择组件",
   "phase.host": "检查服务器",
   "phase.rke2": (version) => `安装 Kubernetes（RKE2 ${version}）`,
-  "phase.namespaces": "命名空间和网络策略",
+  "phase.namespaces": "Namespace 和连接规则",
   "phase.storage": "存储",
   "phase.ca": "证书颁发机构",
   "phase.identity": "Zeabur Identity",
@@ -289,7 +290,7 @@ export const zhCN: Messages = {
   "done.zeabur": "Zeabur",
   "done.identity": "登录",
   "done.ca": "证书颁发机构",
-  "done.caHint": "导入浏览器或系统并设为信任网站，否则浏览器会对这些网站显示警告。",
+  "done.caHint": "导入浏览器或系统，并设为信任，否则浏览器会对这些网站显示警告。",
   "done.caDownload": "下载证书",
   "done.noLink":
     "Zeabur 之前已经设置过，因此没有生成新链接。需要时请运行 zeabur-identityctl setup-link --username admin。",

@@ -44,7 +44,7 @@ test.beforeAll(() => {
 
 test("without Zeabur Proxy, history says how it is turned on", async ({ page }) => {
   const logs = await openHistory(page)
-  await expect(logs).toContainText("Log history isn't installed")
+  await expect(logs).toContainText("Log history isn't turned on")
   await expect(logs).toContainText("proxy.enabled")
   // History is every replica's: no replica to pick, nothing to follow.
   await expect(logs.getByRole("button", { name: /^Replica / })).toHaveCount(0)

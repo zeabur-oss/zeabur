@@ -78,7 +78,7 @@ sudo zeabur-installer apply
 
 `apply` 會先跑主機檢查。只要有一項失敗，就會在改動任何東西之前停下。
 
-通過檢查後，依序設定主機、安裝採用 CIS profile 的 RKE2、命名空間和網路政策、儲存空間、選定的元件，再安裝 Zeabur Identity 和 Zeabur。
+通過檢查後，依序設定主機、安裝採用 CIS profile 的 RKE2、Namespace 和連線規則、儲存空間、選定的元件，再安裝 Zeabur Identity 和 Zeabur。
 
 `apply` 依執行當下的設定計算安裝內容。如果在執行 `plan` 後修改 YAML，`apply` 就會依新內容安裝。
 

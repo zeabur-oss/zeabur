@@ -526,7 +526,7 @@ group("failureOf", () => {
       "zh-TW",
       problem("conflict", { detail: "Already written: x" }),
     )
-    expect(f.title).toBe("你檢查之後，它又有了變更。")
+    expect(f.title).toBe("它在你檢查之後又變了。")
   })
 
   test("a refusal for a managing tool says where to change it, whatever the status and wording", () => {
@@ -741,7 +741,7 @@ group("a deleted claim's data", () => {
     const said = claimDataSaid(t, warning())
     expect(said).toEqual({ text: "warn.claimDataUnlessRetained(web-data)", kept: false })
     expect(claimDataSaid(translator(zhTW), warning()).text).toBe(
-      "磁碟區（web-data）的資料會一起刪除；叢集設定成保留時，管理員還能救回",
+      "磁碟區（web-data）的資料會一起刪除，如果叢集設定成保留，管理員還能救回",
     )
   })
 })

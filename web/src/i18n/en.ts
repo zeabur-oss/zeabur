@@ -89,7 +89,7 @@ export const en = {
   "problem.title.elevation-required": "This needs admin rights",
   "problem.title.quota-exceeded": "This would go over the project's limit",
   "problem.title.policy-denied": "A policy in the cluster refused this",
-  "problem.title.not-found": "It does not exist",
+  "problem.title.not-found": "This object doesn't exist",
   "problem.title.log-unavailable": "The log is not available",
   "problem.title.conflict": "It changed in the meantime",
   "problem.title.managed": "Another tool manages it",
@@ -133,7 +133,7 @@ export const en = {
   "problemPage.rule.unauthenticated":
     "Every request reaches the cluster with your own sign-in. When the cluster no longer accepts it (it expired, or was revoked), nothing can be read or changed until you sign in again.",
   "problemPage.rule.signed-out":
-    "Your Zeabur session ended, so Zeabur holds no sign-in to act with for you. Nothing is read or changed until you sign in again.",
+    "Your Zeabur session ended, so Zeabur can no longer act for you in the cluster. Nothing is read or changed until you sign in again.",
   "problemPage.rule.forbidden":
     "The cluster decides what each person may do, by rules (RBAC) that say who may read or change which kinds of objects, in which projects. Zeabur acts only with your own rights: what they do not allow, it cannot do for you.",
   "problemPage.rule.elevation-required":
@@ -141,7 +141,7 @@ export const en = {
   "problemPage.rule.quota-exceeded":
     "A project can have limits on what all its services may reserve together: CPU, memory, the number of replicas or objects. The cluster refuses a change that would go over them, whatever your rights.",
   "problemPage.rule.policy-denied":
-    "A cluster can check every change against policies of its own, run by an admission webhook or a policy engine. When one refuses a change, its own words say why; your rights do not change its answer.",
+    "A cluster can check every change against policies of its own, run by an admission webhook or a policy engine. When one refuses a change, its own words say why. Your rights do not change its answer.",
   "problemPage.rule.not-found":
     "What was asked for is not in the cluster: it may have been deleted or renamed since the page read it.",
   "problemPage.rule.log-unavailable":
@@ -151,7 +151,7 @@ export const en = {
   "problemPage.rule.managed":
     "Another tool (Helm, Argo CD, Flux) owns this object and puts its own version back at its next sync or upgrade. A change made here would be undone, so Zeabur refuses it.",
   "problemPage.rule.plan-expired":
-    "Reviewed changes are what Zeabur will write, as you saw them. They hold for a few minutes only, so what is applied still matches the cluster as it is.",
+    "Zeabur writes the changes exactly as you reviewed them. They expire after a few minutes, so what is applied still matches the cluster.",
   "problemPage.rule.system-namespace":
     "Kubernetes keeps names starting with kube- (kube-system, kube-public, kube-node-lease) for its own components. They cannot become projects.",
   "problemPage.rule.invalid":
@@ -169,7 +169,7 @@ export const en = {
   "refused.ask": "Ask a cluster administrator.",
   "refused.view": "Use admin rights for a few minutes",
   "refused.details": "Details",
-  "refused.missing": "Missing",
+  "refused.missing": "Missing rights",
   "refused.see": (what: string) => `Seeing ${what}`,
   "refused.some": "Some of this page",
   "refused.terminal": "Opening a terminal",
@@ -207,7 +207,7 @@ export const en = {
   "reason.starting": "Starting",
   "reason.evicted": "Moved off its machine",
   "reason.releaseStuck": "Rollout stuck",
-  "reason.gaveUp": "Gave up",
+  "reason.gaveUp": "Stopped retrying",
   "reason.security": "Blocked by security settings",
   "phase.Running": "Running",
   "phase.Progressing": "Progressing",
@@ -271,7 +271,7 @@ export const en = {
   "cluster.attSkew.why": "Kubernetes does not support it, so replicas there may misbehave.",
   "cluster.attSkew.fix": "Upgrade the kubelet to the control plane's minor version.",
   "cluster.attComponents": (n: number) => `${n} components are older than the tested versions`,
-  "cluster.attComponent.why": "It still runs; Zeabur was tested with a newer version.",
+  "cluster.attComponent.why": "It still runs, but Zeabur was tested with a newer version.",
   "cluster.attComponent.fix": "Upgrade it under Components.",
   "cluster.versionOf": (version: string, tested: string) => `${version}, tested ${tested}`,
   "cluster.showMembers": (n: number) => `Show all ${n}`,
@@ -290,8 +290,8 @@ export const en = {
   "cluster.apiLeases":
     "The scheduler and controller manager are checked separately: each is running if its lease was renewed recently.",
   "cluster.apiNotCovered": "The scheduler and controller manager are not checked here.",
-  "cluster.leaseRenewed": "Leader renewed",
-  "cluster.leaseStale": "No leader: last renewed",
+  "cluster.leaseRenewed": "Running, lease renewed",
+  "cluster.leaseStale": "May have stopped, lease last renewed",
   "node.notReady": (n: number, node: string) =>
     n === 1 ? `${node} is not ready` : `${n} nodes are not ready`,
   "node.notReady.why":
@@ -340,11 +340,11 @@ export const en = {
       ? `Select Continue maintenance on ${node}'s row to move what is left. When the work is done, resume scheduling from its menu.`
       : "Select Continue maintenance on each row to move what is left. When the work is done, resume scheduling from each node's menu.",
   "node.reservedMemory": (n: number, node: string, share: string) =>
-    n === 1 ? `${node}: memory ${share} reserved` : `${n} nodes over-reserved on memory`,
+    n === 1 ? `${node}: memory ${share} reserved` : `${n} nodes have almost all memory reserved`,
   "node.reservedMemory.why": "New replicas that ask for memory may wait for room.",
   "node.reservedMemory.fix": "Lower the memory requests of the services there, or add a node.",
   "node.reservedCpu": (n: number, node: string, share: string) =>
-    n === 1 ? `${node}: CPU ${share} reserved` : `${n} nodes over-reserved on CPU`,
+    n === 1 ? `${node}: CPU ${share} reserved` : `${n} nodes have almost all CPU reserved`,
   "node.reservedCpu.why": "New replicas that ask for CPU may wait for room.",
   "node.reservedCpu.fix": "Lower the CPU requests of the services there, or add a node.",
   "unreachable.title": (name: string) => `Cannot reach ${name}`,
@@ -472,7 +472,7 @@ export const en = {
     "Copy the zeabur-installer binary to the new VM: the same one you installed the first server with.",
   "join.stepRun": "On the new VM, run this as root:",
   "join.stepRunHint":
-    "plan shows the network checks and warnings and changes nothing; apply installs RKE2 as a worker and waits until the node is Ready.",
+    "plan shows the network checks and warnings and changes nothing. apply installs RKE2 as a worker and waits until the node is Ready.",
   "join.script": "Commands for the new VM",
   "join.shownOnce":
     "This is the only time the token is shown. Anyone who has it can add a machine to this cluster until it expires. Revoke it once your node has joined.",
@@ -545,7 +545,7 @@ export const en = {
   "maint.scratch": (n: number) =>
     `${n === 1 ? "1 of them loses" : `${n} of them lose`} what they keep in scratch space.`,
   "maint.lose": "scratch space emptied",
-  "maint.budget": (name: string) => `may wait for disruption budget ${name}`,
+  "maint.budget": (name: string) => `may wait for PodDisruptionBudget ${name}`,
   "maint.stuck": (n: number) => `Cannot move (${n})`,
   "maint.stuck.why": (node: string) =>
     `Their data is on a volume that stays on ${node}. Started on another node, they would wait for it until ${node} is back.`,
@@ -558,7 +558,7 @@ export const en = {
   "maint.reason.daemonSet": "on every node",
   "maint.reason.static": "started by the node",
   "maint.kube.command": "Command",
-  "maint.kube.budgets": "Disruption budgets",
+  "maint.kube.budgets": "PodDisruptionBudgets",
   "maint.progress": (node: string, left: number, total: number) =>
     `Moving replicas off ${node}: ${left} of ${total} left.`,
   "maint.done": (node: string, kept: number) =>
@@ -569,7 +569,7 @@ export const en = {
   "maint.zeaburMoving": (node: string) =>
     `Zeabur itself is moving off ${node}, so this page loses its connection for a minute. Reload then, and turn on admin rights again.`,
   "maint.outcome.waiting": (budget?: string) =>
-    budget ? `Waiting on disruption budget ${budget}` : "Waiting on a disruption budget",
+    budget ? `Waiting on PodDisruptionBudget ${budget}` : "Waiting on a PodDisruptionBudget",
   "maint.outcome.refused": "You may not move it",
   "maint.outcome.failed": "Could not move it",
   "maint.outcome.last": "Zeabur itself: moves once the others have left",
@@ -582,7 +582,7 @@ export const en = {
   "maint.leave.stay": "Keep moving",
   "maint.leave.leave": "Leave",
   "maint.unreadable":
-    "Some reads were refused, so this plan may miss disruption budgets or volumes that stay on this node.",
+    "Some reads were refused, so this may miss PodDisruptionBudgets or volumes that stay on this node.",
   "maint.remove": "Remove node",
   "maint.removeNext": "Remove node",
   "maint.title.remove": (node: string) => `Remove ${node}`,
@@ -824,7 +824,7 @@ export const en = {
     `A newer image is ready: ${tag}. ${service} runs an older one.`,
   "builds.notBuilt": "No Zeabur Builder build makes this service's image.",
   "builds.noImage": "No image has been built yet.",
-  "builds.suspended": "Builds are paused on this Build.",
+  "builds.suspended": "This Build is paused.",
   "builds.image": "Newest",
   "builds.container": "Container",
   "builds.builder": "Builder",
@@ -849,7 +849,7 @@ export const en = {
   "builds.logs": "Logs",
   "builds.hideLogs": "Hide logs",
   "builds.step": "Step",
-  "builds.logsGone": "The logs went with the build's pod, ten minutes after it finished.",
+  "builds.logsGone": "Logs are deleted with the build's pod, ten minutes after the build finishes.",
   "builds.noLogsYet": "This step has not started yet.",
   "builds.emptyLog": "Nothing logged.",
   "overview.source": "Source",
@@ -864,7 +864,7 @@ export const en = {
   "overview.warnings": "Warnings",
   "verdict.problem": (what: string) => `Problem: ${what}`,
   "verdict.trouble.healthCheck": "Health check failing",
-  "verdict.trouble.quota": "Over the project's quota",
+  "verdict.trouble.quota": "Over the project's limit",
   "verdict.trouble.unreachable": (domain: string) => `${domain} can't be reached`,
   "verdict.reach.reachable": (list: string) => `${list} can be reached`,
   "verdict.reach.browserReachable": (list: string) => `Your browser can reach ${list}`,
@@ -884,7 +884,7 @@ export const en = {
   "domain.unknown": "Not confirmed",
   "domain.dns.missing": (host: string) => `No DNS record found for ${host}.`,
   "domain.dns.elsewhere": (list: string) =>
-    `DNS points to ${list}, not to the cluster. That's expected behind a CDN or proxy; otherwise, change the record.`,
+    `DNS points to ${list}, not to the cluster. That's expected behind a CDN or proxy. Otherwise, change the record.`,
   "domain.dns.unknown": "Zeabur couldn't look this domain up from the cluster.",
   "domain.addRecord": "Add this record at your DNS provider:",
   "domain.theRecord": "The record that points it here:",
@@ -926,9 +926,9 @@ export const en = {
   "logs.noPods": "No replica is running",
   "logs.noPodsBody": "Logs come from a running replica. They appear here once one starts.",
   "logs.podOf": (pod: string) => `Replica ${pod}`,
-  "logs.replaced": (old: string, current: string) => `${old} was replaced; showing ${current}.`,
+  "logs.replaced": (old: string, current: string) => `${old} was replaced. Showing ${current}.`,
   "logs.gone": (pod: string) =>
-    `${pod} no longer exists; looking for the replica that took its place.`,
+    `${pod} no longer exists. Looking for the replica that took its place.`,
   "logs.container": "Container",
   "logs.previous": "Previous",
   "logs.timestamps": "Timestamps",
@@ -964,7 +964,7 @@ export const en = {
   "logs.historyHint":
     "Lines every replica wrote, also replicas since replaced, from the log store.",
   "logs.historyLatest": (n: number) => `Latest ${n} lines`,
-  "logs.historyNotInstalled": "Log history isn't installed",
+  "logs.historyNotInstalled": "Log history isn't turned on",
   "logs.historyNotInstalledBody":
     "Logs come from running replicas only. A cluster administrator turns history on with the Helm chart's proxy.enabled.",
   "logs.whatHistory": "Reading this project's log history",
@@ -1160,7 +1160,7 @@ export const en = {
   "storage.readOnly": "Read-only",
   "storage.delete": (path: string) => `Delete volume ${path}`,
   "storage.deleteSaid": (service: string, path: string, claim: string) =>
-    `${service} stops mounting ${path}, and claim ${claim} is deleted with its data.`,
+    `${service} stops mounting ${path}, and the volume (${claim}) is deleted with its data.`,
   "storage.writable": "Read and write",
   "storage.status": "Status",
   "storage.newPath": "Mount path of the new volume",
@@ -1206,7 +1206,7 @@ export const en = {
   "storage.reclaim.Delete": "Deleting the volume deletes its data",
   "storage.reclaim.Retain": "Data stays after the volume is deleted",
   "storage.binding.WaitForFirstConsumer": "Made where its first replica runs",
-  "storage.binding.Immediate": "Made as soon as it is asked for",
+  "storage.binding.Immediate": "Made as soon as the volume is added",
 
   // Palette
   "palette.search": "Jump to a project, service, replica, or domain",
@@ -1251,7 +1251,7 @@ export const en = {
   "category.operations": "Operations",
   "category.other": "Other",
   "cap.certificates": "Certificates",
-  "cap.config-reload": "Config reload",
+  "cap.config-reload": "Restart on config change",
   "cap.container-registry": "Container registry",
   "cap.databases": "Databases",
   "cap.dns": "DNS records",
@@ -1319,7 +1319,7 @@ export const en = {
   "access.askManage": (ns: string) =>
     `Ask a cluster administrator for permission to patch the namespace ${ns} and to zeabur-manage it. Without zeabur-manage, Zeabur's admission policy lets a patch change only the project's name, description and icon.`,
   "access.detailsOnly":
-    "Zeabur's admission policy keeps this permission to the project's name, description and icon; the namespace's labels stay as they are.",
+    "With this permission you can change the project's name, description and icon. Zeabur's admission policy keeps the namespace's labels as they are.",
   "access.alsoLabels":
     "This permission also lets you change the namespace's other labels, including its Pod Security levels (pod-security.kubernetes.io/*). Kubernetes can't limit it to one label.",
   "access.role": "A ClusterRole limited to this namespace with resourceNames:",
@@ -1763,13 +1763,13 @@ export const en = {
   "confirm.redirectOff": (host: string, service: string) =>
     `Show ${service} on ${host} again, without the redirect.`,
   "confirm.envImport": (kind: string, name: string, service: string) =>
-    `${service} reads every key of ${kind} ${name} as variables. Its pods restart.`,
+    `${service} reads every key of ${kind} ${name} as variables. Its replicas restart.`,
   "confirm.publicPort": (port: number, name: string) =>
     `Open port ${port} of ${name} to the internet.`,
   "confirm.publicPortOff": (port: number, name: string) =>
     `Close port ${port} of ${name}. Clients outside the cluster can no longer connect to it.`,
   "confirm.envImportOff": (kind: string, name: string, service: string) =>
-    `${service} stops reading the keys of ${kind} ${name}. Its pods restart.`,
+    `${service} stops reading the keys of ${kind} ${name}. Its replicas restart.`,
   "confirm.basicAuth": (route: string) =>
     `Ask for a password on every domain of Ingress ${route}. The cluster keeps only a bcrypt hash of it.`,
   "confirm.basicAuthOff": (route: string) => `Stop asking for a password on Ingress ${route}.`,
@@ -1922,7 +1922,7 @@ export const en = {
   "form.statefulVolumes": "A StatefulSet's volumes are set when it is created.",
   "form.advanced": "Advanced",
   "form.claimName": "Claim name",
-  "form.claimNameHint": "Creates a new claim; the cluster refuses a name already in use.",
+  "form.claimNameHint": "Creates a new claim. The name must not be in use already.",
   "form.accessMode": "Access mode",
   "form.accessModeHint": "Many-node modes need storage that supports them.",
   "ops.managedEdit": (tool: string) => `Managed by ${tool}: change it at its source`,
@@ -2027,14 +2027,14 @@ export const en = {
   "gap.unchecked": (count: number) =>
     `${count} ${count === 1 ? "service has" : "services have"} no traffic check`,
   "gap.uncheckedWhy":
-    "Without one, Running only means the container started. Each service sets it under Settings.",
+    "Without one, Running only means the container started. Add one under each service's Settings.",
   "gap.uncheckedNames": "Show services",
   "gap.fix": "Fix",
   "gap.install": "Install",
   "gap.snippet": "YAML to add",
   "fix.resources": (container: string) => `Set CPU and memory for ${container}`,
   "fix.readiness": (container: string) => `Add a traffic check to ${container}`,
-  "fix.addVolume": (container: string, path: string) => `Keep ${path} of ${container} on a disk`,
+  "fix.addVolume": (container: string, path: string) => `Keep ${path} of ${container} on a volume`,
   "fix.isolateProject": (project: string) => `Isolate the services of ${project}`,
   "gap.unreadable": "Some checks need rights you don't have.",
   "install.title": "Install",
@@ -2165,11 +2165,11 @@ export const en = {
   "backups.volume.root":
     "The service runs as root, so its backups do too and can read every file of the volume.",
   "backups.volume.user": (user: number) =>
-    `Backups run as user ${user}, as the service does, and meet the restricted Pod Security level.`,
+    `Backups run as user ${user}, as the service does, so they meet Strict security.`,
   "backups.volume.imageUser":
-    "The service sets no user, so backups run as K8up's non-root user and meet the restricted Pod Security level. They skip files that only the service's user may read: set a user in the service's security settings to include them.",
+    "The service sets no user, so backups run as K8up's non-root user and meet Strict security. They skip files that only the service's user may read: set a user in the service's security settings to include them.",
   "backups.volume.restricted":
-    "This project enforces the restricted Pod Security level, which refuses pods that run as root, and backups of this service run as root. Set the service to restricted, or ask an administrator to lower the project to baseline.",
+    "This project allows only Strict services and refuses pods that run as root, but backups of this service run as root. Set the service to Strict, or ask an administrator to let the project allow Compatible services.",
   "backups.volume.openSecurity": "Open security settings",
   "backups.volume.stop": "Stop backups",
   "backups.volume.planStop": (claim: string) => `Stop backups of ${claim}`,
@@ -2241,16 +2241,16 @@ export const en = {
   "clusterBackups.problem.keys": "Both keys are needed.",
   "clusterBackups.problem.bothKeys": "Enter both keys, or neither to keep the ones it has.",
   "clusterBackups.problem.keep": "From 1 to 365 days.",
-  "clusterBackups.problem.projects": "Choose a project at least.",
+  "clusterBackups.problem.projects": "Choose at least one project.",
   "clusterBackups.schedule": "Schedule",
   "clusterBackups.runs": "Runs",
   "clusterBackups.keeps": "Keeps",
   "clusterBackups.keepDays": (days: number) => plural(days, "day", "days"),
   "clusterBackups.covers": "Covers",
   "clusterBackups.wholeCluster": "Whole cluster",
-  "clusterBackups.wholeClusterHint": "Every project and namespace, also ones added later.",
+  "clusterBackups.wholeClusterHint": "Every project and namespace, including ones added later.",
   "clusterBackups.chosenProjects": "Chosen projects",
-  "clusterBackups.chosenProjectsHint": "Only the projects you tick.",
+  "clusterBackups.chosenProjectsHint": "Only the projects you select.",
   "clusterBackups.volumes": "Volumes",
   "clusterBackups.fsOn": "Files in volumes are copied",
   "clusterBackups.fsOff": "Objects only; files in volumes aren't copied",
@@ -2442,7 +2442,7 @@ export const en = {
   "notify.kube.secretsValue": "Secret of the same name as each config",
   "notify.kube.test": "Send test",
   "notify.kube.testValue":
-    "Creates a Job labelled zeabur.com/notification-test; the ZeaburNotificationTest rule fires for it",
+    "Creates a Job labeled zeabur.com/notification-test; the ZeaburNotificationTest rule fires for it",
 
   // Databases
   "add.button": "New",
@@ -2594,7 +2594,7 @@ export const en = {
   "add.composeFinding.sharedVolume": (volume: string) =>
     `Volume ${volume} is shared in Compose; here each service gets its own.`,
   "add.composeFinding.renamed": (from: string, to: string) =>
-    `${from} is named ${to}, as names are lowercase letters, digits and hyphens. Services that reach it as ${from} need the new name.`,
+    `${from} is renamed ${to}, because names can only use lowercase letters, digits and hyphens. Services that reach it as ${from} need the new name.`,
   "add.gitTitle": "Deploy from Git",
   "add.gitBody": (project: string) =>
     `Builds a Git repository and runs it in ${project}. You review the objects before anything is created.`,
@@ -2659,7 +2659,7 @@ export const en = {
   "db.title": "Databases",
   "db.new": "New database",
   "db.newBody":
-    "Zeabur creates the operator's own object in this project, as you; the operator runs the database.",
+    "An operator runs the database. Zeabur creates the objects it needs in this project, with your permissions.",
   "db.engine.postgresql": "PostgreSQL",
   "db.engine.mongodb": "MongoDB",
   "db.engine.mysql": "MySQL",
@@ -2677,14 +2677,14 @@ export const en = {
   "db.size.medium": "Medium",
   "db.size.large": "Large",
   "db.sizeDetail": (cpu: string, memory: string, limit: string) =>
-    `Each instance asks for ${cpu} CPU and ${memory} memory, and may use up to ${limit}.`,
+    `Each instance reserves ${cpu} CPU and ${memory} memory, and may use up to ${limit}.`,
   "db.name.empty": "Give it a name.",
   "db.name.invalid": "Lowercase letters, digits and hyphens, starting with a letter.",
   "db.name.long": "At most 30 characters.",
   "db.name.taken": "A database of this name exists.",
   "db.noRedundancy": (backedUp: boolean) =>
     `One instance: nothing takes over if it fails, and its data is on one volume.${backedUp ? "" : " Set up backups."}`,
-  "db.replicaSetHint": "A replica set keeps running through one failure with three instances.",
+  "db.replicaSetHint": "With three instances, a replica set keeps running when one fails.",
   "db.kernelBlocked": (versions: string) =>
     `This cluster's nodes run Linux 6.19 or newer, where ${versions} does not start.`,
   "db.onOneNode": "This cluster has one node, so one instance.",
@@ -2730,7 +2730,7 @@ export const en = {
     `This ${engine} has no password: anything in the cluster can connect to it.`,
   "db.export": "Export",
   "db.exportHint": (tool: string) =>
-    `Downloads a dump that ${tool} makes in the primary, run through your terminal right.`,
+    `Runs ${tool} on the primary with your terminal access and downloads the dump it makes.`,
   "connect.action": "Connect to a service",
   "connect.addToService": "Add a database connection",
   "connect.title": (database: string) => `Connect ${database} to services`,
@@ -2773,7 +2773,7 @@ export const en = {
   "s3.tabs": "Object storage sections",
   "s3.new": "New object storage",
   "s3.newBody":
-    "Zeabur creates the SeaweedFS Operator's objects in this project, as you; the operator runs an S3-compatible store.",
+    "The SeaweedFS Operator runs an S3-compatible store. Zeabur creates the objects it needs in this project, with your permissions.",
   "s3.planCreate": (name: string) => `Create object storage ${name}`,
   "s3.name.empty": "Give it a name.",
   "s3.name.invalid": "Lowercase letters, digits and hyphens, starting with a letter.",
@@ -2782,7 +2782,7 @@ export const en = {
   "s3.field.storage": "Storage",
   "s3.grow": (name: string) => `Grow the storage of ${name}`,
   "s3.growSentence": (name: string, from: string, to: string) =>
-    `Grow the disk of ${name} from ${from} to ${to}. The operator grows it in place, and its files stay.`,
+    `Grow the volume of ${name} from ${from} to ${to}. The operator grows it in place, and its files stay.`,
   "s3.field.bucket": "Bucket",
   "s3.bucketHint": "Optional. Add more later.",
   "s3.bucketRule": "3 to 63 lowercase letters, digits and hyphens.",
@@ -2815,7 +2815,7 @@ export const en = {
   "s3.deleteBucket": (bucket: string) => `Delete bucket ${bucket}`,
   "s3.deletesFiles": (bucket: string) => `The files in ${bucket} are deleted with it.`,
   "s3.keepsFiles": (bucket: string) =>
-    `The files in ${bucket} stay in the store; only the object goes.`,
+    `Only the Kubernetes object is deleted. The files in ${bucket} stay in the store.`,
   "add.composeKept.roleObjectStorage": (image: string) =>
     `Runs ${image} as it is: your role can't create object storage in this project.`,
   "db.host": "Host",
@@ -2933,7 +2933,7 @@ export const en = {
     `${name} keeps running. Delete it from its page when you no longer need it.`,
   "db.restored.readers": (name: string, services: string) => `Reading ${name}: ${services}.`,
   "db.restored.noReaders": (name: string) => `No service reads ${name}.`,
-  "db.restored.waiting": (name: string) => `Services can move once ${name} is ready.`,
+  "db.restored.waiting": (name: string) => `You can point services to ${name} once it is ready.`,
 
   // Usage and history
   "usage.title": "Current usage",
@@ -2974,7 +2974,7 @@ export const en = {
   "usage.note.cpuAtLimitHint": "Held at its CPU limit (throttled): slower, but not restarted.",
   "usage.note.overRequest": "Above reserved",
   "usage.note.overRequestHint":
-    "Uses more memory than it requests. When the machine runs short, replicas above their request are evicted first.",
+    "Uses more memory than it reserves. When the node runs short of memory, replicas above what they reserve are evicted first.",
   "usage.note.noSample": "No sample yet",
   "usage.note.noSampleHint":
     "metrics-server measures running containers only; a new replica appears within about 30 s.",
@@ -3012,7 +3012,7 @@ export const en = {
   "usage.storeUnavailable": "The metrics store did not respond.",
   "usage.noSeries": (name: string, range: string) => `No samples for ${name} in the last ${range}.`,
   "usage.noSeriesHint":
-    "The store answered but holds nothing for these replicas: it may not collect this machine's container metrics, or not keep data this long.",
+    "The store answered but holds nothing for these replicas: it may not collect this node's container metrics, or not keep data this long.",
   "usage.source": "From",
   "usage.stepSeconds": (n: number) => `a point every ${n} s`,
   "usage.stepMinutes": (n: number) => `a point every ${n} min`,
@@ -3062,7 +3062,8 @@ export const en = {
   "account.username": "User name",
   "account.role": "Role",
   "account.passkeys": "Passkeys",
-  "account.backup": "Add a backup passkey on your phone; one lost device must not lock you out.",
+  "account.backup":
+    "Add a backup passkey on your phone, so losing one device doesn't lock you out.",
   "account.linked": "Linked accounts",
   "account.yours": "your account",
   "account.groups": "Groups",
@@ -3110,7 +3111,7 @@ export const en = {
     `${member} can no longer sign in with ${name}.`,
   "passkey.sessionsStay": "Sessions it already started keep working until they end.",
   "passkey.removeAction": "Remove passkey",
-  "linked.none": "None.",
+  "linked.none": "No linked accounts.",
   "linked.remove": "Unlink",
   "linked.removed": "Account unlinked",
   "linked.removeTitle": (provider: string) => `Unlink ${provider}?`,
@@ -3128,7 +3129,7 @@ export const en = {
   "members.everyone": "the members",
   "members.invite": "Invite",
   "members.denied":
-    "Inviting and changing members needs rights you don't have here. Ask a cluster administrator.",
+    "You don't have the rights to invite or change members. Ask a cluster administrator.",
   "members.inviting": "Inviting members",
   "members.filter": "Filter members",
   "members.none": "No one can sign in yet.",
@@ -3158,7 +3159,8 @@ export const en = {
   "members.revoke": "Revoke",
   "members.revoked": "Link revoked",
   "members.notInstalled": "Zeabur Identity isn't installed",
-  "members.notInstalledBody": "Members are the people Zeabur Identity signs in to this cluster.",
+  "members.notInstalledBody":
+    "Members are the people who sign in to this cluster through Zeabur Identity.",
   "members.noIssuer":
     "Zeabur doesn't know Zeabur Identity's address, so it can't make setup links. Start Zeabur with --issuer-url.",
   "members.notRedeemed":
@@ -3168,7 +3170,7 @@ export const en = {
     "Makes a one-time link that works for 7 days. Whoever opens it first adds a passkey and signs in as this member.",
   "invite.username": "User name",
   "invite.usernameHint": "Lower-case letters, digits, - and . only.",
-  "invite.invalid": "Use lower-case letters, digits, - and . only, at most 63.",
+  "invite.invalid": "Use lower-case letters, digits, - and . only, at most 63 characters.",
   "invite.existing": (user: string) =>
     `${user} is already a member: the link adds a passkey to their account.`,
   "invite.displayName": "Display name",
@@ -3261,7 +3263,7 @@ export const en = {
     "Install the chart with memberRoles.enabled=true, or make the member an admin.",
   "sentence.members.notInstalled": () => "Zeabur Identity isn't installed",
   "sentence.members.notInstalled.fix": () =>
-    "Install Zeabur Identity, or start Zeabur with the namespace it runs in.",
+    "Install Zeabur Identity. If it's installed, start Zeabur with the namespace it runs in.",
   // Account and members end
   // Sentences the server names by key (problems; diagnoses, gaps, traces and incidents are spread in
   // above); `writeSentence` finds them under `sentence.<key>`.
@@ -3423,7 +3425,7 @@ export const en = {
   "part.storage": "Storage",
   "part.compute": "Compute",
   "buildOptions.hint":
-    "Where Zeabur Builder builds from in the repository, and the variables only the build reads.",
+    "Where in the repository Zeabur Builder builds from, and the variables only the build can read.",
   "buildOptions.none": "No build variables yet. Add KEY=value lines below.",
   "buildOptions.fromSecret": (secret: string) => `Value in Secret ${secret}`,
   "buildOptions.literal": "Value written in the Build",
@@ -3486,7 +3488,7 @@ export const en = {
   "tasks.resumeTitle": (name: string) => `Resume ${name}`,
   "tasks.scheduleBlocked": "Fix the schedule to save.",
   "tasks.settingsHint": "Changes apply from the next run.",
-  "tasks.overlapSkips": "A run is still going, and this task skips a run while one is going.",
+  "tasks.overlapSkips": "A run is still going, and this task is set to skip the new run.",
   "tasks.replaceStops": (runs: string) =>
     `A run is still going, and this task stops it for a new one: ${runs} stops first.`,
   "confirm.certificateIssuer": (host: string, issuer: string) =>
@@ -3527,7 +3529,8 @@ export const en = {
   "domainCert.certificate": "Certificate (PEM)",
   "domainCert.certificateHint": "The certificate first, then any intermediate certificates.",
   "domainCert.key": "Private key (PEM)",
-  "domainCert.keyHint": "Not encrypted. Zeabur stores it in a Secret and never shows it again.",
+  "domainCert.keyHint":
+    "Paste an unencrypted key. Zeabur stores it in a Secret and never shows it again.",
   "domainCert.badCert": "Paste a PEM certificate that starts with -----BEGIN CERTIFICATE-----",
   "domainCert.badKey": "Paste a PEM private key that starts with -----BEGIN PRIVATE KEY-----",
   "domainCert.upload": "Upload file",
@@ -3600,7 +3603,7 @@ export const en = {
   "issuers.kube.issuer": "Issuer",
   "issuers.kube.secret": "Token or key",
   "issuers.kube.secretValue": "Secret <issuer>-dns-credentials in cert-manager's namespace",
-  "issuers.kube.domain": "A domain uses it through",
+  "issuers.kube.domain": "How a domain picks it",
   "domainAccess.open": (host: string) => `Redirect or password for ${host}`,
   "domainAccess.title": (host: string) => `Access to ${host}`,
   "domainAccess.planTitle": (host: string) => `Change access to ${host}`,
@@ -3634,7 +3637,7 @@ export const en = {
   "domainAccess.badPassword": "Use at least 8 characters, and at most 72 bytes.",
   "domainAccess.nothing": "Nothing changed.",
   "domainAccess.redirects": "Redirects",
-  "domainAccess.protected": "Password",
+  "domainAccess.protected": "Password protected",
   "domainAccess.kube.annotation": "Middleware list",
   "domainAccess.kube.redirect": "Redirect",
   "domainAccess.kube.kept": "Rules from before",
@@ -3712,7 +3715,7 @@ export const en = {
     "Zeabur puts no password or HTTPS in front of it. The service must check who connects.",
   "ports.allOpen": "Every port of this service is already open.",
   "ports.port": "Port",
-  "ports.portHint": "The same number opens on the nodes' addresses.",
+  "ports.portHint": "The same port number opens on every node's address.",
   "ports.kube.object": "Kubernetes object",
   "ports.kube.how": "How it opens",
   "ports.kube.howValue":
@@ -3727,7 +3730,7 @@ export const en = {
   "shared.usedBy": "Used by",
   "shared.unused": "No service uses it yet.",
   "shared.showAll": (n: number) => `Show all ${n}`,
-  "shared.none": "No shared variables",
+  "shared.none": "No shared variables yet",
   "shared.noneHint": "Add a group of variables, then use it from each service's Variables tab.",
   "shared.another": "Add another group of variables",
   "shared.add": "Add shared variables",
@@ -3735,7 +3738,7 @@ export const en = {
   "shared.addLead": "A group of variables that services of this project can read.",
   "shared.planTitle": (name: string) => `Add shared variables ${name}`,
   "shared.name": "Name",
-  "shared.kind": "Values",
+  "shared.kind": "Store values as",
   "shared.values": "Variables",
   "shared.valuesHint": "One NAME=value on each line, as in a .env file.",
   "shared.badName": "Use lowercase letters, digits, hyphens and dots.",
@@ -3769,7 +3772,7 @@ export const en = {
   "useShared.stop": (name: string) => `Stop reading ${name}`,
   "useShared.kube.writes": "Adds",
   "useShared.kube.when": "Takes effect",
-  "useShared.kube.whenValue": "When the pods restart; this change replaces them",
+  "useShared.kube.whenValue": "When the pods restart (this change replaces them)",
   "warn.taskImageCopied": (service: string, image: string) =>
     `The task runs ${image}, ${service}'s image now; a later image change to ${service} doesn't reach it`,
   "warn.domainMoved": (host: string, from: string, to: string) =>
@@ -3785,9 +3788,9 @@ export const en = {
   "warn.publicPortBlocked": (port: number, policies: string) =>
     `Port ${port} will not answer: connection rule ${policies} lets nothing from the internet in. Add an ingress rule with ipBlock 0.0.0.0/0 on port ${port} to it`,
   "warn.publicPort": (port: number) =>
-    `Port ${port} opens on the nodes' addresses. If another program there uses it, the port waits without an address`,
+    `Port ${port} opens on the nodes' addresses. If another program on a node already uses it, the port stays closed`,
   "warn.passwordOverHttp": (hosts: string) =>
-    `${hosts} has no HTTPS, so the password crosses the network readable there`,
+    `${hosts} has no HTTPS, so the password crosses the network in plain text`,
   "form.healthHint":
     "Checks the cluster runs on each replica: whether it takes traffic, whether to restart it, and when it has started.",
   "draft.add": "Add to changes",
@@ -3808,11 +3811,11 @@ export const en = {
   "project.viewList": "List",
   "project.suggestions": (n: number) => plural(n, "suggestion", "suggestions"),
   "project.suggestionsBody":
-    "Setup the services run without. None of it stops them now; each makes a problem easier to catch or avoid.",
+    "Settings these services run without. None of them stops a service now, but each makes a problem easier to catch or avoid.",
   "project.activity": "Activity",
   "project.next.title": "Deploy the first service",
   "project.next.body":
-    "A service shows up here as soon as a workload runs in this namespace: a Deployment, StatefulSet, DaemonSet, Job or CronJob.",
+    "A service shows up here as soon as a workload runs in this project: a Deployment, StatefulSet, DaemonSet, Job or CronJob.",
   "project.next.command": "Try it with a sample web server",
   "project.next.after": "Run it with kubectl, or apply your own YAML. The page updates by itself.",
   "freshness.failed": "Couldn't refresh",
@@ -3835,7 +3838,7 @@ export const en = {
       ? "1 project could not be checked; its problems are not listed here."
       : `${n} projects could not be checked; their problems are not listed here.`,
   "home.incidentsUnchecked":
-    "Causes in the cluster could not all be read; a problem there may be missing.",
+    "Zeabur couldn't read all of the cluster's state, so a problem may be missing here.",
   "home.lastKnown": "Last known",
   "home.adoptTitle": "Existing namespaces",
   "home.showWarningsOf": (shown: number, total: number) => `Show ${shown} of ${total} warnings`,
@@ -3851,7 +3854,7 @@ export const en = {
   "origin.component.hint":
     "A component the cluster runs for every project causes it, such as the ingress controller or cluster DNS.",
   "origin.zeabur": "Caused by Zeabur",
-  "origin.zeabur.hint": "Zeabur itself causes it; report it with the copied diagnosis.",
+  "origin.zeabur.hint": "Zeabur itself causes it. Report it with the copied diagnosis.",
   "fixer.componentOwner": "This needs the component's owner.",
   "fixer.componentOwner.lead": "This needs the component's owner: ",
   "incident.title": "In the cluster",
@@ -3956,15 +3959,15 @@ export const en = {
   "sentence.rollout.stuck.podSecurity": (p: P) =>
     `The rollout of ${p.name} is stuck: security settings keep a new replica from starting.`,
   "sentence.fix.multiAttach": (p: P) =>
-    `The old replica still holds its volume, and a volume attaches to one machine at a time. In YAML, set ${p.service || "the service"}'s strategy.type to Recreate so the old replica stops first; each release then takes it offline for the seconds the new one needs to start.`,
+    `The old replica still holds its volume, and a volume attaches to one node at a time. In YAML, set ${p.service || "the service"}'s strategy.type to Recreate so the old replica stops first; each release then takes it offline for the seconds the new one needs to start.`,
   "sentence.fix.outOfMemory": (p: P) =>
-    `Raise the memory maximum${p.limit ? ` above ${p.limit}` : ""}; Usage shows how close it runs. The maximum reserves nothing, so the machine needs that memory free when it is used.`,
+    `Raise the memory maximum${p.limit ? ` above ${p.limit}` : ""}. Usage shows how close it gets. A maximum reserves nothing, so the node needs that much memory free.`,
   "sentence.fix.evicted.disk":
-    "The machine ran short of disk and stopped this replica; a new one starts on its own, without what the old one wrote to its own disk. Keep data on a volume and logs small, or have whoever runs the cluster free disk on that machine.",
+    "The node ran short of disk and stopped this replica. A new one starts on its own, without what the old one wrote outside a volume. Keep data on a volume and logs small, or ask a cluster administrator to free disk on that node.",
   "sentence.fix.evicted.memory":
-    "The machine ran short of memory and stopped this replica first. Reserve memory close to what it uses so it goes last; the reservation is held for it even when idle.",
+    "The node ran short of memory and stopped this replica first. Reserve memory close to what it uses so it is stopped last. The reservation is held for it even when idle.",
   "sentence.fix.evicted":
-    "The machine ran short of resources and stopped this replica; a new one starts on its own. Its events say which resource.",
+    "The node ran short of resources and stopped this replica. A new one starts on its own. Its events say which resource ran short.",
   "sentence.rollout.stuck.deadlineExceeded": (p: P) =>
     `The rollout of ${p.name} is stuck: it made no progress before its deadline (progressDeadlineSeconds).`,
   "sentence.rollout.stuck.replicaFailure": (p: P) =>
@@ -3998,11 +4001,11 @@ export const en = {
   "preview.fitUnknown": "Zeabur could not check whether the new replicas fit.",
   "preview.dataLoss": "Data this loses",
   "preview.loss.claimDeleted": (claim: string, paths: string) =>
-    `Deletes the disk ${claim}${paths ? ` and what is in ${paths}` : ""}.`,
+    `Deletes the volume ${claim}${paths ? ` and what is in ${paths}` : ""}.`,
   "preview.loss.emptyDir": (name: string, volume: string, paths: string) =>
-    `${name} keeps ${paths || volume} on a temporary volume; it is emptied when its replicas are replaced.`,
+    `${name} keeps ${paths || volume} in scratch space, which is emptied when its replicas are replaced.`,
   "preview.loss.statefulSet": (name: string, claim: string) =>
-    `${name} deletes the disks it made from ${claim}, with their data.`,
+    `${name} deletes the volumes it made from ${claim}, with their data.`,
   "preview.removals": "Settings this removes",
   "preview.removal": (path: string, name: string) => `Removes ${path} from ${name}, now`,
   "preview.leftOut": "(left out of your edit)",
@@ -4101,7 +4104,7 @@ export const en = {
     size ? `${name} (${size}) is deleted.` : `${name} is deleted.`,
   "files.deleteFolder": (name: string) => `${name} and everything in it are deleted.`,
   "files.deleteClaim": (claim: string) =>
-    `It goes from claim ${claim} at once, for every replica that mounts it, and can't be undone unless the claim is backed up.`,
+    `It disappears from the volume (${claim}) at once, for every replica that mounts it. This can't be undone unless the volume is backed up.`,
   "files.deleteForever": "This can't be undone.",
   "files.target": "Path",
   "files.uploadTitle": (n: number) => (n === 1 ? "Upload 1 file" : `Upload ${n} files`),
@@ -4120,7 +4123,7 @@ export const en = {
   "files.waiting": "Waiting",
   "files.failed": "Failed",
   "files.of": (done: string, total: string) => `${done} of ${total}`,
-  "sentence.files.kernel": () => "/proc, /sys and /dev belong to the kernel, not to the files.",
+  "sentence.files.kernel": () => "/proc, /sys and /dev are kernel interfaces, not ordinary files.",
   "sentence.files.kernel.fix": () => "Read them in the terminal.",
   "sentence.files.imageUnreachable": (p: P) =>
     `${p.path} is in the image's own files, which the debug container doesn't reach.`,
@@ -4138,14 +4141,14 @@ export const en = {
   "sentence.files.readOnly.fix": () => "Change the mount in Settings to write here.",
   "sentence.files.mountPoint": (p: P) => `${p.path} is or holds a mount point.`,
   "sentence.files.mountPoint.fix": () =>
-    "It stays where the pod mounts it; change the files inside.",
+    "A mount point can't be moved, renamed or deleted. Change the files inside it.",
   "sentence.files.noTools": (p: P) => `Container ${p.container} has no ${p.command}.`,
   "sentence.files.noTools.fix": () => "Add a debug container to read its volumes.",
   "sentence.files.notFound": (p: P) => `${p.path} isn't there.`,
   "sentence.files.notFound.fix": () => "It may have been moved or deleted; go up a folder.",
   "sentence.files.permissionDenied": (p: P) => `The container's user may not change ${p.path}.`,
   "sentence.files.permissionDenied.fix": () =>
-    "Files belong to the user the container runs as; change the image or the volume's owner.",
+    "The user the container runs as has no rights to this file. Run the image as a user that does, or change the volume's owner.",
   "sentence.files.readOnlyFileSystem": (p: P) => `${p.path} is on a read-only file system.`,
   "sentence.files.readOnlyFileSystem.fix": () => "Write to a volume instead.",
   "sentence.files.exists": (p: P) => `${p.path} already exists.`,

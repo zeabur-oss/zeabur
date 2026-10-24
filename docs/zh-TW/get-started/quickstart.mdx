@@ -106,7 +106,7 @@ ssh -L 8085:127.0.0.1:8085 root@<伺服器>
 
 摘要會列出：
 
-- 閒置時記憶體。
+- 閒置時的記憶體用量。
 - 選定的元件。
 - Kubernetes 版本，也就是 RKE2 版本。
 - 連線方式和網址。
@@ -120,11 +120,11 @@ ssh -L 8085:127.0.0.1:8085 root@<伺服器>
 
 ## 5. 查看安裝進度
 
-「安裝中」會顯示時間軸，整體約需 10 到 20 分鐘。按「顯示記錄」可以查看完整輸出。
+「正在安裝」會顯示時間軸，整體約需 10 到 20 分鐘。按「顯示日誌」可以查看完整輸出。
 
-![「安裝中」顯示安裝時間軸與進度](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-install.avif)
+![「正在安裝」顯示安裝時間軸與進度](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-install.avif)
 
-時間軸依序列出檢查伺服器、安裝 Kubernetes（RKE2）、命名空間和網路政策、儲存空間、各元件、憑證授權單位、Zeabur Identity、Zeabur 和收尾。憑證授權單位只會在測試機模式安裝。
+時間軸依序列出檢查伺服器、安裝 Kubernetes（RKE2）、Namespace 和連線規則、儲存空間、各元件、憑證授權單位、Zeabur Identity、Zeabur 和收尾。憑證授權單位只會在測試機模式安裝。
 
 關掉頁面不會中斷安裝。重新開啟含權杖的連結，就能繼續查看進度。
 
@@ -152,11 +152,11 @@ zeabur-identityctl setup-link --username admin
 
 完成後，在伺服器終端機按 Ctrl-C 結束 installer。RKE2 和服務會繼續執行。
 
-## 安裝中止時
+## 安裝已停止時
 
-看到「安裝中止」時，先查看頁面指出的步驟，再讀取記錄最後幾行的錯誤原因。可能原因包括記憶體不夠、伺服器檢查未通過或逾時。
+看到「安裝已停止」時，先查看頁面指出的步驟，再讀取日誌最後幾行的錯誤原因。可能原因包括記憶體不夠、伺服器檢查未通過或逾時。
 
-![「安裝中止」顯示停止的步驟與錯誤資訊](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-failed.avif)
+![「安裝已停止」顯示停止的步驟與錯誤資訊](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-failed.avif)
 
 修正後按「再安裝一次」。installer 會從頭開始，略過已就緒的部分，不會移除任何東西。
 

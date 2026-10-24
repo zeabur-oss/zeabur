@@ -32,8 +32,8 @@ export const summaries: Record<string, Summary> = {
   },
   "databases/dragonfly-operator#49e3a8b9": {
     en: "Runs Dragonfly, a Redis-compatible store, with replicas and snapshots, under a licence that is not open source.",
-    "zh-TW": "執行與 Redis 相容的 Dragonfly，支援副本和快照；採用的不是開放原始碼授權。",
-    "zh-CN": "运行与 Redis 兼容的 Dragonfly，支持副本和快照；采用的不是开源许可。",
+    "zh-TW": "執行與 Redis 相容的 Dragonfly，支援副本和快照，但不是開放原始碼授權。",
+    "zh-CN": "运行与 Redis 兼容的 Dragonfly，支持副本和快照，但不是开源许可。",
   },
   "databases/mariadb-operator#9ef81ade": {
     en: "Runs MariaDB databases, a MySQL-compatible choice, with backups to S3.",
@@ -82,8 +82,8 @@ export const summaries: Record<string, Summary> = {
   },
   "intrusion-prevention/crowdsec#bbe1ad93": {
     en: "Blocks brute-force attempts and scanners before they reach your services.",
-    "zh-TW": "在暴力破解與掃描抵達服務前加以阻擋。",
-    "zh-CN": "在暴力破解和扫描到达服务前将其拦截。",
+    "zh-TW": "在暴力破解和掃描碰到服務之前就擋下來。",
+    "zh-CN": "在暴力破解和扫描碰到服务之前就拦下来。",
   },
   "logs/victoria-logs#4376a766": {
     en: "Keeps and searches logs.",
@@ -122,13 +122,13 @@ export const summaries: Record<string, Summary> = {
   },
   "replicated-storage/longhorn#18291cd6": {
     en: "Keeps copies of each volume on other nodes, so it survives losing a node.",
-    "zh-TW": "把每個磁碟區的副本存在其他節點上，節點故障時資料仍在。",
-    "zh-CN": "把每个卷的副本存在其他节点上，节点故障时数据仍在。",
+    "zh-TW": "把每個磁碟區另外複製一份到其他節點，節點故障時資料仍在。",
+    "zh-CN": "把每个卷另外复制一份到其他节点，节点故障时数据仍在。",
   },
   "resource-recommendations/vertical-pod-autoscaler#e6592278": {
     en: "Suggests CPU and memory requests from actual use.",
-    "zh-TW": "依實際用量建議 CPU 與記憶體的請求量。",
-    "zh-CN": "根据实际用量建议 CPU 和内存的请求量。",
+    "zh-TW": "依實際用量建議 CPU 與記憶體的保留量。",
+    "zh-CN": "根据实际用量建议 CPU 和内存的预留量。",
   },
   "runtime-security/falco#1cfea57b": {
     en: "Flags suspicious activity in containers, such as a shell or a privilege escalation.",

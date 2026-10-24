@@ -48,8 +48,8 @@ export const en = {
   "host.passed": "Ready to install",
   "host.warned": (n: number) => `Ready, with ${plural(n, "warning", "warnings")}`,
   "host.failed": (n: number) => `${plural(n, "check", "checks")} to fix`,
-  "host.catalog": "The component catalog could not be read",
-  "host.configFrom": (path: string) => `Starting from ${path}.`,
+  "host.catalog": "Unable to read the component catalog",
+  "host.configFrom": (path: string) => `Using the settings in ${path}.`,
   "host.configNew": (path: string) => `Your choices will be saved to ${path}.`,
   "host.passedCount": (n: number) => `${plural(n, "check", "checks")} passed`,
 
@@ -66,11 +66,11 @@ export const en = {
   "code.root.no": () => "Start the installer with sudo.",
   "code.systemd.ok": () => "systemd manages services on this server.",
   "code.systemd.no": () => "RKE2 runs as a systemd service, and this server does not use systemd.",
-  "code.time.ok": () => "The clock is synchronised.",
+  "code.time.ok": () => "The clock is synchronized.",
   "code.time.drift": () =>
-    "The clock is not synchronised; certificates and sign-ins fail when it drifts. Run timedatectl set-ntp true.",
+    "The clock is not synchronized; certificates and sign-ins fail when it drifts. Run timedatectl set-ntp true.",
   "code.time.unknown": () =>
-    "Could not tell whether the clock is synchronised. Run timedatectl and check that the system clock is synchronised.",
+    "Could not tell whether the clock is synchronized. Run timedatectl and check that the system clock is synchronized.",
   "code.swap.off": () => "Swap is off.",
   "code.swap.on": () =>
     "Swap is on; the kubelet expects it off. Run swapoff -a and remove the swap entry from /etc/fstab.",
@@ -137,7 +137,7 @@ export const en = {
   "presetHint.secure":
     "Standard, plus runtime threat detection, vulnerability scanning and intrusion prevention.",
   "components.chosen": (n: number) => `${plural(n, "component", "components")} chosen`,
-  "components.needed": "Needed by another",
+  "components.needed": "Needed by another component",
   "components.privileged": "Privileged",
   "components.privilegedHint":
     "Runs with host access, so its namespace is exempt from the restricted Pod Security level.",
@@ -145,11 +145,11 @@ export const en = {
   "components.runsOn": (where: string) => `Runs on ${where} only`,
   "components.unsupportedOn": (profile: string) => `Not supported on ${profile}`,
   "components.details": (name: string) => `About ${name}`,
-  "components.customise": (n: number) => `Customise (${n})`,
+  "components.customise": (n: number) => `Customize (${n})`,
   "components.settings": "Settings",
   "components.required": "Required",
   "components.generated": "Generated when left empty.",
-  "components.list": "A list: [a, b].",
+  "components.list": "Write a list: [a, b].",
   "components.secret": "Saved to a file only root can read, never in the configuration.",
   "capability.certificates": "Certificates",
   "capability.config-reload": "Config reload",
@@ -188,7 +188,7 @@ export const en = {
   "review.charts": "Charts and versions",
   "review.install": "Install",
   "review.blocked": "Fix the failed server checks first.",
-  "review.blockedMemory": "The plan needs more memory than this server has.",
+  "review.blockedMemory": "These components need more memory than this server has.",
   "review.blockedTitle": (n: number) => `${plural(n, "server check", "server checks")} failed`,
   "review.blockedHint": "Fix these on the server, then check again.",
   "review.backToChecks": "Back to server checks",
@@ -197,16 +197,16 @@ export const en = {
   "review.privileged": (n: number) => `Privileged: ${n}`,
   "review.fromPreset": (n: number) => `${n} from the preset`,
   "review.added": (n: number) => `${n} added by you`,
-  "review.needed": (n: number) => `${n} needed by another`,
+  "review.needed": (n: number) => `${n} needed by other components`,
   "review.group.preset": "From the preset",
   "review.group.enabled": "Added by you",
-  "review.group.dependency": "Needed by another",
+  "review.group.dependency": "Needed by other components",
   "review.group.leftOut": "Left out",
   "review.col.component": "Component",
   "review.col.chart": "Chart",
   "review.col.version": "Version",
   "review.col.memory": "Idle memory",
-  "review.manifests": "Manifest",
+  "review.manifests": "Manifests",
 
   "memory.fits": "Fits",
   "memory.tight": "Tight",
@@ -220,10 +220,10 @@ export const en = {
   "memory.more": "Or give the server more memory.",
   "memory.add": "Give the server more memory.",
   "memory.unmeasured": (n: number) =>
-    `${plural(n, "component has", "components have")} no measurement yet, so it may be more.`,
+    `${plural(n, "component has", "components have")} no measurement yet, so actual use may be higher.`,
 
   "warning.kubernetes.untested": (version: string, tested: string) =>
-    `The catalog was not tested on Kubernetes ${version}; it lists ${tested}.`,
+    `The catalog was tested on ${tested}, not on Kubernetes ${version}.`,
   "warning.metrics.missing": () => "Without VictoriaMetrics, Zeabur shows no usage history.",
   "warning.local.dns": (identity: string, zeabur: string) =>
     `${zeabur} and ${identity} must resolve to this server through DNS, for browsers and for the server itself. A hosts file is not enough: pods do not read it.`,

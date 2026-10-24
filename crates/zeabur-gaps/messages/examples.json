@@ -5,8 +5,8 @@
    "restarts": "restarts1"
   },
   "en": "It has restarted restarts1 times; the cluster starts it again each time, waiting longer between tries, up to 5 minutes by default.",
-  "zh-TW": "它已重新啟動 restarts1 次；叢集每次都會再啟動它，兩次之間等得越來越久，預設最多等 5 分鐘。",
-  "zh-CN": "它已重启 restarts1 次；集群每次都会再启动它，两次之间等得越来越久，默认最多等 5 分钟。"
+  "zh-TW": "它已重新啟動 restarts1 次。叢集每次都會再啟動它，兩次之間等得越來越久，預設最多等 5 分鐘。",
+  "zh-CN": "它已重启 restarts1 次。集群每次都会再启动它，两次之间等得越来越久，默认最多等 5 分钟。"
  },
  {
   "key": "diagnosis.crashLoop.why.exitsZero",
@@ -23,8 +23,8 @@
    "exitCode": "exitCode1"
   },
   "en": "A run counts as failed when its program ends with an exit code other than 0; this one ended with exitCode1.",
-  "zh-TW": "程式結束時的結束碼不是 0 就算執行失敗；這次是 exitCode1。",
-  "zh-CN": "程序结束时的退出码不是 0 就算运行失败；这次是 exitCode1。"
+  "zh-TW": "程式的結束碼不是 0，就算執行失敗。這次的結束碼是 exitCode1。",
+  "zh-CN": "程序的退出码不是 0，就算运行失败。这次的退出码是 exitCode1。"
  },
  {
   "key": "diagnosis.runFailed.why.gaveUp",
@@ -32,8 +32,8 @@
    "exitCode": "exitCode1"
   },
   "en": "The task gave up after its retries; the last run ended with exit code exitCode1.",
-  "zh-TW": "這項工作重試後已放棄；最後一次的結束碼是 exitCode1。",
-  "zh-CN": "这项任务重试后已放弃；最后一次的退出码是 exitCode1。"
+  "zh-TW": "這項工作重試後已放棄，最後一次的結束碼是 exitCode1。",
+  "zh-CN": "这项任务重试后已放弃，最后一次的退出码是 exitCode1。"
  },
  {
   "key": "diagnosis.runFailed.why.gaveUp",
@@ -42,8 +42,8 @@
    "exitCode": "exitCode1"
   },
   "en": "The task doesn't retry a failed run; this one ended with exit code exitCode1.",
-  "zh-TW": "這項工作失敗後不會重試；這次的結束碼是 exitCode1。",
-  "zh-CN": "这项任务失败后不会重试；这次的退出码是 exitCode1。"
+  "zh-TW": "這項工作失敗後不會重試，這次的結束碼是 exitCode1。",
+  "zh-CN": "这项任务失败后不会重试，这次的退出码是 exitCode1。"
  },
  {
   "key": "diagnosis.runFailed.why.gaveUp",
@@ -75,8 +75,8 @@
   "key": "diagnosis.imagePull.why",
   "params": {},
   "en": "The cluster downloads the image before it starts the container, and keeps retrying, waiting longer each time, until the download works.",
-  "zh-TW": "叢集要先下載映像檔才能啟動容器；下載失敗時會一再重試，每次等得更久。",
-  "zh-CN": "集群要先下载镜像才能启动容器；下载失败时会一再重试，每次等得更久。"
+  "zh-TW": "叢集要先下載映像檔才能啟動容器。下載失敗時會一再重試，每次等得更久。",
+  "zh-CN": "集群要先下载镜像才能启动容器。下载失败时会一再重试，每次等得更久。"
  },
  {
   "key": "diagnosis.probeFailure.why.liveness",
@@ -167,8 +167,8 @@
    "total": "120"
   },
   "en": "The cluster checks every 1 second; after 120 failures in a row (about 2 minutes) the container gets no traffic from its private addresses until it passes again. 120 failures is the default.",
-  "zh-TW": "叢集每 1 秒檢查一次；連續失敗 120 次（約 2 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。120 次是預設值。",
-  "zh-CN": "集群每 1 秒检查一次；连续失败 120 次（约 2 分钟）后，容器就不会从私有地址收到流量，直到再次通过。120 次是默认值。"
+  "zh-TW": "叢集每 1 秒檢查一次，連續失敗 120 次（約 2 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。120 次是預設值。",
+  "zh-CN": "集群每 1 秒检查一次，连续失败 120 次（约 2 分钟）后，容器就不会从私有地址收到流量，直到再次通过。120 次是默认值。"
  },
  {
   "key": "diagnosis.probeFailure.why.readiness",
@@ -180,8 +180,8 @@
    "total": "7200"
   },
   "en": "The cluster checks every 2 seconds; after 3600 failures in a row (about 120 minutes) the container gets no traffic from its private addresses until it passes again. 3600 failures is the default.",
-  "zh-TW": "叢集每 2 秒檢查一次；連續失敗 3600 次（約 120 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。3600 次是預設值。",
-  "zh-CN": "集群每 2 秒检查一次；连续失败 3600 次（约 120 分钟）后，容器就不会从私有地址收到流量，直到再次通过。3600 次是默认值。"
+  "zh-TW": "叢集每 2 秒檢查一次，連續失敗 3600 次（約 120 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。3600 次是預設值。",
+  "zh-CN": "集群每 2 秒检查一次，连续失败 3600 次（约 120 分钟）后，容器就不会从私有地址收到流量，直到再次通过。3600 次是默认值。"
  },
  {
   "key": "diagnosis.probeFailure.why.readiness",
@@ -193,8 +193,8 @@
    "total": "60"
   },
   "en": "The cluster checks every 1 minute; after 1 failures in a row (about 1 minute) the container gets no traffic from its private addresses until it passes again.",
-  "zh-TW": "叢集每 1 分鐘檢查一次；連續失敗 1 次（約 1 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。",
-  "zh-CN": "集群每 1 分钟检查一次；连续失败 1 次（约 1 分钟）后，容器就不会从私有地址收到流量，直到再次通过。"
+  "zh-TW": "叢集每 1 分鐘檢查一次，連續失敗 1 次（約 1 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。",
+  "zh-CN": "集群每 1 分钟检查一次，连续失败 1 次（约 1 分钟）后，容器就不会从私有地址收到流量，直到再次通过。"
  },
  {
   "key": "diagnosis.probeFailure.why.readiness",
@@ -206,8 +206,8 @@
    "total": "180"
   },
   "en": "The cluster checks every 90 seconds; after 2 failures in a row (about 3 minutes) the container gets no traffic from its private addresses until it passes again.",
-  "zh-TW": "叢集每 90 秒檢查一次；連續失敗 2 次（約 3 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。",
-  "zh-CN": "集群每 90 秒检查一次；连续失败 2 次（约 3 分钟）后，容器就不会从私有地址收到流量，直到再次通过。"
+  "zh-TW": "叢集每 90 秒檢查一次，連續失敗 2 次（約 3 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。",
+  "zh-CN": "集群每 90 秒检查一次，连续失败 2 次（约 3 分钟）后，容器就不会从私有地址收到流量，直到再次通过。"
  },
  {
   "key": "diagnosis.probeFailure.why.readiness",
@@ -219,15 +219,15 @@
    "total": "7200"
   },
   "en": "The cluster checks every 2 minutes; after 60 failures in a row (about 120 minutes) the container gets no traffic from its private addresses until it passes again.",
-  "zh-TW": "叢集每 2 分鐘檢查一次；連續失敗 60 次（約 120 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。",
-  "zh-CN": "集群每 2 分钟检查一次；连续失败 60 次（约 120 分钟）后，容器就不会从私有地址收到流量，直到再次通过。"
+  "zh-TW": "叢集每 2 分鐘檢查一次，連續失敗 60 次（約 120 分鐘）後，容器就不會從私有位址收到流量，直到再次通過。",
+  "zh-CN": "集群每 2 分钟检查一次，连续失败 60 次（约 120 分钟）后，容器就不会从私有地址收到流量，直到再次通过。"
  },
  {
   "key": "diagnosis.probeFailure.why.startup",
   "params": {},
   "en": "The other checks wait for the startup check; if it doesn't pass in time, the cluster restarts the container.",
-  "zh-TW": "其他檢查會等啟動檢查通過；如果沒有在時限內通過，叢集就會重新啟動容器。",
-  "zh-CN": "其他检查会等启动检查通过；如果没有在时限内通过，集群就会重启容器。"
+  "zh-TW": "其他檢查會等啟動檢查通過，如果沒有在時限內通過，叢集就會重新啟動容器。",
+  "zh-CN": "其他检查会等启动检查通过，如果没有在时限内通过，集群就会重启容器。"
  },
  {
   "key": "diagnosis.probeFailure.why.startup",
@@ -239,8 +239,8 @@
    "total": "120"
   },
   "en": "The container has 120 × 1 second (2 minutes) to pass the startup check; then the cluster restarts it. 120 failures is the default.",
-  "zh-TW": "容器有 120 × 1 秒（2 分鐘）可以通過啟動檢查；超過時叢集就會重新啟動它。120 次是預設值。",
-  "zh-CN": "容器有 120 × 1 秒（2 分钟）可以通过启动检查；超过时集群就会重启它。120 次是默认值。"
+  "zh-TW": "容器有 120 × 1 秒（2 分鐘）可以通過啟動檢查，超過時叢集就會重新啟動它。120 次是預設值。",
+  "zh-CN": "容器有 120 × 1 秒（2 分钟）可以通过启动检查，超过时集群就会重启它。120 次是默认值。"
  },
  {
   "key": "diagnosis.probeFailure.why.startup",
@@ -252,8 +252,8 @@
    "total": "7200"
   },
   "en": "The container has 3600 × 2 seconds (120 minutes) to pass the startup check; then the cluster restarts it. 3600 failures is the default.",
-  "zh-TW": "容器有 3600 × 2 秒（120 分鐘）可以通過啟動檢查；超過時叢集就會重新啟動它。3600 次是預設值。",
-  "zh-CN": "容器有 3600 × 2 秒（120 分钟）可以通过启动检查；超过时集群就会重启它。3600 次是默认值。"
+  "zh-TW": "容器有 3600 × 2 秒（120 分鐘）可以通過啟動檢查，超過時叢集就會重新啟動它。3600 次是預設值。",
+  "zh-CN": "容器有 3600 × 2 秒（120 分钟）可以通过启动检查，超过时集群就会重启它。3600 次是默认值。"
  },
  {
   "key": "diagnosis.probeFailure.why.startup",
@@ -265,8 +265,8 @@
    "total": "60"
   },
   "en": "The container has 1 × 1 minute (1 minute) to pass the startup check; then the cluster restarts it.",
-  "zh-TW": "容器有 1 × 1 分鐘（1 分鐘）可以通過啟動檢查；超過時叢集就會重新啟動它。",
-  "zh-CN": "容器有 1 × 1 分钟（1 分钟）可以通过启动检查；超过时集群就会重启它。"
+  "zh-TW": "容器有 1 × 1 分鐘（1 分鐘）可以通過啟動檢查，超過時叢集就會重新啟動它。",
+  "zh-CN": "容器有 1 × 1 分钟（1 分钟）可以通过启动检查，超过时集群就会重启它。"
  },
  {
   "key": "diagnosis.probeFailure.why.startup",
@@ -278,8 +278,8 @@
    "total": "180"
   },
   "en": "The container has 2 × 90 seconds (3 minutes) to pass the startup check; then the cluster restarts it.",
-  "zh-TW": "容器有 2 × 90 秒（3 分鐘）可以通過啟動檢查；超過時叢集就會重新啟動它。",
-  "zh-CN": "容器有 2 × 90 秒（3 分钟）可以通过启动检查；超过时集群就会重启它。"
+  "zh-TW": "容器有 2 × 90 秒（3 分鐘）可以通過啟動檢查，超過時叢集就會重新啟動它。",
+  "zh-CN": "容器有 2 × 90 秒（3 分钟）可以通过启动检查，超过时集群就会重启它。"
  },
  {
   "key": "diagnosis.probeFailure.why.startup",
@@ -291,8 +291,8 @@
    "total": "7200"
   },
   "en": "The container has 60 × 2 minutes (120 minutes) to pass the startup check; then the cluster restarts it.",
-  "zh-TW": "容器有 60 × 2 分鐘（120 分鐘）可以通過啟動檢查；超過時叢集就會重新啟動它。",
-  "zh-CN": "容器有 60 × 2 分钟（120 分钟）可以通过启动检查；超过时集群就会重启它。"
+  "zh-TW": "容器有 60 × 2 分鐘（120 分鐘）可以通過啟動檢查，超過時叢集就會重新啟動它。",
+  "zh-CN": "容器有 60 × 2 分钟（120 分钟）可以通过启动检查，超过时集群就会重启它。"
  },
  {
   "key": "diagnosis.configMissing.cause.object",
@@ -451,8 +451,8 @@
   "key": "diagnosis.configMissing.why.volume",
   "params": {},
   "en": "The cluster mounts every volume before it starts a replica's containers; a volume from a secret or config that doesn't exist can't be mounted, so they keep waiting.",
-  "zh-TW": "叢集會先掛載所有磁碟區，再啟動副本的容器；磁碟區如果取自不存在的機密或設定檔，就無法掛載，容器會一直等待。",
-  "zh-CN": "集群会先挂载所有卷，再启动副本的容器；卷如果来自不存在的机密或配置文件，就无法挂载，容器会一直等待。"
+  "zh-TW": "叢集會先掛載所有磁碟區，再啟動副本的容器。磁碟區如果取自不存在的機密或設定檔，就無法掛載，容器會一直等待。",
+  "zh-CN": "集群会先挂载所有卷，再启动副本的容器。卷如果来自不存在的机密或配置文件，就无法挂载，容器会一直等待。"
  },
  {
   "key": "diagnosis.configMissing.fix.object",
@@ -519,8 +519,8 @@
   "key": "diagnosis.configMissing.fix.unknown",
   "params": {},
   "en": "The replica's events name what is missing; add it, or stop reading it.",
-  "zh-TW": "副本的事件會說缺少什麼；把它加上，或不再讀取它。",
-  "zh-CN": "副本的事件会说缺少什么；把它加上，或不再读取它。"
+  "zh-TW": "副本的事件會說缺少什麼。把它加上，或不再讀取它。",
+  "zh-CN": "副本的事件会说缺少什么。把它加上，或不再读取它。"
  },
  {
   "key": "diagnosis.configMissing.fix.volume",
@@ -596,8 +596,8 @@
    "message": "message1"
   },
   "en": "Each replica goes on a machine with room for what it reserves; the cluster says: message1",
-  "zh-TW": "每個副本要放到容得下它保留量的機器上；叢集的說明：message1",
-  "zh-CN": "每个副本要放到容得下它预留量的机器上；集群的说明：message1"
+  "zh-TW": "每個副本都要放在容得下它保留量的機器上。叢集的說明：message1",
+  "zh-CN": "每个副本都要放在容得下它预留量的机器上。集群的说明：message1"
  },
  {
   "key": "diagnosis.unschedulable.fix.cpu",
@@ -643,8 +643,8 @@
    "quota": "quota1"
   },
   "en": "The project limit quota1 caps what all its services may reserve together; the cluster refuses new replicas over it.",
-  "zh-TW": "專案用量上限 quota1 限制所有服務加起來能保留的量；超過時叢集會拒絕新的副本。",
-  "zh-CN": "项目用量上限 quota1 限制所有服务加起来能预留的量；超过时集群会拒绝新的副本。"
+  "zh-TW": "專案用量上限 quota1 限制所有服務加起來能保留的量，超過時叢集會拒絕新的副本。",
+  "zh-CN": "项目用量上限 quota1 限制所有服务加起来能预留的量，超过时集群会拒绝新的副本。"
  },
  {
   "key": "diagnosis.quotaBlocked.fix",
@@ -670,7 +670,7 @@
    "service": "service1"
   },
   "en": "endpoint1 sends to port targetPort1, which service1's containers don't declare.",
-  "zh-TW": "endpoint1 把流量送到連接埠 targetPort1，service1 的容器卻沒有宣告它。",
+  "zh-TW": "endpoint1 把流量送到連接埠 targetPort1，但 service1 的容器沒有宣告這個連接埠。",
   "zh-CN": "endpoint1 把流量送到端口 targetPort1，但 service1 的容器没有声明这个端口。"
  },
  {
@@ -682,8 +682,8 @@
    "ports": "ports1"
   },
   "en": "endpoint1 sends to port targetPort1, which service1's containers don't declare (they declare ports1).",
-  "zh-TW": "endpoint1 把流量送到連接埠 targetPort1，service1 的容器卻沒有宣告它；容器宣告的是 ports1。",
-  "zh-CN": "endpoint1 把流量送到端口 targetPort1，但 service1 的容器没有声明这个端口（声明的是 ports1）。"
+  "zh-TW": "endpoint1 把流量送到連接埠 targetPort1，但 service1 的容器沒有宣告這個連接埠，它宣告的是 ports1。",
+  "zh-CN": "endpoint1 把流量送到端口 targetPort1，但 service1 的容器没有声明这个端口，它声明的是 ports1。"
  },
  {
   "key": "diagnosis.unreachable.cause.noReadyEndpoints",
@@ -781,8 +781,8 @@
   "key": "diagnosis.unreachable.why.targetPort",
   "params": {},
   "en": "A private address forwards to the port it names; a named port must be one the containers declare.",
-  "zh-TW": "私有位址會轉送到它指定的連接埠；用名稱指定時，必須是容器宣告的連接埠。",
-  "zh-CN": "私有地址会转发到它指定的端口；用名称指定时，必须是容器声明的端口。"
+  "zh-TW": "私有位址會轉送到它指定的連接埠。用名稱指定時，必須是容器宣告的連接埠。",
+  "zh-CN": "私有地址会转发到它指定的端口。用名称指定时，必须是容器声明的端口。"
  },
  {
   "key": "diagnosis.unreachable.why.noReadyEndpoints",
@@ -823,8 +823,8 @@
   "key": "diagnosis.unreachable.fix.routeNotAccepted",
   "params": {},
   "en": "Check the route's entry point and the address it sends to; the route's status says which.",
-  "zh-TW": "檢查路由用的流量入口，以及路由指向的位址；路由的狀態會說是哪一個。",
-  "zh-CN": "检查路由的流量入口和它指向的地址；路由的状态会说是哪一个。"
+  "zh-TW": "檢查路由用的流量入口，以及路由指向的位址，路由的狀態會說是哪一個。",
+  "zh-CN": "检查路由的流量入口和它指向的地址，路由的状态会说是哪一个。"
  },
  {
   "key": "diagnosis.crashLoop.cause.exitCode",
@@ -884,8 +884,8 @@
   "key": "diagnosis.crashLoop.fix.exitsZero",
   "params": {},
   "en": "A service must keep running; run one-off work as a task (Job).",
-  "zh-TW": "服務必須持續執行；一次性的工作改用 Job 執行。",
-  "zh-CN": "服务必须持续运行；一次性的工作改用 Job 运行。"
+  "zh-TW": "服務必須持續執行。只跑一次的程式改用批次工作（Job）執行。",
+  "zh-CN": "服务必须持续运行。只运行一次的程序改用批处理任务（Job）运行。"
  },
  {
   "key": "diagnosis.crashLoop.fix.command",
@@ -898,8 +898,8 @@
   "key": "diagnosis.crashLoop.fix.killed",
   "params": {},
   "en": "Something killed it: check its memory use and its restart check.",
-  "zh-TW": "有東西終止了它：檢查記憶體用量與存活檢查。",
-  "zh-CN": "有东西终止了它：检查内存用量与存活检查。"
+  "zh-TW": "它是被強制終止的：檢查記憶體用量與存活檢查。",
+  "zh-CN": "它是被强制终止的：检查内存用量与存活检查。"
  },
  {
   "key": "diagnosis.crashLoop.fix.terminated",
@@ -1122,8 +1122,8 @@
   "key": "diagnosis.imagePull.fix.notFoundOrPrivate",
   "params": {},
   "en": "Check the name and version tag; if the image is private, give the project a login for its registry.",
-  "zh-TW": "確認名稱與版本標籤；如果是私有映像檔，替專案加上映像檔倉庫的登入資訊。",
-  "zh-CN": "确认名称与版本标签；如果是私有镜像，为项目加上镜像仓库的登录信息。"
+  "zh-TW": "確認名稱與版本標籤。如果是私有映像檔，替專案加上映像檔倉庫的登入資訊。",
+  "zh-CN": "确认名称与版本标签。如果是私有镜像，为项目加上镜像仓库的登录信息。"
  },
  {
   "key": "diagnosis.imagePull.fix.unauthorized",
@@ -1229,8 +1229,8 @@
   "key": "diagnosis.probeFailure.fix.startup",
   "params": {},
   "en": "If it only starts slowly, allow more time in Health checks; if it should be up by now, its logs say why.",
-  "zh-TW": "如果只是啟動得比較慢，到健康檢查放寬時間；如果早該啟動好了，日誌會說明原因。",
-  "zh-CN": "如果只是启动得比较慢，到健康检查放宽时间；如果早该启动好了，日志会说明原因。"
+  "zh-TW": "如果只是啟動得比較慢，到健康檢查放寬時間。如果早該啟動好了，日誌會說明原因。",
+  "zh-CN": "如果只是启动得比较慢，到健康检查放宽时间。如果早该启动好了，日志会说明原因。"
  },
  {
   "key": "gap.resourceLimits.none",
@@ -1553,8 +1553,8 @@
    "services": "1"
   },
   "en": "The ingress controller brings requests for public domains to the services they route to; while it is down, 1 domain and 1 service get no requests from outside the cluster.",
-  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務；它停擺時，1 個網域和 1 個服務收不到叢集外部的請求。",
-  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务；它停摆时，1 个域名和 1 个服务收不到集群外部的请求。"
+  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務。它停擺時，1 個網域和 1 個服務收不到叢集外部的請求。",
+  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务。它停摆时，1 个域名和 1 个服务收不到集群外部的请求。"
  },
  {
   "key": "incident.componentDown.why.ingressController",
@@ -1563,8 +1563,8 @@
    "services": "1"
   },
   "en": "The ingress controller brings requests for public domains to the services they route to; while it is down, 2 domains and 1 service get no requests from outside the cluster.",
-  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務；它停擺時，2 個網域和 1 個服務收不到叢集外部的請求。",
-  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务；它停摆时，2 个域名和 1 个服务收不到集群外部的请求。"
+  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務。它停擺時，2 個網域和 1 個服務收不到叢集外部的請求。",
+  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务。它停摆时，2 个域名和 1 个服务收不到集群外部的请求。"
  },
  {
   "key": "incident.componentDown.why.ingressController",
@@ -1573,8 +1573,8 @@
    "services": "1"
   },
   "en": "The ingress controller brings requests for public domains to the services they route to; while it is down, 60 domains and 1 service get no requests from outside the cluster.",
-  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務；它停擺時，60 個網域和 1 個服務收不到叢集外部的請求。",
-  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务；它停摆时，60 个域名和 1 个服务收不到集群外部的请求。"
+  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務。它停擺時，60 個網域和 1 個服務收不到叢集外部的請求。",
+  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务。它停摆时，60 个域名和 1 个服务收不到集群外部的请求。"
  },
  {
   "key": "incident.componentDown.why.ingressController",
@@ -1583,8 +1583,8 @@
    "services": "1"
   },
   "en": "The ingress controller brings requests for public domains to the services they route to; while it is down, 90 domains and 1 service get no requests from outside the cluster.",
-  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務；它停擺時，90 個網域和 1 個服務收不到叢集外部的請求。",
-  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务；它停摆时，90 个域名和 1 个服务收不到集群外部的请求。"
+  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務。它停擺時，90 個網域和 1 個服務收不到叢集外部的請求。",
+  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务。它停摆时，90 个域名和 1 个服务收不到集群外部的请求。"
  },
  {
   "key": "incident.componentDown.why.ingressController",
@@ -1593,8 +1593,8 @@
    "services": "1"
   },
   "en": "The ingress controller brings requests for public domains to the services they route to; while it is down, 120 domains and 1 service get no requests from outside the cluster.",
-  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務；它停擺時，120 個網域和 1 個服務收不到叢集外部的請求。",
-  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务；它停摆时，120 个域名和 1 个服务收不到集群外部的请求。"
+  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務。它停擺時，120 個網域和 1 個服務收不到叢集外部的請求。",
+  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务。它停摆时，120 个域名和 1 个服务收不到集群外部的请求。"
  },
  {
   "key": "incident.componentDown.why.ingressController",
@@ -1603,8 +1603,8 @@
    "services": "1"
   },
   "en": "The ingress controller brings requests for public domains to the services they route to; while it is down, 3600 domains and 1 service get no requests from outside the cluster.",
-  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務；它停擺時，3600 個網域和 1 個服務收不到叢集外部的請求。",
-  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务；它停摆时，3600 个域名和 1 个服务收不到集群外部的请求。"
+  "zh-TW": "公開網域的請求由 Ingress 控制器轉給服務。它停擺時，3600 個網域和 1 個服務收不到叢集外部的請求。",
+  "zh-CN": "Ingress 控制器负责把公开域名的请求送到对应的服务。它停摆时，3600 个域名和 1 个服务收不到集群外部的请求。"
  },
  {
   "key": "incident.componentDown.why.certManager",
@@ -1612,8 +1612,8 @@
    "domains": "1"
   },
   "en": "cert-manager issues and renews the certificates domains ask it for; while it is down, the certificates of 1 domain are neither issued nor renewed, and browsers refuse a certificate once it expires.",
-  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證；它停擺時，1 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
-  "zh-CN": "cert-manager 负责签发和续期域名要求的证书；它停摆时，1 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
+  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證。它停擺時，1 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
+  "zh-CN": "cert-manager 负责签发和续期域名要求的证书。它停摆时，1 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
  },
  {
   "key": "incident.componentDown.why.certManager",
@@ -1621,8 +1621,8 @@
    "domains": "2"
   },
   "en": "cert-manager issues and renews the certificates domains ask it for; while it is down, the certificates of 2 domains are neither issued nor renewed, and browsers refuse a certificate once it expires.",
-  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證；它停擺時，2 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
-  "zh-CN": "cert-manager 负责签发和续期域名要求的证书；它停摆时，2 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
+  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證。它停擺時，2 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
+  "zh-CN": "cert-manager 负责签发和续期域名要求的证书。它停摆时，2 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
  },
  {
   "key": "incident.componentDown.why.certManager",
@@ -1630,8 +1630,8 @@
    "domains": "60"
   },
   "en": "cert-manager issues and renews the certificates domains ask it for; while it is down, the certificates of 60 domains are neither issued nor renewed, and browsers refuse a certificate once it expires.",
-  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證；它停擺時，60 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
-  "zh-CN": "cert-manager 负责签发和续期域名要求的证书；它停摆时，60 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
+  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證。它停擺時，60 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
+  "zh-CN": "cert-manager 负责签发和续期域名要求的证书。它停摆时，60 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
  },
  {
   "key": "incident.componentDown.why.certManager",
@@ -1639,8 +1639,8 @@
    "domains": "90"
   },
   "en": "cert-manager issues and renews the certificates domains ask it for; while it is down, the certificates of 90 domains are neither issued nor renewed, and browsers refuse a certificate once it expires.",
-  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證；它停擺時，90 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
-  "zh-CN": "cert-manager 负责签发和续期域名要求的证书；它停摆时，90 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
+  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證。它停擺時，90 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
+  "zh-CN": "cert-manager 负责签发和续期域名要求的证书。它停摆时，90 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
  },
  {
   "key": "incident.componentDown.why.certManager",
@@ -1648,8 +1648,8 @@
    "domains": "120"
   },
   "en": "cert-manager issues and renews the certificates domains ask it for; while it is down, the certificates of 120 domains are neither issued nor renewed, and browsers refuse a certificate once it expires.",
-  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證；它停擺時，120 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
-  "zh-CN": "cert-manager 负责签发和续期域名要求的证书；它停摆时，120 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
+  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證。它停擺時，120 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
+  "zh-CN": "cert-manager 负责签发和续期域名要求的证书。它停摆时，120 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
  },
  {
   "key": "incident.componentDown.why.certManager",
@@ -1657,8 +1657,8 @@
    "domains": "3600"
   },
   "en": "cert-manager issues and renews the certificates domains ask it for; while it is down, the certificates of 3600 domains are neither issued nor renewed, and browsers refuse a certificate once it expires.",
-  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證；它停擺時，3600 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
-  "zh-CN": "cert-manager 负责签发和续期域名要求的证书；它停摆时，3600 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
+  "zh-TW": "cert-manager 負責簽發和更新網域要求的憑證。它停擺時，3600 個網域的憑證不會簽發也不會更新，憑證一過期，瀏覽器就會拒絕。",
+  "zh-CN": "cert-manager 负责签发和续期域名要求的证书。它停摆时，3600 个域名的证书不会签发也不会续期，证书一过期，浏览器就会拒绝。"
  },
  {
   "key": "incident.componentDown.why.clusterDns",
@@ -1666,8 +1666,8 @@
    "services": "1"
   },
   "en": "Services find each other by name through cluster DNS; while it is down, 1 service that calls another by name can't reach it.",
-  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此；它停擺時，有 1 個服務用名稱連線，會連不到對方。",
-  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此；它停摆时，有 1 个服务用名称连接，会连不上对方。"
+  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此。它停擺時，有 1 個服務用名稱連線，會連不到對方。",
+  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此。它停摆时，有 1 个服务用名称连接，会连不上对方。"
  },
  {
   "key": "incident.componentDown.why.clusterDns",
@@ -1675,8 +1675,8 @@
    "services": "2"
   },
   "en": "Services find each other by name through cluster DNS; while it is down, 2 services that call another by name can't reach it.",
-  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此；它停擺時，有 2 個服務用名稱連線，會連不到對方。",
-  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此；它停摆时，有 2 个服务用名称连接，会连不上对方。"
+  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此。它停擺時，有 2 個服務用名稱連線，會連不到對方。",
+  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此。它停摆时，有 2 个服务用名称连接，会连不上对方。"
  },
  {
   "key": "incident.componentDown.why.clusterDns",
@@ -1684,8 +1684,8 @@
    "services": "60"
   },
   "en": "Services find each other by name through cluster DNS; while it is down, 60 services that call another by name can't reach it.",
-  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此；它停擺時，有 60 個服務用名稱連線，會連不到對方。",
-  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此；它停摆时，有 60 个服务用名称连接，会连不上对方。"
+  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此。它停擺時，有 60 個服務用名稱連線，會連不到對方。",
+  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此。它停摆时，有 60 个服务用名称连接，会连不上对方。"
  },
  {
   "key": "incident.componentDown.why.clusterDns",
@@ -1693,8 +1693,8 @@
    "services": "90"
   },
   "en": "Services find each other by name through cluster DNS; while it is down, 90 services that call another by name can't reach it.",
-  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此；它停擺時，有 90 個服務用名稱連線，會連不到對方。",
-  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此；它停摆时，有 90 个服务用名称连接，会连不上对方。"
+  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此。它停擺時，有 90 個服務用名稱連線，會連不到對方。",
+  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此。它停摆时，有 90 个服务用名称连接，会连不上对方。"
  },
  {
   "key": "incident.componentDown.why.clusterDns",
@@ -1702,8 +1702,8 @@
    "services": "120"
   },
   "en": "Services find each other by name through cluster DNS; while it is down, 120 services that call another by name can't reach it.",
-  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此；它停擺時，有 120 個服務用名稱連線，會連不到對方。",
-  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此；它停摆时，有 120 个服务用名称连接，会连不上对方。"
+  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此。它停擺時，有 120 個服務用名稱連線，會連不到對方。",
+  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此。它停摆时，有 120 个服务用名称连接，会连不上对方。"
  },
  {
   "key": "incident.componentDown.why.clusterDns",
@@ -1711,15 +1711,15 @@
    "services": "3600"
   },
   "en": "Services find each other by name through cluster DNS; while it is down, 3600 services that call another by name can't reach it.",
-  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此；它停擺時，有 3600 個服務用名稱連線，會連不到對方。",
-  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此；它停摆时，有 3600 个服务用名称连接，会连不上对方。"
+  "zh-TW": "服務之間靠叢集 DNS 用名稱找到彼此。它停擺時，有 3600 個服務用名稱連線，會連不到對方。",
+  "zh-CN": "服务之间靠集群 DNS 用名称找到彼此。它停摆时，有 3600 个服务用名称连接，会连不上对方。"
  },
  {
   "key": "incident.componentDown.why.metricsServer",
   "params": {},
   "en": "metrics-server measures what each replica uses; while it is down, usage figures are missing and autoscaling stops.",
-  "zh-TW": "metrics-server 負責量測每個副本的用量；它停擺時，看不到用量數字，自動擴縮也會停止。",
-  "zh-CN": "metrics-server 负责测量每个副本的用量；它停摆时，看不到用量数据，自动扩缩容也会停止。"
+  "zh-TW": "metrics-server 負責量測每個副本的用量。它停擺時，看不到用量數字，自動擴縮也會停止。",
+  "zh-CN": "metrics-server 负责测量每个副本的用量。它停摆时，看不到用量数据，自动扩缩容也会停止。"
  },
  {
   "key": "incident.componentDown.fix.ingressController",
@@ -1728,7 +1728,7 @@
   },
   "en": "Check why workload1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "incident.componentDown.fix.ingressController",
@@ -1738,7 +1738,7 @@
   },
   "en": "Check why workload1 in namespace1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1（namespace1）沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 namespace1 里的 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1（namespace1）没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "incident.componentDown.fix.certManager",
@@ -1747,7 +1747,7 @@
   },
   "en": "Check why workload1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "incident.componentDown.fix.certManager",
@@ -1757,7 +1757,7 @@
   },
   "en": "Check why workload1 in namespace1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1（namespace1）沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 namespace1 里的 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1（namespace1）没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "incident.componentDown.fix.clusterDns",
@@ -1766,7 +1766,7 @@
   },
   "en": "Check why workload1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "incident.componentDown.fix.clusterDns",
@@ -1776,7 +1776,7 @@
   },
   "en": "Check why workload1 in namespace1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1（namespace1）沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 namespace1 里的 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1（namespace1）没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "incident.componentDown.fix.metricsServer",
@@ -1785,7 +1785,7 @@
   },
   "en": "Check why workload1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "incident.componentDown.fix.metricsServer",
@@ -1795,7 +1795,7 @@
   },
   "en": "Check why workload1 in namespace1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1（namespace1）沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 namespace1 里的 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1（namespace1）没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "incident.nodeNotReady.cause",
@@ -1865,8 +1865,8 @@
    "services": "1"
   },
   "en": "A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its pods so they can start elsewhere. 1 pod runs on it; 1 service has replicas there.",
-  "zh-TW": "節點未就緒時不會再啟動新的 Pod；寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 1 個 Pod，1 個服務有副本在上面。",
-  "zh-CN": "节点未就绪时不会再启动新的 Pod；宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 1 个 Pod，1 个服务有副本在上面。"
+  "zh-TW": "節點未就緒時不會再啟動新的 Pod。寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 1 個 Pod，1 個服務有副本在上面。",
+  "zh-CN": "节点未就绪时不会再启动新的 Pod。宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 1 个 Pod，1 个服务有副本在上面。"
  },
  {
   "key": "incident.nodeNotReady.why",
@@ -1875,8 +1875,8 @@
    "services": "1"
   },
   "en": "A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its pods so they can start elsewhere. 2 pods run on it; 1 service has replicas there.",
-  "zh-TW": "節點未就緒時不會再啟動新的 Pod；寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 2 個 Pod，1 個服務有副本在上面。",
-  "zh-CN": "节点未就绪时不会再启动新的 Pod；宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 2 个 Pod，1 个服务有副本在上面。"
+  "zh-TW": "節點未就緒時不會再啟動新的 Pod。寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 2 個 Pod，1 個服務有副本在上面。",
+  "zh-CN": "节点未就绪时不会再启动新的 Pod。宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 2 个 Pod，1 个服务有副本在上面。"
  },
  {
   "key": "incident.nodeNotReady.why",
@@ -1885,8 +1885,8 @@
    "services": "1"
   },
   "en": "A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its pods so they can start elsewhere. 60 pods run on it; 1 service has replicas there.",
-  "zh-TW": "節點未就緒時不會再啟動新的 Pod；寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 60 個 Pod，1 個服務有副本在上面。",
-  "zh-CN": "节点未就绪时不会再启动新的 Pod；宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 60 个 Pod，1 个服务有副本在上面。"
+  "zh-TW": "節點未就緒時不會再啟動新的 Pod。寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 60 個 Pod，1 個服務有副本在上面。",
+  "zh-CN": "节点未就绪时不会再启动新的 Pod。宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 60 个 Pod，1 个服务有副本在上面。"
  },
  {
   "key": "incident.nodeNotReady.why",
@@ -1895,8 +1895,8 @@
    "services": "1"
   },
   "en": "A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its pods so they can start elsewhere. 90 pods run on it; 1 service has replicas there.",
-  "zh-TW": "節點未就緒時不會再啟動新的 Pod；寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 90 個 Pod，1 個服務有副本在上面。",
-  "zh-CN": "节点未就绪时不会再启动新的 Pod；宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 90 个 Pod，1 个服务有副本在上面。"
+  "zh-TW": "節點未就緒時不會再啟動新的 Pod。寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 90 個 Pod，1 個服務有副本在上面。",
+  "zh-CN": "节点未就绪时不会再启动新的 Pod。宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 90 个 Pod，1 个服务有副本在上面。"
  },
  {
   "key": "incident.nodeNotReady.why",
@@ -1905,8 +1905,8 @@
    "services": "1"
   },
   "en": "A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its pods so they can start elsewhere. 120 pods run on it; 1 service has replicas there.",
-  "zh-TW": "節點未就緒時不會再啟動新的 Pod；寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 120 個 Pod，1 個服務有副本在上面。",
-  "zh-CN": "节点未就绪时不会再启动新的 Pod；宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 120 个 Pod，1 个服务有副本在上面。"
+  "zh-TW": "節點未就緒時不會再啟動新的 Pod。寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 120 個 Pod，1 個服務有副本在上面。",
+  "zh-CN": "节点未就绪时不会再启动新的 Pod。宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 120 个 Pod，1 个服务有副本在上面。"
  },
  {
   "key": "incident.nodeNotReady.why",
@@ -1915,8 +1915,8 @@
    "services": "1"
   },
   "en": "A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its pods so they can start elsewhere. 3600 pods run on it; 1 service has replicas there.",
-  "zh-TW": "節點未就緒時不會再啟動新的 Pod；寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 3600 個 Pod，1 個服務有副本在上面。",
-  "zh-CN": "节点未就绪时不会再启动新的 Pod；宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 3600 个 Pod，1 个服务有副本在上面。"
+  "zh-TW": "節點未就緒時不會再啟動新的 Pod。寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 3600 個 Pod，1 個服務有副本在上面。",
+  "zh-CN": "节点未就绪时不会再启动新的 Pod。宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 3600 个 Pod，1 个服务有副本在上面。"
  },
  {
   "key": "incident.nodeNotReady.fix",
@@ -1942,8 +1942,8 @@
    "host": "host1"
   },
   "en": "host1 doesn't resolve from inside the cluster; DNS elsewhere may still answer, so Zeabur can't tell.",
-  "zh-TW": "從叢集內解析不到 host1；其他地方的 DNS 可能仍有回應，所以 Zeabur 無法判斷。",
-  "zh-CN": "从集群内解析不到 host1；其他地方的 DNS 可能仍有响应，所以 Zeabur 无法判断。"
+  "zh-TW": "從叢集內解析不到 host1。叢集外的 DNS 可能查得到，所以 Zeabur 無法確定。",
+  "zh-CN": "从集群内解析不到 host1。集群外的 DNS 可能查得到，所以 Zeabur 无法确定。"
  },
  {
   "key": "trace.dns.unknown",
@@ -1987,8 +1987,8 @@
    "route": "route1"
   },
   "en": "The domain points to another address than route1's; a CDN or proxy in front of the cluster answers with its own.",
-  "zh-TW": "網域指向的位址不屬於 route1；如果叢集前面有 CDN 或代理伺服器，回應的會是它們的位址。",
-  "zh-CN": "域名指向的地址不是 route1 的；集群前面的 CDN 或代理服务器会用自己的地址响应。"
+  "zh-TW": "網域指向的位址不屬於 route1。如果叢集前面有 CDN 或代理伺服器，回應的會是它們的位址。",
+  "zh-CN": "域名指向的地址不是 route1 的。如果集群前面有 CDN 或代理服务器，响应的会是它们的地址。"
  },
  {
   "key": "trace.controller.classesUnreadable",
@@ -2133,8 +2133,8 @@
    "host": "host1"
   },
   "en": "Secret secret1 holds the certificate for host1; Zeabur doesn't check it further.",
-  "zh-TW": "機密 secret1 存有 host1 的憑證；Zeabur 不會進一步檢查。",
-  "zh-CN": "机密 secret1 存有 host1 的证书；Zeabur 不会进一步检查。"
+  "zh-TW": "機密 secret1 存有 host1 的憑證，Zeabur 不會進一步檢查。",
+  "zh-CN": "机密 secret1 存有 host1 的证书，Zeabur 不会进一步检查。"
  },
  {
   "key": "trace.certificate.secretMissing",
@@ -2144,15 +2144,15 @@
    "secret": "secret1"
   },
   "en": "route1 reads the certificate for host1 from secret secret1, which isn't in the project; the controller may serve a default certificate that Zeabur can't check.",
-  "zh-TW": "route1 從機密 secret1 讀取 host1 的憑證，但專案裡沒有這個機密；控制器可能改用預設憑證，Zeabur 無法檢查它。",
-  "zh-CN": "route1 从机密 secret1 读取 host1 的证书，但项目里没有这个机密；控制器可能改用默认证书，Zeabur 无法检查它。"
+  "zh-TW": "route1 從機密 secret1 讀取 host1 的憑證，但專案裡沒有這個機密。控制器可能改用預設憑證，Zeabur 無法檢查它。",
+  "zh-CN": "route1 从机密 secret1 读取 host1 的证书，但项目里没有这个机密。控制器可能改用默认证书，Zeabur 无法检查它。"
  },
  {
   "key": "trace.route.noStatus",
   "params": {
    "route": "route1"
   },
-  "en": "Nothing has written route1's status yet, so whether it is taken up is unknown.",
+  "en": "Nothing has written route1's status yet, so Zeabur can't tell whether it's in effect.",
   "zh-TW": "還沒有任何元件寫入 route1 的狀態，無法得知它是否已生效。",
   "zh-CN": "还没有任何组件写入 route1 的状态，无法得知它是否已生效。"
  },
@@ -2161,7 +2161,7 @@
   "params": {
    "route": "route1"
   },
-  "en": "route1 is taken up: its controller wrote an address into its status.",
+  "en": "route1 is in effect: its controller wrote an address into its status.",
   "zh-TW": "route1 已生效：控制器已在它的狀態裡寫入位址。",
   "zh-CN": "route1 已生效：控制器已在它的状态里写入地址。"
  },
@@ -2182,8 +2182,8 @@
    "reason": "reason1"
   },
   "en": "route1's entry point reports condition1 reason1; requests don't go through.",
-  "zh-TW": "route1 的流量入口回報 condition1 reason1；請求無法通過。",
-  "zh-CN": "route1 的流量入口报告 condition1 reason1；请求无法通过。"
+  "zh-TW": "route1 的流量入口回報 condition1 reason1，請求無法通過。",
+  "zh-CN": "route1 的流量入口报告 condition1 reason1，请求无法通过。"
  },
  {
   "key": "trace.service.unreadable",
@@ -2258,7 +2258,7 @@
    "targetPort": "targetPort1"
   },
   "en": "endpoint1 sends to port targetPort1, which the containers don't declare.",
-  "zh-TW": "endpoint1 把流量送到連接埠 targetPort1，容器卻沒有宣告它。",
+  "zh-TW": "endpoint1 把流量送到連接埠 targetPort1，但容器沒有宣告這個連接埠。",
   "zh-CN": "endpoint1 把流量送到端口 targetPort1，但容器没有声明这个端口。"
  },
  {
@@ -2269,8 +2269,8 @@
    "ports": "ports1"
   },
   "en": "endpoint1 sends to port targetPort1, which the containers don't declare (they declare ports1).",
-  "zh-TW": "endpoint1 把流量送到連接埠 targetPort1，容器卻沒有宣告它；容器宣告的是 ports1。",
-  "zh-CN": "endpoint1 把流量送到端口 targetPort1，但容器没有声明这个端口（声明的是 ports1）。"
+  "zh-TW": "endpoint1 把流量送到連接埠 targetPort1，但容器沒有宣告這個連接埠，它宣告的是 ports1。",
+  "zh-CN": "endpoint1 把流量送到端口 targetPort1，但容器没有声明这个端口，它声明的是 ports1。"
  },
  {
   "key": "trace.targetPort.undeclared",
@@ -2343,8 +2343,8 @@
   "key": "diagnosis.unreachable.why.ingressClassMissing",
   "params": {},
   "en": "An ingress controller serves only the Ingresses of its own class; with no such class, none serves this one.",
-  "zh-TW": "Ingress 控制器只處理自己類別的 Ingress；沒有這個類別，就沒有控制器處理它。",
-  "zh-CN": "Ingress 控制器只处理自己类别的 Ingress；没有这个类别，就没有控制器处理它。"
+  "zh-TW": "Ingress 控制器只處理自己類別的 Ingress，沒有這個類別，就沒有控制器處理它。",
+  "zh-CN": "Ingress 控制器只处理自己类别的 Ingress，没有这个类别，就没有控制器处理它。"
  },
  {
   "key": "diagnosis.unreachable.fix.ingressClassMissing",
@@ -2371,8 +2371,8 @@
   "key": "diagnosis.unreachable.why.controllerDown",
   "params": {},
   "en": "The ingress controller brings requests for a domain into the cluster; while none of its replicas is ready, nothing answers them.",
-  "zh-TW": "Ingress 控制器負責把網域的請求帶進叢集；它沒有任何就緒的副本時，就沒有東西回應這些請求。",
-  "zh-CN": "Ingress 控制器负责把域名的请求带进集群；它没有任何就绪的副本时，就没有东西响应这些请求。"
+  "zh-TW": "Ingress 控制器負責把網域的請求帶進叢集。它沒有任何就緒的副本時，這些請求就得不到回應。",
+  "zh-CN": "Ingress 控制器负责把域名的请求带进集群。它没有任何就绪的副本时，这些请求就得不到响应。"
  },
  {
   "key": "diagnosis.unreachable.fix.controllerDown",
@@ -2381,7 +2381,7 @@
   },
   "en": "Check why workload1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "diagnosis.unreachable.fix.controllerDown",
@@ -2391,7 +2391,7 @@
   },
   "en": "Check why workload1 in namespace1 has no ready replica; its events and logs say why.",
   "zh-TW": "workload1（namespace1）沒有就緒的副本，從它的事件和日誌找出原因。",
-  "zh-CN": "检查 namespace1 里的 workload1 为什么没有就绪的副本；它的事件和日志会说明原因。"
+  "zh-CN": "workload1（namespace1）没有就绪的副本，从它的事件和日志找出原因。"
  },
  {
   "key": "diagnosis.unreachable.cause.certificateNotReady",
@@ -2420,8 +2420,8 @@
    "secret": "secret1"
   },
   "en": "cert-manager writes the certificate into secret secret1 once it is issued; until then the controller serves its default certificate, which browsers refuse.",
-  "zh-TW": "cert-manager 簽發憑證後才會把它寫進機密 secret1；在那之前，控制器會改用預設憑證，瀏覽器會拒絕它。",
-  "zh-CN": "cert-manager 签发证书后才会把它写进机密 secret1；在那之前，控制器会改用默认证书，浏览器会拒绝它。"
+  "zh-TW": "cert-manager 簽發憑證後才會把它寫進機密 secret1。在那之前，控制器會改用預設憑證，瀏覽器會拒絕它。",
+  "zh-CN": "cert-manager 签发证书后才会把它写进机密 secret1。在那之前，控制器会改用默认证书，浏览器会拒绝它。"
  },
  {
   "key": "diagnosis.unreachable.fix.certificateNotReady",
@@ -2447,8 +2447,8 @@
   "key": "diagnosis.unreachable.why.backendPortMissing",
   "params": {},
   "en": "A route sends to one port of a private address, by number or name; a port the address doesn't have receives nothing.",
-  "zh-TW": "路由會用編號或名稱把流量送到私有位址的某個連接埠；私有位址沒有的連接埠收不到任何流量。",
-  "zh-CN": "路由会用编号或名称把流量发到私有地址的某个端口；私有地址没有的端口收不到任何流量。"
+  "zh-TW": "路由會用編號或名稱把流量送到私有位址的某個連接埠。私有位址沒有的連接埠收不到任何流量。",
+  "zh-CN": "路由会用编号或名称把流量发到私有地址的某个端口。私有地址没有的端口收不到任何流量。"
  },
  {
   "key": "diagnosis.unreachable.fix.backendPortMissing",
@@ -2520,8 +2520,8 @@
    "path": "path1"
   },
   "en": "container1 keeps its software1 data in path1, which is on no volume; it's lost whenever the replica is replaced.",
-  "zh-TW": "container1 把 software1 資料存在 path1，但這個路徑不在任何磁碟區上；副本一換掉，資料就不見了。",
-  "zh-CN": "container1 把 software1 数据存在 path1，但这个路径不在任何卷上；副本一替换，数据就没了。"
+  "zh-TW": "container1 把 software1 資料存在 path1，但這個路徑不在任何磁碟區上，副本一換掉，資料就不見了。",
+  "zh-CN": "container1 把 software1 数据存在 path1，但这个路径不在任何卷上，副本一替换，数据就没了。"
  },
  {
   "key": "gap.ephemeralData.ephemeral",
@@ -2531,8 +2531,8 @@
    "path": "path1"
   },
   "en": "container1 keeps its software1 data in path1, on a volume that lasts only as long as the replica; it's lost whenever the replica is replaced.",
-  "zh-TW": "container1 把 software1 資料存在 path1，但這個磁碟區只跟著副本存在；副本一換掉，資料就不見了。",
-  "zh-CN": "container1 把 software1 数据存在 path1，但这个卷只随副本存在；副本一替换，数据就没了。"
+  "zh-TW": "container1 把 software1 資料存在 path1，但這個磁碟區只跟著副本存在，副本一換掉，資料就不見了。",
+  "zh-CN": "container1 把 software1 数据存在 path1，但这个卷只随副本存在，副本一替换，数据就没了。"
  },
  {
   "key": "diagnosis.unexplained.cause.waiting",
@@ -3089,7 +3089,7 @@
   },
   "en": "container1 can't start: its image runs as root, and the service's security is Strict.",
   "zh-TW": "container1 無法啟動：映像檔以 root 執行，但服務的安全性設為「嚴格」。",
-  "zh-CN": "container1 无法启动：镜像以 root 运行，但服务的安全性设为「严格」。"
+  "zh-CN": "container1 无法启动：镜像以 root 运行，但服务的安全性设为“严格”。"
  },
  {
   "key": "diagnosis.podSecurity.why.refused",
@@ -3105,7 +3105,7 @@
   "key": "diagnosis.podSecurity.fix.compatible",
   "params": {},
   "en": "Use an image that runs without root: nginxinc/nginx-unprivileged instead of nginx, or, for a service built from your Dockerfile, a numeric user such as USER 1000 in it. Otherwise, choose Compatible security in the service's settings.",
-  "zh-TW": "改用不需要 root 的映像檔：例如以 nginxinc/nginx-unprivileged 取代 nginx；服務若從你的 Dockerfile 建置，就在 Dockerfile 裡用數字指定使用者，例如 USER 1000。否則請在服務設定裡把安全性改為「相容」。",
-  "zh-CN": "改用不需要 root 的镜像：例如以 nginxinc/nginx-unprivileged 替代 nginx；服务若从你的 Dockerfile 构建，就在 Dockerfile 里用数字指定用户，例如 USER 1000。否则请在服务设置里把安全性改为「兼容」。"
+  "zh-TW": "改用不需要 root 的映像檔：例如以 nginxinc/nginx-unprivileged 取代 nginx。如果服務從你的 Dockerfile 建置，就在 Dockerfile 裡用數字指定使用者，例如 USER 1000。否則請在服務設定裡把安全性改為「相容」。",
+  "zh-CN": "改用不需要 root 的镜像：例如以 nginxinc/nginx-unprivileged 替代 nginx。如果服务从你的 Dockerfile 构建，就在 Dockerfile 里用数字指定用户，例如 USER 1000。否则请在服务设置里把安全性改为“兼容”。"
  }
 ]
