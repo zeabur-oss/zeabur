@@ -21,21 +21,47 @@ export function PlanDrawer({
   onClose: () => void
   children: ReactNode
 }) {
-  const t = useT()
   const asked = step.asked
+  return (
+    <FormDrawer
+      onClose={onClose}
+      title={asked ? asked.title : title}
+      description={asked ? undefined : description}
+      footer={asked ? <div ref={step.footerRef} className="w-full" /> : footer}
+    >
+      <div hidden={!!asked}>{children}</div>
+      {step.view}
+    </FormDrawer>
+  )
+}
+
+/** A form in a drawer. */
+export function FormDrawer({
+  title,
+  description,
+  footer,
+  onClose,
+  children,
+}: {
+  title: ReactNode
+  description?: ReactNode
+  footer: ReactNode
+  onClose: () => void
+  children: ReactNode
+}) {
+  const t = useT()
   return (
     <Drawer
       open
       onOpenChange={(next) => {
         if (!next) onClose()
       }}
-      title={asked ? asked.title : title}
-      description={asked ? undefined : description}
+      title={title}
+      description={description}
       closeLabel={t("common.close")}
-      footer={asked ? <div ref={step.footerRef} className="w-full" /> : footer}
+      footer={footer}
     >
-      <div hidden={!!asked}>{children}</div>
-      {step.view}
+      {children}
     </Drawer>
   )
 }
@@ -61,11 +87,14 @@ export function ReviewFooter({
   onReview,
   disabled,
   note,
+  label,
 }: {
   onCancel: () => void
   onReview: () => void
   disabled?: boolean
   note?: ReactNode
+  /** The review button's words, when not "Review changes". */
+  label?: ReactNode
 }) {
   const t = useT()
   return (
@@ -75,7 +104,7 @@ export function ReviewFooter({
         {t("edit.cancel")}
       </Button>
       <Button size="sm" disabled={disabled} onClick={onReview}>
-        {t("edit.review")}
+        {label ?? t("edit.review")}
       </Button>
     </div>
   )

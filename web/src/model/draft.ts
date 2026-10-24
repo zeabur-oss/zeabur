@@ -13,6 +13,12 @@ export function partOf(change: Change): DraftPart | undefined {
     case "addDomain":
     case "renameDomain":
     case "removeDomain":
+    case "certificate":
+    case "redirect":
+    case "basicAuth":
+    case "maintenance":
+    case "errorPages":
+    case "errorPageHtml":
       return "networking"
     case "addVolume":
     case "expandVolume":
@@ -44,33 +50,38 @@ export const draftable = (changes: readonly Change[]) =>
 
 const workloadKey = (w: Schemas["WorkloadRef"]) => `${w.kind}/${w.name}`
 
+type Keys = { [Op in Change["op"]]?: (change: Extract<Change, { op: Op }>) => string }
+
+const domainKey = (change: { hostname: string }) => `domain:${change.hostname}`
+const hostKey = (change: { op: string; route: { name: string }; hostname: string }) =>
+  `${change.op}:${change.route.name}/${change.hostname}`
+const routeKey = (change: { op: string; route: { name: string } }) =>
+  `${change.op}:${change.route.name}`
+const mountKey = (change: { workload: Schemas["WorkloadRef"]; mountPath: string }) =>
+  `mount:${workloadKey(change.workload)}:${change.mountPath}`
+
 /** Two changes with one key edit the same thing: the later one stands. */
-function keyOf(change: Change): string | undefined {
-  switch (change.op) {
-    case "env":
-      return `env:${workloadKey(change.workload)}:${change.container ?? ""}`
-    case "data":
-      return `data:${change.kind}/${change.name}`
-    case "scale":
-      return `scale:${workloadKey(change.workload)}`
-    case "resources":
-      return `resources:${workloadKey(change.workload)}:${change.container ?? ""}`
-    case "probe":
-      return `probe:${workloadKey(change.workload)}:${change.container ?? ""}:${change.probe}`
-    case "addDomain":
-    case "removeDomain":
-      return `domain:${change.hostname}`
-    case "renameDomain":
-      return `domain:${change.from}`
-    case "expandVolume":
-      return `expand:${change.claim}`
-    case "editMount":
-    case "removeVolume":
-      return `mount:${workloadKey(change.workload)}:${change.mountPath}`
-    default:
-      return undefined
-  }
+const keys: Keys = {
+  env: (c) => `env:${workloadKey(c.workload)}:${c.container ?? ""}`,
+  data: (c) => `data:${c.kind}/${c.name}`,
+  scale: (c) => `scale:${workloadKey(c.workload)}`,
+  resources: (c) => `resources:${workloadKey(c.workload)}:${c.container ?? ""}`,
+  probe: (c) => `probe:${workloadKey(c.workload)}:${c.container ?? ""}:${c.probe}`,
+  addDomain: domainKey,
+  removeDomain: domainKey,
+  renameDomain: (c) => `domain:${c.from}`,
+  certificate: hostKey,
+  redirect: hostKey,
+  maintenance: hostKey,
+  basicAuth: routeKey,
+  errorPages: routeKey,
+  errorPageHtml: (c) => c.op,
+  expandVolume: (c) => `expand:${c.claim}`,
+  editMount: mountKey,
+  removeVolume: mountKey,
 }
+
+const keyOf = (change: Change) => (keys[change.op] as ((c: Change) => string) | undefined)?.(change)
 
 function combine(before: Change, after: Change): Change {
   if (before.op === "env" && after.op === "env") {
@@ -87,6 +98,7 @@ function combine(before: Change, after: Change): Change {
       changes: [...before.changes.filter((e) => !keys.has(e.key)), ...after.changes],
     }
   }
+  if (before.op === "errorPageHtml" && after.op === "errorPageHtml") return { ...before, ...after }
   return after
 }
 
@@ -137,4 +149,22 @@ export function stagedDomains(
       edits.set(`${change.route.name}/${host}`, change)
     }
   return { added, edits }
+}
+
+/** The staged changes of a domain's certificate, redirect, password and pages drawers that touch
+ * `host` of `route`. A password and error pages are the whole route's. */
+export function stagedSettings(changes: readonly Change[], route: string, host: string): Change[] {
+  return changes.filter((change) => {
+    switch (change.op) {
+      case "certificate":
+      case "redirect":
+      case "maintenance":
+        return change.route.name === route && change.hostname === host
+      case "basicAuth":
+      case "errorPages":
+        return change.route.name === route
+      default:
+        return false
+    }
+  })
 }
