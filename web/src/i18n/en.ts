@@ -2117,7 +2117,8 @@ export const en = {
   "backups.volume.imageUser":
     "The service sets no user, so backups run as K8up's non-root user and meet the restricted Pod Security level. They skip files that only the service's user may read: set a user in the service's security settings to include them.",
   "backups.volume.restricted":
-    "This project enforces the restricted Pod Security level, which refuses pods that run as root. Backups of this volume fail until an administrator lowers the level to baseline.",
+    "This project enforces the restricted Pod Security level, which refuses pods that run as root, and backups of this service run as root. Set the service to restricted, or ask an administrator to lower the project to baseline.",
+  "backups.volume.openSecurity": "Open security settings",
   "backups.volume.long": "K8up can't select this volume: its name is longer than 63 characters.",
   "backups.volume.notInstalled":
     "Volume backups need K8up, which this cluster doesn't have. An administrator can install it.",

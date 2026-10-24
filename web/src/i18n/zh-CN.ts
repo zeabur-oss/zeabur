@@ -1957,7 +1957,8 @@ export const zhCN: Messages = {
   "backups.volume.imageUser":
     "这个服务没有指定用户，备份会以 K8up 的非 root 用户运行，符合 restricted Pod Security 级别，但会跳过只有服务用户能读的文件。在服务的安全性设置中指定用户，就能一并备份。",
   "backups.volume.restricted":
-    "这个项目强制使用 restricted Pod Security 级别，以 root 运行的 Pod 会被拒绝。管理员把级别降为 baseline 之前，这个卷的备份都会失败。",
+    "这个项目强制使用 restricted Pod Security 级别，会拒绝以 root 运行的 Pod，而这个服务的备份要以 root 运行。请把服务改为 restricted，或请管理员把项目降为 baseline。",
+  "backups.volume.openSecurity": "打开安全性设置",
   "backups.volume.long": "这个卷的名称超过 63 个字符，K8up 无法用标签选中它。",
   "backups.volume.notInstalled": "备份卷需要 K8up，这个集群还没安装。管理员可以安装。",
   "backups.volume.openK8up": "打开 K8up",

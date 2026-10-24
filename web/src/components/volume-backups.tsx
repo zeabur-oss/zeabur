@@ -263,15 +263,11 @@ function ScheduleDrawer({
       : []
   const review = () => {
     setTried(true)
-    if (problems.length > 0) return
+    if (refused || problems.length > 0) return
     step.plan({
       title: t("db.backup.plan", claim),
       changes: scheduleVolumeBackups(project, claim, target, user),
-      notes: [
-        t("backups.volume.password", `${claim}-backup`),
-        userNote(t, user),
-        ...(refused ? [t("backups.volume.restricted")] : []),
-      ],
+      notes: [t("backups.volume.password", `${claim}-backup`), userNote(t, user)],
     })
   }
   const count = (key: "keepLast" | "keepDays" | "keepWeekly", label: string, max: number) => (
@@ -292,15 +288,31 @@ function ScheduleDrawer({
       onClose={onClose}
       title={t("db.backup.plan", claim)}
       description={t("backups.volume.body")}
-      footer={<ReviewFooter onCancel={onClose} onReview={review} />}
+      footer={<ReviewFooter onCancel={onClose} onReview={review} disabled={refused} />}
     >
       <ReviewForm onReview={review}>
         {refused ? (
           <Alert variant="warn">
             <WarningIcon aria-hidden="true" />
-            <AlertDescription>{t("backups.volume.restricted")}</AlertDescription>
+            <AlertDescription>
+              {t("backups.volume.restricted")}{" "}
+              <a
+                href="#security"
+                onClick={(event) => {
+                  event.preventDefault()
+                  onClose()
+                  document.getElementById("security")?.scrollIntoView({ block: "start" })
+                  history.replaceState(history.state, "", "#security")
+                }}
+                className="text-foreground hover:underline"
+              >
+                {t("backups.volume.openSecurity")}
+              </a>
+            </AlertDescription>
           </Alert>
-        ) : null}
+        ) : (
+          <p className="type-meta text-muted-foreground">{userNote(t, user)}</p>
+        )}
         <S3Fields
           target={target}
           set={set}

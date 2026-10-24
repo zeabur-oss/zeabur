@@ -1960,7 +1960,8 @@ export const zhTW: Messages = {
   "backups.volume.imageUser":
     "這個服務沒有指定使用者，備份會以 K8up 的非 root 使用者執行，符合 restricted Pod Security 等級，但會略過只有服務使用者能讀的檔案。在服務的安全性設定指定使用者，就能一併備份。",
   "backups.volume.restricted":
-    "這個專案強制使用 restricted Pod Security 等級，以 root 執行的 Pod 會遭拒絕。管理員把等級降為 baseline 之前，這個磁碟區的備份都會失敗。",
+    "這個專案強制使用 restricted Pod Security 等級，會拒絕以 root 執行的 Pod，而這個服務的備份要以 root 執行。請把服務改為 restricted，或請管理員把專案降為 baseline。",
+  "backups.volume.openSecurity": "開啟安全性設定",
   "backups.volume.long": "這個磁碟區名稱超過 63 個字元，K8up 無法用標籤選取它。",
   "backups.volume.notInstalled": "備份磁碟區需要 K8up，這個叢集還沒安裝。管理員可以安裝。",
   "backups.volume.openK8up": "開啟 K8up",
