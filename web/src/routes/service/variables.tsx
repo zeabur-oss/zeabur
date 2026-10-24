@@ -545,11 +545,23 @@ export function VariablesTab({
               )}
             </>
           ) : (
-            <SourceLink
-              source={env.source}
-              variable={env.name}
-              onOpen={(kind, name) => setEditor({ kind, name, key: env.source.key ?? undefined })}
-            />
+            <>
+              <SourceLink
+                source={env.source}
+                variable={env.name}
+                onOpen={(kind, name) => setEditor({ kind, name, key: env.source.key ?? undefined })}
+              />
+              <StopReference
+                env={env}
+                container={container}
+                multi={multi}
+                editing={Boolean(editing)}
+                managed={managed}
+                gate={gates("changeServices")}
+                planner={disconnector}
+                workload={workload}
+              />
+            </>
           )}
         </span>
       </li>
@@ -1153,6 +1165,60 @@ function StopImport({
         title={t("useShared.stop", name)}
         onClick={stop}
       >
+        <TrashIcon aria-hidden="true" />
+      </Button>
+    </GateTip>
+  )
+}
+
+/** Removes a variable that reads one key of a config file or secret; the object stays. */
+function StopReference({
+  env,
+  container,
+  multi,
+  editing,
+  managed,
+  gate,
+  planner,
+  workload,
+}: {
+  env: Schemas["EnvVar"]
+  container: string
+  multi: boolean
+  editing: boolean
+  managed: string | undefined
+  gate: Gate
+  planner: ReturnType<typeof usePlanner>
+  workload: Schemas["WorkloadRef"]
+}) {
+  const t = useT()
+  const source = env.source.name
+  const shared = env.source.kind === "ConfigMap" || env.source.kind === "Secret"
+  if (editing || managed || !shared || !source) return null
+  const label = t("vars.removeReference", env.name, source)
+  const stop = () =>
+    planner.plan({
+      title: label,
+      service: workload,
+      changes: [
+        {
+          op: "env",
+          workload,
+          container: multi ? container : undefined,
+          changes: [{ op: "remove", name: env.name }],
+        },
+      ],
+      summary: {
+        lines: [
+          t("vars.removeReferenceSaid", workload.name, env.name),
+          t("vars.referenceKept", source),
+        ],
+        action: t("action.removeVariable"),
+      },
+    })
+  return (
+    <GateTip gate={gate}>
+      <Button variant="muted" size="icon-xs" aria-label={label} title={label} onClick={stop}>
         <TrashIcon aria-hidden="true" />
       </Button>
     </GateTip>

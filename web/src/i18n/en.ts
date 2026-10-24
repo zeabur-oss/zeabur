@@ -1775,6 +1775,7 @@ export const en = {
   "action.grow": (size: string) => `Grow to ${size}`,
   "action.addVolume": "Add volume",
   "action.saveMount": "Save mount",
+  "action.removeVariable": "Remove variable",
   "action.removeVolume": "Remove volume",
   "action.deleteVolume": "Delete volume",
   "action.saveVolumes": "Save volumes",
@@ -3715,6 +3716,10 @@ export const en = {
   "useShared.badVariable": "Use letters, digits and _, not starting with a digit.",
   "useShared.exists": (name: string) => `The container already has ${name}.`,
   "useShared.already": (container: string) => `${container} already reads every key of it.`,
+  "vars.removeReference": (name: string, source: string) => `Remove ${name}, read from ${source}`,
+  "vars.removeReferenceSaid": (service: string, name: string) => `Remove ${name} from ${service}.`,
+  "vars.referenceKept": (source: string) =>
+    `${source} stays, with all its keys; only this variable goes.`,
   "useShared.stop": (name: string) => `Stop reading ${name}`,
   "useShared.kube.writes": "Adds",
   "useShared.kube.when": "Takes effect",
