@@ -98,7 +98,6 @@ async function cropped(page: Page, selector: string, until: string | undefined, 
       padding: ["top", "right", "bottom", "left"].map(pad),
       radius: s.borderRadius,
       bg,
-      radius: s.borderRadius,
     }
   }, end)
   const options = { animations: "disabled", caret: "hide" } as const
