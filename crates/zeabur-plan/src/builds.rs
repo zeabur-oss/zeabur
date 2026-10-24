@@ -42,8 +42,36 @@ pub const KEEL_FORCE: &str = "force";
 
 /// Most build variables a `Build` takes.
 const MAX_BUILD_ENV: usize = 128;
-/// Longest path the `Build` takes for its directory and Dockerfile.
+/// Longest path the `Build` takes for its directory and Dockerfile, and longest watch path.
 const MAX_BUILD_PATH: usize = 1024;
+/// Most watch paths a `Build` takes.
+const MAX_WATCH_PATHS: usize = 32;
+
+/// Refuses more watch paths than the `Build` takes, an empty one, or one too long.
+fn watch_paths_problem(paths: &[String]) -> Result<(), PlanError> {
+    if paths.len() > MAX_WATCH_PATHS {
+        return Err(error(
+            ErrorKind::BadRequest,
+            "too_many_watch_paths",
+            format!("A Build takes at most {MAX_WATCH_PATHS} watch paths."),
+        ));
+    }
+    for path in paths {
+        let pattern = path.trim();
+        let bare = pattern.trim_start_matches('!').trim_start_matches('/');
+        if bare.is_empty()
+            || pattern.len() > MAX_BUILD_PATH
+            || pattern.chars().any(char::is_control)
+        {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "invalid_watch_path",
+                format!("{pattern:?} is not a watch path."),
+            ));
+        }
+    }
+    Ok(())
+}
 
 /// Whether `path` is a relative path that the `Build` accepts: no segment starts with `.`, so
 /// the path cannot climb out with `..`.
@@ -262,7 +290,11 @@ impl Planner<'_> {
     }
 
     pub(crate) fn build_options(&mut self, change: &BuildOptionsChange) -> Result<(), PlanError> {
-        if change.context_dir.is_none() && change.dockerfile.is_none() && change.env.is_empty() {
+        if change.context_dir.is_none()
+            && change.dockerfile.is_none()
+            && change.env.is_empty()
+            && change.watch_paths.is_none()
+        {
             return Err(error(
                 ErrorKind::BadRequest,
                 "no_changes",
@@ -281,6 +313,9 @@ impl Planner<'_> {
                     format!("{path} is not a relative path inside the repository."),
                 ));
             }
+        }
+        if let Some(paths) = &change.watch_paths {
+            watch_paths_problem(paths)?;
         }
         if !change.env.is_empty() {
             validate_env(&change.env)
@@ -311,6 +346,9 @@ impl Planner<'_> {
         }
         for edit in &change.env {
             self.build_env(index, &change.build, edit)?;
+        }
+        if let Some(paths) = &change.watch_paths {
+            self.watch_paths(index, paths)?;
         }
         let after = self.current(index);
         let count = after
@@ -359,6 +397,40 @@ impl Planner<'_> {
                 Step::field(field),
             ],
             &format!("spec.source.git.{field}"),
+        )?;
+        self.patch(index, operations)
+    }
+
+    /// Sets `spec.triggers.paths` to `paths`, or removes it when `paths` is empty.
+    fn watch_paths(&mut self, index: usize, paths: &[String]) -> Result<(), PlanError> {
+        let paths: Vec<&str> = paths.iter().map(|p| p.trim()).collect();
+        let current = self.current(index);
+        let triggers = current.pointer("/spec/triggers");
+        let before = triggers.and_then(|t| t.get("paths")).cloned();
+        let operations = match before {
+            Some(before) if before == json!(paths) => return Ok(()),
+            Some(before) if paths.is_empty() => {
+                vec![
+                    test("/spec/triggers/paths", before),
+                    remove("/spec/triggers/paths"),
+                ]
+            }
+            Some(before) => vec![
+                test("/spec/triggers/paths", before),
+                replace("/spec/triggers/paths", json!(paths)),
+            ],
+            None if paths.is_empty() => return Ok(()),
+            None if triggers.is_some() => vec![add("/spec/triggers/paths", json!(paths))],
+            None => vec![add("/spec/triggers", json!({"paths": paths}))],
+        };
+        self.claim(
+            index,
+            &[
+                Step::field("spec"),
+                Step::field("triggers"),
+                Step::field("paths"),
+            ],
+            "spec.triggers.paths",
         )?;
         self.patch(index, operations)
     }

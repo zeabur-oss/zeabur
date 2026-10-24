@@ -67,6 +67,9 @@ pub struct ZeaburBuilderBuild {
     pub dockerfile: Option<String>,
     /// The build variables, by name. A literal value is left out.
     pub env: Vec<ZeaburBuilderEnv>,
+    /// The watch paths, `spec.triggers.paths`: a new commit builds only when it changes a file
+    /// they match. Empty: every commit builds.
+    pub watch_paths: Vec<String>,
     /// The `ClusterBuilder`.
     pub builder: Option<String>,
     /// Whether builds are paused.
@@ -77,6 +80,8 @@ pub struct ZeaburBuilderBuild {
     pub latest_revision: Option<String>,
     /// The commit the ref points at.
     pub remote_revision: Option<String>,
+    /// The newest commit that changed no watched path, so it was not built.
+    pub skipped_revision: Option<String>,
     /// The `Ready` condition: `True`, `False` or `Unknown`.
     pub ready: Option<String>,
     /// Its reason and message, as the controller wrote them.
@@ -245,6 +250,16 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                 context_dir: text(b, "/spec/source/git/contextDir"),
                 dockerfile: text(b, "/spec/source/git/dockerfile"),
                 env: env(b),
+                watch_paths: b
+                    .data
+                    .pointer("/spec/triggers/paths")
+                    .and_then(serde_json::Value::as_array)
+                    .map_or_else(Vec::new, |paths| {
+                        paths
+                            .iter()
+                            .filter_map(|p| p.as_str().map(str::to_owned))
+                            .collect()
+                    }),
                 builder: text(b, "/spec/builderRef"),
                 suspended: b
                     .data
@@ -254,6 +269,7 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                 latest_image,
                 latest_revision: text(b, "/status/latestRevision"),
                 remote_revision: text(b, "/status/remoteRevision"),
+                skipped_revision: text(b, "/status/skippedRevision"),
                 ready: field(ready, "status"),
                 reason: field(ready, "reason"),
                 message: field(ready, "message"),

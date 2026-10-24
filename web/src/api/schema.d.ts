@@ -2575,6 +2575,12 @@ export interface components {
        *     `secretName` and `key`.
        */
       env?: components["schemas"]["EnvEdit"][]
+      /**
+       * @description The watch paths, `spec.triggers.paths`: glob patterns from the repository's root, `!` to
+       *     leave a path out. A new commit builds only when it changes a file they match. Empty:
+       *     every commit builds.
+       */
+      watchPaths?: string[] | null
     }
     /**
      * @description Where a service deployed from Git keeps its images, as an administrator installed Zeabur (the
@@ -8799,8 +8805,15 @@ export interface components {
        *     reports it.
        */
       resolvedRef?: string | null
+      /** @description The newest commit that changed no watched path, so it was not built. */
+      skippedRevision?: string | null
       /** @description Whether builds are paused. */
       suspended: boolean
+      /**
+       * @description The watch paths, `spec.triggers.paths`: a new commit builds only when it changes a file
+       *     they match. Empty: every commit builds.
+       */
+      watchPaths: string[]
     }
     /** @description A build variable of a `Build`. */
     ZeaburBuilderEnv: {

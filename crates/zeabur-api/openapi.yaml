@@ -4698,6 +4698,16 @@ components:
           description: |-
             The build variables to set or remove, `spec.env`. A value from a Secret names only
             `secretName` and `key`.
+        watchPaths:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+          description: |-
+            The watch paths, `spec.triggers.paths`: glob patterns from the repository's root, `!` to
+            leave a path out. A new commit builds only when it changes a file they match. Empty:
+            every commit builds.
     BuildSettings:
       type: object
       description: |-
@@ -16882,6 +16892,7 @@ components:
       required:
       - name
       - env
+      - watchPaths
       - suspended
       - keelWebhooks
       properties:
@@ -16984,9 +16995,21 @@ components:
           description: |-
             The ref the newest commit came from, such as `refs/heads/master`, when the controller
             reports it.
+        skippedRevision:
+          type:
+          - string
+          - "null"
+          description: The newest commit that changed no watched path, so it was not built.
         suspended:
           type: boolean
           description: Whether builds are paused.
+        watchPaths:
+          type: array
+          items:
+            type: string
+          description: |-
+            The watch paths, `spec.triggers.paths`: a new commit builds only when it changes a file
+            they match. Empty: every commit builds.
     ZeaburBuilderEnv:
       type: object
       description: A build variable of a `Build`.

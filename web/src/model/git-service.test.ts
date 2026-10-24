@@ -191,6 +191,13 @@ describe("the objects", () => {
     expect(ref(" release/1.2 ")).toBe("release/1.2")
   })
 
+  test("watch paths, one per line, become the Build's triggers; none leaves them out", () => {
+    const triggers = (watchPaths: string) =>
+      find(gitObjects(form({ watchPaths }), "shop", "zot:5000", {}), "Build").spec.triggers
+    expect(triggers(" \n ")).toBeUndefined()
+    expect(triggers(" apps/web/** \n\n!**/*.md")).toEqual({ paths: ["apps/web/**", "!**/*.md"] })
+  })
+
   test("a new Git service is Strict and runs as the user its image names", () => {
     expect(newGitService().security).toBe("restricted")
     const pod = find(gitObjects(form({}), "shop", "zot:5000", {}), "Deployment").spec.template.spec
@@ -237,12 +244,27 @@ describe("the objects", () => {
 
 describe("build options in the service's settings", () => {
   const built = (env: Build["env"]) =>
-    ({ name: "site", contextDir: "apps/web", dockerfile: null, env }) as unknown as Build
+    ({
+      name: "site",
+      contextDir: "apps/web",
+      dockerfile: null,
+      env,
+      watchPaths: [],
+    }) as unknown as Build
   const wired = { name: "NPM_TOKEN", secret: "site-build-env", key: "NPM_TOKEN" }
 
   test("nothing changed plans nothing", () => {
     const build = built([wired])
     expect(buildOptionsChanges(build, buildOptionsOf(build))).toEqual([])
+  })
+
+  test("watch paths are sent only when they change", () => {
+    const build = { ...built([]), watchPaths: ["apps/web/**"] }
+    const options = buildOptionsOf(build)
+    expect(buildOptionsChanges(build, { ...options, watchPaths: "apps/web/**\n" })).toEqual([])
+    expect(buildOptionsChanges(build, { ...options, watchPaths: "" })).toEqual([
+      { op: "buildOptions", build: "site", watchPaths: [] },
+    ])
   })
 
   test("a new value of a wired variable changes only its Secret", () => {
@@ -266,6 +288,7 @@ describe("build options in the service's settings", () => {
     const first = buildOptionsChanges(built([]), {
       directory: "",
       dockerfile: "Dockerfile.prod",
+      watchPaths: "",
       removed: [],
       set: [{ name: "SENTRY_TOKEN", value: "s" }],
     })

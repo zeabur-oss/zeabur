@@ -1,0 +1,8 @@
+description: "Watch paths go to spec.triggers.paths, trimmed; a Build without triggers gets the object."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: buildOptions
+        build: web
+        watchPaths: [" apps/web/** ", "!apps/web/docs/**"]
