@@ -15,11 +15,16 @@
 //!   running. [`MAINTENANCE_ANNOTATION`] keeps the backends the hostname had, and stopping writes
 //!   them back. On an Ingress these are the backends of the hostname's paths. On an `HTTPRoute`
 //!   they are the `backendRefs` of its rules, and the route must serve only that hostname, as for a
-//!   redirect. The `errors` middleware would replace the maintenance page with `503.html`, so while
-//!   a hostname of the Ingress is in maintenance, the middleware catches only 502 and 504.
+//!   redirect. When the rules changed since, the kept backends no longer fit, and stopping sends
+//!   the hostname to the workload's first Service instead.
+//! - The `errors` middleware catches the maintenance port's 503 too, and asks for `503.html` with
+//!   the original `Host` header [traefik-errors-source]. Its query lists the hostnames in
+//!   maintenance (`?down=a.example.com,*.example.org`), and for those hosts the pages port answers
+//!   `503.html` with `maintenance.html`. The other hostnames of the Ingress keep their 503 page.
 //!
 //! [k8s-configmap]: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
 //! [traefik-errors]: https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/errorpages/
+//! [traefik-errors-source]: https://github.com/traefik/traefik/blob/v3.5.0/pkg/middlewares/customerrors/custom_errors.go
 
 use std::collections::BTreeMap;
 
@@ -67,6 +72,18 @@ http {
     root /usr/share/nginx/html;
     server {
         listen 8080;
+        location = /503.html {
+            set $probe "$host ,$arg_down,";
+            if ($probe ~ "^(\S+) .*,\1,") {
+                rewrite ^ /maintenance.html last;
+            }
+            if ($host ~ "^[^.]+(\..+)$") {
+                set $probe "*$1 ,$arg_down,";
+            }
+            if ($probe ~ "^(\S+) .*,\1,") {
+                rewrite ^ /maintenance.html last;
+            }
+        }
     }
     server {
         listen 8081;
@@ -127,12 +144,13 @@ fn given(pages: &ErrorPageHtml) -> Result<Vec<(&'static str, &str)>, PlanError> 
     Ok(given)
 }
 
-/// The errors middleware's statuses: without 503 while a hostname is in maintenance.
-fn statuses(in_maintenance: bool) -> Value {
-    if in_maintenance {
-        json!(["502", "504"])
+/// The errors middleware's query, naming the hostnames in maintenance.
+fn query<'h>(down: impl IntoIterator<Item = &'h String>) -> String {
+    let down: Vec<&str> = down.into_iter().map(String::as_str).collect();
+    if down.is_empty() {
+        "/{status}.html".to_owned()
     } else {
-        json!(["502-504"])
+        format!("/{{status}}.html?down={}", down.join(","))
     }
 }
 
@@ -238,13 +256,11 @@ impl Planner<'_> {
         }
         self.ensure_server()?;
         if middleware.is_none() {
-            let busy = !maintenance(&meta)
-                .ok_or_else(|| bad_annotation(ingress))?
-                .is_empty();
+            let down = maintenance(&meta).ok_or_else(|| bad_annotation(ingress))?;
             let spec = json!({"errors": {
-                "status": statuses(busy),
+                "status": ["502-504"],
                 "service": {"name": SERVER, "port": PAGES_PORT},
-                "query": "/{status}.html",
+                "query": query(down.keys()),
             }});
             self.created_middleware(&name, owner_of(&meta).as_ref(), &spec);
         }
@@ -332,13 +348,13 @@ impl Planner<'_> {
         };
         self.set_annotation(index, MAINTENANCE_ANNOTATION, &after)?;
         if route.kind == RouteKind::Ingress {
-            self.retune_errors(&route.name, !kept.is_empty())?;
+            self.retune_errors(&route.name, &query(kept.keys()))?;
         }
         Ok(())
     }
 
-    /// Sets the statuses of the errors middleware of Ingress `ingress`, where it exists.
-    fn retune_errors(&mut self, ingress: &str, busy: bool) -> Result<(), PlanError> {
+    /// Sets the query of the errors middleware of Ingress `ingress`, where it exists.
+    fn retune_errors(&mut self, ingress: &str, query: &str) -> Result<(), PlanError> {
         let name = traefik::error_pages_name(ingress);
         let target = middleware_target(&name);
         let index = match self.objects.iter().position(|w| w.target == target) {
@@ -349,14 +365,20 @@ impl Planner<'_> {
                 None => return Ok(()),
             },
         };
-        let path = "/spec/errors/status";
-        let before = self.current(index).pointer(path).cloned();
-        let after = statuses(busy);
-        let operations = match before {
-            Some(before) if before == after => return Ok(()),
-            Some(before) => vec![test(path, before), replace(path, after)],
-            None => vec![add(path, after)],
-        };
+        let current = self.current(index);
+        let mut operations = Vec::new();
+        for (path, after) in [
+            ("/spec/errors/status", json!(["502-504"])),
+            ("/spec/errors/query", json!(query)),
+        ] {
+            match current.pointer(path) {
+                Some(before) if *before == after => {}
+                Some(before) => {
+                    operations.extend([test(path, before.clone()), replace(path, after)]);
+                }
+                None => operations.push(add(path, after)),
+            }
+        }
         self.patch(index, operations)
     }
 
