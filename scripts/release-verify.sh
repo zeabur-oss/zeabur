@@ -44,7 +44,9 @@ expected=(digests.txt "zeabur-$plain.tgz")
 for build in linux-amd64 linux-arm64 darwin-arm64; do
   expected+=("zeaburctl-$version-$build.tar.gz")
 done
-expected+=("zeabur-$version-linux-amd64.tar.gz" "zeabur-$version-linux-arm64.tar.gz")
+for arch in amd64 arm64; do
+  expected+=("zeabur-$version-linux-$arch.tar.gz" "zeabur-installer-$version-linux-$arch.tar.gz")
+done
 listed="$(awk '{ print $2 }' "$directory/SHA256SUMS" | sort)"
 if [[ "$listed" != "$(printf '%s\n' "${expected[@]}" | sort)" ]]; then
   echo "SHA256SUMS does not list exactly the release assets:" >&2

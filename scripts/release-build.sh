@@ -6,12 +6,13 @@
 #   scripts/release-build.sh v0.0.2 arm64 dist
 #
 # On Linux (native architecture only; Docker for the image):
-#   zeaburctl-<version>-linux-<arch>.tar.gz, zeabur-<version>-linux-<arch>.tar.gz: one static musl
-#     binary each, with LICENSE;
+#   zeaburctl-<version>-linux-<arch>.tar.gz, zeabur-<version>-linux-<arch>.tar.gz,
+#     zeabur-installer-<version>-linux-<arch>.tar.gz: one static musl binary each, with LICENSE;
 #   image.tar: the image of Containerfile around that same `zeabur` binary (`docker image save`).
 # On macOS, arm64 only (Apple silicon):
 #   zeaburctl-<version>-darwin-arm64.tar.gz. The server only runs in a pod
-#   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`.
+#   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`. The installer installs on a
+#   Linux server only.
 set -euo pipefail
 
 if [[ $# != 3 ]]; then
@@ -36,7 +37,7 @@ case "$(uname -s):$arch:$(uname -m)" in
   *) echo "cannot build $arch here: each build is native, and macOS is arm64 only" >&2; exit 2 ;;
 esac
 binaries=(zeaburctl)
-[[ "$os" == linux ]] && binaries+=(zeabur)
+[[ "$os" == linux ]] && binaries+=(zeabur zeabur-installer)
 
 mkdir -p "$3"
 output="$(cd "$3" && pwd)"
@@ -44,13 +45,15 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 target_dir="${CARGO_TARGET_DIR:-$root/target}"
 
-# The web interface is embedded in both binaries.
+# Zeabur's web interface is embedded in zeabur and zeaburctl, the installer's in zeabur-installer.
 "$root/scripts/build-ui.sh"
+[[ "$os" == linux ]] && "$root/scripts/build-installer-ui.sh"
 # cargo-auditable records the dependency tree in the binary, so a scanner reads exactly what was
 # compiled in (https://github.com/rust-secure-code/cargo-auditable).
 packages=()
 for binary in "${binaries[@]}"; do packages+=(-p "$binary"); done
-ZEABUR_UI_DIST="$root/web/dist" cargo auditable build --release --locked --target "$target" \
+ZEABUR_UI_DIST="$root/web/dist" ZEABUR_INSTALLER_UI_DIST="$root/crates/zeabur-installer/web/dist" \
+  cargo auditable build --release --locked --target "$target" \
   --target-dir "$target_dir" --manifest-path "$root/Cargo.toml" "${packages[@]}"
 
 for binary in "${binaries[@]}"; do

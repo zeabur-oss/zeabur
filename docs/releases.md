@@ -17,6 +17,7 @@ tag v0.0.2 ─▶ CI ─▶ build (Linux amd64/arm64, macOS arm64) ─▶ smoke 
 | Helm chart, its default image pinned to that digest | `oci://ghcr.io/zeabur/charts/zeabur`, version `<version>`; also the asset `zeabur-<version>.tgz` |
 | `zeaburctl`, Linux amd64 and arm64 (static, musl), macOS arm64 (Apple silicon) | `zeaburctl-v<version>-<os>-<arch>.tar.gz` |
 | `zeabur`, the server binary in the image, Linux amd64 and arm64 | `zeabur-v<version>-linux-<arch>.tar.gz` |
+| `zeabur-installer`, which installs a cluster with Zeabur on one server ([guide](installer/README.md)), Linux amd64 and arm64 (static, musl) | `zeabur-installer-v<version>-linux-<arch>.tar.gz` |
 | Digests of the image index, each platform's image and the chart | `digests.txt` |
 | Checksums of every asset above, and their signature | `SHA256SUMS`, `SHA256SUMS.sigstore.json` |
 

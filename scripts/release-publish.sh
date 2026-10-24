@@ -71,7 +71,8 @@ for arch in amd64 arm64; do
   refs+=("$image@$digest")
   cosign sign --yes "$image@$digest"
   printf '%s  %s\n' "linux/$arch" "$image@$digest" >>"$assets/digests.txt"
-  cp "$dir/zeaburctl-$version-linux-$arch.tar.gz" "$dir/zeabur-$version-linux-$arch.tar.gz" "$assets/"
+  cp "$dir/zeaburctl-$version-linux-$arch.tar.gz" "$dir/zeabur-$version-linux-$arch.tar.gz" \
+    "$dir/zeabur-installer-$version-linux-$arch.tar.gz" "$assets/"
 done
 docker manifest create "$image:$plain" "${refs[@]}"
 docker manifest push "$image:$plain"
@@ -114,6 +115,9 @@ shows how to verify both first and which values to set.
 \`\`\`sh
 helm install zeabur oci://$charts/zeabur --version $plain --namespace zeabur ...
 \`\`\`
+
+On a fresh Linux server, \`zeabur-installer\` installs RKE2, Zeabur Identity and Zeabur in one
+step: see [Zeabur Installer](https://github.com/$GITHUB_REPOSITORY/blob/$version/docs/installer/README.md).
 
 ## Digests
 
