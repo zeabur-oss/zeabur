@@ -214,6 +214,8 @@ why. Add a row before introducing a new concept.
 | view (compact action) | 檢視 | 查看 | |
 | jobs (Jobs and CronJobs together) | 批次工作 | 批处理任务 | One-off Jobs are not scheduled |
 | scheduled job | 排程工作 | 定时任务 | A CronJob |
+| restore (from a backup) | 還原 | 还原 | Never 恢復／恢复, which is for resume and recover |
+| PodDisruptionBudget | PodDisruptionBudget | PodDisruptionBudget | Kubernetes kind; no settled translation, so keep it |
 | schedule (when a backup runs) | 排程 | 定时 | In words with its time zone (每天 03:00（UTC）); the cron expression on hover. Never 计划, which reads as a plan |
 | background service (no public domain; the map's lane and the sidebar's group) | 背景服務 | 后台服务 | A CronJob in it is marked 排程／定时 |
 | health check | 健康檢查 | 健康检查 | |
