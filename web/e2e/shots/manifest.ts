@@ -88,7 +88,7 @@ function shot(value: unknown, index: number): Shot {
   const at = typeof value.id === "string" ? value.id : `shot ${index}`
   for (const key of Object.keys(value)) check(shotKeys.includes(key), `${at}: unknown key "${key}"`)
   const { id, path, wait, clip, viewport = "desktop", steps = [] } = value
-  const { locales: shotLocales = ["en"], themes: shotThemes = ["light"] } = value
+  const { locales: shotLocales = Object.keys(locales), themes: shotThemes = ["light"] } = value
   check(
     typeof id === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id),
     `${at}: id must be kebab-case`,
