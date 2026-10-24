@@ -1,4 +1,4 @@
-description: "Maintenance needs the project's error pages; without them it is refused and says to write them first."
+description: "Maintenance needs a page server from the error-pages template; without one it is refused."
 operation: mutation.plan
 params:
   request:

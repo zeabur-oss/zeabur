@@ -1,0 +1,19 @@
+description: "A page server created in the same plan serves maintenance: the hostname's paths go to its maintenance port, and the errors middleware names it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test
+        enabled: true
+      - op: create
+        object:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: error-pages
+            labels: {zeabur.com/page-server: "true"}
+          spec:
+            selector: {app.kubernetes.io/name: error-pages}
+            ports: [{name: pages, port: 8080}, {name: maintenance, port: 8081}]

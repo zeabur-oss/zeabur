@@ -33,6 +33,8 @@ rustls.workspace = true
 rustls-platform-verifier.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# Reads the vendored error-pages template.
+serde-saphyr.workspace = true
 secrecy.workspace = true
 sha2 = { workspace = true, features = ["std"] }
 thiserror.workspace = true

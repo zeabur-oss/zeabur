@@ -29,6 +29,24 @@ pub struct Project {
     pub resources: Vec<Resource>,
     /// Which services appear to call which, sorted by source then target.
     pub connections: Vec<Connection>,
+    /// The server of the error pages and the maintenance page. Absent when the project has none,
+    /// or has more than one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_server: Option<PageServer>,
+}
+
+/// The page server Zeabur Catalog's `error-pages` template deploys: the Service and the ConfigMap
+/// with the label `zeabur.com/page-server: "true"`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct PageServer {
+    /// The Service's name.
+    pub service: String,
+    /// The ConfigMap of the pages, by file name such as `503.html`. Absent when no ConfigMap, or
+    /// more than one, has the label.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pages: Option<String>,
 }
 
 /// One service appearing to call another.

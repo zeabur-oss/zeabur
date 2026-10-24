@@ -406,7 +406,8 @@ impl Planner<'_> {
             .contains(&traefik::error_pages_name(ingress))
             .then(|| traefik::error_pages_name(&name));
         if let Some(pages) = &pages {
-            self.created_middleware(pages, None, &errors_spec([]));
+            let spec = errors_spec(&self.page_server()?, []);
+            self.created_middleware(pages, None, &spec);
         }
         let namespace = self.input.snapshot.namespace.clone();
         let body = moved_ingress(&current, &namespace, &name, hostname, pages.as_deref());

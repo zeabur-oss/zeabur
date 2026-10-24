@@ -78,6 +78,7 @@ pub(crate) async fn compute(
         | Change::PublicPort(_)
         | Change::BasicAuth(_)
         | Change::ErrorPageHtml(_)
+        | Change::PageServer(_)
         | Change::ErrorPages(_)
         | Change::Maintenance(_)
         | Change::Restart { .. }

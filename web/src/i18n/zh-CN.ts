@@ -1628,7 +1628,8 @@ export const zhCN: Messages = {
   "confirm.basicAuth": (route) =>
     `Ingress ${route} 的每个域名都要求输入密码。集群只保存密码的 bcrypt 哈希值。`,
   "confirm.basicAuthOff": (route) => `Ingress ${route} 不再要求输入密码。`,
-  "confirm.errorPageHtml": "把项目的错误页面写入 ConfigMap zeabur-error-pages。",
+  "confirm.errorPageHtml": "把项目的错误页面写入页面服务器的 ConfigMap。",
+  "confirm.pageServer": "在项目部署 Error pages 模板作为页面服务器，并放入这些页面。",
   "confirm.errorPages": (route) => `让 Ingress ${route} 下所有域名显示项目错误页面。`,
   "confirm.errorPagesOff": (route) => `Ingress ${route} 不再显示错误页面。`,
   "confirm.maintenance": (host) => `${host} 改为显示维护页面，服务继续运行。`,
@@ -3372,7 +3373,9 @@ export const zhCN: Messages = {
     `维护模式会应用到整个 HTTPRoute，所以这个域名会移到自己的路由，${hosts} 留在原处。`,
   "domainPages.pages": "页面",
   "domainPages.pagesHint": "项目的每个域名都显示同一组页面。",
-  "domainPages.firstUse": "Zeabur 会在项目里加一个小型服务器来提供这些页面。",
+  "domainPages.noServer": "这个项目还没有页面服务器",
+  "domainPages.noServerHint":
+    "这些页面由 Error pages 模板提供。开启任一开关或编辑页面时，会一并把它部署到这个项目。它是只允许 Traefik 连接的小型 nginx。",
   "domainPages.page": "要编辑的页面",
   "domainPages.page.maintenance": "维护",
   "domainPages.page.badGateway": "502 网关错误",
@@ -3391,11 +3394,14 @@ export const zhCN: Messages = {
   "domainPages.default.later": "我们很快回来。",
   "domainPages.default.retry": "请过几分钟再试。",
   "domainPages.kube.server": "服务器",
-  "domainPages.kube.serverValue": (name) => `Deployment、Service 和 ConfigMap ${name}`,
+  "domainPages.kube.serverValue": (name) =>
+    `Service ${name} 和它的 ConfigMap，按标签 zeabur.com/page-server 找到`,
+  "domainPages.kube.serverNew":
+    "Error pages 模板：名为 error-pages 的 Deployment、Service、ConfigMap 和 NetworkPolicy，带标签 zeabur.com/page-server",
   "domainPages.kube.errors": "错误页面",
   "domainPages.kube.maintenance": "维护",
   "domainPages.kube.maintenanceValue":
-    "域名的后端改为 zeabur-error-pages 的 8081 端口；原来的后端记在注解 zeabur.com/maintenance-backend",
+    "域名的后端改为页面服务器的维护端口，原来的后端记在注解 zeabur.com/maintenance-backend",
   "ports.title": "对外端口",
   "ports.about": "集群外的客户端不经域名，直接连到端口。适合不走 HTTP 的服务，例如数据库。",
   "ports.open": "开放端口",

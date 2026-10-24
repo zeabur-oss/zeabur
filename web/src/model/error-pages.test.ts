@@ -20,15 +20,15 @@ describe("pagesOf", () => {
 })
 
 describe("pageChanges", () => {
-  test("first maintenance writes every page before the switch", () => {
+  test("without a page server, maintenance deploys one with every page before the switch", () => {
     const changes = pageChanges(
       route,
       "www.example.com",
-      { ...off, defaults },
+      { ...off, server: false, defaults },
       { maintenance: true, errorPages: false, edited: { badGateway: "mine" } },
     )
     expect(changes).toEqual([
-      { op: "errorPageHtml", ...defaults, badGateway: "mine" },
+      { op: "pageServer", ...defaults, badGateway: "mine" },
       { op: "maintenance", route, hostname: "www.example.com", enabled: true },
     ])
   })
@@ -37,7 +37,7 @@ describe("pageChanges", () => {
     const changes = pageChanges(
       route,
       "www.example.com",
-      { ...off, pages: defaults, defaults },
+      { ...off, server: true, pages: defaults, defaults },
       { ...off, edited: { maintenance: "m", gatewayTimeout: "new" } },
     )
     expect(changes).toEqual([{ op: "errorPageHtml", gatewayTimeout: "new" }])
@@ -47,9 +47,21 @@ describe("pageChanges", () => {
     const changes = pageChanges(
       route,
       "www.example.com",
-      { maintenance: false, errorPages: true, defaults },
+      { maintenance: false, errorPages: true, server: true, pages: defaults, defaults },
       { ...off, edited: {} },
     )
     expect(changes).toEqual([{ op: "errorPages", route, enabled: false }])
+  })
+
+  test("with a page server, maintenance only switches", () => {
+    const changes = pageChanges(
+      route,
+      "www.example.com",
+      { ...off, server: true, pages: defaults, defaults },
+      { maintenance: true, errorPages: false, edited: {} },
+    )
+    expect(changes).toEqual([
+      { op: "maintenance", route, hostname: "www.example.com", enabled: true },
+    ])
   })
 })

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useId, useState } from "react"
 
-import { configMapsQuery } from "@/api/queries"
+import { configMapsQuery, projectQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
@@ -13,7 +13,6 @@ import type { Translate } from "@/i18n"
 import { useProjectSummary } from "@/lib/project-name"
 import {
   defaultPage,
-  ERROR_PAGE_SERVER,
   PAGE_KEYS,
   pageChanges,
   pagesOf,
@@ -24,6 +23,7 @@ import {
 } from "@/model/error-pages"
 import { projectTitle } from "@/model/project"
 import type { Service } from "@/model/service"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Label } from "@zeabur/design-system/components/label"
 import { Select } from "@zeabur/design-system/components/select"
 import { Switch } from "@zeabur/design-system/components/switch"
@@ -49,14 +49,17 @@ function defaults(t: Translate, project: string): Pages {
   }
 }
 
-/** The project's pages as the ConfigMap has them, or the defaults before it exists. */
+/** The project's page server and its pages, or the defaults before it exists. */
 function useCurrentPages(project: string) {
   const t = useT()
   const title = projectTitle(useProjectSummary(project), project)
+  const view = useQuery(projectQuery(project))
   const query = useQuery(configMapsQuery(project))
-  const found = query.data?.items.find((c) => c.origin.name === ERROR_PAGE_SERVER)
+  const server = view.data?.pageServer ?? undefined
+  const found = query.data?.items.find((c) => c.origin.name === server?.pages)
   return {
-    ready: query.isSuccess,
+    ready: view.isSuccess && query.isSuccess,
+    server: server?.service,
     pages: pagesOf(found?.data),
     defaults: defaults(t, title),
   }
@@ -80,7 +83,12 @@ function usePagesForm(
     ? pageChanges(
         routeRef,
         host,
-        { ...was, pages: current.pages, defaults: current.defaults },
+        {
+          ...was,
+          server: current.server !== undefined,
+          pages: current.pages,
+          defaults: current.defaults,
+        },
         form,
         workload,
       )
@@ -141,6 +149,7 @@ export default function DomainPagesDrawer({
       }
     >
       <ReviewForm onReview={review}>
+        <NoServer shown={current.ready && current.server === undefined} />
         <Toggle
           label={t("domainPages.maintenance")}
           hint={maintenanceHint(t, service, route, host)}
@@ -159,21 +168,32 @@ export default function DomainPagesDrawer({
         ) : null}
         <PageEditor
           pages={current.pages ?? current.defaults}
-          firstUse={current.ready && !current.pages}
           edited={form.edited}
           onEdit={(key, html) => setForm({ ...form, edited: { ...form.edited, [key]: html } })}
           errors={errors}
         />
-        <KubeDetails facts={pagesFacts(t, route)} />
+        <KubeDetails facts={pagesFacts(t, route, current.server)} />
       </ReviewForm>
     </FormDrawer>
   )
 }
 
-function pagesFacts(t: Translate, route: Schemas["Route"]): [string, string][] {
+/** Says that review also deploys the Error pages template. */
+function NoServer({ shown }: { shown: boolean }) {
+  const t = useT()
+  if (!shown) return null
+  return (
+    <Alert variant="info">
+      <AlertTitle>{t("domainPages.noServer")}</AlertTitle>
+      <AlertDescription>{t("domainPages.noServerHint")}</AlertDescription>
+    </Alert>
+  )
+}
+
+function pagesFacts(t: Translate, route: Schemas["Route"], name?: string): [string, string][] {
   const server: [string, string] = [
     t("domainPages.kube.server"),
-    t("domainPages.kube.serverValue", ERROR_PAGE_SERVER),
+    name === undefined ? t("domainPages.kube.serverNew") : t("domainPages.kube.serverValue", name),
   ]
   const maintenance: [string, string] = [
     t("domainPages.kube.maintenance"),
@@ -225,13 +245,11 @@ function Toggle({
 
 function PageEditor({
   pages,
-  firstUse,
   edited,
   onEdit,
   errors,
 }: {
   pages: Pages
-  firstUse: boolean
   edited: Partial<Pages>
   onEdit: (key: PageKey, html: string) => void
   errors: string[]
@@ -241,10 +259,7 @@ function PageEditor({
   return (
     <fieldset className="flex flex-col gap-3">
       <legend className="mb-1.5 text-sm font-medium">{t("domainPages.pages")}</legend>
-      <p className="type-meta text-muted-foreground">
-        {t("domainPages.pagesHint")}
-        {firstUse ? ` ${t("domainPages.firstUse")}` : ""}
-      </p>
+      <p className="type-meta text-muted-foreground">{t("domainPages.pagesHint")}</p>
       <FormField label={t("domainPages.page")}>
         <Select
           size="sm"

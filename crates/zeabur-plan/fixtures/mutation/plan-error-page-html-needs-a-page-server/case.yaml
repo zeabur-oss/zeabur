@@ -1,4 +1,4 @@
-description: "Without a ConfigMap of error pages, a change that gives only some pages is refused."
+description: "Without a page server from the error-pages template, a change to a page is refused."
 operation: mutation.plan
 params:
   request:

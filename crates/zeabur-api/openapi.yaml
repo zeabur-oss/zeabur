@@ -5010,7 +5010,7 @@ components:
       - allOf:
         - $ref: "#/components/schemas/ErrorPageHtml"
           description: |-
-            Write the project's error pages, and run the server that serves them (see the
+            Write the HTML of the project's error pages, in the ConfigMap of its page server (see the
             `error_pages` module).
         - type: object
           required:
@@ -5021,8 +5021,28 @@ components:
               enum:
               - errorPageHtml
         description: |-
-          Write the project's error pages, and run the server that serves them (see the
+          Write the HTML of the project's error pages, in the ConfigMap of its page server (see the
           `error_pages` module).
+      - allOf:
+        - $ref: "#/components/schemas/ErrorPageHtml"
+          description: |-
+            Deploy the page server from Zeabur Catalog's `error-pages` template, with this HTML in
+            place of the template's pages. The API opens it into the `create` of each object; the
+            NetworkPolicy that denies traffic to every pod of the namespace is left out, so the
+            project's other services keep their traffic.
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - pageServer
+        description: |-
+          Deploy the page server from Zeabur Catalog's `error-pages` template, with this HTML in
+          place of the template's pages. The API opens it into the `create` of each object; the
+          NetworkPolicy that denies traffic to every pod of the namespace is left out, so the
+          project's other services keep their traffic.
       - allOf:
         - $ref: "#/components/schemas/ErrorPagesChange"
           description: Show the project's error pages on every hostname of an Ingress, or stop.
@@ -7964,8 +7984,8 @@ components:
     ErrorPageHtml:
       type: object
       description: |-
-        A [`Change::ErrorPageHtml`]: the HTML of each page. A page left out keeps its HTML; the first
-        change of a project gives all four.
+        A [`Change::ErrorPageHtml`] or [`Change::PageServer`]: the HTML of each page. A page left out
+        keeps its HTML.
       properties:
         badGateway:
           type:
@@ -11629,6 +11649,24 @@ components:
       - owned
       - shared
       - orphan
+    PageServer:
+      type: object
+      description: |-
+        The page server Zeabur Catalog's `error-pages` template deploys: the Service and the ConfigMap
+        with the label `zeabur.com/page-server: "true"`.
+      required:
+      - service
+      properties:
+        pages:
+          type:
+          - string
+          - "null"
+          description: |-
+            The ConfigMap of the pages, by file name such as `503.html`. Absent when no ConfigMap, or
+            more than one, has the label.
+        service:
+          type: string
+          description: The Service's name.
     Part:
       type: string
       description: What a variable that points at a database holds.
@@ -13239,6 +13277,13 @@ components:
         namespace:
           type: string
           description: The namespace.
+        pageServer:
+          oneOf:
+          - $ref: "#/components/schemas/PageServer"
+            description: |-
+              The server of the error pages and the maintenance page. Absent when the project has none,
+              or has more than one.
+          - type: "null"
         resources:
           type: array
           items:

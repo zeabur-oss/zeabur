@@ -203,6 +203,48 @@ mod tests {
         assert_eq!(status, StatusCode::CONFLICT, "{problem}");
     }
 
+    #[tokio::test]
+    async fn a_page_server_is_planned_and_applied_from_the_vendored_template() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let request = json!({"changes": [{"op": "pageServer", "maintenance": "<p>Back soon</p>"}]});
+        let planned = plan(&app, &request).await;
+        let (status, applied) = post(
+            app.clone(),
+            "/api/v1/projects/shop/apply",
+            &json!({"token": planned["token"]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        let created: Vec<&Value> = writes
+            .iter()
+            .map(|w| {
+                let WriteBody::Create(body) = &w.body else {
+                    panic!("not a creation: {:?}", w.body);
+                };
+                body
+            })
+            .collect();
+        let named = |kind: &str, name: &str| {
+            created
+                .iter()
+                .copied()
+                .find(|o| o["kind"] == kind && o["metadata"]["name"] == name)
+        };
+        assert!(named("NetworkPolicy", "default-deny").is_none());
+        assert!(named("NetworkPolicy", "error-pages").is_some());
+        assert!(named("Deployment", "error-pages").is_some());
+        let service = named("Service", "error-pages").unwrap();
+        assert_eq!(
+            service["metadata"]["labels"]["zeabur.com/page-server"],
+            "true"
+        );
+        let pages = named("ConfigMap", "error-pages").unwrap();
+        assert_eq!(pages["data"]["maintenance.html"], "<p>Back soon</p>");
+        assert_eq!(pages["metadata"]["namespace"], "shop");
+    }
+
     /// Sets the generation of the Deployment `name`, and its `resourceVersion` to `version`.
     fn set_meta(cluster: &MemoryCluster, name: &str, generation: i64, version: &str) {
         cluster.update(|s| {

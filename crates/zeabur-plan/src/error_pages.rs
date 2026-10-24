@@ -1,16 +1,16 @@
 //! Error pages and maintenance on a domain.
 //!
-//! - **The server.** Each project that uses them has one: a Deployment, a Service and a ConfigMap
-//!   named [`SERVER`]. The first `errorPageHtml` change makes them, with all four pages. The
-//!   ConfigMap holds `502.html`, `503.html`, `504.html`, `maintenance.html` and `nginx.conf`. nginx
-//!   reads a page from the ConfigMap volume on each request, so a new page needs no restart; the
-//!   kubelet updates the volume after its sync period [k8s-configmap]. Port [`PAGES_PORT`] serves
-//!   each page by its file name. Port [`MAINTENANCE_PORT`] answers every request with
-//!   `maintenance.html` and status 503. The pod passes the `restricted` Pod Security level.
+//! - **The page server.** The person deploys it in the project from Zeabur Catalog's `error-pages`
+//!   template, or with a `pageServer` change that the API opens into the `create` of each of its
+//!   objects. Zeabur finds its Service and its ConfigMap of pages by [`PAGE_SERVER_LABEL`], and
+//!   never makes or owns them. Port [`PAGES_PORT`] serves each page by its file name. Port
+//!   [`MAINTENANCE_PORT`] answers every request with `maintenance.html` and status 503. nginx reads
+//!   a page from the ConfigMap volume on each request, so a new page needs no restart; the kubelet
+//!   updates the volume after its sync period [k8s-configmap].
 //! - **Error pages on an Ingress** are a Traefik `errors` middleware [traefik-errors] for statuses
 //!   502 to 504 that asks the pages port for `/{status}.html`. The Ingress lists it last and owns
-//!   it. Traefik finds the Service in the middleware's namespace, so the server is in the project.
-//!   Gateway API has no standard filter for error pages, so an `HTTPRoute` refuses them.
+//!   it. Traefik finds the Service in the middleware's namespace, so the page server is in the
+//!   project. Gateway API has no standard filter for error pages, so an `HTTPRoute` refuses them.
 //! - **Maintenance** sends the hostname's requests to the maintenance port, and the workload keeps
 //!   running. [`MAINTENANCE_ANNOTATION`] keeps the backends the hostname had, and stopping writes
 //!   them back. On an Ingress these are the backends of the hostname's paths. On an `HTTPRoute`
@@ -27,13 +27,11 @@
 //! [traefik-errors]: https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/errorpages/
 //! [traefik-errors-source]: https://github.com/traefik/traefik/blob/v3.5.0/pkg/middlewares/customerrors/custom_errors.go
 
-use std::collections::BTreeMap;
-
-use k8s_openapi::api::apps::v1::Deployment;
 use k8s_openapi::api::core::v1::{ConfigMap, Service};
 use serde_json::{Value, json};
 use zeabur_adapters::error_pages::{
-    MAINTENANCE_ANNOTATION, MAINTENANCE_PORT, PAGES_PORT, SERVER, ingress_services, maintenance,
+    MAINTENANCE_ANNOTATION, MAINTENANCE_PORT, PAGE_SERVER_LABEL, PAGES_PORT, PageServer,
+    ingress_services, is_page_server, maintenance, page_server,
 };
 use zeabur_adapters::traefik;
 use zeabur_model::WorkloadRef;
@@ -47,59 +45,8 @@ use crate::plan::{
     ErrorKind, PlanError, Planner, array, error, http_route_target, ingress_target, to_json,
 };
 
-/// nginx-unprivileged 1.30.5 (stable) on Alpine, without modules, by the digest of its image
-/// index. It runs as user 101 and listens on unprivileged ports.
-pub(crate) const IMAGE: &str = "docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim@sha256:7f79f463c6eb0d0bf8782992bb9636434398e3e5848398805aef2c9b025d8609";
-
 /// The largest page, so that the ConfigMap stays far below its limit of 1 MiB.
 const PAGE_MAX: usize = 64 * 1024;
-
-const NGINX_CONF: &str = r#"worker_processes 1;
-pid /tmp/nginx.pid;
-error_log /dev/stderr warn;
-events {
-    worker_connections 256;
-}
-http {
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-    charset utf-8;
-    server_tokens off;
-    access_log off;
-    client_body_temp_path /tmp/client_temp;
-    proxy_temp_path /tmp/proxy_temp;
-    fastcgi_temp_path /tmp/fastcgi_temp;
-    uwsgi_temp_path /tmp/uwsgi_temp;
-    scgi_temp_path /tmp/scgi_temp;
-    root /usr/share/nginx/html;
-    server {
-        listen 8080;
-        location = /503.html {
-            set $probe "$host ,$arg_down,";
-            if ($probe ~ "^(\S+) .*,\1,") {
-                rewrite ^ /maintenance.html last;
-            }
-            if ($host ~ "^[^.]+(\..+)$") {
-                set $probe "*$1 ,$arg_down,";
-            }
-            if ($probe ~ "^(\S+) .*,\1,") {
-                rewrite ^ /maintenance.html last;
-            }
-        }
-    }
-    server {
-        listen 8081;
-        add_header Cache-Control "no-store" always;
-        error_page 404 503 =503 /maintenance.html;
-        location / {
-            return 503;
-        }
-        location = /maintenance.html {
-            internal;
-        }
-    }
-}
-"#;
 
 /// The Traefik `Middleware` a change reads first, if any: the plan updates or deletes it.
 pub(crate) fn middleware_read(change: &Change) -> Option<(ResourceRef, String)> {
@@ -157,12 +104,37 @@ fn query<'h>(down: impl IntoIterator<Item = &'h String>) -> String {
 }
 
 /// The `errors` middleware spec of an Ingress whose hostnames `down` are in maintenance.
-pub(crate) fn errors_spec<'h>(down: impl IntoIterator<Item = &'h String>) -> Value {
+pub(crate) fn errors_spec<'h>(
+    server: &PageServer,
+    down: impl IntoIterator<Item = &'h String>,
+) -> Value {
     json!({"errors": {
         "status": ["502-504"],
-        "service": {"name": SERVER, "port": PAGES_PORT},
+        "service": {"name": server.name, "port": server.pages},
         "query": query(down),
     }})
+}
+
+fn no_page_server() -> PlanError {
+    error(
+        ErrorKind::NotFound,
+        "no_page_server",
+        format!(
+            "The project has no page server: deploy the error-pages template, or another Service \
+             labelled {PAGE_SERVER_LABEL}=true with the ports {PAGES_PORT} and {MAINTENANCE_PORT}."
+        ),
+    )
+}
+
+fn several_page_servers(kind: &str, names: &[String]) -> PlanError {
+    error(
+        ErrorKind::Conflict,
+        "several_page_servers",
+        format!(
+            "Several {kind}s are labelled {PAGE_SERVER_LABEL}=true ({}); keep the label on one.",
+            names.join(", ")
+        ),
+    )
 }
 
 fn bad_annotation(name: &str) -> PlanError {
@@ -180,50 +152,92 @@ fn bad_annotation(name: &str) -> PlanError {
 impl Planner<'_> {
     pub(crate) fn error_page_html(&mut self, pages: &ErrorPageHtml) -> Result<(), PlanError> {
         let given = given(pages)?;
-        let target = Target::of::<ConfigMap>(SERVER);
-        let existing = self.input.snapshot.config_map(SERVER).map(to_json);
-        if let Some(object) = existing.transpose()? {
-            let operations: Vec<Value> = given
-                .iter()
-                .filter(|(key, html)| {
-                    object
-                        .pointer(&pointer(&["data", key]))
-                        .and_then(Value::as_str)
-                        != Some(html)
-                })
-                .map(|(key, html)| add(&pointer(&["data", key]), json!(html)))
-                .collect();
-            if operations.is_empty() {
-                return Err(error(
-                    ErrorKind::BadRequest,
-                    "same_pages",
-                    "The pages already have this HTML.",
-                ));
+        let labelled: Vec<&ConfigMap> = self
+            .input
+            .snapshot
+            .config_maps
+            .iter()
+            .filter(|c| is_page_server(&c.metadata))
+            .collect();
+        let found = match labelled.as_slice() {
+            [] => return Err(no_page_server()),
+            [one] => *one,
+            many => {
+                let names: Vec<String> = many
+                    .iter()
+                    .filter_map(|c| c.metadata.name.clone())
+                    .collect();
+                return Err(several_page_servers("ConfigMap", &names));
             }
-            let index = self.working(target, object.clone());
-            if object.get("data").is_none() {
-                self.patch(index, vec![add("/data", json!({}))])?;
-            }
-            self.patch(index, operations)?;
-        } else {
-            if given.len() < 4 {
-                return Err(error(
-                    ErrorKind::BadRequest,
-                    "pages_needed",
-                    "The first error pages of a project need all four pages.",
-                ));
-            }
-            let mut data: BTreeMap<&str, &str> = given.into_iter().collect();
-            data.insert("nginx.conf", NGINX_CONF);
-            let body = json!({
-                "apiVersion": "v1",
-                "kind": "ConfigMap",
-                "metadata": self.server_metadata(),
-                "data": data,
-            });
-            self.created(target, body);
+        };
+        let name = found.metadata.name.clone().unwrap_or_default();
+        Self::refuse_managed(&found.metadata, "ConfigMap", &name)?;
+        let object = to_json(found)?;
+        let operations: Vec<Value> = given
+            .iter()
+            .filter(|(key, html)| {
+                object
+                    .pointer(&pointer(&["data", key]))
+                    .and_then(Value::as_str)
+                    != Some(html)
+            })
+            .map(|(key, html)| add(&pointer(&["data", key]), json!(html)))
+            .collect();
+        if operations.is_empty() {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "same_pages",
+                "The pages already have this HTML.",
+            ));
         }
-        self.ensure_server()
+        let index = self.working(Target::of::<ConfigMap>(&name), object.clone());
+        if object.get("data").is_none() {
+            self.patch(index, vec![add("/data", json!({}))])?;
+        }
+        self.patch(index, operations)
+    }
+
+    /// The project's page server: the one Service labelled [`PAGE_SERVER_LABEL`], in the project
+    /// or among the objects this plan creates.
+    pub(crate) fn page_server(&self) -> Result<PageServer, PlanError> {
+        let requested = self
+            .requested
+            .iter()
+            .filter(|o| {
+                o.get("apiVersion").and_then(Value::as_str) == Some("v1")
+                    && o.get("kind").and_then(Value::as_str) == Some("Service")
+            })
+            .filter_map(|o| serde_json::from_value::<Service>(o.clone()).ok());
+        let labelled: Vec<Service> = self
+            .input
+            .snapshot
+            .services
+            .iter()
+            .cloned()
+            .chain(requested)
+            .filter(|s| is_page_server(&s.metadata))
+            .collect();
+        match labelled.as_slice() {
+            [] => Err(no_page_server()),
+            [one] => page_server(one).ok_or_else(|| {
+                error(
+                    ErrorKind::Invalid,
+                    "page_server_ports",
+                    format!(
+                        "Service {} is labelled {PAGE_SERVER_LABEL}=true but has no ports named \
+                         {PAGES_PORT} and {MAINTENANCE_PORT}.",
+                        one.metadata.name.as_deref().unwrap_or_default()
+                    ),
+                )
+            }),
+            many => {
+                let names: Vec<String> = many
+                    .iter()
+                    .filter_map(|s| s.metadata.name.clone())
+                    .collect();
+                Err(several_page_servers("Service", &names))
+            }
+        }
     }
 
     pub(crate) fn error_pages(&mut self, route: &RouteRef, enabled: bool) -> Result<(), PlanError> {
@@ -265,10 +279,11 @@ impl Planner<'_> {
                 format!("Ingress {ingress} already shows the error pages."),
             ));
         }
-        self.ensure_server()?;
+        let server = self.page_server()?;
         if middleware.is_none() {
             let down = maintenance(&meta).ok_or_else(|| bad_annotation(ingress))?;
-            self.created_middleware(&name, owner_of(&meta).as_ref(), &errors_spec(down.keys()));
+            let spec = errors_spec(&server, down.keys());
+            self.created_middleware(&name, owner_of(&meta).as_ref(), &spec);
         }
         if !listed {
             self.list(index, &name, false)?;
@@ -321,17 +336,22 @@ impl Planner<'_> {
             }
             _ => {}
         }
-        if enabled {
-            self.ensure_server()?;
-        }
+        let server = if enabled {
+            Some(self.page_server()?)
+        } else {
+            self.page_server().ok()
+        };
         self.claim(index, &[Step::field("spec"), Step::field("rules")], "rules")?;
         let rules = array(&current, "/spec/rules");
         let swapped = match route.kind {
-            RouteKind::Ingress => ingress_swap(&rules, hostname, kept.get(hostname)),
-            RouteKind::HttpRoute => http_route_swap(&rules, kept.get(hostname)),
+            RouteKind::Ingress => {
+                ingress_swap(&rules, hostname, kept.get(hostname), server.as_ref())
+            }
+            RouteKind::HttpRoute => http_route_swap(&rules, kept.get(hostname), server.as_ref()),
         };
         let (operations, had) = match (swapped, workload) {
             (Err(e), Some(workload)) if !enabled && e.code == "maintenance_changed" => {
+                let page = server.as_ref().ok_or_else(no_page_server)?.name.clone();
                 let (service, port) = self.first_endpoint(workload, route)?;
                 self.impact.insert(workload.clone());
                 self.warnings.push(Warning::MaintenanceRestored {
@@ -340,8 +360,8 @@ impl Planner<'_> {
                     port,
                 });
                 let operations = match route.kind {
-                    RouteKind::Ingress => ingress_back(&rules, hostname, &service, port),
-                    RouteKind::HttpRoute => http_route_back(&rules, &service, port),
+                    RouteKind::Ingress => ingress_back(&rules, hostname, &page, &service, port),
+                    RouteKind::HttpRoute => http_route_back(&rules, &page, &service, port),
                 };
                 (operations, Value::Null)
             }
@@ -403,137 +423,20 @@ impl Planner<'_> {
         }
         self.patch(index, operations)
     }
-
-    /// Makes the server's Deployment and Service where they do not exist. The ConfigMap must
-    /// exist, or come from an earlier change of this plan.
-    fn ensure_server(&mut self) -> Result<(), PlanError> {
-        let made = |planner: &Self, target: &Target| {
-            planner
-                .objects
-                .iter()
-                .any(|w| w.target == *target && !w.deleted)
-        };
-        let pages = Target::of::<ConfigMap>(SERVER);
-        if self.input.snapshot.config_map(SERVER).is_none() && !made(self, &pages) {
-            return Err(error(
-                ErrorKind::NotFound,
-                "no_error_page_html",
-                "The project has no error pages yet; write them first with an errorPageHtml change.",
-            ));
-        }
-        let snapshot = self.input.snapshot;
-        let deployment = Target::of::<Deployment>(SERVER);
-        let has_deployment = snapshot
-            .deployments
-            .iter()
-            .any(|d| d.metadata.name.as_deref() == Some(SERVER));
-        if !has_deployment && !made(self, &deployment) {
-            let body = self.server_deployment();
-            self.created(deployment, body);
-        }
-        let service = Target::of::<Service>(SERVER);
-        let has_service = snapshot
-            .services
-            .iter()
-            .any(|s| s.metadata.name.as_deref() == Some(SERVER));
-        if !has_service && !made(self, &service) {
-            let body = json!({
-                "apiVersion": "v1",
-                "kind": "Service",
-                "metadata": self.server_metadata(),
-                "spec": {
-                    "selector": {"app.kubernetes.io/name": SERVER},
-                    "ports": [
-                        {"name": "pages", "port": PAGES_PORT, "targetPort": "pages",
-                            "appProtocol": "http"},
-                        {"name": "maintenance", "port": MAINTENANCE_PORT,
-                            "targetPort": "maintenance", "appProtocol": "http"},
-                    ],
-                },
-            });
-            self.created(service, body);
-        }
-        Ok(())
-    }
-
-    fn server_metadata(&self) -> Value {
-        json!({
-            "name": SERVER,
-            "namespace": self.input.snapshot.namespace,
-            "labels": {"app.kubernetes.io/name": SERVER},
-        })
-    }
-
-    fn server_deployment(&self) -> Value {
-        let items: Vec<Value> = ["502.html", "503.html", "504.html", "maintenance.html"]
-            .iter()
-            .map(|key| json!({"key": key, "path": key}))
-            .collect();
-        json!({
-            "apiVersion": "apps/v1",
-            "kind": "Deployment",
-            "metadata": self.server_metadata(),
-            "spec": {
-                "replicas": 1,
-                "selector": {"matchLabels": {"app.kubernetes.io/name": SERVER}},
-                "template": {
-                    "metadata": {"labels": {"app.kubernetes.io/name": SERVER}},
-                    "spec": {
-                        "automountServiceAccountToken": false,
-                        "securityContext": {
-                            "runAsNonRoot": true,
-                            "runAsUser": 101,
-                            "runAsGroup": 101,
-                            "seccompProfile": {"type": "RuntimeDefault"},
-                        },
-                        "containers": [{
-                            "name": "nginx",
-                            "image": IMAGE,
-                            "command": ["nginx", "-g", "daemon off;"],
-                            "ports": [
-                                {"name": "pages", "containerPort": PAGES_PORT},
-                                {"name": "maintenance", "containerPort": MAINTENANCE_PORT},
-                            ],
-                            "readinessProbe": {"tcpSocket": {"port": "pages"}},
-                            "resources": {
-                                "requests": {"cpu": "5m", "memory": "8Mi"},
-                                "limits": {"memory": "32Mi"},
-                            },
-                            "securityContext": {
-                                "allowPrivilegeEscalation": false,
-                                "readOnlyRootFilesystem": true,
-                                "capabilities": {"drop": ["ALL"]},
-                            },
-                            "volumeMounts": [
-                                {"name": "pages", "mountPath": "/usr/share/nginx/html",
-                                    "readOnly": true},
-                                {"name": "config", "mountPath": "/etc/nginx/nginx.conf",
-                                    "subPath": "nginx.conf", "readOnly": true},
-                                {"name": "tmp", "mountPath": "/tmp"},
-                            ],
-                        }],
-                        "volumes": [
-                            {"name": "pages", "configMap": {"name": SERVER, "items": items}},
-                            {"name": "config", "configMap": {"name": SERVER, "items": [
-                                {"key": "nginx.conf", "path": "nginx.conf"},
-                            ]}},
-                            {"name": "tmp", "emptyDir": {"medium": "Memory", "sizeLimit": "8Mi"}},
-                        ],
-                    },
-                },
-            },
-        })
-    }
 }
 
 /// The patch that sends the paths of `hostname` to the maintenance port, or back to `kept`, and
 /// the backends they had.
+///
+/// `server` is needed when the hostname starts maintenance, so when nothing is kept.
 fn ingress_swap(
     rules: &[Value],
     hostname: &str,
     kept: Option<&Value>,
+    server: Option<&PageServer>,
 ) -> Result<(Vec<Value>, Value), PlanError> {
-    let page = json!({"service": {"name": SERVER, "port": {"number": MAINTENANCE_PORT}}});
+    let page =
+        server.map(|s| json!({"service": {"name": s.name, "port": {"number": s.maintenance}}}));
     let back = kept.map(elements);
     let mut operations = Vec::new();
     let mut had = Vec::new();
@@ -546,9 +449,10 @@ fn ingress_swap(
                 continue;
             };
             let at = format!("/spec/rules/{r}/http/paths/{p}/backend");
-            let next = match &back {
-                Some(back) => back.get(had.len()).cloned().ok_or_else(changed)?,
-                None => page.clone(),
+            let next = match (&back, &page) {
+                (Some(back), _) => back.get(had.len()).cloned().ok_or_else(changed)?,
+                (None, Some(page)) => page.clone(),
+                (None, None) => return Err(no_page_server()),
             };
             operations.push(test(&at, backend.clone()));
             operations.push(replace(&at, next));
@@ -562,9 +466,14 @@ fn ingress_swap(
 fn http_route_swap(
     rules: &[Value],
     kept: Option<&Value>,
+    server: Option<&PageServer>,
 ) -> Result<(Vec<Value>, Value), PlanError> {
-    let page = json!([{"name": SERVER, "port": MAINTENANCE_PORT}]);
     let back = kept.map(elements);
+    let page = match (&back, server) {
+        (Some(_), _) => Value::Null,
+        (None, Some(s)) => json!([{"name": s.name, "port": s.maintenance}]),
+        (None, None) => return Err(no_page_server()),
+    };
     if back.as_ref().is_some_and(|b| b.len() != rules.len()) {
         return Err(changed());
     }
@@ -589,8 +498,15 @@ fn http_route_swap(
     finish_swap(operations, had, back.as_ref())
 }
 
-/// The patch that sends the paths of `hostname` that show the maintenance page to `service`.
-fn ingress_back(rules: &[Value], hostname: &str, service: &str, port: i32) -> Vec<Value> {
+/// The patch that sends the paths of `hostname` that show page server `page`'s maintenance page
+/// to `service`.
+fn ingress_back(
+    rules: &[Value],
+    hostname: &str,
+    page: &str,
+    service: &str,
+    port: i32,
+) -> Vec<Value> {
     let back = json!({"service": {"name": service, "port": {"number": port}}});
     let mut operations = Vec::new();
     for (r, rule) in rules.iter().enumerate() {
@@ -600,7 +516,7 @@ fn ingress_back(rules: &[Value], hostname: &str, service: &str, port: i32) -> Ve
         for (p, path) in array(rule, "/http/paths").iter().enumerate() {
             let Some(backend) = path
                 .get("backend")
-                .filter(|b| shows_page(b, "/service/name"))
+                .filter(|b| shows_page(b, "/service/name", page))
             else {
                 continue;
             };
@@ -612,13 +528,13 @@ fn ingress_back(rules: &[Value], hostname: &str, service: &str, port: i32) -> Ve
 }
 
 /// As [`ingress_back`], for the `backendRefs` of each rule of an `HTTPRoute`.
-fn http_route_back(rules: &[Value], service: &str, port: i32) -> Vec<Value> {
+fn http_route_back(rules: &[Value], page: &str, service: &str, port: i32) -> Vec<Value> {
     let back = json!([{"name": service, "port": port}]);
     let mut operations = Vec::new();
     for (r, rule) in rules.iter().enumerate() {
         let Some(refs) = rule
             .get("backendRefs")
-            .filter(|refs| elements(refs).iter().any(|b| shows_page(b, "/name")))
+            .filter(|refs| elements(refs).iter().any(|b| shows_page(b, "/name", page)))
         else {
             continue;
         };
@@ -628,8 +544,8 @@ fn http_route_back(rules: &[Value], service: &str, port: i32) -> Vec<Value> {
     operations
 }
 
-fn shows_page(backend: &Value, name: &str) -> bool {
-    backend.pointer(name).and_then(Value::as_str) == Some(SERVER)
+fn shows_page(backend: &Value, name: &str, page: &str) -> bool {
+    backend.pointer(name).and_then(Value::as_str) == Some(page)
 }
 
 fn finish_swap(

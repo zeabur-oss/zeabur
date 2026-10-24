@@ -5,7 +5,7 @@
       "write": {"type": "patch", "operations": [
         {"op": "test", "path": "/metadata/resourceVersion", "value": "9"},
         {"op": "test", "path": "/spec/rules/1/http/paths/0/backend", "value": {"service": {"name": "web", "port": {"number": 8080}}}},
-        {"op": "replace", "path": "/spec/rules/1/http/paths/0/backend", "value": {"service": {"name": "zeabur-error-pages", "port": {"number": 8081}}}},
+        {"op": "replace", "path": "/spec/rules/1/http/paths/0/backend", "value": {"service": {"name": "error-pages", "port": {"number": 8081}}}},
         {"op": "add", "path": "/metadata/annotations/zeabur.com~1maintenance-backend", "value": "{\"www.shop.example.test\":[{\"service\":{\"name\":\"web\",\"port\":{\"number\":8080}}}]}"}
       ]}
     },

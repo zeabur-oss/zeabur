@@ -2725,6 +2725,10 @@ export interface components {
           /** @enum {string} */
           op: "errorPageHtml"
         })
+      | (components["schemas"]["ErrorPageHtml"] & {
+          /** @enum {string} */
+          op: "pageServer"
+        })
       | (components["schemas"]["ErrorPagesChange"] & {
           /** @enum {string} */
           op: "errorPages"
@@ -4164,8 +4168,8 @@ export interface components {
       value?: string | null
     }
     /**
-     * @description A [`Change::ErrorPageHtml`]: the HTML of each page. A page left out keeps its HTML; the first
-     *     change of a project gives all four.
+     * @description A [`Change::ErrorPageHtml`] or [`Change::PageServer`]: the HTML of each page. A page left out
+     *     keeps its HTML.
      */
     ErrorPageHtml: {
       /** @description `502.html`: the workload sent no valid answer. */
@@ -6054,6 +6058,19 @@ export interface components {
      */
     Ownership: "owned" | "shared" | "orphan"
     /**
+     * @description The page server Zeabur Catalog's `error-pages` template deploys: the Service and the ConfigMap
+     *     with the label `zeabur.com/page-server: "true"`.
+     */
+    PageServer: {
+      /**
+       * @description The ConfigMap of the pages, by file name such as `503.html`. Absent when no ConfigMap, or
+       *     more than one, has the label.
+       */
+      pages?: string | null
+      /** @description The Service's name. */
+      service: string
+    }
+    /**
      * @description What a variable that points at a database holds.
      * @enum {string}
      */
@@ -6817,6 +6834,7 @@ export interface components {
       endpoints: components["schemas"]["Endpoint"][]
       /** @description The namespace. */
       namespace: string
+      pageServer?: components["schemas"]["PageServer"] | null
       /** @description The ConfigMaps, Secrets, PVCs, Services and Ingresses, sorted by kind then name. */
       resources: components["schemas"]["Resource"][]
       /**

@@ -46,6 +46,7 @@ pub(crate) mod events;
 pub mod namespace;
 pub mod network_policy;
 pub mod object_storage;
+pub(crate) mod page_server;
 pub mod rights;
 pub mod storage;
 pub mod usage;

@@ -67,9 +67,14 @@ pub enum Change {
     /// Ask for a user name and password on every hostname of an Ingress, or stop (see the
     /// `access` module).
     BasicAuth(BasicAuthChange),
-    /// Write the project's error pages, and run the server that serves them (see the
+    /// Write the HTML of the project's error pages, in the ConfigMap of its page server (see the
     /// `error_pages` module).
     ErrorPageHtml(ErrorPageHtml),
+    /// Deploy the page server from Zeabur Catalog's `error-pages` template, with this HTML in
+    /// place of the template's pages. The API opens it into the `create` of each object; the
+    /// NetworkPolicy that denies traffic to every pod of the namespace is left out, so the
+    /// project's other services keep their traffic.
+    PageServer(ErrorPageHtml),
     /// Show the project's error pages on every hostname of an Ingress, or stop.
     ErrorPages(ErrorPagesChange),
     /// Show the maintenance page on a hostname instead of its workload, or stop.
@@ -598,8 +603,8 @@ impl std::fmt::Debug for BasicAuthUser {
     }
 }
 
-/// A [`Change::ErrorPageHtml`]: the HTML of each page. A page left out keeps its HTML; the first
-/// change of a project gives all four.
+/// A [`Change::ErrorPageHtml`] or [`Change::PageServer`]: the HTML of each page. A page left out
+/// keeps its HTML.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]

@@ -1632,7 +1632,8 @@ export const zhTW: Messages = {
   "confirm.basicAuth": (route) =>
     `Ingress ${route} 的每個網域都要求輸入密碼。叢集只保存密碼的 bcrypt 雜湊值。`,
   "confirm.basicAuthOff": (route) => `Ingress ${route} 不再要求輸入密碼。`,
-  "confirm.errorPageHtml": "把專案的錯誤頁面寫入 ConfigMap zeabur-error-pages。",
+  "confirm.errorPageHtml": "把專案錯誤頁面寫入頁面伺服器 ConfigMap。",
+  "confirm.pageServer": "在專案部署 Error pages 範本當作頁面伺服器，並放入這些頁面。",
   "confirm.errorPages": (route) => `讓 Ingress ${route} 底下所有網域顯示專案錯誤頁面。`,
   "confirm.errorPagesOff": (route) => `Ingress ${route} 不再顯示錯誤頁面。`,
   "confirm.maintenance": (host) => `${host} 改為顯示維護頁面，服務繼續執行。`,
@@ -3382,7 +3383,9 @@ export const zhTW: Messages = {
     `維護模式會套用到整個 HTTPRoute，所以這個網域會移到自己的路由，${hosts} 留在原處。`,
   "domainPages.pages": "頁面",
   "domainPages.pagesHint": "專案的每個網域都顯示同一組頁面。",
-  "domainPages.firstUse": "Zeabur 會在專案裡加一個小型伺服器來提供這些頁面。",
+  "domainPages.noServer": "這個專案還沒有頁面伺服器",
+  "domainPages.noServerHint":
+    "這些頁面由 Error pages 範本提供。開啟任一個開關或編輯頁面時，會一併把它部署到這個專案。它是只讓 Traefik 連線的小型 nginx。",
   "domainPages.page": "要編輯的頁面",
   "domainPages.page.maintenance": "維護",
   "domainPages.page.badGateway": "502 閘道錯誤",
@@ -3401,11 +3404,14 @@ export const zhTW: Messages = {
   "domainPages.default.later": "我們很快就回來。",
   "domainPages.default.retry": "請過幾分鐘再試一次。",
   "domainPages.kube.server": "伺服器",
-  "domainPages.kube.serverValue": (name) => `Deployment、Service 和 ConfigMap ${name}`,
+  "domainPages.kube.serverValue": (name) =>
+    `Service ${name} 和它的 ConfigMap，依標籤 zeabur.com/page-server 找到`,
+  "domainPages.kube.serverNew":
+    "Error pages 範本：名為 error-pages 的 Deployment、Service、ConfigMap 和 NetworkPolicy，帶標籤 zeabur.com/page-server",
   "domainPages.kube.errors": "錯誤頁面",
   "domainPages.kube.maintenance": "維護",
   "domainPages.kube.maintenanceValue":
-    "網域的後端改成 zeabur-error-pages 的 8081 連接埠；原本的後端記在註解 zeabur.com/maintenance-backend",
+    "網域後端改成頁面伺服器維護連接埠，原本後端記在註解 zeabur.com/maintenance-backend",
   "ports.title": "對外連接埠",
   "ports.about": "叢集外的用戶端不經網域，直接連到連接埠。適合不走 HTTP 的服務，例如資料庫。",
   "ports.open": "開放連接埠",

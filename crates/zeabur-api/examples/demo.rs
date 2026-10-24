@@ -557,7 +557,7 @@ fn shop() -> NamespaceObjects {
             api,
             worker,
             deployment(
-                "zeabur-error-pages",
+                "error-pages",
                 "docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim",
                 1,
                 1,
@@ -568,13 +568,7 @@ fn shop() -> NamespaceObjects {
         cron_jobs: vec![nightly],
         pods: vec![
             pod("web-7c9d8-abcde", "web", true, 0, None),
-            pod(
-                "zeabur-error-pages-5d4f7-k2m9x",
-                "zeabur-error-pages",
-                true,
-                0,
-                None,
-            ),
+            pod("error-pages-5d4f7-k2m9x", "error-pages", true, 0, None),
             pod("web-7c9d8-fghij", "web", true, 2, None),
             pod("api-5f6b7-k2m4p", "api", true, 0, None),
             pod("api-5f6b7-q8r1s", "api", true, 0, None),
@@ -622,8 +616,9 @@ fn shop() -> NamespaceObjects {
             service("api", 8080, "http"),
             service("db", 5432, "postgres"),
             from(
-                json!({"metadata": {"name": "zeabur-error-pages", "namespace": "shop"},
-                "spec": {"selector": {"app": "zeabur-error-pages"}, "ports": [
+                json!({"metadata": {"name": "error-pages", "namespace": "shop",
+                    "labels": {"zeabur.com/page-server": "true"}},
+                "spec": {"selector": {"app": "error-pages"}, "ports": [
                     {"name": "pages", "port": 8080, "targetPort": "http"},
                     {"name": "maintenance", "port": 8081, "targetPort": "http"}]}}),
             ),
@@ -639,7 +634,8 @@ fn shop() -> NamespaceObjects {
         ],
         config_maps: vec![
             from::<ConfigMap>(
-                json!({"metadata": {"name": "zeabur-error-pages", "namespace": "shop"},
+                json!({"metadata": {"name": "error-pages", "namespace": "shop",
+                    "labels": {"zeabur.com/page-server": "true"}},
                 "data": {
                     "502.html": "<!doctype html><title>Shop</title><h1>Shop is not responding</h1>",
                     "503.html": "<!doctype html><title>Shop</title><h1>Shop is not available right now</h1>",
@@ -714,7 +710,7 @@ fn shop() -> NamespaceObjects {
                         r#"{"api.shop.example.com":[{"service":{"name":"api","port":{"name":"http"}}}]}"#,
                         "cert-manager.io/cluster-issuer": "letsencrypt"}},
                 "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
-                    "backend": {"service": {"name": "zeabur-error-pages", "port": {"number": 8081}}}}]}}],
+                    "backend": {"service": {"name": "error-pages", "port": {"number": 8081}}}}]}}],
                     "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
                 "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
         ],
@@ -1919,7 +1915,7 @@ fn state() -> State {
                     "ownerReferences": [{"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
                         "name": "web", "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0001"}]},
                 "spec": {"errors": {"status": ["502-504"],
-                    "service": {"name": "zeabur-error-pages", "port": 8080}, "query": "/{status}.html"}}
+                    "service": {"name": "error-pages", "port": 8080}, "query": "/{status}.html"}}
             })),
             from(json!({
                 "apiVersion": "traefik.io/v1alpha1", "kind": "Middleware",

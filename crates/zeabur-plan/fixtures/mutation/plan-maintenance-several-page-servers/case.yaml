@@ -1,0 +1,9 @@
+description: "Two Services with the page server label are refused: Zeabur cannot tell which one shows the maintenance page."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test
+        enabled: true

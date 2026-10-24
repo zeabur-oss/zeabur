@@ -1773,7 +1773,9 @@ export const en = {
   "confirm.basicAuth": (route: string) =>
     `Ask for a password on every domain of Ingress ${route}. The cluster keeps only a bcrypt hash of it.`,
   "confirm.basicAuthOff": (route: string) => `Stop asking for a password on Ingress ${route}.`,
-  "confirm.errorPageHtml": "Write the project's error pages to ConfigMap zeabur-error-pages.",
+  "confirm.errorPageHtml": "Write the project's error pages to the page server's ConfigMap.",
+  "confirm.pageServer":
+    "Deploy the Error pages template to the project as its page server, with these pages.",
   "confirm.errorPages": (route: string) =>
     `Show the project's error pages on every domain of Ingress ${route}.`,
   "confirm.errorPagesOff": (route: string) => `Stop showing the error pages on Ingress ${route}.`,
@@ -3659,7 +3661,9 @@ export const en = {
     `Maintenance applies to the whole HTTPRoute, so this domain moves to a route of its own. ${hosts} stay where they are.`,
   "domainPages.pages": "Pages",
   "domainPages.pagesHint": "Every domain of the project shows the same pages.",
-  "domainPages.firstUse": "Zeabur adds a small server to the project to serve them.",
+  "domainPages.noServer": "This project has no page server yet",
+  "domainPages.noServerHint":
+    "These pages come from the Error pages template. Turning either switch on or editing a page also deploys it here: a small nginx that only Traefik can reach.",
   "domainPages.page": "Page to edit",
   "domainPages.page.maintenance": "Maintenance",
   "domainPages.page.badGateway": "502 Bad gateway",
@@ -3679,11 +3683,14 @@ export const en = {
   "domainPages.default.later": "We'll be back soon.",
   "domainPages.default.retry": "Please try again in a few minutes.",
   "domainPages.kube.server": "Server",
-  "domainPages.kube.serverValue": (name: string) => `Deployment, Service and ConfigMap ${name}`,
+  "domainPages.kube.serverValue": (name: string) =>
+    `Service ${name} and its ConfigMap, found by label zeabur.com/page-server`,
+  "domainPages.kube.serverNew":
+    "Error pages template: Deployment, Service, ConfigMaps and NetworkPolicy error-pages, labelled zeabur.com/page-server",
   "domainPages.kube.errors": "Error pages",
   "domainPages.kube.maintenance": "Maintenance",
   "domainPages.kube.maintenanceValue":
-    "The domain's backend becomes port 8081 of zeabur-error-pages; annotation zeabur.com/maintenance-backend keeps the one it had",
+    "The domain's backend becomes the maintenance port of the page server. Annotation zeabur.com/maintenance-backend keeps the one it had",
   "ports.title": "Public ports",
   "ports.about":
     "Clients outside the cluster connect straight to a port, without a domain. For services that don't speak HTTP, such as a database.",

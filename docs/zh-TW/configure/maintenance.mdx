@@ -8,7 +8,7 @@ description: 讓網域在維護期間顯示 503 頁面，並為服務的 502、5
 ## 開始前
 
 - 服務有[公開網域](./domains.mdx)。Ingress 和 HTTPRoute 提供的網域都能開維護模式。
-- 有權修改路由、建立專案內的頁面伺服器，以及修改它的 HTML 設定檔。
+- 有權修改路由。專案還沒有[頁面伺服器](#頁面伺服器)時，也要有權建立 Deployment、Service、ConfigMap 和 NetworkPolicy。
 - 自訂錯誤頁面需要 Traefik 提供的 Ingress。HTTPRoute 和其他 Ingress controller 的網域可以開維護模式，但面板裡沒有 **顯示錯誤頁面**。
 
 維護模式只改這一個網域的轉送目標，服務本身繼續執行。同一個服務的其他網域、私有位址和對外連接埠照樣連得到應用程式，排程工作也照常執行。
@@ -35,14 +35,14 @@ description: 讓網域在維護期間顯示 503 頁面，並為服務的 502、5
 
 每個頁面要小於 64 KiB。專案的每個網域都用同一組頁面，所以在這裡改了維護頁面，專案裡其他進入維護的網域也會顯示新內容。
 
-第一次使用時，Zeabur 會在專案裡建立 `zeabur-error-pages` 頁面伺服器，並寫入維護、502、503、504 四份預設頁面。只改維護頁面時，其他三份保留預設內容。
+專案還沒有頁面伺服器時，面板上方會寫 **這個專案還沒有頁面伺服器**。照常往下做，檢查變更時會一併把 Zeabur Catalog 的 **Error pages** 範本部署到專案，並寫入維護、502、503、504 四份預設頁面。只改維護頁面時，其他三份保留預設內容。
 
 </Step>
 <Step>
 
 ### 檢查並套用
 
-在側邊面板按 **加入變更**，網域列會標上 **已修改**。再從頁面下方按 **檢查變更**，確認目標網域、HTML 和要建立的頁面伺服器，然後套用。
+在側邊面板按 **加入變更**，網域列會標上 **已修改**。再從頁面下方按 **檢查變更**，確認目標網域和 HTML，然後套用。要部署頁面伺服器時，清單裡也會列出它的 Deployment、Service、ConfigMap 和 NetworkPolicy。
 
 這個網域底下的所有路徑都會轉到維護頁面，同一個 Ingress 的其他網域不受影響。HTTPRoute 的維護作用在整條路由，同一條 HTTPRoute 還有其他網域時，這個網域會先移到自己的路由。
 
@@ -91,13 +91,27 @@ curl -i https://app.example.com/
 
 HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀取。改完 HTML 後，等 kubelet 下一次同步、更新掛載檔案後就會生效，不用重新啟動。
 
+## 頁面伺服器
+
+維護頁和錯誤頁面由專案裡的頁面伺服器提供，它來自 Zeabur Catalog 的 **Error pages** 範本：一個小型 nginx，HTML 放在 ConfigMap `error-pages`。Zeabur 不看名稱，而是依標籤 `zeabur.com/page-server: "true"` 找到它：
+
+| 物件 | 需要的內容 |
+| --- | --- |
+| Service | 帶這個標籤，連接埠 `pages` 依檔名提供頁面，連接埠 `maintenance` 對每個請求回維護頁和 503 |
+| ConfigMap | 帶這個標籤，鍵為 `502.html`、`503.html`、`504.html` 和 `maintenance.html` |
+
+一個專案只能有一個帶這個標籤的 Service。也可以自己用 `kubectl` 部署這個範本，或改用符合上表的其他伺服器，Zeabur 一樣認得。這些都是一般的 Kubernetes 物件，不用 Zeabur 也照常運作。
+
+範本附的 NetworkPolicy `error-pages` 只讓 `traefik` 命名空間的 Traefik 連到頁面伺服器，也不讓它往外連線。叢集用其他 Ingress controller 或 Gateway 時，要在這個 NetworkPolicy 加上它的來源。Zeabur 部署時不會建立範本裡擋下整個命名空間的 `default-deny`，專案裡其他服務的流量不受影響。
+
 ## 遇到問題
 
 | 畫面或結果 | 接著處理 |
 | --- | --- |
 | 維護與錯誤頁面按鈕無法按 | 確認你有修改路由的權限，以及路由沒有標示由其他工具管理。 |
 | 套用後仍看到應用程式 | 確認開啟的網址就是切到維護的網域，並看前面有沒有 CDN 或代理快取。回到 **網路** 看網域列有沒有 **維護中**。 |
-| 維護頁面本身打不開 | 查看專案裡 `zeabur-error-pages` 的副本和事件。 |
+| 維護頁面本身打不開 | 查看專案裡 `error-pages` 的副本和事件，並確認 NetworkPolicy `error-pages` 允許叢集的 Ingress controller 連線。 |
+| 檢查變更說專案有多個頁面伺服器 | 只留一個 Service 帶 `zeabur.com/page-server` 標籤，其他的拿掉標籤。 |
 | 頁面還是舊的 HTML | 等掛載檔案更新後再重新整理。 |
 | 關閉維護模式後流量送到別的 Service | 維護期間規則改過，路徑改送到第一個 Service。到 Ingress 的 **YAML** 改成要的後端。 |
 | 沒有 **顯示錯誤頁面** | 網域不是由 Traefik 提供，要用該 Ingress controller 自己的錯誤頁面設定。 |
@@ -106,8 +120,8 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 
 關閉 **維護模式** 會讓網域轉回原本的服務。關閉 **顯示錯誤頁面** 會拿掉該 Ingress 的錯誤頁面規則。頁面伺服器和 HTML 都會留著，之後可以直接再用。
 
-整個專案都不再需要這些頁面時，先關掉每個網域的維護模式和錯誤頁面，確認流量都恢復了，再到專案 **物件** 刪除 `zeabur-error-pages` 的 Deployment、Service 和 ConfigMap。每個物件在 **YAML** 按 **刪除**，檢查後套用。
+整個專案都不再需要這些頁面時，先關掉每個網域的維護模式和錯誤頁面，確認流量都恢復了，再到專案 **物件** 刪除 `error-pages` 的 Deployment、Service 和 NetworkPolicy，以及 ConfigMap `error-pages` 和 `error-pages-nginx`。每個物件在 **YAML** 按 **刪除**，檢查後套用。
 
 <Callout type="warn">
-還有網域在維護或開著錯誤頁面時刪掉 `zeabur-error-pages`，這些網域的訪客會直接看到錯誤，看不到你的頁面。
+還有網域在維護或開著錯誤頁面時刪掉頁面伺服器，這些網域的訪客會直接看到錯誤，看不到你的頁面。
 </Callout>

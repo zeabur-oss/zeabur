@@ -15,7 +15,7 @@
         "spec": {
           "parentRefs": [{"name": "public", "namespace": "gateway"}],
           "hostnames": ["www.shop.example.test"],
-          "rules": [{"backendRefs": [{"name": "zeabur-error-pages", "port": 8081}]}]
+          "rules": [{"backendRefs": [{"name": "error-pages", "port": 8081}]}]
         }
       }}
     }

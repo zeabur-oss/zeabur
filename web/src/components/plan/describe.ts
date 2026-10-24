@@ -226,7 +226,7 @@ type ServiceChange =
 
 type PagesChange = Extract<
   Change,
-  { op: "errorPageHtml" | "errorPages" | "maintenance" | "copyS3Keys" }
+  { op: "errorPageHtml" | "pageServer" | "errorPages" | "maintenance" | "copyS3Keys" }
 >
 
 /** An edit of a task reads as Pause or Resume when that is all it does. */
@@ -294,6 +294,8 @@ function pagesSentence(t: Translate, change: PagesChange): string {
   switch (change.op) {
     case "errorPageHtml":
       return t("confirm.errorPageHtml")
+    case "pageServer":
+      return t("confirm.pageServer")
     case "errorPages":
       return change.enabled
         ? t("confirm.errorPages", change.route.name)
@@ -885,6 +887,8 @@ function pagesAction(t: Translate, change: PagesChange): string {
   switch (change.op) {
     case "errorPageHtml":
       return t("action.savePages")
+    case "pageServer":
+      return t("action.create")
     case "errorPages":
       return change.enabled ? t("action.showErrorPages") : t("action.hideErrorPages")
     case "maintenance":

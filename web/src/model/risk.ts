@@ -146,6 +146,7 @@ type ServiceChange = Extract<
       | "buildOptions"
       | "labelVolume"
       | "errorPageHtml"
+      | "pageServer"
       | "errorPages"
       | "maintenance"
       | "copyS3Keys"

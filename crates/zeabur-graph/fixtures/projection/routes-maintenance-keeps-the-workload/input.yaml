@@ -50,4 +50,4 @@ spec:
           - path: /
             pathType: Prefix
             backend:
-              service: {name: zeabur-error-pages, port: {number: 8081}}
+              service: {name: error-pages, port: {number: 8081}}

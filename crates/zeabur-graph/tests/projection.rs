@@ -6,7 +6,7 @@ mod tests {
     use zeabur_graph::{
         Snapshot, attribution, env_from, project, relations, with_http_routes, workloads,
     };
-    use zeabur_model::{DataStore, Ownership, ReadOnlyReason, RelationKind, Tool};
+    use zeabur_model::{DataStore, Ownership, PageServer, ReadOnlyReason, RelationKind, Tool};
 
     fn deployment(managed_fields: &serde_json::Value) -> serde_json::Value {
         json!({
@@ -66,7 +66,7 @@ mod tests {
             }))
             .unwrap(),
         ];
-        let page = json!([{"name": "zeabur-error-pages", "port": 8081}]);
+        let page = json!([{"name": "error-pages", "port": 8081}]);
         let routes = [
             json!({
                 "metadata": {"name": "down", "namespace": "demo", "annotations": {
@@ -96,6 +96,38 @@ mod tests {
         assert_eq!(moved.rules[0].service, "web");
         assert_eq!(moved.redirects[0].to.as_deref(), Some("example.test"));
         assert_eq!(moved.redirects[0].permanent, Some(true));
+    }
+
+    #[test]
+    fn the_page_server_is_the_one_service_with_the_label() {
+        let mut snapshot = snapshot(deployment(&json!([])), &json!({}));
+        assert_eq!(project(&snapshot).page_server, None);
+        let labelled = |kind: &str, name: &str| {
+            json!({
+                "apiVersion": "v1",
+                "kind": kind,
+                "metadata": {
+                    "name": name,
+                    "namespace": "demo",
+                    "labels": {"zeabur.com/page-server": "true"}
+                }
+            })
+        };
+        snapshot.services = vec![from_value(labelled("Service", "error-pages")).unwrap()];
+        snapshot
+            .config_maps
+            .push(from_value(labelled("ConfigMap", "error-pages")).unwrap());
+        assert_eq!(
+            project(&snapshot).page_server,
+            Some(PageServer {
+                service: "error-pages".to_owned(),
+                pages: Some("error-pages".to_owned()),
+            })
+        );
+        snapshot
+            .services
+            .push(from_value(labelled("Service", "other-pages")).unwrap());
+        assert_eq!(project(&snapshot).page_server, None);
     }
 
     #[test]

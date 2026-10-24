@@ -39,8 +39,8 @@ pub use network::{
 };
 pub use pod_security::{PodSecurityLevel, RunAs};
 pub use project::{
-    Connection, ConnectionEvidence, DataStore, Project, Relation, RelationKind, Resource,
-    ResourceKind, Service,
+    Connection, ConnectionEvidence, DataStore, PageServer, Project, Relation, RelationKind,
+    Resource, ResourceKind, Service,
 };
 pub use provenance::{Provenance, Tool};
 pub use reload::ConfigReload;

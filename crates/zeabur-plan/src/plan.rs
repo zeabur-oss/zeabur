@@ -75,12 +75,15 @@ use crate::rules::{
 /// - a volume's backups: K8up's `Schedule`, `Backup` and `PodConfig`, and the Secret with the
 ///   bucket's keys and the repository password;
 /// - a service from a container image: its Deployment, Service, Ingress, volume claim and Secrets;
-/// - a service from Git: the same, and Zeabur Builder's `Build`.
+/// - a service from Git: the same, and Zeabur Builder's `Build`;
+/// - the page server of Zeabur Catalog's `error-pages` template: its ConfigMaps, Deployment,
+///   Service and NetworkPolicy.
 ///
 /// The object is created as the person, so kube-apiserver's RBAC and admission decide, as for
 /// `kubectl create`; the plan only keeps it in the project's namespace.
 pub const CREATABLE: &[(&str, &str, &str)] = &[
     ("networking.k8s.io/v1", "NetworkPolicy", "networkpolicies"),
+    ("v1", "ConfigMap", "configmaps"),
     ("v1", "Secret", "secrets"),
     ("v1", "PersistentVolumeClaim", "persistentvolumeclaims"),
     ("v1", "Service", "services"),
@@ -312,6 +315,8 @@ pub(crate) struct Planner<'a> {
     pub(crate) warnings: Vec<Warning>,
     /// The objects `create` changes make, with the index of their change.
     pub(crate) created: Vec<(Target, usize)>,
+    /// The objects the request's `create` changes give, read before any change is planned.
+    pub(crate) requested: Vec<Value>,
     /// The level a `podSecurity` change asks the project to enforce.
     pub(crate) pod_security: Option<PodSecurityLevel>,
 }
@@ -377,6 +382,12 @@ pub fn plan_with(
         impact: BTreeSet::new(),
         warnings: Vec::new(),
         created: Vec::new(),
+        requested: request
+            .changes
+            .iter()
+            .filter_map(crate::create::created_object)
+            .filter_map(Result::ok)
+            .collect(),
         pod_security: None,
     };
     for index in crate::create::order(&request.changes) {
@@ -574,6 +585,11 @@ impl<'a> Planner<'a> {
                 ErrorKind::BadRequest,
                 "unopened_deploy_key",
                 "A deploy key is planned by the server that sealed it.",
+            )),
+            Change::PageServer(_) => Err(error(
+                ErrorKind::BadRequest,
+                "unopened_page_server",
+                "The page server is planned by the server that carries its template.",
             )),
             Change::CopyS3Keys(_) => Err(error(
                 ErrorKind::BadRequest,

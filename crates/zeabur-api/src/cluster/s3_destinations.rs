@@ -429,6 +429,7 @@ pub(crate) async fn open(
             | Change::Redirect(_)
             | Change::BasicAuth(_)
             | Change::ErrorPageHtml(_)
+            | Change::PageServer(_)
             | Change::ErrorPages(_)
             | Change::Maintenance(_)
             | Change::Certificate(_)

@@ -62,3 +62,14 @@ spec:
               service:
                 name: web
                 port: {number: 8080}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: error-pages
+  labels: {zeabur.com/page-server: "true"}
+  namespace: demo
+  resourceVersion: "6"
+spec:
+  selector: {app.kubernetes.io/name: error-pages}
+  ports: [{name: pages, port: 8080}, {name: maintenance, port: 8081}]

@@ -2,9 +2,6 @@ import type { Schemas } from "@/api/client"
 
 type Change = Schemas["Change"]
 
-/** The ConfigMap and Deployment of the project's error-page server. */
-export const ERROR_PAGE_SERVER = "zeabur-error-pages"
-
 export const PAGE_KEYS = [
   "maintenance",
   "badGateway",
@@ -16,7 +13,7 @@ export type PageKey = (typeof PAGE_KEYS)[number]
 
 export type Pages = Record<PageKey, string>
 
-/** The ConfigMap key of each page. */
+/** The key of each page in the page server's ConfigMap. */
 const PAGE_FILES: Record<PageKey, string> = {
   maintenance: "maintenance.html",
   badGateway: "502.html",
@@ -71,17 +68,26 @@ export interface PagesForm {
   edited: Partial<Pages>
 }
 
-/** What the form asks for, against what the route and the ConfigMap say now. */
+/** What the form asks for, against what the route and the page server say now. */
 export function pageChanges(
   route: Schemas["RouteRef"],
   host: string,
-  was: { maintenance: boolean; errorPages: boolean; pages?: Pages; defaults: Pages },
+  was: {
+    maintenance: boolean
+    errorPages: boolean
+    /** The project has a page server. */
+    server: boolean
+    pages?: Pages
+    defaults: Pages
+  },
   form: PagesForm,
   /** Gets the domain back when the rules changed during maintenance. */
   workload?: Schemas["WorkloadRef"],
 ): Change[] {
   const starts = (form.maintenance && !was.maintenance) || (form.errorPages && !was.errorPages)
-  const html = htmlChange(was.pages, was.defaults, form.edited, starts)
+  const html = was.server
+    ? htmlChange(was.pages, form.edited)
+    : deployChange(was.defaults, form.edited, starts)
   return [
     ...html,
     ...(form.errorPages === was.errorPages
@@ -101,18 +107,17 @@ export function pageChanges(
   ]
 }
 
-/** All four pages the first time, else only those that changed. */
-function htmlChange(
-  pages: Pages | undefined,
-  defaults: Pages,
-  edited: Partial<Pages>,
-  starts: boolean,
-): Change[] {
-  if (!pages) {
-    const typed = PAGE_KEYS.some((key) => edited[key] !== undefined)
-    return starts || typed ? [{ op: "errorPageHtml", ...defaults, ...edited }] : []
-  }
-  const changed = PAGE_KEYS.filter((key) => edited[key] !== undefined && edited[key] !== pages[key])
+/** Without a page server: deploy the template with the pages, when the form needs them. */
+function deployChange(defaults: Pages, edited: Partial<Pages>, starts: boolean): Change[] {
+  const typed = PAGE_KEYS.some((key) => edited[key] !== undefined)
+  return starts || typed ? [{ op: "pageServer", ...defaults, ...edited }] : []
+}
+
+/** Only the pages that changed. */
+function htmlChange(pages: Pages | undefined, edited: Partial<Pages>): Change[] {
+  const changed = PAGE_KEYS.filter(
+    (key) => edited[key] !== undefined && edited[key] !== pages?.[key],
+  )
   if (changed.length === 0) return []
   return [{ op: "errorPageHtml", ...Object.fromEntries(changed.map((key) => [key, edited[key]])) }]
 }

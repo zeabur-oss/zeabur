@@ -15,7 +15,7 @@
     {
       "target": {"kind": "Middleware", "name": "web-shop-example-test-error-pages"},
       "write": {"type": "create"},
-      "after": {"spec": {"errors": {"status": ["502-504"], "service": {"name": "zeabur-error-pages", "port": 8080}, "query": "/{status}.html"}}}
+      "after": {"spec": {"errors": {"status": ["502-504"], "service": {"name": "error-pages", "port": 8080}, "query": "/{status}.html"}}}
     },
     {
       "target": {"kind": "Ingress", "name": "web-shop-example-test"},

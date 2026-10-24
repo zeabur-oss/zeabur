@@ -714,6 +714,7 @@ mod tests {
             routes: Vec::new(),
             resources: Vec::new(),
             connections: Vec::new(),
+            page_server: None,
         };
         let cluster = ClusterTraits::default();
         let module = Always("data");

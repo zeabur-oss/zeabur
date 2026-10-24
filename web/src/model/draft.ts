@@ -5,36 +5,31 @@ import type { DraftPart } from "@/routes/search"
 
 type Change = Schemas["Change"]
 
+const PARTS: Partial<Record<Change["op"], DraftPart>> = {
+  env: "variables",
+  data: "variables",
+  addDomain: "networking",
+  renameDomain: "networking",
+  removeDomain: "networking",
+  certificate: "networking",
+  redirect: "networking",
+  basicAuth: "networking",
+  maintenance: "networking",
+  errorPages: "networking",
+  errorPageHtml: "networking",
+  pageServer: "networking",
+  addVolume: "storage",
+  expandVolume: "storage",
+  editMount: "storage",
+  removeVolume: "storage",
+  scale: "compute",
+  resources: "compute",
+  probe: "health-checks",
+  editTask: "schedule",
+}
+
 export function partOf(change: Change): DraftPart | undefined {
-  switch (change.op) {
-    case "env":
-    case "data":
-      return "variables"
-    case "addDomain":
-    case "renameDomain":
-    case "removeDomain":
-    case "certificate":
-    case "redirect":
-    case "basicAuth":
-    case "maintenance":
-    case "errorPages":
-    case "errorPageHtml":
-      return "networking"
-    case "addVolume":
-    case "expandVolume":
-    case "editMount":
-    case "removeVolume":
-      return "storage"
-    case "scale":
-    case "resources":
-      return "compute"
-    case "probe":
-      return "health-checks"
-    case "editTask":
-      return "schedule"
-    default:
-      return undefined
-  }
+  return PARTS[change.op]
 }
 
 /** The parts in the order of the tabs. */
@@ -79,6 +74,7 @@ const keys: Keys = {
   basicAuth: routeKey,
   errorPages: routeKey,
   errorPageHtml: (c) => c.op,
+  pageServer: (c) => c.op,
   editTask: (c) => `editTask:${c.cronJob}`,
   expandVolume: (c) => `expand:${c.claim}`,
   editMount: mountKey,
@@ -86,6 +82,9 @@ const keys: Keys = {
 }
 
 const keyOf = (change: Change) => (keys[change.op] as ((c: Change) => string) | undefined)?.(change)
+
+/** A later edit of these keeps the fields it leaves out. */
+const MERGED = new Set<Change["op"]>(["errorPageHtml", "pageServer", "editTask"])
 
 function combine(before: Change, after: Change): Change {
   if (before.op === "env" && after.op === "env") {
@@ -102,8 +101,7 @@ function combine(before: Change, after: Change): Change {
       changes: [...before.changes.filter((e) => !keys.has(e.key)), ...after.changes],
     }
   }
-  if (before.op === "errorPageHtml" && after.op === "errorPageHtml") return { ...before, ...after }
-  if (before.op === "editTask" && after.op === "editTask") return { ...before, ...after }
+  if (before.op === after.op && MERGED.has(after.op)) return { ...before, ...after } as Change
   return after
 }
 

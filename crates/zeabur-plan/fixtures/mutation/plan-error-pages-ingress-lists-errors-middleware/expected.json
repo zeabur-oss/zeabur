@@ -53,7 +53,7 @@
                 "502-504"
               ],
               "service": {
-                "name": "zeabur-error-pages",
+                "name": "error-pages",
                 "port": 8080
               },
               "query": "/{status}.html"

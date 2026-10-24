@@ -11,7 +11,7 @@ use serde_json::Value;
 use zeabur_adapters::provenance::{detect_tool, managed_by};
 use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, gateway, traefik};
 use zeabur_model::{
-    Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin,
+    Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin, PageServer,
     ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,
     Route, RouteMiddleware, RouteRule, RouteTls, Service, WorkloadRef,
 };
@@ -80,7 +80,31 @@ pub fn project_with(snapshot: &Snapshot, conventions: &Conventions) -> Project {
         endpoints: by_name(endpoints, |e| &e.name),
         routes: by_name(routes, |r| &r.name),
         resources: resources(snapshot, &attribution),
+        page_server: page_server(snapshot),
     }
+}
+
+/// The one Service and the one ConfigMap with [`error_pages::PAGE_SERVER_LABEL`].
+fn page_server(snapshot: &Snapshot) -> Option<PageServer> {
+    let only = |mut names: Vec<String>| (names.len() == 1).then(|| names.remove(0));
+    let labelled =
+        |meta: &ObjectMeta| error_pages::is_page_server(meta).then(|| name_of(meta).to_owned());
+    Some(PageServer {
+        service: only(
+            snapshot
+                .services
+                .iter()
+                .filter_map(|o| labelled(&o.metadata))
+                .collect(),
+        )?,
+        pages: only(
+            snapshot
+                .config_maps
+                .iter()
+                .filter_map(|o| labelled(&o.metadata))
+                .collect(),
+        ),
+    })
 }
 
 /// `items` sorted by name, the first of each name kept.
