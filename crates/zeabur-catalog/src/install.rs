@@ -30,7 +30,7 @@
 //! Releases that are manifests (by URL or inline) are applied with `kubectl apply
 //! --server-side` in the Helm form, and listed in the others for the person's own repository.
 //! Inputs the catalogue asks for appear as `<name>` placeholders; generated ones are produced by
-//! `openssl rand -hex 64` in the Helm form and marked in the others. Secrets an input is stored
+//! `openssl rand` in the Helm form and marked in the others. Secrets an input is stored
 //! in are created before the releases.
 //!
 //! [helm-values]: https://helm.sh/docs/chart_template_guide/values_files/
@@ -228,6 +228,7 @@ struct Contribution {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Input {
     name: String,
     description: String,
@@ -240,9 +241,25 @@ struct Input {
     #[serde(default)]
     generate: Option<String>,
     #[serde(default)]
+    generate_bytes: Option<u32>,
+    #[serde(default)]
+    generate_encoding: Option<String>,
+    #[serde(default)]
     required: bool,
     #[serde(default)]
     default: Option<Value>,
+}
+
+impl Input {
+    /// The shell command that makes a value like the one Zeabur generates.
+    fn random(&self) -> String {
+        let n = self.generate_bytes.unwrap_or(64);
+        if self.generate_encoding.as_deref() == Some("base64url") {
+            format!("openssl rand -base64 {n} | tr '+/' '-_' | tr -d '='")
+        } else {
+            format!("openssl rand -hex {n}")
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -476,7 +493,7 @@ impl<'a> Rendered<'a> {
                 .iter()
                 .map(|(input, key)| {
                     let value = if input.generate.is_some() {
-                        "\"$(openssl rand -hex 64)\"".to_owned()
+                        format!("\"$({})\"", input.random())
                     } else {
                         format!("'<{}>'", input.name)
                     };
@@ -599,7 +616,7 @@ impl<'a> Rendered<'a> {
                 continue;
             }
             let value = if input.generate.is_some() {
-                "\"$(openssl rand -hex 64)\"".to_owned()
+                format!("\"$({})\"", input.random())
             } else {
                 format!("'<{}>'", input.name)
             };
@@ -660,7 +677,7 @@ impl<'a> Rendered<'a> {
             );
             for (input, key) in &inputs {
                 let value = if input.generate.is_some() {
-                    "<random: openssl rand -hex 64>".to_owned()
+                    format!("<random: {}>", input.random())
                 } else {
                     format!("<{}>", input.name)
                 };
@@ -907,7 +924,7 @@ impl<'a> Rendered<'a> {
 
 fn placeholder(input: &Input) -> Value {
     if input.generate.is_some() {
-        Value::String("<random: openssl rand -hex 64>".to_owned())
+        Value::String(format!("<random: {}>", input.random()))
     } else {
         input
             .default
@@ -1133,13 +1150,14 @@ mod tests {
     /// Representative cases: an OCI chart with a profile (cert-manager), an HTTP repository with
     /// asked inputs (velero), generated inputs stored in Secrets (crowdsec), a manifest
     /// release before a chart (traefik), and the k3s packaged notes (traefik, metrics-server).
-    const GOLDEN: [(&str, &str); 6] = [
+    const GOLDEN: [(&str, &str); 7] = [
         ("certificates/cert-manager", "single-node"),
         ("certificates/cert-manager", "multi-node"),
         ("volume-backup/velero", "single-node"),
         ("intrusion-prevention/crowdsec", "single-node"),
         ("ingress/traefik", "multi-node"),
         ("metrics/metrics-server", "single-node"),
+        ("volume-backup/velero", "single-node"),
     ];
 
     #[test]

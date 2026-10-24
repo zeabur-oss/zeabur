@@ -6,12 +6,13 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use serde_json::{Value, json};
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
 use zeabur_installer_host::{archive, cloud, cmd, download, facts, files, systemd};
+use zeabur_installer_plan::catalog::Encoding;
 use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::plan::{
     self, ComponentPlan, Download, IDENTITY_NAMESPACE, IdentityPlan, LOCAL_ISSUER, MANAGER,
@@ -489,12 +490,12 @@ fn secrets(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallEr
         for s in keys {
             let value = match &s.source {
                 SecretSource::File(path) => files::read_secret(Path::new(path))?,
-                SecretSource::Generate => match existing
+                SecretSource::Generate { bytes, encoding } => match existing
                     .as_ref()
                     .and_then(|e| kubectl::secret_key(e, &s.secret.key))
                 {
                     Some(value) => value,
-                    None => files::random_hex()?.into_bytes(),
+                    None => encode(&files::random_bytes(*bytes)?, *encoding).into_bytes(),
                 },
             };
             data.insert(s.secret.key.clone(), value);
@@ -502,6 +503,13 @@ fn secrets(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallEr
         kubectl.apply_object(&kubectl::secret(namespace, name, &data))?;
     }
     Ok(())
+}
+
+fn encode(bytes: &[u8], encoding: Encoding) -> String {
+    match encoding {
+        Encoding::Hex => hex::encode(bytes),
+        Encoding::Base64url => URL_SAFE_NO_PAD.encode(bytes),
+    }
 }
 
 fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallError> {
@@ -1050,6 +1058,13 @@ fn record(kubectl: &Kubectl, plan: &Plan, link_issued: bool) -> Result<(), Insta
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn generated_values_use_the_encoding() {
+        assert_eq!(encode(&[0xfb, 0xff], Encoding::Hex), "fbff");
+        assert_eq!(encode(&[0xfb, 0xff], Encoding::Base64url), "-_8");
+        assert_eq!(encode(&[0; 24], Encoding::Base64url).len(), 32);
+    }
 
     #[test]
     fn whole_second_mtime_drops_the_fraction() {

@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use crate::catalog::{Component, Index, SecretRef};
+use crate::catalog::{Component, Encoding, Index, SecretRef};
 use crate::config::{AccessMode, Config};
 use crate::pins::{self, RKE2};
 use crate::rke2::{self, HostFile};
@@ -232,8 +232,13 @@ pub struct SecretRefPlan {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SecretSource {
-    /// 64 random bytes as 128 hexadecimal digits, made once.
-    Generate,
+    /// Random bytes, made once.
+    Generate {
+        /// How many.
+        bytes: usize,
+        /// How they are written.
+        encoding: Encoding,
+    },
     /// A file, mode 0600, read at apply time.
     File(String),
 }
@@ -819,7 +824,10 @@ fn inputs(component: &Component, config: &Config) -> Result<Inputs, PlanError> {
         if let Some(secret) = &input.secret {
             let source = match files.and_then(|f| f.get(&input.name)) {
                 Some(path) => SecretSource::File(path.clone()),
-                None if input.generate.as_deref() == Some("random") => SecretSource::Generate,
+                None if input.generate.as_deref() == Some("random") => SecretSource::Generate {
+                    bytes: input.generate_bytes.unwrap_or(64),
+                    encoding: input.generate_encoding,
+                },
                 None => {
                     return Err(PlanError::MissingInput {
                         component: id.to_owned(),
@@ -1263,7 +1271,7 @@ mod tests {
             crowdsec
                 .secrets
                 .iter()
-                .all(|s| s.source == SecretSource::Generate)
+                .all(|s| matches!(s.source, SecretSource::Generate { bytes: 64, encoding: Encoding::Hex }))
         );
         assert!(
             ids(&plan).iter().position(|id| *id == "ingress/traefik")

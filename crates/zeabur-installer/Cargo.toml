@@ -16,6 +16,7 @@ zeabur-installer-host.workspace = true
 zeabur-installer-plan.workspace = true
 base64.workspace = true
 clap.workspace = true
+hex.workspace = true
 serde-saphyr = { workspace = true, features = ["serialize"] }
 serde_json.workspace = true
 thiserror.workspace = true

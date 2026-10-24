@@ -2833,6 +2833,7 @@ version = "0.0.1"
 dependencies = [
  "base64 0.23.1",
  "clap",
+ "hex",
  "serde-saphyr",
  "serde_json",
  "tempfile",

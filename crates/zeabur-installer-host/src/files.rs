@@ -74,11 +74,20 @@ pub fn read_secret(path: &Path) -> Result<Vec<u8>, HostError> {
 ///
 /// When `/dev/urandom` cannot be read.
 pub fn random_hex() -> Result<String, HostError> {
-    let mut bytes = [0_u8; 64];
+    random_bytes(64).map(hex::encode)
+}
+
+/// `n` random bytes.
+///
+/// # Errors
+///
+/// When `/dev/urandom` cannot be read.
+pub fn random_bytes(n: usize) -> Result<Vec<u8>, HostError> {
+    let mut bytes = vec![0_u8; n];
     fs::File::open("/dev/urandom")
         .and_then(|mut f| f.read_exact(&mut bytes))
         .map_err(HostError::io("/dev/urandom"))?;
-    Ok(hex::encode(bytes))
+    Ok(bytes)
 }
 
 #[cfg(test)]
@@ -100,5 +109,6 @@ mod tests {
         assert!(write(&path, 0o600, b"y").unwrap());
         assert_eq!(read_secret(&path).unwrap(), b"y");
         assert_eq!(random_hex().unwrap().len(), 128);
+        assert_eq!(random_bytes(24).unwrap().len(), 24);
     }
 }
