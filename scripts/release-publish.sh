@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # Publishes the candidates that release-build.sh built and release-smoke.sh tried, compiling
 # nothing: the image by digest and the chart pinned to that digest, each signed, and the release
-# assets (archives, chart, digests, signed checksums) with the release notes. Every signature is
-# keyless (Sigstore, with the workflow's identity token). The workflow then attests the
-# provenance and creates the draft release; a maintainer publishes it (docs/releases.md).
+# assets (archives, chart, documentation screenshots, digests, signed checksums) with the release
+# notes. Every signature is keyless (Sigstore, with the workflow's identity token). The workflow
+# then attests the provenance and creates the draft release; a maintainer publishes it
+# (docs/releases.md).
 # CI only, from .github/workflows/release.yml, inside `nix develop`; Docker is the runner's.
 #   scripts/release-publish.sh v0.0.2 candidates release
 #
-# <candidates> holds one directory per build (release-linux-amd64, release-darwin-arm64, …);
-# <out> receives assets/ and notes.md.
+# <candidates> holds one directory per build (release-linux-amd64, release-darwin-arm64, …) and
+# release-docs-shots; <out> receives assets/ and notes.md.
 set -euo pipefail
 
 version="${1:?usage: release-publish.sh <vVERSION> <candidates> <out>}"
@@ -59,6 +60,8 @@ for build in linux-amd64 linux-arm64 darwin-arm64; do
   [[ -f "$candidates/release-$build/zeaburctl-$version-$build.tar.gz" ]] ||
     { echo "missing the $build build" >&2; exit 1; }
 done
+[[ -f "$candidates/release-docs-shots/docs-shots-$version.tar" ]] ||
+  { echo "missing the documentation screenshots" >&2; exit 1; }
 
 # The image: each platform's candidate by digest, then one index of exactly those two.
 refs=()
@@ -81,6 +84,7 @@ cosign sign --yes "$image@$index"
 printf 'index  %s\n' "$image@$index" >>"$assets/digests.txt"
 
 cp "$candidates/release-darwin-arm64/zeaburctl-$version-darwin-arm64.tar.gz" "$assets/"
+cp "$candidates/release-docs-shots/docs-shots-$version.tar" "$assets/"
 
 # The chart: the image pinned to the index above, at the version of Chart.yaml (checked equal to
 # the release's by the workflow).
@@ -99,7 +103,7 @@ printf 'chart  %s\n' "$charts/zeabur@$chart_digest" >>"$assets/digests.txt"
 
 (
   cd "$assets"
-  sha256sum -- *.tar.gz *.tgz digests.txt >SHA256SUMS
+  sha256sum -- *.tar.gz *.tar *.tgz digests.txt >SHA256SUMS
   cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
 )
 

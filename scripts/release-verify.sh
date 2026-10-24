@@ -40,7 +40,7 @@ attestation=(--repo "$repository" --cert-identity "$identity")
 
 # 1. The checksums: signed by the release workflow at this tag, and covering every asset.
 cosign verify-blob "${certificate[@]}" --bundle "$directory/SHA256SUMS.sigstore.json" "$directory/SHA256SUMS"
-expected=(digests.txt "zeabur-$plain.tgz")
+expected=(digests.txt "zeabur-$plain.tgz" "docs-shots-$version.tar")
 for build in linux-amd64 linux-arm64 darwin-arm64; do
   expected+=("zeaburctl-$version-$build.tar.gz")
 done
