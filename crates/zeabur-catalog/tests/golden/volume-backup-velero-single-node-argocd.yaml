@@ -27,7 +27,7 @@ metadata:
   name: velero-backup-key
   namespace: velero
 stringData:
-  key: "<random: openssl rand -hex 64>"
+  key: "<random: openssl rand -base64 24 | tr '+/' '-_' | tr -d '='>"
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application

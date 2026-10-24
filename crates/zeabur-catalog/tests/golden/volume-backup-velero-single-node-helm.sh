@@ -11,7 +11,7 @@ kubectl -n velero create secret generic velero-repo-credentials \
   --dry-run=client -o yaml | kubectl apply -f -
 # The S3 server encrypts every backup object, Secrets included, with this SSE-C key. The AWS plugin needs exactly 32 bytes.
 kubectl -n velero create secret generic velero-backup-key \
-  --from-literal=key="$(openssl rand -hex 64)" \
+  --from-literal=key="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # velero
