@@ -2553,6 +2553,7 @@ export const zhTW: Messages = {
   "s3d.denied": (namespace) =>
     `你無權讀取 ${namespace} 裡的 Secret，無法複製這些目的地的金鑰，請自行輸入。`,
   "s3d.from": (name) => `金鑰複製自 ${name}`,
+  "s3d.none": "先在叢集新增 S3 目的地，之後就能在這裡直接選用，不用再輸入金鑰。",
   "db.backup.endpoint": "端點",
   "db.backup.bucket": "儲存貯體",
   "db.backup.path": "資料夾",

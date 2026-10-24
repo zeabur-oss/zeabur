@@ -112,7 +112,7 @@ export function BackupsPage() {
       ) : data ? (
         <Installed data={data} />
       ) : null}
-      <S3DestinationsSection />
+      {data?.state === "installed" ? null : <S3DestinationsSection />}
     </ClusterFrame>
   )
 }
@@ -164,6 +164,7 @@ function Installed({ data }: { data: Data }) {
   return (
     <>
       <Verdict data={data} gate={gate} onPlan={open} />
+      <S3DestinationsSection />
       <LocationSection data={data} gate={gate} onPlan={open} />
       <ScheduleSection data={data} gate={gate} onPlan={open} />
       <BackupList data={data} />
@@ -451,7 +452,11 @@ function LocationEditor({
       }}
     >
       <p className="type-meta text-muted-foreground">{t("clusterBackups.outside")}</p>
-      <DestinationPicker value={form.destination} onPick={(d) => set(pickLocation(d))} />
+      <DestinationPicker
+        value={form.destination}
+        blank={!editing && !form.endpoint && !form.bucket && !form.accessKeyId}
+        onPick={(d) => set(pickLocation(d))}
+      />
       <FormField
         label={t("clusterBackups.endpoint")}
         hint={t("clusterBackups.endpointHint")}

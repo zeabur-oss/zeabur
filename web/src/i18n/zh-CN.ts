@@ -2547,6 +2547,7 @@ export const zhCN: Messages = {
   "s3d.denied": (namespace) =>
     `你没有权限读取集群 S3 目的地的密钥（${namespace} 中的 Secret），请自行输入密钥。`,
   "s3d.from": (name) => `密钥复制自 ${name}`,
+  "s3d.none": "加入集群 S3 目的地的存储桶可以直接在这里选用，无需再输入密钥。",
   "db.backup.endpoint": "端点",
   "db.backup.bucket": "存储桶",
   "db.backup.path": "文件夹",

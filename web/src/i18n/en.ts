@@ -2763,6 +2763,8 @@ export const en = {
   "s3d.denied": (namespace: string) =>
     `You may not read the keys (Secrets in ${namespace}). Enter them yourself.`,
   "s3d.from": (name: string) => `Keys copied from ${name}`,
+  "s3d.none":
+    "Buckets in the cluster's S3 destinations can be picked here, without typing their keys.",
   "db.backup.endpoint": "Endpoint",
   "db.backup.bucket": "Bucket",
   "db.backup.path": "Folder",

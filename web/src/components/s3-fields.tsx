@@ -1,5 +1,6 @@
 import { queryOptions, useQuery } from "@tanstack/react-query"
-import type { ReactNode } from "react"
+import { Link } from "@tanstack/react-router"
+import { useEffect, useRef, type ReactNode } from "react"
 
 import { api, unwrap } from "@/api/client"
 import { FormField } from "@/components/form-field"
@@ -22,22 +23,31 @@ export const s3DestinationsQuery = queryOptions({
 
 const MANUAL = "\u0000manual"
 
-/** The cluster's S3 destinations, or typing the fields. Hidden when the cluster has none. Choosing
- * one fills the fields; the plan copies its keys. */
+/** The cluster's S3 destinations, or typing the fields. A blank form starts on the first
+ * destination. Choosing one fills the fields; the plan copies its keys. */
 export function DestinationPicker({
   value,
+  blank,
   onPick,
 }: {
   value?: string
+  /** Nothing is typed yet, so a destination may fill the form. */
+  blank: boolean
   onPick: (destination: Destination | undefined) => void
 }) {
   const t = useT()
   const found = useQuery(s3DestinationsQuery).data
   const items = found?.items ?? []
-  if (items.length === 0 && value === undefined) return null
-  if (found?.canUseKeys === "denied")
+  const usable = found !== undefined && found.canUseKeys !== "denied"
+  const started = useFirstPick(
+    usable && blank && value === undefined ? items[0] : undefined,
+    onPick,
+  )
+  if (items.length === 0 && value === undefined)
+    return found?.canChange === "allowed" ? <NoDestinations /> : null
+  if (!usable)
     return (
-      <FormField label={t("s3d.pick")} hint={t("s3d.denied", found.namespace)}>
+      <FormField label={t("s3d.pick")} hint={found && t("s3d.denied", found.namespace)}>
         <Select
           size="sm"
           disabled
@@ -54,13 +64,46 @@ export function DestinationPicker({
       <Select
         size="sm"
         value={value ?? MANUAL}
-        onValueChange={(name) => onPick(items.find((d) => d.name === name))}
+        onValueChange={(name) => {
+          started.current = true
+          onPick(items.find((d) => d.name === name))
+        }}
         items={[
-          { value: MANUAL, label: t("s3d.manual") },
           ...items.map((d) => ({ value: d.name, label: d.name })),
+          { value: MANUAL, label: t("s3d.manual") },
         ]}
       />
     </FormField>
+  )
+}
+
+/** Picks `first` once. The returned ref is set when the person picks, so no later pick follows. */
+function useFirstPick(
+  first: Destination | undefined,
+  onPick: (destination: Destination | undefined) => void,
+) {
+  const started = useRef(false)
+  useEffect(() => {
+    if (!first || started.current) return
+    started.current = true
+    onPick(first)
+  }, [first, onPick])
+  return started
+}
+
+function NoDestinations() {
+  const t = useT()
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t("s3d.none")}{" "}
+      <Link
+        to="/cluster/backups"
+        hash="s3-destinations"
+        className="text-foreground hover:underline"
+      >
+        {t("s3d.add")}
+      </Link>
+    </p>
   )
 }
 
@@ -98,6 +141,7 @@ export function S3Fields({
     <>
       <DestinationPicker
         value={target.destination}
+        blank={!target.endpoint && !target.bucket && !target.accessKey}
         onPick={(d) => set(d ? fromDestination(d, folder) : manual())}
       />
       <FormField label={t("db.backup.endpoint")} errors={errors("endpoint")}>
