@@ -74,10 +74,10 @@ releases:
         config:
           policyreport:
             enabled: true
-            # The upstream default: the newest 1000 alerts per namespace.
-            maxevents: 1000
-            # When full, drop the lowest-priority alerts first, not the oldest.
-            prunebypriority: true
+            # The newest 100 alerts per namespace. One alert is about 1.5 KiB and
+            # holds the command line twice. At the upstream 1000, a report passes
+            # the etcd limit of 1.5 MiB, and each later update fails.
+            maxevents: 100
     profiles:
       single-node: |
         resources:

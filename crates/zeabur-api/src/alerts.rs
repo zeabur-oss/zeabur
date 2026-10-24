@@ -29,8 +29,8 @@ use crate::views::UnreadableView;
 pub struct RuntimeAlerts {
     /// Whether the reports could be read.
     pub state: ProviderState,
-    /// Newest first. A report keeps its newest alerts only (1000 by default), so older ones may
-    /// be gone.
+    /// Newest first. A report keeps its newest alerts only (100 when Zeabur Catalog installs
+    /// Falco), so older ones may be gone.
     pub items: Vec<Alert>,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,

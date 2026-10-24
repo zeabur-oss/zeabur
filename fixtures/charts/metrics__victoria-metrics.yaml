@@ -1359,6 +1359,10 @@ spec:
     metricRelabelConfigs:
     - action: labeldrop
       regex: (uid|container_id|image_id)
+    - action: drop
+      if: '{__name__="zeabur_cnpg_backup_created", phase="completed"}'
+    - action: drop
+      if: '{__name__="zeabur_psmdb_backup_created", state="ready"}'
     port: http
   jobLabel: app.kubernetes.io/name
   selector:

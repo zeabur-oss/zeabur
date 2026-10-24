@@ -14447,8 +14447,8 @@ components:
           items:
             $ref: "#/components/schemas/FalcoAlert"
           description: |-
-            Newest first. A report keeps its newest alerts only (1000 by default), so older ones may
-            be gone.
+            Newest first. A report keeps its newest alerts only (100 when Zeabur Catalog installs
+            Falco), so older ones may be gone.
         state:
           $ref: "#/components/schemas/ProviderState"
           description: Whether the reports could be read.

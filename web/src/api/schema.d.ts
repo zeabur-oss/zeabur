@@ -7478,8 +7478,8 @@ export interface components {
     /** @description Falco's recent alerts in one place. */
     RuntimeAlerts: {
       /**
-       * @description Newest first. A report keeps its newest alerts only (1000 by default), so older ones may
-       *     be gone.
+       * @description Newest first. A report keeps its newest alerts only (100 when Zeabur Catalog installs
+       *     Falco), so older ones may be gone.
        */
       items: components["schemas"]["FalcoAlert"][]
       /** @description Whether the reports could be read. */

@@ -68,6 +68,7 @@ releases:
           # installed adds nothing. One series for each object: a Build keeps at
           # most its historyLimit of BuildRuns, Velero and K8up delete old
           # backups, but CloudNativePG and Percona keep every Backup object.
+          # The scrape below drops their successful backups.
           enabled: true
           config:
             kind: CustomResourceStateMetrics
@@ -189,6 +190,20 @@ releases:
                           labelsFromPath:
                             type: [type]
                           valueFrom: [status]
+        vmScrape:
+          spec:
+            endpoints:
+              # The chart's endpoint, plus two drops. The rules read failed
+              # backups only. Each successful backup adds one series.
+              - port: http
+                honorLabels: true
+                metricRelabelConfigs:
+                  - action: labeldrop
+                    regex: (uid|container_id|image_id)
+                  - action: drop
+                    if: '{__name__="zeabur_cnpg_backup_created", phase="completed"}'
+                  - action: drop
+                    if: '{__name__="zeabur_psmdb_backup_created", state="ready"}'
       alertmanager:
         spec:
           # Each project keeps its channels in VMAlertmanagerConfigs. The operator

@@ -4,8 +4,9 @@
 //! Falcosidekick appends each alert to the `PolicyReport` `falco-policy-report` of the namespace
 //! named by its `k8s.ns.name` (or `ka.target.namespace`) field, and an alert without one to the
 //! `ClusterPolicyReport` `falco-cluster-policy-report`. A report keeps its newest
-//! `policyreport.maxevents` results (1000 by default), so these are recent alerts, not all of
-//! them. Kubernetes' RBAC on `policyreports` decides who reads them; Zeabur reads as the person.
+//! `policyreport.maxevents` results (100 when Zeabur Catalog installs Falco), so these are recent
+//! alerts, not all of them. Kubernetes' RBAC on `policyreports` decides who reads them; Zeabur
+//! reads as the person.
 //!
 //! A result's `timestamp` is the alert's time from falcosidekick 2.35.0 on; earlier versions
 //! write only its seconds within the minute, so a time before 2001 is replaced by the `evt.time`

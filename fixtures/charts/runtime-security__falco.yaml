@@ -399,8 +399,8 @@ data:
   # Policy Reporter Output
   POLICYREPORT_ENABLED: "dHJ1ZQ=="
   POLICYREPORT_KUBECONFIG: "fi8ua3ViZS9jb25maWc="
-  POLICYREPORT_MAXEVENTS: "MTAwMA=="
-  POLICYREPORT_PRUNEBYPRIORITY: "dHJ1ZQ=="
+  POLICYREPORT_MAXEVENTS: "MTAw"
+  POLICYREPORT_PRUNEBYPRIORITY: "ZmFsc2U="
   POLICYREPORT_MINIMUMPRIORITY: ""
 
   # Node Red Output
@@ -1103,7 +1103,7 @@ spec:
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/component: core
       annotations:
-        checksum/config: a8d03545be392b778fc5f293ee4963f646ae2e400e13e594a62f6c23e0de3e02
+        checksum/config: 33d73a396f1e7b554e22dd3fa2e7d1f869b871e78b9d8cec3315131fdd8ff35f
     spec:
       serviceAccountName: falco-falcosidekick
       securityContext:
