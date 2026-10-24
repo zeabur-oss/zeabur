@@ -320,7 +320,9 @@ export const zhCN: Messages = {
   "node.cordoned": (n, node) => (n === 1 ? `${node} 已停止调度` : `${n} 个节点已停止调度`),
   "node.cordoned.why": "新的副本不会放到上面，运行中的会留着。",
   "node.cordoned.fix": (n, node) =>
-    n === 1 ? `维护完成后恢复调度（kubectl uncordon ${node}）。` : "维护完成后恢复这些节点的调度。",
+    n === 1
+      ? `在 ${node} 那一行选“继续维护”，迁走剩下的副本。维护完成后，再从它的菜单恢复调度。`
+      : "在每个节点那一行选“继续维护”，迁走剩下的副本。维护完成后，再从各节点的菜单恢复调度。",
   "node.reservedMemory": (n, node, share) =>
     n === 1 ? `${node}：内存已预留 ${share}` : `${n} 个节点的内存预留过量`,
   "node.reservedMemory.why": "请求内存的新副本可能要等到有空间。",
@@ -373,7 +375,7 @@ export const zhCN: Messages = {
   "node.maintenance.fix": "维护完成后，从节点菜单恢复调度。",
   "node.draining": (n, node) => (n === 1 ? `正在把副本迁出 ${node}` : `正在把副本迁出 ${n} 个节点`),
   "node.draining.why": "这些副本会在其他节点重新启动。",
-  "node.draining.fix": "从节点菜单打开维护模式，就能看到还剩哪些。",
+  "node.draining.fix": "维护窗口开着时才会迁移副本。在节点那一行选“继续维护”就能继续迁移。",
   "cluster.cores": (n) => `${n} 核`,
   "cluster.requestedOf": (requested, allocatable) => `已预留 ${requested}/${allocatable}`,
   "cluster.allocatable": (allocatable) => `可分配 ${allocatable}`,
@@ -534,6 +536,11 @@ export const zhCN: Messages = {
   "maint.leaveNote":
     "可以先关掉这个窗口。节点会保持停止调度，要迁走剩下的副本时，再打开维护模式即可。",
   "maint.retry": "再试一次",
+  "maint.leave.title": "要停止迁移副本吗？",
+  "maint.leave.body": (node) =>
+    `只有这个窗口开着时，副本才会从 ${node} 迁走。如果离开，${node} 会保持停止调度，剩下的副本会留在上面，直到你继续维护。`,
+  "maint.leave.stay": "继续迁移",
+  "maint.leave.leave": "离开",
   "maint.unreadable": "有些数据无法读取，这份计划可能没算到中断预算，或存在这个节点本地的卷。",
   "maint.remove": "移除节点",
   "maint.removeNext": "移除节点",

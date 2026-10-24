@@ -337,8 +337,8 @@ export const en = {
   "node.cordoned.why": "New replicas are not placed there; the running ones stay.",
   "node.cordoned.fix": (n: number, node: string) =>
     n === 1
-      ? `When its maintenance is done, uncordon it (kubectl uncordon ${node}).`
-      : "When their maintenance is done, uncordon them.",
+      ? `Select Continue maintenance on ${node}'s row to move what is left. When the work is done, resume scheduling from its menu.`
+      : "Select Continue maintenance on each row to move what is left. When the work is done, resume scheduling from each node's menu.",
   "node.reservedMemory": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: memory ${share} reserved` : `${n} nodes over-reserved on memory`,
   "node.reservedMemory.why": "New replicas that ask for memory may wait for room.",
@@ -396,7 +396,8 @@ export const en = {
   "node.draining": (n: number, node: string) =>
     n === 1 ? `Replicas are moving off ${node}` : `Replicas are moving off ${n} nodes`,
   "node.draining.why": "Their services start them again on other nodes.",
-  "node.draining.fix": "Open maintenance mode from the node's menu to see what is left.",
+  "node.draining.fix":
+    "Replicas move only while the maintenance window is open. Select Continue maintenance on the node's row to keep moving them.",
   "cluster.cores": (n: string) => `${n} cores`,
   "cluster.requestedOf": (requested: string, allocatable: string) =>
     `${requested} of ${allocatable} reserved`,
@@ -575,6 +576,11 @@ export const en = {
   "maint.leaveNote":
     "You can close this. The node stays out of scheduling; open maintenance mode again to move what is left.",
   "maint.retry": "Try again",
+  "maint.leave.title": "Stop moving replicas?",
+  "maint.leave.body": (node: string) =>
+    `Replicas move off ${node} only while this window is open. If you leave, ${node} stays out of scheduling and what is left stays on it until you continue maintenance.`,
+  "maint.leave.stay": "Keep moving",
+  "maint.leave.leave": "Leave",
   "maint.unreadable":
     "Some reads were refused, so this plan may miss disruption budgets or volumes that stay on this node.",
   "maint.remove": "Remove node",

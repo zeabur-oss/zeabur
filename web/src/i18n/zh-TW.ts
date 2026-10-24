@@ -320,7 +320,9 @@ export const zhTW: Messages = {
   "node.cordoned": (n, node) => (n === 1 ? `${node} 已停止排程` : `${n} 個節點已停止排程`),
   "node.cordoned.why": "新的副本不會放到上面，執行中的會留著。",
   "node.cordoned.fix": (n, node) =>
-    n === 1 ? `維護完成後恢復排程（kubectl uncordon ${node}）。` : "維護完成後恢復這些節點的排程。",
+    n === 1
+      ? `在 ${node} 那一列選「繼續維護」，移走剩下的副本。維護完成後，再從它的選單恢復排程。`
+      : "在每個節點那一列選「繼續維護」，移走剩下的副本。維護完成後，再從各節點的選單恢復排程。",
   "node.reservedMemory": (n, node, share) =>
     n === 1 ? `${node}：記憶體已保留 ${share}` : `${n} 個節點的記憶體保留過量`,
   "node.reservedMemory.why": "要求記憶體的新副本可能要等到有空間。",
@@ -373,7 +375,7 @@ export const zhTW: Messages = {
   "node.maintenance.fix": "維護完成後，從節點選單恢復排程。",
   "node.draining": (n, node) => (n === 1 ? `正在把副本移出 ${node}` : `正在把副本移出 ${n} 個節點`),
   "node.draining.why": "這些副本會在其他節點重新啟動。",
-  "node.draining.fix": "從節點選單打開維護模式，就能看到還剩哪些。",
+  "node.draining.fix": "維護視窗開著時才會移動副本。在節點那一列選「繼續維護」就能繼續移動。",
   "cluster.cores": (n) => `${n} 核`,
   "cluster.requestedOf": (requested, allocatable) => `已保留 ${requested}/${allocatable}`,
   "cluster.allocatable": (allocatable) => `可分配 ${allocatable}`,
@@ -534,6 +536,11 @@ export const zhTW: Messages = {
   "maint.leaveNote":
     "可以先關掉這個視窗。節點會維持停止排程，要移走剩下的副本時，再打開維護模式就好。",
   "maint.retry": "再試一次",
+  "maint.leave.title": "要停止移動副本嗎？",
+  "maint.leave.body": (node) =>
+    `只有這個視窗開著時，副本才會從 ${node} 移走。如果離開，${node} 會維持停止排程，剩下的副本會留在上面，直到你繼續維護。`,
+  "maint.leave.stay": "繼續移動",
+  "maint.leave.leave": "離開",
   "maint.unreadable": "有些資料無法讀取，這份計畫可能沒算到中斷預算，或存在這個節點本機的磁碟區。",
   "maint.remove": "移除節點",
   "maint.removeNext": "移除節點",

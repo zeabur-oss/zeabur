@@ -1,6 +1,7 @@
 // A node's menu: stop scheduling, maintenance mode, resume scheduling, remove. Each opens a plan the
 // person reviews; maintenance then moves replicas off in passes while the dialog stays open.
 import { useMutation, useQuery } from "@tanstack/react-query"
+import { useBlocker } from "@tanstack/react-router"
 import { useEffect, useId, useRef, useState, type ComponentType, type ReactNode } from "react"
 import DotsThreeIcon from "~icons/ph/dots-three"
 import InfoIcon from "~icons/ph/info-fill"
@@ -45,6 +46,12 @@ import type { Health } from "@/model/service"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Checkbox } from "@zeabur/design-system/components/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@zeabur/design-system/components/dialog"
 import { Label } from "@zeabur/design-system/components/label"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 
@@ -64,44 +71,26 @@ interface Item {
   action: NodeAction
 }
 
-/** The actions on a node, for those who may change nodes; nothing for anyone else. The row goes
- * once the node is removed, so `onRemoved` shows what to do next outside it. */
+/** A dialog open on a node; `removing`: maintenance was opened on the way to removing it. */
+export interface NodeOpen {
+  action: NodeAction
+  removing?: boolean
+}
+
+/** The actions on a node, for those who may change nodes; nothing for anyone else. */
 export function NodeMenu({
   node,
   className,
-  onRemoved,
+  onOpen,
 }: {
   node: NodeView
   className?: string
-  onRemoved: (node: string) => void
+  onOpen: (open: NodeOpen) => void
 }) {
   const t = useT()
   const gate = useClusterGate("changeNodes")
-  // `removing`: maintenance was opened on the way to removing the node.
-  const [open, setOpen] = useState<{ action: NodeAction; removing?: boolean }>()
   if (!gate.open) return null
-  const left = node.cordoned && cordonedKind(node) !== "maintenance"
   const items: Item[] = [
-    ...(node.cordoned
-      ? []
-      : [
-          {
-            key: "cordon",
-            icon: PauseCircleIcon,
-            label: t("maint.cordon"),
-            action: "cordon" as const,
-          },
-        ]),
-    ...(!node.cordoned || left
-      ? [
-          {
-            key: "drain",
-            icon: WrenchIcon,
-            label: node.cordoned ? t("maint.continue") : t("maint.drain"),
-            action: "drain" as const,
-          },
-        ]
-      : []),
     ...(node.cordoned
       ? [
           {
@@ -111,7 +100,15 @@ export function NodeMenu({
             action: "uncordon" as const,
           },
         ]
-      : []),
+      : [
+          {
+            key: "cordon",
+            icon: PauseCircleIcon,
+            label: t("maint.cordon"),
+            action: "cordon" as const,
+          },
+          { key: "drain", icon: WrenchIcon, label: t("maint.drain"), action: "drain" as const },
+        ]),
     { key: "remove", icon: TrashIcon, label: t("maint.remove"), action: "remove" },
   ]
   return (
@@ -126,30 +123,67 @@ export function NodeMenu({
         </MenuTrigger>
         <MenuContent align="end">
           {items.map(({ key, icon: Icon, label, action }) => (
-            <MenuItem key={key} onClick={() => setOpen({ action })}>
+            <MenuItem key={key} onClick={() => onOpen({ action })}>
               <Icon aria-hidden="true" />
               {label}
             </MenuItem>
           ))}
         </MenuContent>
       </Menu>
-      {open ? (
-        <MaintenanceDialog
-          key={open.action}
-          node={node.name}
-          action={open.action}
-          removing={open.removing}
-          onAction={(action) =>
-            setOpen({ action, removing: open.removing || open.action === "remove" })
-          }
-          onRemoved={() => {
-            setOpen(undefined)
-            onRemoved(node.name)
-          }}
-          onClose={() => setOpen(undefined)}
-        />
-      ) : null}
     </div>
+  )
+}
+
+/** On a cordoned node with replicas still to move: maintenance stops when its window closes, so
+ * the way back is on the row. */
+export function ContinueMaintenance({
+  node,
+  onOpen,
+}: {
+  node: NodeView
+  onOpen: (open: NodeOpen) => void
+}) {
+  const t = useT()
+  const gate = useClusterGate("changeNodes")
+  if (!gate.open || !node.cordoned || cordonedKind(node) === "maintenance") return null
+  return (
+    <div>
+      <Button variant="outline" size="xs" onClick={() => onOpen({ action: "drain" })}>
+        <WrenchIcon aria-hidden="true" data-icon="inline-start" />
+        {t("maint.continue")}
+      </Button>
+    </div>
+  )
+}
+
+/** The dialog open on a node. The row goes once the node is removed, so `onRemoved` shows what
+ * to do next outside it. */
+export function NodeDialog({
+  node,
+  open,
+  onOpen,
+  onRemoved,
+  onClose,
+}: {
+  node: string
+  open: NodeOpen
+  onOpen: (open: NodeOpen) => void
+  onRemoved: (node: string) => void
+  onClose: () => void
+}) {
+  return (
+    <MaintenanceDialog
+      key={open.action}
+      node={node}
+      action={open.action}
+      removing={open.removing}
+      onAction={(action) => onOpen({ action, removing: open.removing || open.action === "remove" })}
+      onRemoved={() => {
+        onClose()
+        onRemoved(node)
+      }}
+      onClose={onClose}
+    />
   )
 }
 
@@ -184,6 +218,12 @@ function MaintenanceDialog({
   const [passError, setPassError] = useState<unknown>()
   const abort = useRef<AbortController | undefined>(undefined)
   useEffect(() => () => abort.current?.abort(), [])
+  // Passes run only in this window; leaving stops them.
+  const leaving = useBlocker({
+    shouldBlockFn: () => running,
+    enableBeforeUnload: () => running,
+    withResolver: true,
+  })
 
   const choice = (token: string) => ({ token, includeStuck, includeDeleted })
   const run = (token: string, first: DrainProgress) => {
@@ -283,6 +323,9 @@ function MaintenanceDialog({
         />
         {passError ? <Problem error={passError} /> : null}
         {retry.isError ? <Problem error={retry.error} /> : null}
+        {leaving.status === "blocked" ? (
+          <LeaveDialog node={node} onStay={leaving.reset} onLeave={leaving.proceed} />
+        ) : null}
       </Frame>
     )
 
@@ -427,6 +470,36 @@ export function Removed({ node, onClose }: { node: string; onClose: () => void }
       <YamlBlock yaml={UNINSTALL_COMMANDS} label={t("maint.removed.commands", node)} />
       <p className="type-meta text-muted-foreground">{t("maint.removed.volumes")}</p>
     </Frame>
+  )
+}
+
+function LeaveDialog({
+  node,
+  onStay,
+  onLeave,
+}: {
+  node: string
+  onStay: () => void
+  onLeave: () => void
+}) {
+  const t = useT()
+  return (
+    <Dialog open onOpenChange={(open) => (open ? undefined : onStay())}>
+      <DialogContent variant="compact">
+        <div className="flex flex-col gap-2 px-5 pt-4 pb-3">
+          <DialogTitle>{t("maint.leave.title")}</DialogTitle>
+          <DialogDescription>{t("maint.leave.body", node)}</DialogDescription>
+        </div>
+        <div className="flex justify-end gap-2 border-t px-5 py-3">
+          <Button variant="ghost" size="sm" onClick={onLeave}>
+            {t("maint.leave.leave")}
+          </Button>
+          <Button size="sm" onClick={onStay}>
+            {t("maint.leave.stay")}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

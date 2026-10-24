@@ -33,7 +33,13 @@ import type { Health } from "@/model/service"
 import { useIssueText } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { AddNodeButton, JoinTokens } from "@/routes/cluster/add-node"
-import { NodeMenu, Removed } from "@/routes/cluster/node-maintenance"
+import {
+  ContinueMaintenance,
+  NodeDialog,
+  NodeMenu,
+  type NodeOpen,
+  Removed,
+} from "@/routes/cluster/node-maintenance"
 import { PoliciesBehind } from "@/routes/cluster/node-policies"
 import { Section } from "@/routes/cluster/section"
 import { Meter } from "@zeabur/design-system/components/meter"
@@ -376,6 +382,7 @@ function NodeRow({
 }) {
   const t = useT()
   const { cores, memory, percent } = useQuantityFormat()
+  const [open, setOpen] = useState<NodeOpen>()
   // Reservations show in the bars; the pills say what is wrong.
   const issues = nodeIssues(node).filter((issue) => !quiet.has(issue.kind))
   const gauge = (
@@ -513,12 +520,22 @@ function NodeRow({
             {t("node.pinnedLeft", node.pinnedPods ?? 0)}
           </p>
         ) : null}
+        <ContinueMaintenance node={node} onOpen={setOpen} />
       </div>
       <NodeMenu
         node={node}
         className="-my-1 self-start sm:order-last sm:self-center"
-        onRemoved={onRemoved}
+        onOpen={setOpen}
       />
+      {open ? (
+        <NodeDialog
+          node={node.name}
+          open={open}
+          onOpen={setOpen}
+          onRemoved={onRemoved}
+          onClose={() => setOpen(undefined)}
+        />
+      ) : null}
       <div className="grid w-full grid-cols-2 items-start gap-x-4 gap-y-3 sm:flex sm:w-auto sm:gap-x-6">
         {gauge(
           t("cluster.cpu"),
