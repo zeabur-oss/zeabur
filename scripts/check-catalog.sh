@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails if crates/zeabur-catalog/bundle differs from Zeabur Catalog at the commit
 # pinned in its PINNED file. Reads it from RECS_DIR (a local clone) when set, otherwise
-# from GitHub.
+# from GitHub (scripts/vendor-catalog.sh).
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,15 +11,7 @@ commit=$(sed -n 's/^commit = //p' "$bundle/PINNED")
 
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-mkdir -p "$tmp/upstream"
-if [[ -n "${RECS_DIR:-}" ]]; then
-  git -C "$RECS_DIR" archive "$commit" components LICENSE | tar -x -C "$tmp/upstream"
-else
-  curl --fail --silent --show-error --location --proto '=https' \
-    "https://codeload.github.com/zeabur-oss/catalog/tar.gz/$commit" |
-    tar -xz -C "$tmp/upstream" --strip-components=1 "catalog-$commit/components" \
-      "catalog-$commit/LICENSE"
-fi
+"$root/scripts/vendor-catalog.sh" "$commit" "$tmp/upstream" >/dev/null
 if ! diff -r --exclude PINNED "$bundle" "$tmp/upstream" >&2; then
   echo "error: crates/zeabur-catalog/bundle differs from Zeabur Catalog $commit" >&2
   exit 1

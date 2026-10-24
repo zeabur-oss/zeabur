@@ -1,0 +1,73 @@
+name: Update catalog
+
+# Moves crates/zeabur-catalog/bundle to Zeabur Catalog's latest release in one pull request, which
+# CI then checks like any other. The GitHub App token (as in update-toolchain.yml) also reads the
+# catalog, which is private.
+
+on:
+  schedule:
+    - cron: "0 18 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-26.04-arm
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app
+        with:
+          client-id: ${{ vars.UPDATE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.UPDATE_BOT_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: zeabur,catalog
+      # The commit's author must match its sign-off (scripts/check-dco.sh).
+      - id: bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          echo "identity=${APP_SLUG}[bot] <${id}+${APP_SLUG}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Vendor the latest release
+        id: vendor
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          if ! tag="$(gh release view --repo zeabur-oss/catalog --json tagName --jq .tagName)"; then
+            echo "::notice::Zeabur Catalog has no release yet"
+            exit 0
+          fi
+          scripts/vendor-catalog.sh "$tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        if: steps.vendor.outputs.tag
+        with:
+          token: ${{ steps.app.outputs.token }}
+          author: ${{ steps.bot.outputs.identity }}
+          committer: ${{ steps.bot.outputs.identity }}
+          signoff: true
+          branch: update/catalog
+          delete-branch: true
+          commit-message: "chore(catalog): move the pin to ${{ steps.vendor.outputs.tag }}"
+          title: "chore(catalog): move the pin to ${{ steps.vendor.outputs.tag }}"
+          body: |
+            Scheduled update by `.github/workflows/update-catalog.yml`: Zeabur Catalog
+            ${{ steps.vendor.outputs.tag }} ([release notes](https://github.com/zeabur-oss/catalog/releases/tag/${{ steps.vendor.outputs.tag }})).
+
+            Before merging, render the chart corpus again (`scripts/render-chart-corpus.sh`). A
+            changed description fails the web tests until its summary in
+            `web/src/i18n/component-summaries.ts` is checked.
+          labels: dependencies
