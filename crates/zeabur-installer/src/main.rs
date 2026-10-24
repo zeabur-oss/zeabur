@@ -40,9 +40,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Show what `apply` would install, without changing anything.
+    /// Show what `apply` would install and run its host checks, without changing anything.
     Plan {
-        /// Print the plan as JSON.
+        /// Print the plan as JSON, without the host checks.
         #[arg(long)]
         json: bool,
     },
@@ -55,11 +55,16 @@ enum Command {
         #[arg(long, default_value = "127.0.0.1:8085")]
         listen: SocketAddr,
     },
-    /// Check the install. Exits 0 when healthy, 1 with warnings, 2 when something is broken.
+    /// Check the install.
+    ///
+    /// Exit codes, as monitoring plugins (Nagios) and `zeaburctl doctor` use them: 0 when all is
+    /// well, 1 for a warning, 2 for something critical, 3 when the checks cannot run (not root).
+    /// An invalid command line also exits 2.
     Doctor,
     /// Remove Zeabur, or Zeabur and Zeabur Identity. RKE2 itself is removed with
     /// `/usr/local/bin/rke2-uninstall.sh`. On a node that joined a cluster, prints how to take
-    /// the node out. Says which of the installer's files stay after that.
+    /// the node out. Says which of the installer's files stay after that. After Zeabur Identity
+    /// is removed, the other servers stop trusting it once `apply` runs on each of them.
     Uninstall {
         /// What to remove; required on a server installed with Zeabur, unless with `--purge`.
         #[arg(value_enum)]
@@ -220,6 +225,13 @@ fn show_plan(cli: &Cli, json: bool) -> Result<(), InstallError> {
         out::line(&text);
     } else {
         out::line(render::plan(&plan).trim_end());
+        if apply::show_checks(
+            apply::UNIT,
+            config.host.require_encrypted_disk,
+            plan.node_prep.as_ref(),
+        ) {
+            out::line("apply stops until what failed is fixed.");
+        }
     }
     Ok(())
 }

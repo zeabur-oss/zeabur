@@ -69,6 +69,8 @@ use zeabur_core::crypto::{RandomError, equal, random_token};
 use zeabur_core::guard::{self, Origins, Refusal};
 use zeabur_core::problem::{Kind, Problem};
 
+use crate::page::{self, Lang};
+
 /// The prefix of the session cookie's name; the port follows, because cookies are shared by every
 /// port of a host and two `zeaburctl ui` runs (two kubeconfig contexts) must not replace each
 /// other's session.
@@ -144,10 +146,7 @@ pub async fn guard(State(access): State<Arc<Access>>, request: Request, next: Ne
         if request.method() == Method::GET && access.redeem(&presented) {
             return start_session(&access);
         }
-        return problem(
-            Kind::Forbidden,
-            "This link was already used or is not valid. Run `zeaburctl ui` again to get a new one.",
-        );
+        return link_refused(headers);
     }
     if !access.has_session(headers) {
         return problem(
@@ -169,6 +168,25 @@ fn not_this_address() -> Response {
     problem(
         Kind::Forbidden,
         "This address does not belong to the Zeabur running on this machine.",
+    )
+}
+
+/// The page for a launch link that was used before or is not this run's.
+fn link_refused(headers: &HeaderMap) -> Response {
+    let lang = Lang::of(headers);
+    let text = match lang {
+        Lang::En => {
+            "This link was already used or is not valid. Run <code>zeaburctl ui</code> again to get a new one."
+        }
+        Lang::ZhTw => "這個連結已經用過或無效。再執行一次 <code>zeaburctl ui</code> 取得新連結。",
+        Lang::ZhCn => "这个链接已经用过或无效。再运行一次 <code>zeaburctl ui</code> 获取新链接。",
+    };
+    page::html(
+        StatusCode::FORBIDDEN,
+        lang,
+        "",
+        None,
+        &format!("<p>{text}</p>"),
     )
 }
 
@@ -257,8 +275,15 @@ mod tests {
         let set = first.headers()[header::SET_COOKIE].to_str().unwrap();
         assert!(set.contains("HttpOnly") && set.contains("SameSite=Strict"));
 
-        let again = send(app(&access), Method::GET, &uri, &[HOST]).await;
+        let again = send(
+            app(&access),
+            Method::GET,
+            &uri,
+            &[HOST, ("accept-language", "zh-TW")],
+        )
+        .await;
         assert_eq!(again.status(), StatusCode::FORBIDDEN);
+        assert_eq!(again.headers()[header::CONTENT_LANGUAGE], "zh-TW");
 
         let cookie = session_cookie(&first);
         let page = send(app(&access), Method::GET, "/", &[HOST, ("cookie", &cookie)]).await;

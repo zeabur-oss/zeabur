@@ -74,6 +74,13 @@ pub(crate) fn show_plan(config: &JoinConfig, json: bool) -> Result<(), InstallEr
         out::line(&text);
     } else {
         out::line(render::join_plan(&plan).trim_end());
+        if apply::show_checks(
+            plan.unit,
+            config.host.require_encrypted_disk,
+            plan.node_prep.as_ref(),
+        ) {
+            out::line("apply stops until what failed is fixed.");
+        }
     }
     Ok(())
 }
@@ -199,6 +206,9 @@ fn authn_from_cluster(admin: &Kubectl) -> Result<Option<String>, InstallError> {
 }
 
 pub(crate) fn doctor(config: &JoinConfig) -> ExitCode {
+    if let Some(code) = crate::doctor::cannot_run() {
+        return code;
+    }
     let mut results: Vec<(Status, String)> = Vec::new();
     let unit = match config.join.role {
         Role::Worker => "rke2-agent",

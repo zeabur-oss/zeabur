@@ -1,63 +1,17 @@
 //! The few pages the server writes itself, outside the web interface: a sign-in that could not
 //! finish, and the end of "Retry as admin" in its own window.
 //!
-//! Each is a short static text in the person's language (English, Traditional or Simplified
-//! Chinese, from `Accept-Language`), with no inline script or style: the elevation page loads
-//! one script from this origin and passes its result in `data-` attributes. The policy is the
-//! web interface's, without what these pages do not use.
+//! The elevation page loads one script from this origin and passes its result in `data-`
+//! attributes. [`zeabur_api::page`] writes the pages.
 
 use axum::body::Body;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::Response;
-
-/// Content Security Policy of these pages.
-const CSP: &str = "default-src 'none'; script-src 'self'; base-uri 'none'; form-action 'none'; \
-frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'";
+pub(crate) use zeabur_api::page::secure;
+use zeabur_api::page::{Lang, html};
 
 /// The script of the elevation page.
 pub(crate) const ELEVATED_JS: &str = include_str!("elevated.js");
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Lang {
-    En,
-    ZhTw,
-    ZhCn,
-}
-
-impl Lang {
-    /// The first language of `Accept-Language` Zeabur speaks; weights are ignored, as browsers
-    /// list languages in order of preference.
-    fn of(headers: &HeaderMap) -> Self {
-        let accept = headers
-            .get(header::ACCEPT_LANGUAGE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("");
-        for tag in accept.split(',') {
-            let tag = tag
-                .split(';')
-                .next()
-                .unwrap_or("")
-                .trim()
-                .to_ascii_lowercase();
-            match tag.as_str() {
-                "zh-tw" | "zh-hk" | "zh-mo" | "zh-hant" => return Self::ZhTw,
-                _ if tag.starts_with("zh-hant") => return Self::ZhTw,
-                _ if tag == "zh" || tag.starts_with("zh-") => return Self::ZhCn,
-                _ if tag == "en" || tag.starts_with("en-") => return Self::En,
-                _ => {}
-            }
-        }
-        Self::En
-    }
-
-    const fn code(self) -> &'static str {
-        match self {
-            Self::En => "en",
-            Self::ZhTw => "zh-TW",
-            Self::ZhCn => "zh-CN",
-        }
-    }
-}
 
 /// Why a sign-in could not finish.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,48 +101,6 @@ impl Elevated {
     }
 }
 
-fn html(status: StatusCode, lang: Lang, attributes: &str, script: bool, body: &str) -> Response {
-    let script = if script {
-        r#"<script src="/auth/elevated.js"></script>"#
-    } else {
-        ""
-    };
-    let page = format!(
-        "<!doctype html><html lang=\"{}\"{attributes}><head><meta charset=\"utf-8\">\
-<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Zeabur</title>\
-{script}</head><body>{body}</body></html>",
-        lang.code()
-    );
-    let mut response = Response::new(Body::from(page));
-    *response.status_mut() = status;
-    let headers = response.headers_mut();
-    headers.insert(
-        header::CONTENT_TYPE,
-        HeaderValue::from_static("text/html; charset=utf-8"),
-    );
-    secure(headers);
-    headers.insert(
-        header::CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static(CSP),
-    );
-    response
-}
-
-/// Headers every answer of the sign-in routes carries: not stored, not framed, not sniffed, and
-/// no `Referer` (the issuer's answer carries a code in the address).
-pub(crate) fn secure(headers: &mut HeaderMap) {
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    headers.insert(
-        header::REFERRER_POLICY,
-        HeaderValue::from_static("no-referrer"),
-    );
-    headers.insert(
-        header::X_CONTENT_TYPE_OPTIONS,
-        HeaderValue::from_static("nosniff"),
-    );
-    headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
-}
-
 /// The page for a sign-in that could not finish, with a link to start again.
 pub(crate) fn sign_in_problem(request: &HeaderMap, problem: SignInProblem) -> Response {
     let lang = Lang::of(request);
@@ -201,7 +113,7 @@ pub(crate) fn sign_in_problem(request: &HeaderMap, problem: SignInProblem) -> Re
         problem.status(),
         lang,
         "",
-        false,
+        None,
         &format!(
             "<p>{}</p><p><a href=\"/auth/login\">{again}</a></p>",
             problem.text(lang)
@@ -222,7 +134,7 @@ pub(crate) fn elevated(request: &HeaderMap, outcome: &Elevated) -> Response {
         StatusCode::OK,
         lang,
         &format!(" data-result=\"{}\"{until}", outcome.result()),
-        true,
+        Some("/auth/elevated.js"),
         &format!("<p>{}</p>", outcome.text(lang)),
     )
 }
@@ -237,35 +149,4 @@ pub(crate) fn script() -> Response {
     );
     secure(headers);
     response
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn accept(value: &'static str) -> HeaderMap {
-        let mut headers = HeaderMap::new();
-        headers.insert(header::ACCEPT_LANGUAGE, HeaderValue::from_static(value));
-        headers
-    }
-
-    #[test]
-    fn the_language_follows_accept_language() {
-        assert_eq!(Lang::of(&HeaderMap::new()), Lang::En);
-        assert_eq!(Lang::of(&accept("zh-TW,zh;q=0.9,en;q=0.8")), Lang::ZhTw);
-        assert_eq!(Lang::of(&accept("zh-Hant-HK")), Lang::ZhTw);
-        assert_eq!(Lang::of(&accept("zh-CN")), Lang::ZhCn);
-        assert_eq!(Lang::of(&accept("fr, zh;q=0.5")), Lang::ZhCn);
-        assert_eq!(Lang::of(&accept("en-GB, zh-TW")), Lang::En);
-    }
-
-    #[test]
-    fn pages_run_no_inline_script_and_cannot_be_framed() {
-        let page = elevated(&HeaderMap::new(), &Elevated::NotAllowed);
-        let headers = page.headers();
-        assert_eq!(headers[header::CONTENT_SECURITY_POLICY], CSP);
-        assert_eq!(headers[header::CACHE_CONTROL], "no-store");
-        assert_eq!(headers[header::X_FRAME_OPTIONS], "DENY");
-        assert!(!CSP.contains("unsafe"));
-    }
 }

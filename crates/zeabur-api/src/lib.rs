@@ -132,6 +132,7 @@ pub mod incidents;
 pub mod local;
 pub mod members;
 pub mod notifications;
+pub mod page;
 pub mod plan_token;
 pub mod pods;
 pub mod projects;

@@ -14,8 +14,8 @@ use zeabur_installer_host::preflight::{self, Status};
 use zeabur_installer_host::{archive, cloud, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::plan::{
-    self, ComponentPlan, IDENTITY_NAMESPACE, LOCAL_ISSUER, MANAGER, NAMESPACE_MANAGER, Plan,
-    ReleasePlan, Rke2Plan, SecretSource, ZEABUR_NAMESPACE,
+    self, ComponentPlan, Download, IDENTITY_NAMESPACE, IdentityPlan, LOCAL_ISSUER, MANAGER,
+    NAMESPACE_MANAGER, Plan, ReleasePlan, Rke2Plan, SecretSource, Source, ZEABUR_NAMESPACE,
 };
 use zeabur_installer_plan::rke2::{
     self, AUTHN_CONFIGMAP, AUTHN_FILE, ETCD_USER, HostFile, IMAGES_DIR, PREFIX,
@@ -28,7 +28,7 @@ use crate::{InstallError, load, out, render};
 pub(crate) const STATE_DIR: &str = "/var/lib/rancher/zeabur-installer";
 /// The `ConfigMap` recording what was installed.
 pub(crate) const STATE_CONFIGMAP: &str = "zeabur-installer";
-const UNIT: &str = "rke2-server";
+pub(crate) const UNIT: &str = "rke2-server";
 const RELOADS_METRIC: &str = "apiserver_authentication_config_controller_automatic_reloads_total";
 
 pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
@@ -92,6 +92,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
     let mut report = Vec::new();
     let mut link_issued = !first_install(&kubectl)?;
     if config.zeabur {
+        fetch_pinned(&plan)?;
         if config.access.mode == AccessMode::Local {
             local_ca(&kubectl, &plan)?;
         }
@@ -127,6 +128,20 @@ pub(crate) fn check_host(
     require_encrypted_disk: bool,
     prep: Option<&NodePrep>,
 ) -> Result<(), InstallError> {
+    if show_checks(unit, require_encrypted_disk, prep) {
+        return Err(InstallError::Message(
+            "the host is not ready; fix what failed and run apply again".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// Runs and prints the preflight checks, which only read the host. Returns whether one failed.
+pub(crate) fn show_checks(
+    unit: &str,
+    require_encrypted_disk: bool,
+    prep: Option<&NodePrep>,
+) -> bool {
     out::step("Checking the host");
     let mut checks = preflight::run(preflight::Options {
         rke2_running: systemd::is_active(unit),
@@ -144,12 +159,7 @@ pub(crate) fn check_host(
         };
         out::err(&format!("    {mark} {:<18} {}", check.name, check.detail));
     }
-    if checks.iter().any(|c| c.status == Status::Fail) {
-        return Err(InstallError::Message(
-            "the host is not ready; fix what failed and run apply again".to_owned(),
-        ));
-    }
-    Ok(())
+    checks.iter().any(|c| c.status == Status::Fail)
 }
 
 /// Installs and starts what the planned components need on this node, before RKE2 runs their pods
@@ -658,6 +668,50 @@ fn local_ca_pem(kubectl: &Kubectl, namespace: &str) -> Result<String, InstallErr
         })
 }
 
+/// Where `apply` keeps a file of a pinned release.
+fn pinned_path(download: &Download) -> PathBuf {
+    Path::new(STATE_DIR).join("downloads").join(&download.file)
+}
+
+/// The `zeabur-identityctl` that `apply` runs.
+fn identityctl_path(identity: &IdentityPlan) -> PathBuf {
+    match &identity.identityctl {
+        Source::Local(path) => PathBuf::from(path),
+        Source::Pinned(archive) => {
+            let dir = archive.file.trim_end_matches(".tar.gz");
+            Path::new(STATE_DIR)
+                .join("downloads")
+                .join(dir)
+                .join("zeabur-identityctl")
+        }
+    }
+}
+
+/// Downloads the planned files of pinned releases and checks their digests.
+fn fetch_pinned(plan: &Plan) -> Result<(), InstallError> {
+    let agent = download::agent();
+    let fetch = |d: &Download| -> Result<PathBuf, InstallError> {
+        let dest = pinned_path(d);
+        out::err(&format!("    {}", d.url));
+        download::fetch(&agent, &d.url, &dest, d.sha256.as_deref())?;
+        Ok(dest)
+    };
+    if let Some(identity) = &plan.identity
+        && let Source::Pinned(d) = &identity.identityctl
+    {
+        let archive = fetch(d)?;
+        if let Some(dir) = identityctl_path(identity).parent() {
+            archive::unpack_tar_gz(&archive, dir)?;
+        }
+    }
+    if let Some(zeabur) = &plan.zeabur
+        && let Source::Pinned(d) = &zeabur.chart
+    {
+        fetch(d)?;
+    }
+    Ok(())
+}
+
 fn identityctl(
     kubectl: &Kubectl,
     plan: &Plan,
@@ -670,7 +724,7 @@ fn identityctl(
         .ok_or_else(|| InstallError::Message("no identity in the plan".to_owned()))?;
     let kubeconfig = kubectl.kubeconfig().display().to_string();
     Ok(cmd::run_with(
-        &identity.identityctl,
+        identityctl_path(identity),
         args,
         &[
             ("KUBECONFIG", &kubeconfig),
@@ -718,7 +772,20 @@ fn identity(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError> {
     let before = reloads(kubectl);
     // RKE2 runs k3s's server, so its file is k3s's (see `EMPTY_AUTHN`).
     let config = identityctl(kubectl, plan, &["kube-config", "--distro", "k3s"], None)?.stdout;
-    // Servers that join later copy it from here.
+    if trust(kubectl, &config)? {
+        out::err("    waiting for kube-apiserver to trust Zeabur Identity (up to a few minutes)");
+        kubectl::poll(
+            Duration::from_secs(300),
+            "kube-apiserver to load Zeabur Identity's configuration",
+            || reloads(kubectl) > before,
+        )?;
+    }
+    Ok(())
+}
+
+/// Writes kube-apiserver's authentication configuration on this server and in the cluster, where
+/// the other servers copy it from (`join::sync_authn`). Returns whether this server's file changed.
+pub(crate) fn trust(kubectl: &Kubectl, config: &str) -> Result<bool, InstallError> {
     kubectl.apply_object(&json!({
         "apiVersion": "v1",
         "kind": "ConfigMap",
@@ -729,15 +796,11 @@ fn identity(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError> {
         },
         "data": {"authn.yaml": config},
     }))?;
-    if files::write(Path::new(AUTHN_FILE), 0o600, config.as_bytes())? {
-        out::err("    waiting for kube-apiserver to trust Zeabur Identity (up to a few minutes)");
-        kubectl::poll(
-            Duration::from_secs(300),
-            "kube-apiserver to load Zeabur Identity's configuration",
-            || reloads(kubectl) > before,
-        )?;
-    }
-    Ok(())
+    Ok(files::write(
+        Path::new(AUTHN_FILE),
+        0o600,
+        config.as_bytes(),
+    )?)
 }
 
 /// The sum of kube-apiserver's successful authentication-configuration reloads.
@@ -778,7 +841,14 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
         }))?;
     }
 
-    let chart = chart_content(&zeabur.chart)?;
+    let chart = match &zeabur.chart {
+        Source::Local(path) => chart_content(path)?,
+        Source::Pinned(d) => {
+            let path = pinned_path(d);
+            fs::read(&path)
+                .map_err(|e| InstallError::Message(format!("{}: {e}", path.display())))?
+        }
+    };
     let object = json!({
         "apiVersion": "helm.cattle.io/v1",
         "kind": "HelmChart",
@@ -906,9 +976,14 @@ fn setup_link(kubectl: &Kubectl, plan: &Plan) -> Result<String, InstallError> {
         &["setup-link", "--username", "admin", "--valid-for", "24h"],
         None,
     )?;
+    let program = plan
+        .identity
+        .as_ref()
+        .map_or_else(PathBuf::new, identityctl_path);
     Ok(format!(
-        "\nEnroll the first admin's passkey (works once, for 24 hours):\n  {}\nA new link: zeabur-identityctl setup-link --username admin",
-        link.stdout.trim()
+        "\nEnroll the first admin's passkey (works once, for 24 hours):\n  {}\nA new link: {} setup-link --username admin",
+        link.stdout.trim(),
+        program.display()
     ))
 }
 

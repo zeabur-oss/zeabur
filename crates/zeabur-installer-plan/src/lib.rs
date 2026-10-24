@@ -55,7 +55,11 @@ pub enum PlanError {
     /// The host's CPU architecture.
     #[error("RKE2 has no release for the {0} architecture; amd64 and arm64 are supported")]
     Arch(String),
-    /// A product has no published release yet, so its source must be named.
-    #[error("no published release is pinned yet: set sources.{0} in the configuration")]
-    Unpublished(&'static str),
+    /// This build pins no release, and `sources` does not name these keys.
+    #[error(
+        "this installer is a development build and pins no release: set {} in the configuration \
+         (docs/installer/configuration.md)",
+        .0.iter().map(|k| format!("sources.{k}")).collect::<Vec<_>>().join(", ")
+    )]
+    Unpublished(Vec<&'static str>),
 }

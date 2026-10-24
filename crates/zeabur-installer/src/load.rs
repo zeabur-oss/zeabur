@@ -82,17 +82,18 @@ pub(crate) fn config(path: &Path) -> Result<Config, InstallError> {
 
 /// Reads the catalog index: `sources.catalog`, or the pinned release checked against its digest.
 pub(crate) fn catalog(sources: &Sources) -> Result<Index, InstallError> {
-    let bytes = match (&sources.catalog, pins::CATALOG) {
+    let bytes = match (&sources.catalog, pins::PRODUCTS) {
         (Some(path), _) => {
             fs::read(path).map_err(|e| InstallError::Message(format!("{path}: {e}")))?
         }
-        (None, Some((url, sha256))) => {
+        (None, Some(products)) => {
+            let index = products.catalog.index();
             let dest = Path::new(crate::apply::STATE_DIR).join("index.json");
-            download::fetch(&download::agent(), url, &dest, Some(sha256))?;
+            download::fetch(&download::agent(), &index.url, &dest, Some(index.sha256))?;
             fs::read(&dest)
                 .map_err(|e| InstallError::Message(format!("{}: {e}", dest.display())))?
         }
-        (None, None) => return Err(PlanError::Unpublished("catalog").into()),
+        (None, None) => return Err(PlanError::Unpublished(vec!["catalog"]).into()),
     };
     Ok(Index::parse(&bytes)?)
 }
