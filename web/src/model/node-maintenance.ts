@@ -128,6 +128,10 @@ export function fates(pods: readonly DrainPod[]) {
   return { moves: of("moves"), stuck: of("stuck"), deleted: of("deleted"), stays: of("stays") }
 }
 
+/** What to run on a removed node's machine: RKE2's own uninstaller, then the installer's files. */
+export const UNINSTALL_COMMANDS =
+  "/usr/local/bin/rke2-uninstall.sh\nzeabur-installer uninstall --purge"
+
 /** What kubectl does for the same plan. */
 export function kubectlCommand(
   action: Schemas["NodeAction"],
@@ -136,5 +140,6 @@ export function kubectlCommand(
 ): string {
   if (action === "cordon") return `kubectl cordon ${node}`
   if (action === "uncordon") return `kubectl uncordon ${node}`
+  if (action === "remove") return `kubectl delete node ${node}`
   return `kubectl drain ${node} --ignore-daemonsets --delete-emptydir-data${force ? " --force" : ""}`
 }

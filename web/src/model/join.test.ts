@@ -180,9 +180,12 @@ describe("network policies after a node joins", () => {
     unreadable: [],
   } satisfies Schemas["NodePolicies"]
 
-  test("behind while a node's address is missing, current once none is", () => {
+  test("behind while a node's address is missing, stale while a removed one's stays", () => {
     expect(policiesState(policies)).toBe("behind")
-    expect(policiesState({ ...policies, behind: [] })).toBe("current")
+    const exact = [{ namespace: "zeabur", missing: [], current: true }]
+    expect(policiesState({ ...policies, policies: exact, behind: [] })).toBe("current")
+    const extra = [{ namespace: "zeabur", missing: [], current: false }]
+    expect(policiesState({ ...policies, policies: extra, behind: [] })).toBe("stale")
     expect(policiesState({ ...policies, policies: [], behind: [] })).toBe("none")
     expect(
       policiesState({

@@ -33,7 +33,7 @@ import type { Health } from "@/model/service"
 import { useIssueText } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { AddNodeButton, JoinTokens } from "@/routes/cluster/add-node"
-import { NodeMenu } from "@/routes/cluster/node-maintenance"
+import { NodeMenu, Removed } from "@/routes/cluster/node-maintenance"
 import { PoliciesBehind } from "@/routes/cluster/node-policies"
 import { Section } from "@/routes/cluster/section"
 import { Meter } from "@zeabur/design-system/components/meter"
@@ -261,6 +261,7 @@ function NodeList({
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState<Sort>("worst")
   const [all, setAll] = useState(false)
+  const [removed, setRemoved] = useState<string>()
   const large = nodes.length > LIST_AT
   const needle = query.trim().toLowerCase()
   const matching = needle
@@ -309,10 +310,12 @@ function NodeList({
               node={node}
               skew={skew.find((s) => s.node === node.name)}
               metrics={metrics}
+              onRemoved={setRemoved}
             />
           ))}
         </ul>
       )}
+      {removed ? <Removed node={removed} onClose={() => setRemoved(undefined)} /> : null}
       {large && sorted.length > ROWS_SHOWN ? (
         <div>
           <Button variant="ghost" size="sm" onClick={() => setAll(!all)} aria-expanded={all}>
@@ -364,10 +367,12 @@ function NodeRow({
   node,
   skew,
   metrics,
+  onRemoved,
 }: {
   node: NodeView
   skew?: Schemas["NodeSkew"]
   metrics: Schemas["MetricsState"]
+  onRemoved: (node: string) => void
 }) {
   const t = useT()
   const { cores, memory, percent } = useQuantityFormat()
@@ -509,7 +514,11 @@ function NodeRow({
           </p>
         ) : null}
       </div>
-      <NodeMenu node={node} className="-my-1 self-start sm:order-last sm:self-center" />
+      <NodeMenu
+        node={node}
+        className="-my-1 self-start sm:order-last sm:self-center"
+        onRemoved={onRemoved}
+      />
       <div className="grid w-full grid-cols-2 items-start gap-x-4 gap-y-3 sm:flex sm:w-auto sm:gap-x-6">
         {gauge(
           t("cluster.cpu"),

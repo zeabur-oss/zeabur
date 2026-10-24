@@ -9929,6 +9929,11 @@ components:
           items:
             $ref: "#/components/schemas/DrainPod"
           description: The pods on the node, those that move first, then by namespace and name.
+        removal:
+          oneOf:
+          - $ref: "#/components/schemas/NodeRemoval"
+            description: Whether the node can be removed; removing only.
+          - type: "null"
         roles:
           type: array
           items:
@@ -10626,6 +10631,7 @@ components:
       - cordon
       - uncordon
       - drain
+      - remove
     NodeBehind:
       type: object
       description: A node some baseline policy drops traffic from.
@@ -10791,6 +10797,32 @@ components:
           items:
             $ref: "#/components/schemas/PolicyWrite"
           description: The policies it rewrites; empty when all are current.
+    NodeRemoval:
+      type: object
+      description: Whether a node can be removed.
+      required:
+      - ready
+      - left
+      - otherServers
+      properties:
+        left:
+          type: integer
+          description: >-
+            Pods still on it that maintenance moves or deletes, those already leaving left
+            out.
+          minimum: 0
+        otherServers:
+          type: integer
+          description: Other nodes that run the control plane.
+          minimum: 0
+        ready:
+          type: boolean
+          description: The kubelet reports the node Ready.
+        refused:
+          oneOf:
+          - $ref: "#/components/schemas/RemovalRefusal"
+            description: Why apply refuses now; absent when it removes the node.
+          - type: "null"
     NodeShellApplied:
       type: object
       description: What an apply did.
@@ -14120,6 +14152,13 @@ components:
         target:
           $ref: "#/components/schemas/ObjectName"
           description: The object.
+    RemovalRefusal:
+      type: string
+      description: Why a node cannot be removed now.
+      enum:
+      - lastNode
+      - lastServer
+      - notDrained
     Replicas:
       type: object
       description: Ready and desired replicas (per node for a DaemonSet, completions for a Job).

@@ -1,4 +1,5 @@
-//! Node maintenance: stop scheduling (cordon), resume scheduling (uncordon), and maintenance.
+//! Node maintenance: stop scheduling (cordon), resume scheduling (uncordon), maintenance, and
+//! removing a node.
 //!
 //! Maintenance cordons the node and evicts what can move, as `kubectl drain --ignore-daemonsets
 //! --delete-emptydir-data` does [kubectl-drain].
@@ -34,8 +35,17 @@
 //! (`evict`, with the same token, for an hour); nothing runs on the server between passes. A
 //! person who leaves leaves the node cordoned, and a new plan shows what is still on it.
 //!
+//! # Removing a node
+//!
+//! Removing deletes the Node object, as `kubectl delete node` does after a drain; the machine
+//! itself is taken out on the machine (the installer's `rke2-uninstall.sh`). Apply refuses while
+//! the node is Ready and takes new pods or still runs pods that maintenance moves (a pod whose
+//! volume stays on the node goes with it), when it is the last node, and
+//! when it is the last control-plane node. A node that is not Ready can be removed with its pods
+//! on it: kube-controller-manager's pod garbage collector then deletes them, budgets or not.
+//!
 //! Everything is read and written as the person: RBAC decides whether they may patch the node
-//! (`patch nodes`) and evict pods (`create pods/eviction`).
+//! (`patch nodes`), evict pods (`create pods/eviction`) and delete the node (`delete nodes`).
 //!
 //! [kubectl-drain]: https://kubernetes.io/docs/reference/kubectl/generated/kubectl_drain/
 
@@ -59,7 +69,7 @@ use zeabur_model::ProjectDetails;
 
 use crate::cluster::WIDE_LIMIT;
 use crate::cluster::capacity::{Amount, spec_amounts};
-use crate::error::{ApiError, get_read, read_problem};
+use crate::error::{ApiError, get_read, list_read, read_problem};
 use crate::handlers::{AppState, Everyday, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::projects::writes::preview::node_room;
@@ -86,6 +96,8 @@ pub enum NodeAction {
     Uncordon,
     /// Cordon it, then evict the pods that can move.
     Drain,
+    /// Delete the Node object.
+    Remove,
 }
 
 /// The action to plan.
@@ -196,6 +208,34 @@ pub struct DrainCapacity {
     pub unplaced: Vec<String>,
 }
 
+/// Why a node cannot be removed now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum RemovalRefusal {
+    /// It is the only node.
+    LastNode,
+    /// It is the only node running the control plane.
+    LastServer,
+    /// It is Ready and still takes new pods or runs pods that maintenance moves: put it in
+    /// maintenance first. Pods whose volume stays on the node do not count: they go with it.
+    NotDrained,
+}
+
+/// Whether a node can be removed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeRemoval {
+    /// The kubelet reports the node Ready.
+    pub ready: bool,
+    /// Pods still on it that maintenance moves or deletes, those already leaving left out.
+    pub left: usize,
+    /// Other nodes that run the control plane.
+    pub other_servers: usize,
+    /// Why apply refuses now; absent when it removes the node.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refused: Option<RemovalRefusal>,
+}
+
 /// What a plan changes, and the token that applies it.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -221,6 +261,9 @@ pub struct MaintenancePlan {
     /// Whether the moving pods fit elsewhere; maintenance only.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capacity: Option<DrainCapacity>,
+    /// Whether the node can be removed; removing only.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub removal: Option<NodeRemoval>,
     /// Reads that were refused and what they leave unchecked (`persistentvolumes`,
     /// `poddisruptionbudgets.policy`, `pods`).
     pub unreadable: Vec<UnreadableView>,
@@ -337,6 +380,42 @@ fn is_ready(node: &Node) -> bool {
         .as_ref()
         .and_then(|s| s.conditions.as_ref())
         .is_some_and(|c| c.iter().any(|c| c.type_ == "Ready" && c.status == "True"))
+}
+
+fn is_control_plane(node: &Node) -> bool {
+    crate::cluster::roles(node.metadata.labels.as_ref())
+        .iter()
+        .any(|role| matches!(role.as_str(), "control-plane" | "etcd"))
+}
+
+/// Whether `node`, with `pods` on it as [`classify`] sees them, can be removed while `others` are
+/// the cluster's other nodes.
+fn removal(node: &Node, pods: &[DrainPod], others: &[Node]) -> NodeRemoval {
+    let ready = is_ready(node);
+    let left = pods
+        .iter()
+        .filter(|p| p.fate != PodFate::Stays && !p.terminating)
+        .count();
+    let movable = pods
+        .iter()
+        .filter(|p| matches!(p.fate, PodFate::Moves | PodFate::Deleted) && !p.terminating)
+        .count();
+    let other_servers = others.iter().filter(|n| is_control_plane(n)).count();
+    let refused = if others.is_empty() {
+        Some(RemovalRefusal::LastNode)
+    } else if is_control_plane(node) && other_servers == 0 {
+        Some(RemovalRefusal::LastServer)
+    } else if ready && (!is_cordoned(node) || movable > 0) {
+        Some(RemovalRefusal::NotDrained)
+    } else {
+        None
+    };
+    NodeRemoval {
+        ready,
+        left,
+        other_servers,
+        refused,
+    }
 }
 
 fn is_finished(pod: &Pod) -> bool {
@@ -706,7 +785,7 @@ async fn read_pods(cluster: &dyn Cluster, node: &str) -> Result<Vec<Pod>, ApiErr
         read_problem(
             e,
             &format!("the pods on {node}"),
-            crate::error::list_read("", "pods", None),
+            list_read("", "pods", None),
         )
     })
 }
@@ -809,7 +888,12 @@ pub(crate) async fn plan(
     let classified = classify(&node, &pods, &context);
     let (nodes, cluster_pods) =
         futures_util::join!(cluster.list::<Node>(None), cluster.cluster_pods(WIDE_LIMIT));
-    let others: Vec<Node> = readable(nodes, "nodes", &mut unreadable)?
+    let nodes = if request.action == NodeAction::Remove {
+        Some(nodes.map_err(|e| read_problem(e, "the nodes", list_read("", "nodes", None)))?)
+    } else {
+        readable(nodes, "nodes", &mut unreadable)?
+    };
+    let others: Vec<Node> = nodes
         .unwrap_or_default()
         .into_iter()
         .filter(|n| n.metadata.name.as_deref() != Some(name.as_str()))
@@ -818,6 +902,8 @@ pub(crate) async fn plan(
         .iter()
         .filter(|n| is_ready(n) && !is_cordoned(n))
         .count();
+    let removal =
+        (request.action == NodeAction::Remove).then(|| removal(&node, &classified, &others));
     let capacity = (request.action == NodeAction::Drain).then(|| {
         let moving: Vec<&DrainPod> = classified
             .iter()
@@ -884,6 +970,7 @@ pub(crate) async fn plan(
         zeabur_here: classified.iter().any(|p| p.zeabur),
         pods: classified,
         capacity,
+        removal,
         unreadable,
     }))
 }
@@ -980,6 +1067,68 @@ async fn opened(
     Ok((claims, node))
 }
 
+/// Deletes `node` once [`removal`] allows it, read again now.
+async fn remove(
+    cluster: &dyn Cluster,
+    name: &str,
+    node: &Node,
+    zeabur_namespace: Option<&str>,
+) -> Result<(), ApiError> {
+    let pods = read_pods(cluster, name).await?;
+    let mut unreadable = Vec::new();
+    let context = context(cluster, &pods, zeabur_namespace, &mut unreadable).await?;
+    let others: Vec<Node> = cluster
+        .list::<Node>(None)
+        .await
+        .map_err(|e| read_problem(e, "the nodes", list_read("", "nodes", None)))?
+        .into_iter()
+        .filter(|n| n.metadata.name.as_deref() != Some(name))
+        .collect();
+    let refused = removal(node, &classify(node, &pods, &context), &others).refused;
+    let problem = |detail: String| Err(ApiError::from(Problem::new(Kind::Conflict, detail)));
+    match refused {
+        Some(RemovalRefusal::LastNode) => {
+            return problem(format!("{name} is the cluster's only node."));
+        }
+        Some(RemovalRefusal::LastServer) => {
+            return problem(format!(
+                "{name} is the only node that runs the control plane."
+            ));
+        }
+        Some(RemovalRefusal::NotDrained) => {
+            return problem(format!(
+                "{name} is Ready and still runs replicas. Put it in maintenance first."
+            ));
+        }
+        None => {}
+    }
+    for dry_run in [true, false] {
+        let write = WriteRequest {
+            target: node_target(name),
+            body: WriteBody::Delete(Preconditions {
+                uid: node.metadata.uid.clone(),
+                resource_version: None,
+                grace_period_seconds: None,
+            }),
+            dry_run,
+        };
+        cluster.write(&write).await.map_err(|error| {
+            read_problem(
+                error,
+                &format!("the node {name}"),
+                Denied {
+                    verb: "delete".to_owned(),
+                    group: String::new(),
+                    resource: "nodes".to_owned(),
+                    name: Some(name.to_owned()),
+                    namespace: None,
+                },
+            )
+        })?;
+    }
+    Ok(())
+}
+
 /// The pods of `claims` a pass evicts.
 fn chosen(claims: &Claims, request: &MaintenanceApply) -> Vec<Planned> {
     claims
@@ -1021,6 +1170,21 @@ pub(crate) async fn apply(
         |c| c.expires_at,
     )
     .await?;
+    if claims.action == NodeAction::Remove {
+        remove(
+            cluster.as_ref(),
+            &name,
+            &node,
+            state.settings.namespace.as_deref(),
+        )
+        .await?;
+        return Ok(Json(DrainProgress {
+            cordoned: true,
+            pods: Vec::new(),
+            remaining: 0,
+            done: true,
+        }));
+    }
     let cordon = claims.action != NodeAction::Uncordon;
     if let Some(patch) = unschedulable_patch(&node, cordon) {
         patch_node(cluster.as_ref(), &name, patch).await?;
@@ -1797,6 +1961,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn removing_a_drained_node_deletes_it_and_a_busy_one_is_refused() {
+        let web = pod(
+            "shop",
+            "web-1",
+            Some(("ReplicaSet", "web-7c9d8")),
+            &json!({}),
+        );
+        let busy = cluster(vec![web]);
+        let node = read_node(&busy, "vps-3").await.unwrap();
+        let refused = remove(&busy, "vps-3", &node, None).await.unwrap_err();
+        assert_eq!(refused.0.status, 409);
+
+        let drained = cluster(Vec::new());
+        remove(&drained, "vps-3", &node, None).await.unwrap();
+        assert!(read_node(&drained, "vps-3").await.is_err());
+    }
+
+    #[tokio::test]
     async fn a_refused_eviction_is_reported_as_refused() {
         let web = pod(
             "shop",
@@ -1814,6 +1996,58 @@ mod tests {
             Some(EvictOutcome::Refused)
         );
         assert!(!progress.done);
+    }
+
+    #[test]
+    fn a_node_is_removed_only_once_drained_or_down_and_never_the_last() {
+        let server = |name: &str| {
+            let mut n = node(name);
+            n.metadata.labels.get_or_insert_default().insert(
+                "node-role.kubernetes.io/control-plane".to_owned(),
+                "true".to_owned(),
+            );
+            n
+        };
+        let mut worker = node("vps-3");
+        let others = [server("vps-1")];
+        let web = moving("web-1", 0, 0);
+        let refused =
+            |n: &Node, pods: &[DrainPod], others: &[Node]| removal(n, pods, others).refused;
+        assert_eq!(refused(&worker, &[], &[]), Some(RemovalRefusal::LastNode));
+        assert_eq!(
+            refused(&worker, &[], &others),
+            Some(RemovalRefusal::NotDrained),
+            "Ready and still taking pods"
+        );
+        worker.spec.get_or_insert_default().unschedulable = Some(true);
+        assert_eq!(
+            refused(&worker, std::slice::from_ref(&web), &others),
+            Some(RemovalRefusal::NotDrained)
+        );
+        let leaving = DrainPod {
+            terminating: true,
+            ..web.clone()
+        };
+        assert_eq!(refused(&worker, &[leaving], &others), None);
+        let kept = DrainPod {
+            fate: PodFate::Stuck,
+            ..web.clone()
+        };
+        assert_eq!(
+            refused(&worker, &[kept], &others),
+            None,
+            "its volume goes with the node"
+        );
+        worker.status = None;
+        assert_eq!(
+            refused(&worker, &[web], &others),
+            None,
+            "down: its pods go with it"
+        );
+        assert_eq!(
+            refused(&server("vps-2"), &[], &[node("vps-3")]),
+            Some(RemovalRefusal::LastServer)
+        );
     }
 
     #[test]

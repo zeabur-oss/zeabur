@@ -5201,6 +5201,7 @@ export interface components {
       otherSchedulable: number
       /** @description The pods on the node, those that move first, then by namespace and name. */
       pods: components["schemas"]["DrainPod"][]
+      removal?: components["schemas"]["NodeRemoval"] | null
       /** @description Its roles (`control-plane`, `etcd`). */
       roles: string[]
       /** @description Send this to `apply` to carry out exactly this plan. */
@@ -5570,7 +5571,7 @@ export interface components {
      * @description What a plan changes on a node.
      * @enum {string}
      */
-    NodeAction: "cordon" | "uncordon" | "drain"
+    NodeAction: "cordon" | "uncordon" | "drain" | "remove"
     /** @description A node some baseline policy drops traffic from. */
     NodeBehind: {
       /** @description Its addresses a policy does not let in. */
@@ -5644,6 +5645,16 @@ export interface components {
       token: string
       /** @description The policies it rewrites; empty when all are current. */
       writes: components["schemas"]["PolicyWrite"][]
+    }
+    /** @description Whether a node can be removed. */
+    NodeRemoval: {
+      /** @description Pods still on it that maintenance moves or deletes, those already leaving left out. */
+      left: number
+      /** @description Other nodes that run the control plane. */
+      otherServers: number
+      /** @description The kubelet reports the node Ready. */
+      ready: boolean
+      refused?: components["schemas"]["RemovalRefusal"] | null
     }
     /** @description What an apply did. */
     NodeShellApplied: {
@@ -7277,6 +7288,11 @@ export interface components {
       /** @description The object. */
       target: components["schemas"]["ObjectName"]
     }
+    /**
+     * @description Why a node cannot be removed now.
+     * @enum {string}
+     */
+    RemovalRefusal: "lastNode" | "lastServer" | "notDrained"
     /** @description Ready and desired replicas (per node for a DaemonSet, completions for a Job). */
     Replicas: {
       /**

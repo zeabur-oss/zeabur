@@ -84,7 +84,7 @@ export function PoliciesStep() {
           </span>
         ) : (
           <>
-            <span>{t("policies.step")}</span>
+            <span>{state === "behind" ? t("policies.step") : t("policies.stale")}</span>
             <Update policies={policies.data} />
           </>
         )}
@@ -93,19 +93,23 @@ export function PoliciesStep() {
   )
 }
 
-/** Cluster → Nodes: a line while a node's traffic is dropped by the policies. */
+/** Cluster → Nodes: a line while a node's traffic is dropped by the policies, or a removed node's
+ * is still let in. */
 export function PoliciesBehind() {
   const t = useT()
   const policies = useQuery(nodePoliciesQuery)
-  if (!policies.data || policiesState(policies.data) !== "behind") return null
+  const state = policies.data && policiesState(policies.data)
+  if (!policies.data || (state !== "behind" && state !== "stale")) return null
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 type-meta">
       <span className="flex items-center gap-2">
         <StatusDot health="warn" />
-        {t(
-          "policies.behind",
-          policies.data.behind.map((node) => node.name),
-        )}
+        {state === "behind"
+          ? t(
+              "policies.behind",
+              policies.data.behind.map((node) => node.name),
+            )
+          : t("policies.stale")}
       </span>
       <Update policies={policies.data} />
     </div>

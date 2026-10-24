@@ -520,6 +520,10 @@ impl State {
             items.retain(|o| o.metadata().name.as_deref() != Some(name));
         }
         self.dynamic.retain(|o| !is_target(o, target));
+        if target.kind == "Node" {
+            named(&mut self.nodes, &target.name);
+            return;
+        }
         let Some(objects) = self.objects.get_mut(&target.namespace) else {
             return;
         };

@@ -469,6 +469,7 @@ export const zhCN: Messages = {
   "policies.step": "让网络策略放行它的流量。",
   "policies.current": "网络策略已放行所有节点的流量。",
   "policies.behind": (names) => `网络策略还没放行 ${listZh("zh-CN", names)}。`,
+  "policies.stale": "网络策略还在放行已移除节点的地址。",
   "policies.unreadable": (command) => `Zeabur 读不到网络策略。请在服务器上运行 ${command}。`,
   "policies.cannotUpdate": (command) => `你无法在这里更新网络策略。请在服务器上运行 ${command}。`,
   "policies.planTitle": "更新网络策略",
@@ -534,6 +535,28 @@ export const zhCN: Messages = {
     "可以先关掉这个窗口。节点会保持停止调度，要迁走剩下的副本时，再打开维护模式即可。",
   "maint.retry": "再试一次",
   "maint.unreadable": "有些数据无法读取，这份计划可能没算到中断预算，或存在这个节点本地的卷。",
+  "maint.remove": "移除节点",
+  "maint.removeNext": "移除节点",
+  "maint.title.remove": (node) => `移除 ${node}`,
+  "maint.lead.remove": (node) => `${node} 会离开集群。机器本身会继续运行，直到你在上面卸载 RKE2。`,
+  "maint.removal.lastNode": (node) =>
+    `${node} 是集群唯一的节点。如果要拆掉整个集群，请在机器上卸载 RKE2。`,
+  "maint.removal.lastServer": (node) => `${node} 是唯一运行控制平面的节点。请先加入另一台服务器。`,
+  "maint.removal.notDrained": (node) =>
+    `请先让 ${node} 进入维护模式，把副本迁到其他节点，再移除它。`,
+  "maint.removal.drainFirst": "开始维护",
+  "maint.removal.down": (node, n) =>
+    `${node} 没有就绪，上面还有 ${n} 个副本。Kubernetes 会随节点删除它们，它们的服务会在其他节点重新启动。`,
+  "maint.removal.lose": (n, node) =>
+    `有 ${n} 个副本把数据放在 ${node} 的卷里，这些数据会随节点一起消失。`,
+  "maint.removal.loseConfirm": "连同节点删除这些数据",
+  "maint.removal.servers": (n) =>
+    `移除后剩 ${n} 台服务器运行控制平面。要有三台以上，少一台时控制平面才能继续运行。`,
+  "maint.removed": (node) => `${node} 已从集群移除。`,
+  "maint.removed.run": (node) =>
+    `在 ${node} 上运行这些命令，卸载 RKE2 和安装程序的文件。运行之前，RKE2 一重启，它就会再次加入集群。`,
+  "maint.removed.commands": (node) => `要在 ${node} 上运行的命令`,
+  "maint.removed.volumes": "/var/lib/zeabur/storage 下的卷会留在机器上，不再需要时请手动删除。",
   "warning.join.sameRegion":
     "所有节点都要在同一家云服务商的同一个区域。同一区域内的不同可用区没有问题；跨服务商或跨区域时，延迟会拖慢 etcd、Kubernetes API 和存储，甚至让集群不稳定。",
   "warning.join.ports":

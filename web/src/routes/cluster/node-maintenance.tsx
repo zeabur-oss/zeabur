@@ -1,11 +1,12 @@
-// A node's menu: stop scheduling, maintenance mode, resume scheduling. Each opens a plan the person
-// reviews; maintenance then moves replicas off in passes while the dialog stays open.
+// A node's menu: stop scheduling, maintenance mode, resume scheduling, remove. Each opens a plan the
+// person reviews; maintenance then moves replicas off in passes while the dialog stays open.
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useEffect, useId, useRef, useState, type ComponentType, type ReactNode } from "react"
 import DotsThreeIcon from "~icons/ph/dots-three"
 import InfoIcon from "~icons/ph/info-fill"
 import PauseCircleIcon from "~icons/ph/pause-circle"
 import PlayCircleIcon from "~icons/ph/play-circle"
+import TrashIcon from "~icons/ph/trash"
 import WarningIcon from "~icons/ph/warning-fill"
 import WrenchIcon from "~icons/ph/wrench"
 
@@ -13,6 +14,7 @@ import type { Schemas } from "@/api/client"
 import {
   applyNodeMaintenance,
   evictNodePods,
+  nodePoliciesQuery,
   nodesQuery,
   planNodeMaintenance,
   queryClient,
@@ -24,6 +26,7 @@ import { LoadingRows } from "@/components/page"
 import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
+import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
@@ -35,6 +38,7 @@ import {
   kubectlCommand,
   sleep,
   type PodGroup,
+  UNINSTALL_COMMANDS,
   zeaburLeaving,
 } from "@/model/node-maintenance"
 import type { Health } from "@/model/service"
@@ -60,11 +64,21 @@ interface Item {
   action: NodeAction
 }
 
-/** The actions on a node, for those who may change nodes; nothing for anyone else. */
-export function NodeMenu({ node, className }: { node: NodeView; className?: string }) {
+/** The actions on a node, for those who may change nodes; nothing for anyone else. The row goes
+ * once the node is removed, so `onRemoved` shows what to do next outside it. */
+export function NodeMenu({
+  node,
+  className,
+  onRemoved,
+}: {
+  node: NodeView
+  className?: string
+  onRemoved: (node: string) => void
+}) {
   const t = useT()
   const gate = useClusterGate("changeNodes")
-  const [open, setOpen] = useState<NodeAction>()
+  // `removing`: maintenance was opened on the way to removing the node.
+  const [open, setOpen] = useState<{ action: NodeAction; removing?: boolean }>()
   if (!gate.open) return null
   const left = node.cordoned && cordonedKind(node) !== "maintenance"
   const items: Item[] = [
@@ -98,6 +112,7 @@ export function NodeMenu({ node, className }: { node: NodeView; className?: stri
           },
         ]
       : []),
+    { key: "remove", icon: TrashIcon, label: t("maint.remove"), action: "remove" },
   ]
   return (
     <div className={className}>
@@ -111,7 +126,7 @@ export function NodeMenu({ node, className }: { node: NodeView; className?: stri
         </MenuTrigger>
         <MenuContent align="end">
           {items.map(({ key, icon: Icon, label, action }) => (
-            <MenuItem key={key} onClick={() => setOpen(action)}>
+            <MenuItem key={key} onClick={() => setOpen({ action })}>
               <Icon aria-hidden="true" />
               {label}
             </MenuItem>
@@ -119,7 +134,20 @@ export function NodeMenu({ node, className }: { node: NodeView; className?: stri
         </MenuContent>
       </Menu>
       {open ? (
-        <MaintenanceDialog node={node.name} action={open} onClose={() => setOpen(undefined)} />
+        <MaintenanceDialog
+          key={open.action}
+          node={node.name}
+          action={open.action}
+          removing={open.removing}
+          onAction={(action) =>
+            setOpen({ action, removing: open.removing || open.action === "remove" })
+          }
+          onRemoved={() => {
+            setOpen(undefined)
+            onRemoved(node.name)
+          }}
+          onClose={() => setOpen(undefined)}
+        />
       ) : null}
     </div>
   )
@@ -128,10 +156,16 @@ export function NodeMenu({ node, className }: { node: NodeView; className?: stri
 function MaintenanceDialog({
   node,
   action,
+  removing,
+  onAction,
+  onRemoved,
   onClose,
 }: {
   node: string
   action: NodeAction
+  removing?: boolean
+  onAction: (action: NodeAction) => void
+  onRemoved: () => void
   onClose: () => void
 }) {
   const t = useT()
@@ -144,6 +178,7 @@ function MaintenanceDialog({
   })
   const [includeStuck, setIncludeStuck] = useState(false)
   const [includeDeleted, setIncludeDeleted] = useState(false)
+  const [loseData, setLoseData] = useState(false)
   const [progress, setProgress] = useState<DrainProgress>()
   const [running, setRunning] = useState(false)
   const [passError, setPassError] = useState<unknown>()
@@ -178,6 +213,7 @@ function MaintenanceDialog({
   const apply = useMutation({
     mutationFn: (token: string) => applyNodeMaintenance(node, choice(token)),
     onSuccess: (first, token) => {
+      if (action === "remove") return onRemoved()
       refresh()
       if (action !== "drain") return onClose()
       setProgress(first)
@@ -198,7 +234,10 @@ function MaintenanceDialog({
   const expired = left !== undefined && left <= 0
   const ready = plan.data && !plan.isFetching
   const split = fates(plan.data?.pods ?? [])
-  const confirmNeeded = action === "drain" && split.deleted.length > 0 && !includeDeleted
+  const confirmNeeded =
+    (action === "drain" && split.deleted.length > 0 && !includeDeleted) ||
+    (action === "remove" && split.stuck.length > 0 && !loseData)
+  const refused = plan.data?.removal?.refused
   const title = t(`maint.title.${action}`, node)
 
   if (progress && plan.data)
@@ -219,10 +258,19 @@ function MaintenanceDialog({
                 {t("maint.retry")}
               </Button>
             ) : null}
-            <span className="ml-auto">
-              <Button size="sm" variant={progress.done ? "default" : "ghost"} onClick={onClose}>
+            <span className="ml-auto flex gap-2">
+              <Button
+                size="sm"
+                variant={progress.done && !removing ? "default" : "ghost"}
+                onClick={onClose}
+              >
                 {t("common.close")}
               </Button>
+              {removing && progress.done ? (
+                <Button size="sm" onClick={() => onAction("remove")}>
+                  {t("maint.removeNext")}
+                </Button>
+              ) : null}
             </span>
           </div>
         }
@@ -258,14 +306,18 @@ function MaintenanceDialog({
               <Button size="sm" onClick={() => void plan.refetch()}>
                 {t("plan.replan")}
               </Button>
-            ) : (
+            ) : refused === "notDrained" ? (
+              <Button size="sm" onClick={() => onAction("drain")}>
+                {t("maint.removal.drainFirst")}
+              </Button>
+            ) : refused ? null : (
               <Button
                 size="sm"
                 disabled={!ready || confirmNeeded}
                 loading={apply.isPending}
                 onClick={() => plan.data && apply.mutate(plan.data.token)}
               >
-                {t("plan.apply")}
+                {action === "remove" ? t("maint.remove") : t("plan.apply")}
               </Button>
             )}
           </span>
@@ -284,6 +336,8 @@ function MaintenanceDialog({
           includeDeleted={includeDeleted}
           onIncludeDeleted={setIncludeDeleted}
         />
+      ) : action === "remove" ? (
+        <RemovePlan plan={plan.data} loseData={loseData} onLoseData={setLoseData} />
       ) : (
         <>
           <p>{t(`maint.lead.${action}`, node)}</p>
@@ -291,6 +345,87 @@ function MaintenanceDialog({
         </>
       )}
       {apply.isError ? <Problem error={apply.error} /> : null}
+    </Frame>
+  )
+}
+
+function RemovePlan({
+  plan,
+  loseData,
+  onLoseData,
+}: {
+  plan: MaintenancePlan
+  loseData: boolean
+  onLoseData: (value: boolean) => void
+}) {
+  const t = useT()
+  const loseId = useId()
+  const node = plan.node
+  const removal = plan.removal
+  if (!removal) return null
+  const lost = fates(plan.pods).stuck.length
+  const control = plan.roles.some((role) => ["control-plane", "master", "etcd"].includes(role))
+  return (
+    <>
+      {removal.refused === "lastNode" ? (
+        <Note variant="destructive">{t("maint.removal.lastNode", node)}</Note>
+      ) : removal.refused === "lastServer" ? (
+        <Note variant="destructive">{t("maint.removal.lastServer", node)}</Note>
+      ) : removal.refused === "notDrained" ? (
+        <p>{t("maint.removal.notDrained", node)}</p>
+      ) : (
+        <>
+          <p>{t("maint.lead.remove", node)}</p>
+          {!removal.ready && removal.left > 0 ? (
+            <Note variant="warn">{t("maint.removal.down", node, removal.left)}</Note>
+          ) : null}
+          {lost > 0 ? (
+            <Group
+              health="fail"
+              title={t("maint.removal.lose", lost, node)}
+              groups={byProject(fates(plan.pods).stuck)}
+            >
+              <Choice id={loseId} checked={loseData} onChange={onLoseData}>
+                {t("maint.removal.loseConfirm")}
+              </Choice>
+            </Group>
+          ) : null}
+          {control && removal.otherServers < 3 ? (
+            <Note variant="warn">{t("maint.removal.servers", removal.otherServers)}</Note>
+          ) : null}
+        </>
+      )}
+      <KubeDetails facts={[[t("maint.kube.command"), kubectlCommand("remove", node, false)]]} />
+    </>
+  )
+}
+
+/** After a node is removed: what to run on its machine. */
+export function Removed({ node, onClose }: { node: string; onClose: () => void }) {
+  const t = useT()
+  useEffect(() => {
+    refresh()
+    void queryClient.invalidateQueries({ queryKey: nodePoliciesQuery.queryKey })
+  }, [])
+  return (
+    <Frame
+      title={t("maint.title.remove", node)}
+      onClose={onClose}
+      footer={
+        <span className="ml-auto">
+          <Button size="sm" onClick={onClose}>
+            {t("common.close")}
+          </Button>
+        </span>
+      }
+    >
+      <p className="flex items-center gap-2" role="status">
+        <StatusDot health="ok" />
+        {t("maint.removed", node)}
+      </p>
+      <p>{t("maint.removed.run", node)}</p>
+      <YamlBlock yaml={UNINSTALL_COMMANDS} label={t("maint.removed.commands", node)} />
+      <p className="type-meta text-muted-foreground">{t("maint.removed.volumes")}</p>
     </Frame>
   )
 }

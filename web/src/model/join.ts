@@ -161,10 +161,12 @@ export const SYNC_COMMAND = "zeabur-installer node sync"
 /** Whether the installer's network policies let every node in: `none` on a cluster without them. */
 export function policiesState(
   policies: NodePolicies,
-): "unreadable" | "none" | "behind" | "current" {
+): "unreadable" | "none" | "behind" | "stale" | "current" {
   if (policies.unreadable.length > 0) return "unreadable"
   if (policies.policies.length === 0) return "none"
-  return policies.behind.length > 0 ? "behind" : "current"
+  if (policies.behind.length > 0) return "behind"
+  // Every node is let in, but a policy still lets in a removed node's addresses.
+  return policies.policies.some((policy) => !policy.current) ? "stale" : "current"
 }
 
 /** The ports plan checks on the server for a worker, besides 9345. */

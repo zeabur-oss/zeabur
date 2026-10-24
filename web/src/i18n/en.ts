@@ -499,6 +499,7 @@ export const en = {
   "policies.current": "The network policies let every node's traffic through.",
   "policies.behind": (names: string[]) =>
     `The network policies do not let ${new Intl.ListFormat("en").format(names)} in yet.`,
+  "policies.stale": "The network policies still let in the addresses of a removed node.",
   "policies.unreadable": (command: string) =>
     `Zeabur cannot read the network policies. On a server, run ${command}.`,
   "policies.cannotUpdate": (command: string) =>
@@ -576,6 +577,31 @@ export const en = {
   "maint.retry": "Try again",
   "maint.unreadable":
     "Some reads were refused, so this plan may miss disruption budgets or volumes that stay on this node.",
+  "maint.remove": "Remove node",
+  "maint.removeNext": "Remove node",
+  "maint.title.remove": (node: string) => `Remove ${node}`,
+  "maint.lead.remove": (node: string) =>
+    `${node} leaves the cluster. The machine keeps running until you uninstall RKE2 on it.`,
+  "maint.removal.lastNode": (node: string) =>
+    `${node} is the cluster's only node. To take down the whole cluster, uninstall RKE2 on the machine.`,
+  "maint.removal.lastServer": (node: string) =>
+    `${node} is the only node that runs the control plane. Add another server first.`,
+  "maint.removal.notDrained": (node: string) =>
+    `Put ${node} in maintenance first, so its replicas move to other nodes. Then remove it.`,
+  "maint.removal.drainFirst": "Start maintenance",
+  "maint.removal.down": (node: string, n: number) =>
+    `${node} is not Ready. ${n === 1 ? "1 replica is" : `${n} replicas are`} still on it; Kubernetes deletes them with the node, and their services start them on other nodes.`,
+  "maint.removal.lose": (n: number, node: string) =>
+    `${n === 1 ? "1 replica keeps its" : `${n} replicas keep their`} data on a volume on ${node}. The data goes with the node.`,
+  "maint.removal.loseConfirm": "Delete this data with the node",
+  "maint.removal.servers": (n: number) =>
+    `After this, ${n === 1 ? "1 server runs" : `${n} servers run`} the control plane. It keeps running when a server goes down only with three or more.`,
+  "maint.removed": (node: string) => `${node} is removed from the cluster.`,
+  "maint.removed.run": (node: string) =>
+    `Run these on ${node} to uninstall RKE2 and the installer's files. Until then, it joins the cluster again when RKE2 restarts.`,
+  "maint.removed.commands": (node: string) => `Commands to run on ${node}`,
+  "maint.removed.volumes":
+    "Volumes under /var/lib/zeabur/storage stay on the machine. Delete them by hand once you no longer need them.",
   "warning.join.sameRegion":
     "Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.",
   "warning.join.ports":
