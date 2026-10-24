@@ -13,7 +13,8 @@
 #
 # Zeabur Identity is built from ZEABUR_IDENTITY_SRC (default: ../identity next to this checkout) at the commit in
 # ZEABUR_IDENTITY_PINNED; the script refuses a checkout whose HEAD is another commit. K3S_IMAGE picks the
-# k3s release (default as in CI).
+# k3s release (default as in CI). ZEABUR_REGISTRY_MIRRORS (`docker.io=http://mirror:5001,ghcr.io=...`)
+# makes the cluster pull through those mirrors.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -109,10 +110,22 @@ docker volume rm -f "$authn_volume" >/dev/null
 docker volume create "$authn_volume" >/dev/null
 printf 'apiVersion: apiserver.config.k8s.io/v1\nkind: AuthenticationConfiguration\nanonymous:\n  enabled: false\njwt: []\n' |
   docker run --rm -i -v "$authn_volume:/authn" busybox:1.37 sh -c 'cat >/authn/authn.yaml'
+registry_args=()
+if [[ -n "${ZEABUR_REGISTRY_MIRRORS:-}" ]]; then
+  IFS=, read -ra mirrors <<<"$ZEABUR_REGISTRY_MIRRORS"
+  {
+    echo "mirrors:"
+    for mirror in "${mirrors[@]}"; do
+      [[ "$mirror" == ?*=?* ]] || { echo "error: ZEABUR_REGISTRY_MIRRORS: want registry=endpoint, got $mirror" >&2; exit 1; }
+      printf '  "%s":\n    endpoint: ["%s"]\n' "${mirror%%=*}" "${mirror#*=}"
+    done
+  } >"$out/registries.yaml"
+  registry_args=(--registry-config "$out/registries.yaml")
+fi
 # No k3d load balancer, so the port maps straight onto the server node (`direct`, see
 # https://k3d.io/stable/usage/exposing_services/).
 k3d cluster create "$cluster" --image "$k3s_image" --no-lb --wait --timeout 300s \
-  --kubeconfig-update-default=false \
+  --kubeconfig-update-default=false "${registry_args[@]}" \
   --volume "$authn_volume:/etc/rancher/k3s/zeabur-identity@server:0" \
   --k3s-arg "--kube-apiserver-arg=authentication-config=/etc/rancher/k3s/zeabur-identity/authn.yaml@server:0" \
   --port "443:443@server:0:direct"
