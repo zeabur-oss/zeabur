@@ -77,6 +77,10 @@ pub const SCHEDULE: &str = "zeabur";
 pub const CREDENTIALS: &str = "zeabur-backup-credentials";
 /// Its key.
 pub const CREDENTIALS_KEY: &str = "cloud";
+/// The Secret holding the SSE-C key of a location Zeabur creates, as the catalog names it.
+pub const BACKUP_KEY: &str = "velero-backup-key";
+/// Its key. The AWS plugin needs a value of exactly 32 bytes.
+pub const BACKUP_KEY_KEY: &str = "key";
 /// The label Velero puts on a schedule's backups.
 pub const SCHEDULE_LABEL: &str = "velero.io/schedule-name";
 const BACKUP_LABEL: &str = "velero.io/backup-name";
@@ -600,6 +604,9 @@ fn map_at<'a>(value: &'a mut Value, path: &[&str]) -> Option<&'a mut Map<String,
 
 /// The location as it will be: `current` with the request's fields, or a new default location.
 /// `credential` names the Secret with its keys, or keeps the one it names (none: Velero's own).
+/// A new location has the store encrypt every object with the key in [`BACKUP_KEY`] (SSE-C).
+/// A current location keeps its encryption: a key added later makes older objects unreadable
+/// on stores that refuse SSE-C headers for objects written without them.
 #[must_use]
 pub fn location_object(
     namespace: &str,
@@ -612,7 +619,11 @@ pub fn location_object(
             "apiVersion": API_VERSION,
             "kind": "BackupStorageLocation",
             "metadata": {"name": LOCATION, "namespace": namespace},
-            "spec": {"provider": "aws", "default": true},
+            "spec": {
+                "provider": "aws",
+                "default": true,
+                "config": {"customerKeyEncryptionSecret": format!("{BACKUP_KEY}/{BACKUP_KEY_KEY}")},
+            },
         })
     });
     let region = match request.region.trim() {
@@ -656,6 +667,18 @@ pub fn credentials_file(access_key_id: &str, secret_access_key: &str) -> String 
         access_key_id.trim(),
         secret_access_key.trim()
     )
+}
+
+/// The Secret with the SSE-C key `key` of a new location.
+#[must_use]
+pub fn backup_key_secret(namespace: &str, key: &str) -> Value {
+    json!({
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "metadata": {"name": BACKUP_KEY, "namespace": namespace},
+        "type": "Opaque",
+        "stringData": {BACKUP_KEY_KEY: key},
+    })
 }
 
 /// The Secret with the keys under `string_data`, as Zeabur writes it with `stringData`.
@@ -802,7 +825,7 @@ mod tests {
     }
 
     #[test]
-    fn a_new_location_speaks_s3_path_style_and_names_zeaburs_secret() {
+    fn a_new_location_speaks_s3_path_style_and_names_zeaburs_secrets() {
         let request = LocationRequest {
             bucket: "backups".into(),
             prefix: "/cluster/".into(),
@@ -815,7 +838,8 @@ mod tests {
             json!({"provider": "aws", "default": true,
                    "objectStorage": {"bucket": "backups", "prefix": "cluster"},
                    "config": {"region": "us-east-1", "s3Url": "https://minio.example.com",
-                              "s3ForcePathStyle": "true"},
+                              "s3ForcePathStyle": "true",
+                              "customerKeyEncryptionSecret": "velero-backup-key/key"},
                    "credential": {"name": CREDENTIALS, "key": "cloud"}})
         );
     }

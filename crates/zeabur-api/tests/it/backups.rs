@@ -126,7 +126,11 @@ mod tests {
             .collect();
         assert_eq!(
             kinds,
-            [("create", "Secret"), ("create", "BackupStorageLocation")]
+            [
+                ("create", "Secret"),
+                ("create", "Secret"),
+                ("create", "BackupStorageLocation")
+            ]
         );
         let written = stored(&cluster, "BackupStorageLocation", "default").unwrap();
         assert_eq!(
@@ -138,6 +142,15 @@ mod tests {
             written["spec"]["credential"],
             json!({"name": "zeabur-backup-credentials", "key": "cloud"})
         );
+        assert_eq!(
+            written["spec"]["config"]["customerKeyEncryptionSecret"],
+            "velero-backup-key/key"
+        );
+        let key = cluster
+            .inspect(|s| s.secret_values["velero/velero-backup-key"]["key"].clone())
+            .unwrap();
+        assert_eq!(key.len(), 32);
+        assert!(!planned.to_string().contains(&String::from_utf8(key).unwrap()));
         let keys = cluster
             .inspect(|s| s.secret_values["velero/zeabur-backup-credentials"]["cloud"].clone())
             .unwrap();
@@ -152,6 +165,27 @@ mod tests {
         assert_eq!(found["namespace"], "velero");
         assert_eq!(found["locations"][0]["bucket"], "cluster-backups");
         assert_eq!(found["locations"][0]["phase"], "unknown");
+    }
+
+    #[tokio::test]
+    async fn a_new_location_keeps_the_backup_key_that_exists() {
+        let key = object(json!({
+            "apiVersion": "v1", "kind": "Secret",
+            "metadata": {"name": "velero-backup-key", "namespace": "velero",
+                         "resourceVersion": "5"},
+        }));
+        let cluster = velero(vec![key]);
+        let app = app(&cluster);
+        let request = json!({"op": "location", "bucket": "backups", "endpoint": "http://s3:8333",
+            "accessKeyId": "AKIA1", "secretAccessKey": SECRET_KEY});
+        let (planned, _) = applied(&app, &request).await;
+        let names: Vec<&str> = planned["writes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| w["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names, ["zeabur-backup-credentials", "default"]);
     }
 
     #[tokio::test]

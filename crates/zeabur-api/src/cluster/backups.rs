@@ -17,6 +17,8 @@
 use std::collections::BTreeMap;
 
 use axum::Json;
+use base64::Engine as _;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -623,6 +625,9 @@ async fn location_writes(
         format!("BackupStorageLocation/{name}"),
         version(current.as_ref()),
     );
+    if current.is_none() {
+        writes.extend(backup_key_write(cluster, namespace, versions).await?);
+    }
     let after = v::location_object(namespace, current.as_ref(), request, keys.is_some());
     writes.extend(change(
         "BackupStorageLocation",
@@ -632,6 +637,50 @@ async fn location_writes(
         after,
     ));
     Ok(writes)
+}
+
+/// Creates the SSE-C key of a new location when it does not exist. An existing key stays, because
+/// the backups it encrypted need it.
+async fn backup_key_write(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    versions: &mut BTreeMap<String, String>,
+) -> Result<Option<Planned>, ApiError> {
+    let existing = cluster
+        .find_object(&secrets(), Some(namespace), v::BACKUP_KEY)
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("Secret {} in {namespace}", v::BACKUP_KEY),
+                get_read("", "secrets", Some(namespace), v::BACKUP_KEY),
+            )
+        })?
+        .map(|s| value(&s))
+        .transpose()?;
+    versions.insert(
+        format!("Secret/{}", v::BACKUP_KEY),
+        version(existing.as_ref()),
+    );
+    if existing.is_some() {
+        return Ok(None);
+    }
+    // 24 random bytes in base64url are the 32 bytes the AWS plugin needs.
+    let key = zeabur_core::crypto::random::<24>()
+        .map(|b| URL_SAFE_NO_PAD.encode(b))
+        .map_err(|_random| {
+            ApiError::from(Problem::new(
+                Kind::Internal,
+                "The system random number generator failed, so Zeabur could not make the backup key.",
+            ))
+        })?;
+    Ok(Some(Planned {
+        target: target("Secret", namespace, v::BACKUP_KEY),
+        body: WriteBody::Create(v::backup_key_secret(namespace, &key)),
+        action: BackupWriteAction::Create,
+        before: None,
+        shown: v::backup_key_secret(namespace, HIDDEN),
+    }))
 }
 
 /// The restore of `backup` into `namespaces`, named `made`; the backup must have finished.
