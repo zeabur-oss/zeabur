@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Cargo crates, web/ packages (bun.lock), action digests and the k3s test version. The Rust nightly and flake.lock are updated by .github/workflows/update-toolchain.yml, which also has to update the fenix hash in flake.nix.",
+  "description": "Cargo crates, web/ packages (bun.lock), action digests and the k3s test version. The Rust nightly and flake.lock are updated by .github/workflows/update-toolchain.yml, which also has to update the fenix hash in flake.nix; the pinned RKE2 release by scripts/bump-rke2.sh, which also updates its digests.",
   "extends": [
     "config:recommended",
     ":semanticCommitTypeAll(chore)",

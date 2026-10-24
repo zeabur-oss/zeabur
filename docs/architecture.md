@@ -116,6 +116,9 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 5 | [`zeabur`](../crates/zeabur), [`zeaburctl`](../crates/zeaburctl) | **binaries** |
 | 0 | [`zeabur-fixtures`](../crates/zeabur-fixtures) | loading the fixture cases (dev-dependency only) |
 | 6 | [`zeabur-test-support`](../crates/zeabur-test-support) | test helpers |
+| 0 | [`zeabur-installer-plan`](../crates/zeabur-installer-plan) | the installer's configuration, component selection and install plan; no I/O |
+| 1 | [`zeabur-installer-host`](../crates/zeabur-installer-host) | what the installer does to a host: facts, preflight, downloads, files, systemd, `kubectl` |
+| 5 | [`zeabur-installer`](../crates/zeabur-installer) | **binary**: installs RKE2, Zeabur Identity and Zeabur on a server ([guide](installer/README.md)) |
 
 Every crate has a README that is also its crate-level documentation (`cargo doc --open`).
 

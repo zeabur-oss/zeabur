@@ -92,12 +92,13 @@ compiles locally, and `cargo lint` turns every warning into an error in CI.
 - `unsafe_code` and `non_ascii_idents` are forbidden.
 - clippy `pedantic`, `cargo` and `nursery` are on.
 - A selection of `restriction` lints targets what matters in a server that handles other
-  people's credentials: no panics on input (`unwrap_used`, `expect_used`, `indexing_slicing`, …; tests may
+  people's credentials and in an installer that runs as root on someone's server: no panics on
+  input (`unwrap_used`, `expect_used`, `indexing_slicing`, …; tests may
   unwrap), exhaustive matches in security logic (`wildcard_enum_match_arm`), no silently dropped
   errors (`map_err_ignore`, `let_underscore_must_use`, …), and no unexplained suppressions:
   use `#[expect(lint, reason = "…")]`, which also fails once it is no longer needed.
-- Only the binaries' `output` modules write to stdout or stderr; everything else logs through
-  `tracing`.
+- Only the binaries' `output` modules (`out` in `zeabur-installer`) write to stdout or stderr;
+  everything else logs through `tracing`.
 
 `rustfmt.toml` groups and orders imports, wraps comments at 100 columns and fails on code it
 cannot format.
@@ -110,7 +111,8 @@ cannot format.
   [OSI](https://opensource.org/licenses)); crates come from crates.io only; no `*` versions.
 - TLS uses rustls with [aws-lc-rs](https://aws.github.io/aws-lc-rs/) as the only cryptographic
   backend. `ring`, OpenSSL, `native-tls`, the FIPS build of aws-lc and `webpki-roots` (whose
-  CDLA licence is not OSI-approved; the image ships a CA bundle instead) are banned.
+  CDLA licence is not OSI-approved; the image ships a CA bundle instead, and the installer uses
+  the system's CA store) are banned.
 - [RustSec](https://rustsec.org/) advisories and yanked versions fail the check. Every ignored
   advisory carries its reason in `deny.toml`.
 
@@ -141,7 +143,8 @@ the same delay.
 A dependency that reaches the shipped binaries and contains `unsafe` code or builds native code
 needs an entry in `supply-chain/unsafe-allowlist.toml` with a reason and the date a maintainer
 approved it. `scripts/unsafe-report.sh` scans the shipped dependency graph (normal and build
-dependencies of `zeabur` and `zeaburctl` for the image target), lists every such crate and fails
+dependencies of `zeabur`, `zeaburctl`, `zeabur-proxy` and `zeabur-installer` for the image
+target), lists every such crate and fails
 on one that is not approved; an entry marked `pending` is a proposal awaiting review. The count
 is a review signal, not an audit.
 
@@ -223,3 +226,39 @@ A release binary embeds the built interface; see the `zeabur-ui` crate documenta
 
 Motion work follows the `zeabur-ui` skill and the transitions.dev skills that `skills-lock.json`
 pins; install those with `npx skills experimental_install` (they are not kept in this repository).
+
+## Installer
+
+`zeabur-installer` installs RKE2, Zeabur Catalog components, Zeabur Identity and Zeabur on a
+Linux server ([guide](docs/installer/README.md)). It is three crates, each depending only on the
+ones above it:
+
+- `zeabur-installer-plan`: configuration, catalog, selection, values and the plan. No I/O.
+- `zeabur-installer-host`: facts, preflight, downloads, files, systemd and `kubectl`.
+- `zeabur-installer`: the command line, the steps of `apply` and the web interface.
+
+Build on Linux for the server's architecture:
+
+```sh
+nix develop
+./scripts/build-installer-ui.sh
+ZEABUR_INSTALLER_UI_DIST="$PWD/crates/zeabur-installer/web/dist" cargo build --release --locked -p zeabur-installer
+```
+
+A release build embeds the web interface and stops without `ZEABUR_INSTALLER_UI_DIST`; a debug
+build embeds a placeholder page instead. The interface is in `crates/zeabur-installer/web`, with
+its own `package.json` and the same lint and format rules as `web/`. CI does not check it yet.
+Check it by hand:
+
+```sh
+(cd crates/zeabur-installer/web && bun install && bun run fmt:check && bun run lint && bun run typecheck)
+```
+
+`crates/zeabur-installer-plan/src/pins.rs` names the RKE2 release and its SHA-256 digests.
+`scripts/bump-rke2.sh <version>` rewrites both from the release's checksum lists. Review the
+diff, and run the catalog's tests on that Kubernetes minor before you move to it.
+
+`cargo nextest run --workspace` runs the planning code against a catalog `index.json` fixture and
+the host helpers against temporary directories. To run `apply`, use a disposable Linux VM with
+systemd, 4 GB of memory and nothing else installed: RKE2 takes over the machine. Never run it on
+a machine you need.

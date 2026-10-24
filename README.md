@@ -100,10 +100,13 @@ ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeaburctl
 with your current kubeconfig context. `zeaburctl doctor` and `zeaburctl mcp` use it the same way.
 
 In a cluster, for everyone who signs in through Zeabur Identity: [Install in a cluster](docs/install.md).
+On a fresh Linux server, `zeabur-installer` installs RKE2, Zeabur Identity and Zeabur in one
+step: [Zeabur Installer](docs/installer/README.md).
 
 ## Learn more
 
 - [Install in a cluster](docs/install.md): the Helm chart, signing in through Zeabur Identity.
+- [Zeabur Installer](docs/installer/README.md): a cluster with Zeabur on it, from one Linux server.
 - [Releases](docs/releases.md): what a release contains, verifying it, publishing one.
 - [Architecture](docs/architecture.md): principles, layers, crates.
 - [Contributing](CONTRIBUTING.md): environment, checks, dependency policy, tests.

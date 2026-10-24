@@ -1,6 +1,4 @@
-//! What `zeabur-installer` does to the host: reading facts, preflight checks, verified downloads,
-//! files, systemd and `kubectl`. Each operation is small and safe to repeat, so an interrupted
-//! `apply` resumes by running again.
+#![doc = include_str!("../README.md")]
 
 pub mod archive;
 pub mod cloud;

@@ -1,9 +1,9 @@
 //! Generates the table of embedded web-interface files.
 //!
 //! The only input is the directory named by `ZEABUR_INSTALLER_UI_DIST`, which
-//! `scripts/build-installer-ui.sh` fills with the built interface, its brotli encodings and `manifest.tsv`.
-//! This script runs no JavaScript tool and makes no network request, so `cargo build` stays
-//! hermetic.
+//! `scripts/build-installer-ui.sh` fills with the built interface, its brotli encodings and
+//! `manifest.tsv`. This script runs no JavaScript tool and makes no network request, so
+//! `cargo build` stays hermetic.
 //!
 //! Without `ZEABUR_INSTALLER_UI_DIST`, a debug build embeds a one-page placeholder and a release
 //! build stops with a compile error: a release binary without its interface would be a silent
