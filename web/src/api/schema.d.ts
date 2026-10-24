@@ -2168,6 +2168,13 @@ export interface components {
       config: string
       /** @description The events it receives; empty for one Zeabur did not make. */
       events: components["schemas"]["AlertmanagerEvent"][]
+      /**
+       * @description Its settings that are not secret, by the request's field names (`chatId`, `to`, `from`,
+       *     `smarthost`, `username`); empty for one Zeabur did not make.
+       */
+      fields?: {
+        [key: string]: string
+      }
       /** @description Where it sends. */
       kind: components["schemas"]["AlertmanagerChannelKind"]
       /** @description Whether Zeabur made it, and so may change it. */
@@ -5881,6 +5888,16 @@ export interface components {
           /** @enum {string} */
           op: "add"
           /** @description Where it sends, secrets included. */
+          settings: components["schemas"]["AlertmanagerChannelSettings"]
+        }
+      | {
+          /** @description The events it receives after the change. */
+          events: components["schemas"]["AlertmanagerEvent"][]
+          /** @description The channel. */
+          name: string
+          /** @enum {string} */
+          op: "edit"
+          /** @description Its settings after the change. */
           settings: components["schemas"]["AlertmanagerChannelSettings"]
         }
       | {

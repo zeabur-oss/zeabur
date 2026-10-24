@@ -75,6 +75,9 @@ export const SECRET_FIELDS: Field[] = [
   "appToken",
 ]
 
+/** Fields kept in the channel's Secret. An edit shows them empty, and empty keeps them. */
+export const STORED_FIELDS: Field[] = [...SECRET_FIELDS, "server", "topic"]
+
 export interface ChannelForm {
   name: string
   kind: ChannelKind
@@ -86,15 +89,29 @@ export function nameProblem(name: string): boolean {
   return !/^[a-z]([a-z0-9-]*[a-z0-9])?$/.test(name) || name.length > NAME_MAX
 }
 
-/** The fields still needed, in order: required and empty, or a chat ID that is not a number. */
-export function missing(form: ChannelForm): Field[] {
+/** The fields still needed, in order: required and empty, or a chat ID that is not a number.
+ * In an edit a stored field may stay empty, but ntfy's topic is stored with its server. */
+export function missing(form: ChannelForm, editing = false): Field[] {
+  const typed = (field: Field) => (form.values[field]?.trim() ?? "") !== ""
   return FIELDS[form.kind]
     .filter(([field, optional]) => {
       const value = form.values[field]?.trim() ?? ""
       if (field === "chatId") return !/^-?\d+$/.test(value) || Number(value) === 0
+      if (editing && field === "topic") return value === "" && typed("server")
+      if (editing && STORED_FIELDS.includes(field)) return false
       return !optional && value === ""
     })
     .map(([field]) => field)
+}
+
+/** The form of a channel to edit: its shown settings, the stored ones empty. */
+export function formOf(channel: Schemas["AlertmanagerChannel"]): ChannelForm {
+  return {
+    name: channel.name,
+    kind: channel.kind as ChannelKind,
+    values: { ...channel.fields },
+    events: channel.events,
+  }
 }
 
 export function settingsOf(form: ChannelForm): Settings {

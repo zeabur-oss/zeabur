@@ -19,10 +19,12 @@
 //! plan reads. Apply reads them again, refuses when one moved, dry-runs every write, then
 //! writes. A plan's YAML never holds a secret.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use axum::Json;
 use axum::extract::{Path, State};
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -86,6 +88,16 @@ pub enum NotificationsPlanRequest {
         /// Where it sends, secrets included.
         settings: AlertmanagerChannelSettings,
     },
+    /// Change where a channel sends and which events it receives. A setting kept in the Secret
+    /// (a URL, token, password, ntfy server or topic) left empty keeps its value; the kind stays.
+    Edit {
+        /// The channel.
+        name: String,
+        /// The events it receives after the change.
+        events: Vec<AlertmanagerEvent>,
+        /// Its settings after the change.
+        settings: AlertmanagerChannelSettings,
+    },
     /// Change which events a channel receives.
     Events {
         /// The channel.
@@ -109,6 +121,7 @@ impl NotificationsPlanRequest {
     fn name(&self) -> &str {
         match self {
             Self::Add { name, .. }
+            | Self::Edit { name, .. }
             | Self::Events { name, .. }
             | Self::Remove { name }
             | Self::Test { name } => name,
@@ -497,6 +510,115 @@ impl Add<'_> {
     }
 }
 
+/// A channel to change.
+struct Edit<'a> {
+    namespace: &'a str,
+    scope: Scope,
+    name: &'a str,
+    events: &'a [AlertmanagerEvent],
+    settings: &'a AlertmanagerChannelSettings,
+}
+
+impl Edit<'_> {
+    fn writes(
+        &self,
+        configs: &[DynamicObject],
+        secret: Option<&Value>,
+        versions: &mut BTreeMap<String, String>,
+    ) -> Result<Vec<Planned>, ApiError> {
+        let (namespace, name) = (self.namespace, self.name);
+        let object_name = am::object_name(name);
+        let object = managed(configs, name)?;
+        if am::channel(object).kind != self.settings.kind() {
+            return Err(invalid(format!(
+                "Channel {name} keeps where it sends; add another channel to send elsewhere."
+            )));
+        }
+        let before = value(object)?;
+        versions.insert(
+            format!("VMAlertmanagerConfig/{object_name}"),
+            version(Some(&before)),
+        );
+        if let Some(problem) = am::problem(name, self.events, self.scope.events(), None) {
+            return Err(invalid(problem));
+        }
+        // The values come back hidden; only the keys are read.
+        let stored: BTreeSet<String> = secret
+            .and_then(|s| s.get("data"))
+            .and_then(Value::as_object)
+            .map(|data| data.keys().cloned().collect())
+            .unwrap_or_default();
+        let edited = am::edit(self.settings, &stored).map_err(invalid)?;
+        let mut writes = Vec::new();
+        if !edited.secret.is_empty() {
+            let hidden: serde_json::Map<String, Value> = edited
+                .secret
+                .keys()
+                .map(|key| (key.clone(), Value::String(HIDDEN.to_owned())))
+                .collect();
+            let shown = json!({
+                "apiVersion": "v1", "kind": "Secret",
+                "metadata": {"name": object_name, "namespace": namespace},
+                "stringData": hidden,
+            });
+            writes.push(match secret {
+                Some(secret) => {
+                    let mut patch = vec![json!({"op": "test", "path": "/metadata/resourceVersion",
+                                                "value": version(Some(secret))})];
+                    patch.extend(edited.secret.iter().map(|(key, value)| {
+                        json!({"op": "add", "path": format!("/data/{key}"),
+                               "value": STANDARD.encode(value)})
+                    }));
+                    Planned {
+                        target: target("Secret", namespace, &object_name),
+                        body: WriteBody::JsonPatch(Value::Array(patch)),
+                        action: NotificationWriteAction::Patch,
+                        before: None,
+                        shown: Some(shown),
+                    }
+                }
+                None => create(
+                    "Secret",
+                    namespace,
+                    &object_name,
+                    am::secret(namespace, name, &edited.settings, None),
+                    shown,
+                ),
+            });
+        }
+        let made = am::config(namespace, name, &edited.settings, self.events);
+        let target_path = format!(
+            "/metadata/annotations/{}",
+            am::TARGET_ANNOTATION.replace('/', "~1")
+        );
+        let aim = edited.target.map(Value::String);
+        let retarget = aim.is_some() && before.pointer(&target_path) != aim.as_ref();
+        if before.get("spec") != made.get("spec") || retarget {
+            let mut after = before.clone();
+            after["spec"] = made.get("spec").cloned().unwrap_or(Value::Null);
+            let mut patch = vec![
+                json!({"op": "test", "path": "/metadata/resourceVersion",
+                       "value": version(Some(&before))}),
+                json!({"op": "replace", "path": "/spec", "value": made.get("spec")}),
+            ];
+            if let Some(aim) = aim.filter(|_| retarget) {
+                if let Some(slot) = after.pointer_mut("/metadata/annotations") {
+                    slot[am::TARGET_ANNOTATION] = aim.clone();
+                }
+                patch.push(json!({"op": "add", "path": target_path, "value": aim}));
+            }
+            writes.push(Planned {
+                target: target(am::CONFIGS.kind, namespace, &object_name),
+                body: WriteBody::JsonPatch(Value::Array(patch)),
+                action: NotificationWriteAction::Patch,
+                before: Some(before),
+                shown: Some(after),
+            });
+        }
+        Ok(writes)
+    }
+}
+
 async fn compute(
     cluster: &dyn Cluster,
     namespace: &str,
@@ -537,6 +659,20 @@ async fn compute(
                 settings,
             };
             add.writes(&configs, secret.is_some(), &mut versions)?
+        }
+        NotificationsPlanRequest::Edit {
+            name,
+            events,
+            settings,
+        } => {
+            let edit = Edit {
+                namespace,
+                scope,
+                name,
+                events,
+                settings,
+            };
+            edit.writes(&configs, secret.as_ref(), &mut versions)?
         }
         NotificationsPlanRequest::Events { name, events } => {
             if let Some(problem) = am::problem(name, events, scope.events(), None) {

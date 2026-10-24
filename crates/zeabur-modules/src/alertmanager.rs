@@ -27,6 +27,8 @@
 //!
 //! [vm-amcfg]: https://docs.victoriametrics.com/operator/resources/vmalertmanagerconfig/
 
+use std::collections::{BTreeMap, BTreeSet};
+
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -334,6 +336,10 @@ pub struct AlertmanagerChannel {
     /// Why the operator refused it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// Its settings that are not secret, by the request's field names (`chatId`, `to`, `from`,
+    /// `smarthost`, `username`); empty for one Zeabur did not make.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub fields: BTreeMap<String, String>,
 }
 
 /// What `name`, `events` and `settings` need before Zeabur writes them; `None` when nothing.
@@ -819,7 +825,168 @@ pub fn channel(object: &DynamicObject) -> AlertmanagerChannel {
         managed: label.is_some(),
         status,
         reason,
+        fields: if label.is_some() {
+            shown_fields(&spec)
+        } else {
+            BTreeMap::new()
+        },
     }
+}
+
+/// The first `field` receiver config of `spec`, where Zeabur's channels keep their settings.
+fn receiver_config<'a>(spec: &'a Value, field: &str) -> Option<&'a Value> {
+    spec.pointer(&format!("/receivers/0/{field}/0"))
+}
+
+fn shown_fields(spec: &Value) -> BTreeMap<String, String> {
+    let mut out = BTreeMap::new();
+    if let Some(chat) = receiver_config(spec, "telegram_configs")
+        .and_then(|c| c.get("chat_id"))
+        .and_then(Value::as_i64)
+    {
+        out.insert("chatId".to_owned(), chat.to_string());
+    }
+    if let Some(email) = receiver_config(spec, "email_configs") {
+        for (field, key) in [
+            ("to", "to"),
+            ("from", "from"),
+            ("smarthost", "smarthost"),
+            ("username", "auth_username"),
+        ] {
+            let value = email.get(key).and_then(Value::as_str).unwrap_or_default();
+            out.insert(field.to_owned(), value.to_owned());
+        }
+    }
+    out
+}
+
+/// A change to a channel, as [`edit`] works it out.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Edited {
+    /// The settings to write the config from. A setting kept in the Secret stands in with a
+    /// valid value of its kind, empty when the Secret has no key for it.
+    pub settings: AlertmanagerChannelSettings,
+    /// The Secret's values to replace, by key; the other keys keep theirs.
+    pub secret: BTreeMap<String, String>,
+    /// The config's target annotation after the change, when the change says what it is.
+    pub target: Option<String>,
+}
+
+const KEPT_URL: &str = "https://kept.invalid";
+const KEPT: &str = "kept";
+
+/// The Secret's keys, and those an edit types again.
+struct Kept<'a> {
+    stored: &'a BTreeSet<String>,
+    fresh: BTreeSet<&'static str>,
+}
+
+impl Kept<'_> {
+    /// `value` when typed; else a stand-in when the Secret has `key`, else empty.
+    fn or(&mut self, value: &str, key: &'static str, stand_in: &str) -> String {
+        if !value.trim().is_empty() {
+            self.fresh.insert(key);
+            value.to_owned()
+        } else if self.stored.contains(key) {
+            stand_in.to_owned()
+        } else {
+            String::new()
+        }
+    }
+}
+
+/// What changing a channel to `typed` writes, without reading its Secret's values: a setting
+/// kept in the Secret (a URL, token, password, or ntfy's server and topic) left empty keeps its
+/// value, and `stored` names the Secret's keys. ntfy's server and topic are one value, so the
+/// topic is typed again to change either. Says what to fix when the settings are not valid.
+pub fn edit(
+    typed: &AlertmanagerChannelSettings,
+    stored: &BTreeSet<String>,
+) -> Result<Edited, String> {
+    use AlertmanagerChannelSettings as S;
+    let mut kept = Kept {
+        stored,
+        fresh: BTreeSet::new(),
+    };
+    let settings = match typed {
+        S::Slack { webhook_url } => S::Slack {
+            webhook_url: kept.or(webhook_url, "url", KEPT_URL),
+        },
+        S::Discord { webhook_url } => S::Discord {
+            webhook_url: kept.or(webhook_url, "url", KEPT_URL),
+        },
+        S::Telegram { bot_token, chat_id } => S::Telegram {
+            bot_token: kept.or(bot_token, "token", KEPT),
+            chat_id: *chat_id,
+        },
+        S::Email {
+            to,
+            from,
+            smarthost,
+            username,
+            password,
+        } => S::Email {
+            to: to.clone(),
+            from: from.clone(),
+            smarthost: smarthost.clone(),
+            username: username.clone(),
+            password: kept.or(password, "password", KEPT),
+        },
+        S::Webhook { url, bearer_token } => S::Webhook {
+            url: kept.or(url, "url", KEPT_URL),
+            bearer_token: kept.or(bearer_token, "token", KEPT),
+        },
+        S::Ntfy {
+            server,
+            topic,
+            access_token,
+        } => {
+            if topic.trim().is_empty() && !server.trim().is_empty() {
+                return Err(
+                    "Enter the topic too: the server and topic are stored together.".to_owned(),
+                );
+            }
+            let topic = kept.or(topic, "url", KEPT);
+            S::Ntfy {
+                server: if kept.fresh.contains("url") {
+                    server.clone()
+                } else {
+                    String::new()
+                },
+                topic,
+                access_token: kept.or(access_token, "token", KEPT),
+            }
+        }
+        S::Gotify { app_token } => S::Gotify {
+            app_token: kept.or(app_token, "url", KEPT),
+        },
+    };
+    let fresh = kept.fresh;
+    if let Some(problem) = settings_problem(&settings) {
+        return Err(problem);
+    }
+    let secret = secret_data(&settings)
+        .into_iter()
+        .filter(|(key, _)| fresh.contains(key.as_str()))
+        .collect();
+    let target = match &settings {
+        S::Webhook { .. } | S::Ntfy { .. } if !fresh.contains("url") => None,
+        other => target(other),
+    };
+    Ok(Edited {
+        settings,
+        secret,
+        target,
+    })
+}
+
+/// The values of a channel's Secret with `settings`, by key.
+#[must_use]
+pub fn secret_data(settings: &AlertmanagerChannelSettings) -> BTreeMap<String, String> {
+    secret_values(settings)
+        .into_iter()
+        .map(|(key, value)| (key.to_owned(), value))
+        .collect()
 }
 
 /// The operator's reason, without the URL it read from a Secret: that URL can hold a token.
@@ -896,6 +1063,60 @@ mod tests {
             super::channel(&object(changed)).events,
             vec![AlertmanagerEvent::BuildFailed]
         );
+    }
+
+    #[test]
+    fn an_edit_replaces_only_the_secrets_typed_again() {
+        let stored = BTreeSet::from(["url".to_owned(), "token".to_owned()]);
+        let typed = AlertmanagerChannelSettings::Webhook {
+            url: String::new(),
+            bearer_token: "new-token".to_owned(),
+        };
+        let edited = edit(&typed, &stored).unwrap();
+        assert_eq!(
+            edited.secret,
+            BTreeMap::from([("token".to_owned(), "new-token".to_owned())])
+        );
+        assert_eq!(edited.target, None);
+        let made = config("shop", "ops", &edited.settings, &EVENTS)["spec"].to_string();
+        assert!(made.contains("authorization"), "{made}");
+        assert!(!made.contains("kept"), "{made}");
+
+        let without_token = BTreeSet::from(["url".to_owned()]);
+        let kept = edit(
+            &AlertmanagerChannelSettings::Webhook {
+                url: String::new(),
+                bearer_token: String::new(),
+            },
+            &without_token,
+        )
+        .unwrap();
+        assert!(kept.secret.is_empty());
+        assert!(
+            !config("shop", "ops", &kept.settings, &EVENTS)
+                .to_string()
+                .contains("authorization")
+        );
+
+        let nothing = BTreeSet::new();
+        assert!(edit(&typed, &nothing).is_err(), "a URL is required");
+        let server_only = AlertmanagerChannelSettings::Ntfy {
+            server: "https://ntfy.example.com".to_owned(),
+            topic: String::new(),
+            access_token: String::new(),
+        };
+        assert!(edit(&server_only, &stored).is_err());
+        let moved = AlertmanagerChannelSettings::Ntfy {
+            server: "https://ntfy.example.com".to_owned(),
+            topic: "shop".to_owned(),
+            access_token: String::new(),
+        };
+        let moved = edit(&moved, &stored).unwrap();
+        assert_eq!(
+            moved.secret["url"],
+            "https://ntfy.example.com/shop?template=alertmanager"
+        );
+        assert_eq!(moved.target.as_deref(), Some("ntfy.example.com"));
     }
 
     #[test]

@@ -35,6 +35,14 @@ describe("notification channels", () => {
     ).toEqual({ kind: "telegram", botToken: "1:a", chatId: -100 })
   })
 
+  test("an edit keeps stored fields left empty, but ntfy's topic goes with its server", () => {
+    expect(missing(form({ kind: "webhook", values: {} }), true)).toEqual([])
+    expect(missing(form({ kind: "webhook", values: {} }))).toEqual(["url"])
+    expect(
+      missing(form({ kind: "ntfy", values: { server: "https://ntfy.example.com" } }), true),
+    ).toEqual(["topic"])
+  })
+
   test("a rejected channel comes first in the verdict", () => {
     const channel = (status: "active" | "rejected" | "waiting") =>
       ({ status }) as Parameters<typeof verdict>[0][number]

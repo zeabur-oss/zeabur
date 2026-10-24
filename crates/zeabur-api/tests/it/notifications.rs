@@ -1,6 +1,6 @@
 //! Notification channels: not installed is an answer, a refused read is not "not installed", a
 //! channel's URL stays in its Secret and out of every answer, and a channel is added, changed,
-//! tested and removed through plans.
+//! edited, tested and removed through plans.
 
 #[cfg(test)]
 mod tests {
@@ -80,7 +80,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_channel_is_added_changed_tested_and_removed_and_its_url_never_shown() {
+    async fn a_channel_is_added_changed_edited_tested_and_removed_and_its_url_never_shown() {
         let cluster = alerting();
         let app = app(&cluster);
         let (planned, done) = applied(&app, BASE, &add()).await;
@@ -118,6 +118,37 @@ mod tests {
         assert_eq!(planned["writes"][0]["action"], "patch");
         let (_, found) = send(&app, "GET", BASE, None).await;
         assert_eq!(found["channels"][0]["events"], json!(["build-failed"]));
+
+        let (planned, _) = applied(
+            &app,
+            BASE,
+            &json!({"op": "edit", "name": "ops", "events": ["deploy-failed"],
+                    "settings": {"kind": "slack", "webhookUrl": ""}}),
+        )
+        .await;
+        assert_eq!(planned["writes"].as_array().unwrap().len(), 1, "{planned}");
+        assert_eq!(planned["writes"][0]["kind"], "VMAlertmanagerConfig");
+        let (planned, _) = applied(
+            &app,
+            BASE,
+            &json!({"op": "edit", "name": "ops", "events": ["deploy-failed"],
+                    "settings": {"kind": "slack", "webhookUrl": "https://hooks.slack.com/services/new-secret"}}),
+        )
+        .await;
+        assert_eq!(planned["writes"][0]["kind"], "Secret", "{planned}");
+        assert_eq!(planned["writes"][0]["action"], "patch");
+        assert!(!planned.to_string().contains("new-secret"), "{planned}");
+        let (status, _) = send(
+            &app,
+            "POST",
+            &format!("{BASE}/plan"),
+            Some(
+                &json!({"op": "edit", "name": "ops", "events": ["deploy-failed"],
+                         "settings": {"kind": "discord", "webhookUrl": HOOK}}),
+            ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "the kind stays");
 
         let (planned, _) = applied(&app, BASE, &json!({"op": "test", "name": "ops"})).await;
         let job = planned["writes"][0]["name"].as_str().unwrap();

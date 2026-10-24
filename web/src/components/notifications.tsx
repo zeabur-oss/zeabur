@@ -27,6 +27,7 @@ import { useT } from "@/i18n"
 import {
   FIELDS,
   fixOf,
+  formOf,
   GOTIFY_COMPONENT,
   KINDS,
   METRICS_COMPONENT,
@@ -35,6 +36,7 @@ import {
   nameProblem,
   SECRET_FIELDS,
   settingsOf,
+  STORED_FIELDS,
   statusHealth,
   verdict,
   type ChannelForm,
@@ -113,7 +115,7 @@ function NotInstalled() {
 
 type Open =
   | { as: "add" }
-  | { as: "events"; channel: Channel }
+  | { as: "edit"; channel: Channel }
   | { as: "plan"; request: Request; title: string }
 
 function Channels({ data, project }: { data: Data; project?: string }) {
@@ -161,7 +163,7 @@ function Channels({ data, project }: { data: Data; project?: string }) {
               onTest={() =>
                 plan({ op: "test", name: channel.name }, t("notify.plan.test", channel.name))
               }
-              onEvents={() => setOpen({ as: "events", channel })}
+              onEdit={() => setOpen({ as: "edit", channel })}
               onRemove={() =>
                 plan({ op: "remove", name: channel.name }, t("notify.plan.remove", channel.name))
               }
@@ -236,16 +238,16 @@ function OpenDialog({
           }
         />
       )
-    case "events":
+    case "edit":
       return (
-        <EventsDialog
-          channel={open.channel}
+        <ChannelDialog
           events={data.events}
+          channel={open.channel}
           onClose={onClose}
-          onReview={(events) =>
+          onReview={(form) =>
             onPlan(
-              { op: "events", name: open.channel.name, events },
-              t("notify.plan.events", open.channel.name),
+              { op: "edit", name: form.name, events: form.events, settings: settingsOf(form) },
+              t("notify.plan.edit", form.name),
             )
           }
         />
@@ -263,7 +265,7 @@ function ChannelRow({
   change,
   test,
   onTest,
-  onEvents,
+  onEdit,
   onRemove,
 }: {
   channel: Channel
@@ -271,7 +273,7 @@ function ChannelRow({
   change: ReturnType<typeof useHintGate>
   test: ReturnType<typeof useHintGate>
   onTest: () => void
-  onEvents: () => void
+  onEdit: () => void
   onRemove: () => void
 }) {
   const t = useT()
@@ -308,6 +310,11 @@ function ChannelRow({
     >
       {channel.managed ? (
         <span className="flex items-center gap-1">
+          <GateTip gate={change}>
+            <Button size="sm" variant="outline" onClick={onEdit}>
+              {t("notify.edit")}
+            </Button>
+          </GateTip>
           <GateTip gate={test}>
             <Button size="sm" variant="outline" onClick={onTest}>
               {t("notify.test")}
@@ -328,7 +335,6 @@ function ChannelRow({
               </MenuTrigger>
             </GateTip>
             <MenuContent align="end">
-              <MenuItem onClick={onEvents}>{t("notify.chooseEvents")}</MenuItem>
               <MenuItem onClick={onRemove}>{t("notify.remove")}</MenuItem>
             </MenuContent>
           </Menu>
@@ -375,32 +381,42 @@ function EventChoices({
   )
 }
 
+/** Adds a channel, or with `channel` edits it: the name and kind stay, and a stored setting left
+ * empty keeps its value. */
 function ChannelDialog({
   events,
+  channel,
   onClose,
   onReview,
 }: {
   events: Event[]
+  channel?: Channel
   onClose: () => void
   onReview: (form: ChannelForm) => void
 }) {
   const t = useT()
   const formId = useId()
-  const [form, setForm] = useState<ChannelForm>({
-    name: "",
-    kind: "slack",
-    values: {},
-    events: events.filter((e) => e.endsWith("-failed") || e === "crash-loop"),
-  })
+  const editing = channel !== undefined
+  const [form, setForm] = useState<ChannelForm>(() =>
+    channel
+      ? formOf(channel)
+      : {
+          name: "",
+          kind: "slack",
+          values: {},
+          events: events.filter((e) => e.endsWith("-failed") || e === "crash-loop"),
+        },
+  )
   const [tried, setTried] = useState(false)
-  const needed = missing(form)
+  const needed = missing(form, editing)
+  const kept = (field: Field) => editing && STORED_FIELDS.includes(field)
   const badName = nameProblem(form.name)
   const ok = !badName && needed.length === 0 && form.events.length > 0
   const set = (field: Field, value: string) =>
     setForm((f) => ({ ...f, values: { ...f.values, [field]: value } }))
   return (
     <Frame
-      title={t("notify.addTitle")}
+      title={channel ? t("notify.plan.edit", channel.name) : t("notify.addTitle")}
       onClose={onClose}
       footer={
         <>
@@ -422,25 +438,28 @@ function ChannelDialog({
           if (ok) onReview(form)
         }}
       >
-        <FormField
-          label={t("notify.name")}
-          hint={t("notify.nameHint", NAME_MAX)}
-          errors={tried && badName ? [t("notify.nameProblem")] : []}
-        >
-          <Input
-            size="sm"
-            value={form.name}
-            autoComplete="off"
-            spellCheck={false}
-            maxLength={NAME_MAX}
-            placeholder="team-alerts"
-            onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
-          />
-        </FormField>
+        {editing ? null : (
+          <FormField
+            label={t("notify.name")}
+            hint={t("notify.nameHint", NAME_MAX)}
+            errors={tried && badName ? [t("notify.nameProblem")] : []}
+          >
+            <Input
+              size="sm"
+              value={form.name}
+              autoComplete="off"
+              spellCheck={false}
+              maxLength={NAME_MAX}
+              placeholder="team-alerts"
+              onChange={(event) => setForm((f) => ({ ...f, name: event.target.value }))}
+            />
+          </FormField>
+        )}
         <FormField label={t("notify.sendTo")}>
           <Select
             size="sm"
             className="w-full"
+            disabled={editing}
             value={form.kind}
             onValueChange={(kind) =>
               setForm((f) => ({ ...f, kind: kind as ChannelKind, values: {} }))
@@ -456,10 +475,18 @@ function ChannelDialog({
                 ? t("notify.optional", t(`notify.field.${field}`))
                 : t(`notify.field.${field}`)
             }
-            hint={hintOf(form.kind, field, t)}
+            hint={kept(field) ? t("notify.keptHint") : hintOf(form.kind, field, t)}
             errors={
               tried && needed.includes(field)
-                ? [t(field === "chatId" ? "notify.chatIdProblem" : "notify.required")]
+                ? [
+                    t(
+                      field === "chatId"
+                        ? "notify.chatIdProblem"
+                        : editing && field === "topic"
+                          ? "notify.topicWithServer"
+                          : "notify.required",
+                    ),
+                  ]
                 : []
             }
           >
@@ -469,6 +496,7 @@ function ChannelDialog({
               inputMode={field === "chatId" ? "numeric" : undefined}
               autoComplete="off"
               spellCheck={false}
+              placeholder={kept(field) ? t("notify.kept") : undefined}
               value={form.values[field] ?? ""}
               onChange={(event) => set(field, event.target.value)}
             />
@@ -492,7 +520,9 @@ function ChannelDialog({
           onChange={(chosen) => setForm((f) => ({ ...f, events: chosen }))}
           error={tried && form.events.length === 0 ? t("notify.noEvents") : undefined}
         />
-        <p className="type-meta text-muted-foreground">{t("notify.secretNote")}</p>
+        {editing ? null : (
+          <p className="type-meta text-muted-foreground">{t("notify.secretNote")}</p>
+        )}
       </form>
     </Frame>
   )
@@ -504,44 +534,6 @@ function hintOf(kind: ChannelKind, field: Field, t: ReturnType<typeof useT>) {
   if (field === "smarthost") return t("notify.hint.smarthost")
   if (field === "chatId") return t("notify.hint.chatId")
   return undefined
-}
-
-function EventsDialog({
-  channel,
-  events,
-  onClose,
-  onReview,
-}: {
-  channel: Channel
-  events: Event[]
-  onClose: () => void
-  onReview: (events: Event[]) => void
-}) {
-  const t = useT()
-  const [chosen, setChosen] = useState(channel.events)
-  return (
-    <Frame
-      title={t("notify.plan.events", channel.name)}
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("plan.cancel")}
-          </Button>
-          <Button size="sm" disabled={chosen.length === 0} onClick={() => onReview(chosen)}>
-            {t("edit.review")}
-          </Button>
-        </>
-      }
-    >
-      <EventChoices
-        events={events}
-        chosen={chosen}
-        onChange={setChosen}
-        error={chosen.length === 0 ? t("notify.noEvents") : undefined}
-      />
-    </Frame>
-  )
 }
 
 /** What a change writes, and applying it; planning writes nothing. */
@@ -580,7 +572,7 @@ function PlanDialog({
       title={title}
       plan={plan}
       apply={apply}
-      action={request.op === "test" ? t("notify.test") : t("plan.apply")}
+      action={t(`notify.action.${request.op}`)}
       ready={(data) => (data?.writes.length ?? 0) > 0}
       onClose={onClose}
     >
@@ -614,7 +606,7 @@ function Planned({
           </li>
         ))}
       </ul>
-      {writes.some((write) => write.kind === "Secret" && write.action === "create") ? (
+      {writes.some((write) => write.kind === "Secret" && write.action !== "delete") ? (
         <p className="type-meta text-muted-foreground">{t("notify.plan.hidden")}</p>
       ) : null}
       <PlanDiffs writes={writes} />

@@ -3951,6 +3951,15 @@ components:
           items:
             $ref: "#/components/schemas/AlertmanagerEvent"
           description: The events it receives; empty for one Zeabur did not make.
+        fields:
+          type: object
+          description: |-
+            Its settings that are not secret, by the request's field names (`chatId`, `to`, `from`,
+            `smarthost`, `username`); empty for one Zeabur did not make.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
         kind:
           $ref: "#/components/schemas/AlertmanagerChannelKind"
           description: Where it sends.
@@ -11292,6 +11301,31 @@ components:
           settings:
             $ref: "#/components/schemas/AlertmanagerChannelSettings"
             description: Where it sends, secrets included.
+      - type: object
+        description: |-
+          Change where a channel sends and which events it receives. A setting kept in the Secret
+          (a URL, token, password, ntfy server or topic) left empty keeps its value; the kind stays.
+        required:
+        - name
+        - events
+        - settings
+        - op
+        properties:
+          events:
+            type: array
+            items:
+              $ref: "#/components/schemas/AlertmanagerEvent"
+            description: The events it receives after the change.
+          name:
+            type: string
+            description: The channel.
+          op:
+            type: string
+            enum:
+            - edit
+          settings:
+            $ref: "#/components/schemas/AlertmanagerChannelSettings"
+            description: Its settings after the change.
       - type: object
         description: Change which events a channel receives.
         required:
