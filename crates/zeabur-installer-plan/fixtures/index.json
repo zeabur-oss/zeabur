@@ -82,17 +82,21 @@
   "components": [
     {
       "id": "certificates/cert-manager",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "certificates",
-      "displayName": "cert-manager",
-      "homepage": "https://cert-manager.io",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "cert-manager",
+        "description": "cert-manager is the standard Kubernetes certificate controller (CNCF graduated). Its issuers live in the cluster, so it renews certificates itself.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://cert-manager.io"
+      },
       "maturity": "cncf-graduated",
-      "rationale": "cert-manager is the standard Kubernetes certificate controller (CNCF graduated). Its issuers live in the cluster, so it renews certificates itself.\n",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "recommended"
       },
-      "dependsOn": [
+      "requires": [
         "ingress"
       ],
       "releases": [
@@ -223,12 +227,16 @@
     },
     {
       "id": "config-reload/reloader",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "config-reload",
-      "displayName": "Stakater Reloader",
-      "homepage": "https://github.com/stakater/Reloader",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "Stakater Reloader",
+        "description": "Rolls Deployments, StatefulSets and DaemonSets when a ConfigMap or Secret they use changes, whoever changed it. Optional: only workloads that opt in with an annotation restart.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://github.com/stakater/Reloader"
+      },
       "maturity": "independent",
-      "rationale": "Rolls Deployments, StatefulSets and DaemonSets when a ConfigMap or Secret they use changes, whoever changed it. Optional: only workloads that opt in with an annotation restart.\n",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
@@ -307,17 +315,21 @@
     },
     {
       "id": "dns/external-dns",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "dns",
-      "displayName": "ExternalDNS",
-      "homepage": "https://kubernetes-sigs.github.io/external-dns/",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "ExternalDNS",
+        "description": "Creates DNS records for route hostnames (Kubernetes SIG). Optional: it needs a provider token, and a wildcard record often suffices.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://kubernetes-sigs.github.io/external-dns/"
+      },
       "maturity": "kubernetes-sig",
-      "rationale": "Creates DNS records for route hostnames (Kubernetes SIG). Optional: it needs a provider token, and a wildcard record often suffices.\n",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "dependsOn": [
+      "requires": [
         "ingress"
       ],
       "inputs": [
@@ -431,12 +443,16 @@
     },
     {
       "id": "event-autoscaling/keda",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "event-autoscaling",
-      "displayName": "KEDA",
-      "homepage": "https://keda.sh",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "KEDA",
+        "description": "Scales workloads on events, down to zero, with scaling configured per namespace. Optional on a single node: there it costs more memory than scaling saves.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://keda.sh"
+      },
       "maturity": "cncf-graduated",
-      "rationale": "Scales workloads on events, down to zero, with scaling configured per namespace. Optional on a single node: there it costs more memory than scaling saves.\n",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "optional"
@@ -543,18 +559,22 @@
     },
     {
       "id": "event-autoscaling/keda-http-add-on",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "event-autoscaling",
-      "displayName": "KEDA HTTP Add-on",
-      "homepage": "https://github.com/kedacore/http-add-on",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "KEDA HTTP Add-on",
+        "description": "Scales HTTP services on request rate, including to zero; the interceptor holds the first request while the workload wakes. It is pre-1.0, so it is marked beta.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://github.com/kedacore/http-add-on"
+      },
       "maturity": "cncf-graduated",
       "stability": "beta",
-      "rationale": "Scales HTTP services on request rate, including to zero; the interceptor holds the first request while the workload wakes. It is pre-1.0, so it is marked beta.\n",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "dependsOn": [
+      "requires": [
         "event-autoscaling/keda"
       ],
       "releases": [
@@ -608,7 +628,7 @@
       "upgradeNotes": [
         {
           "note": "HTTPScaledObject fields change between minor versions; read the release notes before upgrading.",
-          "versions": "\u003c1.0.0"
+          "versions": "<1.0.0"
         }
       ],
       "installOrder": {
@@ -658,12 +678,16 @@
     },
     {
       "id": "ingress/traefik",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "ingress",
-      "displayName": "Traefik Proxy",
-      "homepage": "https://traefik.io/traefik/",
-      "license": "MIT",
+      "metadata": {
+        "name": "Traefik Proxy",
+        "description": "Serves Gateway API and Ingress, and hosts the CrowdSec bouncer. Ingress NGINX was retired in March 2026.\n",
+        "license": "MIT",
+        "homepage": "https://traefik.io/traefik/"
+      },
       "maturity": "independent",
-      "rationale": "Serves Gateway API and Ingress, and hosts the CrowdSec bouncer. Ingress NGINX was retired in March 2026.\n",
       "alternatives": {
         "envoy-gateway": "Serves Gateway API on Envoy; an existing installation is reused."
       },
@@ -807,18 +831,22 @@
     },
     {
       "id": "intrusion-prevention/crowdsec",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "intrusion-prevention",
-      "displayName": "CrowdSec",
-      "homepage": "https://www.crowdsec.net",
-      "license": "MIT",
+      "metadata": {
+        "name": "CrowdSec",
+        "description": "Blocks brute-force attempts and scanners that show up in Traefik's access logs, for every app behind the ingress. It fails open, and the online API is off by default.\n",
+        "license": "MIT",
+        "homepage": "https://www.crowdsec.net"
+      },
       "maturity": "independent",
-      "rationale": "Blocks brute-force attempts and scanners that show up in Traefik's access logs, for every app behind the ingress. It fails open, and the online API is off by default.\n",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
       "persistsData": true,
-      "dependsOn": [
+      "requires": [
         "ingress/traefik"
       ],
       "inputs": [
@@ -958,12 +986,16 @@
     },
     {
       "id": "logs/victoria-logs",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "logs",
-      "displayName": "VictoriaLogs",
-      "homepage": "https://docs.victoriametrics.com/victorialogs/",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "VictoriaLogs",
+        "description": "Keeps and searches log history with low memory and disk use. It is Apache-2.0, unlike Loki, and runs on the VictoriaMetrics operator.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://docs.victoriametrics.com/victorialogs/"
+      },
       "maturity": "independent",
-      "rationale": "Keeps and searches log history with low memory and disk use. It is Apache-2.0, unlike Loki, and runs on the VictoriaMetrics operator.\n",
       "alternatives": {
         "loki": "Licensed AGPL-3.0; an existing installation is reused."
       },
@@ -972,7 +1004,7 @@
         "single-node": "recommended"
       },
       "persistsData": true,
-      "dependsOn": [
+      "requires": [
         "observability-operator/victoria-metrics-operator"
       ],
       "releases": [
@@ -1067,12 +1099,16 @@
     },
     {
       "id": "metrics/metrics-server",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "metrics",
-      "displayName": "Kubernetes Metrics Server",
-      "homepage": "https://github.com/kubernetes-sigs/metrics-server",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "Kubernetes Metrics Server",
+        "description": "Serves metrics.k8s.io for HPA and `kubectl top`. It keeps no history, so it is the cheapest source of live CPU and memory.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://github.com/kubernetes-sigs/metrics-server"
+      },
       "maturity": "kubernetes-sig",
-      "rationale": "Serves metrics.k8s.io for HPA and `kubectl top`. It keeps no history, so it is the cheapest source of live CPU and memory.\n",
       "alternatives": {
         "victoria-metrics": "Adds history and alerts at a few hundred MiB."
       },
@@ -1168,12 +1204,16 @@
     },
     {
       "id": "metrics/victoria-metrics",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "metrics",
-      "displayName": "VictoriaMetrics (k8s stack)",
-      "homepage": "https://victoriametrics.com",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "VictoriaMetrics (k8s stack)",
+        "description": "Keeps metrics history and evaluates alerts with a fraction of Prometheus' memory. On one node it is tuned to about 200Mi.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://victoriametrics.com"
+      },
       "maturity": "independent",
-      "rationale": "Keeps metrics history and evaluates alerts with a fraction of Prometheus' memory. On one node it is tuned to about 200Mi.\n",
       "alternatives": {
         "kube-prometheus-stack": "An existing installation is reused, but its memory use keeps it from being recommended.",
         "metrics-server": "Serves live CPU and memory only; it is installed alongside for the metrics API."
@@ -1183,7 +1223,7 @@
         "single-node": "recommended"
       },
       "persistsData": true,
-      "dependsOn": [
+      "requires": [
         "observability-operator/victoria-metrics-operator"
       ],
       "releases": [
@@ -1295,12 +1335,16 @@
     },
     {
       "id": "node-updates/system-upgrade-controller",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "node-updates",
-      "displayName": "System Upgrade Controller",
-      "homepage": "https://github.com/rancher/system-upgrade-controller",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "System Upgrade Controller",
+        "description": "Upgrades k3s and node packages one node at a time from declarative Plans, with cordon, drain and concurrency limits. The catalog installs it from upstream manifests because the Rancher chart lags behind releases.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://github.com/rancher/system-upgrade-controller"
+      },
       "maturity": "independent",
-      "rationale": "Upgrades k3s and node packages one node at a time from declarative Plans, with cordon, drain and concurrency limits. The catalog installs it from upstream manifests because the Rancher chart lags behind releases.\n",
       "alternatives": {
         "kured": "If installed, kured keeps handling reboots."
       },
@@ -1409,12 +1453,16 @@
     },
     {
       "id": "observability-operator/victoria-metrics-operator",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "observability-operator",
-      "displayName": "VictoriaMetrics operator",
-      "homepage": "https://docs.victoriametrics.com/operator/",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "VictoriaMetrics operator",
+        "description": "One operator runs both the metrics and the logs stack from CRDs, and accepts Prometheus operator objects so existing app manifests keep working.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://docs.victoriametrics.com/operator/"
+      },
       "maturity": "independent",
-      "rationale": "One operator runs both the metrics and the logs stack from CRDs, and accepts Prometheus operator objects so existing app manifests keep working.\n",
       "alternatives": {
         "prometheus-operator": "An existing installation is reused, and the VictoriaMetrics operator converts its objects."
       },
@@ -1422,7 +1470,7 @@
         "multi-node": "recommended",
         "single-node": "recommended"
       },
-      "dependsOn": [
+      "requires": [
         "certificates"
       ],
       "releases": [
@@ -1514,12 +1562,16 @@
     },
     {
       "id": "remote-access/tailscale-operator",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "remote-access",
-      "displayName": "Tailscale Kubernetes operator",
-      "homepage": "https://tailscale.com/kb/1236/kubernetes-operator",
-      "license": "BSD-3-Clause",
+      "metadata": {
+        "name": "Tailscale Kubernetes operator",
+        "description": "Puts a Service or Ingress on the tailnet with no port open to the internet. An Ingress gets a MagicDNS name with a Let's Encrypt certificate, so a host without a domain still serves trusted HTTPS; a Service is proxied as it is, without TLS. Optional: it needs a Tailscale account, and an Ingress needs HTTPS and MagicDNS enabled on the tailnet.\n",
+        "license": "BSD-3-Clause",
+        "homepage": "https://tailscale.com/kb/1236/kubernetes-operator"
+      },
       "maturity": "independent",
-      "rationale": "Puts a Service or Ingress on the tailnet with no port open to the internet. An Ingress gets a MagicDNS name with a Let's Encrypt certificate, so a host without a domain still serves trusted HTTPS; a Service is proxied as it is, without TLS. Optional: it needs a Tailscale account, and an Ingress needs HTTPS and MagicDNS enabled on the tailnet.\n",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
@@ -1620,12 +1672,16 @@
     },
     {
       "id": "replicated-storage/longhorn",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "replicated-storage",
-      "displayName": "Longhorn",
-      "homepage": "https://longhorn.io",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "Longhorn",
+        "description": "Block storage replicated across nodes: a volume survives losing its node, follows its pod to another node, and can be expanded in place. Recommended on multi-node, where it becomes the default storage class. Optional on single-node, where a replica has nowhere else to go; it still gives expandable volumes and snapshots there.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://longhorn.io"
+      },
       "maturity": "cncf-incubating",
-      "rationale": "Block storage replicated across nodes: a volume survives losing its node, follows its pod to another node, and can be expanded in place. Recommended on multi-node, where it becomes the default storage class. Optional on single-node, where a replica has nowhere else to go; it still gives expandable volumes and snapshots there.\n",
       "alternatives": {
         "local-path": "What the cluster has without it. Faster, but a volume stays on the node that created it. Still the better class for databases that replicate themselves (CloudNativePG, MongoDB): a second layer of copies costs write latency and disk for nothing.\n"
       },
@@ -1731,17 +1787,21 @@
     },
     {
       "id": "resource-recommendations/vertical-pod-autoscaler",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "resource-recommendations",
-      "displayName": "Vertical Pod Autoscaler (recommender only)",
-      "homepage": "https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "Vertical Pod Autoscaler (recommender only)",
+        "description": "Suggests CPU and memory requests from observed usage. Recommender only: nothing changes pods unless you apply a suggestion.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler"
+      },
       "maturity": "kubernetes-sig",
-      "rationale": "Suggests CPU and memory requests from observed usage. Recommender only: nothing changes pods unless you apply a suggestion.\n",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "dependsOn": [
+      "requires": [
         "metrics/metrics-server"
       ],
       "releases": [
@@ -1834,12 +1894,16 @@
     },
     {
       "id": "runtime-security/falco",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "runtime-security",
-      "displayName": "Falco",
-      "homepage": "https://falco.org",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "Falco",
+        "description": "Flags suspicious runtime behavior (container shells, privilege escalation) from kernel events as JSON logs. Optional: it needs a privileged eBPF probe and a BTF kernel (5.8+).\n",
+        "license": "Apache-2.0",
+        "homepage": "https://falco.org"
+      },
       "maturity": "cncf-graduated",
-      "rationale": "Flags suspicious runtime behavior (container shells, privilege escalation) from kernel events as JSON logs. Optional: it needs a privileged eBPF probe and a BTF kernel (5.8+).\n",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
@@ -1929,17 +1993,21 @@
     },
     {
       "id": "uptime-probes/blackbox-exporter",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "uptime-probes",
-      "displayName": "Prometheus Blackbox Exporter",
-      "homepage": "https://github.com/prometheus/blackbox_exporter",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "Prometheus Blackbox Exporter",
+        "description": "Probes HTTP, TCP and DNS targets; it comes from the Prometheus project, and uptime alerts are plain rules. It needs VictoriaMetrics, so it follows VictoriaMetrics' defaults.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://github.com/prometheus/blackbox_exporter"
+      },
       "maturity": "cncf-graduated",
-      "rationale": "Probes HTTP, TCP and DNS targets; it comes from the Prometheus project, and uptime alerts are plain rules. It needs VictoriaMetrics, so it follows VictoriaMetrics' defaults.\n",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "optional"
       },
-      "dependsOn": [
+      "requires": [
         "metrics/victoria-metrics"
       ],
       "releases": [
@@ -2034,12 +2102,16 @@
     },
     {
       "id": "volume-backup/k8up",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "volume-backup",
-      "displayName": "K8up",
-      "homepage": "https://k8up.io",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "K8up",
+        "description": "Backs up each namespace with restic to any S3-compatible store, so tenants can safely manage their own backups.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://k8up.io"
+      },
       "maturity": "cncf-sandbox",
-      "rationale": "Backs up each namespace with restic to any S3-compatible store, so tenants can safely manage their own backups.\n",
       "alternatives": {
         "velero": "Backs up the whole cluster; for administrators only."
       },
@@ -2152,12 +2224,16 @@
     },
     {
       "id": "volume-backup/velero",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "volume-backup",
-      "displayName": "Velero",
-      "homepage": "https://velero.io",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "Velero",
+        "description": "Backs up the whole cluster to S3 for disaster recovery. It can touch any namespace, so it is for administrators only.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://velero.io"
+      },
       "maturity": "cncf-sandbox",
-      "rationale": "Backs up the whole cluster to S3 for disaster recovery. It can touch any namespace, so it is for administrators only.\n",
       "alternatives": {
         "k8up": "Backs up each namespace on its own, so tenants can use it."
       },
@@ -2291,12 +2367,16 @@
     },
     {
       "id": "vulnerability-scanning/trivy-operator",
+      "apiVersion": "catalog.zeabur.com/v1",
+      "kind": "Component",
       "capability": "vulnerability-scanning",
-      "displayName": "Trivy Operator",
-      "homepage": "https://aquasecurity.github.io/trivy-operator/",
-      "license": "Apache-2.0",
+      "metadata": {
+        "name": "Trivy Operator",
+        "description": "Scans running images and workload configs and writes namespaced reports next to each workload. Optional: scan jobs cost noticeable CPU and memory.\n",
+        "license": "Apache-2.0",
+        "homepage": "https://aquasecurity.github.io/trivy-operator/"
+      },
       "maturity": "independent",
-      "rationale": "Scans running images and workload configs and writes namespaced reports next to each workload. Optional: scan jobs cost noticeable CPU and memory.\n",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
@@ -2402,7 +2482,7 @@
       }
     }
   ],
-  "indexVersion": 1,
+  "indexVersion": 2,
   "kubernetes": [
     "1.34.0",
     "1.35.0",
@@ -2412,5 +2492,6 @@
   "profiles": [
     "single-node",
     "multi-node"
-  ]
+  ],
+  "templates": []
 }

@@ -1,0 +1,142 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: Keel
+  description: >
+    Rolls workloads annotated keel.sh/policy to a new image tag when Zeabur
+    Builder calls its webhook after a push, or when polling finds one. Optional:
+    only annotated workloads change.
+  license: MPL-2.0
+  homepage: https://keel.sh
+maturity: independent
+defaults:
+  single-node: optional
+  multi-node: optional
+
+releases:
+  - name: keel
+    namespace: keel
+    repo: https://keel-hq.github.io/keel/
+    chart: keel
+    version: v1.2.3
+    values: |
+      image:
+        # The tag defaults to the chart's appVersion (0.22.4), so it is
+        # pinned; Always would hit the registry on every restart.
+        pullPolicy: IfNotPresent
+      helmProvider:
+        # Workload annotations only. The Helm provider rewrites release
+        # values, which conflicts with whoever owns the release.
+        enabled: false
+      polling:
+        # For workloads annotated keel.sh/trigger: poll, such as those on
+        # public registries that send no webhook.
+        enabled: true
+        # Fewer registry requests than the chart's 1m; a workload sets
+        # keel.sh/pollSchedule to poll faster.
+        defaultSchedule: "@every 5m"
+      service:
+        # Builder posts to http://keel.keel.svc:9300/v1/webhooks/native. The
+        # chart's LoadBalancer would publish an unauthenticated webhook.
+        enabled: true
+        type: ClusterIP
+        externalPort: 9300
+      rbac:
+        clusterRole:
+          # The chart's rules minus configmaps and pods/portforward, unused
+          # with the Helm provider off.
+          rules:
+            - apiGroups: [""]
+              resources: [namespaces, nodes]
+              verbs: [get, watch, list]
+            - apiGroups: [""]
+              resources: [secrets]
+              verbs: [get, watch, list]
+            - apiGroups: ["", extensions, apps, batch]
+              resources: [pods, replicasets, replicationcontrollers, statefulsets, deployments, daemonsets, jobs, cronjobs]
+              verbs: [get, delete, watch, list, update]
+      podSecurityContext:
+        # The image runs as uid 666; enforce it and the default seccomp profile.
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containerSecurityContext:
+        # Root filesystem stays writable: keel.db lives in /data.
+        allowPrivilegeEscalation: false
+        capabilities: {drop: [ALL]}
+      persistence:
+        # keel.db holds approvals and the audit log; neither is used here.
+        enabled: false
+    profiles:
+      single-node: |
+        resources:
+          # Caches annotated workloads only.
+          requests: {cpu: 10m, memory: 32Mi}
+          limits: {memory: 128Mi}
+      multi-node: |
+        resources:
+          # More workloads to track. Still one replica (the chart fixes it):
+          # Keel has no leader election, and two would roll each workload twice.
+          requests: {cpu: 20m, memory: 64Mi}
+          limits: {memory: 256Mi}
+
+detection:
+  helmCharts: [keel]
+  workloads:
+    - kind: Deployment
+      labels: {app: keel}
+
+security:
+  summary: >
+    ClusterRole: reads, lists and watches every Secret (registry credentials of
+    tracked workloads), Namespace and Node; reads, updates and deletes Pods,
+    ReplicaSets, ReplicationControllers, Deployments, StatefulSets,
+    DaemonSets, Jobs and CronJobs in every namespace.
+  clusterWide: true
+  risks:
+    - risk: It reads every Secret in the cluster, so its token exposes all of them.
+      mitigation: Keep its namespace admin-only; it runs as non-root with the RuntimeDefault seccomp profile and no capabilities.
+    - risk: >
+        Port 9300 is reachable from any pod, and its webhooks take no
+        credentials: whoever can call it rolls any annotated workload, in any
+        namespace, to any tag of that workload's repository.
+      mitigation: >
+        A NetworkPolicy allowing ingress to 9300 only from Builder's
+        namespace. basicauth with AUTHENTICATED_WEBHOOKS=true (extraEnv) makes
+        every webhook but /v1/webhooks/registry require it; basicauth also
+        enables the admin UI, which otherwise does not exist.
+
+smoke:
+  - name: rolls-on-native-webhook
+    manifest: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: smoke
+        namespace: catalog-smoke
+        annotations: {keel.sh/policy: force}
+      spec:
+        selector: {matchLabels: {app: smoke}}
+        template:
+          metadata: {labels: {app: smoke}}
+          spec:
+            containers:
+              - name: pause
+                image: registry.k8s.io/pause:3.9
+      ---
+      # Retries until Keel has seen the Deployment; a repeated event is a no-op.
+      apiVersion: batch/v1
+      kind: Job
+      metadata: {name: webhook, namespace: catalog-smoke}
+      spec:
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: curl
+                image: curlimages/curl:8.11.1
+                command: [sh, -c]
+                args:
+                  - for i in 1 2 3 4 5 6; do curl -sSf -d '{"name":"registry.k8s.io/pause","tag":"3.10"}' http://keel.keel.svc:9300/v1/webhooks/native; sleep 10; done
+    wait:
+      - "-n catalog-smoke deployment/smoke --for=jsonpath={.spec.template.spec.containers[0].image}=registry.k8s.io/pause:3.10"
+      - "-n catalog-smoke deployment/smoke --for=condition=Available"

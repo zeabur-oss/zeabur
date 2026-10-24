@@ -1,0 +1,153 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: MariaDB Operator
+  description: >
+    Runs MariaDB from a MariaDB object in the tenant's namespace, standalone or
+    replicated, with users, grants and databases as objects and backups to S3.
+    A MySQL-compatible database under an OSI licence.
+  # The operator is MIT; the MariaDB Server images it runs are GPL-2.0.
+  license: MIT AND GPL-2.0-only
+  homepage: https://github.com/mariadb-operator/mariadb-operator
+maturity: independent
+alternatives:
+  moco: MySQL 8 itself, for applications that need it rather than MariaDB.
+  cloudnative-pg: PostgreSQL.
+defaults:
+  single-node: optional
+  multi-node: optional
+# The webhook's serving certificate comes from cert-manager.
+requires: [certificates]
+persistsData: true
+
+releases:
+  # Its own chart so CRDs upgrade before the operator, as upstream installs it.
+  - name: mariadb-operator-crds
+    namespace: mariadb-operator
+    repo: https://helm.mariadb.com/mariadb-operator
+    chart: mariadb-operator-crds
+    version: 26.10.1
+
+  - name: mariadb-operator
+    namespace: mariadb-operator
+    repo: https://helm.mariadb.com/mariadb-operator
+    chart: mariadb-operator
+    version: 26.10.1
+    values: |
+      crds:
+        # From the mariadb-operator-crds release.
+        enabled: false
+      webhook:
+        cert:
+          certManager:
+            # cert-manager issues the webhook certificate, so the chart's
+            # cert-controller Deployment is not installed.
+            enabled: true
+        # Restricted Pod Security; the chart sets none.
+        podSecurityContext:
+          runAsNonRoot: true
+          seccompProfile: {type: RuntimeDefault}
+        # Restricted Pod Security; the chart sets none.
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities: {drop: [ALL]}
+      # Restricted Pod Security; the chart sets none.
+      podSecurityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      # Restricted Pod Security; the chart sets none.
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: {drop: [ALL]}
+    profiles:
+      single-node: |
+        resources:
+          # The chart sets none; grows with MariaDB objects.
+          requests: {cpu: 10m, memory: 64Mi}
+          limits: {memory: 256Mi}
+        webhook:
+          resources:
+            # Only admits MariaDB objects.
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+      multi-node: |
+        ha:
+          # Leader election keeps one active; survives a drain.
+          enabled: true
+          replicas: 2
+        resources:
+          # More MariaDB objects to reconcile.
+          requests: {cpu: 20m, memory: 128Mi}
+          limits: {memory: 512Mi}
+        webhook:
+          ha:
+            # Admission keeps working during a drain.
+            enabled: true
+            replicas: 2
+          resources:
+            # Only admits MariaDB objects.
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+
+detection:
+  crds: [mariadbs.k8s.mariadb.com]
+  helmCharts: [mariadb-operator]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: mariadb-operator}
+
+security:
+  summary: Manages pods, Services, Secrets, PVCs, Jobs and RBAC for MariaDB objects in every namespace.
+  clusterWide: true
+  credentials: optional
+  credentialsNote: Backups need S3 credentials, stored as a Secret in the tenant namespace.
+  tenants: namespaced
+  tenantCRDs: [MariaDB, Backup, PhysicalBackup, Restore, PointInTimeRecovery, Database, User, Grant, Connection, SqlJob, ExternalMariaDB, MaxScale]
+  risks:
+    - risk: >
+        MariaDB pods run as UID 999 but without a seccomp profile or dropped
+        capabilities unless the object sets podSecurityContext and securityContext.
+      mitigation: Set both on each MariaDB (see the smoke test); restricted namespaces reject the pods otherwise.
+    - risk: A MaxScale object runs MariaDB MaxScale, which is BSL-1.1, not OSI-approved.
+      mitigation: Do not create MaxScale objects, or review MaxScale's licence first; replication fails over without it.
+    - risk: Uninstalling the mariadb-operator-crds release deletes the CRDs and with them every MariaDB object.
+      mitigation: Uninstall only the mariadb-operator release when removing the operator; keep the CRDs while data exists.
+    - risk: Without TLS, root password rotation sends the new password in plain text.
+      mitigation: Enable tls on each MariaDB before rotating.
+
+smoke:
+  - name: standalone
+    manifest: |
+      # Proves MariaDB runs under restricted Pod Security.
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: catalog-smoke
+        labels: {pod-security.kubernetes.io/enforce: restricted}
+      ---
+      apiVersion: k8s.mariadb.com/v1alpha1
+      kind: MariaDB
+      metadata: {name: smoke, namespace: catalog-smoke}
+      spec:
+        storage: {size: 1Gi}
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 999
+          runAsGroup: 999
+          fsGroup: 999
+          seccompProfile: {type: RuntimeDefault}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+    wait: ["-n catalog-smoke mariadb/smoke --for=condition=Ready"]
+    # Pulls the MariaDB image first.
+    timeout: 600s
+
+upgradeNotes:
+  - versions: "*"
+    note: >
+      Upgrade the mariadb-operator-crds release first, one operator version at a
+      time. Data-plane containers update only with updateStrategy.autoUpdateDataPlane,
+      and a major MariaDB upgrade needs mariadb-upgrade enabled deliberately (docs/updates.md).

@@ -395,7 +395,7 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
             json!({
                 "id": c.id,
                 "capability": c.capability,
-                "displayName": c.display_name,
+                "displayName": c.metadata.name,
                 "default": match c.default_for("single-node") {
                     Default::Recommended => "recommended",
                     Default::Optional => "optional",

@@ -13,11 +13,11 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/upstream"
 if [[ -n "${RECS_DIR:-}" ]]; then
-  git -C "$RECS_DIR" archive "$commit" capabilities LICENSE | tar -x -C "$tmp/upstream"
+  git -C "$RECS_DIR" archive "$commit" components LICENSE | tar -x -C "$tmp/upstream"
 else
   curl --fail --silent --show-error --location --proto '=https' \
     "https://codeload.github.com/zeabur-oss/catalog/tar.gz/$commit" |
-    tar -xz -C "$tmp/upstream" --strip-components=1 "catalog-$commit/capabilities" \
+    tar -xz -C "$tmp/upstream" --strip-components=1 "catalog-$commit/components" \
       "catalog-$commit/LICENSE"
 fi
 if ! diff -r --exclude PINNED "$bundle" "$tmp/upstream" >&2; then

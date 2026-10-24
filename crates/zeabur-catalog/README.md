@@ -23,10 +23,10 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
   change makes it differ from that commit. The binary carries the catalogue it was built with and
   fetches nothing at run time. Once the catalogue publishes signed releases, the pin moves to a
   release.
-- **The rationale is the catalogue's own words.** It is English and written for operators
+- **The description is the catalogue's own words.** It is English and written for operators
   (licence, sizing, packaging); the interface shows it as the install sheet's notes, and on each
   card a one-sentence summary per locale (`web/src/i18n/component-summaries.ts`), keyed by a hash
-  of the rationale so that moving the pin to a changed rationale fails the web tests until the
+  of the description so that moving the pin to a changed description fails the web tests until the
   summary is checked.
 - **Exists or missing.** A capability *exists* when any of its components' detection rules
   matches something in the cluster; otherwise it is missing and its components are what could be

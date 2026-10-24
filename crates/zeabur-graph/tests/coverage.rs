@@ -124,7 +124,7 @@ mod tests {
             .map(|f| f.file_stem().unwrap().to_string_lossy().into_owned())
             .collect();
         let bundle =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../zeabur-catalog/bundle/capabilities");
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../zeabur-catalog/bundle/components");
         let mut components: Vec<String> = std::fs::read_dir(&bundle)
             .unwrap()
             .filter_map(Result::ok)

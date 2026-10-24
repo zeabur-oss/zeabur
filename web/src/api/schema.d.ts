@@ -3277,6 +3277,8 @@ export interface components {
       defaults: {
         [key: string]: string
       }
+      /** @description Why the catalogue chose it. */
+      description: string
       /** @description Human-readable name. */
       displayName: string
       /** @description The distributions it supports (`k3s`, …); empty means all. */
@@ -3287,8 +3289,6 @@ export interface components {
       id: string
       /** @description Its licence (SPDX). */
       license: string
-      /** @description Why the catalogue chose it. */
-      rationale: string
     }
     /**
      * @description The installed version against the tested one. An open set.
@@ -4821,8 +4821,6 @@ export interface components {
        *     are not in these texts.
        */
       contributesTo: string[]
-      /** @description What it needs installed first: `<capability>` (any provider) or `<capability>/<id>`. */
-      dependsOn: string[]
       /** @description The texts, one per form. */
       formats: components["schemas"]["InstallText"][]
       /** @description Whether Zeabur can install it itself, and how. */
@@ -4838,6 +4836,8 @@ export interface components {
        *     disabled on k3s before installing this one; each text begins by saying how.
        */
       replacesK3sPackaged: string[]
+      /** @description What it needs installed first: `<capability>` (any provider) or `<capability>/<id>`. */
+      requires: string[]
       /** @description Its RBAC and network access. */
       security: components["schemas"]["Security"]
     }

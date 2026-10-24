@@ -13,7 +13,7 @@ use serde_json::Value;
 use crate::PlanError;
 
 /// The only `indexVersion` this installer understands.
-pub const INDEX_VERSION: u64 = 1;
+pub const INDEX_VERSION: u64 = 2;
 
 /// A parsed `index.json`.
 #[derive(Debug, Clone, Deserialize)]
@@ -40,7 +40,7 @@ pub struct Component {
     /// The capability it fills.
     pub capability: String,
     /// Its name for people.
-    pub display_name: String,
+    pub metadata: Metadata,
     /// `recommended`, `optional` or `unsupported`, per profile.
     pub defaults: BTreeMap<String, Default>,
     /// Distributions it works on; empty means any.
@@ -65,6 +65,13 @@ pub struct Component {
     /// Idle use measured by the catalog's CI, keyed `<profile>-<arch>-v<kubernetes>`.
     #[serde(default)]
     pub measured: BTreeMap<String, Measured>,
+}
+
+/// The part of a component's `metadata` the installer reads.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Metadata {
+    /// Its name for people.
+    pub name: String,
 }
 
 /// How a component is offered on a profile.

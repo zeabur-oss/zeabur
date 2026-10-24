@@ -1,0 +1,121 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: Alertmanager Gotify bridge
+  description: >
+    Alertmanager has no Gotify receiver. The bridge takes Alertmanager's
+    webhook and posts each alert to one Gotify server as a message. Each
+    notification channel gives its own application token in the webhook URL.
+    Optional: only for clusters whose people use Gotify.
+  license: Apache-2.0
+  homepage: https://github.com/DRuggeri/alertmanager_gotify_bridge
+maturity: independent
+defaults:
+  single-node: optional
+  multi-node: optional
+requires: [metrics/victoria-metrics]
+
+inputs:
+  - name: endpoint
+    description: >
+      The bridge posts messages to the Gotify server at this URL, such as
+      https://gotify.example.com/message.
+    secret: {name: gotify-bridge, key: endpoint, namespace: observability}
+    required: true
+    testValue: http://gotify.invalid/message
+
+releases:
+  - name: bridge
+    namespace: observability
+    manifests: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: gotify-bridge
+        namespace: observability
+        labels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+      spec:
+        # Alertmanager retries a failed webhook, so one replica is enough.
+        replicas: 1
+        selector:
+          matchLabels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+        template:
+          metadata:
+            labels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+          spec:
+            automountServiceAccountToken: false
+            securityContext:
+              # The image does not set a user.
+              runAsNonRoot: true
+              runAsUser: 65534
+              runAsGroup: 65534
+              seccompProfile: {type: RuntimeDefault}
+            containers:
+              - name: bridge
+                image: docker.io/druggeri/alertmanager_gotify_bridge:2.3.2
+                env:
+                  - name: GOTIFY_ENDPOINT
+                    valueFrom:
+                      secretKeyRef: {name: gotify-bridge, key: endpoint}
+                  # The bridge does not start without a default token. Every
+                  # channel sets its own with ?token= in the webhook URL, so
+                  # a request without one fails at Gotify.
+                  - name: GOTIFY_TOKEN
+                    value: none
+                ports:
+                  - {name: http, containerPort: 8080}
+                readinessProbe:
+                  tcpSocket: {port: http}
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  readOnlyRootFilesystem: true
+                  capabilities: {drop: [ALL]}
+                resources:
+                  requests: {cpu: 5m, memory: 16Mi}
+                  limits: {memory: 64Mi}
+      ---
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: gotify-bridge
+        namespace: observability
+      spec:
+        selector: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+        ports:
+          - {name: http, port: 8080, targetPort: http}
+      ---
+      # Tokens travel in the request URL, so only Alertmanager may call the
+      # bridge.
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: gotify-bridge-alertmanager-only
+        namespace: observability
+      spec:
+        podSelector:
+          matchLabels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+        policyTypes: [Ingress]
+        ingress:
+          - from:
+              - podSelector:
+                  matchLabels: {app.kubernetes.io/name: vmalertmanager}
+            ports:
+              - {port: 8080, protocol: TCP}
+
+detection:
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: alertmanager-gotify-bridge}
+
+security:
+  summary: No Kubernetes API access; forwards alerts from Alertmanager to one Gotify server.
+  clusterWide: false
+  egress: [docker.io, the Gotify server]
+  risks:
+    - risk: The image is built on Alpine 3.14, which no longer gets security fixes.
+      mitigation: >
+        The bridge runs as non-root with a read-only root filesystem, no
+        capabilities and no service account token, and only Alertmanager
+        reaches it.
+    - risk: Every channel shares one Gotify server; a person cannot choose another.
+      mitigation: Use the generic webhook channel for a second server through a bridge of its own.

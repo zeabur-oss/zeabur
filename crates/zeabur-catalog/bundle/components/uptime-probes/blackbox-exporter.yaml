@@ -1,0 +1,64 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: Prometheus Blackbox Exporter
+  description: >
+    Probes HTTP, TCP and DNS targets; it comes from the Prometheus project, and
+    uptime alerts are plain rules. It needs VictoriaMetrics, so it follows VictoriaMetrics'
+    defaults.
+  license: Apache-2.0
+  homepage: https://github.com/prometheus/blackbox_exporter
+maturity: cncf-graduated
+defaults:
+  single-node: optional
+  multi-node: recommended
+requires: [metrics/victoria-metrics]
+
+releases:
+  - name: blackbox-exporter
+    namespace: observability
+    chart: oci://ghcr.io/prometheus-community/charts/prometheus-blackbox-exporter
+    version: 11.20.0
+    values: |
+      config:
+        modules:
+          # Uptime: a 2xx after redirects, IPv6 then IPv4.
+          http_2xx:
+            prober: http
+            timeout: 5s
+            http:
+              valid_http_versions: ["HTTP/1.1", "HTTP/2.0"]
+              follow_redirects: true
+              preferred_ip_protocol: ip6
+              ip_protocol_fallback: true
+          # Port checks for TCP services.
+          tcp_connect:
+            prober: tcp
+            timeout: 5s
+    profiles:
+      single-node: |
+        resources:
+          # Idles around 15Mi.
+          requests: {cpu: 10m, memory: 16Mi}
+          limits: {memory: 64Mi}
+      multi-node: |
+        # Two replicas, so a failure means the target is down.
+        replicas: 2
+        resources:
+          # More probes per interval.
+          requests: {cpu: 20m, memory: 32Mi}
+          limits: {memory: 128Mi}
+
+detection:
+  helmCharts: [prometheus-blackbox-exporter]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: prometheus-blackbox-exporter}
+
+security:
+  summary: Has no API access and only makes outbound probes.
+  tenants: admin-only
+  tenantCRDs: [VMProbe]
+  risks:
+    - risk: Probe targets can reach cloud metadata or private services (SSRF).
+      mitigation: Admit only the namespace's own hostnames or public URLs with an admission policy.

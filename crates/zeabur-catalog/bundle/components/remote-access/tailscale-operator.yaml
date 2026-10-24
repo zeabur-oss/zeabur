@@ -1,0 +1,122 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: Tailscale Kubernetes operator
+  description: >
+    Puts a Service or Ingress on the tailnet with no port open to the internet.
+    An Ingress gets a MagicDNS name with a Let's Encrypt certificate, so a host
+    without a domain still serves trusted HTTPS; a Service is proxied as it is,
+    without TLS. Optional: it needs a Tailscale account, and an Ingress needs
+    HTTPS and MagicDNS enabled on the tailnet.
+  license: BSD-3-Clause
+  homepage: https://tailscale.com/kb/1236/kubernetes-operator
+maturity: independent
+defaults:
+  single-node: optional
+  multi-node: optional
+
+inputs:
+  - name: oauth-client-id
+    description: >
+      The operator uses the Tailscale OAuth client with this ID. The client
+      needs write scope for Services, Devices Core and Auth Keys, and the tag
+      tag:k8s-operator. The tailnet policy must make tag:k8s-operator an owner
+      of tag:k8s, the proxies' default tag.
+    secret: {name: operator-oauth, key: client_id, namespace: tailscale}
+    required: true
+    testValue: catalog-ci
+  - name: oauth-client-secret
+    description: The operator authenticates with this OAuth client secret.
+    secret: {name: operator-oauth, key: client_secret, namespace: tailscale}
+    required: true
+    testValue: catalog-ci
+
+releases:
+  - name: tailscale-operator
+    namespace: tailscale
+    repo: https://pkgs.tailscale.com/helmcharts
+    chart: tailscale-operator
+    version: 1.104.1
+    values: |
+      oauth:
+        # Empty, so the chart renders no Secret; the operator mounts
+        # operator-oauth, created from the inputs before install.
+        clientId: ""
+        clientSecret: ""
+      operatorConfig:
+        image:
+          # The tag is pinned to the chart's appVersion; Always pulls on every restart.
+          pullPolicy: IfNotPresent
+      apiServerProxyConfig:
+        # No Kubernetes API proxy and no impersonation ClusterRole.
+        mode: "false"
+        allowImpersonation: "false"
+    profiles:
+      single-node: |
+        operatorConfig:
+          resources:
+            # Chart sets none; one controller and one tailnet node.
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+      multi-node: |
+        operatorConfig:
+          resources:
+            # More Services and Ingresses to reconcile.
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 512Mi}
+
+detection:
+  crds: [proxyclasses.tailscale.com, connectors.tailscale.com]
+  helmCharts: [tailscale-operator]
+  ingressControllers: [tailscale.com/ts-ingress]
+
+security:
+  summary: >
+    Creates, updates and deletes Services and Ingresses (and their status) in
+    every namespace; reads nodes and EndpointSlices; manages
+    ValidatingAdmissionPolicies and their bindings. In its own namespace it
+    manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments,
+    Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs,
+    peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders,
+    tailnets) and the IngressClass tailscale.
+  clusterWide: true
+  privileged: true
+  # Control plane, log uploads and DERP relays; proxies fetch certificates
+  # from Let's Encrypt; images come from Docker Hub.
+  egress: ["*.tailscale.com", acme-v02.api.letsencrypt.org, docker.io]
+  credentials: required
+  credentialsNote: >
+    A Tailscale OAuth client; the operator mints auth keys for itself and every
+    proxy, tagged tag:k8s-operator and tag:k8s.
+  risks:
+    - risk: >
+        Anyone who can create a Service or Ingress in any namespace can put it
+        on the tailnet (annotation tailscale.com/expose, loadBalancerClass
+        tailscale, or IngressClass tailscale), or reach a tailnet device
+        through an egress Service (annotation tailscale.com/tailnet-fqdn).
+      mitigation: >
+        Tailnet ACLs limit what tag:k8s may reach and who may reach it; a
+        ValidatingAdmissionPolicy can reserve those annotations, the class and
+        the IngressClass for approved namespaces.
+    - risk: >
+        Proxies for Services, egress and ProxyGroups run a privileged container
+        and a privileged init container that turns on IP forwarding, in the
+        operator's namespace. Ingress proxies run in userspace mode with no
+        added privileges.
+      mitigation: >
+        Label only the tailscale namespace with Pod Security privileged;
+        tenant namespaces keep restricted, since proxies never run there.
+    - risk: >
+        Pods in the cluster cannot resolve *.ts.net names by default, so an app
+        cannot call another app's tailnet name (an OIDC issuer, for example).
+      mitigation: >
+        A DNSConfig and a CoreDNS stub domain for ts.net resolve names that
+        have an egress proxy; an Ingress needs the experimental annotation
+        tailscale.com/experimental-forward-cluster-traffic-via-ingress, which
+        makes its proxy privileged. Calling the in-cluster Service avoids both.
+
+smoke:
+  - name: crds-established
+    wait:
+      - "crd/proxyclasses.tailscale.com --for=condition=Established"
+      - "crd/connectors.tailscale.com --for=condition=Established"

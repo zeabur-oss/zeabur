@@ -1,0 +1,116 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: Falco
+  description: >
+    Flags suspicious runtime behavior (container shells, privilege escalation)
+    from kernel events, and keeps each namespace's recent alerts in a
+    PolicyReport there, readable with namespace admin rights. Optional: it needs
+    a privileged eBPF probe and a BTF kernel (5.8+).
+  license: Apache-2.0
+  homepage: https://falco.org
+maturity: cncf-graduated
+defaults:
+  single-node: optional
+  multi-node: optional
+
+releases:
+  - name: policy-report-crds
+    namespace: falco
+    # Falcosidekick writes wgpolicyk8s.io/v1alpha2 reports; the chart lacks the CRDs.
+    # Kyverno and other report producers may have installed them already.
+    skipIfPresent: [policyreports.wgpolicyk8s.io]
+    urls:
+      - https://raw.githubusercontent.com/kubernetes-retired/wg-policy-prototypes/{version}/policy-report/crd/wgpolicyk8s.io/v1alpha2/wgpolicyk8s.io_policyreports.yaml
+      - https://raw.githubusercontent.com/kubernetes-retired/wg-policy-prototypes/{version}/policy-report/crd/wgpolicyk8s.io/v1alpha2/wgpolicyk8s.io_clusterpolicyreports.yaml
+    # The repository is archived; this is its last commit.
+    version: ed0ca5a1c7788055074c7500915b76fc4518ed33
+
+  - name: alert-readers
+    namespace: falco
+    manifests: |
+      # Alerts carry command lines and file paths, so only namespace admins
+      # (the built-in admin role, by aggregation) read their namespace's
+      # report. Bind this role in a namespace to let others read it too.
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRole
+      metadata:
+        name: falco-alert-reader
+        labels:
+          rbac.authorization.k8s.io/aggregate-to-admin: "true"
+      rules:
+        - apiGroups: [wgpolicyk8s.io]
+          resources: [policyreports]
+          verbs: [get, list, watch]
+
+  - name: falco
+    namespace: falco
+    chart: oci://ghcr.io/falcosecurity/charts/falco
+    version: 9.2.0
+    values: |
+      driver:
+        # Built-in CO-RE eBPF probe: no kernel module or headers.
+        kind: modern_ebpf
+      falco:
+        # JSON alerts so the log store can index fields.
+        json_output: true
+        json_include_output_property: true
+      falcoctl:
+        artifact:
+          follow:
+            # Rules change only with chart upgrades; no background downloads.
+            enabled: false
+      falcosidekick:
+        # Forwards alerts to PolicyReports in the namespace they concern.
+        enabled: true
+        # One writer: reports are read, appended to and replaced whole, and a
+        # second replica's concurrent update would be refused and its alert lost.
+        replicaCount: 1
+        image:
+          # 2.35.0 writes the alert's time; earlier versions only its seconds
+          # within the minute.
+          tag: 2.35.0
+        resources:
+          # Idle most of the time; one report update per alert.
+          requests: {cpu: 10m, memory: 32Mi}
+          limits: {memory: 128Mi}
+        config:
+          policyreport:
+            enabled: true
+            # The newest 100 alerts per namespace. One alert is about 1.5 KiB and
+            # holds the command line twice. At the upstream 1000, a report passes
+            # the etcd limit of 1.5 MiB, and each later update fails.
+            maxevents: 100
+    profiles:
+      single-node: |
+        resources:
+          # The chart asks 512Mi; one node idles well below that.
+          requests: {cpu: 50m, memory: 128Mi}
+          limits: {memory: 768Mi}
+      multi-node: |
+        resources:
+          # Busier nodes mean more syscalls to evaluate.
+          requests: {cpu: 100m, memory: 256Mi}
+          limits: {memory: 1Gi}
+
+detection:
+  helmCharts: [falco]
+  workloads:
+    - kind: DaemonSet
+      labels: {app.kubernetes.io/name: falco}
+
+security:
+  summary: >
+    Reads pod and node metadata to enrich alerts; falcosidekick writes
+    PolicyReports in every namespace.
+  clusterWide: true
+  privileged: true
+  egress: [ghcr.io, docker.io]
+  risks:
+    - risk: Alerts include command lines and file paths from every tenant's containers.
+      mitigation: >
+        Each namespace's report is readable by its admins only (falco-alert-reader,
+        aggregated to admin); alerts without a namespace go to a
+        ClusterPolicyReport for cluster administrators.
+
+leftovers: [customresourcedefinitions]

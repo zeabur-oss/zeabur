@@ -1,0 +1,57 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: VictoriaMetrics operator
+  description: >
+    One operator runs both the metrics and the logs stack from CRDs, and accepts
+    Prometheus operator objects so existing app manifests keep working.
+  license: Apache-2.0
+  homepage: https://docs.victoriametrics.com/operator/
+maturity: independent
+alternatives:
+  prometheus-operator: An existing installation is reused, and the VictoriaMetrics operator converts its objects.
+defaults:
+  single-node: recommended
+  multi-node: recommended
+# cert-manager issues the admission webhook certificate.
+requires: [certificates]
+
+releases:
+  - name: operator
+    namespace: observability
+    releaseName: victoria-metrics-operator
+    chart: oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator
+    version: 0.68.1
+    values: |
+      admissionWebhooks:
+        certManager:
+          # cert-manager issues the webhook certificate, so every render is identical.
+          enabled: true
+      crds:
+        # Delete VM objects before uninstall so finalizers don't block the namespace.
+        cleanup:
+          enabled: true
+    profiles:
+      single-node: |
+        resources:
+          # The operator idles near 40Mi.
+          requests: {cpu: 10m, memory: 48Mi}
+          limits: {memory: 256Mi}
+
+detection:
+  crds: [vmsingles.operator.victoriametrics.com, vlsingles.operator.victoriametrics.com]
+  helmCharts: [victoria-metrics-operator]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: victoria-metrics-operator}
+
+security:
+  summary: Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.
+  clusterWide: true
+  tenants: admin-only
+
+leftovers:
+  - customresourcedefinitions
+  # The cleanup hook's RBAC outlives uninstall. TODO: report upstream.
+  - clusterroles/victoria-metrics-operator-cleanup-hook
+  - clusterrolebindings/victoria-metrics-operator-cleanup-hook

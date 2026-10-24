@@ -6251,7 +6251,7 @@ components:
       - displayName
       - homepage
       - license
-      - rationale
+      - description
       - defaults
       - distributions
       properties:
@@ -6267,6 +6267,9 @@ components:
             type: string
           propertyNames:
             type: string
+        description:
+          type: string
+          description: Why the catalogue chose it.
         displayName:
           type: string
           description: Human-readable name.
@@ -6284,9 +6287,6 @@ components:
         license:
           type: string
           description: Its licence (SPDX).
-        rationale:
-          type: string
-          description: Why the catalogue chose it.
     ComponentUpgrade:
       type: string
       description: The installed version against the tested one. An open set.
@@ -9166,7 +9166,7 @@ components:
       - component
       - profile
       - profiles
-      - dependsOn
+      - requires
       - security
       - inputs
       - contributesTo
@@ -9184,11 +9184,6 @@ components:
           description: |-
             Other components whose releases it adds values to (`<capability>/<id>`); those values
             are not in these texts.
-        dependsOn:
-          type: array
-          items:
-            type: string
-          description: "What it needs installed first: `<capability>` (any provider) or `<capability>/<id>`."
         formats:
           type: array
           items:
@@ -9217,6 +9212,11 @@ components:
           description: |-
             k3s packaged components of the same kind (`traefik`, `metrics-server`) that must be
             disabled on k3s before installing this one; each text begins by saying how.
+        requires:
+          type: array
+          items:
+            type: string
+          description: "What it needs installed first: `<capability>` (any provider) or `<capability>/<id>`."
         security:
           $ref: "#/components/schemas/Security"
           description: Its RBAC and network access.

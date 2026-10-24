@@ -1,0 +1,96 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: Percona Operator for MongoDB
+  description: >
+    Runs MongoDB replica sets from a PerconaServerMongoDB object in the tenant's
+    namespace, with scheduled backups to S3 through Percona Backup for MongoDB.
+    The database server is SSPL, so it is never on by default.
+  # The operator is Apache-2.0; the Percona Server for MongoDB images it runs
+  # are SSPL-1.0, which is not OSI-approved.
+  license: Apache-2.0 AND SSPL-1.0
+  homepage: https://docs.percona.com/percona-operator-for-mongodb/
+maturity: independent
+alternatives:
+  cloudnative-pg: PostgreSQL, under an OSI license.
+defaults:
+  single-node: optional
+  multi-node: optional
+persistsData: true
+
+releases:
+  - name: psmdb-operator
+    namespace: psmdb-operator
+    repo: https://percona.github.io/percona-helm-charts
+    chart: psmdb-operator
+    version: 1.23.2
+    values: |
+      # Reconcile clusters in every namespace.
+      watchAllNamespaces: true
+      # Telemetry is on by default and reports to Percona.
+      disableTelemetry: true
+    profiles:
+      single-node: |
+        resources:
+          # Idles near 25Mi; grows with clusters. Chart sets none.
+          requests: {cpu: 10m, memory: 64Mi}
+          limits: {memory: 256Mi}
+      multi-node: |
+        # Leader election keeps one active; survives a drain.
+        replicaCount: 2
+        resources:
+          # More clusters to reconcile.
+          requests: {cpu: 20m, memory: 128Mi}
+          limits: {memory: 512Mi}
+
+detection:
+  crds: [perconaservermongodbs.psmdb.percona.com]
+  helmCharts: [psmdb-operator]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: psmdb-operator}
+
+security:
+  summary: Manages pods, Services, Secrets and PVCs for MongoDB clusters in every namespace.
+  clusterWide: true
+  credentials: optional
+  credentialsNote: Backups need S3 credentials, stored as a Secret in the tenant namespace.
+  tenants: namespaced
+  tenantCRDs: [PerconaServerMongoDB, PerconaServerMongoDBBackup, PerconaServerMongoDBRestore]
+  risks:
+    - risk: A backup storage without credentialsSecret uses the node's cloud identity.
+      mitigation: Require credentialsSecret with an admission policy where nodes carry a cloud identity.
+    - risk: sidecars, serviceAccountName and volumeSpec.hostPath reach beyond the database pod.
+      mitigation: The namespace's Pod Security level applies; restricted blocks hostPath.
+    - risk: A PerconaServerMongoDBRestore can read any backup whose credentials the tenant holds.
+      mitigation: Use one bucket path and key pair per tenant.
+    - risk: Percona Server for MongoDB is SSPL-1.0; offering it as a service to third parties has licence obligations.
+      mitigation: Show the licence before install; it is opt-in only.
+
+leftovers: [customresourcedefinitions]
+
+smoke:
+  - name: one-member-replset
+    manifest: |
+      apiVersion: psmdb.percona.com/v1
+      kind: PerconaServerMongoDB
+      metadata: {name: smoke, namespace: catalog-smoke}
+      spec:
+        crVersion: 1.23.1
+        # MongoDB 8 does not start on Linux 6.19 and newer (SERVER-121912); 7.0 runs everywhere.
+        image: percona/percona-server-mongodb:7.0.43-23
+        unsafeFlags: {replsetSize: true}
+        replsets:
+          - name: rs0
+            size: 1
+            volumeSpec:
+              persistentVolumeClaim:
+                resources: {requests: {storage: 1Gi}}
+        sharding: {enabled: false}
+    wait: ["-n catalog-smoke psmdb/smoke --for=jsonpath={.status.state}=ready"]
+    # Pulls the MongoDB image first.
+    timeout: 600s
+
+upgradeNotes:
+  - versions: "*"
+    note: Helm does not upgrade CRDs from the crds/ folder; apply the release's crd.yaml first, then bump crVersion in each cluster.

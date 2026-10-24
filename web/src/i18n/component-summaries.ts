@@ -1,7 +1,7 @@
 // What each catalogue component gives the cluster, in one sentence per locale. Keys are
-// `capability/id#hash`, the hash of the catalogue rationale the sentence summarises, so a changed
-// rationale leaves the old sentence unused until someone rewrites it (component-summaries.test.ts
-// fails meanwhile). The rationale itself stays in the install sheet's notes.
+// `capability/id#hash`, the hash of the catalogue description the sentence summarises, so a changed
+// description leaves the old sentence unused until someone rewrites it (component-summaries.test.ts
+// fails meanwhile). The description itself stays in the install sheet's notes.
 import type { Locale } from "@/i18n"
 
 type Summary = { en: string } & Partial<Record<Exclude<Locale, "en">, string>>
@@ -164,16 +164,16 @@ export function sourceHash(text: string): string {
   return hash.toString(16).padStart(8, "0")
 }
 
-export const summaryKey = (capability: string, id: string, rationale: string) =>
-  `${capability}/${id}#${sourceHash(rationale)}`
+export const summaryKey = (capability: string, id: string, description: string) =>
+  `${capability}/${id}#${sourceHash(description)}`
 
-/** The component's sentence in `locale`, else in English; none when the rationale changed. */
+/** The component's sentence in `locale`, else in English; none when the description changed. */
 export function summaryOf(
   capability: string,
   id: string,
-  rationale: string,
+  description: string,
   locale: Locale,
 ): string | undefined {
-  const summary = summaries[summaryKey(capability, id, rationale)]
+  const summary = summaries[summaryKey(capability, id, description)]
   return summary ? (summary[locale] ?? summary.en) : undefined
 }

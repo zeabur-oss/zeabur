@@ -1,4 +1,4 @@
-//! Embeds the vendored Zeabur Catalog (`bundle/capabilities/<capability>/<id>.yaml`)
+//! Embeds the vendored Zeabur Catalog (`bundle/components/<capability>/<id>.yaml`)
 //! as a sorted table of `include_str!` entries, so the binary carries the catalogue it was built
 //! with and reads nothing at run time.
 
@@ -8,7 +8,7 @@ use std::{env, fs};
 
 fn main() {
     let manifest = PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap_or_default());
-    let root = manifest.join("bundle/capabilities");
+    let root = manifest.join("bundle/components");
     println!("cargo::rerun-if-changed={}", root.display());
     let mut entries = Vec::new();
     for capability in fs::read_dir(&root).into_iter().flatten().flatten() {

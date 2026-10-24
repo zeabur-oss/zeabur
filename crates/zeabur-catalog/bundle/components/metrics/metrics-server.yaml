@@ -1,0 +1,57 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: Kubernetes Metrics Server
+  description: >
+    Serves metrics.k8s.io for HPA and `kubectl top`. It keeps no history, so it
+    is the cheapest source of live CPU and memory.
+  license: Apache-2.0
+  homepage: https://github.com/kubernetes-sigs/metrics-server
+maturity: kubernetes-sig
+alternatives:
+  victoria-metrics: Adds history and alerts at a few hundred MiB.
+defaults:
+  single-node: recommended
+  multi-node: recommended
+
+releases:
+  - name: metrics-server
+    namespace: kube-system
+    repo: https://kubernetes-sigs.github.io/metrics-server
+    chart: metrics-server
+    version: 3.14.0
+    values: |
+      args:
+        # 15s is fresh enough for live views; the default is 60s.
+        - --metric-resolution=15s
+    profiles:
+      single-node: |
+        resources:
+          # The chart's 200Mi request is sized for 100+ nodes.
+          requests: {cpu: 20m, memory: 48Mi}
+          limits: {memory: 128Mi}
+      multi-node: |
+        # HPA stops while metrics.k8s.io is down; two replicas.
+        replicas: 2
+        podDisruptionBudget:
+          # Keep one replica during node drains.
+          enabled: true
+          minAvailable: 1
+        resources:
+          # Covers clusters of a few dozen nodes.
+          requests: {cpu: 50m, memory: 96Mi}
+          limits: {memory: 256Mi}
+
+detection:
+  apiServices: [v1beta1.metrics.k8s.io]
+  helmCharts: [metrics-server]
+  k3sAddons: [metrics-server]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: metrics-server}
+    - kind: Deployment
+      labels: {k8s-app: metrics-server}
+
+security:
+  summary: Reads kubelet metrics; registers an aggregated API.
+  clusterWide: true

@@ -169,7 +169,7 @@ pub struct InstallGuide {
     /// Every profile the catalogue sizes it for.
     pub profiles: Vec<String>,
     /// What it needs installed first: `<capability>` (any provider) or `<capability>/<id>`.
-    pub depends_on: Vec<String>,
+    pub requires: Vec<String>,
     /// Its RBAC and network access.
     pub security: Security,
     /// Values asked for or generated.
@@ -204,7 +204,7 @@ pub enum InstallError {
 #[serde(rename_all = "camelCase")]
 struct File {
     #[serde(default)]
-    depends_on: Vec<String>,
+    requires: Vec<String>,
     #[serde(default)]
     inputs: Vec<Input>,
     releases: Vec<Release>,
@@ -354,7 +354,7 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
         component: component.to_owned(),
         profile: profile.to_owned(),
         profiles: PROFILES.iter().map(|p| (*p).to_owned()).collect(),
-        depends_on: file.depends_on.clone(),
+        requires: file.requires.clone(),
         security: file.security.clone(),
         inputs: file
             .inputs

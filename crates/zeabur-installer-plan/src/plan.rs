@@ -777,7 +777,7 @@ fn component_plan(
 
     Ok(ComponentPlan {
         id: id.to_owned(),
-        display_name: component.display_name.clone(),
+        display_name: component.metadata.name.clone(),
         why: match why {
             Why::Preset => "preset",
             Why::Enabled => "enabled",

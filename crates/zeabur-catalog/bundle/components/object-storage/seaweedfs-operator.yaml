@@ -1,0 +1,152 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: SeaweedFS Operator
+  description: >
+    Runs SeaweedFS from a Seaweed object in the tenant's namespace and serves
+    its S3 API, with buckets, users, keys and policies as objects. Beta: the
+    chart is pre-1.0, almost all of it comes from one maintainer, and its
+    features and CRDs still change from release to release.
+  license: Apache-2.0
+  homepage: https://github.com/seaweedfs/seaweedfs-operator
+maturity: independent
+stability: beta
+defaults:
+  single-node: optional
+  multi-node: optional
+# The webhook's serving certificate comes from cert-manager.
+requires: [certificates]
+persistsData: true
+
+releases:
+  - name: seaweedfs-operator
+    namespace: seaweedfs-operator
+    repo: https://seaweedfs.github.io/seaweedfs-operator/
+    chart: seaweedfs-operator
+    version: 0.1.43
+    values: |
+      webhook:
+        certManager:
+          # cert-manager issues the webhook certificate instead of the chart's
+          # certgen hook Job.
+          enabled: true
+        # Restricted Pod Security; the chart's default.
+        podSecurityContext:
+          runAsNonRoot: true
+          runAsUser: 65532
+          fsGroup: 65532
+          seccompProfile: {type: RuntimeDefault}
+      grafanaDashboard:
+        # On by default; no Grafana assumed.
+        enabled: false
+      # Restricted Pod Security; the chart leaves out the seccomp profile.
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+    profiles:
+      single-node: |
+        resources:
+          # The chart asks for 100m and 50Mi; it idles lower.
+          requests: {cpu: 10m, memory: 64Mi}
+          limits: {memory: 256Mi}
+      multi-node: |
+        # Leader election keeps one active; survives a drain.
+        replicaCount: 2
+        resources:
+          # More clusters and buckets to reconcile.
+          requests: {cpu: 20m, memory: 128Mi}
+          limits: {memory: 512Mi}
+
+detection:
+  crds: [seaweeds.seaweed.seaweedfs.com]
+  helmCharts: [seaweedfs-operator]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: seaweedfs-operator}
+
+security:
+  summary: >
+    Manages pods, StatefulSets, Services, Secrets, PVCs, Jobs and Ingresses
+    for Seaweed objects in every namespace, and calls each cluster's admin API.
+  clusterWide: true
+  egress: [docker.io]
+  credentials: optional
+  credentialsNote: Backups and remote storage need cloud credentials, stored as a Secret in the tenant namespace.
+  tenants: namespaced
+  tenantCRDs: [Seaweed, Bucket, BucketLifecyclePolicy, S3Identity, S3Credentials, S3Policy, S3PolicyBinding, S3OIDCProvider, SeaweedBackup, SeaweedRestore, AdminScript, ResourceReferenceGrant]
+  risks:
+    - risk: >
+        SeaweedFS pods run as root unless each component of the Seaweed object
+        sets podSecurityContext and containerSecurityContext.
+      mitigation: Set them for master, volume, filer and s3 (see the smoke test); restricted namespaces reject the pods otherwise.
+    - risk: volume.kind DaemonSet stores data on hostPath and SeaweedCSIDriver installs a privileged CSI driver.
+      mitigation: Both are admin features; restricted Pod Security blocks hostPath in tenant namespaces.
+    - risk: Without IAM, the S3 gateway accepts anonymous requests.
+      mitigation: Create an S3Identity and S3Credentials for each application; IAM is embedded on the S3 port.
+    - risk: >
+        SeaweedRestore reloads filer metadata only; restoring into a new cluster
+        also needs the file data, which the operator does not re-seed yet.
+      mitigation: >
+        Keep a dataMirror to S3 and copy the objects back through the new
+        cluster's S3 API.
+    - risk: An AdminScript runs weed shell commands against a cluster with admin rights.
+      mitigation: It reaches only Seaweed objects in its namespace unless a ResourceReferenceGrant allows more.
+
+# The CRDs carry helm.sh/resource-policy: keep.
+leftovers: [customresourcedefinitions]
+
+smoke:
+  - name: one-node-s3
+    manifest: |
+      # Proves SeaweedFS runs under restricted Pod Security.
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: catalog-smoke
+        labels: {pod-security.kubernetes.io/enforce: restricted}
+      ---
+      apiVersion: seaweed.seaweedfs.com/v1
+      kind: Seaweed
+      metadata: {name: smoke, namespace: catalog-smoke}
+      spec:
+        image: chrislusf/seaweedfs:4.48
+        volumeServerDiskCount: 1
+        master:
+          replicas: 1
+          podSecurityContext: &pod
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000
+            seccompProfile: {type: RuntimeDefault}
+          containerSecurityContext: &container
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+        volume:
+          replicas: 1
+          requests: {storage: 1Gi}
+          podSecurityContext: *pod
+          containerSecurityContext: *container
+        filer:
+          replicas: 1
+          podSecurityContext: *pod
+          containerSecurityContext: *container
+        s3:
+          replicas: 1
+          podSecurityContext: *pod
+          containerSecurityContext: *container
+    wait:
+      # The operator creates the S3 gateway after master, volume and filer.
+      - "-n catalog-smoke deployment/smoke-s3 --for=create"
+      - "-n catalog-smoke deployment/smoke-s3 --for=condition=Available"
+    # Pulls the SeaweedFS image and starts master, volume and filer in turn.
+    timeout: 600s
+
+upgradeNotes:
+  - versions: "*"
+    note: >
+      Upgrades roll every SeaweedFS component the operator manages. Pin
+      spec.image (or spec.version) in each Seaweed object so an operator
+      upgrade does not also change the SeaweedFS version.

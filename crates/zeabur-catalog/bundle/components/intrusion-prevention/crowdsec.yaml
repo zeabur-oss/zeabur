@@ -1,0 +1,160 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: CrowdSec
+  description: >
+    Blocks brute-force attempts and scanners that show up in Traefik's access
+    logs, for every app behind the ingress. It fails open, and the online API is
+    off by default.
+  license: MIT
+  homepage: https://www.crowdsec.net
+maturity: independent
+defaults:
+  single-node: optional
+  multi-node: optional
+persistsData: true
+requires: [ingress/traefik]
+
+inputs:
+  - name: bouncer-key
+    description: The Traefik bouncer uses this key to call the CrowdSec local API.
+    secret: {name: crowdsec-bouncer-key, key: key, namespace: crowdsec}
+    generate: random
+  - name: lapi-secret
+    description: The local API (LAPI) signs agent sessions with this shared secret.
+    secret: {name: crowdsec-lapi, key: csLapiSecret, namespace: crowdsec}
+    generate: random
+  - name: registration-token
+    description: Agents register with the local API using this token.
+    secret: {name: crowdsec-lapi, key: registrationToken, namespace: crowdsec}
+    generate: random
+
+releases:
+  - name: crowdsec
+    namespace: crowdsec
+    chart: oci://ghcr.io/crowdsecurity/helm-charts/crowdsec
+    version: 0.24.2
+    values: |
+      # The runtime on k3s and mainstream distributions.
+      container_runtime: containerd
+      secrets:
+        externalSecret:
+          # Inputs, not chart-generated, so every render is identical.
+          name: crowdsec-lapi
+      agent:
+        acquisition:
+          # Traefik's JSON access log.
+          - namespace: traefik
+            podName: traefik-*
+            program: traefik
+        env:
+          # Parsers and scenarios for Traefik plus generic HTTP attacks.
+          - name: COLLECTIONS
+            value: crowdsecurity/traefik
+      lapi:
+        env:
+          # No data leaves the cluster unless the user opts in.
+          - name: DISABLE_ONLINE_API
+            value: "true"
+          # Registers the Traefik bouncer (input bouncer-key).
+          - name: BOUNCER_KEY_traefik
+            valueFrom:
+              secretKeyRef: {name: crowdsec-bouncer-key, key: key}
+        persistentVolume:
+          data:
+            # SQLite decisions and bouncer registrations.
+            enabled: true
+          config:
+            # Keeps machine credentials stable across restarts.
+            enabled: true
+    profiles:
+      single-node: |
+        agent:
+          resources:
+            # Chart asks 250Mi; an idle agent uses under 100Mi.
+            requests: {cpu: 20m, memory: 48Mi}
+            limits: {memory: 192Mi}
+        lapi:
+          resources:
+            # Chart asks 500Mi; LAPI on SQLite idles far below.
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+      multi-node: |
+        agent:
+          resources:
+            # One agent per node; busier logs than single-node.
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {memory: 256Mi}
+        lapi:
+          resources:
+            # Headroom for more agents and decisions.
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {memory: 384Mi}
+
+  - name: bouncer-middleware
+    namespace: crowdsec
+    manifests: |
+      # Referenced from Traefik's entrypoints as crowdsec-bouncer@kubernetescrd.
+      apiVersion: traefik.io/v1alpha1
+      kind: Middleware
+      metadata:
+        name: bouncer
+        namespace: crowdsec
+      spec:
+        plugin:
+          crowdsec-bouncer:
+            enabled: true
+            # Local copy of decisions; requests never wait on LAPI.
+            crowdsecMode: stream
+            crowdsecLapiScheme: http
+            crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+            # Read from the Secret in the Middleware's namespace.
+            crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:key
+            # Fail open: if LAPI is unreachable, keep serving traffic.
+            updateMaxFailure: -1
+
+contributes:
+  - target: ingress/traefik
+    release: traefik
+    values: |
+      experimental:
+        plugins:
+          # Downloaded from plugins.traefik.io at start.
+          crowdsec-bouncer:
+            moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+            version: v1.7.1
+      ports:
+        web:
+          http:
+            # Every request passes the bouncer; no app opts in.
+            middlewares: [crowdsec-bouncer@kubernetescrd]
+        websecure:
+          http:
+            # Same as web.
+            middlewares: [crowdsec-bouncer@kubernetescrd]
+      accessLog:
+        fields:
+          names:
+            # CrowdSec's scenarios key on the client address.
+            ClientHost: keep
+          headers:
+            names:
+              # Bot scenarios match on the user agent.
+              User-Agent: keep
+
+detection:
+  helmCharts: [crowdsec]
+  workloads:
+    - kind: Deployment
+      labels: {k8s-app: crowdsec, type: lapi}
+
+security:
+  summary: The agent reads node log files read-only and makes no API writes.
+  privileged: true
+  egress: [hub-data.crowdsec.net, plugins.traefik.io, github.com]
+  tenants: admin-only
+  risks:
+    - risk: A ban on a shared IP (NAT, CDN) blocks it for every tenant.
+      mitigation: Only administrators manage decisions. Configure trusted proxies before running CrowdSec behind a CDN.
+
+leftovers: [persistentvolumeclaims]

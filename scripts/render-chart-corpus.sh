@@ -145,10 +145,10 @@ rm -f "$out_dir"/*.yaml "$out_dir/README.md"
 rows=$work/rows
 failed=()
 : >"$rows"
-for path in "$src"/capabilities/*/*.yaml; do
+for path in "$src"/components/*/*.yaml; do
   capability=$(basename "$(dirname "$path")")
   component=$(basename "$path" .yaml)
-  rel=capabilities/$capability/$component.yaml
+  rel=components/$capability/$component.yaml
   if [[ $(yq -r ".defaults.\"$PROFILE\"" "$rel") == unsupported ]]; then
     continue
   fi

@@ -33,7 +33,7 @@ pub struct Component {
     /// Its licence (SPDX).
     pub license: String,
     /// Why the catalogue chose it.
-    pub rationale: String,
+    pub description: String,
     /// Whether the catalogue installs it by default, per profile (`single-node`, `multi-node`):
     /// `recommended` or `optional`.
     pub defaults: BTreeMap<String, String>,
@@ -114,16 +114,21 @@ pub struct WorkloadMatch {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct File {
-    display_name: String,
-    homepage: String,
-    license: String,
-    rationale: String,
+    metadata: Metadata,
     defaults: BTreeMap<String, String>,
     #[serde(default)]
     distributions: Vec<String>,
     detection: Detection,
     #[serde(default)]
     releases: Vec<Release>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Metadata {
+    name: String,
+    description: String,
+    license: String,
+    homepage: String,
 }
 
 /// Why the catalogue could not be read.
@@ -153,10 +158,10 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
             Ok(Component {
                 id: (*id).to_owned(),
                 capability: (*capability).to_owned(),
-                display_name: file.display_name,
-                homepage: file.homepage,
-                license: file.license,
-                rationale: file.rationale.trim().to_owned(),
+                display_name: file.metadata.name,
+                homepage: file.metadata.homepage,
+                license: file.metadata.license,
+                description: file.metadata.description.trim().to_owned(),
                 defaults: file.defaults,
                 distributions: file.distributions,
                 tested_version: tested_version(&file.releases, &file.detection),
@@ -371,7 +376,7 @@ mod tests {
     fn every_catalogue_file_parses_and_has_a_detection_rule() {
         let components = catalogue().unwrap();
         // Every file of the bundle is embedded.
-        let bundle = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("bundle/capabilities");
+        let bundle = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("bundle/components");
         let files = std::fs::read_dir(bundle)
             .unwrap()
             .filter_map(Result::ok)

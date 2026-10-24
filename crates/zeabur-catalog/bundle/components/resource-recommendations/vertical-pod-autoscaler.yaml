@@ -1,0 +1,49 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: Vertical Pod Autoscaler (recommender only)
+  description: >
+    Suggests CPU and memory requests from observed usage. Recommender only:
+    nothing changes pods unless you apply a suggestion.
+  license: Apache-2.0
+  homepage: https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler
+maturity: kubernetes-sig
+defaults:
+  single-node: optional
+  multi-node: optional
+requires: [metrics/metrics-server]
+
+releases:
+  - name: vpa
+    namespace: vpa-system
+    repo: https://kubernetes.github.io/autoscaler
+    chart: vertical-pod-autoscaler
+    version: 0.13.0
+    values: |
+      recommender:
+        # Produces suggestions from metrics.k8s.io.
+        enabled: true
+      updater:
+        # Evicts pods to apply suggestions; keep changes manual.
+        enabled: false
+      admissionController:
+        # Rewrites pod resources at admission; same reason.
+        enabled: false
+
+detection:
+  crds: [verticalpodautoscalers.autoscaling.k8s.io]
+  helmCharts: [vertical-pod-autoscaler]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/component: recommender}
+
+security:
+  summary: Reads pods, workloads and metrics in all namespaces; writes VPA status.
+  clusterWide: true
+  tenants: namespaced
+  tenantCRDs: [VerticalPodAutoscaler]
+  risks:
+    - risk: A VPA's targetRef could name a workload in another namespace.
+      mitigation: targetRef has no namespace field, so a VPA only targets its own namespace.
+
+leftovers: [customresourcedefinitions]

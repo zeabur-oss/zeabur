@@ -124,7 +124,7 @@ export function ComponentsPage() {
       (filter === "installed" && c.existing) ||
       (filter === "recommended" && !c.existing && c.suggestion === "recommended")) &&
     (!query ||
-      `${c.name} ${capLabel(c.name)} ${c.components.map((x) => `${x.displayName} ${summaryOf(c.name, x.id, x.rationale, locale) ?? x.rationale}`).join(" ")}`
+      `${c.name} ${capLabel(c.name)} ${c.components.map((x) => `${x.displayName} ${summaryOf(c.name, x.id, x.description, locale) ?? x.description}`).join(" ")}`
         .toLowerCase()
         .includes(query.toLowerCase()))
   const known = new Set(categories.flatMap((c) => c.names))
@@ -150,7 +150,7 @@ export function ComponentsPage() {
           <InstallSheet
             component={open}
             name={opened?.displayName ?? open}
-            notes={opened?.rationale}
+            notes={opened?.description}
             profile={search.profile}
             onProfile={(profile) =>
               void navigate({ search: (previous) => ({ ...previous, profile }), replace: true })
@@ -289,8 +289,8 @@ function ComponentCard({
         <StateChip state={state} evidence={capability.evidence} />
       </div>
       <p className="line-clamp-3 type-body leading-normal text-muted-foreground">
-        {summaryOf(capability.name, component.id, component.rationale, locale) ??
-          component.rationale}
+        {summaryOf(capability.name, component.id, component.description, locale) ??
+          component.description}
       </p>
       <div className="mt-auto flex min-h-8 items-center gap-2 pt-1">
         <span className="type-meta text-muted-foreground" translate="no">

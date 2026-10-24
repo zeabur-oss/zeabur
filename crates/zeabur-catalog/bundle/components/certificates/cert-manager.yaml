@@ -1,0 +1,171 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: cert-manager
+  description: >
+    cert-manager is the standard Kubernetes certificate controller (CNCF
+    graduated). Its issuers live in the cluster, so it renews certificates
+    itself.
+  license: Apache-2.0
+  homepage: https://cert-manager.io
+maturity: cncf-graduated
+defaults:
+  single-node: recommended
+  multi-node: recommended
+# Gateway API CRDs come with ingress; the controller exits without them.
+requires: [ingress]
+
+releases:
+  - name: cert-manager
+    namespace: cert-manager
+    chart: oci://quay.io/jetstack/charts/cert-manager
+    version: v1.21.2
+    values: |
+      crds:
+        # Upgrade CRDs with the chart, whatever the installer.
+        enabled: true
+        # Keep CRDs on uninstall; deleting them deletes every Certificate.
+        keep: true
+      enableCertificateOwnerRef: true # Delete the TLS Secret with its Certificate.
+      config:
+        # Typed controller config for the setting below.
+        apiVersion: controller.config.cert-manager.io/v1alpha1
+        kind: ControllerConfiguration
+        # Issue certificates for Gateway listeners.
+        enableGatewayAPI: true
+    profiles:
+      single-node: |
+        prometheus:
+          # Metrics on the pod port; no Prometheus operator assumed.
+          enabled: true
+          servicemonitor:
+            enabled: false
+        # Idles at 20-40Mi; small requests fit a 2 GB node.
+        resources:
+          requests: {cpu: 10m, memory: 32Mi}
+          limits: {memory: 128Mi}
+        webhook:
+          # Same sizing as the controller.
+          resources:
+            requests: {cpu: 10m, memory: 24Mi}
+            limits: {memory: 64Mi}
+        cainjector:
+          # Caches watched Secrets; the limit bounds it.
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+        startupapicheck:
+          # Short-lived post-install Job.
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {memory: 64Mi}
+      multi-node: |
+        # Two replicas; leader election keeps one active.
+        replicaCount: 2
+        podDisruptionBudget:
+          # Keep a controller during drains.
+          enabled: true
+        webhook:
+          # Gates every cert-manager write; stay available during drains.
+          replicaCount: 2
+          podDisruptionBudget:
+            enabled: true
+        cainjector:
+          # Same reason as the controller.
+          replicaCount: 2
+          podDisruptionBudget:
+            enabled: true
+
+  # Applied after the chart: helm --wait and the chart's startupapicheck hook
+  # wait for the webhook that validates these objects.
+  - name: issuers
+    namespace: cert-manager
+    manifests: |
+      # Try here first; production rate limits are far lower. Staging
+      # certificates are not trusted by browsers.
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: letsencrypt-staging
+      spec:
+        acme:
+          server: https://acme-staging-v02.api.letsencrypt.org/directory
+          # No email: ACME accounts need no contact, and Let's Encrypt sends
+          # no expiry emails since 2025. Setting spec.acme.email later updates
+          # the registered account.
+          # Account key, created by cert-manager in its own namespace.
+          privateKeySecretRef:
+            name: letsencrypt-staging-account-key
+          solvers:
+            # HTTP-01 through Traefik's Ingress support; needs no Gateway, and
+            # also answers for names served by Gateway listeners. The name
+            # must reach port 80 of the cluster from the internet.
+            - http01:
+                ingress:
+                  ingressClassName: traefik
+      ---
+      # Trusted certificates; same settings as staging.
+      apiVersion: cert-manager.io/v1
+      kind: ClusterIssuer
+      metadata:
+        name: letsencrypt
+      spec:
+        acme:
+          server: https://acme-v02.api.letsencrypt.org/directory
+          privateKeySecretRef:
+            name: letsencrypt-account-key
+          solvers:
+            - http01:
+                ingress:
+                  ingressClassName: traefik
+
+detection:
+  crds: [certificates.cert-manager.io, clusterissuers.cert-manager.io]
+  helmCharts: [cert-manager]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: cert-manager}
+
+security:
+  summary: Writes Secrets in all namespaces and manages webhook CA bundles.
+  clusterWide: true
+  egress: [acme-v02.api.letsencrypt.org, acme-staging-v02.api.letsencrypt.org]
+  credentials: optional
+  credentialsNote: Only DNS-01 issuers need a DNS provider token.
+  tenants: namespaced
+  tenantCRDs: [Certificate, Issuer]
+  risks:
+    - risk: Any namespace can use a ClusterIssuer for a hostname it does not own.
+      mitigation: Offer tenants HTTP-01 ClusterIssuers only; keep DNS-01 admin-only.
+    - risk: A tenant DNS-01 Issuer can issue certificates for any name in its zone.
+      mitigation: Scope the token to the tenant's own zones and namespace.
+
+# ACME account keys have no owner; keeping them keeps the accounts on reinstall.
+leftovers:
+  - customresourcedefinitions
+  - secrets/letsencrypt-staging-account-key
+  - secrets/letsencrypt-account-key
+
+smoke:
+  - name: self-signed-certificate
+    manifest: |
+      apiVersion: cert-manager.io/v1
+      kind: Issuer
+      metadata: {name: smoke, namespace: catalog-smoke}
+      spec: {selfSigned: {}}
+      ---
+      apiVersion: cert-manager.io/v1
+      kind: Certificate
+      metadata: {name: smoke, namespace: catalog-smoke}
+      spec:
+        secretName: smoke-tls
+        dnsNames: [smoke.example.test]
+        issuerRef: {kind: Issuer, name: smoke}
+    wait: ["-n catalog-smoke certificate/smoke --for=condition=Ready"]
+  # Ready means the ACME account is registered; it needs egress to Let's
+  # Encrypt, not a reachable ingress. CI points both issuers at staging
+  # (config/e2e.yaml), so it registers no production accounts.
+  - name: acme-issuers
+    wait:
+      - "clusterissuer/letsencrypt-staging --for=condition=Ready"
+      - "clusterissuer/letsencrypt --for=condition=Ready"

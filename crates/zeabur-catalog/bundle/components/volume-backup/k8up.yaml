@@ -1,0 +1,64 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Component
+metadata:
+  name: K8up
+  description: >
+    Backs up each namespace with restic to any S3-compatible store, so tenants
+    can safely manage their own backups.
+  license: Apache-2.0
+  homepage: https://k8up.io
+maturity: cncf-sandbox
+alternatives:
+  velero: Backs up the whole cluster; for administrators only.
+defaults:
+  single-node: optional
+  multi-node: optional
+
+releases:
+  - name: k8up
+    namespace: k8up-system
+    repo: https://k8up-io.github.io/k8up
+    chart: k8up
+    version: 4.10.0
+    values: |
+      k8up:
+        # Back up only PVCs annotated for backup.
+        skipWithoutAnnotation: true
+    profiles:
+      single-node: |
+        k8up:
+          # No leader election with a single replica.
+          enableLeaderElection: false
+        resources:
+          # Idle between schedules; backup Jobs have their own requests.
+          requests: {cpu: 10m, memory: 32Mi}
+          limits: {memory: 256Mi}
+      multi-node: |
+        # Keeps schedules firing through node drains.
+        replicaCount: 2
+        resources:
+          # More schedules on bigger clusters.
+          requests: {cpu: 20m, memory: 64Mi}
+          limits: {memory: 512Mi}
+
+detection:
+  crds: [schedules.k8up.io, backups.k8up.io]
+  helmCharts: [k8up]
+  workloads:
+    - kind: Deployment
+      labels: {app.kubernetes.io/name: k8up}
+
+security:
+  summary: Watches K8up objects cluster-wide; backup Jobs mount PVCs in their own namespace.
+  clusterWide: true
+  credentials: required
+  credentialsNote: S3 credentials and a restic password, stored in the tenant namespace.
+  tenants: namespaced
+  tenantCRDs: [Schedule, Backup, Restore, Check, Prune, Archive, Snapshot]
+  risks:
+    - risk: A Restore can read any repository whose credentials the tenant holds.
+      mitigation: Use one repository path and password per tenant.
+    - risk: PreBackupPod runs an arbitrary pod spec before each backup.
+      mitigation: It is subject to the namespace's Pod Security level.
+
+leftovers: [customresourcedefinitions]

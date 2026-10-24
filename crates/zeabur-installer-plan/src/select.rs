@@ -160,7 +160,7 @@ fn resolve_all(index: &Index, profile: &str, names: &[&str]) -> Result<Vec<Strin
 }
 
 /// A component id, or the provider of a capability: its recommended component on the profile,
-/// else its first optional one (the catalog's own rule for a bare `dependsOn`).
+/// else its first optional one (the catalog's own rule for a bare `requires`).
 fn resolve(index: &Index, profile: &str, name: &str) -> Result<String, PlanError> {
     if name.contains('/') {
         return index

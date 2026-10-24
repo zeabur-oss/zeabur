@@ -46,7 +46,7 @@ export function InstallSheet({
   /** `capability/id`. */
   component: string
   name: string
-  /** The catalogue's rationale: licence, sizing and packaging, in English. */
+  /** The catalogue's description: licence, sizing and packaging, in English. */
   notes?: string
   profile?: Profile
   onProfile: (profile: Profile) => void
@@ -133,11 +133,11 @@ export function InstallSheet({
                     <dd lang="en">{notes}</dd>
                   </>
                 ) : null}
-                {data.dependsOn.length > 0 ? (
+                {data.requires.length > 0 ? (
                   <>
                     <dt className="text-muted-foreground">{t("install.needs")}</dt>
                     <dd className="flex flex-wrap gap-1.5">
-                      {data.dependsOn.map((d) => (
+                      {data.requires.map((d) => (
                         <Badge key={d} variant="outline" translate="no">
                           {d}
                         </Badge>
