@@ -148,7 +148,8 @@ pub(crate) fn write(mut stream: &TcpStream, response: &Response) {
     // The browser may have gone; nothing to do about it.
     drop(
         stream
-            .write_all(head.as_bytes())
+            .set_write_timeout(Some(Duration::from_secs(30)))
+            .and_then(|()| stream.write_all(head.as_bytes()))
             .and_then(|()| stream.write_all(&response.body)),
     );
 }

@@ -11,6 +11,9 @@ use ureq::tls::{RootCerts, TlsConfig};
 
 use crate::HostError;
 
+/// The largest file [`fetch`] downloads.
+const MAX_FILE: u64 = 4 << 30;
+
 /// An HTTPS client trusting the system's CA store.
 #[must_use]
 pub fn agent() -> Agent {
@@ -23,6 +26,8 @@ pub fn agent() -> Agent {
                 .build(),
         )
         .timeout_connect(Some(Duration::from_secs(30)))
+        .timeout_recv_response(Some(Duration::from_mins(1)))
+        .timeout_recv_body(Some(Duration::from_hours(1)))
         .user_agent(concat!("zeabur-installer/", env!("CARGO_PKG_VERSION")))
         .build()
         .into()
@@ -34,7 +39,7 @@ pub fn agent() -> Agent {
 ///
 /// # Errors
 ///
-/// When the download fails or the digest differs; a wrong file is removed.
+/// When the download fails, is larger than 4 GiB or the digest differs; a wrong file is removed.
 pub fn fetch(
     agent: &Agent,
     url: &str,
@@ -55,7 +60,11 @@ pub fn fetch(
     fs::create_dir_all(dir).map_err(HostError::io(dir))?;
     let partial = dest.with_extension("partial");
     let response = agent.get(url).call().map_err(|e| fail(e.to_string()))?;
-    let mut reader = response.into_body().into_reader();
+    let mut reader = response
+        .into_body()
+        .into_with_config()
+        .limit(MAX_FILE)
+        .reader();
     let mut file = File::create(&partial).map_err(HostError::io(&partial))?;
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 1 << 16];

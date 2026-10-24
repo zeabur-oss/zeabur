@@ -9,12 +9,13 @@
 
 mod http;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, VecDeque};
 use std::fs;
 use std::io::{self, BufRead as _, BufReader, Read};
 use std::net::{SocketAddr, TcpListener, ToSocketAddrs as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::{self, JoinHandle};
 
@@ -48,10 +49,18 @@ pub(crate) struct Asset {
 include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 
 const COOKIE: &str = "zeabur_installer";
+/// The most connections the page serves at a time. The server closes other connections.
+const MAX_CONNECTIONS: usize = 16;
+/// The most lines of `apply` output a job keeps. The job drops the oldest lines first.
+const MAX_LINES: usize = 10_000;
+/// The most bytes a job keeps of one line.
+const MAX_LINE: usize = 4096;
 
 #[derive(Debug, Default)]
 struct Job {
-    lines: Vec<String>,
+    lines: VecDeque<String>,
+    /// The number of lines dropped from the front of `lines`.
+    dropped: usize,
     running: bool,
     code: Option<i32>,
 }
@@ -94,14 +103,21 @@ pub(crate) fn run(config_path: &Path, listen: SocketAddr) -> Result<(), InstallE
         out::err("warning: the page is served over plain HTTP; anyone on the path can read it.");
     }
     out::line("Stop with Ctrl-C once the install has finished.");
+    let active = Arc::new(AtomicUsize::new(0));
     for stream in listener.incoming().flatten() {
+        if active.fetch_add(1, Ordering::AcqRel) >= MAX_CONNECTIONS {
+            active.fetch_sub(1, Ordering::AcqRel);
+            continue;
+        }
         let server = Arc::clone(&server);
+        let active = Arc::clone(&active);
         thread::spawn(move || {
             let response = http::read(&stream).map_or_else(
                 || Response::new(400, "text/plain", "bad request"),
                 |request| server.handle(&request),
             );
             http::write(&stream, &response);
+            active.fetch_sub(1, Ordering::AcqRel);
         });
     }
     Ok(())
@@ -315,9 +331,8 @@ impl Server {
             Err(e) => return Response::json(200, &json!({"error": e.to_string()})),
         };
         *job = Job {
-            lines: Vec::new(),
             running: true,
-            code: None,
+            ..Job::default()
         };
         let pipe = follow(reader, Arc::clone(&self.job));
         let job_ref = Arc::clone(&self.job);
@@ -333,10 +348,11 @@ impl Server {
 
     fn progress(&self, from: usize) -> Response {
         let job = self.job.lock().unwrap_or_else(PoisonError::into_inner);
-        let lines = job.lines.get(from..).unwrap_or_default();
+        let skip = from.saturating_sub(job.dropped);
+        let lines: Vec<&String> = job.lines.iter().skip(skip).collect();
         Response::json(
             200,
-            &json!({"lines": lines, "next": from + lines.len(), "running": job.running, "code": job.code}),
+            &json!({"lines": lines, "next": job.dropped + skip + lines.len(), "running": job.running, "code": job.code}),
         )
     }
 }
@@ -344,11 +360,14 @@ impl Server {
 /// Copies a child's output into the job's log, line by line.
 fn follow(reader: impl Read + Send + 'static, job: Arc<Mutex<Job>>) -> JoinHandle<()> {
     thread::spawn(move || {
-        for line in BufReader::new(reader).lines().map_while(Result::ok) {
-            job.lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .lines
-                .push(line);
+        for mut line in BufReader::new(reader).lines().map_while(Result::ok) {
+            line.truncate(line.floor_char_boundary(MAX_LINE));
+            let mut job = job.lock().unwrap_or_else(PoisonError::into_inner);
+            if job.lines.len() >= MAX_LINES {
+                job.lines.pop_front();
+                job.dropped += 1;
+            }
+            job.lines.push_back(line);
         }
     })
 }
