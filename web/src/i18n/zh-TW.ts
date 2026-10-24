@@ -1629,6 +1629,7 @@ export const zhTW: Messages = {
   "action.pauseMany": (n) => `暫停 ${n} 個服務`,
   "action.saveResources": "儲存資源",
   "action.save": "儲存",
+  "action.applyMany": (n) => `套用 ${n} 項變更`,
   "action.saveYaml": "儲存 YAML",
   "action.isolate": "隔離",
   "action.allow": "允許",

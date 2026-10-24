@@ -403,7 +403,7 @@ export function describe(
   reasons: readonly Reason[] = [],
   mountsOf: MountsOf = () => [],
 ): Description {
-  if (writtenCreates(ask.changes)) return describeWritten(t, plan)
+  if (writtenCreates(ask.changes)) return describeWritten(t, ask, plan)
   const more: Record<string, string[]> = {}
   const named = (names: string[], sentence: (list: string) => string) => {
     const { text, rest } = bounded(t, names)
@@ -512,7 +512,7 @@ function writtenCreates(changes: readonly Change[]): boolean {
 }
 
 /** Objects written as YAML, in the order the plan creates them. */
-function describeWritten(t: Translate, plan: Plan): Description {
+function describeWritten(t: Translate, ask: Asked, plan: Plan): Description {
   const objects = plan.objects.map((o) => `${o.target.kind} ${o.target.name}`)
   const [one] = plan.objects
   const lines =
@@ -522,8 +522,7 @@ function describeWritten(t: Translate, plan: Plan): Description {
   return {
     lines,
     more: {},
-    action:
-      plan.objects.length > 1 ? t("create.buttonMany", plan.objects.length) : t("action.create"),
+    action: actionOf(t, ask),
     said: [],
     cost: plan.objects.length > 1 ? t("create.noTransaction") : undefined,
   }
@@ -727,18 +726,15 @@ const secretName = (object: unknown): string => {
   return typeof meta?.name === "string" ? meta.name : ""
 }
 
+/** The confirm button, the same whether a form, YAML or a drawer asked (`docs/wording.md`). */
 export function actionOf(t: Translate, ask: Asked): string {
   const ops = new Set(ask.changes.map(opOf))
   const [change] = ask.changes
   if (!change) return t("plan.apply")
-  if (writtenCreates(ask.changes))
-    return ask.changes.length > 1 ? t("create.buttonMany", ask.changes.length) : t("action.create")
-  if (ask.changes.length > 1 && [...ops].every((op) => storageOps.has(op)))
-    return t("action.saveVolumes")
-  if (ops.size > 1)
-    // A service's draft, as its bar says: Save.
-    return ask.changes.every((c) => partOf(c) !== undefined) ? t("action.save") : t("plan.apply")
   const count = ask.changes.length
+  if (count > 1 && ops.size === 1 && ops.has("create")) return t("create.buttonMany", count)
+  if (count > 1 && [...ops].every((op) => storageOps.has(op))) return t("action.saveVolumes")
+  if (ops.size > 1) return t("action.applyMany", editCount(ask.changes))
   switch (change.op) {
     case "restart":
       return count > 1 ? t("action.restartMany", count) : t("action.restart")

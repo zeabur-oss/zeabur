@@ -366,7 +366,7 @@ group("deletion", () => {
 })
 
 group("actionOf", () => {
-  test("the compute form saves; mixed kinds apply", () => {
+  test("several kinds apply, counted, whether a draft or a form asked", () => {
     expect(
       actionOf(t, {
         changes: [
@@ -374,7 +374,7 @@ group("actionOf", () => {
           { op: "resources", workload: api },
         ],
       }),
-    ).toBe("action.save")
+    ).toBe("action.applyMany(2)")
     expect(
       actionOf(t, {
         changes: [
@@ -382,7 +382,28 @@ group("actionOf", () => {
           { op: "addDomain", workload: api, hostname: "a" },
         ],
       }),
-    ).toBe("plan.apply")
+    ).toBe("action.applyMany(2)")
+  })
+
+  test("creates say how many objects, whether a form or YAML wrote them", () => {
+    const object = (name: string) =>
+      ({ apiVersion: "v1", kind: "ConfigMap", metadata: { name } }) as unknown as Record<
+        string,
+        never
+      >
+    const form: Schemas["Change"][] = [
+      { op: "create", object: object("a") },
+      { op: "create", object: object("b") },
+      { op: "deployKey", name: "c", key: "k" },
+    ]
+    const yaml: Schemas["Change"][] = ["a", "b", "c"].map((name) => ({
+      op: "create",
+      yaml: `kind: ConfigMap\nmetadata:\n  name: ${name}\n`,
+    }))
+    expect(actionOf(t, { changes: form })).toBe("create.buttonMany(3)")
+    expect(actionOf(t, { changes: yaml })).toBe("create.buttonMany(3)")
+    expect(actionOf(t, { changes: form.slice(0, 1) })).toBe("action.create")
+    expect(actionOf(t, { changes: yaml.slice(0, 1) })).toBe("action.create")
   })
 
   test("several volume changes save the volumes, even of one kind", () => {
@@ -691,7 +712,7 @@ group("deploying from Git", () => {
     const d = describe(t, { changes }, plan(), pods({}))
     expect(d.lines).toContain("confirm.deployKey(site-git)")
     expect(d.lines.join(" ")).not.toContain("k1.sealed")
-    expect(actionOf(t, { changes })).toBe("action.create")
+    expect(actionOf(t, { changes })).toBe("create.buttonMany(2)")
   })
 })
 

@@ -285,7 +285,7 @@ group("describe at 1, 5 and 45 changes", () => {
       ["compute", 1],
     ])
     expect(d.said).toContainEqual(api)
-    expect(d.action).toBe("action.save")
+    expect(d.action).toBe("action.applyMany(46)")
   })
 
   test("restarting 45 services says each verdict once, with counts", () => {

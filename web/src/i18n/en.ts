@@ -1773,6 +1773,7 @@ export const en = {
   "action.pauseMany": (n: number) => `Pause ${n} services`,
   "action.saveResources": "Save resources",
   "action.save": "Save",
+  "action.applyMany": (n: number) => `Apply ${n} changes`,
   "action.saveYaml": "Save YAML",
   "action.isolate": "Isolate",
   "action.allow": "Allow",

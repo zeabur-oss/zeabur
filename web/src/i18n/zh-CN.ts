@@ -1627,6 +1627,7 @@ export const zhCN: Messages = {
   "action.pauseMany": (n) => `暂停 ${n} 个服务`,
   "action.saveResources": "保存资源",
   "action.save": "保存",
+  "action.applyMany": (n) => `应用 ${n} 项变更`,
   "action.saveYaml": "保存 YAML",
   "action.isolate": "隔离",
   "action.allow": "允许",
