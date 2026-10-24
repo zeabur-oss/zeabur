@@ -203,6 +203,16 @@ export const storeAddress = (store: ObjectStorage) => ({
   name: store.name,
 })
 
+/** Growing the volume servers' disks; the operator grows each claim in place. */
+export function growObjectStorage(store: ObjectStorage, storage: string): Change[] {
+  type Spec = { volume?: { requests?: Record<string, string> } }
+  const object = structuredClone(store.object) as { spec?: Spec }
+  const volume = ((object.spec ??= {}).volume ??= {})
+  volume.requests = { ...volume.requests, storage: storage.trim() }
+  const { name, ...resource } = storeAddress(store)
+  return [{ op: "edit", resource, name, yaml: JSON.stringify(object) }]
+}
+
 /** Events about the store, its pods and its buckets. */
 export function storeEvents(events: Event[], store: ObjectStorage): Event[] {
   const pods = new Set(store.pods.map((p) => p.name))

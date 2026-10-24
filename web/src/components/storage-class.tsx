@@ -42,6 +42,22 @@ export function growthWords(t: Translate, storage: ProjectStorage | undefined, n
   return grows ? t("storage.grows") : t("storage.fixedSize")
 }
 
+/** Whether an existing volume on class `name` can grow, and a sentence that says so. */
+export function useGrowth(project: string, name: string | null | undefined) {
+  const t = useT()
+  const storage = useStorage(project)
+  const storageClass = classNamed(storage, name)
+  const growable = storage?.classes.some((c) => c.allowExpansion) ?? false
+  const fixed = storageClass?.allowExpansion === false
+  const description =
+    storageClass === undefined
+      ? t("storage.growUnknown")
+      : fixed
+        ? t("storage.fixed", storageClass.name, growable)
+        : t("storage.grows")
+  return { storageClass, fixed, description }
+}
+
 export function placementWords(t: Translate, placement: Placement): string {
   switch (placement.kind) {
     case "node":

@@ -107,7 +107,8 @@ pub(crate) async fn compute(
         | Change::Unadopt
         | Change::Details { .. }
         | Change::ScheduleTask { .. }
-        | Change::RunTask { .. } => Err(ApiError::from(Problem::new(
+        | Change::RunTask { .. }
+        | Change::EditTask { .. } => Err(ApiError::from(Problem::new(
             Kind::BadRequest,
             "This change is not a terminal's.",
         ))),

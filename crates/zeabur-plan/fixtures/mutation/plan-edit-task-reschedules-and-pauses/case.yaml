@@ -1,0 +1,3 @@
+description: "An edit sets the schedule, time zone, policy, history, pause and the /bin/sh -c command of a task."
+operation: mutation.plan
+params: {"now": "2026-10-23T10:15:30Z", "request": {"changes": [{"op": "editTask", "cronJob": "nightly", "schedule": "30 4 * * 1", "timeZone": "Asia/Taipei", "command": "bin/cleanup --all", "concurrency": "forbid", "keepSucceeded": 5, "keepFailed": 2, "paused": true}]}}

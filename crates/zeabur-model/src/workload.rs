@@ -299,4 +299,52 @@ pub struct TaskSchedule {
     /// The service it was made from: its `zeabur.com/task-of` label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_of: Option<String>,
+    /// What happens when a run is due while the last one still runs (`spec.concurrencyPolicy`).
+    pub concurrency: TaskConcurrency,
+    /// How many succeeded runs Kubernetes keeps (`spec.successfulJobsHistoryLimit`).
+    pub keep_succeeded: i32,
+    /// How many failed runs Kubernetes keeps (`spec.failedJobsHistoryLimit`).
+    pub keep_failed: i32,
+    /// The command, when the only container runs `/bin/sh -c <command>` as a task Zeabur made.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+}
+
+/// A CronJob's `concurrencyPolicy` [k8s-concurrency].
+///
+/// [k8s-concurrency]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#concurrency-policy
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum TaskConcurrency {
+    /// Skip the new run.
+    #[default]
+    Forbid,
+    /// Start it beside the last one.
+    Allow,
+    /// Stop the last one and start the new one.
+    Replace,
+}
+
+impl TaskConcurrency {
+    /// The value Kubernetes reads.
+    #[must_use]
+    pub const fn as_kubernetes(self) -> &'static str {
+        match self {
+            Self::Forbid => "Forbid",
+            Self::Allow => "Allow",
+            Self::Replace => "Replace",
+        }
+    }
+
+    /// The policy of a CronJob's `spec.concurrencyPolicy`. Kubernetes reads an unset policy as
+    /// `Allow`.
+    #[must_use]
+    pub fn from_kubernetes(value: Option<&str>) -> Self {
+        match value {
+            Some("Forbid") => Self::Forbid,
+            Some("Replace") => Self::Replace,
+            _ => Self::Allow,
+        }
+    }
 }

@@ -20,7 +20,15 @@ export type ServiceMode = keyof typeof serviceModes
 const modes = Object.keys(serviceModes) as ServiceMode[]
 
 /** The parts of Settings, each an anchor. */
-const settingsParts = ["build", "storage", "compute", "health-checks", "security", "tasks"] as const
+const settingsParts = [
+  "build",
+  "schedule",
+  "storage",
+  "compute",
+  "health-checks",
+  "security",
+  "tasks",
+] as const
 export type SettingsPart = (typeof settingsParts)[number]
 
 /** The parts a pending edit can belong to. */
@@ -73,6 +81,7 @@ export function servicePlace(place?: ServicePlace): {
     case "yaml":
       return { tab: serviceModes[place], mode: place }
     case "build":
+    case "schedule":
     case "storage":
     case "compute":
     case "health-checks":
@@ -155,16 +164,20 @@ export function validateServiceSearch(search: Record<string, unknown>): ServiceS
 export const databaseTabs = ["overview", "logs", "backups", "events", "settings"] as const
 export type DatabaseTab = (typeof databaseTabs)[number]
 
-export interface DatabaseSearch {
+/** The search of a database's or an object store's page. */
+interface StoreSearch<Tab> {
   /** Overview when absent. */
-  tab?: DatabaseTab
+  tab?: Tab
   /** Settings' YAML view; only with Settings. */
   mode?: "yaml"
   pod?: string
 }
 
-export function validateDatabaseSearch(search: Record<string, unknown>): DatabaseSearch {
-  const tab = oneOf(databaseTabs, search.tab)
+function validateStoreSearch<Tab extends string>(
+  tabs: readonly Tab[],
+  search: Record<string, unknown>,
+): StoreSearch<Tab> {
+  const tab = oneOf(tabs, search.tab)
   return {
     tab: tab === "overview" ? undefined : tab,
     mode: tab === "settings" && search.mode === "yaml" ? "yaml" : undefined,
@@ -172,22 +185,18 @@ export function validateDatabaseSearch(search: Record<string, unknown>): Databas
   }
 }
 
+export type DatabaseSearch = StoreSearch<DatabaseTab>
+
+export const validateDatabaseSearch = (search: Record<string, unknown>): DatabaseSearch =>
+  validateStoreSearch(databaseTabs, search)
+
 export const objectStorageTabs = ["overview", "logs", "events", "settings"] as const
 export type ObjectStorageTab = (typeof objectStorageTabs)[number]
 
-export interface ObjectStorageSearch {
-  /** Overview when absent. */
-  tab?: ObjectStorageTab
-  pod?: string
-}
+export type ObjectStorageSearch = StoreSearch<ObjectStorageTab>
 
-export function validateObjectStorageSearch(search: Record<string, unknown>): ObjectStorageSearch {
-  const tab = oneOf(objectStorageTabs, search.tab)
-  return {
-    tab: tab === "overview" ? undefined : tab,
-    pod: tab === "logs" || tab === "events" ? str(search.pod) : undefined,
-  }
-}
+export const validateObjectStorageSearch = (search: Record<string, unknown>): ObjectStorageSearch =>
+  validateStoreSearch(objectStorageTabs, search)
 
 export interface ObjectsSearch {
   q?: string
@@ -277,6 +286,13 @@ export const tabSearch =
   (previous: { pod?: string }) => ({
     tab: next === "overview" ? undefined : next,
     pod: next === "logs" || next === "events" ? previous.pod : undefined,
+  })
+
+export const modeSearch =
+  (mode?: ServiceMode) =>
+  <S extends object>(previous: S) => ({
+    ...previous,
+    mode: mode === "yaml" ? ("yaml" as const) : undefined,
   })
 
 export const podSearch =

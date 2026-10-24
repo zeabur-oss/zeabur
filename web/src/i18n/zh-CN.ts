@@ -1578,6 +1578,11 @@ export const zhCN: Messages = {
   "confirm.scheduleTask": (name, service) =>
     `添加 CronJob ${name}：在从 ${service} 复制的新容器中运行命令。${service} 不会重启。`,
   "confirm.runTask": (name) => `立即以新的 Job 运行 ${name} 一次，计划不变。`,
+  "confirm.editTask": (name) =>
+    `从下一次运行起，更改 ${name} 的运行时间与方式。正在运行的那次会继续。`,
+  "confirm.pauseTask": (name) =>
+    `${name} 不再按计划运行。正在运行的那次会继续，“立即运行”也仍可使用。`,
+  "confirm.resumeTask": (name) => `${name} 恢复按计划运行。`,
   "confirm.redirect": (host, to) => `把 ${host} 的访客转到 ${to}。`,
   "confirm.redirectOff": (host, service) => `取消重定向，${host} 重新显示 ${service}。`,
   "confirm.envImport": (kind, name, service) =>
@@ -1629,6 +1634,8 @@ export const zhCN: Messages = {
   "action.scaleMany": (n) => `调整 ${n} 个服务`,
   "action.restartMany": (n) => `重启 ${n} 个服务`,
   "action.pause": "暂停",
+  "action.resume": "恢复",
+  "action.saveSchedule": "保存计划",
   "action.pauseMany": (n) => `暂停 ${n} 个服务`,
   "action.saveResources": "保存资源",
   "action.save": "保存",
@@ -2514,6 +2521,9 @@ export const zhCN: Messages = {
   "s3.name.long": "最多 30 个字符。",
   "s3.name.taken": "已有同名的对象存储。",
   "s3.field.storage": "存储空间",
+  "s3.grow": (name) => `扩容 ${name} 的存储空间`,
+  "s3.growSentence": (name, from, to) =>
+    `将 ${name} 的磁盘从 ${from} 扩容到 ${to}。Operator 会直接扩容，文件都会保留。`,
   "s3.field.bucket": "存储桶",
   "s3.bucketHint": "可选，之后可以再加。",
   "s3.bucketRule": "3 到 63 个小写字母、数字或连字符。",
@@ -3110,6 +3120,7 @@ export const zhCN: Messages = {
   "part.health-checks": "健康检查",
   "part.security": "安全性",
   "part.tasks": "定时任务",
+  "part.schedule": "计划",
   "tasks.hint": "按计划运行这个服务的命令，例如每晚清理数据或生成报表。",
   "tasks.none": "还没有定时任务",
   "tasks.noneHint": "添加一个，就能在固定时间运行这个服务的命令。",
@@ -3152,6 +3163,12 @@ export const zhCN: Messages = {
   "tasks.run.failed": "失败",
   "tasks.manual": "手动运行",
   "tasks.allRuns": (n) => `显示全部 ${n} 次运行`,
+  "tasks.pauseTitle": (name) => `暂停 ${name}`,
+  "tasks.resumeTitle": (name) => `恢复 ${name}`,
+  "tasks.scheduleBlocked": "修正计划后才能保存。",
+  "tasks.settingsHint": "从下一次运行开始生效。",
+  "tasks.overlapSkips": "上一次还在运行，而这个任务设置为跳过。",
+  "tasks.replaceStops": (runs) => `上一次还在运行，而这个任务设置为停止上一次：${runs} 会先停止。`,
   "confirm.certificateIssuer": (host, issuer) => `${host} 的证书改由 ${issuer} 签发。`,
   "confirm.certificateOwn": (host) => `${host} 改用你自己的证书。`,
   "action.useCertificate": "使用证书",

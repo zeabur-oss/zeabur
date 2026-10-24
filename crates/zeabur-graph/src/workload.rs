@@ -13,8 +13,8 @@ use zeabur_adapters::group::{
 };
 use zeabur_adapters::operators::{database_cluster, is_operator};
 use zeabur_model::{
-    Classification, ManagedBy, Origin, Phase, Replicas, TaskSchedule, WorkloadKind, WorkloadRef,
-    WorkloadSummary,
+    Classification, ManagedBy, Origin, Phase, Replicas, TaskConcurrency, TaskSchedule,
+    WorkloadKind, WorkloadRef, WorkloadSummary,
 };
 
 use crate::project::provenance;
@@ -509,5 +509,32 @@ fn schedule(workload: Workload<'_>) -> Option<TaskSchedule> {
             .as_ref()
             .and_then(|l| l.get(zeabur_adapters::LABEL_TASK_OF))
             .cloned(),
+        concurrency: TaskConcurrency::from_kubernetes(spec.concurrency_policy.as_deref()),
+        keep_succeeded: spec.successful_jobs_history_limit.unwrap_or(3),
+        keep_failed: spec.failed_jobs_history_limit.unwrap_or(1),
+        command: shell_command(cron_job),
     })
+}
+
+/// The command of a CronJob whose only container runs `/bin/sh -c <command>`.
+fn shell_command(cron_job: &CronJob) -> Option<String> {
+    let pod = cron_job
+        .spec
+        .as_ref()?
+        .job_template
+        .spec
+        .as_ref()?
+        .template
+        .spec
+        .as_ref()?;
+    let [container] = pod.containers.as_slice() else {
+        return None;
+    };
+    if container.args.as_ref().is_some_and(|a| !a.is_empty()) {
+        return None;
+    }
+    match container.command.as_deref()? {
+        [shell, flag, command] if shell == "/bin/sh" && flag == "-c" => Some(command.clone()),
+        _ => None,
+    }
 }

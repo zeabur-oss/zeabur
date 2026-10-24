@@ -254,6 +254,8 @@ impl Planner<'_> {
                     name: owner.name.clone(),
                 },
             }),
+            // A CronJob does not make a deleted Job again.
+            Some(owner) if kind == "Job" && owner.kind == "CronJob" => {}
             Some(owner) => {
                 return Err(error(
                     ErrorKind::Conflict,
@@ -515,6 +517,14 @@ impl Planner<'_> {
                 .input
                 .snapshot
                 .ingresses
+                .iter()
+                .find(|o| o.metadata.name.as_deref() == Some(name))
+                .map(to_json)
+                .transpose()?,
+            ("batch", "jobs") => self
+                .input
+                .snapshot
+                .jobs
                 .iter()
                 .find(|o| o.metadata.name.as_deref() == Some(name))
                 .map(to_json)

@@ -27,7 +27,6 @@ import {
   CardRow,
   CardRows,
   Mono,
-  ObjectYaml,
   RevealRow,
   Section,
   useReveal,
@@ -43,13 +42,13 @@ import {
   createBucket,
   deleteBucket,
   deleteObjectStorage,
-  storeAddress,
   storeEvents,
   type Bucket,
   type ObjectStorage,
 } from "@/model/object-storage"
 import type { Event } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
+import { ObjectStorageSettings } from "@/routes/object-storage/settings"
 import { objectStorageTabs, type ObjectStorageTab } from "@/routes/search"
 import { StoreMenu, StoreShell, useStorePage } from "@/routes/store/shell"
 import { Events, MemberLogs } from "@/routes/service/views"
@@ -137,11 +136,8 @@ function Body({
 }) {
   const t = useT()
   const search = route.useSearch()
-  const { tab, shown, gates, unreadable, deleter, setTab, setPod } = useStorePage(
-    project,
-    search.tab,
-    objectStorageTabs,
-  )
+  const page = useStorePage(project, search.tab, objectStorageTabs)
+  const { tab, shown, gates, unreadable, deleter, setTab, setPod } = page
   const events = storeEvents(useProjectEvents(project), store)
   return (
     <StoreShell
@@ -197,7 +193,14 @@ function Body({
         ) : null}
       </TabsContent>
       <TabsContent value="settings">
-        {tab === "settings" ? <ObjectYaml project={project} address={storeAddress(store)} /> : null}
+        {tab === "settings" ? (
+          <ObjectStorageSettings
+            project={project}
+            store={store}
+            mode={search.mode}
+            onMode={page.setMode}
+          />
+        ) : null}
       </TabsContent>
       {deleter.dialog}
     </StoreShell>

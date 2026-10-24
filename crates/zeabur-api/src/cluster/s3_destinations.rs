@@ -461,6 +461,7 @@ pub(crate) async fn open(
             | Change::Details { .. }
             | Change::ScheduleTask { .. }
             | Change::RunTask { .. }
+            | Change::EditTask { .. }
             | Change::DebugContainer { .. }
             | Change::ClusterTools) => other,
         });

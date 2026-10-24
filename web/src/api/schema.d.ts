@@ -3006,6 +3006,31 @@ export interface components {
           op: "runTask"
         }
       | {
+          /** @description The command, run by `/bin/sh -c`. Only for a task whose only container runs one. */
+          command?: string | null
+          concurrency?: components["schemas"]["TaskConcurrency"] | null
+          /** @description The CronJob. */
+          cronJob: string
+          /**
+           * Format: int32
+           * @description How many failed runs to keep.
+           */
+          keepFailed?: number | null
+          /**
+           * Format: int32
+           * @description How many succeeded runs to keep.
+           */
+          keepSucceeded?: number | null
+          /** @enum {string} */
+          op: "editTask"
+          /** @description Stop starting runs on schedule (`spec.suspend`), or start again. */
+          paused?: boolean | null
+          /** @description When it runs, a cron expression. */
+          schedule?: string | null
+          /** @description The IANA time zone of the schedule; empty removes it, for the controller's. */
+          timeZone?: string | null
+        }
+      | {
           /** @description The container whose processes it shares; by default the pod's default container. */
           container?: string | null
           /** @enum {string} */
@@ -8195,8 +8220,22 @@ export interface components {
      *     [k8s-cronjob]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
      */
     TaskSchedule: {
+      /** @description The command, when the only container runs `/bin/sh -c <command>` as a task Zeabur made. */
+      command?: string | null
+      /** @description What happens when a run is due while the last one still runs (`spec.concurrencyPolicy`). */
+      concurrency: components["schemas"]["TaskConcurrency"]
       /** @description The cron expression (`spec.schedule`). */
       cron: string
+      /**
+       * Format: int32
+       * @description How many failed runs Kubernetes keeps (`spec.failedJobsHistoryLimit`).
+       */
+      keepFailed: number
+      /**
+       * Format: int32
+       * @description How many succeeded runs Kubernetes keeps (`spec.successfulJobsHistoryLimit`).
+       */
+      keepSucceeded: number
       /** @description When a run was last started, in RFC 3339. */
       lastScheduled?: string | null
       /** @description The controller starts no new runs (`spec.suspend`). */

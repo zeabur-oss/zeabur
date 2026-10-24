@@ -1580,6 +1580,11 @@ export const zhTW: Messages = {
   "confirm.scheduleTask": (name, service) =>
     `新增 CronJob ${name}：在從 ${service} 複製的新容器中執行指令。${service} 不會重新啟動。`,
   "confirm.runTask": (name) => `立即以新的 Job 執行 ${name} 一次，排程不變。`,
+  "confirm.editTask": (name) =>
+    `從下一次執行起，變更 ${name} 的執行時間與方式。正在執行的那次會繼續。`,
+  "confirm.pauseTask": (name) =>
+    `${name} 不再依排程執行。正在執行的那次會繼續，「立即執行」也仍可使用。`,
+  "confirm.resumeTask": (name) => `${name} 恢復依排程執行。`,
   "confirm.redirect": (host, to) => `把 ${host} 的訪客轉到 ${to}。`,
   "confirm.redirectOff": (host, service) => `取消轉址，${host} 重新顯示 ${service}。`,
   "confirm.envImport": (kind, name, service) =>
@@ -1631,6 +1636,8 @@ export const zhTW: Messages = {
   "action.scaleMany": (n) => `調整 ${n} 個服務`,
   "action.restartMany": (n) => `重新啟動 ${n} 個服務`,
   "action.pause": "暫停",
+  "action.resume": "恢復",
+  "action.saveSchedule": "儲存排程",
   "action.pauseMany": (n) => `暫停 ${n} 個服務`,
   "action.saveResources": "儲存資源",
   "action.save": "儲存",
@@ -2519,6 +2526,9 @@ export const zhTW: Messages = {
   "s3.name.long": "最多 30 個字元。",
   "s3.name.taken": "已經有同名的物件儲存。",
   "s3.field.storage": "儲存空間",
+  "s3.grow": (name) => `擴充 ${name} 的儲存空間`,
+  "s3.growSentence": (name, from, to) =>
+    `將 ${name} 的磁碟從 ${from} 擴充到 ${to}。Operator 會直接擴充，檔案都會保留。`,
   "s3.field.bucket": "儲存貯體",
   "s3.bucketHint": "選填，之後可以再加。",
   "s3.bucketRule": "3 到 63 個小寫字母、數字或連字號。",
@@ -3115,6 +3125,7 @@ export const zhTW: Messages = {
   "part.health-checks": "健康檢查",
   "part.security": "安全性",
   "part.tasks": "排程任務",
+  "part.schedule": "排程",
   "tasks.hint": "依排程執行這個服務的指令，例如每晚清理資料或產生報表。",
   "tasks.none": "還沒有排程任務",
   "tasks.noneHint": "新增一個，就能在固定時間執行這個服務的指令。",
@@ -3158,6 +3169,12 @@ export const zhTW: Messages = {
   "tasks.run.failed": "失敗",
   "tasks.manual": "手動執行",
   "tasks.allRuns": (n) => `顯示全部 ${n} 次執行`,
+  "tasks.pauseTitle": (name) => `暫停 ${name}`,
+  "tasks.resumeTitle": (name) => `恢復 ${name}`,
+  "tasks.scheduleBlocked": "修正排程後才能儲存。",
+  "tasks.settingsHint": "從下一次執行開始生效。",
+  "tasks.overlapSkips": "上一次還在執行，而這個任務設定為略過。",
+  "tasks.replaceStops": (runs) => `上一次還在執行，而這個任務設定為停止上一次：${runs} 會先停止。`,
   "confirm.certificateIssuer": (host, issuer) => `${host} 的憑證改由 ${issuer} 簽發。`,
   "confirm.certificateOwn": (host) => `${host} 改用你自己的憑證。`,
   "action.useCertificate": "使用憑證",

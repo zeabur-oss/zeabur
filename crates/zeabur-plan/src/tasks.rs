@@ -7,9 +7,14 @@
 //!   service's Kubernetes Services do not select its pods.
 //! - **A run now** is a Job made from the CronJob's `jobTemplate`, as `kubectl create job --from=
 //!   cronjob/<name>` makes it [kubectl-from]: annotated `cronjob.kubernetes.io/instantiate: manual`
-//!   and controlled by the CronJob, so its history limits also clean it up.
+//!   and controlled by the CronJob, so its history limits also clean it up. It follows the
+//!   CronJob's `concurrencyPolicy` [k8s-concurrency] against the unfinished Jobs the CronJob
+//!   controls. The controller's `status.active` does not list manual runs.
+//! - **An edit** sets the fields given on the CronJob; the command only when the one container runs
+//!   `/bin/sh -c`.
 //!
 //! [kubectl-from]: https://github.com/kubernetes/kubectl/blob/master/pkg/cmd/create/create_job.go
+//! [k8s-concurrency]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#concurrency-policy
 
 use k8s_openapi::api::batch::v1::{CronJob, Job};
 use k8s_openapi::api::core::v1::Container;
@@ -17,7 +22,11 @@ use serde_json::{Map, Value, json};
 use zeabur_adapters::LABEL_TASK_OF;
 use zeabur_model::{WorkloadKind, WorkloadRef};
 
-use crate::change::{Target, TaskConcurrency, Warning};
+use crate::TaskConcurrency;
+use crate::change::{Target, Warning};
+use crate::checks::ResourceRef;
+use crate::fields::Step;
+use crate::json::{add, remove, replace};
 use crate::owned::SERVICE_LABEL;
 use crate::plan::{ErrorKind, PlanError, Planner, Working, error, to_json};
 
@@ -60,11 +69,23 @@ pub(crate) struct TaskRequest<'r> {
     pub(crate) keep_failed: i32,
 }
 
+/// What an edit of a scheduled task sets; `None` keeps the field.
+pub(crate) struct TaskEdit<'r> {
+    pub(crate) cron_job: &'r str,
+    pub(crate) schedule: Option<&'r str>,
+    pub(crate) time_zone: Option<&'r str>,
+    pub(crate) command: Option<&'r str>,
+    pub(crate) concurrency: Option<TaskConcurrency>,
+    pub(crate) keep_succeeded: Option<i32>,
+    pub(crate) keep_failed: Option<i32>,
+    pub(crate) paused: Option<bool>,
+}
+
 #[expect(
     clippy::multiple_inherent_impl,
     reason = "the planner's change kinds are split across modules by area"
 )]
-impl Planner<'_> {
+impl<'a> Planner<'a> {
     pub(crate) fn schedule_task(&mut self, task: &TaskRequest<'_>) -> Result<(), PlanError> {
         check_request(task)?;
         let found = self.workload(task.from)?;
@@ -144,20 +165,23 @@ impl Planner<'_> {
         Ok(())
     }
 
-    pub(crate) fn run_task(&mut self, name: &str) -> Result<(), PlanError> {
-        let Some(cron_job) = self
-            .input
+    fn cron_job(&self, name: &str) -> Result<&'a CronJob, PlanError> {
+        self.input
             .snapshot
             .cron_jobs
             .iter()
             .find(|c| c.metadata.name.as_deref() == Some(name))
-        else {
-            return Err(error(
-                ErrorKind::NotFound,
-                "unknown_workload",
-                format!("There is no CronJob named {name}."),
-            ));
-        };
+            .ok_or_else(|| {
+                error(
+                    ErrorKind::NotFound,
+                    "unknown_workload",
+                    format!("There is no CronJob named {name}."),
+                )
+            })
+    }
+
+    pub(crate) fn run_task(&mut self, name: &str) -> Result<(), PlanError> {
+        let cron_job = self.cron_job(name)?;
         let Some(uid) = cron_job.metadata.uid.clone() else {
             return Err(error(
                 ErrorKind::Invalid,
@@ -165,6 +189,40 @@ impl Planner<'_> {
                 format!("CronJob {name} has no uid."),
             ));
         };
+        let policy = TaskConcurrency::from_kubernetes(
+            cron_job
+                .spec
+                .as_ref()
+                .and_then(|s| s.concurrency_policy.as_deref()),
+        );
+        let active: Vec<String> = self
+            .input
+            .snapshot
+            .jobs
+            .iter()
+            .filter(|job| controlled_by(job, &uid) && !finished(job))
+            .filter_map(|job| job.metadata.name.clone())
+            .collect();
+        match policy {
+            TaskConcurrency::Allow => {}
+            TaskConcurrency::Forbid => {
+                if let Some(running) = active.first() {
+                    return Err(error(
+                        ErrorKind::Invalid,
+                        "task_running",
+                        format!(
+                            "Job {running} of {name} still runs, and {name} skips a run while \
+                             one runs. Wait for it to finish, or let runs overlap."
+                        ),
+                    ));
+                }
+            }
+            TaskConcurrency::Replace => {
+                for job in &active {
+                    self.delete(&jobs(), job, None)?;
+                }
+            }
+        }
         let template = cron_job
             .spec
             .as_ref()
@@ -212,6 +270,87 @@ impl Planner<'_> {
             name: name.to_owned(),
         });
         Ok(())
+    }
+
+    pub(crate) fn edit_task(&mut self, edit: &TaskEdit<'_>) -> Result<(), PlanError> {
+        check_edit(edit)?;
+        let name = edit.cron_job;
+        let cron_job = self.cron_job(name)?;
+        Self::refuse_managed(&cron_job.metadata, "CronJob", name)?;
+        let container = match edit.command {
+            Some(_) => Some(shell_container(cron_job, name)?),
+            None => None,
+        };
+        let index = self.working(Target::of::<CronJob>(name), to_json(cron_job)?);
+        let fields = [
+            ("schedule", edit.schedule.map(|s| json!(s.trim()))),
+            (
+                "timeZone",
+                edit.time_zone.map(|z| {
+                    let zone = z.trim();
+                    if zone.is_empty() {
+                        Value::Null
+                    } else {
+                        json!(zone)
+                    }
+                }),
+            ),
+            (
+                "concurrencyPolicy",
+                edit.concurrency.map(|c| json!(c.as_kubernetes())),
+            ),
+            (
+                "successfulJobsHistoryLimit",
+                edit.keep_succeeded.map(|n| json!(n)),
+            ),
+            ("failedJobsHistoryLimit", edit.keep_failed.map(|n| json!(n))),
+            ("suspend", edit.paused.map(|p| json!(p))),
+        ];
+        for (field, value) in fields {
+            if let Some(value) = value {
+                self.set_spec(index, field, value)?;
+            }
+        }
+        if let (Some(command), Some(container)) = (edit.command, container) {
+            let path = [
+                Step::field("spec"),
+                Step::field("jobTemplate"),
+                Step::field("spec"),
+                Step::field("template"),
+                Step::field("spec"),
+                Step::field("containers"),
+                Step::named(&container),
+                Step::field("command"),
+            ];
+            self.claim(index, &path, "command")?;
+            self.patch(
+                index,
+                vec![replace(
+                    "/spec/jobTemplate/spec/template/spec/containers/0/command",
+                    json!(["/bin/sh", "-c", command.trim()]),
+                )],
+            )?;
+        }
+        self.impact.insert(WorkloadRef {
+            kind: WorkloadKind::CronJob,
+            name: name.to_owned(),
+        });
+        Ok(())
+    }
+
+    /// Sets, or with `null` removes, a field of the CronJob's `spec`.
+    fn set_spec(&mut self, index: usize, field: &str, value: Value) -> Result<(), PlanError> {
+        let path = [Step::field("spec"), Step::field(field)];
+        self.claim(index, &path, &format!("spec.{field}"))?;
+        let pointer = format!("/spec/{field}");
+        let present = self.current(index).pointer(&pointer).is_some();
+        let operation = match (present, value.is_null()) {
+            (false, true) => return Ok(()),
+            (true, true) => remove(&pointer),
+            (true, false) => replace(&pointer, value),
+            (false, false) => add(&pointer, value),
+        };
+        self.patch(index, vec![operation])
     }
 
     fn push_created(&mut self, target: Target, body: Value) {
@@ -318,6 +457,85 @@ fn check_request(task: &TaskRequest<'_>) -> Result<(), PlanError> {
         ));
     }
     Ok(())
+}
+
+fn check_edit(edit: &TaskEdit<'_>) -> Result<(), PlanError> {
+    if edit.schedule.is_some_and(|s| s.trim().is_empty()) {
+        return Err(field_error(
+            "missing_field",
+            "A task needs a schedule.",
+            "schedule",
+        ));
+    }
+    if edit.command.is_some_and(|c| c.trim().is_empty()) {
+        return Err(field_error(
+            "missing_field",
+            "A task needs a command.",
+            "command",
+        ));
+    }
+    let keeps = [edit.keep_succeeded, edit.keep_failed];
+    if keeps.into_iter().flatten().any(|n| !(0..=100).contains(&n)) {
+        return Err(error(
+            ErrorKind::BadRequest,
+            "invalid_history",
+            "Keep between 0 and 100 finished runs.",
+        ));
+    }
+    Ok(())
+}
+
+/// The name of the CronJob's only container, when it runs `/bin/sh -c <command>`.
+fn shell_container(cron_job: &CronJob, name: &str) -> Result<String, PlanError> {
+    let containers = cron_job
+        .spec
+        .as_ref()
+        .and_then(|s| s.job_template.spec.as_ref())
+        .and_then(|s| s.template.spec.as_ref())
+        .map_or(&[][..], |s| s.containers.as_slice());
+    match containers {
+        [container]
+            if container.args.as_ref().is_none_or(Vec::is_empty)
+                && container.command.as_deref().is_some_and(
+                    |c| matches!(c, [shell, flag, _] if shell == "/bin/sh" && flag == "-c"),
+                ) =>
+        {
+            Ok(container.name.clone())
+        }
+        _ => Err(field_error(
+            "not_a_shell_task",
+            format!("CronJob {name} does not run one /bin/sh -c command; edit its YAML instead."),
+            "command",
+        )),
+    }
+}
+
+fn jobs() -> ResourceRef {
+    ResourceRef {
+        group: "batch".to_owned(),
+        version: "v1".to_owned(),
+        resource: "jobs".to_owned(),
+    }
+}
+
+fn controlled_by(job: &Job, uid: &str) -> bool {
+    job.metadata
+        .owner_references
+        .iter()
+        .flatten()
+        .any(|o| o.controller == Some(true) && o.uid == uid)
+}
+
+/// A Job is finished once its `Complete` or `Failed` condition is true.
+fn finished(job: &Job) -> bool {
+    job.status
+        .as_ref()
+        .and_then(|s| s.conditions.as_ref())
+        .is_some_and(|conditions| {
+            conditions
+                .iter()
+                .any(|c| (c.type_ == "Complete" || c.type_ == "Failed") && c.status == "True")
+        })
 }
 
 /// `<cron job>-manual-<MMDDhhmmss of now>`, kept within the 63 characters of a Job's

@@ -71,7 +71,7 @@ import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
 import { Restore, Restored } from "@/routes/database/restore"
 import { DatabaseSettings } from "@/routes/database/settings"
-import { databaseTabs, type DatabaseTab, type ServiceMode } from "@/routes/search"
+import { databaseTabs, type DatabaseTab } from "@/routes/search"
 import { StoreMenu, StoreShell, useStorePage } from "@/routes/store/shell"
 import { Events, MemberLogs } from "@/routes/service/views"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
@@ -171,18 +171,12 @@ function Body({
 }) {
   const t = useT()
   const search = route.useSearch()
-  const navigate = route.useNavigate()
-  const { tab, shown, gates, unreadable, deleter, setTab, setPod } = useStorePage(
+  const { tab, shown, gates, unreadable, deleter, setTab, setPod, setMode } = useStorePage(
     project,
     search.tab,
     databaseTabs,
   )
   const events = eventsOf(useProjectEvents(project), database)
-  const setMode = (next?: ServiceMode) =>
-    void navigate({
-      search: (previous) => ({ ...previous, mode: next === "yaml" ? "yaml" : undefined }),
-      hash: "",
-    })
   const shell = (pod?: string) => openDatabaseShell(project, database, pod)
   const terminalGate = gates("openTerminal")
 

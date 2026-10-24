@@ -1,0 +1,13 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Job", "name": "nightly-29340180"},
+      "write": {"type": "delete", "resourceVersion": "20"}
+    },
+    {
+      "target": {"kind": "Job", "name": "nightly-manual-1023101530"},
+      "write": {"type": "create"}
+    }
+  ],
+  "warnings": []
+}

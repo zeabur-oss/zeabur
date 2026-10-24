@@ -30,6 +30,8 @@ export function partOf(change: Change): DraftPart | undefined {
       return "compute"
     case "probe":
       return "health-checks"
+    case "editTask":
+      return "schedule"
     default:
       return undefined
   }
@@ -39,6 +41,7 @@ export function partOf(change: Change): DraftPart | undefined {
 export const partOrder: DraftPart[] = [
   "networking",
   "variables",
+  "schedule",
   "compute",
   "health-checks",
   "storage",
@@ -76,6 +79,7 @@ const keys: Keys = {
   basicAuth: routeKey,
   errorPages: routeKey,
   errorPageHtml: (c) => c.op,
+  editTask: (c) => `editTask:${c.cronJob}`,
   expandVolume: (c) => `expand:${c.claim}`,
   editMount: mountKey,
   removeVolume: mountKey,
@@ -99,6 +103,7 @@ function combine(before: Change, after: Change): Change {
     }
   }
   if (before.op === "errorPageHtml" && after.op === "errorPageHtml") return { ...before, ...after }
+  if (before.op === "editTask" && after.op === "editTask") return { ...before, ...after }
   return after
 }
 

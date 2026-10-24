@@ -159,6 +159,7 @@ export type AccessChange = Extract<
     op:
       | "scheduleTask"
       | "runTask"
+      | "editTask"
       | "redirect"
       | "basicAuth"
       | "certificate"

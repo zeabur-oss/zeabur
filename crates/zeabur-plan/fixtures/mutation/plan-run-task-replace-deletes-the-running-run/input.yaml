@@ -1,0 +1,60 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly
+  namespace: demo
+  uid: 5b0c0a4e-1111-2222-3333-444455556666
+  resourceVersion: "12"
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Replace
+  jobTemplate:
+    metadata:
+      labels: {app.kubernetes.io/name: nightly}
+    spec:
+      template:
+        metadata:
+          labels: {app.kubernetes.io/name: nightly}
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: app
+              image: example/web:1.0
+              command: ["/bin/sh", "-c", "bin/cleanup"]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nightly-29340120
+  namespace: demo
+  uid: 7c1d0b5f-aaaa-bbbb-cccc-000000000001
+  resourceVersion: "18"
+  ownerReferences:
+    - {apiVersion: batch/v1, kind: CronJob, name: nightly, uid: 5b0c0a4e-1111-2222-3333-444455556666, controller: true}
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - {name: app, image: example/web:1.0}
+status:
+  conditions:
+    - {type: Complete, status: "True"}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: nightly-29340180
+  namespace: demo
+  uid: 7c1d0b5f-aaaa-bbbb-cccc-ddddeeeeffff
+  resourceVersion: "20"
+  ownerReferences:
+    - {apiVersion: batch/v1, kind: CronJob, name: nightly, uid: 5b0c0a4e-1111-2222-3333-444455556666, controller: true}
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - {name: app, image: example/web:1.0}
+status:
+  active: 1

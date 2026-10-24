@@ -1719,6 +1719,11 @@ export const en = {
     `Add CronJob ${name}: it runs the command in a new container copied from ${service}. ${service} doesn't restart.`,
   "confirm.runTask": (name: string) =>
     `Start one run of ${name} now, as a new Job. Its schedule doesn't change.`,
+  "confirm.editTask": (name: string) =>
+    `Change when and how ${name} runs, from its next run. A run already going keeps going.`,
+  "confirm.pauseTask": (name: string) =>
+    `Stop running ${name} on schedule. A run already going keeps going, and Run now still works.`,
+  "confirm.resumeTask": (name: string) => `Run ${name} on schedule again.`,
   "confirm.redirect": (host: string, to: string) => `Send visitors of ${host} to ${to}.`,
   "confirm.redirectOff": (host: string, service: string) =>
     `Show ${service} on ${host} again, without the redirect.`,
@@ -1775,6 +1780,8 @@ export const en = {
   "action.scaleMany": (n: number) => `Scale ${n} services`,
   "action.restartMany": (n: number) => `Restart ${n} services`,
   "action.pause": "Pause",
+  "action.resume": "Resume",
+  "action.saveSchedule": "Save schedule",
   "action.pauseMany": (n: number) => `Pause ${n} services`,
   "action.saveResources": "Save resources",
   "action.save": "Save",
@@ -2728,6 +2735,9 @@ export const en = {
   "s3.name.long": "At most 30 characters.",
   "s3.name.taken": "Object storage of this name exists.",
   "s3.field.storage": "Storage",
+  "s3.grow": (name: string) => `Grow the storage of ${name}`,
+  "s3.growSentence": (name: string, from: string, to: string) =>
+    `Grow the disk of ${name} from ${from} to ${to}. The operator grows it in place, and its files stay.`,
   "s3.field.bucket": "Bucket",
   "s3.bucketHint": "Optional. Add more later.",
   "s3.bucketRule": "3 to 63 lowercase letters, digits and hyphens.",
@@ -3380,6 +3390,7 @@ export const en = {
   "part.health-checks": "Health checks",
   "part.security": "Security",
   "part.tasks": "Scheduled tasks",
+  "part.schedule": "Schedule",
   "tasks.hint":
     "Run a command from this service on a schedule, such as a nightly cleanup or a report.",
   "tasks.none": "No scheduled tasks",
@@ -3426,6 +3437,13 @@ export const en = {
   "tasks.run.failed": "Failed",
   "tasks.manual": "Started by hand",
   "tasks.allRuns": (n: number) => `Show all ${n} runs`,
+  "tasks.pauseTitle": (name: string) => `Pause ${name}`,
+  "tasks.resumeTitle": (name: string) => `Resume ${name}`,
+  "tasks.scheduleBlocked": "Fix the schedule to save.",
+  "tasks.settingsHint": "Changes apply from the next run.",
+  "tasks.overlapSkips": "A run is still going, and this task skips a run while one is going.",
+  "tasks.replaceStops": (runs: string) =>
+    `A run is still going, and this task stops it for a new one: ${runs} stops first.`,
   "confirm.certificateIssuer": (host: string, issuer: string) =>
     `Get the certificate of ${host} from ${issuer}.`,
   "confirm.certificateOwn": (host: string) => `Use your own certificate for ${host}.`,

@@ -38,13 +38,18 @@ const Tasks = lazy(() =>
     default: m.TasksSection,
   })),
 )
+const ScheduleSection = lazy(() =>
+  import("@/routes/service/tasks").then((m) => ({
+    default: m.ScheduleSection,
+  })),
+)
 const HealthChecks = lazy(() =>
   import("@/routes/service/settings").then((m) => ({
     default: m.HealthChecksSection,
   })),
 )
 
-/** Build, compute, health checks, storage, security and scheduled tasks, one under the other;
+/** Build, schedule, compute, health checks, storage, security and scheduled tasks, one under the other;
  * edits other than the build's wait in the draft. */
 export function SettingsTab({
   project,
@@ -109,6 +114,11 @@ export function SettingsTab({
               <BuildSection project={project} builds={builds} />
             </Part>
           ) : null}
+          {parts.includes("schedule") ? (
+            <Part id="schedule">
+              <ScheduleSection project={project} service={service} />
+            </Part>
+          ) : null}
           <Part id="compute">
             <Compute project={project} service={service} />
           </Part>
@@ -142,6 +152,7 @@ export function SettingsTab({
 function partsOf(service: Service, built: boolean): SettingsPart[] {
   return [
     ...(built ? (["build"] as const) : []),
+    ...(service.schedule ? (["schedule"] as const) : []),
     "compute",
     ...(isTask(service.kind) ? [] : (["health-checks"] as const)),
     "storage",

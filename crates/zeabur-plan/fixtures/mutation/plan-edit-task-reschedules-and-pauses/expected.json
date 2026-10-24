@@ -1,0 +1,22 @@
+{
+  "impact": [{"kind": "CronJob", "name": "nightly"}],
+  "objects": [
+    {
+      "target": {"kind": "CronJob", "name": "nightly"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "12"},
+          {"op": "replace", "path": "/spec/schedule", "value": "30 4 * * 1"},
+          {"op": "add", "path": "/spec/timeZone", "value": "Asia/Taipei"},
+          {"op": "add", "path": "/spec/concurrencyPolicy", "value": "Forbid"},
+          {"op": "add", "path": "/spec/successfulJobsHistoryLimit", "value": 5},
+          {"op": "add", "path": "/spec/failedJobsHistoryLimit", "value": 2},
+          {"op": "add", "path": "/spec/suspend", "value": true},
+          {"op": "replace", "path": "/spec/jobTemplate/spec/template/spec/containers/0/command", "value": ["/bin/sh", "-c", "bin/cleanup --all"]}
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}

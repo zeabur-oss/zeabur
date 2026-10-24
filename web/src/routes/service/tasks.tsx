@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState } from "react"
+import PauseCircleIcon from "~icons/ph/pause-circle"
 import PlayIcon from "~icons/ph/play"
+import PlayCircleIcon from "~icons/ph/play-circle"
 import PlusIcon from "~icons/ph/plus"
 
 import { projectQuery, taskRunsQuery } from "@/api/queries"
@@ -10,8 +12,10 @@ import { useLogsReadable } from "@/api/logs-access"
 import { Ago } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { GateNote, GateTip, useGate } from "@/components/gate"
+import type { Gate } from "@/model/rights"
 import { KubeDetails } from "@/components/kube-details"
 import { LoadingRows } from "@/components/page"
+import { useHold } from "@/components/plan/draft"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanner, usePlanStep } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
@@ -29,6 +33,7 @@ import { Container } from "@zeabur/design-system/components/container"
 import { Input } from "@zeabur/design-system/components/input"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Select } from "@zeabur/design-system/components/select"
+import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
 type Concurrency = Schemas["TaskConcurrency"]
 type Run = Schemas["TaskRun"]
@@ -227,35 +232,15 @@ function ScheduleTaskDrawer({
           />
         </FormField>
         <ContainerField containers={containers} value={container} onChange={setContainer} />
-        <FormField label={t("tasks.overlap")}>
-          <Select
-            size="sm"
-            value={concurrency}
-            onValueChange={setConcurrency}
-            items={(["forbid", "allow", "replace"] as const).map((value) => ({
-              value,
-              label: t(`tasks.overlap.${value}`),
-            }))}
-          />
-        </FormField>
-        <div className="grid grid-cols-2 gap-4">
-          <FormField label={t("tasks.keepSucceeded")} errors={shown(problems.keepSucceeded)}>
-            <Input
-              size="sm"
-              inputMode="numeric"
-              value={keepSucceeded}
-              onChange={(event) => setKeepSucceeded(event.target.value.trim())}
-            />
-          </FormField>
-          <FormField label={t("tasks.keepFailed")} errors={shown(problems.keepFailed)}>
-            <Input
-              size="sm"
-              inputMode="numeric"
-              value={keepFailed}
-              onChange={(event) => setKeepFailed(event.target.value.trim())}
-            />
-          </FormField>
-        </div>
+        <RunFields
+          values={{ concurrency, keepSucceeded, keepFailed }}
+          problems={tried ? problems : {}}
+          onChange={(key, value) => {
+            if (key === "concurrency") setConcurrency(value as Concurrency)
+            else if (key === "keepSucceeded") setKeepSucceeded(value)
+            else setKeepFailed(value)
+          }}
+        />
         <KubeDetails
           facts={[
             [t("tasks.kube.object"), `CronJob ${name} → Job → Pod`],
@@ -268,6 +253,205 @@ function ScheduleTaskDrawer({
   )
 }
 
+/** A CronJob's schedule and how it runs; edits wait in the draft. */
+export function ScheduleSection({ project, service }: { project: string; service: Service }) {
+  const t = useT()
+  const gate = useGate(project, "changeServices")
+  const current = service.schedule
+  if (!current) return null
+  const disabled = !!service.provenance.tool || !gate.open
+  return (
+    <section aria-labelledby="schedule-title" className="flex flex-col gap-3">
+      <SectionHeader
+        id="schedule-title"
+        title={t("part.schedule")}
+        description={t("tasks.settingsHint")}
+      />
+      {service.provenance.tool ? null : <GateNote gate={gate} />}
+      <ScheduleForm cronJob={service.name} current={current} disabled={disabled} />
+    </section>
+  )
+}
+
+interface ScheduleValues {
+  schedule: string
+  zone: string
+  command: string
+  concurrency: Concurrency
+  keepSucceeded: string
+  keepFailed: string
+}
+
+const valuesOf = (current: Schemas["TaskSchedule"]): ScheduleValues => ({
+  schedule: current.cron,
+  zone: current.timeZone ?? "",
+  command: current.command ?? "",
+  concurrency: current.concurrency,
+  keepSucceeded: String(current.keepSucceeded),
+  keepFailed: String(current.keepFailed),
+})
+
+/** The fields that differ from the CronJob, as one edit; `undefined` when none do. */
+function scheduleEdit(
+  cronJob: string,
+  current: Schemas["TaskSchedule"],
+  values: ScheduleValues,
+): Extract<Schemas["Change"], { op: "editTask" }> | undefined {
+  const before = valuesOf(current)
+  const trimmed = (key: keyof ScheduleValues) => values[key].trim()
+  const changed = (key: keyof ScheduleValues) => trimmed(key) !== before[key]
+  const edit = {
+    op: "editTask" as const,
+    cronJob,
+    ...(changed("schedule") ? { schedule: trimmed("schedule") } : {}),
+    ...(changed("zone") ? { timeZone: trimmed("zone") } : {}),
+    ...(current.command != null && changed("command") ? { command: trimmed("command") } : {}),
+    ...(changed("concurrency") ? { concurrency: values.concurrency } : {}),
+    ...(changed("keepSucceeded") ? { keepSucceeded: Number(values.keepSucceeded) } : {}),
+    ...(changed("keepFailed") ? { keepFailed: Number(values.keepFailed) } : {}),
+  }
+  return Object.keys(edit).length > 2 ? edit : undefined
+}
+
+function ScheduleForm({
+  cronJob,
+  current,
+  disabled,
+}: {
+  cronJob: string
+  current: Schemas["TaskSchedule"]
+  disabled: boolean
+}) {
+  const t = useT()
+  const [values, setValues] = useState(() => valuesOf(current))
+  const set = (key: keyof ScheduleValues) => (value: string) =>
+    setValues((v) => ({ ...v, [key]: value }))
+  const shell = current.command != null
+  const problems = {
+    ...taskProblems(t, { ...values, name: "task", command: shell ? values.command : "-" }),
+    name: undefined,
+  }
+  const edit = disabled ? undefined : scheduleEdit(cronJob, current, values)
+  useHold(
+    "schedule",
+    edit
+      ? {
+          changes: [edit],
+          blocked: Object.values(problems).some(Boolean) ? t("tasks.scheduleBlocked") : undefined,
+          scope: { ops: ["editTask"], workload: { kind: "CronJob", name: cronJob } },
+        }
+      : undefined,
+  )
+  const shown = (message?: string) => (message ? [message] : [])
+  const words = describeCron(t, zoned(values.schedule.trim(), values.zone.trim()))
+  return (
+    <form
+      aria-label={t("part.schedule")}
+      className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-5"
+      onSubmit={(event) => event.preventDefault()}
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField
+          label={t("tasks.schedule")}
+          hint={words ?? t("tasks.scheduleHint")}
+          errors={shown(problems.schedule)}
+        >
+          <Input
+            size="sm"
+            mono
+            value={values.schedule}
+            disabled={disabled}
+            autoComplete="off"
+            onChange={(event) => set("schedule")(event.target.value)}
+          />
+        </FormField>
+        <FormField label={t("tasks.zone")} hint={t("tasks.zoneHint")}>
+          <Input
+            size="sm"
+            mono
+            value={values.zone}
+            disabled={disabled}
+            placeholder="Etc/UTC"
+            autoComplete="off"
+            onChange={(event) => set("zone")(event.target.value)}
+          />
+        </FormField>
+      </div>
+      {shell ? (
+        <FormField
+          label={t("tasks.command")}
+          hint={t("tasks.commandHint")}
+          errors={shown(problems.command)}
+        >
+          <Input
+            size="sm"
+            mono
+            value={values.command}
+            disabled={disabled}
+            autoComplete="off"
+            onChange={(event) => set("command")(event.target.value)}
+          />
+        </FormField>
+      ) : null}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <RunFields
+          values={values}
+          problems={problems}
+          disabled={disabled}
+          onChange={(key, value) => set(key)(value)}
+        />
+      </div>
+    </form>
+  )
+}
+
+/** What happens when a run is still going, and how many runs are kept. */
+function RunFields({
+  values,
+  problems,
+  disabled,
+  onChange,
+}: {
+  values: Pick<ScheduleValues, "concurrency" | "keepSucceeded" | "keepFailed">
+  problems: { keepSucceeded?: string; keepFailed?: string }
+  disabled?: boolean
+  onChange: (key: "concurrency" | "keepSucceeded" | "keepFailed", value: string) => void
+}) {
+  const t = useT()
+  const shown = (message?: string) => (message ? [message] : [])
+  const keep = (key: "keepSucceeded" | "keepFailed") => (
+    <FormField label={t(`tasks.${key}`)} errors={shown(problems[key])}>
+      <Input
+        size="sm"
+        inputMode="numeric"
+        value={values[key]}
+        disabled={disabled}
+        onChange={(event) => onChange(key, event.target.value.trim())}
+      />
+    </FormField>
+  )
+  return (
+    <>
+      <FormField label={t("tasks.overlap")}>
+        <Select
+          size="sm"
+          value={values.concurrency}
+          disabled={disabled}
+          onValueChange={(value) => onChange("concurrency", value)}
+          items={(["forbid", "allow", "replace"] as const).map((value) => ({
+            value,
+            label: t(`tasks.overlap.${value}`),
+          }))}
+        />
+      </FormField>
+      <div className="grid grid-cols-2 gap-4">
+        {keep("keepSucceeded")}
+        {keep("keepFailed")}
+      </div>
+    </>
+  )
+}
+
 const RUNS_SHOWN = 10
 
 /** A CronJob's schedule, Run now, and its runs with their logs. */
@@ -276,32 +460,20 @@ export function TaskRunsCard({ project, service }: { project: string; service: S
   const gate = useGate(project, "changeServices")
   const planner = usePlanner(project, undefined, true)
   const runs = useQuery(taskRunsQuery(project, service.name))
+  const going = (runs.data?.runs ?? []).filter((run) => run.status === "running")
   return (
     <Container
       title={
         <span className="flex min-w-0 items-center gap-3">
-          {t("tasks.runs")}
+          <span className="shrink-0">{t("tasks.runs")}</span>
           {service.schedule ? <TaskWhen schedule={service.schedule} /> : null}
         </span>
       }
       titleAction={
-        <GateTip gate={gate}>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!gate.open}
-            onClick={() =>
-              planner.plan({
-                title: t("tasks.runTitle", service.name),
-                changes: [{ op: "runTask", cronJob: service.name }],
-                service: { kind: service.kind, name: service.name },
-              })
-            }
-          >
-            <PlayIcon aria-hidden="true" />
-            {t("tasks.runNow")}
-          </Button>
-        </GateTip>
+        <span className="flex items-center gap-2">
+          <PauseButton service={service} gate={gate} planner={planner} />
+          <RunNowButton service={service} going={going} gate={gate} planner={planner} />
+        </span>
       }
       variant="list"
     >
@@ -318,6 +490,98 @@ export function TaskRunsCard({ project, service }: { project: string; service: S
       )}
       {planner.dialog}
     </Container>
+  )
+}
+
+type Planner = ReturnType<typeof usePlanner>
+
+/** Stops or starts runs on schedule. */
+function PauseButton({
+  service,
+  gate,
+  planner,
+}: {
+  service: Service
+  gate: Gate
+  planner: Planner
+}) {
+  const t = useT()
+  if (!service.schedule || service.provenance.tool) return null
+  const suspended = !!service.schedule.suspended
+  return (
+    <GateTip gate={gate}>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={!gate.open}
+        onClick={() =>
+          planner.plan({
+            title: t(suspended ? "tasks.resumeTitle" : "tasks.pauseTitle", service.name),
+            changes: [{ op: "editTask", cronJob: service.name, paused: !suspended }],
+            service: { kind: service.kind, name: service.name },
+          })
+        }
+      >
+        {suspended ? <PlayCircleIcon aria-hidden="true" /> : <PauseCircleIcon aria-hidden="true" />}
+        {t(suspended ? "action.resume" : "action.pause")}
+      </Button>
+    </GateTip>
+  )
+}
+
+/** Run now, as the task's overlap rule lets it: not while a run is going when it skips, and
+ * saying which runs stop when it replaces. */
+function RunNowButton({
+  service,
+  going,
+  gate,
+  planner,
+}: {
+  service: Service
+  going: Run[]
+  gate: Gate
+  planner: Planner
+}) {
+  const t = useT()
+  const concurrency = service.schedule?.concurrency
+  const skipped = concurrency === "forbid" && going.length > 0
+  const stops = concurrency === "replace" && going.length > 0
+  const button = (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={!gate.open || skipped}
+      onClick={() =>
+        planner.plan({
+          title: t("tasks.runTitle", service.name),
+          changes: [{ op: "runTask", cronJob: service.name }],
+          service: { kind: service.kind, name: service.name },
+          notes: stops
+            ? [
+                t(
+                  "tasks.replaceStops",
+                  t(
+                    "common.list",
+                    going.map((run) => run.name),
+                  ),
+                ),
+              ]
+            : undefined,
+        })
+      }
+    >
+      <PlayIcon aria-hidden="true" />
+      {t("tasks.runNow")}
+    </Button>
+  )
+  if (!skipped) return <GateTip gate={gate}>{button}</GateTip>
+  return (
+    <Tooltip content={t("tasks.overlapSkips")}>
+      <span className="inline-flex" tabIndex={0}>
+        {button}
+        <span className="sr-only">{t("tasks.overlapSkips")}</span>
+      </span>
+    </Tooltip>
   )
 }
 

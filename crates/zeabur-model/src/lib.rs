@@ -51,7 +51,7 @@ pub use trace::{
 };
 pub use workload::{
     Classification, ContainerStatusSummary, ContainerTermination, ContainerWaiting, ManagedBy,
-    Phase, PodSummary, Replicas, TaskSchedule, WorkloadKind, WorkloadSummary,
+    Phase, PodSummary, Replicas, TaskConcurrency, TaskSchedule, WorkloadKind, WorkloadSummary,
 };
 
 /// `skip_serializing_if` helper: a `false` flag is left out, so the wire form only names flags

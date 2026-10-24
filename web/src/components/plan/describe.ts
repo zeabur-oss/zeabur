@@ -229,12 +229,26 @@ type PagesChange = Extract<
   { op: "errorPageHtml" | "errorPages" | "maintenance" | "copyS3Keys" }
 >
 
+/** An edit of a task reads as Pause or Resume when that is all it does. */
+function editTaskWords(t: Translate, change: Extract<Change, { op: "editTask" }>) {
+  const pauseOnly =
+    typeof change.paused === "boolean" &&
+    Object.entries(change).every(([k, v]) => ["op", "cronJob", "paused"].includes(k) || v == null)
+  if (!pauseOnly)
+    return { sentence: t("confirm.editTask", change.cronJob), action: t("action.saveSchedule") }
+  return change.paused
+    ? { sentence: t("confirm.pauseTask", change.cronJob), action: t("action.pause") }
+    : { sentence: t("confirm.resumeTask", change.cronJob), action: t("action.resume") }
+}
+
 function accessSentence(t: Translate, change: AccessChange | ServiceChange): string {
   switch (change.op) {
     case "scheduleTask":
       return t("confirm.scheduleTask", change.name, change.from.name)
     case "runTask":
       return t("confirm.runTask", change.cronJob)
+    case "editTask":
+      return editTaskWords(t, change).sentence
     case "redirect":
       return change.to
         ? t("confirm.redirect", change.hostname, change.to)
@@ -834,6 +848,8 @@ function accessAction(t: Translate, change: AccessChange | ServiceChange): strin
       return t("action.create")
     case "runTask":
       return t("tasks.runNow")
+    case "editTask":
+      return editTaskWords(t, change).action
     case "redirect":
       return change.to ? t("action.redirect") : t("action.stopRedirect")
     case "basicAuth":

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use zeabur_model::{PodSecurityLevel, ProjectIcon, WorkloadRef};
+use zeabur_model::{PodSecurityLevel, ProjectIcon, TaskConcurrency, WorkloadRef};
 
 use crate::checks::{ProbeRequest, ResourceRef, VolumeRequest};
 use crate::rules::{EnvEdit, FieldChange};
@@ -375,11 +375,41 @@ pub enum Change {
         #[serde(default = "one")]
         keep_failed: i32,
     },
-    /// Run a CronJob now, as `kubectl create job --from=cronjob/<name>` does.
+    /// Run a CronJob now, as `kubectl create job --from=cronjob/<name>` does, under its
+    /// `concurrencyPolicy`: `Forbid` refuses while a run is active, `Replace` deletes the active
+    /// runs first.
     #[serde(rename_all = "camelCase")]
     RunTask {
         /// The CronJob.
         cron_job: String,
+    },
+    /// Change a scheduled task. Each field given replaces the CronJob's; the runs already started
+    /// keep going.
+    #[serde(rename_all = "camelCase")]
+    EditTask {
+        /// The CronJob.
+        cron_job: String,
+        /// When it runs, a cron expression.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        schedule: Option<String>,
+        /// The IANA time zone of the schedule; empty removes it, for the controller's.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        time_zone: Option<String>,
+        /// The command, run by `/bin/sh -c`. Only for a task whose only container runs one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        command: Option<String>,
+        /// What happens when a run is due while the last one still runs.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        concurrency: Option<TaskConcurrency>,
+        /// How many succeeded runs to keep.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        keep_succeeded: Option<i32>,
+        /// How many failed runs to keep.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        keep_failed: Option<i32>,
+        /// Stop starting runs on schedule (`spec.suspend`), or start again.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        paused: Option<bool>,
     },
     /// Add a debug container to a pod, for a terminal in a container whose image has no shell:
     /// an ephemeral container with a shell image, sharing the target container's processes
@@ -614,34 +644,6 @@ pub struct MaintenanceChange {
     /// after maintenance started, so the backends kept then no longer fit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub workload: Option<WorkloadRef>,
-}
-
-/// A CronJob's `concurrencyPolicy` [k8s-concurrency].
-///
-/// [k8s-concurrency]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#concurrency-policy
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[serde(rename_all = "camelCase")]
-pub enum TaskConcurrency {
-    /// Skip the new run.
-    #[default]
-    Forbid,
-    /// Start it beside the last one.
-    Allow,
-    /// Stop the last one and start the new one.
-    Replace,
-}
-
-impl TaskConcurrency {
-    /// The value Kubernetes reads.
-    #[must_use]
-    pub const fn as_kubernetes(self) -> &'static str {
-        match self {
-            Self::Forbid => "Forbid",
-            Self::Allow => "Allow",
-            Self::Replace => "Replace",
-        }
-    }
 }
 
 /// The probes of a container [k8s-probes].

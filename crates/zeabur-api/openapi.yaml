@@ -5690,7 +5690,10 @@ components:
             - "null"
             description: The IANA time zone of the schedule; by default the controller's, usually UTC.
       - type: object
-        description: Run a CronJob now, as `kubectl create job --from=cronjob/<name>` does.
+        description: |-
+          Run a CronJob now, as `kubectl create job --from=cronjob/<name>` does, under its
+          `concurrencyPolicy`: `Forbid` refuses while a run is active, `Replace` deletes the active
+          runs first.
         required:
         - cronJob
         - op
@@ -5702,6 +5705,58 @@ components:
             type: string
             enum:
             - runTask
+      - type: object
+        description: |-
+          Change a scheduled task. Each field given replaces the CronJob's; the runs already started
+          keep going.
+        required:
+        - cronJob
+        - op
+        properties:
+          command:
+            type:
+            - string
+            - "null"
+            description: The command, run by `/bin/sh -c`. Only for a task whose only container runs one.
+          concurrency:
+            oneOf:
+            - $ref: "#/components/schemas/TaskConcurrency"
+              description: What happens when a run is due while the last one still runs.
+            - type: "null"
+          cronJob:
+            type: string
+            description: The CronJob.
+          keepFailed:
+            type:
+            - integer
+            - "null"
+            format: int32
+            description: How many failed runs to keep.
+          keepSucceeded:
+            type:
+            - integer
+            - "null"
+            format: int32
+            description: How many succeeded runs to keep.
+          op:
+            type: string
+            enum:
+            - editTask
+          paused:
+            type:
+            - boolean
+            - "null"
+            description: Stop starting runs on schedule (`spec.suspend`), or start again.
+          schedule:
+            type:
+            - string
+            - "null"
+            description: When it runs, a cron expression.
+          timeZone:
+            type:
+            - string
+            - "null"
+            description: The IANA time zone of the schedule; empty removes it, for the controller's.
       - type: object
         description: |-
           Add a debug container to a pod, for a terminal in a container whose image has no shell:
@@ -15791,10 +15846,33 @@ components:
         [k8s-cronjob]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
       required:
       - cron
+      - concurrency
+      - keepSucceeded
+      - keepFailed
       properties:
+        command:
+          type:
+          - string
+          - "null"
+          description: >-
+            The command, when the only container runs `/bin/sh -c <command>` as a task
+            Zeabur made.
+        concurrency:
+          $ref: "#/components/schemas/TaskConcurrency"
+          description: >-
+            What happens when a run is due while the last one still runs
+            (`spec.concurrencyPolicy`).
         cron:
           type: string
           description: The cron expression (`spec.schedule`).
+        keepFailed:
+          type: integer
+          format: int32
+          description: How many failed runs Kubernetes keeps (`spec.failedJobsHistoryLimit`).
+        keepSucceeded:
+          type: integer
+          format: int32
+          description: How many succeeded runs Kubernetes keeps (`spec.successfulJobsHistoryLimit`).
         lastScheduled:
           type:
           - string

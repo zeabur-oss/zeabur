@@ -18,7 +18,14 @@ import type { Icon } from "@/lib/icon"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Gate } from "@/model/rights"
-import { podSearch, tabSearch, type DatabaseTab, type ObjectStorageTab } from "@/routes/search"
+import {
+  modeSearch,
+  podSearch,
+  tabSearch,
+  type DatabaseTab,
+  type ObjectStorageTab,
+  type ServiceMode,
+} from "@/routes/search"
 import { TabRow } from "@/routes/service/tab-row"
 import { Button } from "@zeabur/design-system/components/button"
 import {
@@ -133,6 +140,7 @@ export function useStorePage<Tab extends DatabaseTab | ObjectStorageTab>(
   return {
     setTab: (next: Tab) => void go({ to: ".", search: tabSearch(next), hash: "" }),
     setPod: (pod?: string) => void go({ to: ".", search: podSearch(pod), replace: true }),
+    setMode: (mode?: ServiceMode) => void go({ to: ".", search: modeSearch(mode), hash: "" }),
     tab: asked === undefined || (asked === "logs" && !logs) ? ("overview" as Tab) : asked,
     shown: all.filter((value) => value !== "logs" || logs),
     gates: useGates(project),
