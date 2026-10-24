@@ -3,13 +3,13 @@ title: 開始使用 Zeabur
 description: 從一台伺服器、既有 Kubernetes 叢集或示範專案開始管理服務。
 ---
 
-用 Zeabur 查看 Kubernetes 裡的服務、日誌與網域；調整設定時，先**檢查變更**再套用。依手上的環境選一個起點。
+用 Zeabur 查看 Kubernetes 裡的服務、日誌與網域。調整設定時，先**檢查變更**再套用。依手上的環境選一個起點。
 
 ## 從一台伺服器開始
 
-準備一台使用 systemd 的 Linux 伺服器、root 權限，以及指向這台主機的登入與管理網域。Zeabur Installer 會安裝 RKE2、選定的元件、Zeabur Identity 和 Zeabur。
+準備一台使用 systemd 的 Linux 伺服器、root 權限，以及指向這台主機的登入與管理網域。Zeabur Installer 的網頁介面會一步步檢查伺服器、選元件，再安裝 RKE2、Zeabur Identity 和 Zeabur。
 
-完成後，終端機會印出 Zeabur 網址與首次管理員的通行密鑰註冊連結；登入後就能建立第一個專案。
+完成後，畫面會顯示 Zeabur 網址與第一位管理員的通行密鑰註冊連結。登入後就能建立第一個專案。
 
 [在一台伺服器安裝 Zeabur](get-started/quickstart.mdx)
 
@@ -23,8 +23,8 @@ description: 從一台伺服器、既有 Kubernetes 叢集或示範專案開始�
 
 ## 先試示範專案
 
-不必準備主機或 kubeconfig。下方是 `shop` 示範專案，可以查看服務、資料庫與網路，再進入服務看日誌或設定。示範資料放在記憶體裡，操作不會寫進你的叢集。
+下面是 `shop` 示範專案的畫面。專案頁列出服務、資料庫與網路，點進服務可以看日誌或改設定。
 
-<LiveScreen path="/projects/shop" />
+![shop 專案頁列出 web、api、資料庫等服務](https://oss.zeabur.com/shots/zeabur/zh-TW/light/project-services.avif)
 
 已有可登入的 Zeabur 後，接著[部署第一個服務](get-started/first-project.mdx)。

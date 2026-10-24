@@ -9,11 +9,11 @@ description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章�
 
 | 成品 | 位置或檔名 | 平台 |
 |---|---|---|
-| `zeaburctl` | `zeaburctl-v<version>-<os>-<arch>.tar.gz` | Linux `amd64`、`arm64`；macOS `arm64` |
+| `zeaburctl` | `zeaburctl-v<version>-<os>-<arch>.tar.gz` | Linux `amd64`、`arm64`，macOS `arm64` |
 | `zeabur` 伺服器 | `zeabur-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
 | `zeabur-installer` | `zeabur-installer-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
 | 多平台容器映像檔 | `ghcr.io/zeabur-oss/zeabur:<version>` | Linux `amd64`、`arm64` |
-| Helm chart | `oci://ghcr.io/zeabur-oss/charts/zeabur`；也提供 `zeabur-<version>.tgz` | 安裝到 Kubernetes 叢集 |
+| Helm chart | `oci://ghcr.io/zeabur-oss/charts/zeabur`，也提供 `zeabur-<version>.tgz` | 安裝到 Kubernetes 叢集 |
 | 成品 digest | `digests.txt` | image index、各平台映像檔與 chart |
 | 檔案 checksum 與簽章 | `SHA256SUMS`、`SHA256SUMS.sigstore.json` | 同一份 release 的 assets |
 
@@ -65,7 +65,7 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 "./$binary" --version
 ```
 
-checksum 不符時，重新下載那個檔案。簽署者、issuer 或 attestation 不符時，不要執行檔案，先核對 release、檔名和 workflow 身分；也不要放寬驗證參數來讓它通過。
+checksum 不符時，重新下載那個檔案。簽署者、issuer 或 attestation 不符時，不要執行檔案，先核對 release、檔名和 workflow 身分，也不要放寬驗證參數來讓它通過。
 
 用 macOS 瀏覽器下載的檔案會帶 quarantine 標記。驗證通過後，對解出的檔案執行：
 

@@ -5,7 +5,7 @@ description: 查閱 zeabur-installer 的規劃、安裝、健康檢查、加入�
 
 先用 `plan` 看設定會建立什麼，再以 root 執行 `apply`。安裝中斷時，修正原因後用同一份設定重跑 `apply`，每個步驟會先看現況，只補上缺少或不同的部分。
 
-第一次安裝的主機條件見[從一台伺服器開始](../get-started/quickstart.mdx)，YAML 欄位見 [installer 設定](./installer-configuration.mdx)。已有 Kubernetes 叢集時，走[在既有叢集安裝](../get-started/install.mdx)。
+用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用設定檔和指令安裝見[用設定檔和指令安裝](../get-started/advanced-install.mdx)，YAML 欄位見 [Installer 設定](./installer-configuration.mdx)。已有 Kubernetes 叢集時，走[把 Zeabur 裝進既有叢集](../get-started/install.mdx)。
 
 ## 共用參數
 
@@ -24,11 +24,11 @@ sudo zeabur-installer --config /etc/zeabur-installer/config.yaml plan
 sudo zeabur-installer --config /etc/zeabur-installer/config.yaml plan --json
 ```
 
-`plan` 讀取設定、Catalog 和主機資訊，列出 RKE2、元件、Namespace、主機檔案、儲存類別、記憶體估算和提醒，不會改動主機。加 `--json` 輸出 JSON。
+`plan` 讀取設定、Catalog 和主機資訊，列出 RKE2、元件、Namespace、主機檔案、儲存類別、記憶體估算和提醒，接著執行和 `apply` 相同的主機檢查，不會改動主機。有檢查未通過時，它會說 `apply` 會停下。加 `--json` 輸出 JSON，這時不跑主機檢查。
 
 沒有設定檔時，`plan` 用主機位址產生 `sslip.io` 測試名稱，搭配 `local` 憑證模式和 `standard` preset，讓你先看結果。`apply` 一定要有設定檔。
 
-`apply` 依執行當下的設定重新計算安裝內容；`plan` 之後改了 YAML，`apply` 就照新的內容安裝。
+`apply` 依執行當下的設定重新計算安裝內容。`plan` 之後改了 YAML，`apply` 就照新的內容安裝。
 
 ## `apply`
 
@@ -37,13 +37,13 @@ sudo zeabur-installer --config /etc/zeabur-installer/config.yaml apply
 sudo zeabur-installer doctor
 ```
 
-需要 Linux、systemd 和 root 權限。installer 先檢查主機、連接埠、磁碟和時間同步，有一項失敗就在寫入任何東西前停下；時鐘沒同步只會警告。server 要用 `80`、`443`、`6443`、`9345`、`10250`，worker 只用 `80`、`443`、`10250`。ServiceLB 在每個節點占用 `80`、`443`。
+需要 Linux、systemd 和 root 權限。installer 先檢查主機、連接埠、磁碟和時間同步，有一項失敗就在寫入任何東西前停下。時鐘沒同步只會警告。server 要用 `80`、`443`、`6443`、`9345`、`10250`，worker 只用 `80`、`443`、`10250`。ServiceLB 在每個節點占用 `80`、`443`。
 
 建立叢集時依序執行：
 
 1. 為選定的元件準備主機套件，例如 Longhorn 要用的 iSCSI 和 NFS client。
 2. 寫入 RKE2 設定、CIS 要求的 kernel 參數，以及只記錄請求 metadata 的稽核政策。
-3. 下載並驗證 RKE2，啟動 `rke2-server`，等待 API 與節點就緒。
+3. 下載 RKE2 到 `/var/lib/rancher/zeabur-installer/downloads`，用 installer 釘選的 SHA-256 核對，啟動 `rke2-server`，等待 API 與節點就緒。
 4. 建立元件的 Namespace、基準 NetworkPolicy 和儲存類別。
 5. 依 Catalog 順序安裝元件並等待就緒。
 6. `zeabur: true` 時，安裝 Zeabur Identity、讓 API server 信任它、註冊 OAuth client，再安裝 Zeabur。
@@ -67,10 +67,10 @@ sudo zeabur-installer gui
 ssh -L 8085:127.0.0.1:8085 root@server.example.com
 ```
 
-開啟伺服器印出的完整連結。GUI 預設監聽 `127.0.0.1:8085`，用 `--listen <address:port>` 改位址。GUI 寫的是同一份設定檔，按下安裝時執行的也是同一個 `apply`。
+開啟伺服器印出的完整連結。GUI 預設監聽 `127.0.0.1:8085`，用 `--listen <address:port>` 改位址。GUI 寫的是同一份設定檔，按下安裝時執行的也是同一個 `apply`。每一步的畫面見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)。
 
 <Callout type="warn">
-GUI 以 root 修改這台主機。讓它只監聽 loopback，透過 SSH tunnel 開啟；改成對外位址時，登入權杖和安裝設定會以明文 HTTP 傳送。
+GUI 以 root 修改這台主機。讓它只監聽 loopback，透過 SSH tunnel 開啟。改成對外位址時，登入權杖和安裝設定會以明文 HTTP 傳送。
 </Callout>
 
 安裝完成後按 `Ctrl-C` 關閉 GUI，RKE2 和裝好的服務繼續執行。
@@ -83,15 +83,16 @@ sudo zeabur-installer doctor
 
 在建立叢集的 server 上，`doctor` 檢查 RKE2 unit、API、安裝紀錄裡的元件、預設儲存類別、Zeabur 和 Zeabur Identity 的 Deployment、節點位址、基準網路政策，以及 `/var/lib/rancher` 有沒有加密。它比對的是上次 `apply` 的紀錄，改過的 YAML 要重跑 `apply` 才算數。
 
-在加入既有叢集的節點上，它檢查自己的 RKE2 unit、Node 是否就緒、到 server 的連線和延遲、磁碟加密；如果是 server，還會比對 Zeabur Identity 的驗證設定。
+在加入既有叢集的節點上，它檢查自己的 RKE2 unit、Node 是否就緒、到 server 的連線和延遲、磁碟加密。如果是 server，還會比對 Zeabur Identity 的驗證設定。
 
 | 結束碼 | 意義 |
 |---|---|
 | `0` | 檢查通過 |
 | `1` | 有警告 |
 | `2` | 有故障 |
+| `3` | 檢查無法執行，例如沒有用 root 執行 |
 
-要從自己的電腦透過 Kubernetes API 檢查，用 [`zeaburctl doctor`](./zeaburctl.mdx#doctor)，它多了結束碼 `3`。
+指令列打錯時也以 `2` 結束。要從自己的電腦透過 Kubernetes API 檢查，用 [`zeaburctl doctor`](./zeaburctl.mdx#doctor)，結束碼的意思相同。
 
 ## `node add` 與 `node sync`
 
@@ -105,11 +106,11 @@ sudo zeabur-installer node add --role server --address 10.0.0.5
 
 | 選項 | 預設與用途 |
 |---|---|
-| `--role` | `worker`；也接受 `server` |
-| `--address` | 預設是這個節點的 `InternalIP`；新主機用這個位址連到 supervisor |
+| `--role` | `worker`，也接受 `server` |
+| `--address` | 預設是這個節點的 `InternalIP`，新主機用這個位址連到 supervisor |
 | `--ttl` | worker 權杖的有效期，預設 `1h`，可寫 `30m`、`1h` 等，最多 `24h` |
 
-`node add` 印出新 VM 要用的 join YAML 和指令。新 VM 要和這台在同一家主機商、同一個區域，可用區不同沒關係。worker 用會過期的 bootstrap token；server 用叢集的 server token，不會過期，`--ttl` 對它沒有作用。輸出內容等同密碼，存到新主機時權限設為 `0600`。
+`node add` 印出新 VM 要用的 join YAML 和指令。新 VM 要和這台在同一家主機商、同一個區域，可用區不同沒關係。worker 用會過期的 bootstrap token。server 用叢集的 server token，不會過期，`--ttl` 對它沒有作用。輸出內容等同密碼，存到新主機時權限設為 `0600`。
 
 新主機套用 join 設定後，在既有 server 執行：
 
@@ -117,7 +118,7 @@ sudo zeabur-installer node add --role server --address 10.0.0.5
 sudo zeabur-installer node sync
 ```
 
-`node sync` 把目前所有節點的位址加進 installer 建立的基準網路政策。新加入的 server 會自己同步；加入 worker 後，要在 server 執行一次。網路和儲存的前提見[加入節點](../cluster/nodes.mdx)。
+`node sync` 把目前所有節點的位址加進 installer 建立的基準網路政策。新加入的 server 會自己同步。加入 worker 後，要在 server 執行一次。網路和儲存的前提見[加入節點](../cluster/nodes.mdx)。
 
 ## `uninstall`
 
@@ -125,16 +126,18 @@ sudo zeabur-installer node sync
 sudo zeabur-installer uninstall zeabur
 ```
 
-只移除 Zeabur，RKE2、Zeabur Identity、Catalog 元件和應用程式都保留。`uninstall identity` 會連 Zeabur Identity 一起移除，並修改這台 server 的 API 驗證設定；執行前先依[移除 Zeabur](../leave/uninstall.mdx)準備其他登入方式。
+只移除 Zeabur，RKE2、Zeabur Identity、Catalog 元件和應用程式都保留。`uninstall zeabur` 也會刪掉 Zeabur 為成員建立的 RoleBinding 和 ClusterRoleBinding。
 
-在加入的節點上執行 `uninstall`，它只印出要依序執行的指令：drain、刪除 Node、執行 RKE2 移除腳本、同步網路政策。
+`uninstall identity` 會連 Zeabur Identity 一起移除，並清空 API server 對它的信任設定。執行前先依[移除 Zeabur](../leave/uninstall.mdx)準備其他登入方式。叢集有多台 server 時，其他 server 要各自執行一次 `sudo zeabur-installer apply` 才會停止信任 Zeabur Identity 的權杖，指令會列出這些 server。
+
+在加入的節點上執行 `uninstall`，它只印出要依序執行的指令：drain、刪除 Node、執行 RKE2 移除腳本、同步網路政策。也可以在 Zeabur 的節點選單按「移除節點」，見[新增與維護節點](../cluster/nodes.mdx)。
 
 RKE2 移除後，`uninstall --purge` 清掉 installer 的下載快取、本機 CA 副本和設定，磁碟區保留。`--purge` 不能和 `zeabur`、`identity` 一起用。要保留叢集，就不要執行 RKE2 移除腳本或 `--purge`。
 
 ## 安裝中斷時
 
 - 主機檢查失敗：依輸出釋出連接埠或修正磁碟，再重跑 `plan`、`apply`。
-- RKE2 沒啟動：看 `sudo journalctl -u rke2-server`；worker 看 `rke2-agent`。
+- RKE2 沒啟動：看 `sudo journalctl -u rke2-server`，worker 看 `rke2-agent`。
 - 元件卡在 Helm 安裝：`doctor` 會指出 `kube-system` 裡的 `helm-install-<name>` Job，看它的日誌。
 - 新節點就緒但部分系統服務連不到：先在 server 執行 `node sync`，再看 `doctor` 的網路政策檢查。
 

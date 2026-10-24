@@ -5,7 +5,7 @@ description: 查閱建立叢集與加入節點所用的 YAML 欄位、預設值�
 
 把網域、元件選擇和主機設定寫進 YAML，執行 `zeabur-installer --config config.yaml plan` 先看安裝內容。檔案預設放在 `/etc/zeabur-installer/config.yaml`。欄位用 camelCase，拼錯或多出欄位時，installer 會直接停下。
 
-指令用法見 [installer 指令](./installer.mdx)，第一次安裝見[從一台伺服器開始](../get-started/quickstart.mdx)。
+網頁介面的選擇也存成這份檔案。用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用指令安裝見[用設定檔和指令安裝](../get-started/advanced-install.mdx)，各指令的選項見 [Installer 指令](./installer.mdx)。
 
 ## 建立叢集的檔案
 
@@ -33,12 +33,12 @@ host:
 | `profile` | `single-node` | `single-node` 或 `multi-node`，選取 Catalog 對應的元件設定 |
 | `enable` | `[]` | 加入 capability 或完整元件 ID |
 | `disable` | `[]` | 排除 capability 或完整元件 ID |
-| `zeabur` | `true` | 安裝 Zeabur Identity 與 Zeabur；`false` 只安裝 RKE2 與選定元件 |
+| `zeabur` | `true` | 安裝 Zeabur Identity 與 Zeabur。`false` 只安裝 RKE2 與選定元件 |
 | `inputs` | `{}` | 依元件 ID 分組的一般輸入值 |
 | `secretFiles` | `{}` | 依元件 ID 分組的機密檔案路徑 |
 | `rke2Version` | installer 釘選版本 | 覆寫 RKE2 版本 |
 | `host` | 空 | API 憑證的額外名稱和磁碟加密要求 |
-| `sources` | 空 | 改用自己準備的 Catalog、映像檔和 chart |
+| `sources` | 空 | 選填，用自己準備的 Catalog、映像檔和 chart 取代釘選的版本 |
 
 `zeabur: false` 只決定這次安裝什麼，不會移除已裝好的 Zeabur。要移除，用 [`uninstall`](./installer.mdx#uninstall)。
 
@@ -46,10 +46,10 @@ host:
 
 | 欄位 | 預設與規則 |
 |---|---|
-| `mode` | 必填。`domain` 由 cert-manager 向 Let's Encrypt 申請憑證（HTTP-01）；`local` 在伺服器上建立私有 CA，只適合測試機 |
-| `identity` | 必填；Zeabur Identity 主機名稱，issuer 為 `https://<identity>` |
-| `zeabur` | 必填；Zeabur 主機名稱，必須與 `identity` 不同 |
-| `invitations` | `true`；是否接受 Zeabur **成員** 頁產生的設定連結。成員只由版本控制管理時關掉 |
+| `mode` | 必填。`domain` 由 cert-manager 向 Let's Encrypt 申請憑證（HTTP-01）。`local` 在伺服器上建立私有 CA，只適合測試機 |
+| `identity` | 必填。Zeabur Identity 主機名稱，issuer 為 `https://<identity>` |
+| `zeabur` | 必填。Zeabur 主機名稱，必須與 `identity` 不同 |
+| `invitations` | `true`。是否接受 Zeabur **成員** 頁產生的設定連結。成員只由版本控制管理時關掉 |
 
 主機名稱不加 `https://`、連接埠或路徑，只用小寫英文字母、數字、連字號和點，至少兩段。每段最多 63 個字元、不能以連字號開頭或結尾，總長最多 253 個字元。
 
@@ -71,7 +71,7 @@ inputs:
     owner-id: vps-1
 ```
 
-每個元件有哪些 input、型別是什麼，由 Catalog 定義；少了必填值時，`plan` 會指出要補哪個欄位。
+每個元件有哪些 input、型別是什麼，由 Catalog 定義。少了必填值時，`plan` 會指出要補哪個欄位。
 
 ### `secretFiles`
 
@@ -95,7 +95,7 @@ installer 一定會建立 `local-path`，資料放在節點的 `/var/lib/zeabur/
 
 - `local-path` 的磁碟區留在原本的節點，換預設類別不會搬移既有資料。
 - Longhorn 成為預設時，installer 原本設為預設的 `local-path` 會改成一般類別。
-- 叢集已有別的預設類別時，installer 保留它；如果這次要把 Longhorn 設為預設，`apply` 會停下，請你先拿掉原本類別的預設註解。
+- 叢集已有別的預設類別時，installer 保留它。如果這次要把 Longhorn 設為預設，`apply` 會停下，先拿掉原本類別的預設註解再重跑。
 
 選了 Longhorn 時，`apply` 會在這台主機安裝 iSCSI initiator 和 NFS client、載入 `iscsi_tcp`、啟動 `iscsid`。每個跑 Longhorn 的節點都要有這些，見[加入節點](../cluster/nodes.mdx)。
 
@@ -103,15 +103,17 @@ installer 一定會建立 `local-path`，資料放在節點的 `/var/lib/zeabur/
 
 | 欄位 | 預設與用途 |
 |---|---|
-| `host.tlsSan` | `[]`；Kubernetes API server 憑證額外加入的 DNS 名稱或 IP 位址，只用於 server |
-| `host.requireEncryptedDisk` | `false`；設為 `true` 時，根目錄或資料目錄不在加密裝置上，`apply` 就停下 |
-| `rke2Version` | installer 釘選的版本；要換版本時填，例如 `v1.37.1+rke2r1` |
+| `host.tlsSan` | `[]`。Kubernetes API server 憑證額外加入的 DNS 名稱或 IP 位址，只用於 server |
+| `host.requireEncryptedDisk` | `false`。設為 `true` 時，根目錄或資料目錄不在加密裝置上，`apply` 就停下 |
+| `rke2Version` | installer 釘選的版本。要換版本時填，例如 `v1.37.1+rke2r1` |
 
 預設版本的檔案用編譯進 installer 的 digest 驗證。換成其他版本時，只能用該 release 頁面自己的 checksum 清單驗證，`plan` 會標示這是未支援的版本，Catalog 測過的 Kubernetes 版本也可能對不上。
 
 ### `sources`
 
-`sources` 讓 installer 改裝你自己建置的 Catalog、Zeabur Identity 和 Zeabur，取代釘選的發行版，通常用在開發測試。路徑換成實際準備好的檔案：
+發行版的 installer 不需要 `sources`。它釘選了 Zeabur Catalog、Zeabur Identity 和 Zeabur 的版本，下載到 `/var/lib/rancher/zeabur-installer/downloads`，並用編譯進 installer 的 SHA-256 核對。
+
+`sources` 用來改裝自己建置的版本，通常是開發測試。只寫要換的欄位，其他照用釘選的版本。自己編譯的開發版 installer 沒有釘選任何版本，所以 `catalog`、`identityImage`、`identityctl`、`zeaburImage`、`zeaburChart` 都要寫，少了哪個 `plan` 會列出來。路徑換成實際準備好的檔案：
 
 ```yaml
 sources:
@@ -141,14 +143,14 @@ sources:
 
 | 欄位 | 預設與規則 |
 |---|---|
-| `join.server` | 必填；server 的 supervisor，例如 `https://10.0.0.5:9345` |
-| `join.role` | `worker`；也接受 `server` |
-| `join.token` | 和 `tokenFile` 擇一；直接寫權杖時，設定檔權限要是 `0600` |
-| `join.tokenFile` | 和 `token` 擇一；權限 `0600` 的權杖檔案 |
+| `join.server` | 必填。server 的 supervisor，例如 `https://10.0.0.5:9345` |
+| `join.role` | `worker`。也接受 `server` |
+| `join.token` | 和 `tokenFile` 擇一。直接寫權杖時，設定檔權限要是 `0600` |
+| `join.tokenFile` | 和 `token` 擇一。權限 `0600` 的權杖檔案 |
 | `join.expect.provider` | server 所在的主機商，新主機用來比對自己是否在同一處 |
-| `join.expect.region` | server 所在的區域；`expect.zone` 可另外記錄可用區 |
-| `join.serverConfig` | `server` 必填，worker 不接受；照抄 `node add --role server` 印出的 `disable` 和 `identity` |
-| `join.longhorn` | `false`；`true` 時在 RKE2 啟動前先裝好 Longhorn 需要的主機套件 |
+| `join.expect.region` | server 所在的區域。`expect.zone` 可另外記錄可用區 |
+| `join.serverConfig` | `server` 必填，worker 不接受。照抄 `node add --role server` 印出的 `disable` 和 `identity` |
+| `join.longhorn` | `false`。`true` 時在 RKE2 啟動前先裝好 Longhorn 需要的主機套件 |
 
 worker 不接受 `host.tlsSan`。`rke2Version` 要和叢集一致。worker 的 bootstrap token 不能用來加入 server，要用 `node add --role server` 產生的設定。
 

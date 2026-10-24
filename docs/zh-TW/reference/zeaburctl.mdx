@@ -21,7 +21,7 @@ zeaburctl mcp --context production
 
 | 指令 | 成果 | 會變更什麼 |
 |---|---|---|
-| `ui` | 在本機瀏覽器開啟 Zeabur | 不在叢集安裝元件；在介面套用的變更直接寫入叢集 |
+| `ui` | 在本機瀏覽器開啟 Zeabur | 不在叢集安裝元件，在介面套用的變更直接寫入叢集 |
 | `mcp` | 透過標準輸入與標準輸出提供 MCP 工具 | 只提供讀取工具 |
 | `doctor` | 檢查叢集版本、元件和 Zeabur Identity 設定 | 只讀取，不修改設定 |
 
@@ -31,7 +31,7 @@ zeaburctl mcp --context production
 |---|---|
 | `--context <name>` | kubeconfig 的目前 context |
 | `--no-browser` | 不自動開啟瀏覽器，仍會印出連結 |
-| `--metrics-service <namespace/name:port>` | 指定支援 Prometheus HTTP API 的 Kubernetes Service；也可用 `ZEABUR_METRICS_SERVICE` 環境變數 |
+| `--metrics-service <namespace/name:port>` | 指定支援 Prometheus HTTP API 的 Kubernetes Service，也可用 `ZEABUR_METRICS_SERVICE` 環境變數 |
 
 例如改從既有的 Prometheus 讀取用量歷史：
 
@@ -58,7 +58,7 @@ zeaburctl doctor --context production --output json
 | `--context <name>` | 指定 kubeconfig context |
 | `--output <format>` | `text`（預設）或 `json` |
 
-JSON 最外層是 `checks` 陣列，每一項有 `name`、`status`、`findings` 和 `fix`。`status` 是 `ok`、`warning`、`critical`、`skipped` 或 `error`；讀不到某項資料時，會列出缺少的權限。
+JSON 最外層是 `checks` 陣列，每一項有 `name`、`status`、`findings` 和 `fix`。`status` 是 `ok`、`warning`、`critical`、`skipped` 或 `error`。讀不到某項資料時，會列出缺少的權限。
 
 | 結束碼 | 意義 |
 |---|---|
@@ -86,9 +86,9 @@ kube-apiserver 是否信任 Zeabur Identity 的 issuer，寫在控制平面的 `
 }
 ```
 
-`mcp` 接受 `--context` 和 `--metrics-service`（也可用 `ZEABUR_METRICS_SERVICE`）。它透過 stdio 通訊：標準輸出只放協定訊息，給人看的訊息寫到標準錯誤；用戶端關閉標準輸入後，程式結束。
+`mcp` 接受 `--context` 和 `--metrics-service`（也可用 `ZEABUR_METRICS_SERVICE`）。它透過 stdio 通訊：標準輸出只放協定訊息，給人看的訊息寫到標準錯誤。用戶端關閉標準輸入後，程式結束。
 
-提供的工具有 `cluster_summary`、`list_projects`、`get_project`、`get_service`、`project_events`、`project_alerts`、`project_usage`、`pod_logs`、`object_yaml`、`service_history`。這些工具都只讀取，不能套用、刪除或開終端機；能讀到什麼由 kubeconfig 的權限決定。`pod_logs` 和 `object_yaml` 會把日誌和設定交給 AI 用戶端，用戶端會把內容送到哪裡，要先確認。
+提供的工具有 `cluster_summary`、`list_projects`、`get_project`、`get_service`、`project_events`、`project_alerts`、`project_usage`、`pod_logs`、`object_yaml`、`service_history`。這些工具都只讀取，不能套用、刪除或開終端機。能讀到什麼由 kubeconfig 的權限決定。`pod_logs` 和 `object_yaml` 會把日誌和設定交給 AI 用戶端，用戶端會把內容送到哪裡，要先確認。
 
 ## 連線與權限問題
 

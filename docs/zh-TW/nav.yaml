@@ -2,6 +2,7 @@
   label: 開始使用
   pages:
     quickstart: 在一台伺服器安裝 Zeabur
+    advanced-install: 用設定檔和指令安裝
     install: 把 Zeabur 裝進既有叢集
     first-project: 部署第一個服務
     how-it-works: Zeabur 如何管理服務

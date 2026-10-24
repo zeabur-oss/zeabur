@@ -13,7 +13,7 @@ Zeabur 顯示的內容讀自叢集裡的 Kubernetes 物件：用 kubectl 改了�
 |---|---|---|
 | `zeaburctl ui` | 本機 `127.0.0.1` 上的網頁 | 啟動時選的 kubeconfig context |
 | `zeaburctl mcp` | AI 用戶端透過 stdio 連線 | 選的 kubeconfig context，只有讀取工具 |
-| 叢集內的 `zeabur` | 透過 Ingress 或 HTTPRoute 公開的 Zeabur 網址 | Zeabur Identity 發給使用者的權杖；暫時使用管理員權限時，改用管理員權杖 |
+| 叢集內的 `zeabur` | 透過 Ingress 或 HTTPRoute 公開的 Zeabur 網址 | Zeabur Identity 發給使用者的權杖，暫時使用管理員權限時，改用管理員權杖 |
 
 `zeabur` 同時提供 `/api` 下的 API 和網頁介面。Chart 建立的 ServiceAccount 沒有綁定任何 Role，Pod 也不掛載 ServiceAccount token，每一次讀寫都用登入者的權杖。
 
@@ -21,7 +21,7 @@ Zeabur Identity 負責登入、通行密鑰和短效權杖。Zeabur 是它的 OA
 
 ## 專案與服務如何組成
 
-專案就是帶 `zeabur.com/project: "true"` 標籤的 Namespace。把既有 Namespace 加入 Zeabur 只是加上這個標籤；從 Zeabur 移除專案只拿掉標籤，裡面的物件都還在。
+專案就是帶 `zeabur.com/project: "true"` 標籤的 Namespace。把既有 Namespace 加入 Zeabur 只是加上這個標籤。從 Zeabur 移除專案只拿掉標籤，裡面的物件都還在。
 
 Zeabur 讀取 Deployment、StatefulSet、DaemonSet 和相關物件，依下列關係組成服務：
 
@@ -37,7 +37,7 @@ Zeabur 沒有自己的資料庫。資料庫是 operator 的 CR，從 Git 部署�
 
 1. **檢查變更** 讀取現況，算出要建立、修改或刪除哪些物件，以及會造成什麼影響。
 2. API 回傳一份變更權杖，以 AES-256-GCM 加密和驗證，裡面有使用者、群組、專案、請求、物件版本和期限。權杖 10 分鐘內有效。
-3. 確認套用時，瀏覽器只送回這份權杖。API 核對身分和期限，重讀物件、重新計算；有物件的版本變了，就要你重新檢查。
+3. 確認套用時，瀏覽器只送回這份權杖。API 核對身分和期限，重讀物件、重新計算。有物件的版本變了，就要你重新檢查。
 4. 每一筆寫入先送 kube-apiserver dry run，全部通過才依序真正寫入。每筆寫入都帶著版本，刪除則帶前置條件，物件被別人改過就不會寫入。
 
 一份變更可能修改多個物件，而 Kubernetes 沒有跨物件的交易。後面的寫入失敗時，前面寫成功的物件會留在叢集，錯誤訊息會列出已套用的項目。重新載入現況，再檢查下一份變更。

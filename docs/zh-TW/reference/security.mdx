@@ -13,7 +13,7 @@ description: 了解登入、機密、變更套用、終端機與 installer 的�
 
 Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。Chart 只接受事先建立好的 client Secret，不接受把 client secret 寫成 Helm value，所以它不會出現在 Helm 的 release 紀錄裡。能讀 Zeabur Namespace 的 Secret、能 exec 進 Zeabur Pod 或管理它所在節點的人，都碰得到這些機密和使用者的登入權杖，這些權限只給管理員。
 
-**暫時使用管理員權限** 要用通行密鑰確認。取得後，直到畫面顯示的時間，或按下 **放棄管理員權限** 之前，所有操作都使用管理員權限。管理員權限到期後不會自動延長，要再確認一次；一般登入權杖則會在工作階段期間自動更新。
+**暫時使用管理員權限** 要用通行密鑰確認。取得後，直到畫面顯示的時間，或按下 **放棄管理員權限** 之前，所有操作都使用管理員權限。管理員權限到期後不會自動延長，要再確認一次。一般登入權杖則會在工作階段期間自動更新。
 
 ## 本機介面
 
@@ -28,15 +28,15 @@ Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。C
 
 ## Secret 與一般設定
 
-能讀 Secret（包括 `list secrets`）就看得到它的值。**檢視者** 讀不到 Secret 和日誌；**開發者** 可以讀寫 Secret、讀日誌、在容器裡執行指令。日誌、ConfigMap 和工作負載裡直接寫的環境變數，也可能有應用程式寫出的敏感資料。
+能讀 Secret（包括 `list secrets`）就看得到它的值。**檢視者** 讀不到 Secret 和日誌，**開發者** 可以讀寫 Secret、讀日誌、在容器裡執行指令。日誌、ConfigMap 和工作負載裡直接寫的環境變數，也可能有應用程式寫出的敏感資料。
 
 **檢查變更** 畫面不顯示 Secret 的值，要寫入的機密放在加密的變更權杖裡帶到套用步驟。寫進 ConfigMap 的值仍是明文，誰能讀它由 RBAC 決定。
 
-已登錄的 S3 目的地，連線資訊放在 ConfigMap，金鑰放在 Secret。Chart 讓所有登入的人讀得到目的地清單，但讀不到那些 Secret。備份選用目的地時，金鑰會複製一份到備份所在的 Namespace；之後換金鑰，[已複製的副本](../cluster/s3-destinations.mdx)也要一起更新。
+已登錄的 S3 目的地，連線資訊放在 ConfigMap，金鑰放在 Secret。Chart 讓所有登入的人讀得到目的地清單，但讀不到那些 Secret。備份選用目的地時，金鑰會複製一份到備份所在的 Namespace。之後換金鑰，[已複製的副本](../cluster/s3-destinations.mdx)也要一起更新。
 
 ## 檢查變更與套用
 
-變更權杖以 AES-256-GCM 加密和驗證，綁定使用者名稱、群組、專案、請求和物件版本，10 分鐘內有效。換掉金鑰後，還沒套用的權杖都會失效；`zeaburctl ui` 每次啟動都產生新金鑰。
+變更權杖以 AES-256-GCM 加密和驗證，綁定使用者名稱、群組、專案、請求和物件版本，10 分鐘內有效。換掉金鑰後，還沒套用的權杖都會失效。`zeaburctl ui` 每次啟動都產生新金鑰。
 
 套用前，Zeabur 重讀物件、核對版本，並以使用者當下的權限 dry-run 每一筆寫入。正式寫入時帶著 `resourceVersion` 或刪除前置條件，物件在這段時間被改過就不會寫入。
 
@@ -46,7 +46,7 @@ Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。C
 
 新專案的 Pod Security `enforce`、`audit`、`warn` 都是 `restricted`。服務設為 **嚴格（建議）** 時，以非 root 執行、不能提升權限、移除所有 capabilities，並使用 `RuntimeDefault` seccomp profile。
 
-映像檔需要 root 時選 **相容**。專案強制 `restricted` 時，同一份變更會把 Namespace 的 `enforce` 降為 `baseline`，這一步要由管理員或有 Namespace 管理權的人套用；`audit` 和 `warn` 不變，所以不符合 `restricted` 的服務仍會被警告並記入稽核紀錄。套用後服務副本會替換。
+映像檔需要 root 時選 **相容**。專案強制 `restricted` 時，同一份變更會把 Namespace 的 `enforce` 降為 `baseline`，這一步要由管理員或有 Namespace 管理權的人套用。`audit` 和 `warn` 不變，所以不符合 `restricted` 的服務仍會被警告並記入稽核紀錄。套用後服務副本會替換。
 
 Pod Security 不管網路。要限制跨專案的流量，另外設定 NetworkPolicy。開發者可以修改 NetworkPolicy，所以也能改變專案的連線規則。
 
@@ -56,14 +56,14 @@ Pod Security 不管網路。要限制跨專案的流量，另外設定 NetworkPo
 
 容器終端機用你自己的 `pods/exec` 權限，能讀到這個容器掛載的磁碟區、Secret 和 ServiceAccount token。
 
-沒有 shell 的容器，Zeabur 會加一個除錯容器。Pod 或容器有指定使用者時，除錯容器用同一個使用者執行；它移除所有 capabilities，透過 `targetContainerName` 共享目標容器的程序空間，並在相同路徑掛上目標容器的磁碟區。Kubernetes 不會移除 ephemeral container，關閉終端機後它仍留在 Pod 裡，直到 Pod 被替換。
+沒有 shell 的容器，Zeabur 會加一個除錯容器。Pod 或容器有指定使用者時，除錯容器用同一個使用者執行。它移除所有 capabilities，透過 `targetContainerName` 共享目標容器的程序空間，並在相同路徑掛上目標容器的磁碟區。Kubernetes 不會移除 ephemeral container，關閉終端機後它仍留在 Pod 裡，直到 Pod 被替換。
 
 ### kubectl 終端機
 
 Zeabur 在短暫的 tools Pod 裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
 
 <Callout type="warn">
-能在 tools Pod 所在 Namespace 執行 `pods/exec` 的人，以及那個節點的管理員，在權杖到期前都能讀到並使用這份 kubeconfig。管理員的叢集 tools Pod 放在獨立的 `zeabur-cluster-tools` Namespace；專案的 tools Pod 預設放在專案裡，可以用 chart 的 `terminal.toolsNamespace` 移到只有管理員能 exec 的 Namespace。
+能在 tools Pod 所在 Namespace 執行 `pods/exec` 的人，以及那個節點的管理員，在權杖到期前都能讀到並使用這份 kubeconfig。管理員的叢集 tools Pod 放在獨立的 `zeabur-cluster-tools` Namespace。專案的 tools Pod 預設放在專案裡，可以用 chart 的 `terminal.toolsNamespace` 移到只有管理員能 exec 的 Namespace。
 </Callout>
 
 tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 立刻刪掉 kubeconfig，60 秒後刪除 Pod。Zeabur 中途重新啟動時，Pod 仍會在 `activeDeadlineSeconds` 到期時停止，之後查詢 tools Pod 狀態時再刪除。權杖寫進 tools Pod 後，Zeabur 無法撤銷，kube-apiserver 會接受它直到過期。
@@ -72,7 +72,7 @@ tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur
 
 **節點終端機** 用 privileged Pod、host PID／network／IPC 和 `nsenter` 進入主機，取得完整的 root 權限，在裡面做的事不會經過 **檢查變更**。
 
-節點終端機只給叢集管理員，Pod 放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立 Pod 或執行指令，Zeabur 就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 刪除 Pod；Zeabur 或瀏覽器先離開時，Pod 發現 shell 都結束了也會自己停止，最多執行 30 分鐘。
+節點終端機只給叢集管理員，Pod 放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立 Pod 或執行指令，Zeabur 就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 刪除 Pod。Zeabur 或瀏覽器先離開時，Pod 發現 shell 都結束了也會自己停止，最多執行 30 分鐘。
 
 ## 指標與歷史日誌
 
@@ -82,11 +82,11 @@ Zeabur Proxy（chart 預設 `proxy.enabled: false`）啟用後，使用者要能
 
 ## Installer 的主機與下載權限
 
-installer 以 root 寫入 RKE2 設定和 systemd unit、調整 kernel 參數、建立 `etcd` 使用者；選了 Longhorn 時還會安裝主機套件。GUI 以明文 HTTP 提供，讓它只監聽 loopback，透過 SSH tunnel 連線。
+installer 以 root 寫入 RKE2 設定和 systemd unit、調整 kernel 參數、建立 `etcd` 使用者。選了 Longhorn 時還會安裝主機套件。GUI 以明文 HTTP 提供，讓它只監聽 loopback，透過 SSH tunnel 連線。
 
 預設的 RKE2 版本用編譯進 installer 的 SHA-256 digest 驗證，信任來自 installer 本身的簽章。指定其他 `rke2Version` 時，只能用該 release 頁面上的 checksum 清單驗證。`sources` 指定的檔案、映像檔和 chart 不在釘選範圍內，內容由提供的人負責，使用前先依[發行檔與驗證](./releases.mdx)確認來源。
 
-RKE2 以 CIS profile 安裝，並加密 etcd 裡的 Secret。主機磁碟有沒有加密另外檢查；設 `host.requireEncryptedDisk: true` 時，沒加密就不安裝。備份目的地的存取權和加密，在備份工具和儲存服務那邊設定。
+RKE2 以 CIS profile 安裝，並加密 etcd 裡的 Secret。主機磁碟有沒有加密另外檢查。設 `host.requireEncryptedDisk: true` 時，沒加密就不安裝。備份目的地的存取權和加密，在備份工具和儲存服務那邊設定。
 
 ## 私下回報漏洞
 

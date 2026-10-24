@@ -1,14 +1,127 @@
-# Screenshots the docs use, taken from the in-memory demo (crates/zeabur-api/examples/demo.rs).
+# Screenshots the docs use, taken from the in-memory demo (crates/zeabur-api/examples/demo.rs),
+# or with `app: installer` from the installer's pages and captured responses
+# (crates/zeabur-installer/web/scripts/dev-api.ts).
 # The docs, README, landing and OG images use them: https://oss.zeabur.com/shots/zeabur/en/light/<id>.avif.
 #
 # - id: project-overview        # kebab-case, unique, the file name
+#   app: zeabur                 # optional; zeabur (default) or installer
 #   path: /projects/shop        # route in the demo UI
 #   wait: '[data-testid="services-table"]'   # optional selector to wait for
 #   steps:                      # optional; selectors only, never visible text
-#     - click: '[data-testid="deploy-button"]'
+#     - click: '[data-testid="deploy-button"]'   # or fill, hover, press, wait
 #   clip: main                  # optional selector to crop to
 #   viewport: desktop           # desktop (1440x900) or phone (390x844); default desktop
 #   locales: [en]               # optional; default en, zh-TW, zh-CN
 #   themes: [light, dark]       # optional; default [light]
 #   env: {}                     # optional demo env vars, e.g. ZEABUR_DEMO_FORBID
-[]
+
+# The installer (docs/zh-TW/get-started/quickstart.mdx). Each step's last button continues.
+- id: installer-host
+  app: installer
+  path: /
+  wait: '[data-testid="step-next"]'
+- id: installer-access
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="field"] .text-ok-strong'
+    - wait: '[data-slot="field"] ~ [data-slot="field"] .text-ok-strong'
+- id: installer-components
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="checkbox"][data-checked]'
+- id: installer-review
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[role="alert"]'
+# Stopped before Zeabur: the folded timeline then shows five items.
+- id: installer-install
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="timeline-item"]:nth-of-type(5)'
+  env:
+    ZEABUR_DEMO_INSTALL: running
+- id: installer-done
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="copy-input"]'
+  env:
+    ZEABUR_DEMO_INSTALL: done
+- id: installer-failed
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="timeline-item"]'
+    - wait: '[role="alert"]'
+  env:
+    ZEABUR_DEMO_INSTALL: fail
+
+# Zeabur pages, from the demo.
+- id: git-builds
+  path: /projects/blog/services/Deployment/docs?tab=builds
+  wait: 'main h1'
+  clip: main
+- id: service-overview
+  path: /projects/shop/services/Deployment/web
+  wait: 'main h1'
+  clip: main
+- id: project-services
+  path: /projects/shop
+  wait: 'main h1'
+  clip: main
+- id: database-overview
+  path: /projects/shop/databases/postgresql/orders
+  wait: 'main h1'
+  clip: main
+- id: object-storage
+  path: /projects/lab/object-storage/files-mvjrswvl
+  wait: 'main h1'
+  clip: main
+- id: cron-job
+  path: /projects/shop/services/CronJob/nightly-report
+  wait: 'main h1'
+  clip: main
+- id: service-variables
+  path: /projects/shop/services/Deployment/web?tab=variables
+  wait: 'main h1'
+  clip: main
+- id: service-storage
+  path: /projects/shop/services/StatefulSet/redis?tab=settings
+  wait: 'section#storage'
+  clip: 'section#storage'
+- id: service-networking
+  path: /projects/shop/services/Deployment/web?tab=networking
+  wait: '#net-public'
+  clip: main
+- id: cluster-nodes
+  path: /cluster
+  wait: '#cluster-nodes'
+  clip: '#cluster-nodes'
+  env:
+    ZEABUR_DEMO_RKE2: "1"
+- id: cluster-components
+  path: /cluster/components
+  wait: '#cluster-installed'
+  clip: main

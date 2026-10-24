@@ -1,0 +1,145 @@
+---
+title: 用設定檔和指令安裝
+description: 把安裝選擇寫成 YAML，用 plan 檢查、apply 安裝，適合重複安裝和版本控制。
+---
+
+把安裝選擇寫進 `/etc/zeabur-installer/config.yaml`，用 `plan` 查看計畫，再用 `apply` 安裝。這個方式適合把設定放進版本控制、在多台機器重複同樣的安裝，或透過自動化工具安裝。
+
+[網頁介面](quickstart.mdx)和指令讀寫同一份設定檔，安裝的內容相同。你也可以在網頁介面的「確認」步驟下載設定檔，再用指令安裝。
+
+## 準備伺服器與 installer
+
+依照[快速開始的伺服器條件](quickstart.mdx#先準備伺服器)準備主機，並下載符合架構的 installer。
+
+## 建立設定檔
+
+以 root 權限建立 `/etc/zeabur-installer/config.yaml`。使用公開網域時，最小設定如下：
+
+```yaml
+access:
+  mode: domain
+  identity: login.example.com
+  zeabur: zeabur.example.com
+```
+
+把兩個網域換成你要使用的網域。公開網域模式的 DNS 和連接埠需求，見[快速開始的連線方式](quickstart.mdx#2-選擇連線方式)。
+
+未填 `preset` 時使用 `standard`，未填 `profile` 時使用 `single-node`。
+
+測試機可以改用 `local` 模式：
+
+```yaml
+access:
+  mode: local
+  identity: login.<位址>.sslip.io
+  zeabur: zeabur.<位址>.sslip.io
+```
+
+把 `<位址>` 換成伺服器位址。
+
+所有欄位見 [Installer 設定](../reference/installer-configuration.mdx)。`sources` 是選填欄位，用來改裝自己建置的 Catalog、映像檔和 chart。未填時使用 installer 釘選的版本。
+
+## 查看安裝計畫
+
+執行：
+
+```sh
+sudo zeabur-installer plan
+```
+
+`plan` 會執行主機檢查，並列出以下內容，不會改動主機：
+
+- RKE2 版本。
+- 元件和 chart。
+- Namespace。
+- 儲存類別。
+- 網址。
+- 閒置記憶體估算和警告。
+
+檢查有未通過的項目時，輸出會指出 `apply` 將會停下。先修正這些項目，再開始安裝。
+
+需要 JSON 輸出時，執行：
+
+```sh
+sudo zeabur-installer plan --json
+```
+
+`plan --json` 不會執行主機檢查。
+
+沒有設定檔時，`plan` 會用這台伺服器的位址產生 sslip.io 名稱，以 `local` 模式和 `standard` 組合提供參考。執行 `apply` 前一定要建立設定檔。
+
+## 執行安裝
+
+確認設定後執行：
+
+```sh
+sudo zeabur-installer apply
+```
+
+`apply` 會先跑主機檢查。只要有一項失敗，就會在改動任何東西之前停下。
+
+通過檢查後，依序設定主機、安裝採用 CIS profile 的 RKE2、命名空間和網路政策、儲存空間、選定的元件，再安裝 Zeabur Identity 和 Zeabur。
+
+`apply` 依執行當下的設定計算安裝內容。如果在執行 `plan` 後修改 YAML，`apply` 就會依新內容安裝。
+
+### 中斷後繼續安裝
+
+修正中斷原因後，用同一份設定重新執行：
+
+```sh
+sudo zeabur-installer apply
+```
+
+每一步都會先檢查已完成的部分，並從中斷處繼續。
+
+## 註冊管理員並登入
+
+安裝完成時，終端機會印出：
+
+- Zeabur 網址。
+- Zeabur Identity 網址。
+- 第一位管理員的通行密鑰註冊連結。
+
+使用 `local` 模式時，先把以下憑證匯入瀏覽器或系統的信任清單：
+
+```text
+/var/lib/rancher/zeabur-installer/local-ca.crt
+```
+
+開啟註冊連結，註冊通行密鑰，再開啟 Zeabur 網址登入。
+
+<Callout type="warn">
+第一位管理員的註冊連結等同管理員權限，只交給要管理叢集的人。連結只能使用一次，24 小時內有效。
+</Callout>
+
+## 檢查安裝結果
+
+執行：
+
+```sh
+sudo zeabur-installer doctor
+```
+
+這會檢查 RKE2、元件、預設儲存類別、Zeabur Identity 和 Zeabur。
+
+| 結束碼 | 結果 |
+| --- | --- |
+| `0` | 正常 |
+| `1` | 警告 |
+| `2` | 嚴重 |
+| `3` | 檢查無法執行，例如沒有用 root 執行 |
+
+## 常見停止原因與處理方式
+
+| 遇到的情況 | 處理方式 |
+| --- | --- |
+| 連接埠被占用，或已有其他 Kubernetes | 先停掉占用的程式，或換乾淨的主機，再執行 `apply` |
+| `domain` 模式的憑證還沒核發 | 檢查兩個網域的 DNS，以及 TCP 80 連接埠能否從外部連到。修正後重跑 `apply` |
+| `local` 模式下，瀏覽器顯示憑證不受信任 | 把 `/var/lib/rancher/zeabur-installer/local-ca.crt` 匯入瀏覽器或系統的信任清單 |
+| 第一位管理員的註冊連結過期 | 在伺服器執行 `zeabur-identityctl setup-link --username admin`，產生新的連結 |
+
+## 指令參考與加入節點
+
+`gui`、`doctor`、`node add`、`uninstall` 等指令與所有選項，見 [Installer 指令](../reference/installer.mdx)。
+
+要加入更多節點，見[新增與維護節點](../cluster/nodes.mdx)。
