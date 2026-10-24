@@ -448,13 +448,24 @@ pub fn router_with_resolver(
     router_with_settings_and_resolver(access, Settings::default(), resolver)
 }
 
-/// [`router_with_settings`], looking domains up with `resolver`; for tests and the demo.
+/// [`router_with_settings`], looking domains up with `resolver`; for tests.
 pub fn router_with_settings_and_resolver(
     access: Arc<dyn ClusterAccess>,
     settings: Settings,
     resolver: Arc<dyn resolve::Resolve>,
 ) -> Router {
     let images = inspector(images::https::Reach::Any, &settings);
+    router_with_settings_resolver_and_images(access, settings, resolver, images)
+}
+
+/// [`router_with_settings_and_resolver`], reading images' configurations with `images`; for the
+/// demo.
+pub fn router_with_settings_resolver_and_images(
+    access: Arc<dyn ClusterAccess>,
+    settings: Settings,
+    resolver: Arc<dyn resolve::Resolve>,
+    images: Arc<images::Inspector>,
+) -> Router {
     build_with(
         access,
         zeabur_kube::k8s_openapi::jiff::Timestamp::now,

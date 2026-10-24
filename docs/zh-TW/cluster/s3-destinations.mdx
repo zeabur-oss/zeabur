@@ -33,6 +33,8 @@ description: 登錄 S3 儲存位置供資料庫、K8up 與 Velero 備份選用�
 | **區域** | 儲存服務需要時填。 |
 | **存取金鑰 ID**、**私密存取金鑰** | 新增時兩個都要填。 |
 
+![新增 S3 目的地的表單，填了 Backblaze B2 的端點、儲存貯體和金鑰](https://oss.zeabur.com/shots/zeabur/zh-TW/light/s3-destination-add.avif)
+
 </Step>
 <Step>
 
@@ -62,6 +64,8 @@ description: 登錄 S3 儲存位置供資料庫、K8up 與 Velero 備份選用�
 在目的地列按 **編輯**。名稱不能改。兩個金鑰都留白就沿用原本的，要換就兩個一起填，再按 **檢查變更**。
 
 檢查畫面會列出每份要一起更新的金鑰複本，例如 **更新 shop 裡複製的金鑰 …**。資料庫、K8up 和 Velero 的複本都在同一次套用中換成新金鑰。
+
+![儲存目的地前的檢查畫面，列出要一起更新的 shop 金鑰複本](https://oss.zeabur.com/shots/zeabur/zh-TW/light/s3-destination-keys.avif)
 
 更新不到的複本也會列出原因，它們會繼續用舊金鑰：
 

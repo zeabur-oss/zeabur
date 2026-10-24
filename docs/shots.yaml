@@ -14,6 +14,7 @@
 #   locales: [en]               # optional; default en, zh-TW, zh-CN
 #   themes: [light, dark]       # optional; default [light]
 #   env: {}                     # optional demo env vars, e.g. ZEABUR_DEMO_FORBID
+#   fresh: true                 # optional; a new demo for each locale and theme, for steps that change it
 
 # The installer (docs/zh-TW/get-started/quickstart.mdx). Each step's last button continues.
 - id: installer-host
@@ -125,3 +126,357 @@
   path: /cluster/components
   wait: '#cluster-installed'
   clip: main
+# Adding a worker node (docs/zh-TW/cluster/nodes.mdx, tokens.mdx). The join token's ID and
+# expiry differ from run to run. vps-4 joins a few seconds after a join token is created.
+- id: node-add
+  path: /cluster
+  wait: '#cluster-nodes'
+  steps:
+    - click: '[data-testid="add-node"]'
+    - wait: '[data-slot="dialog-content"] input'
+  clip: '[data-slot="dialog-content"]'
+  env:
+    ZEABUR_DEMO_RKE2: "1"
+- id: node-add-command
+  path: /cluster
+  wait: '#cluster-nodes'
+  steps:
+    - click: '[data-testid="add-node"]'
+    - click: '[data-slot="dialog-footer"] button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - click: '[data-slot="dialog-footer"] button:last-child'
+    - wait: '[data-testid="join-ready"]'
+  clip: '[data-testid="join-ready"]'
+  fresh: true
+  env:
+    ZEABUR_DEMO_RKE2: "1"
+- id: node-add-joined
+  path: /cluster
+  wait: '#cluster-nodes'
+  steps:
+    - click: '[data-testid="add-node"]'
+    - click: '[data-slot="dialog-footer"] button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - click: '[data-slot="dialog-footer"] button:last-child'
+    - wait: 'section[aria-labelledby="join-next"] li:nth-child(2)'
+  clip: '[data-testid="join-ready"]'
+  fresh: true
+  env:
+    ZEABUR_DEMO_RKE2: "1"
+- id: join-tokens
+  path: /cluster
+  wait: 'section[aria-labelledby="join-tokens"]'
+  clip: 'section[aria-labelledby="join-tokens"]'
+  env:
+    ZEABUR_DEMO_RKE2: "1"
+# Notification channels (docs/zh-TW/cluster/notifications.mdx).
+- id: notify-channel-add
+  path: /cluster/notifications
+  wait: 'main [data-slot="card"]'
+  steps:
+    - click: 'main div:has(> p[role="status"]) button'
+    - fill: '[data-slot="dialog-content"] input[maxlength="30"]'
+      value: ops-slack
+    - fill: '[data-slot="dialog-content"] input[type="password"]'
+      value: https://hooks.slack.com/services/T0000/B0000/XXXXXXXX
+    - click: '[data-slot="dialog-content"] label[for$="-node-not-ready"]'
+  clip: '[data-slot="dialog-content"]'
+- id: notify-channels
+  path: /cluster/notifications
+  wait: 'main [data-slot="card"]'
+  clip: 'main [data-slot="card"]'
+# Inviting a member (docs/zh-TW/cluster/members.mdx).
+- id: members-invite
+  path: /members
+  steps:
+    - click: '[data-slot="page-header"] button'
+    - fill: '[data-slot="dialog-content"] input[translate="no"]'
+      value: erin
+    - fill: '[data-slot="dialog-content"] input[data-slot="input"]:not([translate]):not([type])'
+      value: Erin Huang
+    - click: '[data-slot="dialog-content"] label[for$="-blog"]'
+    - fill: '[data-slot="dialog-content"] input[type="search"]'
+      value: shop
+    - click: '[data-slot="dialog-content"] label[for$="-shop"]'
+    - click: '[data-slot="dialog-content"] li:has(label[for$="-shop"]) [data-slot="select-trigger"]'
+    - click: '[role="option"]:not([aria-selected="true"])'
+  clip: '[data-slot="dialog-content"]'
+- id: members-invite-review
+  path: /members
+  steps:
+    - click: '[data-slot="page-header"] button'
+    - fill: '[data-slot="dialog-content"] input[translate="no"]'
+      value: erin
+    - click: '[data-slot="dialog-content"] label[for$="-shop"]'
+    - click: '[data-slot="dialog-content"] li:has(label[for$="-shop"]) [data-slot="select-trigger"]'
+    - click: '[role="option"]:not([aria-selected="true"])'
+    - click: '[data-slot="dialog-content"] > div:last-child button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+  clip: '[data-slot="dialog-content"]'
+- id: members-invite-link
+  path: /members
+  steps:
+    - click: '[data-slot="page-header"] button'
+    - fill: '[data-slot="dialog-content"] input[translate="no"]'
+      value: erin
+    - click: '[data-slot="dialog-content"] label[for$="-shop"]'
+    - click: '[data-slot="dialog-content"] > div:last-child button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - click: '[data-slot="dialog-content"] > div:last-child button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="copy-input"]'
+  clip: '[data-slot="dialog-content"]'
+  fresh: true
+# S3 destinations and cluster backups (docs/zh-TW/cluster/s3-destinations.mdx, backups.mdx).
+- id: s3-destination-add
+  path: /cluster/backups
+  wait: '#s3-destinations'
+  steps:
+    - click: '#s3-destinations > div:first-child button'
+    - fill: '#s3-destinations form > :first-child input'
+      value: b2-archive
+    - fill: '#s3-destinations form .grid > :nth-child(1) input'
+      value: https://s3.us-west-004.backblazeb2.com
+    - fill: '#s3-destinations form .grid > :nth-child(2) input'
+      value: acme-archive
+    - fill: '#s3-destinations form .grid > :nth-child(3) input'
+      value: zeabur
+    - fill: '#s3-destinations form .grid > :nth-child(4) input'
+      value: us-west-004
+    - fill: '#s3-destinations form .grid > :nth-child(5) input'
+      value: 004a1b2c3d4e5f6000000000a
+    - fill: '#s3-destinations form input[type="password"]'
+      value: K004demo-secret-key
+  clip: '#s3-destinations form'
+- id: s3-destination-keys
+  path: /cluster/backups
+  wait: '#s3-destinations li'
+  steps:
+    - click: '#s3-destinations li button'
+    - fill: '#s3-destinations form .grid > :nth-child(5) input'
+      value: 7d1f0c9e2b4a6c8e0f1a3b5c7d9e1f20
+    - fill: '#s3-destinations form input[type="password"]'
+      value: demo-new-secret-key
+    - click: '#s3-destinations form button[type="submit"]'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+  clip: '[data-slot="dialog-content"]'
+- id: backup-location-form
+  path: /cluster/backups
+  wait: '#backup-location'
+  steps:
+    - click: '#backup-location > div:first-child button'
+    - click: '#backup-location [data-slot="select-trigger"]'
+    - click: '[role="option"]:not([aria-selected="true"])'
+  clip: '#backup-location'
+- id: backup-location
+  path: /cluster/backups
+  wait: '#backup-location'
+  clip: '#backup-location'
+- id: backup-schedule-form
+  path: /cluster/backups
+  wait: '#backup-schedule'
+  steps:
+    - click: '#backup-schedule > div:first-child button:last-child'
+  clip: '#backup-schedule'
+- id: backup-list
+  path: /cluster/backups
+  wait: '#backup-list'
+  clip: '#backup-list'
+- id: backup-restore
+  path: /cluster/backups
+  wait: '#backup-list'
+  steps:
+    - click: '#backup-list li:nth-child(3) button[aria-expanded]'
+    - click: '#backup-list li:has(form) label[for$="-blog"]'
+  clip: '#backup-list li:has(form)'
+# Maintenance mode of one domain (docs/zh-TW/configure/maintenance.mdx).
+- id: domain-pages-open
+  path: /projects/shop/services/Deployment/web?tab=networking
+  wait: '[data-testid="domain-pages"]'
+  steps:
+    - hover: '[data-testid="domain-pages"]'
+  clip: 'section[aria-labelledby="net-public"]'
+- id: domain-pages-maintenance
+  path: /projects/shop/services/Deployment/web?tab=networking
+  wait: '[data-testid="domain-pages"]'
+  steps:
+    - click: '[data-testid="domain-pages"]'
+    - click: '[data-slot="dialog-content"] [data-slot="switch"]'
+  clip: '[data-slot="dialog-content"]'
+- id: domain-pages-review
+  path: /projects/shop/services/Deployment/web?tab=networking
+  wait: '[data-testid="domain-pages"]'
+  steps:
+    - click: '[data-testid="domain-pages"]'
+    - click: '[data-slot="dialog-content"] [data-slot="switch"]'
+    - click: '[data-slot="dialog-footer"] button:last-child'
+    - click: '[data-slot="draft-bar"] button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+  clip: '[data-slot="dialog-content"]'
+- id: domain-maintenance-on
+  path: /projects/shop/services/Deployment/web?tab=networking
+  wait: '[data-testid="domain-pages"]'
+  steps:
+    - click: '[data-testid="domain-pages"]'
+    - click: '[data-slot="dialog-content"] [data-slot="switch"]'
+    - click: '[data-slot="dialog-footer"] button:last-child'
+    - click: '[data-slot="draft-bar"] button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - click: '[data-slot="dialog-content"] > div:last-child button:last-child'
+    - wait: '[data-testid="in-maintenance"]'
+  clip: 'section[aria-labelledby="net-public"]'
+  fresh: true
+# First project and an image (docs/zh-TW/get-started/first-project.mdx, deploy/image.mdx).
+- id: project-new
+  path: /projects
+  wait: '[data-testid="new-project"]'
+  steps:
+    - click: '[data-testid="new-project"]'
+    - fill: '[data-slot="dialog-content"] input'
+      value: hello
+  clip: '[data-slot="dialog-content"]'
+- id: project-new-review
+  path: /projects
+  wait: '[data-testid="new-project"]'
+  steps:
+    - click: '[data-testid="new-project"]'
+    - fill: '[data-slot="dialog-content"] input'
+      value: hello
+    - click: '[data-slot="dialog-content"] button[type="submit"]'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+  clip: '[data-slot="dialog-content"]:has([data-slot="collapsible-trigger"])'
+- id: image-form
+  path: /projects/edge
+  wait: '[data-testid="add"]'
+  steps:
+    - click: '[data-testid="add"]'
+    - click: '[data-testid="add-image"]'
+    - fill: '[data-slot="dialog-content"] input'
+      value: docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim
+    - fill: ':nth-match([data-slot="dialog-content"] input, 2)'
+      value: web
+    - click: '[data-slot="dialog-content"] [data-slot="switch"]'
+    - wait: '[data-slot="dialog-content"] input[value$="apps.example.com"]'
+  clip: '[data-slot="dialog-content"]'
+- id: image-review
+  path: /projects/edge
+  wait: '[data-testid="add"]'
+  steps:
+    - click: '[data-testid="add"]'
+    - click: '[data-testid="add-image"]'
+    - fill: '[data-slot="dialog-content"] input'
+      value: docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim
+    - fill: ':nth-match([data-slot="dialog-content"] input, 2)'
+      value: web
+    - click: '[data-slot="dialog-content"] [data-slot="switch"]'
+    - wait: '[data-slot="dialog-content"] input[value$="apps.example.com"]'
+    - click: '[data-slot="dialog-footer"] button:last-child'
+    - wait: '[data-slot="dialog-body"] > :not([hidden]) [data-slot="collapsible-trigger"]'
+  clip: '[data-slot="dialog-content"]'
+# Git (docs/zh-TW/deploy/git.mdx); Keel makes Deploy from Git available.
+- id: git-form
+  path: /projects/edge
+  wait: '[data-testid="add"]'
+  steps:
+    - click: '[data-testid="add"]'
+    - click: '[data-testid="add-git"]'
+    - fill: '[data-slot="dialog-content"] input'
+      value: https://github.com/acme/web
+    - fill: ':nth-match([data-slot="dialog-content"] input, 4)'
+      value: web
+  clip: '[data-slot="dialog-content"]'
+  env:
+    ZEABUR_DEMO_KEEL: '1'
+# Compose (docs/zh-TW/deploy/compose.mdx).
+- id: compose-services
+  path: /projects/edge
+  wait: '[data-testid="add"]'
+  steps:
+    - click: '[data-testid="add"]'
+    - click: '[data-testid="add-compose"]'
+    - fill: '[data-slot="dialog-content"] textarea'
+      value: |
+        services:
+          web:
+            image: ghcr.io/acme/web:1.4
+            ports: ["3000:3000"]
+            environment:
+              DATABASE_URL: postgres://app:secret@db:5432/app
+            depends_on: [db]
+          db:
+            image: postgres:17
+            environment:
+              POSTGRES_USER: app
+              POSTGRES_PASSWORD: secret
+              POSTGRES_DB: app
+            volumes: [pgdata:/var/lib/postgresql/data]
+        volumes:
+          pgdata: {}
+    - click: '[data-slot="dialog-footer"] button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="section-label"]'
+  clip: '[data-slot="dialog-content"] div:has(> [data-slot="section-label"])'
+# Databases and object storage (docs/zh-TW/deploy/databases.mdx, object-storage.mdx).
+- id: database-form
+  path: /projects/shop
+  wait: '[data-testid="add"]'
+  steps:
+    - click: '[data-testid="add"]'
+    - click: '[data-testid="add-postgresql"]'
+    - click: ':nth-match([data-slot="dialog-content"] [data-slot="checkbox"], 3)'
+  clip: '[data-slot="dialog-content"]'
+- id: object-storage-form
+  path: /projects/shop
+  wait: '[data-testid="add"]'
+  steps:
+    - click: '[data-testid="add"]'
+    - click: '[data-testid="add-object-storage"]'
+    - click: ':nth-match([data-slot="dialog-content"] [data-slot="checkbox"], 3)'
+  clip: '[data-slot="dialog-content"]'
+# A service's settings (docs/zh-TW/deploy/cron-jobs.mdx, configure/variables.mdx, volumes.mdx, domains.mdx).
+- id: cron-job-form
+  path: /projects/shop/services/Deployment/web?tab=settings
+  wait: '#tasks button'
+  steps:
+    - click: '#tasks button'
+    - fill: '[data-slot="dialog-content"] input'
+      value: npm run cleanup
+    - fill: ':nth-match([data-slot="dialog-content"] input, 3)'
+      value: Asia/Taipei
+    - fill: ':nth-match([data-slot="dialog-content"] input, 4)'
+      value: nightly-cleanup
+  clip: '[data-slot="dialog-content"]'
+- id: variables-edit
+  path: /projects/shop/services/Deployment/web?tab=variables
+  wait: 'main [data-slot="section-header"]'
+  steps:
+    - click: 'main [data-slot="section-header"] [role="group"] ~ button:last-of-type'
+    - wait: 'main [data-slot="tabs-content"] input'
+  clip: 'main [data-slot="tabs-content"]'
+- id: volume-add
+  path: /projects/shop/services/Deployment/web?tab=settings
+  wait: '#storage button'
+  steps:
+    - click: '#storage button'
+    - fill: '#storage input'
+      value: /data
+    - fill: ':nth-match(#storage input, 2)'
+      value: 5Gi
+  clip: '#storage'
+- id: domain-add
+  path: /projects/shop/services/Deployment/web?tab=networking
+  wait: 'section[aria-labelledby="net-public"] [data-slot="section-header"] button'
+  steps:
+    - click: 'section[aria-labelledby="net-public"] [data-slot="section-header"] button'
+    - fill: 'section[aria-labelledby="net-public"] form input'
+      value: app.example.com
+  clip: 'section[aria-labelledby="net-public"]'
+- id: domain-review
+  path: /projects/shop/services/Deployment/web?tab=networking
+  wait: 'section[aria-labelledby="net-public"] [data-slot="section-header"] button'
+  steps:
+    - click: 'section[aria-labelledby="net-public"] [data-slot="section-header"] button'
+    - fill: 'section[aria-labelledby="net-public"] form input'
+      value: app.example.com
+    - click: 'section[aria-labelledby="net-public"] form button[type="submit"]'
+    - click: '[data-slot="draft-bar"] button:last-child'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+  clip: '[data-slot="dialog-content"]'

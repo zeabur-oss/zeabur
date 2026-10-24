@@ -23,6 +23,8 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 
 進入服務 **網路**，在 **公開網域** 按 **新增網域**，輸入 `app.example.com`。欄位只填主機名稱，不加 `https://`、連接埠或路徑。
 
+![公開網域的新增欄位填入 app.example.com，下方預先列出要新增的 DNS 紀錄](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-add.avif)
+
 叢集有多個簽發者時，表單會出現 **簽發者**，可以保留預設或改選另一個。如果這個網域拿不到憑證，檢查變更時會提示它只有 HTTP。
 
 </Step>
@@ -31,6 +33,8 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 ### 加入草稿，再檢查變更
 
 按 **加入變更**，網域會先放進這個服務的草稿，叢集還沒有改動。從頁面下方按 **檢查變更**，確認網域、轉送目標和憑證設定後套用。
+
+![儲存前確認 web 的變更：app.example.com 會連到 web，並使用 HTTPS](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-review.avif)
 
 表單沒有連接埠欄位，所以要在檢查時看 **轉送到** 的服務和連接埠。服務已經有路由時，新網域加在同一個 Ingress 上，沿用它的後端。沒有路由時，Zeabur 建立新的 Ingress，轉送到服務第一個 Kubernetes Service 的第一個連接埠。
 
@@ -47,7 +51,7 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 
 如果網域在叢集的應用程式網域底下，例如 `shop.apps.example.com`，畫面會改成請管理員新增萬用字元紀錄 `*.apps.example.com`。已經有這筆紀錄，就不用另外設定。Zeabur 不會替你修改 DNS。
 
-畫面顯示 **Zeabur 不知道叢集的入口位址，請問管理員要指向哪個位址。** 時，先向叢集管理員要入口的對外位址，再設定 DNS。
+畫面顯示 **Zeabur 不知道叢集的入口位址，請問管理員要指向哪個位址** 時，先向叢集管理員要入口的對外位址，再設定 DNS。
 
 </Step>
 <Step>

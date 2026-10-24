@@ -108,7 +108,7 @@ export function AddMenu({ project, compact = false }: { project: string; compact
   const trigger = compact ? (
     <Button variant="ghost" size="icon-xs" aria-label={t("add.inProject", project)} />
   ) : (
-    <Button size="sm" />
+    <Button size="sm" data-testid="add" />
   )
   const face = (
     <>
@@ -129,11 +129,19 @@ export function AddMenu({ project, compact = false }: { project: string; compact
     <Menu>
       <MenuTrigger render={trigger}>{face}</MenuTrigger>
       <MenuContent align={compact ? "start" : "end"} className="w-60">
-        <GatedMenuItem gate={choices.gates.image} onClick={() => openAdd(project, "image")}>
+        <GatedMenuItem
+          gate={choices.gates.image}
+          testid="add-image"
+          onClick={() => openAdd(project, "image")}
+        >
           {t("add.image")}
         </GatedMenuItem>
         <GitItem project={project} git={choices.git} />
-        <GatedMenuItem gate={choices.gates.image} onClick={() => openAdd(project, "compose")}>
+        <GatedMenuItem
+          gate={choices.gates.image}
+          testid="add-compose"
+          onClick={() => openAdd(project, "compose")}
+        >
           {t("add.compose")}
         </GatedMenuItem>
         {!choices.gates.database.open ? (
@@ -147,7 +155,11 @@ export function AddMenu({ project, compact = false }: { project: string; compact
             <MenuSeparator />
             {databases.map(({ engine, installed }) =>
               installed ? (
-                <MenuItem key={engine} onClick={() => openAdd(project, engine)}>
+                <MenuItem
+                  key={engine}
+                  data-testid={`add-${engine}`}
+                  onClick={() => openAdd(project, engine)}
+                >
                   {engineName(engine)}
                 </MenuItem>
               ) : (
@@ -167,7 +179,12 @@ export function AddMenu({ project, compact = false }: { project: string; compact
           <>
             <MenuSeparator />
             {choices.objectStorage.installed ? (
-              <MenuItem onClick={() => openAdd(project, "objectStorage")}>{t("s3.title")}</MenuItem>
+              <MenuItem
+                data-testid="add-object-storage"
+                onClick={() => openAdd(project, "objectStorage")}
+              >
+                {t("s3.title")}
+              </MenuItem>
             ) : (
               <MenuItem render={<Link to="/cluster/components" />}>
                 <span className="flex min-w-0 flex-col">
@@ -198,7 +215,7 @@ function GitItem({ project, git }: { project: string; git: AddChoices["git"] }) 
   const t = useT()
   if (!git.gate.open || !git.missing)
     return (
-      <GatedMenuItem gate={git.gate} onClick={() => openAdd(project, "git")}>
+      <GatedMenuItem gate={git.gate} testid="add-git" onClick={() => openAdd(project, "git")}>
         {t("add.git")}
       </GatedMenuItem>
     )

@@ -32,7 +32,7 @@ export function NewProjectButton({
   if (canCreate === "denied" && !elevate) return null
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Button size="sm" data-testid="new-project" onClick={() => setOpen(true)}>
         <PlusIcon aria-hidden="true" data-icon="inline-start" />
         {t("projects.new")}
       </Button>

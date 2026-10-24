@@ -28,6 +28,8 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
 
 手動輸入時填 **儲存貯體**、**存取金鑰 ID** 和 **私密存取金鑰**。用 AWS S3 時 **端點** 留白，R2、B2 或 MinIO 填它們的 S3 位址。**區域** 留白時是 `us-east-1`。**資料夾** 選填，可以讓這些備份和其他檔案分開。
 
+![備份存放位置的表單，選了 S3 目的地 r2-backups 並帶入端點和儲存貯體](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-location-form.avif)
+
 編輯既有設定時，兩個金鑰都留白就沿用目前的金鑰。要換就兩個一起填。
 
 </Step>
@@ -39,6 +41,8 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
 
 回到 **備份存放位置**，等 **狀態** 從 **尚未檢查** 變成 **可連線**。顯示 **無法連線** 時，先核對儲存貯體、端點和金鑰，再設定排程。
 
+![備份存放位置顯示儲存貯體、端點和可連線狀態](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-location.avif)
+
 </Step>
 </Steps>
 
@@ -46,9 +50,14 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
 
 1. 在 **排程** 選每天執行的 **時間**（UTC 整點）和 **保留天數**。新排程預設每天 03:00（UTC）、保留 7 天。保留天數可填 1 到 365。
 2. 在 **範圍** 選 **整個叢集**，或選 **選定的專案** 並至少勾一個專案。**整個叢集** 也包括之後新增的專案和 Namespace。
+
+   ![排程表單，每天 03:00（UTC）、保留 7 天、範圍是整個叢集](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-schedule-form.avif)
+
 3. 按 **檢查變更**，確認執行時間和範圍後套用。Zeabur 會建立或修改名為 `zeabur` 的 Velero Schedule，並開啟磁碟區檔案備份。
 4. 按 **立即備份**，檢查後套用。這次備份照剛設定的範圍和保留天數執行，不用等排程。
 5. 在 **備份紀錄** 找到這筆，等狀態從 **執行中** 變成 **成功**，再看紀錄列出的項目數和 **保留到** 的日期。
+
+   ![備份紀錄列出每次備份的狀態、項目數和保留期限](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-list.avif)
 
 在 Zeabur 以外建立的排程會標示 **在 Zeabur 以外設定**，要回到原本建立的地方修改。
 
@@ -56,6 +65,9 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
 
 1. 在 **備份紀錄** 找到要用的備份，按該列的 **還原**。
 2. 在 **要還原的 Namespace** 勾選要還原的 Namespace，至少一個。選項是這份備份裡的 Namespace。
+
+   ![還原表單，從備份裡勾選要還原的 Namespace blog](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-restore.avif)
+
 3. 按 **檢查變更**，確認要還原的備份和 Namespace，再按 **還原**。Velero 會馬上開始。
 4. 到 **還原紀錄** 看這筆的狀態、來源備份、錯誤和警告數。
 

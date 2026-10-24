@@ -11,7 +11,11 @@ description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽
 
 打開**專案**，按**新增專案**，**名稱**填 `hello`。這個名稱也會是 Kubernetes Namespace 的名稱，建立後不能改。
 
+![新增專案視窗，名稱填了 hello](https://oss.zeabur.com/shots/zeabur/zh-TW/light/project-new.avif)
+
 按**檢查變更**，畫面會列出 Zeabur 準備做的事：建立 `hello` Namespace，加上專案標籤，並套用嚴格的 Pod Security 設定。確認沒問題就按**建立**。
+
+![建立專案 hello 前的確認畫面，說明會建立的 Namespace 與安全性設定](https://oss.zeabur.com/shots/zeabur/zh-TW/light/project-new-review.avif)
 
 如果找不到**新增專案**，表示你的角色不能建立 Namespace。請管理員先建立專案並把你加進去，再從下一步開始。
 
@@ -30,6 +34,8 @@ description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽
 
 填完映像檔後，表單會讀出映像檔宣告的連接埠，正常會自動帶入 `8080`。
 
+![部署映像檔表單，填好映像檔、名稱 web、讀到的連接埠 8080，並開啟公開網域](https://oss.zeabur.com/shots/zeabur/zh-TW/light/image-form.avif)
+
 ## 檢查變更，再套用
 
 按**檢查變更**，Zeabur 會列出三個要建立的物件：
@@ -37,6 +43,8 @@ description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽
 - `web` Deployment，執行剛才的映像檔，1 個副本
 - `web` Service，把 `8080` 轉給容器
 - `web` Ingress，把你的網域導向 `web` Service
+
+![部署 web 前的確認畫面，列出要建立的 Deployment、Service 和 Ingress](https://oss.zeabur.com/shots/zeabur/zh-TW/light/image-review.avif)
 
 這時候叢集裡還沒有任何新東西。發現網域填錯，就回到表單改。確認無誤再按**建立**，Zeabur 會帶你到服務頁。
 

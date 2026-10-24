@@ -105,11 +105,13 @@ export function GateTip({
 /** A menu item the person's role cannot use: disabled, with the role that can under its label. */
 export function GatedMenuItem({
   gate: g,
+  testid,
   onClick,
   render,
   children,
 }: {
   gate: Gate
+  testid?: string
   onClick?: () => void
   render?: ReactElement
   children: ReactNode
@@ -117,7 +119,7 @@ export function GatedMenuItem({
   const reason = useGateReason()(g)
   if (!reason)
     return (
-      <MenuItem onClick={onClick} render={render}>
+      <MenuItem data-testid={testid} onClick={onClick} render={render}>
         {children}
       </MenuItem>
     )

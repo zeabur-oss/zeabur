@@ -24,6 +24,7 @@ export type Shot = {
   env: Record<string, string>
   locales: Locale[]
   themes: Theme[]
+  fresh: boolean
 }
 
 export const locales = { en: "en-US", "zh-TW": "zh-TW", "zh-CN": "zh-CN" }
@@ -47,6 +48,7 @@ const shotKeys = [
   "env",
   "locales",
   "themes",
+  "fresh",
 ]
 const stepKeys: Record<string, string[]> = {
   click: ["click"],
@@ -115,6 +117,10 @@ function shot(value: unknown, index: number): Shot {
   check(isSelector(wait), `${at}: wait must be a CSS selector`)
   check(isSelector(clip), `${at}: clip must be a CSS selector`)
   check(viewport === "desktop" || viewport === "phone", `${at}: viewport must be desktop or phone`)
+  check(
+    value.fresh === undefined || typeof value.fresh === "boolean",
+    `${at}: fresh must be true or false`,
+  )
   if (!Array.isArray(steps)) throw new Error(`${at}: steps must be a list`)
   return {
     id: id as string,
@@ -127,12 +133,25 @@ function shot(value: unknown, index: number): Shot {
     env: environment(value.env, at),
     locales: subset(shotLocales, Object.keys(locales) as Locale[], `${at}: locales`),
     themes: subset(shotThemes, themes, `${at}: themes`),
+    fresh: value.fresh === true,
   }
 }
 
 /** The demo server a shot needs as one canonical line, for grouping shots by server. */
 export function serverKey({ app, env }: Pick<Shot, "app" | "env">): string {
   return JSON.stringify({ app, env: Object.fromEntries(Object.entries(env).sort()) })
+}
+
+/** The servers a shot is taken on: the one it shares with the shots that need the same, or with
+ * `fresh`, a new one for each locale and theme, since its steps change what the demo holds. */
+export function serversOf(shot: Shot): string[] {
+  if (!shot.fresh) return [serverKey(shot)]
+  const env = Object.fromEntries(Object.entries(shot.env).sort())
+  return shot.locales.flatMap((locale) =>
+    shot.themes.map((theme) =>
+      JSON.stringify({ app: shot.app, env, shot: shot.id, project: `${locale}/${theme}` }),
+    ),
+  )
 }
 
 export function readManifest(file: string): Shot[] {
@@ -150,7 +169,7 @@ export function readManifest(file: string): Shot[] {
 if (import.meta.main) {
   try {
     const shots = readManifest(process.argv[2])
-    for (const key of new Set(shots.map(serverKey))) console.log(key)
+    for (const key of new Set(shots.flatMap(serversOf))) console.log(key)
   } catch (error) {
     console.error(`${process.argv[3] ?? process.argv[2]}: ${(error as Error).message}`)
     process.exit(1)

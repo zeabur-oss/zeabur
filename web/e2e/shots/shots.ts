@@ -3,6 +3,7 @@ import { test } from "../fixtures.ts"
 import {
   readManifest,
   serverKey,
+  serversOf,
   viewports,
   type Locale,
   type Step,
@@ -13,6 +14,8 @@ const manifest = process.env.ZEABUR_SHOTS_MANIFEST
 const out = process.env.ZEABUR_SHOTS_OUT
 if (!manifest || !out) throw new Error("ZEABUR_SHOTS_MANIFEST and ZEABUR_SHOTS_OUT must be set")
 const server = process.env.ZEABUR_SHOTS_SERVER ?? serverKey({ app: "zeabur", env: {} })
+// A fresh shot's server serves one locale and theme.
+const only = (JSON.parse(server) as { project?: string }).project
 
 async function run(page: Page, step: Step) {
   if ("click" in step) await page.locator(step.click).first().click()
@@ -39,29 +42,34 @@ async function cropped(page: Page, selector: string, path: string) {
       width: el.getBoundingClientRect().width,
       padding: ["top", "right", "bottom", "left"].map(pad),
       bg,
+      radius: s.borderRadius,
     }
   })
   const options = { animations: "disabled", caret: "hide" } as const
-  if (frame.padding.every((p) => p === 0))
+  if (frame.padding.every((p) => p === 0) && parseFloat(frame.radius) === 0)
     return void (await element.screenshot({ ...options, path }))
   const image = (await element.screenshot(options)).toString("base64")
   const sheet = await page.context().newPage()
   await sheet.setContent(
     `<body style="margin:0"><div style="display:inline-block;background:${frame.bg};` +
       `padding:${frame.padding.map((p) => `${p}px`).join(" ")}">` +
-      `<img style="display:block;width:${frame.width}px" src="data:image/png;base64,${image}"></div>`,
+      `<img style="display:block;width:${frame.width}px;border-radius:${frame.radius}" src="data:image/png;base64,${image}"></div>`,
   )
   await sheet.locator("div").screenshot({ path })
   await sheet.close()
 }
 
-for (const shot of readManifest(manifest).filter((s) => serverKey(s) === server)) {
+for (const shot of readManifest(manifest).filter((s) => serversOf(s).includes(server))) {
   test.describe(() => {
     test.use({ viewport: viewports[shot.viewport] })
 
     test(shot.id, async ({ page }, info) => {
       const [locale, theme] = info.project.name.split("/") as [Locale, Theme]
-      test.skip(!shot.locales.includes(locale) || !shot.themes.includes(theme))
+      test.skip(
+        !shot.locales.includes(locale) ||
+          !shot.themes.includes(theme) ||
+          (only !== undefined && only !== info.project.name),
+      )
       await page.goto(shot.path, { waitUntil: "networkidle" })
       if (shot.wait) await page.locator(shot.wait).first().waitFor()
       for (const step of shot.steps) await run(page, step)

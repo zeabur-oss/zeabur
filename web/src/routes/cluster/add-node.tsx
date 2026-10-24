@@ -74,6 +74,7 @@ export function AddNodeButton() {
       size="sm"
       onClick={() => setOpen(true)}
       disabled={!join.data || !!why}
+      data-testid="add-node"
     >
       <PlusIcon aria-hidden="true" data-icon="inline-start" />
       {t("join.add")}
@@ -318,7 +319,7 @@ function Ready({
       view: "/cluster",
     })
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" data-testid="join-ready">
       <p className="flex items-center gap-2">
         <StatusDot health="ok" />
         {t("join.created", until)}

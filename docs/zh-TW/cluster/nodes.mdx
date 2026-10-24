@@ -33,6 +33,8 @@ UDP 8472 只對叢集節點開放，不要對網際網路開放。Installer 的�
 
 在 **節點** 按 **新增節點**，確認 **伺服器位址** 是新 VM 連得到的 `https://<位址>:9345`，選擇 **權杖有效時間**，再按 **檢查變更** 並套用。
 
+![新增節點視窗，列出伺服器位址和權杖有效時間](https://oss.zeabur.com/shots/zeabur/zh-TW/light/node-add.avif)
+
 權杖的細節和撤銷方式見[節點加入權杖](./tokens.mdx)。
 
 </Step>
@@ -44,6 +46,8 @@ UDP 8472 只對叢集節點開放，不要對網際網路開放。Installer 的�
 
 `plan` 只列出網路檢查和警告，不會改動任何東西。有警告時先處理再繼續。`apply` 會把 RKE2 安裝成工作節點，並等到節點就緒。
 
+![加入視窗顯示新 VM 要執行的指令，下方等待新節點加入](https://oss.zeabur.com/shots/zeabur/zh-TW/light/node-add-command.avif)
+
 </Step>
 <Step>
 
@@ -51,13 +55,15 @@ UDP 8472 只對叢集節點開放，不要對網際網路開放。Installer 的�
 
 回到加入視窗，等畫面顯示節點已加入並就緒，按 **檢視節點** 確認名稱和狀況。
 
+![新節點已加入並就緒，下方提示放行網路政策和撤銷加入權杖](https://oss.zeabur.com/shots/zeabur/zh-TW/light/node-add-joined.avif)
+
 畫面顯示網路政策還沒放行新節點時，按 **檢查變更**，確認要更新的 Namespace 和節點位址後套用。畫面說你無法在這裡更新時，到現有的伺服器執行：
 
 ```sh
 zeabur-installer node sync
 ```
 
-看到 **網路政策已放行所有節點的流量。** 後，按 **撤銷權杖**。
+看到 **網路政策已放行所有節點的流量** 後，按 **撤銷權杖**。
 
 </Step>
 </Steps>

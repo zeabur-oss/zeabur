@@ -34,6 +34,8 @@ Zeabur 會從映像檔讀取它宣告的連接埠。確認 **連接埠** 和應�
 
 要提供 HTTP 網站，開啟 **公開網域**。管理員設定了應用程式網域時，表單會建議網址。沒有設定時自行填寫，並把 DNS 指向叢集入口。表單也會顯示目前使用的憑證簽發者，或只有 HTTP。詳見[加入公開網域](../configure/domains.mdx)。
 
+![部署映像檔表單，連接埠帶入映像檔宣告的 8080，公開網域填入建議的網址](https://oss.zeabur.com/shots/zeabur/zh-TW/light/image-form.avif)
+
 </Step>
 <Step>
 
@@ -59,6 +61,8 @@ Zeabur 會從映像檔讀取它宣告的連接埠。確認 **連接埠** 和應�
 ### 檢查將新增的物件
 
 按 **檢查變更**。核對映像檔、名稱、連接埠與公開網域。新增磁碟區時，也檢查容量與掛載路徑。套用後會進入新服務。
+
+![部署 web 前的確認畫面，列出要建立的 Deployment、Service 和 Ingress](https://oss.zeabur.com/shots/zeabur/zh-TW/light/image-review.avif)
 
 需要表單以外的容器欄位時，按 **以 YAML 編輯**，表單會把目前設定帶到建立頁。改完 YAML 再 **檢查變更**，確認所有文件後建立。
 

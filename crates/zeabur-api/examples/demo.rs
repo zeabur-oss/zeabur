@@ -19,7 +19,8 @@
 //! no `/auth/elevate` to grant them). `services/proxy` in `ZEABUR_DEMO_FORBID` refuses the
 //! sample metrics store, whose history and disk use are made up like the live usage. A
 //! system-upgrade-controller Plan resolves a newer patch, so the cluster page shows one; the demo
-//! makes no outbound request: domains resolve from a fixed table (`dns`).
+//! makes no outbound request: domains resolve from a fixed table (`dns`), and every image is
+//! read from a made-up registry (`Registry`) that says it listens on 8080 as user 101.
 //!
 //! Velero runs with a location on R2, a daily schedule and a week of backups, the newest failed:
 //! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location.
@@ -34,6 +35,8 @@
 //! `storageclasses.storage.k8s.io` and `persistentvolumes` in `ZEABUR_DEMO_FORBID` refuse
 //! reading the storage classes (local-path, the default, and Longhorn) and the volumes behind
 //! claims.
+//!
+//! `ZEABUR_DEMO_KEEL=1` installs Keel, so a project offers Deploy from Git.
 //!
 //! `namespaces` in `ZEABUR_DEMO_FORBID` refuses creating projects. New public URLs are suggested
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
@@ -68,12 +71,16 @@
 )]
 
 use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::http::request::Parts;
 use secrecy::SecretString;
 use serde_json::{Value, json};
+use sha2::{Digest as _, Sha256};
 use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
+use zeabur_api::images::registry::{Answer, Get, Transport};
 use zeabur_core::problem::Problem;
 use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use zeabur_kube::k8s_openapi::api::batch::v1::{CronJob, Job};
@@ -426,6 +433,63 @@ fn certificate(namespace: &str, secret: &str, host: &str, conditions: &Value) ->
         "spec": {"secretName": secret, "dnsNames": [host]},
         "status": {"conditions": conditions, "notAfter": "2027-01-21T08:00:00Z"}
     }))
+}
+
+/// A registry holding every image, one platform each, listening on 8080 as user 101.
+struct Registry {
+    manifest: Vec<u8>,
+    config: Vec<u8>,
+    digest: String,
+}
+
+impl Registry {
+    fn new() -> Self {
+        let config = serde_json::to_vec(&json!({
+            "architecture": "arm64", "os": "linux",
+            "config": {"ExposedPorts": {"8080/tcp": {}}, "User": "101"},
+        }))
+        .expect("example config");
+        let digest = format!("sha256:{:x}", Sha256::digest(&config));
+        let manifest = serde_json::to_vec(&json!({
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "config": {"digest": digest, "size": config.len()},
+            "layers": [],
+        }))
+        .expect("example manifest");
+        Self {
+            manifest,
+            config,
+            digest,
+        }
+    }
+}
+
+impl Transport for Registry {
+    fn get<'a>(
+        &'a self,
+        get: Get,
+    ) -> Pin<Box<dyn Future<Output = Result<Answer, String>> + Send + 'a>> {
+        let body = if get.url.contains("/manifests/") {
+            Some(self.manifest.clone())
+        } else if get.url.ends_with(&format!("/blobs/{}", self.digest)) {
+            Some(self.config.clone())
+        } else {
+            None
+        };
+        let answer = body.map_or_else(
+            || Answer {
+                status: 404,
+                ..Answer::default()
+            },
+            |body| Answer {
+                status: 200,
+                body,
+                ..Answer::default()
+            },
+        );
+        Box::pin(async move { Ok(answer) })
+    }
 }
 
 /// What the demo's DNS answers: shop points at the cluster, its API not yet, billing behind a
@@ -1594,6 +1658,15 @@ fn state() -> State {
             ),
         ]),
     ));
+    if std::env::var_os("ZEABUR_DEMO_KEEL").is_some() {
+        facts.workload_labels.push((
+            "Deployment".to_owned(),
+            BTreeMap::from([
+                ("app".to_owned(), "keel".to_owned()),
+                ("helm.sh/chart".to_owned(), "keel-1.0.5".to_owned()),
+            ]),
+        ));
+    }
     let mut objects = BTreeMap::new();
     for mut project in [
         shop(),
@@ -3980,9 +4053,14 @@ async fn main() -> std::io::Result<()> {
         },
         ..zeabur_api::Settings::default()
     };
-    let app =
-        zeabur_api::router_with_settings_and_resolver(Arc::new(access), settings, Arc::new(dns()))
-            .fallback_service(zeabur_ui::router());
+    let images = zeabur_api::images::Inspector::new(Arc::new(Registry::new()), Vec::new());
+    let app = zeabur_api::router_with_settings_resolver_and_images(
+        Arc::new(access),
+        settings,
+        Arc::new(dns()),
+        Arc::new(images),
+    )
+    .fallback_service(zeabur_ui::router());
     // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090.
     let addr = std::env::var("ZEABUR_DEMO_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await?;

@@ -681,7 +681,10 @@ function PagesMarks({ route, host }: { route?: Schemas["Route"]; host?: string |
   return (
     <>
       {host && route.maintenance?.includes(host) ? (
-        <span className="flex shrink-0 items-center gap-1 type-meta text-warn-strong">
+        <span
+          className="flex shrink-0 items-center gap-1 type-meta text-warn-strong"
+          data-testid="in-maintenance"
+        >
           <HardHatIcon aria-hidden="true" />
           {t("domainPages.inMaintenance")}
         </span>
@@ -749,6 +752,7 @@ function PagesButton({ route, host, ...rest }: RowDrawerProps) {
       {...rest}
       label={t("domainPages.open", host)}
       icon={<HardHatIcon aria-hidden="true" />}
+      testid="domain-pages"
     >
       {(onClose) => (
         <DomainPages
@@ -811,6 +815,7 @@ function RowDrawer({
   label,
   off,
   icon,
+  testid,
   children,
 }: {
   managed?: string
@@ -818,6 +823,7 @@ function RowDrawer({
   label: string
   off?: string
   icon: ReactElement
+  testid?: string
   children: (onClose: () => void) => ReactNode
 }) {
   const [open, setOpen] = useState(false)
@@ -831,6 +837,7 @@ function RowDrawer({
           disabled={Boolean(managed) || off !== undefined}
           aria-label={title}
           title={title}
+          data-testid={testid}
           onClick={() => setOpen(true)}
         >
           {icon}

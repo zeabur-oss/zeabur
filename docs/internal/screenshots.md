@@ -23,7 +23,8 @@ that only one page uses can list fewer `locales`. It writes:
 ```
 
 Each AVIF must be at most 150 KB; the script names the files above it and fails. When a shot
-fails, Playwright's trace is in `target/docs-shots-results`.
+fails, Playwright's trace is in `target/docs-shots-results`. The demo listens on port 18300;
+`ZEABUR_SHOTS_PORT` picks another, for example when two worktrees take shots at once.
 
 ## Declare a shot
 
@@ -45,12 +46,18 @@ fails, Playwright's trace is in `target/docs-shots-results`.
   themes: [light, dark]         # optional: light, dark; default [light]
   env:                          # optional: the demo's ZEABUR_DEMO_* variables, as strings
     ZEABUR_DEMO_FORBID: nodes,pods
+  fresh: true                   # optional: a new demo for each locale and theme
 ```
 
 Selectors never use visible text: it changes with the locale. Use a route in `href`, an
 attribute, or a `data-testid` added to the component. A selector that matches several elements
 uses the first. After the steps the pointer moves to the corner of the page, unless the last step
 is `hover`.
+
+A shot whose steps change what the demo holds, such as creating a join token or sending an
+invitation, sets `fresh: true`: it gets its own demo server for each locale and theme, so every
+locale shows the same state. The demo's `ZEABUR_DEMO_*` variables are listed at the top of
+`crates/zeabur-api/examples/demo.rs`.
 
 With `app: installer` the script builds the installer's pages and serves them with `vite
 preview` and the captured responses in `crates/zeabur-installer/web/scripts/dev-api.ts`.

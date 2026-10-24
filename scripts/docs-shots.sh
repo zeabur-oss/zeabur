@@ -15,7 +15,7 @@ out="$(realpath "${2:-$root/target/docs-shots}")"
 version="${3:-}"
 # ZEABUR_SHOTS_BUDGET_KB sets the largest AVIF; the README images use 30.
 budget=$((${ZEABUR_SHOTS_BUDGET_KB:-150} * 1024))
-port=18300
+port="${ZEABUR_SHOTS_PORT:-18300}"
 if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "expected a version like v0.0.2" >&2
   exit 2
