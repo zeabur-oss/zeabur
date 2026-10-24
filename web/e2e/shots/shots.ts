@@ -69,8 +69,9 @@ async function fit(page: Page, selector = "html") {
 }
 
 // Content must not touch the edge of the image. Take the element alone, then put it on its
-// background with space added on each side where its own padding is under 24 px. With `until`
-// the image ends at the bottom of that element.
+// background with space added on each side where its own padding is under 24 px, and its own
+// rounded corners, so a dialog's backdrop does not show in them. With `until` the image ends at
+// the bottom of that element.
 async function cropped(page: Page, selector: string, until: string | undefined, path: string) {
   const element = page.locator(selector).first()
   const end = until ? await page.locator(until).first().boundingBox() : null
@@ -95,6 +96,7 @@ async function cropped(page: Page, selector: string, until: string | undefined, 
         height: (end ? end.y + end.height : box.bottom) - box.y,
       },
       padding: ["top", "right", "bottom", "left"].map(pad),
+      radius: s.borderRadius,
       bg,
       radius: s.borderRadius,
     }
