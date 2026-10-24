@@ -3,7 +3,7 @@
 # Bump deliberately: update `sha256` in flake.nix in the same change, and re-check every nightly flag listed in
 # nightly-only setting (CONTRIBUTING.md, "Toolchain").
 [toolchain]
-channel = "nightly-2026-10-12"
+channel = "nightly-2026-10-15"
 profile = "minimal"
 components = ["rustfmt", "clippy", "rust-src", "rust-analyzer"]
 targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"]
