@@ -8,3 +8,11 @@ Then open {{ .Values.publicUrl }} and sign in through {{ .Values.issuer.url }}.
 Neither ingress.enabled nor httpRoute.enabled is set: route {{ .Values.publicUrl }} to the
 Service {{ include "zeabur.fullname" . }} (port {{ .Values.service.port }}) yourself.
 {{- end }}
+{{- if .Values.memberRoles.enabled }}
+
+Zeabur gives members their rights with RoleBindings and ClusterRoleBindings it makes itself.
+`helm uninstall` leaves them. After it, remove them with:
+
+  kubectl delete rolebindings,clusterrolebindings --all-namespaces \
+    -l app.kubernetes.io/managed-by=zeabur,zeabur.com/member
+{{- end }}

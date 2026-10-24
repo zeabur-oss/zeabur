@@ -16,6 +16,8 @@ use crate::{InstallError, Product, out};
 
 /// Where local-path volumes live; never removed by the installer.
 const VOLUMES_DIR: &str = "/var/lib/zeabur/storage";
+/// The members' bindings, as Zeabur labels them (`zeabur_api::members::access`).
+const MEMBER_BINDINGS: &str = "app.kubernetes.io/managed-by=zeabur,zeabur.com/member";
 /// Where Longhorn keeps its replicas on each node.
 const LONGHORN_DIR: &str = "/var/lib/longhorn";
 
@@ -39,6 +41,19 @@ pub(crate) fn run(config: &Path, what: Product) -> Result<(), InstallError> {
             ZEABUR_NAMESPACE,
             "--ignore-not-found",
             "--wait",
+        ],
+        None,
+    )?;
+    // Zeabur makes the members' bindings at run time, so removing the chart leaves them. They
+    // bind people, not workloads.
+    kubectl.run(
+        &[
+            "delete",
+            "rolebindings,clusterrolebindings",
+            "--all-namespaces",
+            "--selector",
+            MEMBER_BINDINGS,
+            "--ignore-not-found",
         ],
         None,
     )?;
