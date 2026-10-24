@@ -33,7 +33,7 @@ export const zhTW: Messages = {
   "step.of": (n, total) => `第 ${n} 步，共 ${total} 步`,
 
   "host.title": "檢查伺服器",
-  "host.description": "按下安裝之前不會變更任何東西。未通過的項目要先修正，警告則值得一讀。",
+  "host.description": "按下安裝之前不會變更任何東西。未通過的項目要先修正，警告建議看一下。",
   "host.server": "這台伺服器",
   "host.name": "主機名稱",
   "host.arch": "架構",
@@ -119,7 +119,7 @@ export const zhTW: Messages = {
   "preset.standard": "標準",
   "preset.secure": "強化",
   "presetHint.minimal": "Ingress、憑證和 metrics-server：Zeabur 執行所需的元件。",
-  "presetHint.standard": "元件目錄建議單台伺服器安裝的全部元件。",
+  "presetHint.standard": "單台伺服器建議安裝的所有元件。",
   "presetHint.secure": "標準組合，再加上執行期威脅偵測、弱點掃描和入侵防護。",
   "components.chosen": (n) => `已選 ${n} 個元件`,
   "components.needed": "其他元件需要",
@@ -191,9 +191,9 @@ export const zhTW: Messages = {
   "review.col.memory": "閒置記憶體",
   "review.manifests": "清單檔",
 
-  "memory.fits": "放得下",
-  "memory.tight": "偏緊",
-  "memory.over": "放不下",
+  "memory.fits": "夠用",
+  "memory.tight": "快不夠了",
+  "memory.over": "不夠用",
   "memory.usage": (used, host) =>
     `約 ${used.toLocaleString("zh-TW")} MiB，共 ${host.toLocaleString("zh-TW")} MiB`,
   "memory.overBy": (mib) => `超出 ${mib.toLocaleString("zh-TW")} MiB。`,

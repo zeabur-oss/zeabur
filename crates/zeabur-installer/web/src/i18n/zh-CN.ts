@@ -33,7 +33,7 @@ export const zhCN: Messages = {
   "step.of": (n, total) => `第 ${n} 步，共 ${total} 步`,
 
   "host.title": "检查服务器",
-  "host.description": "点击安装之前不会做任何更改。未通过的项目需要先修复，警告值得一读。",
+  "host.description": "点击安装之前不会做任何更改。未通过的项目需要先修复，警告建议看一下。",
   "host.server": "这台服务器",
   "host.name": "主机名",
   "host.arch": "架构",
@@ -119,7 +119,7 @@ export const zhCN: Messages = {
   "preset.standard": "标准",
   "preset.secure": "加固",
   "presetHint.minimal": "Ingress、证书和 metrics-server：Zeabur 运行所需的组件。",
-  "presetHint.standard": "组件目录推荐单台服务器安装的全部组件。",
+  "presetHint.standard": "单台服务器推荐安装的所有组件。",
   "presetHint.secure": "标准组合，外加运行时威胁检测、漏洞扫描和入侵防护。",
   "components.chosen": (n) => `已选 ${n} 个组件`,
   "components.needed": "被其他组件依赖",
@@ -192,7 +192,7 @@ export const zhCN: Messages = {
   "review.manifests": "清单文件",
 
   "memory.fits": "够用",
-  "memory.tight": "偏紧",
+  "memory.tight": "快不够了",
   "memory.over": "不够用",
   "memory.usage": (used, host) =>
     `约 ${used.toLocaleString("zh-CN")} MiB，共 ${host.toLocaleString("zh-CN")} MiB`,
