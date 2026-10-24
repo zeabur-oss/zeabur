@@ -21,7 +21,8 @@ export default defineConfig({
     baseURL: url,
     // Full Chromium in its new headless mode, as in playwright.config.ts.
     channel: "chromium",
-    deviceScaleFactor: 2,
+    // ZEABUR_SHOTS_SCALE: the README images use 1.
+    deviceScaleFactor: Number(process.env.ZEABUR_SHOTS_SCALE ?? 2),
     reducedMotion: "reduce",
     timezoneId: "UTC",
     trace: "retain-on-failure",

@@ -61,3 +61,11 @@ Two runs on the same machine on the same day give the same files. Two limits:
 - The demo dates its objects relative to the moment it starts, so a page that shows a date
   (for example "Created on Sep 26, 2026") changes from one day to the next.
 - Fonts render differently on macOS and Linux. The release takes the shots on Linux.
+
+## README images
+
+The README's screenshots are the exception: they are in git, in `docs/images`, at most 30 KB
+each. `docs/readme-shots.yaml` declares them, and `scripts/readme-images.sh` takes them at one
+pixel per CSS pixel, light and dark, English only. The script sets `ZEABUR_SHOTS_SCALE=1` and
+`ZEABUR_SHOTS_BUDGET_KB=30` for `scripts/docs-shots.sh`, which lowers the AVIF quality in steps
+until each file fits.

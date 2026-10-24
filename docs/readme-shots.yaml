@@ -1,0 +1,37 @@
+# The README's screenshots, from the demo. scripts/readme-images.sh takes them into docs/images.
+- id: readme-home
+  path: /
+  wait: main h1
+  clip: main
+  locales: [en]
+  themes: [light, dark]
+- id: readme-project
+  path: /projects/shop
+  wait: main h1
+  clip: main
+  locales: [en]
+  themes: [light, dark]
+- id: readme-diagnosis
+  path: /projects/shop/services/Deployment/worker
+  wait: main h1
+  clip: main
+  locales: [en]
+  themes: [light, dark]
+- id: readme-database
+  path: /projects/shop/databases/postgresql/orders
+  wait: main h1
+  clip: main
+  locales: [en]
+  themes: [light, dark]
+- id: readme-rollout
+  path: /projects/payments/services/Deployment/api
+  wait: main h1
+  clip: main
+  locales: [en]
+  themes: [light, dark]
+- id: readme-cluster
+  path: /cluster
+  wait: main h1
+  clip: main
+  locales: [en]
+  themes: [light, dark]

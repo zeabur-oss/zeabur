@@ -12,7 +12,8 @@ manifest="$(realpath "${1:-$root/docs/shots.yaml}")"
 mkdir -p "${2:-$root/target/docs-shots}"
 out="$(realpath "${2:-$root/target/docs-shots}")"
 version="${3:-}"
-budget=$((150 * 1024))
+# ZEABUR_SHOTS_BUDGET_KB sets the largest AVIF; the README images use 30.
+budget=$((${ZEABUR_SHOTS_BUDGET_KB:-150} * 1024))
 port=18300
 if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "expected a version like v0.0.2" >&2
@@ -69,8 +70,12 @@ while IFS= read -r png; do
   name="${png#"$work/png/"}"
   avif="$out/${name%.png}.avif"
   mkdir -p "$(dirname "$avif")"
-  avifenc --jobs all --speed 4 --qcolor 70 --yuv 444 "$png" "$avif" >/dev/null
-  size=$(wc -c <"$avif" | tr -d ' ')
+  # Lower the quality in steps until the file fits the budget, down to 40.
+  for quality in 70 65 60 55 50 45 40; do
+    avifenc --jobs all --speed 4 --qcolor "$quality" --yuv 444 "$png" "$avif" >/dev/null
+    size=$(wc -c <"$avif" | tr -d ' ')
+    if ((size <= budget)); then break; fi
+  done
   printf '%s\t%s\n' "${name%.png}.avif" "$size" >>"$work/sizes.tsv"
   if ((size > budget)); then over+=("${name%.png}.avif ($size bytes)"); fi
 done < <(find "$work/png" -name '*.png' | sort)
