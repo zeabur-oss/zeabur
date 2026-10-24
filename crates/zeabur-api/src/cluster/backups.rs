@@ -68,6 +68,8 @@ pub struct ClusterBackups {
     pub total_backups: usize,
     /// Whether the person may create schedules in Velero's namespace.
     pub can_change: Permission,
+    /// Whether the person may create restores in Velero's namespace.
+    pub can_restore: Permission,
     /// The S3 destination the main location's keys were copied from.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keys_from: Option<String>,
@@ -302,6 +304,7 @@ fn empty(state: ProviderState, unreadable: Vec<UnreadableView>) -> ClusterBackup
         restores: Vec::new(),
         total_backups: 0,
         can_change: Permission::Unknown,
+        can_restore: Permission::Unknown,
         keys_from: None,
         unreadable,
     }
@@ -356,14 +359,8 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
     let keys_from = keys_from(cluster, &namespace, &locations).await;
     let mut schedules: Vec<v::ScheduleView> = schedules.iter().map(v::schedule).collect();
     schedules.sort_by(|a, b| (!a.zeabur, &a.name).cmp(&(!b.zeabur, &b.name)));
-    let can_change = match cluster
-        .review_access(&right("create", "schedules", &namespace, None))
-        .await
-    {
-        Ok(true) => Permission::Allowed,
-        Ok(false) => Permission::Denied,
-        Err(_) => Permission::Unknown,
-    };
+    let can_change = may_create(cluster, "schedules", &namespace).await;
+    let can_restore = may_create(cluster, "restores", &namespace).await;
     Ok(Json(ClusterBackups {
         state: ProviderState::Installed,
         namespace,
@@ -373,9 +370,21 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
         restores,
         total_backups,
         can_change,
+        can_restore,
         keys_from,
         unreadable,
     }))
+}
+
+async fn may_create(cluster: &dyn Cluster, resource: &str, namespace: &str) -> Permission {
+    match cluster
+        .review_access(&right("create", resource, namespace, None))
+        .await
+    {
+        Ok(true) => Permission::Allowed,
+        Ok(false) => Permission::Denied,
+        Err(_) => Permission::Unknown,
+    }
 }
 
 /// The S3 destination the main location's keys were copied from; `None` when unknown.

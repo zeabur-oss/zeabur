@@ -61,6 +61,7 @@ const data = (patch: Partial<Schemas["ClusterBackups"]> = {}): Schemas["ClusterB
   restores: [],
   totalBackups: 0,
   canChange: "allowed",
+  canRestore: "allowed",
   unreadable: [],
   ...patch,
 })

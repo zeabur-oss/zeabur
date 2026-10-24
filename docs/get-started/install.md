@@ -292,6 +292,10 @@ removes their bindings first. Each rule names its verbs and resources, without `
 has RBAC objects, namespace creation or deletion, `nodes/proxy`, or `escalate`, `bind` and
 `impersonate`, so no member can widen their own rights
 ([RBAC good practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks)).
+Neither role has `velero.io`: Velero writes a Restore's objects with its own service account
+(`cluster-admin` by default) into each namespace the Restore names, RoleBindings and Secrets
+included, and RBAC on the Restore cannot limit those namespaces. Cluster backups and restores
+stay with admins; the restore button is closed to anyone who may not create a Restore.
 
 Compared with Kubernetes' built-in roles, Viewer reads what `view` reads that Zeabur shows, and
 like `view` no Secrets. Unlike `view`, it reads no logs (`pods/log`): logs often carry what

@@ -301,6 +301,21 @@ mod tests {
         assert_eq!(found["backups"][1]["bytes"], 2048);
         assert_eq!(found["totalBackups"], 2);
         assert_eq!(found["canChange"], "allowed");
+        assert_eq!(found["canRestore"], "allowed");
+    }
+
+    #[tokio::test]
+    async fn who_may_change_schedules_may_not_restore_without_its_own_right() {
+        let cluster = MemoryCluster::new(State {
+            served: served(),
+            dynamic: vec![location(), schedule()],
+            refused_rights: ["create restores".to_owned()].into(),
+            ..State::default()
+        });
+        let (status, found) = send(&app(&cluster), "GET", "/api/v1/cluster/backups", None).await;
+        assert_eq!(status, StatusCode::OK, "{found}");
+        assert_eq!(found["canChange"], "allowed");
+        assert_eq!(found["canRestore"], "denied");
     }
 
     #[tokio::test]

@@ -3129,6 +3129,8 @@ export interface components {
       backups: components["schemas"]["VeleroBackup"][]
       /** @description Whether the person may create schedules in Velero's namespace. */
       canChange: components["schemas"]["Permission"]
+      /** @description Whether the person may create restores in Velero's namespace. */
+      canRestore: components["schemas"]["Permission"]
       /** @description The S3 destination the main location's keys were copied from. */
       keysFrom?: string | null
       /** @description Where backups go. */

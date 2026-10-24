@@ -5955,6 +5955,7 @@ components:
       - restores
       - totalBackups
       - canChange
+      - canRestore
       - unreadable
       properties:
         backups:
@@ -5965,6 +5966,9 @@ components:
         canChange:
           $ref: "#/components/schemas/Permission"
           description: Whether the person may create schedules in Velero's namespace.
+        canRestore:
+          $ref: "#/components/schemas/Permission"
+          description: Whether the person may create restores in Velero's namespace.
         keysFrom:
           type:
           - string

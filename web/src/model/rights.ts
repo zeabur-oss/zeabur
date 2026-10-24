@@ -10,6 +10,7 @@ type PageRight =
   | "testClusterNotifications"
   | "changeIssuers"
   | "changeS3Destinations"
+  | "restoreBackups"
 export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
 type Permission = Schemas["Permission"]
 
@@ -39,6 +40,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   installComponents: { role: "admin", rule: "create helmcharts.helm.cattle.io" },
   changeNodes: { role: "admin", rule: "patch nodes" },
   changeBackups: { role: "admin", rule: "create schedules.velero.io" },
+  restoreBackups: { role: "admin", rule: "create restores.velero.io" },
   changeIssuers: { role: "admin", rule: "create clusterissuers.cert-manager.io" },
   changeNotifications: {
     role: "developer",
@@ -122,6 +124,7 @@ const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
   changeClusterNotifications: true,
   testClusterNotifications: true,
   changeS3Destinations: true,
+  restoreBackups: true,
 }
 
 const workloads = ["deployments", "statefulsets", "daemonsets"]

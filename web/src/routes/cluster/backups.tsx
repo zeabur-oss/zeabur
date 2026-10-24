@@ -162,6 +162,7 @@ function NotInstalled() {
 function Installed({ data }: { data: Data }) {
   const t = useT()
   const gate = useHintGate("changeBackups", data.canChange)
+  const restoreGate = useHintGate("restoreBackups", data.canRestore)
   const [plan, setPlan] = useState<{ request: Request; title: string; action?: string }>()
   const open = (request: Request, title: string, action?: string) =>
     setPlan({ request, title, action })
@@ -173,7 +174,7 @@ function Installed({ data }: { data: Data }) {
       <S3DestinationsSection />
       <LocationSection data={data} gate={gate} onPlan={open} />
       <ScheduleSection data={data} gate={gate} onPlan={open} />
-      <BackupList data={data} gate={gate} onPlan={open} />
+      <BackupList data={data} gate={restoreGate} onPlan={open} />
       <RestoreList restores={data.restores} />
       <div className="flex flex-col gap-3">
         <KubeDetails

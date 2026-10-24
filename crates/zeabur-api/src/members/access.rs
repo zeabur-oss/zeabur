@@ -591,6 +591,22 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn no_member_role_reaches_velero() {
+        for (name, role) in roles() {
+            for resource in [
+                "restores.velero.io",
+                "backups.velero.io",
+                "schedules.velero.io",
+                "backupstoragelocations.velero.io",
+            ] {
+                for verb in ["get", "list", "create", "patch", "delete"] {
+                    assert!(!allows(&role, verb, resource), "{name} {verb} {resource}");
+                }
+            }
+        }
+    }
+
+    #[test]
     fn both_project_roles_see_builds_and_developers_deploy_from_git_and_build_again() {
         let roles = roles();
         let developer = &roles[ProjectRole::Developer.cluster_role()];

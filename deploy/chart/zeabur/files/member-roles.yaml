@@ -6,6 +6,11 @@
 # delete, nodes/proxy, or the escalate, bind and impersonate verbs, so no member can widen their
 # own rights or reach a kubelet.
 # https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks
+#
+# No role has `velero.io`. Velero writes a Restore's objects with its own service account
+# (`cluster-admin` by default) into each namespace the Restore names, RoleBindings and Secrets
+# included. RBAC on the Restore cannot limit those namespaces, so restores stay with cluster admins.
+# https://velero.io/docs/main/rbac/
 
 # Everyone signed in: node names and status, the names of every project, the StorageClasses a
 # new volume can use, and the PersistentVolume behind a claim (where its data is). `get` without
