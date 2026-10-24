@@ -1044,6 +1044,9 @@ export const zhTW: Messages = {
   "storage.otherMounts": "其他掛載",
   "storage.edit": "編輯",
   "storage.readOnly": "唯讀",
+  "storage.delete": (path) => `刪除磁碟區 ${path}`,
+  "storage.deleteSaid": (service, path, claim) =>
+    `${service} 不再掛載 ${path}，claim ${claim} 會連同資料一起刪除。`,
   "storage.writable": "可讀寫",
   "storage.status": "狀態",
   "storage.newPath": "新磁碟區的掛載路徑",
@@ -1620,6 +1623,7 @@ export const zhTW: Messages = {
   "action.addVolume": "新增磁碟區",
   "action.saveMount": "儲存掛載",
   "action.removeVolume": "移除磁碟區",
+  "action.deleteVolume": "刪除磁碟區",
   "action.saveVolumes": "儲存磁碟區",
   "action.saveHealthChecks": "儲存健康檢查",
   "action.scale": (replicas) => `調整為 ${replicas} 個副本`,
@@ -1962,6 +1966,10 @@ export const zhTW: Messages = {
   "backups.volume.restricted":
     "這個專案強制使用 restricted Pod Security 等級，會拒絕以 root 執行的 Pod，而這個服務的備份要以 root 執行。請把服務改為 restricted，或請管理員把專案降為 baseline。",
   "backups.volume.openSecurity": "開啟安全性設定",
+  "backups.volume.stop": "停止備份",
+  "backups.volume.planStop": (claim) => `停止備份 ${claim}`,
+  "backups.volume.stopSaid": (claim, secret) =>
+    `K8up 不再備份 ${claim}。已完成的備份會留在儲存貯體，Secret ${secret} 也會保留還原它們所需的密碼。`,
   "backups.volume.long": "這個磁碟區名稱超過 63 個字元，K8up 無法用標籤選取它。",
   "backups.volume.notInstalled": "備份磁碟區需要 K8up，這個叢集還沒安裝。管理員可以安裝。",
   "backups.volume.openK8up": "開啟 K8up",

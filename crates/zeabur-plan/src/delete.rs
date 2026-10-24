@@ -328,7 +328,7 @@ impl Planner<'_> {
         let users: Vec<WorkloadRef> = self
             .users(&this)
             .into_iter()
-            .filter(|w| !self.deletes(w.kind.as_str(), &w.name))
+            .filter(|w| !self.deletes(w.kind.as_str(), &w.name) && self.still_mounts(w, &this))
             .collect();
         if !users.is_empty() {
             self.impact.extend(users.iter().cloned());
@@ -403,6 +403,32 @@ impl Planner<'_> {
         self.objects
             .iter()
             .any(|w| w.deleted && w.target.kind == kind && w.target.name == name)
+    }
+
+    /// Whether `workload` still mounts claim `target` after the changes before this one. An
+    /// earlier `removeVolume` in the plan stops the mount.
+    fn still_mounts(&self, workload: &WorkloadRef, target: &ObjectName) -> bool {
+        if target.kind != "PersistentVolumeClaim" {
+            return true;
+        }
+        let Some(working) = self
+            .objects
+            .iter()
+            .find(|o| o.target.kind == workload.kind.as_str() && o.target.name == workload.name)
+        else {
+            return true;
+        };
+        working
+            .current
+            .pointer("/spec/template/spec/volumes")
+            .and_then(Value::as_array)
+            .is_some_and(|volumes| {
+                volumes.iter().any(|v| {
+                    v.pointer("/persistentVolumeClaim/claimName")
+                        .and_then(Value::as_str)
+                        == Some(target.name.as_str())
+                })
+            })
     }
 
     fn claim_data_warning(&mut self, claim: &ObjectName) {

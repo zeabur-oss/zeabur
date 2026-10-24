@@ -184,6 +184,24 @@ export function scheduleOf(data: ProjectBackups, claim: string): Schedule | unde
   return k8up.find((s) => s.name.endsWith(`/${names(claim).schedule}`)) ?? k8up[0]
 }
 
+/** Whether `schedule` is the one made for `claim` alone, so stopping it stops nothing else. */
+export const ownSchedule = (schedule: Schedule, claim: string) =>
+  schedule.name.endsWith(`/${names(claim).schedule}`)
+
+/** The deletes that stop `schedule`. The Secret stays: its password restores the backups taken. */
+export function stopVolumeBackups(schedule: Schedule): Change[] {
+  const name = schedule.name.slice(schedule.name.indexOf("/") + 1)
+  const runNow = schedule.runNow as { spec?: { podConfigRef?: { name?: string } } } | undefined
+  const podConfig = runNow?.spec?.podConfigRef?.name
+  const k8up = (resource: string) => ({ group: "k8up.io", version: "v1", resource })
+  return [
+    { op: "delete", resource: k8up("schedules"), name },
+    ...(podConfig
+      ? [{ op: "delete" as const, resource: k8up("podconfigs"), name: podConfig }]
+      : []),
+  ]
+}
+
 /** One backup of `claim` now, as its schedule would take it. */
 export function backUpVolumeNow(schedule: Schedule, claim: string, now: Date): Change[] {
   const object = schedule.runNow as Record<string, unknown> | undefined

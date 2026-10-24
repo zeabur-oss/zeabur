@@ -1125,6 +1125,9 @@ export const en = {
   "storage.otherMounts": "Other mounts",
   "storage.edit": "Edit",
   "storage.readOnly": "Read-only",
+  "storage.delete": (path: string) => `Delete volume ${path}`,
+  "storage.deleteSaid": (service: string, path: string, claim: string) =>
+    `${service} stops mounting ${path}, and claim ${claim} is deleted with its data.`,
   "storage.writable": "Read and write",
   "storage.status": "Status",
   "storage.newPath": "Mount path of the new volume",
@@ -1764,6 +1767,7 @@ export const en = {
   "action.addVolume": "Add volume",
   "action.saveMount": "Save mount",
   "action.removeVolume": "Remove volume",
+  "action.deleteVolume": "Delete volume",
   "action.saveVolumes": "Save volumes",
   "action.saveHealthChecks": "Save health checks",
   "action.scale": (replicas: number) => `Scale to ${replicas}`,
@@ -2119,6 +2123,10 @@ export const en = {
   "backups.volume.restricted":
     "This project enforces the restricted Pod Security level, which refuses pods that run as root, and backups of this service run as root. Set the service to restricted, or ask an administrator to lower the project to baseline.",
   "backups.volume.openSecurity": "Open security settings",
+  "backups.volume.stop": "Stop backups",
+  "backups.volume.planStop": (claim: string) => `Stop backups of ${claim}`,
+  "backups.volume.stopSaid": (claim: string, secret: string) =>
+    `K8up stops backing up ${claim}. The backups taken stay in the bucket, and Secret ${secret} keeps the password that restores them.`,
   "backups.volume.long": "K8up can't select this volume: its name is longer than 63 characters.",
   "backups.volume.notInstalled":
     "Volume backups need K8up, which this cluster doesn't have. An administrator can install it.",

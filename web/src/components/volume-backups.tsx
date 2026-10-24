@@ -23,7 +23,9 @@ import {
   newVolumeTarget,
   runsOf,
   scheduleOf,
+  ownSchedule,
   scheduleVolumeBackups,
+  stopVolumeBackups,
   volumeTargetProblems,
   type VolumeTarget,
 } from "@/model/volume-backups"
@@ -160,7 +162,12 @@ function ClaimRow({
     </>
   ) : undefined
   const action = schedule ? (
-    <BackUpNow project={project} claim={claim} schedule={schedule} />
+    <span className="flex items-center gap-1.5">
+      <BackUpNow project={project} claim={claim} schedule={schedule} />
+      {ownSchedule(schedule, claim) ? (
+        <StopBackups project={project} claim={claim} schedule={schedule} />
+      ) : null}
+    </span>
   ) : installed ? (
     <SetUpBackups project={project} claim={claim} user={user} />
   ) : null
@@ -195,6 +202,43 @@ function BackUpNow({
         >
           <ArchiveIcon aria-hidden="true" data-icon="inline-start" />
           {t("db.backup.now")}
+        </Button>
+      </GateTip>
+      {planner.dialog}
+    </>
+  )
+}
+
+function StopBackups({
+  project,
+  claim,
+  schedule,
+}: {
+  project: string
+  claim: string
+  schedule: Schemas["BackupSchedule"]
+}) {
+  const t = useT()
+  const planner = usePlanner(project)
+  const gate = useGate(project, "backUpVolumes")
+  return (
+    <>
+      <GateTip gate={gate}>
+        <Button
+          variant="ghost"
+          size="xs"
+          onClick={() =>
+            planner.plan({
+              title: t("backups.volume.planStop", claim),
+              changes: stopVolumeBackups(schedule),
+              summary: {
+                lines: [t("backups.volume.stopSaid", claim, `${claim}-backup`)],
+                action: t("backups.volume.stop"),
+              },
+            })
+          }
+        >
+          {t("backups.volume.stop")}
         </Button>
       </GateTip>
       {planner.dialog}

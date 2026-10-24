@@ -1,0 +1,12 @@
+description: "Deleting a claim right after its mount is removed in the same plan does not say the workload still uses it."
+operation: mutation.plan
+params:
+  reclaimPolicies: {pv-data: Delete}
+  request:
+    changes:
+      - op: removeVolume
+        workload: {kind: Deployment, name: db}
+        mountPath: /var/lib/db
+      - op: delete
+        resource: {group: "", version: v1, resource: persistentvolumeclaims}
+        name: data

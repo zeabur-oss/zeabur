@@ -27,6 +27,7 @@ import {
 } from "@/components/storage-class"
 import { useGate } from "@/components/gate"
 import { useDraft, useHold } from "@/components/plan/draft"
+import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
 import {
@@ -50,7 +51,7 @@ import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
 import { claimOf, type Service } from "@/model/service"
-import { claimMounts } from "@/model/volume-use"
+import { claimMounts, type VolumeFill } from "@/model/volume-use"
 import {
   canGrow,
   chosenClass,
@@ -256,52 +257,20 @@ export function StorageTab({ project, service }: { project: string; service: Ser
                       onChange={(change) => update(row.id, change)}
                     />
                   ))
-                : mounts.map(({ container, mount }) => {
-                    const fill = volumes.fill(claimOf(mount))
-                    return (
-                      <li
-                        key={`${container}/${mount.mountPath}`}
-                        className={cn(
-                          "grid grid-cols-2 items-center gap-x-3 gap-y-1 px-5 py-3 sm:grid-cols-volume",
-                          entrance(createdKey.volume(workload, mount.mountPath)),
-                        )}
-                      >
-                        <span className="col-span-2 flex min-w-0 flex-col gap-1.5 sm:col-span-1">
-                          <span className="flex min-w-0 items-baseline gap-2">
-                            <span
-                              className="truncate font-mono type-body"
-                              translate="no"
-                              title={mount.mountPath}
-                            >
-                              {mount.mountPath}
-                            </span>
-                            {multi ? (
-                              <span className="shrink-0 type-meta text-tertiary" translate="no">
-                                {container}
-                              </span>
-                            ) : null}
-                          </span>
-                          <StorageLine mount={mount} storage={storage} podNode={podNode} />
-                          {fill ? <VolumeUse fill={fill} className="max-w-64" /> : null}
-                          {fill ? (
-                            <VolumeFullNote
-                              fill={fill}
-                              grows={canGrow(storage, mount.storageClass)}
-                            />
-                          ) : null}
-                        </span>
-                        <span className="font-mono type-body tabular-nums" translate="no">
-                          {mount.size ?? "—"}
-                        </span>
-                        <span className="type-body text-secondary max-sm:justify-self-end">
-                          {mount.readOnly ? t("storage.readOnly") : t("storage.writable")}
-                        </span>
-                        <span className="max-sm:col-span-2">
-                          <Phase mount={mount} />
-                        </span>
-                      </li>
-                    )
-                  })}
+                : mounts.map(({ container, mount }) => (
+                    <MountRow
+                      key={`${container}/${mount.mountPath}`}
+                      project={project}
+                      service={service}
+                      container={multi ? container : undefined}
+                      mount={mount}
+                      fill={volumes.fill(claimOf(mount))}
+                      storage={storage}
+                      podNode={podNode}
+                      deletable={addable}
+                      managed={managed}
+                    />
+                  ))}
             </ul>
             {rows ? (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-v2-border py-2 pr-5 pl-3">
@@ -376,6 +345,132 @@ export function StorageTab({ project, service }: { project: string; service: Ser
         ]}
       />
     </div>
+  )
+}
+
+/** Stops mounting the volume and deletes its claim, as one plan. */
+function MountRow({
+  project,
+  service,
+  container,
+  mount,
+  fill,
+  storage,
+  podNode,
+  deletable,
+  managed,
+}: {
+  project: string
+  service: Service
+  /** Set when the service has more than one container. */
+  container?: string
+  mount: Mount
+  fill: VolumeFill | undefined
+  storage: ProjectStorage | undefined
+  podNode?: string
+  deletable: boolean
+  managed?: string
+}) {
+  const t = useT()
+  // A claim that is not there has nothing to delete.
+  const canDelete = deletable && Boolean(mount.status)
+  return (
+    <li
+      className={cn(
+        "grid grid-cols-2 items-center gap-x-3 gap-y-1 px-5 py-3 sm:grid-cols-volume",
+        entrance(createdKey.volume({ kind: service.kind, name: service.name }, mount.mountPath)),
+      )}
+    >
+      <span className="col-span-2 flex min-w-0 flex-col gap-1.5 sm:col-span-1">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="truncate font-mono type-body" translate="no" title={mount.mountPath}>
+            {mount.mountPath}
+          </span>
+          {container ? (
+            <span className="shrink-0 type-meta text-tertiary" translate="no">
+              {container}
+            </span>
+          ) : null}
+        </span>
+        <StorageLine mount={mount} storage={storage} podNode={podNode} />
+        {fill ? <VolumeUse fill={fill} className="max-w-64" /> : null}
+        {fill ? <VolumeFullNote fill={fill} grows={canGrow(storage, mount.storageClass)} /> : null}
+      </span>
+      <span className="font-mono type-body tabular-nums" translate="no">
+        {mount.size ?? "—"}
+      </span>
+      <span className="type-body text-secondary max-sm:justify-self-end">
+        {mount.readOnly ? t("storage.readOnly") : t("storage.writable")}
+      </span>
+      <span className={canDelete ? undefined : "max-sm:col-span-2"}>
+        <Phase mount={mount} />
+      </span>
+      {canDelete ? (
+        <DeleteVolume
+          project={project}
+          service={service}
+          container={container}
+          mount={mount}
+          managed={managed}
+        />
+      ) : null}
+    </li>
+  )
+}
+
+function DeleteVolume({
+  project,
+  service,
+  container,
+  mount,
+  managed,
+}: {
+  project: string
+  service: Service
+  container?: string
+  mount: Mount
+  managed?: string
+}) {
+  const t = useT()
+  const planner = usePlanner(project)
+  const gate = useGate(project, "changeStorage")
+  const claim = claimOf(mount)
+  const workload = { kind: service.kind, name: service.name }
+  const label = t("storage.delete", mount.mountPath)
+  return (
+    <>
+      <ManagedTip tool={managed} gate={gate}>
+        <Button
+          variant="muted"
+          size="icon-xs"
+          className="justify-self-end"
+          aria-label={label}
+          title={label}
+          disabled={managed !== undefined}
+          onClick={() =>
+            planner.plan({
+              title: label,
+              service: workload,
+              changes: [
+                { op: "removeVolume", workload, container, mountPath: mount.mountPath },
+                {
+                  op: "delete",
+                  resource: { group: "", version: "v1", resource: "persistentvolumeclaims" },
+                  name: claim,
+                },
+              ],
+              summary: {
+                lines: [t("storage.deleteSaid", service.name, mount.mountPath, claim)],
+                action: t("action.deleteVolume"),
+              },
+            })
+          }
+        >
+          <TrashIcon aria-hidden="true" />
+        </Button>
+      </ManagedTip>
+      {planner.dialog}
+    </>
   )
 }
 

@@ -1042,6 +1042,9 @@ export const zhCN: Messages = {
   "storage.otherMounts": "其他挂载",
   "storage.edit": "编辑",
   "storage.readOnly": "只读",
+  "storage.delete": (path) => `删除卷 ${path}`,
+  "storage.deleteSaid": (service, path, claim) =>
+    `${service} 不再挂载 ${path}，claim ${claim} 会连同数据一起删除。`,
   "storage.writable": "可读写",
   "storage.status": "状态",
   "storage.newPath": "新卷的挂载路径",
@@ -1618,6 +1621,7 @@ export const zhCN: Messages = {
   "action.addVolume": "添加卷",
   "action.saveMount": "保存挂载",
   "action.removeVolume": "移除卷",
+  "action.deleteVolume": "删除卷",
   "action.saveVolumes": "保存卷",
   "action.saveHealthChecks": "保存健康检查",
   "action.scale": (replicas) => `调整为 ${replicas} 个副本`,
@@ -1959,6 +1963,10 @@ export const zhCN: Messages = {
   "backups.volume.restricted":
     "这个项目强制使用 restricted Pod Security 级别，会拒绝以 root 运行的 Pod，而这个服务的备份要以 root 运行。请把服务改为 restricted，或请管理员把项目降为 baseline。",
   "backups.volume.openSecurity": "打开安全性设置",
+  "backups.volume.stop": "停止备份",
+  "backups.volume.planStop": (claim) => `停止备份 ${claim}`,
+  "backups.volume.stopSaid": (claim, secret) =>
+    `K8up 不再备份 ${claim}。已完成的备份会留在存储桶中，Secret ${secret} 也会保留还原它们所需的密码。`,
   "backups.volume.long": "这个卷的名称超过 63 个字符，K8up 无法用标签选中它。",
   "backups.volume.notInstalled": "备份卷需要 K8up，这个集群还没安装。管理员可以安装。",
   "backups.volume.openK8up": "打开 K8up",
