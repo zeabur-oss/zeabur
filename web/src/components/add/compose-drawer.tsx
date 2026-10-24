@@ -19,12 +19,14 @@ import { TextFile } from "@/components/text-file"
 import { useT, type Translate } from "@/i18n"
 import {
   composeChanges,
+  differences,
   imageServices,
   managedOffer,
   portsOf,
   type ComposeChoices,
   type ComposeService,
   type Conversion,
+  type Difference,
   type KeptReason,
   type Managed,
 } from "@/model/compose"
@@ -96,7 +98,24 @@ function useChoices(
     .filter((s) => offersEngine(offers.get(s.name)) && !unmanaged.has(s.name))
     .map((s) => s.name)
   const choices: ComposeChoices = { managed: new Set(managed), published }
-  return { offers, choices, setUnmanaged, setPublished }
+  const offered = services.filter((s) => offersEngine(offers.get(s.name))).map((s) => s.name)
+  const setAll = (on: boolean) => setUnmanaged(new Set(on ? [] : offered))
+  return { offers, offered, choices, setUnmanaged, setAll, setPublished }
+}
+
+/** For each service an operator would make: how it differs from the Compose service. */
+function differencesOf(
+  conversion: Conversion | undefined,
+  offers: Map<string, Offer>,
+  context: { project: string; nodes: number },
+): Map<string, Difference[]> {
+  const out = new Map<string, Difference[]>()
+  for (const service of conversion?.services ?? []) {
+    const offer = offers.get(service.name)
+    if (conversion && offersEngine(offer))
+      out.set(service.name, differences(conversion, service, offer.engine, context))
+  }
+  return out
 }
 
 /** "Docker Compose": the server reads the file; each service is planned as the "Docker image"
@@ -109,7 +128,11 @@ export function ComposeDrawer({ project, onClose }: { project: string; onClose: 
   const [envFiles, setEnvFiles] = useState<Files>({})
   const [tried, setTried] = useState(false)
   const { convert, conversion, stale } = useConversion(project, yaml, envFiles)
-  const { offers, choices, setUnmanaged, setPublished } = useChoices(conversion, context)
+  const { offers, offered, choices, setUnmanaged, setAll, setPublished } = useChoices(
+    conversion,
+    context,
+  )
+  const diffs = differencesOf(conversion, offers, { project, nodes: context.nodes })
   const made = (conversion?.services ?? []).filter((s) => s.image)
   const problems = problemsOf(t, made, choices.published, context.taken)
   const planner = usePlanStep(project, onClose, () => {
@@ -121,7 +144,7 @@ export function ComposeDrawer({ project, onClose }: { project: string; onClose: 
     planner.plan({
       title: t("add.composePlan", made.length),
       changes: composeChanges(conversion, choices, { project, ...context }),
-      notes: notesOf(t, conversion, offers, choices.managed, envFiles),
+      notes: notesOf(t, conversion, offers, diffs, choices.managed, envFiles),
     })
   }
   return (
@@ -164,11 +187,14 @@ export function ComposeDrawer({ project, onClose }: { project: string; onClose: 
             project={project}
             conversion={conversion}
             offers={offers}
+            offered={offered.length}
+            diffs={diffs}
             choices={choices}
             suffix={context.domains.suffix}
             publicUrl={context.options.publicUrl}
             problems={tried ? problems : new Map()}
             onManaged={(name, on) => setUnmanaged((names) => toggled(names, name, !on))}
+            onAll={setAll}
             onHost={(name, host) => setPublished((hosts) => withHost(hosts, name, host))}
           />
         ) : null}
@@ -295,35 +321,48 @@ function Services({
   project,
   conversion,
   offers,
+  offered,
+  diffs,
   choices,
   suffix,
   publicUrl,
   problems,
   onManaged,
+  onAll,
   onHost,
 }: {
   project: string
   conversion: Conversion
   offers: Map<string, Offer>
+  offered: number
+  diffs: Map<string, Difference[]>
   choices: ComposeChoices
   suffix?: string | null
   publicUrl: boolean
   problems: Map<string, string>
   onManaged: (name: string, on: boolean) => void
+  onAll: (on: boolean) => void
   onHost: (name: string, host?: string) => void
 }) {
   const t = useT()
+  const allManaged = choices.managed.size === offered
   return (
     <div className="flex flex-col gap-2">
       <SectionLabel className="mb-1">
         {t("add.composeServices", conversion.services.length)}
       </SectionLabel>
+      {offered > 1 ? (
+        <Toggle checked={allManaged} onChange={onAll}>
+          {t("add.composeManagedAll", offered)}
+        </Toggle>
+      ) : null}
       <Card variant="list">
         {conversion.services.map((service) => (
           <ServiceRow
             key={service.name}
             service={service}
             offer={offers.get(service.name)}
+            diffs={diffs.get(service.name) ?? []}
             managed={choices.managed.has(service.name)}
             onManaged={(on) => onManaged(service.name, on)}
             domain={
@@ -350,6 +389,7 @@ function Services({
 function ServiceRow({
   service,
   offer,
+  diffs,
   managed,
   onManaged,
   domain,
@@ -357,6 +397,7 @@ function ServiceRow({
 }: {
   service: ComposeService
   offer: Offer
+  diffs: Difference[]
   managed: boolean
   onManaged: (on: boolean) => void
   domain: ReactNode
@@ -381,7 +422,13 @@ function ServiceRow({
       description={
         <span className="flex flex-col gap-2">
           {image ? null : <span>{t("add.composeBuildOnly")}</span>}
-          <Counterpart service={service} offer={offer} managed={managed} onManaged={onManaged} />
+          <Counterpart
+            service={service}
+            offer={offer}
+            diffs={diffs}
+            managed={managed}
+            onManaged={onManaged}
+          />
           {runs ? <ServiceFacts service={service} /> : null}
           {runs && portsOf(service).length > 0 ? domain : null}
           {problem ? (
@@ -399,11 +446,13 @@ function ServiceRow({
 function Counterpart({
   service,
   offer,
+  diffs,
   managed,
   onManaged,
 }: {
   service: ComposeService
   offer: Offer
+  diffs: Difference[]
   managed: boolean
   onManaged: (on: boolean) => void
 }) {
@@ -417,7 +466,18 @@ function Counterpart({
       <Toggle checked={managed} onChange={onManaged}>
         {t("add.composeManaged", managedName(t, offer.engine))}
       </Toggle>
-      {managed ? <span>{t("add.composeManagedHint", image)}</span> : null}
+      {managed ? (
+        <>
+          <span>{t("add.composeManagedHint", image)}</span>
+          {diffs.length > 0 ? (
+            <ul className="flex list-disc flex-col gap-1 pl-5 type-meta text-muted-foreground">
+              {diffs.map((d) => (
+                <li key={d.kind}>{differenceText(t, d, offer.engine)}</li>
+              ))}
+            </ul>
+          ) : null}
+        </>
+      ) : null}
     </>
   )
 }
@@ -494,6 +554,24 @@ function ServiceFacts({ service }: { service: ComposeService }) {
 const managedName = (t: Translate, engine: Managed) =>
   engine === "objectStorage" ? t("s3.engine") : engineName(engine)
 
+function differenceText(t: Translate, d: Difference, engine: Managed): string {
+  const sep = t("common.sep")
+  switch (d.kind) {
+    case "version":
+      return t("add.composeDiff.version", d.image, `${managedName(t, engine)} ${d.version}`)
+    case "command":
+      return t("add.composeDiff.command")
+    case "ports":
+      return t("add.composeDiff.ports", String(d.to), d.from.join(sep))
+    case "volumes":
+      return t("add.composeDiff.volumes", d.paths.join(sep), d.gib)
+    case "variables":
+      return t("add.composeDiff.variables", d.names.join(sep))
+    case "instances":
+      return t("add.composeDiff.instances", d.from, d.to)
+  }
+}
+
 const KEPT: Record<KeptReason, (t: Translate, image: string, engine: string) => string> = {
   notInstalled: (t, image, engine) => t("add.composeKept.notInstalled", image, engine),
   unknown: (t, image, engine) => t("add.composeKept.unknown", image, engine),
@@ -538,10 +616,15 @@ function serviceNotes(
   t: Translate,
   service: ComposeService,
   offer: Offer,
+  diffs: Difference[],
   managed: boolean,
 ): string[] {
   const kept = keptOf(offer)
-  if (managed) return [t("add.composeManagedHint", service.image ?? "")]
+  if (managed && offersEngine(offer))
+    return [
+      t("add.composeManagedHint", service.image ?? ""),
+      ...diffs.map((d) => differenceText(t, d, offer.engine)),
+    ]
   return [
     ...(kept && service.image ? [keptText(t, kept, service.image, service)] : []),
     ...service.findings.map((f) => findingText(t, f, service)),
@@ -556,6 +639,7 @@ function notesOf(
   t: Translate,
   conversion: Conversion,
   offers: Map<string, Offer>,
+  diffs: Map<string, Difference[]>,
   managed: ReadonlySet<string>,
   envFiles: Files,
 ): string[] {
@@ -564,7 +648,7 @@ function notesOf(
   const missing = conversion.missingEnvFiles.filter((path) => !given(path))
   return [
     ...conversion.services.flatMap((s) =>
-      serviceNotes(t, s, offers.get(s.name), managed.has(s.name)).map(
+      serviceNotes(t, s, offers.get(s.name), diffs.get(s.name) ?? [], managed.has(s.name)).map(
         (line) => `${s.name}${t("common.colon")}${line}`,
       ),
     ),

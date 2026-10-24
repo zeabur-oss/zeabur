@@ -2303,8 +2303,16 @@ export const zhTW: Messages = {
     `沒有提供 ${paths}，裡面的變數不會匯入。匯入後可以在「環境變數」補上。`,
   "add.composeServices": (count) => `服務（${count}）`,
   "add.composeManaged": (engine) => `建立由 operator 管理的 ${engine}`,
-  "add.composeManagedHint": (image) =>
-    `取代 ${image}。它一開始是空的，Compose 磁碟裡的資料不會複製過來。其他服務的連線變數會改為指向它。`,
+  "add.composeManagedHint": (image) => `取代 ${image}。其他服務的連線變數會改為指向它。`,
+  "add.composeManagedAll": (count) => `${count} 個都換成 operator 管理的服務`,
+  "add.composeDiff.version": (image, version) =>
+    `operator 沒有提供 ${image} 這個版本，改用 ${version}。`,
+  "add.composeDiff.command": "不使用它的 command，由 operator 啟動。",
+  "add.composeDiff.ports": (to, from) => `連接埠是 ${to}，不是 ${from}。`,
+  "add.composeDiff.volumes": (paths, gib) =>
+    `不使用掛在 ${paths} 的磁碟區：改用新的 ${gib} GiB 磁碟區，一開始是空的，資料不會複製過來。`,
+  "add.composeDiff.variables": (names) => `不使用 ${names}：operator 會自己產生帳號密碼。`,
+  "add.composeDiff.instances": (from, to) => `執行 ${to} 個執行個體，不是 ${from} 個。`,
   "add.composeKept.notInstalled": (image, engine) =>
     `直接執行 ${image}：還沒安裝 ${engine} 的 operator。到「元件」安裝後，就能改由 operator 管理。`,
   "add.composeKept.unknown": (image, engine) =>

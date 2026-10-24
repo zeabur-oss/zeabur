@@ -2299,8 +2299,16 @@ export const zhCN: Messages = {
     `没有提供 ${paths}，其中的变量不会导入。导入后可在「变量」中补上。`,
   "add.composeServices": (count) => `服务（${count}）`,
   "add.composeManaged": (engine) => `创建由 operator 管理的 ${engine}`,
-  "add.composeManagedHint": (image) =>
-    `替代 ${image}。它一开始是空的，Compose 卷中的数据不会复制过来。其他服务的连接变量会改为指向它。`,
+  "add.composeManagedHint": (image) => `替代 ${image}。其他服务的连接变量会改为指向它。`,
+  "add.composeManagedAll": (count) => `${count} 个都换成 operator 管理的服务`,
+  "add.composeDiff.version": (image, version) =>
+    `operator 没有提供 ${image} 这个版本，改用 ${version}。`,
+  "add.composeDiff.command": "不使用它的 command，由 operator 启动。",
+  "add.composeDiff.ports": (to, from) => `端口是 ${to}，不是 ${from}。`,
+  "add.composeDiff.volumes": (paths, gib) =>
+    `不使用挂载在 ${paths} 的卷：改用新的 ${gib} GiB 卷，一开始是空的，数据不会复制过来。`,
+  "add.composeDiff.variables": (names) => `不使用 ${names}：operator 会自己生成账号密码。`,
+  "add.composeDiff.instances": (from, to) => `运行 ${to} 个实例，不是 ${from} 个。`,
   "add.composeKept.notInstalled": (image, engine) =>
     `直接运行 ${image}：尚未安装 ${engine} 的 operator。在「组件」中安装后，即可改由 operator 管理。`,
   "add.composeKept.unknown": (image, engine) =>

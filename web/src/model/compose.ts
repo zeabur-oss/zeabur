@@ -183,6 +183,60 @@ function storeForm(conversion: Conversion, service: ComposeService): NewObjectSt
   return { ...newObjectStorage(), name: service.name, buckets: bucketsOf(conversion, service) }
 }
 
+/** How a service an operator makes differs from its Compose service. */
+export type Difference =
+  | { kind: "version"; image: string; version: string }
+  | { kind: "command" }
+  | { kind: "ports"; from: number[]; to: number }
+  | { kind: "volumes"; paths: string[]; gib: number }
+  | { kind: "variables"; names: string[] }
+  | { kind: "instances"; from: number; to: number }
+
+/** The port, storage, instances and version of what the operator makes for a service. */
+function managedTarget(
+  conversion: Conversion,
+  service: ComposeService,
+  engine: Managed,
+  { project, nodes }: Pick<ComposeContext, "project" | "nodes">,
+) {
+  if (engine === "objectStorage") {
+    const form = storeForm(conversion, service)
+    const port = pendingObjectStorage(form, project).connection.port
+    return { port, storage: form.storage, members: 1, version: undefined }
+  }
+  const form = managedForm(service, engine, nodes)
+  const port = pendingDatabase(form, project).connection.port
+  const version = versionOf(engine, service.image ?? "") ? undefined : form.version
+  return { port, storage: form.storage, members: form.members, version }
+}
+
+/** What the operator's service does differently from the Compose service it replaces. */
+export function differences(
+  conversion: Conversion,
+  service: ComposeService,
+  engine: Managed,
+  context: Pick<ComposeContext, "project" | "nodes">,
+): Difference[] {
+  const target = managedTarget(conversion, service, engine, context)
+  const out: Difference[] = []
+  if (target.version)
+    out.push({ kind: "version", image: service.image ?? "", version: target.version })
+  if (service.command?.length || service.args?.length) out.push({ kind: "command" })
+  if (service.ports.some((p) => p !== target.port))
+    out.push({ kind: "ports", from: service.ports, to: target.port })
+  if (service.volumes.length > 0)
+    out.push({
+      kind: "volumes",
+      paths: service.volumes.map((v) => v.mountPath),
+      gib: Number.parseInt(target.storage, 10),
+    })
+  if (service.variables.length > 0)
+    out.push({ kind: "variables", names: service.variables.map((v) => v.name) })
+  if (target.members !== service.replicas)
+    out.push({ kind: "instances", from: service.replicas, to: target.members })
+  return out
+}
+
 /** Every create of the import, databases first, and the project's level once. */
 export function composeChanges(
   conversion: Conversion,

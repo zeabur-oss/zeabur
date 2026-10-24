@@ -2493,7 +2493,18 @@ export const en = {
   "add.composeServices": (count: number) => `Services (${count})`,
   "add.composeManaged": (engine: string) => `Create ${engine} run by its operator`,
   "add.composeManagedHint": (image: string) =>
-    `Instead of ${image}. It starts empty: data in a Compose volume isn't copied. Other services' connection variables point at it.`,
+    `Instead of ${image}. Other services' connection variables point at it.`,
+  "add.composeManagedAll": (count: number) => `Replace all ${count} with operator-run services`,
+  "add.composeDiff.version": (image: string, version: string) =>
+    `${image} names no version the operator offers; it runs ${version}.`,
+  "add.composeDiff.command": "Its command isn't used; the operator starts it.",
+  "add.composeDiff.ports": (to: string, from: string) => `Listens on ${to}, not ${from}.`,
+  "add.composeDiff.volumes": (paths: string, gib: number) =>
+    `Its volume at ${paths} isn't used: it starts empty on a new ${gib} GiB volume. Data isn't copied.`,
+  "add.composeDiff.variables": (names: string) =>
+    `${names} aren't used: the operator makes its own credentials.`,
+  "add.composeDiff.instances": (from: number, to: number) =>
+    `Runs ${plural(to, "instance", "instances")}, not ${from}.`,
   "add.composeKept.notInstalled": (image: string, engine: string) =>
     `Runs ${image} as it is: the ${engine} operator isn't installed. Install it in Components to have it run by the operator.`,
   "add.composeKept.unknown": (image: string, engine: string) =>

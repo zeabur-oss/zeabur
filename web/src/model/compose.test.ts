@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test"
 
 import {
   composeChanges,
+  differences,
   managedOffer,
   type ComposeChoices,
   type ComposeContext,
+  type ComposeService,
   type Conversion,
 } from "@/model/compose"
 
@@ -133,6 +135,25 @@ describe("composeChanges", () => {
     const env = named(made, "Secret", "web-env")?.stringData
     expect(env.DATABASE_URL).toBe("postgres://acme:s3cret@db:5432/acme")
     expect(named(made, "Deployment", "web")?.spec.replicas).toBe(3)
+  })
+})
+
+describe("differences", () => {
+  test("list what the operator's service does unlike the Compose service", () => {
+    const [cache, db] = conversion.services as [ComposeService, ComposeService]
+    expect(differences(conversion, db, "postgresql", { project: "shop", nodes: 1 })).toEqual([
+      { kind: "volumes", paths: ["/var/lib/postgresql/data"], gib: 5 },
+      { kind: "variables", names: ["POSTGRES_PASSWORD"] },
+    ])
+    const custom = { ...db, image: "postgres:latest", args: ["-c", "fsync=off"], ports: [15432] }
+    expect(
+      differences(conversion, custom, "postgresql", { project: "shop", nodes: 3 }).map(
+        (d) => d.kind,
+      ),
+    ).toEqual(["version", "command", "ports", "volumes", "variables"])
+    expect(differences(conversion, cache, "dragonfly", { project: "shop", nodes: 1 })).toEqual([
+      { kind: "version", image: "valkey/valkey:8", version: expect.any(String) },
+    ])
   })
 })
 
