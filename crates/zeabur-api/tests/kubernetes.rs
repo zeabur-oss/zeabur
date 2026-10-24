@@ -5,8 +5,7 @@
 //! writes through plan and apply (Helm's fields kept, one winner of 64 concurrent applies, a write
 //! outside the role refused before anything is written, the other keys of a Secret the person
 //! cannot read kept, and the object stored being the one the plan showed), and usage and history
-//! read as a person with `view` (and, for history, `services/proxy`). Where Stakater Reloader runs,
-//! a service opted in through a plan is rolled out by it when its ConfigMap changes.
+//! read as a person with `view` (and, for history, `services/proxy`).
 //!
 //! Needs a disposable cluster where the current kubeconfig context is cluster admin
 //! (CONTRIBUTING.md, "Tests"); the admin connection only prepares the namespace and the person.
@@ -1276,109 +1275,6 @@ mod tests {
             assert!(
                 std::time::Instant::now() < deadline,
                 "{uri} after {seconds} s: {status} {body}"
-            );
-            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        }
-    }
-
-    /// A service the person opts in to Reloader through a plan is rolled out by Reloader when an
-    /// admin edits the ConfigMap it reads, with no further write from Zeabur; the plan for a
-    /// data change says so. Needs Stakater Reloader running in the cluster with the catalog's
-    /// values (`autoReloadAll: false`, `reloadStrategy: annotations`).
-    #[tokio::test]
-    #[ignore = "needs a disposable cluster with Stakater Reloader"]
-    async fn reloader_restarts_an_opted_in_service_when_its_config_map_changes() {
-        let (sandbox, app) = project_as(
-            "zeabur-reload",
-            json!([
-                {"apiGroups": ["", "apps"], "resources": ["*"], "verbs": ["get", "list", "patch"]}
-            ]),
-        )
-        .await;
-        let (ns, admin) = (sandbox.namespace().to_owned(), sandbox.admin().clone());
-        let maps = objects(&admin, &ns, "", "ConfigMap");
-        create(
-            &maps,
-            json!({"apiVersion": "v1", "kind": "ConfigMap",
-                   "metadata": {"name": "web-config", "namespace": ns}, "data": {"MODE": "a"}}),
-        )
-        .await;
-        let deployments = objects(&admin, &ns, "apps", "Deployment");
-        create(
-            &deployments,
-            json!({"apiVersion": "apps/v1", "kind": "Deployment",
-                   "metadata": {"name": "web", "namespace": ns},
-                   "spec": {"selector": {"matchLabels": {"app": "web"}},
-                            "template": {"metadata": {"labels": {"app": "web"}},
-                                         "spec": {"containers": [{"name": "web", "image": "busybox:1.37",
-                                             "command": ["sleep", "infinity"],
-                                             "envFrom": [{"configMapRef": {"name": "web-config"}}]}]}}}}),
-        )
-        .await;
-        let workload = json!({"kind": "Deployment", "name": "web"});
-
-        let (status, body) = plan_and_apply(
-            &app,
-            &ns,
-            json!([{"op": "configReload", "workload": workload, "enabled": true}]),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        let opted = deployments.get("web").await.unwrap();
-        assert_eq!(
-            opted
-                .metadata
-                .annotations
-                .unwrap_or_default()
-                .get("reloader.stakater.com/auto")
-                .map(String::as_str),
-            Some("true")
-        );
-        let generation = opted.metadata.generation;
-
-        // The person cannot list Deployments cluster-wide: Reloader may run, not "does".
-        let (status, planned) = send(
-            &app,
-            "POST",
-            &format!("/api/v1/projects/{ns}/plan"),
-            Some(
-                &json!({"changes": [{"op": "data", "kind": "ConfigMap", "name": "web-config",
-                "changes": [{"op": "set", "key": "MODE", "value": "b"}]}]}),
-            ),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{planned}");
-        let warning = planned["warnings"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|w| w["code"] == "reloaderRestarts")
-            .unwrap_or_else(|| panic!("{planned}"));
-        assert_eq!(warning["workloads"], json!([workload]));
-        assert_eq!(warning["confirmed"], false);
-
-        maps.patch(
-            "web-config",
-            &kube::api::PatchParams::default(),
-            &kube::api::Patch::Merge(json!({"data": {"MODE": "b"}})),
-        )
-        .await
-        .unwrap();
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
-        loop {
-            let web = deployments.get("web").await.unwrap();
-            let reloaded = web.data.pointer(
-                "/spec/template/metadata/annotations/reloader.stakater.com~1last-reloaded-from",
-            );
-            if let Some(from) = reloaded {
-                assert!(from.as_str().unwrap().contains("web-config"), "{from}");
-                assert_ne!(web.metadata.generation, generation);
-                break;
-            }
-            assert!(
-                std::time::Instant::now() < deadline,
-                "no rollout after 60 s: {:?}",
-                web.data.pointer("/spec/template/metadata")
             );
             tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         }

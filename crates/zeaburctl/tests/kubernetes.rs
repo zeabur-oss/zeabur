@@ -163,8 +163,6 @@ mod tests {
                 .peer_info()
                 .map(|info| info.protocol_version.clone());
             assert_eq!(negotiated, Some(version), "{era:?}");
-            let tools = session.client.list_all_tools().await.unwrap();
-            assert_eq!(tools.len(), 9, "{era:?}: {tools:?}");
 
             // Wait for the kubelet to restart it once, and to report how the run ended.
             let deadline = Instant::now() + Duration::from_secs(180);

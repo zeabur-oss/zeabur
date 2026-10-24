@@ -154,18 +154,19 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
 
     // Closed rather than missing, each with the role that opens it.
     const header = viewer.locator("main header").first()
+    // Base UI's tooltip popup carries no tooltip role; it opens outside the app's root.
+    const tip = viewer
+      .locator("body > :not(#root)")
+      .getByText("Needs Developer access", { exact: true })
     for (const name of ["Restart", "Terminal"]) {
       const button = viewer.getByRole("button", { name, exact: true })
       await expect(header.locator(button)).toBeDisabled({ timeout: 30_000 })
       const closed = header.locator("span[tabindex='0']").filter({ has: button })
       await expect(closed).toContainText("Needs Developer access")
-      // Base UI's tooltip popup carries no tooltip role: it is one more line saying the same.
-      const said = viewer.getByText("Needs Developer access", { exact: true })
-      const before = await said.count()
       await closed.hover()
-      await expect(said).toHaveCount(before + 1)
+      await expect(tip).toBeVisible()
       await viewer.mouse.move(0, 0)
-      await expect(said).toHaveCount(before)
+      await expect(tip).toBeHidden()
     }
     await expect(viewer.getByRole("region", { name: "Terminal" })).toHaveCount(0)
 
