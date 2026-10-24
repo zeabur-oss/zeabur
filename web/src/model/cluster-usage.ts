@@ -48,7 +48,7 @@ export function groups(items: readonly NamespaceUsage[], resource: Resource): Gr
   }
 }
 
-export const total = (items: readonly NamespaceUsage[], resource: Resource) =>
+export const together = (items: readonly NamespaceUsage[], resource: Resource) =>
   items.reduce((sum, i) => sum + lead(i, resource), 0)
 
 /** The namespace that uses the most, when any uses something. */

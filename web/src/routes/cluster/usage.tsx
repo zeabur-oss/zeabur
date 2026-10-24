@@ -23,7 +23,7 @@ import {
   nearMaximum,
   reserved,
   shownName,
-  total,
+  together,
   type ClusterUsage,
   type NamespaceUsage,
   type Resource,
@@ -155,7 +155,7 @@ function Summary({ data, scale }: { data: ClusterUsage; scale: Scale }) {
   const { resource, measured } = scale
   const first = largest(data.items, resource)
   const { projects, others, system } = groups(data.items, resource)
-  const say = (items: NamespaceUsage[]) => amount(resource, total(items, resource), measured)
+  const say = (items: NamespaceUsage[]) => amount(resource, together(items, resource), measured)
   const key = measured
     ? resource === "memory"
       ? "clusterUsage.mostMemory"
@@ -250,7 +250,7 @@ function SystemGroup({ items, scale }: { items: NamespaceUsage[]; scale: Scale }
         <CaretRightIcon aria-hidden="true" />
         {t(
           "clusterUsage.systemTotal",
-          amount(scale.resource, total(items, scale.resource), scale.measured),
+          amount(scale.resource, together(items, scale.resource), scale.measured),
         )}
       </CollapsibleTrigger>
       <CollapsibleContent>
