@@ -1292,9 +1292,13 @@ mod tests {
     #[test]
     fn required_inputs_name_the_line_to_add() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let err = plan(&index, &config("enable: [volume-backup/velero]\n"), &facts())
-            .unwrap_err()
-            .to_string();
+        let err = plan(
+            &index,
+            &config("enable: [volume-backup/velero]\n"),
+            &facts(),
+        )
+        .unwrap_err()
+        .to_string();
         assert!(err.contains("inputs.volume-backup/velero.bucket"), "{err}");
         let ok = plan(
             &index,

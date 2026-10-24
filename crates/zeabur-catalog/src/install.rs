@@ -1085,7 +1085,10 @@ mod tests {
             assert_eq!(parsed["metadata"]["namespace"], "kube-system");
             assert!(parsed["spec"]["version"].is_string());
         }
-        assert_eq!(here("volume-backup/velero").blocked, Some(HereBlocked::Inputs));
+        assert_eq!(
+            here("volume-backup/velero").blocked,
+            Some(HereBlocked::Inputs)
+        );
         assert_eq!(
             here("metrics/metrics-server").blocked,
             Some(HereBlocked::K3sPackaged)
