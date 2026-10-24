@@ -1,44 +1,38 @@
 ---
 title: Zeabur 如何管理服務
-description: 從既有部署、過期變更、權限不足與移除管理介面理解 Zeabur 和 Kubernetes 的分工。
+description: 用四個情境說明 Zeabur 和 Kubernetes 怎麼分工：既有部署、別人同時修改、權限不足、移除 Zeabur。
 ---
 
-把已部署的 Namespace 開成專案，就能查看服務；修改前先檢查差異，確認後用自己的 Kubernetes 權限套用。服務設定保留在叢集物件裡，之後仍可交給原本的工具管理。
+Zeabur 沒有自己的資料庫。你在 Zeabur 看到的專案、服務、網域，全部是直接從 Kubernetes 讀出來的；你在 Zeabur 改的東西，也直接寫回 Kubernetes 物件。下面四個情境會說明這件事在日常操作裡代表什麼。
 
-## 用既有工具部署的服務
+## 已經用 Helm 部署的服務
 
-用 `kubectl`、Helm、Argo CD 或 Flux 部署的工作負載本來就在 Kubernetes 裡。開啟 Zeabur 的**專案**，從**其他 Namespace**進入對應的 Namespace，就能依自己的權限查看裡面的服務。
+假設 `shop` 這個 Namespace 是同事半年前用 Helm 裝的。打開 Zeabur 的**專案**，在**其他 Namespace**裡找到它，點進去，服務、網域、環境變數都已經在那裡，不需要匯入。
 
-Zeabur 會依工作負載與物件的關係整理資訊：Deployment 等工作負載對應服務，Service 提供私有位址，Ingress 或 HTTPRoute 提供公開網域，Pod 的參照指出環境變數與磁碟區從哪裡來。按**使用這個 Namespace**只加上專案標籤，原有物件不會搬動。
+想把它當成專案來管，就按**使用這個 Namespace**。Zeabur 只會在 Namespace 加上一個標籤，裡面的東西一個都不會搬。
 
-如果服務由 Helm、Argo CD 或 Flux 管理，直接改 Deployment，那個工具下次同步時就會改回去。Zeabur 會標出管理工具，拒絕編輯或刪除這類物件，請你到 Helm values 或 Git repository 修改。重新啟動不改設定，仍然可以使用。
+接著你可能想直接在 Zeabur 調高副本數。Zeabur 會擋下來，告訴你這個服務歸 Helm 管：就算這次改成功，下次 `helm upgrade` 也會蓋回去。要改，就去改 Helm values。重新啟動不會動到設定，所以照樣可以按。Argo CD 和 Flux 管的服務也一樣。
 
-同一份 ConfigMap 或機密可能給多個服務使用。改共用的設定前，先看還有哪些服務會受影響；詳見[環境變數](../configure/variables.mdx)。
+## 檢查完，同事又改了一次
 
-## 檢查完變更，叢集又有了更新
+你把副本數從 2 改成 3，按**檢查變更**，畫面列出要寫進叢集的差異。這時候叢集還沒有任何變化。
 
-修改副本數或環境變數後，按**檢查變更**會列出要寫入的內容與前後差異。按下套用之前，叢集裡什麼都不會變。
+你去倒杯水的時候，同事用 `kubectl` 換了同一個 Deployment 的映像檔。你回來按下套用，Zeabur 會拒絕，請你重新檢查。重新算出的差異以同事改過的版本為準，你不會不小心把同事換上的映像檔改回舊的。
 
-如果這段時間有人用 `kubectl` 改了同一個物件，Zeabur 會拒絕套用，請你重新檢查。重新檢查會從物件目前的狀態算出差異，你的舊值不會蓋掉另一個人的修改。
+檢查過的變更放太久也會過期，看到**這份變更已過期**時，按**重新檢查**就好。
 
-檢查過的變更 10 分鐘內有效，超過時間會看到**這份變更已過期**，按**重新檢查**。變更只能由檢查它的人、在同一台 Zeabur 伺服器上套用；中途換了帳號或群組，也要重新檢查。
+## 看得到服務，打開日誌卻被拒絕
 
-一次套用多個物件時，Zeabur 依序寫入。中途有一個遭拒，前面已建立的物件會留在叢集；畫面會列出哪些已寫入，依此決定清除或重新檢查。
+新進的同事在 `shop` 是**檢視者**，看得到服務和狀態，點開**日誌**卻顯示權限不足。
 
-## 看得到專案，操作卻遭拒
+這是因為 Zeabur 每次讀寫叢集，用的都是登入者自己的身分，能做什麼由 Kubernetes RBAC 決定。**檢視者**的角色不能讀日誌和機密，所以 Zeabur 也讀不到。Zeabur 自己沒有任何叢集權限，沒辦法替誰多讀一點。
 
-同一個專案，**檢視者**能看狀態與事件，但讀不到機密和日誌；**開發者**還能部署、修改設定、讀日誌與使用終端機。所以檢視者看得到服務名稱，打開日誌卻會遭拒。
+要讓新同事看日誌，管理員可以到[成員](../cluster/members.mdx)把角色改成**開發者**。管理員自己遇到權限不足時，可以按**暫時使用管理員權限**，再驗證一次通行密鑰，在短時間內用管理員權限重試。每個角色能做的事，見[權限](../reference/permissions.mdx)。
 
-Zeabur 每次呼叫 kube-apiserver 都帶著登入者的 token，由 Kubernetes RBAC 決定能讀寫什麼。chart 建立的 Zeabur ServiceAccount 沒有綁定任何 Role 或 ClusterRole，Pod 也不掛載它的 token（`automountServiceAccountToken: false`），所以 Zeabur 沒有自己的權限可以代替成員操作。
+## 有一天決定不用 Zeabur
 
-讀取遭拒時，畫面會說是權限不足，不會顯示成物件不存在。管理員可到[成員](../cluster/members.mdx)調整角色。若安裝啟用提升權限，符合條件的管理員可選擇**暫時使用管理員權限**，再次驗證通行密鑰後重試。
+因為服務本來就是 Kubernetes 物件，移除 Zeabur 之後，Deployment、Service、Ingress、環境變數和磁碟區都還在原本的 Namespace，網站照常回應。
 
-管理員權限有效期間，所有請求都用提升後的權限；時間到就回到日常權限，不會自動續期。有效時間由 Zeabur Identity 的設定決定。角色範圍與終端機的安全邊界見[權限參考](../reference/permissions.mdx)和[安全性](../reference/security.mdx)。
+會消失的是 Zeabur 的管理介面，以及 Zeabur 安裝的成員角色。原本靠這些角色登入叢集的同事，要先改用別的方式取得權限。資料庫 operator、Ingress controller、cert-manager 這些元件也要留著，服務還依賴它們。
 
-## 移除 Zeabur，服務會怎樣
-
-只移除 Zeabur 的 Helm release，應用程式的 Deployment、Service、Ingress、環境變數與磁碟區仍在各自的 Namespace。Kubernetes 和已安裝的 controller 繼續處理它們，應用程式流量經原本的入口進入服務。
-
-移除後，Zeabur 的管理介面、工作階段與由 chart 安裝的成員角色會消失。由成員角色取得的權限要另行接手；保留 Zeabur Identity 時，其他用戶端仍可使用它登入。
-
-資料庫依賴的 operator、網域依賴的 Ingress controller、憑證與儲存元件都要留下。如果連 RKE2 或這些元件一起移除，就會影響依賴它們的服務。執行前依[移除 Zeabur](../leave/uninstall.mdx)核對清單，先準備其他管理與登入方式。
+完整的移除步驟和要保留的元件清單，見[移除 Zeabur](../leave/uninstall.mdx)。
