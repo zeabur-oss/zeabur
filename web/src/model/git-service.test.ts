@@ -309,30 +309,23 @@ describe("build options in the service's settings", () => {
 describe("what the cluster lacks", () => {
   const capability = (name: string, existing: boolean) =>
     ({ name, existing, components: [], evidence: [], installations: [] }) as never
-  test("the Builder, the registry, Keel, then the registry setting; unknown stays open", () => {
-    expect(gitMissing({ builds: "not-installed", capabilities: [], registry: "zot" })).toBe(
-      "builder",
-    )
-    expect(
-      gitMissing({
-        builds: "installed",
-        capabilities: [capability("container-registry", false), capability("image-updates", false)],
-        registry: "zot",
-      }),
-    ).toBe("registry")
-    expect(
-      gitMissing({
-        builds: "installed",
-        capabilities: [capability("container-registry", true), capability("image-updates", false)],
-        registry: "zot",
-      }),
-    ).toBe("keel")
-    expect(gitMissing({ builds: "installed", capabilities: undefined, registry: "" })).toBe(
-      "registrySetting",
-    )
-    expect(
-      gitMissing({ builds: undefined, capabilities: undefined, registry: undefined }),
-    ).toBeUndefined()
+  const noZot = capability("container-registry", false)
+  const noKeel = capability("image-updates", false)
+  test.each([
+    ["the Builder", "not-installed", [], "zot", "builder"],
+    ["a registry to install", "installed", [noZot, noKeel], "", "registry"],
+    ["the registry setting", "installed", undefined, "", "registrySetting"],
+    [
+      "Keel, past a configured registry detection doesn't know",
+      "installed",
+      [noZot, noKeel],
+      "ghcr.io/acme",
+      "keel",
+    ],
+    ["nothing with a configured registry", "installed", [noZot], "harbor.example.com", undefined],
+    ["nothing while unknown", undefined, undefined, undefined, undefined],
+  ] as const)("%s", (_, builds, capabilities, registry, missing) => {
+    expect(gitMissing({ builds, capabilities: capabilities as never, registry })).toBe(missing)
   })
 })
 

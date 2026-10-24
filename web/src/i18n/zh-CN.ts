@@ -2376,12 +2376,14 @@ export const zhCN: Messages = {
   "add.buildVariablesHint":
     "每行一个 KEY=value，只有构建时读得到，例如包仓库的令牌。以机密传入，不会留在镜像里。",
   "add.buildVariablesDockerfile": "Dockerfile 用 RUN --mount=type=secret,id=KEY 读取。",
-  "add.gitAfter": "应用后开始第一次构建。之后分支有新的 commit 就会自动构建并部署。",
+  "add.gitAfter":
+    "应用后开始第一次构建。之后 Zeabur Builder 每分钟检查一次分支，新的 commit 构建成功就会上线。",
   "add.planGit": (name) => `从 Git 部署 ${name}`,
   "add.card.git": "构建并运行 Git 仓库。",
   "add.palette.git": (project) => `在 ${project} 从 Git 部署`,
   "add.gitMissing.builder": "需要集群里有 Zeabur Builder。",
-  "add.gitMissing.registry": "需要容器 registry，请到组件页安装。",
+  "add.gitMissing.registry":
+    "需要容器 registry：到组件页安装，或在 Zeabur 的 chart 中设置 builds.registry。",
   "add.gitMissing.keel": "自动部署需要 Keel，请到组件页安装。",
   "add.gitMissing.registrySetting":
     "Zeabur 没有设置构建用的 registry，请在 chart 设置 builds.registry。",

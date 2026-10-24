@@ -2381,12 +2381,14 @@ export const zhTW: Messages = {
   "add.buildVariablesHint":
     "一行一個 KEY=value，只有建置時讀得到，例如套件庫的權杖。以機密傳入，不會留在映像檔裡。",
   "add.buildVariablesDockerfile": "Dockerfile 用 RUN --mount=type=secret,id=KEY 讀取。",
-  "add.gitAfter": "套用後開始第一次建置。之後分支有新的 commit 就會自動建置並部署。",
+  "add.gitAfter":
+    "套用後開始第一次建置。之後 Zeabur Builder 每分鐘檢查一次分支，新的 commit 建置成功就會上線。",
   "add.planGit": (name) => `從 Git 部署 ${name}`,
   "add.card.git": "建置並執行 Git 儲存庫。",
   "add.palette.git": (project) => `在 ${project} 從 Git 部署`,
   "add.gitMissing.builder": "需要叢集裡有 Zeabur Builder。",
-  "add.gitMissing.registry": "需要容器 registry，請到元件頁安裝。",
+  "add.gitMissing.registry":
+    "需要容器 registry：到元件頁安裝，或在 Zeabur 的 chart 設定 builds.registry。",
   "add.gitMissing.keel": "自動部署需要 Keel，請到元件頁安裝。",
   "add.gitMissing.registrySetting":
     "Zeabur 沒有設定建置用的 registry，請在 chart 設定 builds.registry。",

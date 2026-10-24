@@ -2581,12 +2581,13 @@ export const en = {
     "KEY=value lines that only the build reads, such as a registry token. They are passed as secrets and are not kept in the image.",
   "add.buildVariablesDockerfile": "A Dockerfile reads one with RUN --mount=type=secret,id=KEY.",
   "add.gitAfter":
-    "The first build starts when you apply. After that, each new commit on the branch is built and deployed automatically.",
+    "The first build starts when you apply. After that, Zeabur Builder checks the branch every minute, and each new commit goes live once it builds.",
   "add.planGit": (name: string) => `Deploy ${name} from Git`,
   "add.card.git": "Build a Git repository and run it.",
   "add.palette.git": (project: string) => `Deploy from Git in ${project}`,
   "add.gitMissing.builder": "Needs Zeabur Builder in this cluster.",
-  "add.gitMissing.registry": "Needs a container registry. Install one in Components.",
+  "add.gitMissing.registry":
+    "Needs a container registry: install one in Components, or set builds.registry in Zeabur's chart.",
   "add.gitMissing.keel": "Needs Keel for auto-deploy. Install it in Components.",
   "add.gitMissing.registrySetting":
     "Zeabur has no registry for builds: set builds.registry in its chart.",

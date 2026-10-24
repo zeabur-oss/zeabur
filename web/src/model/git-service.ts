@@ -394,8 +394,8 @@ export function gitMissing({
 }): GitMissing | undefined {
   if (builds === "not-installed") return "builder"
   const absent = (name: string) => capabilities?.find((c) => c.name === name)?.existing === false
-  if (absent("container-registry")) return "registry"
+  // The registry setting names the registry; detection only recognises the catalog's Zot.
+  if (registry === "") return absent("container-registry") ? "registry" : "registrySetting"
   if (absent("image-updates")) return "keel"
-  if (registry === "") return "registrySetting"
   return undefined
 }
