@@ -1,0 +1,102 @@
+---
+title: 發行檔與驗證
+description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章與建置來源後再執行。
+---
+
+在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為該版本 tag 的 release workflow，通過了才解壓縮、執行。
+
+## 檔案與平台
+
+| 成品 | 位置或檔名 | 平台 |
+|---|---|---|
+| `zeaburctl` | `zeaburctl-v<version>-<os>-<arch>.tar.gz` | Linux `amd64`、`arm64`；macOS `arm64` |
+| `zeabur` 伺服器 | `zeabur-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
+| `zeabur-installer` | `zeabur-installer-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
+| 多平台容器映像檔 | `ghcr.io/zeabur-oss/zeabur:<version>` | Linux `amd64`、`arm64` |
+| Helm chart | `oci://ghcr.io/zeabur-oss/charts/zeabur`；也提供 `zeabur-<version>.tgz` | 安裝到 Kubernetes 叢集 |
+| 成品 digest | `digests.txt` | image index、各平台映像檔與 chart |
+| 檔案 checksum 與簽章 | `SHA256SUMS`、`SHA256SUMS.sigstore.json` | 同一份 release 的 assets |
+
+每個 archive 裡有執行檔和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，沒有 Intel Mac 版本。`zeabur` 和 installer 只在 Linux 執行，macOS 上只需要 `zeaburctl`。
+
+發行時，chart 的 `image.digest` 會釘在這次發布的 image index 上，用 chart 預設值安裝就會拿到同一份映像檔。Image tag 和 chart version 沒有開頭的 `v`，GitHub release tag 和 archive 檔名有。
+
+## 下載與驗證執行檔
+
+需要 GitHub CLI `gh`、cosign 3 和 GNU `sha256sum`。把 `version` 換成你選的版本，下例用 `0.0.1`：
+
+```sh
+version=0.0.1
+platform=darwin-arm64
+binary=zeaburctl
+identity="https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v$version"
+
+gh release download "v$version" --repo zeabur-oss/zeabur \
+  --dir "zeabur-$version" \
+  --pattern SHA256SUMS \
+  --pattern SHA256SUMS.sigstore.json \
+  --pattern "$binary-v$version-$platform.tar.gz"
+```
+
+`platform` 可以換成 `linux-amd64` 或 `linux-arm64`。下載 installer 時，把 `binary` 改成 `zeabur-installer`，並選 Linux 平台。
+
+進入下載目錄，依序驗證 checksum 清單的簽署者、檔案內容和建置來源：
+
+```sh
+cd "zeabur-$version"
+
+cosign verify-blob \
+  --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "$identity" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  SHA256SUMS
+
+sha256sum --check --ignore-missing SHA256SUMS
+
+gh attestation verify "$binary-v$version-$platform.tar.gz" \
+  --repo zeabur-oss/zeabur \
+  --cert-identity "$identity"
+```
+
+三項都通過後再解壓縮：
+
+```sh
+tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
+"./$binary" --version
+```
+
+checksum 不符時，重新下載那個檔案。簽署者、issuer 或 attestation 不符時，不要執行檔案，先核對 release、檔名和 workflow 身分；也不要放寬驗證參數來讓它通過。
+
+用 macOS 瀏覽器下載的檔案會帶 quarantine 標記。驗證通過後，對解出的檔案執行：
+
+```sh
+xattr -d com.apple.quarantine zeaburctl
+```
+
+用 `gh release download` 下載就不會有這個標記。macOS 版本有 Sigstore 簽章，但沒有經過 Apple notarization。
+
+## 驗證映像檔與 chart
+
+`digests.txt` 列出 image index、各平台映像檔和 chart 的完整 registry 參照。它也列在 `SHA256SUMS` 裡，先用上面的流程驗證它，再把裡面的 digest 交給 cosign：
+
+```sh
+cosign verify \
+  --certificate-identity "$identity" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  'ghcr.io/zeabur-oss/zeabur@sha256:<image-index-digest>'
+
+cosign verify \
+  --certificate-identity "$identity" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  'ghcr.io/zeabur-oss/charts/zeabur@sha256:<chart-digest>'
+```
+
+角括號換成 `digests.txt` 裡的值。在既有叢集安裝 chart 的步驟見[在既有叢集安裝](../get-started/install.mdx)。
+
+## 發行流程
+
+維護者推送 `v<version>` tag 後，release workflow 跑 CI、建置 Linux 和 macOS 版本、做 smoke test、發布映像檔和 chart，再以 Sigstore keyless 簽署映像檔、chart 和 checksum 清單，並為三者產生建置來源 attestation。
+
+Workflow 最後建立 GitHub release 草稿，維護者檢查後才公開。Releases 頁面上看得到的版本，才有可下載的檔案。
+
+下載和驗證都不會動到叢集，用完的下載目錄可以直接刪掉。要移除已安裝的 Zeabur，見[移除流程](../leave/uninstall.mdx)。

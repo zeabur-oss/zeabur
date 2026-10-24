@@ -1,0 +1,162 @@
+---
+title: Installer 設定
+description: 查閱建立叢集與加入節點所用的 YAML 欄位、預設值及機密檔案格式。
+---
+
+把網域、元件選擇和主機設定寫進 YAML，執行 `zeabur-installer --config config.yaml plan` 先看安裝內容。檔案預設放在 `/etc/zeabur-installer/config.yaml`。欄位用 camelCase，拼錯或多出欄位時，installer 會直接停下。
+
+指令用法見 [installer 指令](./installer.mdx)，第一次安裝見[從一台伺服器開始](../get-started/quickstart.mdx)。
+
+## 建立叢集的檔案
+
+下面的例子用自己的網域。兩個 DNS 名稱都要指向伺服器，外部也要連得到連接埠 `80`，Let's Encrypt 才能完成 HTTP-01 驗證。
+
+```yaml title="/etc/zeabur-installer/config.yaml"
+preset: minimal
+profile: single-node
+access:
+  mode: domain
+  identity: login.example.com
+  zeabur: zeabur.example.com
+  invitations: true
+zeabur: true
+host:
+  requireEncryptedDisk: true
+```
+
+### 頂層欄位
+
+| 欄位 | 預設 | 用途 |
+|---|---|---|
+| `access` | 必填 | 登入服務與 Zeabur 的網域和憑證模式 |
+| `preset` | `standard` | `minimal`、`standard` 或 `secure` |
+| `profile` | `single-node` | `single-node` 或 `multi-node`，選取 Catalog 對應的元件設定 |
+| `enable` | `[]` | 加入 capability 或完整元件 ID |
+| `disable` | `[]` | 排除 capability 或完整元件 ID |
+| `zeabur` | `true` | 安裝 Zeabur Identity 與 Zeabur；`false` 只安裝 RKE2 與選定元件 |
+| `inputs` | `{}` | 依元件 ID 分組的一般輸入值 |
+| `secretFiles` | `{}` | 依元件 ID 分組的機密檔案路徑 |
+| `rke2Version` | installer 釘選版本 | 覆寫 RKE2 版本 |
+| `host` | 空 | API 憑證的額外名稱和磁碟加密要求 |
+| `sources` | 空 | 改用自己準備的 Catalog、映像檔和 chart |
+
+`zeabur: false` 只決定這次安裝什麼，不會移除已裝好的 Zeabur。要移除，用 [`uninstall`](./installer.mdx#uninstall)。
+
+### `access`
+
+| 欄位 | 預設與規則 |
+|---|---|
+| `mode` | 必填。`domain` 由 cert-manager 向 Let's Encrypt 申請憑證（HTTP-01）；`local` 在伺服器上建立私有 CA，只適合測試機 |
+| `identity` | 必填；Zeabur Identity 主機名稱，issuer 為 `https://<identity>` |
+| `zeabur` | 必填；Zeabur 主機名稱，必須與 `identity` 不同 |
+| `invitations` | `true`；是否接受 Zeabur **成員** 頁產生的設定連結。成員只由版本控制管理時關掉 |
+
+主機名稱不加 `https://`、連接埠或路徑，只用小寫英文字母、數字、連字號和點，至少兩段。每段最多 63 個字元、不能以連字號開頭或結尾，總長最多 253 個字元。
+
+瀏覽器和伺服器都要能解析這兩個名稱。Pod 透過 DNS 解析，主機 `/etc/hosts` 裡的設定 Pod 看不到。`local` 模式的 CA 憑證在 `/var/lib/rancher/zeabur-installer/local-ca.crt`，匯入使用者電腦的信任儲存區後，瀏覽器才會信任這兩個網址。
+
+### 元件選擇
+
+- `minimal`：ingress、憑證和 metrics-server，也就是 Zeabur 能連線、能顯示用量所需的元件。
+- `standard`：Catalog 為這個 profile 建議的所有元件。
+- `secure`：`standard` 再加上執行期偵測、漏洞掃描和入侵防護。
+
+`enable` 可以寫 capability（例如 `dns`）或完整元件 ID（例如 `dns/external-dns`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。
+
+```yaml
+inputs:
+  dns/external-dns:
+    provider: cloudflare
+    domain-filters: [example.com]
+    owner-id: vps-1
+```
+
+每個元件有哪些 input、型別是什麼，由 Catalog 定義；少了必填值時，`plan` 會指出要補哪個欄位。
+
+### `secretFiles`
+
+機密輸入寫成檔案路徑，檔案權限設為 `0600`：
+
+```yaml
+secretFiles:
+  volume-backup/velero:
+    credentials: /root/secrets/velero-credentials
+```
+
+```sh
+sudo chmod 0600 /root/secrets/velero-credentials
+```
+
+檔案內容依元件 input 的格式填寫，installer 會用它建立元件需要的 Secret。機密值放在檔案裡，不要寫進 `inputs`。Catalog 標為 `generate: random` 的機密如果沒指定檔案，第一次 `apply` 時自動產生，之後沿用。
+
+### 儲存類別
+
+installer 一定會建立 `local-path`，資料放在節點的 `/var/lib/zeabur/storage`。裝了 Longhorn 時，由 Catalog 對這個 profile 的設定決定誰是預設：`multi-node` 用 `longhorn`，`single-node` 維持 `local-path`。`plan` 會列出預設類別和其他類別。
+
+- `local-path` 的磁碟區留在原本的節點，換預設類別不會搬移既有資料。
+- Longhorn 成為預設時，installer 原本設為預設的 `local-path` 會改成一般類別。
+- 叢集已有別的預設類別時，installer 保留它；如果這次要把 Longhorn 設為預設，`apply` 會停下，請你先拿掉原本類別的預設註解。
+
+選了 Longhorn 時，`apply` 會在這台主機安裝 iSCSI initiator 和 NFS client、載入 `iscsi_tcp`、啟動 `iscsid`。每個跑 Longhorn 的節點都要有這些，見[加入節點](../cluster/nodes.mdx)。
+
+### `host` 與 `rke2Version`
+
+| 欄位 | 預設與用途 |
+|---|---|
+| `host.tlsSan` | `[]`；Kubernetes API server 憑證額外加入的 DNS 名稱或 IP 位址，只用於 server |
+| `host.requireEncryptedDisk` | `false`；設為 `true` 時，根目錄或資料目錄不在加密裝置上，`apply` 就停下 |
+| `rke2Version` | installer 釘選的版本；要換版本時填，例如 `v1.37.1+rke2r1` |
+
+預設版本的檔案用編譯進 installer 的 digest 驗證。換成其他版本時，只能用該 release 頁面自己的 checksum 清單驗證，`plan` 會標示這是未支援的版本，Catalog 測過的 Kubernetes 版本也可能對不上。
+
+### `sources`
+
+`sources` 讓 installer 改裝你自己建置的 Catalog、Zeabur Identity 和 Zeabur，取代釘選的發行版，通常用在開發測試。路徑換成實際準備好的檔案：
+
+```yaml
+sources:
+  catalog: /root/releases/catalog/index.json
+  identityImage: registry.example.com/identity@sha256:<digest>
+  identityctl: /root/releases/zeabur-identityctl
+  zeaburImage: registry.example.com/zeabur@sha256:<digest>
+  zeaburChart: /root/releases/zeabur-chart
+```
+
+| 欄位 | 接受內容 |
+|---|---|
+| `catalog` | 本機 `index.json` |
+| `imageArchives` | `docker save` 產生的封存檔路徑陣列，RKE2 啟動時匯入 |
+| `identityImage` | Zeabur Identity 映像檔參照 |
+| `identityctl` | 本機 `zeabur-identityctl` 執行檔 |
+| `zeaburImage` | Zeabur 映像檔參照 |
+| `zeaburChart` | Helm chart 目錄或封裝好的 `.tgz` |
+
+從 `imageArchives` 拿掉的檔案，下次 `apply` 時也會從 RKE2 的匯入目錄移除。這份清單放的是已經在主機上的封存檔，和私有 registry 的存取設定無關。
+
+## 加入既有叢集的檔案
+
+頂層有 `join` 時，installer 把這台機器當成要加入的新節點，只安裝 RKE2。同一份檔案只能再放 `rke2Version`、`host` 和 `sources.imageArchives`，不能放 `preset`、`access` 這些建立叢集的欄位。
+
+在既有 server 執行 `zeabur-installer node add` 取得完整 YAML，存到新主機。權杖和 server 設定都在裡面，不用自己拼。
+
+| 欄位 | 預設與規則 |
+|---|---|
+| `join.server` | 必填；server 的 supervisor，例如 `https://10.0.0.5:9345` |
+| `join.role` | `worker`；也接受 `server` |
+| `join.token` | 和 `tokenFile` 擇一；直接寫權杖時，設定檔權限要是 `0600` |
+| `join.tokenFile` | 和 `token` 擇一；權限 `0600` 的權杖檔案 |
+| `join.expect.provider` | server 所在的主機商，新主機用來比對自己是否在同一處 |
+| `join.expect.region` | server 所在的區域；`expect.zone` 可另外記錄可用區 |
+| `join.serverConfig` | `server` 必填，worker 不接受；照抄 `node add --role server` 印出的 `disable` 和 `identity` |
+| `join.longhorn` | `false`；`true` 時在 RKE2 啟動前先裝好 Longhorn 需要的主機套件 |
+
+worker 不接受 `host.tlsSan`。`rke2Version` 要和叢集一致。worker 的 bootstrap token 不能用來加入 server，要用 `node add --role server` 產生的設定。
+
+## 設定無法使用時
+
+- unknown field：檢查欄位大小寫，刪掉拼錯或放錯層級的 key。
+- 主機名稱無效：拿掉 `https://` 和路徑，`identity` 和 `zeabur` 要用不同名稱。
+- 缺少必填 input：依 `plan` 列出的元件和欄位補上，再跑一次 `plan`。
+- 權杖檔案權限不對：在新主機執行 `chmod 0600`。含權杖的設定檔不要放進 Git 儲存庫。
+
+改完設定檔先跑 `plan`。要移除產品、清理主機檔案，見[移除 Zeabur](../leave/uninstall.mdx)。

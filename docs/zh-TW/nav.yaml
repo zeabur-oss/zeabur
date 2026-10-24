@@ -1,0 +1,47 @@
+- group: get-started
+  label: 開始使用
+  pages:
+    quickstart: 在一台伺服器安裝 Zeabur
+    install: 把 Zeabur 裝進既有叢集
+    first-project: 部署第一個服務
+    how-it-works: Zeabur 如何管理服務
+- group: deploy
+  label: 部署服務
+  pages:
+    git: 從 Git 建置並部署服務
+    image: 部署容器映像檔
+    compose: 匯入 Docker Compose 服務
+    databases: 建立、備份與還原資料庫
+    object-storage: 建立 S3 物件儲存與儲存貯體
+    cron-jobs: 依排程執行服務指令
+- group: configure
+  label: 調整服務設定
+  pages:
+    variables: 設定環境變數
+    domains: 加上公開網域與 HTTPS
+    maintenance: 顯示維護與錯誤頁面
+    volumes: 儲存檔案與備份磁碟區
+- group: cluster
+  label: 管理叢集
+  pages:
+    members: 邀請成員並分配專案權限
+    tokens: 建立與撤銷節點加入權杖
+    notifications: 把叢集警示送到通知管道
+    backups: 備份叢集並從備份還原
+    nodes: 新增與維護節點
+    components: 檢查並安裝叢集元件
+    s3-destinations: 登錄共用的 S3 備份目的地
+- group: reference
+  label: 參考
+  pages:
+    zeaburctl: zeaburctl
+    installer-configuration: Installer 設定
+    installer: Installer 指令
+    permissions: 權限
+    architecture: 架構
+    releases: 發行檔與驗證
+    security: 安全性
+- group: leave
+  label: 移除 Zeabur
+  pages:
+    uninstall: 移除 Zeabur，保留服務

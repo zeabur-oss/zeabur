@@ -3,7 +3,7 @@
 # translations' nav.yaml refers to it, and it is part of each page's URL.
 - group: get-started
   label: Get started
-  pages: [quickstart, install, first-project]
+  pages: [quickstart, install, first-project, how-it-works]
 - group: deploy
   label: Deploy
   pages: [git, image, compose, databases, object-storage, cron-jobs]

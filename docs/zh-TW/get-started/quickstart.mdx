@@ -1,0 +1,79 @@
+---
+title: 在一台伺服器安裝 Zeabur
+description: 用 Zeabur Installer 建立 RKE2 叢集並完成首次通行密鑰登入。
+---
+
+在 Linux 伺服器寫好只有網域的設定檔，執行 `zeabur-installer plan` 查看安裝內容，再執行 `apply`。完成後，開啟終端機印出的連結註冊管理員通行密鑰，回到 Zeabur 部署服務。
+
+## 先準備主機
+
+需要一台使用 systemd 的 Linux 伺服器（amd64 或 arm64）、root 權限，以及兩個指向這台伺服器的公開 DNS 名稱，例如 `login.example.com` 和 `zeabur.example.com`。`access.mode: domain` 透過 cert-manager 的 HTTP-01 驗證取得 Let's Encrypt 憑證，所以外部要能用 HTTP 連到這台主機。
+
+建議記憶體至少 4096 MiB，不足時 `plan` 會列出警告。`plan` 也會估算 RKE2 與各元件閒置時的記憶體用量；部署應用程式還要另外預留空間。
+
+`apply` 開始前會檢查連接埠、磁碟、時鐘同步與其他 Kubernetes 發行版。TCP `80`、`443`、`6443`、`9345`、`10250` 要空著；主機上已有 k3s、kubeadm、k0s 或 MicroK8s 時，installer 會停止。`/var/lib/rancher` 可用空間不到 10 GiB 會停止，不到 30 GiB 會提醒預留日誌、監控與應用程式的空間。
+
+從 [Zeabur 的 GitHub release](https://github.com/zeabur-oss/zeabur/releases) 下載符合主機架構的 `zeabur-installer-v<version>-linux-<arch>.tar.gz`，驗證方式見[發布成品](../reference/releases.mdx)。installer 會下載它釘選的 RKE2、Zeabur Catalog、Zeabur Identity 與 Zeabur 版本，並逐一核對 digest。
+
+## 寫入設定檔
+
+以 root 建立 `/etc/zeabur-installer/config.yaml`，把兩個網域換成自己的：
+
+```sh
+mkdir -p /etc/zeabur-installer
+```
+
+```yaml title="/etc/zeabur-installer/config.yaml"
+access:
+  mode: domain
+  identity: login.example.com
+  zeabur: zeabur.example.com
+```
+
+沒有指定 `preset` 時會用 `standard`，沒有指定 `profile` 時會用 `single-node`。要調整元件、改用本機 CA，或改裝自行建置的版本（`sources`），見[Installer 設定](../reference/installer-configuration.mdx)。
+
+## 檢查安裝內容，再執行
+
+```sh
+zeabur-installer plan
+zeabur-installer apply
+```
+
+`plan` 列出元件、chart、Namespace、記憶體估算與警告，不修改主機。確認網域與元件清單後，再執行 `apply`。
+
+`apply` 會設定主機、安裝使用 CIS profile 的 RKE2、儲存空間與選定元件，接著設定 Zeabur Identity 和 Zeabur。安裝中斷時，依輸出修正原因，再用同一份設定執行 `apply`；每個步驟會先檢查已經做完的部分，從中斷處繼續。
+
+## 註冊第一個管理員
+
+完成時，終端機會印出 Zeabur、Zeabur Identity 網址，以及 `admin` 的註冊連結。這個連結只能用一次，24 小時內有效。開啟後依瀏覽器提示註冊通行密鑰，再開啟 Zeabur 網址登入。
+
+<Callout type="warn">
+註冊連結能建立首次管理員的通行密鑰。只交給要管理叢集的人，避免貼進共用日誌或聊天紀錄。
+</Callout>
+
+接著檢查安裝狀態：
+
+```sh
+zeabur-installer doctor
+```
+
+`doctor` 檢查 RKE2、元件、預設儲存類別、Zeabur Identity 與 Zeabur；結束碼 `0` 表示正常、`1` 有警告、`2` 有嚴重問題，監控工具可以直接讀取。確認能登入 Zeabur 後，接著[部署第一個服務](first-project.mdx)。
+
+## 安裝停在哪裡
+
+| 看到的情況 | 接著處理 |
+| --- | --- |
+| 連接埠已占用，或找到其他 Kubernetes 發行版 | 改用乾淨的主機，或先停掉占用連接埠的程式，再執行 `apply`。 |
+| 憑證還沒核發 | 核對兩個網域的 DNS、主機入口與 HTTP-01 驗證路徑，修正後重跑 `apply`。 |
+| 選 `local` 後瀏覽器不信任網站 | 把主機 `/var/lib/rancher/zeabur-installer/local-ca.crt` 匯入使用者裝置的信任庫，再登入。 |
+| 通行密鑰註冊連結已過期 | 使用 installer 輸出提示的 `zeabur-identityctl setup-link --username admin` 重新產生連結。 |
+
+## 移除這次安裝的 Zeabur
+
+只移除管理介面、保留叢集與應用程式：
+
+```sh
+zeabur-installer uninstall zeabur
+```
+
+RKE2、元件和 Zeabur Identity 會留下。若連登入服務也要移除，先準備其他叢集登入方式，再依[移除 Zeabur](../leave/uninstall.mdx)操作。

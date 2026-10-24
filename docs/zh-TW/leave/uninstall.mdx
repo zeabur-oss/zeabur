@@ -1,0 +1,211 @@
+---
+title: 移除 Zeabur，保留服務
+description: 移除 Zeabur 管理介面，保留應用程式、資料與仍在使用的 Kubernetes 元件。
+---
+
+只移除 Zeabur 的 chart 或執行 `zeabur-installer uninstall zeabur`，既有服務會留在 Kubernetes，繼續由原生控制器與 operator 執行。保留 ingress、憑證、儲存與備份等相依元件，就能改用 kubectl、Helm 或原本的 GitOps 工具管理服務。
+
+用 `zeaburctl ui` 在本機開啟介面時，按 `Ctrl-C` 關掉就好；它沒有在叢集裡安裝任何東西，已套用的變更會留在叢集。
+
+## 移除前準備
+
+需要能管理 Zeabur 安裝物件的 kubeconfig；installer 安裝則需要原 server 的 root 權限。先確認移除管理介面後，仍有不依賴該介面的叢集存取方式。
+
+1. 用 kubectl 連上目標叢集，確認 context 與目前權限。installer 主機可用 root 保管的 `/etc/rancher/rke2/rke2.yaml`；不要將這份管理員認證資訊交給一般成員。
+2. 記下 Zeabur 的安裝方式、release 名稱與 Namespace。下文 Helm 範例使用 release `zeabur`、Namespace `zeabur`，自行安裝時要換成實際名稱。
+3. 關閉開著的容器終端機、kubectl 終端機與節點終端機，並把檢查過的變更套用或放棄。移除後這些連線會中斷，還沒套用的變更也會失效。
+4. 若成員還需要用 Zeabur Identity 的身分操作，保留 Identity，並先安排[替代 RBAC 與准入政策](#成員權限與准入政策)。Chart 提供的成員角色會在卸載時移除。
+5. 對重要資料依原本的備份工具完成備份，確認還原所需的 Secret、目的地與控制器都在。此流程不刪應用程式磁碟區。
+
+在自己的電腦確認連線並記下服務現況：
+
+```sh
+kubectl config current-context
+kubectl get nodes
+kubectl get namespaces -l zeabur.com/project
+kubectl get deployments,statefulsets,daemonsets,cronjobs,services,ingresses,pvc \
+  --namespace shop
+```
+
+將 `shop` 換成要保留的專案。記下重要服務的公開網址，移除前後都開啟一次；資料庫與物件儲存也以現有用戶端確認能連線。
+
+若使用 installer，且主機上沒有另外安裝的 kubectl，可在該主機用以下完整路徑執行後文的 kubectl 操作：
+
+```sh
+sudo /var/lib/rancher/rke2/bin/kubectl \
+  --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes
+```
+
+## 哪些物件與行為留下
+
+| 項目 | 移除 Zeabur 後 |
+|---|---|
+| 應用程式 Namespace、Deployment、StatefulSet、Service、CronJob | 保留；副本與排程由 Kubernetes 繼續管理 |
+| Ingress、HTTPRoute、憑證與 DNS 設定 | 保留；轉送與憑證續期仍需要原本的 ingress／Gateway、cert-manager 與 DNS 元件 |
+| PVC、PV 與儲存系統 | 保留；仍需儲存 driver、provisioner 或 Longhorn |
+| 資料庫、物件儲存的原生 CR 與 Secret | 保留；仍需所屬 operator |
+| Build、Git 認證資訊與自動部署設定 | 保留；後續建置與自動部署仍需 Zeabur Builder、有使用時的 Keel 及 registry |
+| 備份排程、備份認證資訊與已存的備份 | 保留；仍需各資料庫 operator、K8up 或 Velero，以及備份目的地 |
+| Reloader、監控、告警、通知設定 | 各自保留；依原控制器繼續執行 |
+| 專案的 `zeabur.com/project` 標籤與顯示資訊 | 保留，不影響工作負載執行 |
+| 成員的 RoleBinding／ClusterRoleBinding | 保留，但它們參照的 chart 成員 ClusterRole 會移除 |
+| `zeabur-s3-destinations` | Chart 標記保留的 Namespace；登錄的目的地與金鑰留在其中 |
+| Zeabur Identity | 只移除 Zeabur 時保留；其使用者與其他 OAuth client 繼續留在原 Namespace |
+
+備份使用的金鑰已複製到各備份所在的 Namespace，不會在執行時回頭讀取 S3 目的地清單。刪除清單不會撤銷那些金鑰，也不會刪掉遠端備份。
+
+維護頁與自訂錯誤頁在專案內有自己的工作負載、Service 與設定。移除 Zeabur 不會把維護中的網域自動切回應用程式；需要恢復流量時，先依[維護模式](../configure/maintenance.mdx)完成切換。
+
+<Callout type="warn">
+保留服務時，不要執行 `rke2-uninstall.sh`、刪除專案 Namespace、PVC 或 operator 的 CRD，也不要一起卸載 ingress、cert-manager、儲存與資料庫 operator。這些動作會停止服務，或使資料與後續維運失去必要元件。
+</Callout>
+
+## 移除管理介面
+
+依原安裝方式選一條路。若 Flux 或 Argo CD 還在同步 Zeabur，先在它的設定來源移除 Zeabur 安裝項目，再由原工具卸載，避免控制器重新建立它。
+
+### Installer 安裝
+
+在最初建立叢集的 server 執行：
+
+```sh
+sudo zeabur-installer \
+  --config /etc/zeabur-installer/config.yaml \
+  uninstall zeabur
+```
+
+指令刪除 `kube-system` 的 `HelmChart zeabur`，再刪除 `zeabur` Namespace。RKE2、Zeabur Identity、Catalog 元件與專案 Namespace 都保留。
+
+`zeabur` Namespace 內的 OAuth client Secret、變更權杖金鑰、`zeabur-settings` 與其他物件會跟著刪除。若曾把額外工作負載放進此 Namespace，先搬走；需要保留叢集顯示名稱或 metrics store 選擇時，先記下設定。
+
+保留 installer 設定與下載目錄可繼續管理節點。此時不要執行 `uninstall --purge`；之後重跑原本 `zeabur: true` 設定的 `apply`，會再次安裝 Zeabur。
+
+### Helm 安裝
+
+先確認 release 與它管理的物件：
+
+```sh
+helm list --all-namespaces
+helm status zeabur --namespace zeabur
+kubectl get deployments,services,ingresses,configmaps,secrets --namespace zeabur
+```
+
+這裡的 `get secrets` 只列出名稱與摘要，不加 `-o yaml`。確認選到的是 Zeabur release 後卸載：
+
+```sh
+helm uninstall zeabur --namespace zeabur --wait
+```
+
+Chart 管理的 Deployment、Service、Ingress／HTTPRoute、ServiceAccount、生成的變更金鑰與可選的 Proxy 會移除；成員角色與 Namespace 准入政策也會移除。
+
+你預先建立的 OAuth client Secret、外部指定的變更金鑰或 CA ConfigMap 不屬於 chart，會保留。透過介面建立的 `zeabur-settings` ConfigMap 也不由 chart 卸載。先檢查這些物件是否仍有用途，再逐一刪除；不需要為了移除介面刪除整個 Namespace。
+
+## 確認服務繼續執行
+
+再次查看同一個專案：
+
+```sh
+kubectl get deployments,statefulsets,daemonsets,cronjobs,services,ingresses,pvc \
+  --namespace shop
+kubectl get pods --namespace shop
+kubectl get storageclasses
+```
+
+應用程式與磁碟區都還在，公開網址與資料庫連線的結果和移除前相同。Zeabur 的網址不再有介面，之後用 kubectl、Helm 或原本的 GitOps 工具調整設定。
+
+確認資料庫與備份 operator 還在，並在下一次原排程執行後查看備份結果。卸載 Zeabur chart 也會卸載其 Proxy；VictoriaLogs 本身留下，但 Zeabur 的歷史日誌入口會消失。
+
+## 成員權限與准入政策
+
+Chart 卸載會移除 `zeabur-member`、專案的聚合 ClusterRole、其規則集，以及 `zeabur-project-namespace` ValidatingAdmissionPolicy 與 binding。管理員建立在各專案的成員 binding 仍存在；只參照已移除角色的 binding 不再授權。
+
+仍要讓成員存取叢集時，先用自己的 RBAC 設定接手，確認每個角色實際能讀寫的範圍。若替代角色保留 `patch namespaces`，也要保留相等的欄位限制：chart 政策移除後，單靠 RBAC 無法把 patch 限定在顯示名稱、描述與圖示。既有的 Pod Security 與 NetworkPolicy 標籤會保留。
+
+查看 Zeabur 建立的成員 binding：
+
+```sh
+kubectl get clusterrolebindings -l zeabur.com/member
+kubectl get rolebindings --all-namespaces -l zeabur.com/member
+```
+
+確認不再使用舊授權後，依清單逐一刪除；例如移除 `ada` 在 `shop` 的舊 binding 與叢集基礎讀取 binding：
+
+```sh
+kubectl delete rolebinding zeabur-member-ada --namespace shop
+kubectl delete clusterrolebinding zeabur-member-ada
+```
+
+保留 Identity 時，其他 client 或 kubeconfig 仍可能以 `zeabur:<username>` 身分登入，刪除前先確認它們不再依賴這些 binding。
+
+## 清理短暫工具與登錄資訊
+
+### 終端機物件
+
+關閉終端機後，先列出仍留下的 tools Pod 與節點終端機 Pod：
+
+```sh
+kubectl get pods --all-namespaces -l zeabur.com/tools
+kubectl get pods --all-namespaces -l zeabur.com/node-shell=true
+```
+
+確認沒有使用中的終端機後，再依清單中的實際名稱與 Namespace 刪除：
+
+```sh
+kubectl delete pod <pod-name> --namespace <namespace>
+```
+
+tools Pod 到了最長執行時間會自己結束，但 Zeabur 移除後就沒有人刪除它們的物件。除錯容器會留到原本的 Pod 被替換為止；只為了移除它而重新啟動應用程式，會中斷那個副本，可以等下次部署時一起處理。
+
+節點終端機裡做過的主機修改不會因刪除終端機 Pod 自動還原。
+
+### S3 目的地
+
+`zeabur-s3-destinations` 會保留登錄的目的地與金鑰。要繼續管理備份可留下它；確定不再需要清單與原始認證資訊後，先查看物件，再刪除此專用 Namespace：
+
+```sh
+kubectl get configmaps,secrets --namespace zeabur-s3-destinations
+kubectl delete namespace zeabur-s3-destinations
+```
+
+這只刪登錄清單與其中的 Secret，不刪遠端 bucket、備份，也不刪已複製到其他 Namespace 的 Secret。要撤銷金鑰，另到儲存服務停用它，並先更新仍使用它的備份。
+
+## 同時移除 Zeabur Identity
+
+若仍有其他 client、使用者 kubeconfig 或自動化使用 Zeabur Identity，先保留它。把這些登入來源搬到替代認證系統、確認不靠 Identity 也能管理叢集後，單 server 的 installer 安裝可執行：
+
+```sh
+sudo zeabur-installer uninstall identity
+```
+
+<Callout type="warn">
+此指令同時移除 Zeabur 與整個 `zeabur-identity` Namespace，刪除其中的使用者、通行密鑰資料與 client，並讓執行指令的 server 停止信任 Identity 權杖。先確認替代管理登入能用。Identity 的 CRD 會留下。
+</Callout>
+
+多 server 叢集的 API 驗證檔案分別放在每台主機。此指令只修改執行它的主機，不會同步撤除其他 server 的信任，也不會清掉供新 server 複製的 `kube-system/zeabur-identity-authn` ConfigMap；要先在全部控制平面與節點加入設定中完成認證切換，再移除 Identity。
+
+自行安裝 Identity 的叢集依原安裝來源處理；卸載 Zeabur chart 不會替你移除 Identity 的 OAuth client 或 Kubernetes API 的 issuer 設定。
+
+## 停用整個測試叢集時
+
+要保留服務就停在前面的流程。確定整個 RKE2 叢集都不用，且重要資料已備份、還原所需認證資訊另有保存時，才在主機執行：
+
+```sh
+sudo /usr/local/bin/rke2-uninstall.sh
+sudo zeabur-installer uninstall
+sudo zeabur-installer uninstall --purge
+```
+
+RKE2 腳本移除 Kubernetes 與其資料，所有依賴它的工作負載會停止。下一個 `uninstall` 列出 installer 殘留檔案；`--purge` 清除下載快取、本機 CA 副本、設定，以及 installer 寫給 Longhorn 的 module／multipath 設定檔。Longhorn 主機套件會保留。
+
+`/var/lib/zeabur/storage` 的 local-path 資料與 `/var/lib/longhorn` 的 replica 資料都不由 `--purge` 刪除。保留原始資料目錄還需要對應的 PV／PVC 與儲存系統資訊才能重新接回服務；確認已有可還原的備份後，再決定這些目錄如何處理。
+
+加入既有叢集的節點要先 drain 與移除 Node；在該節點執行 `zeabur-installer uninstall` 會印出對應指令。不要在服務仍需使用該節點的 local-path 資料時直接退出節點。
+
+## 移除沒有完成時
+
+- Zeabur 又出現：檢查 Flux、Argo CD、RKE2 HelmChart 或自動化是否仍有安裝來源；先移除來源，再由原管理工具卸載。
+- Namespace 卡在 `Terminating`：查看 Namespace 狀態與殘留物件的 finalizers，先恢復對應控制器或完成其清理，不要直接移除儲存或資料庫 finalizer。
+- 服務網址在移除後失效：比對 Ingress／HTTPRoute、ingress controller、Gateway、憑證與後端 Pod，確認沒有把共同依賴一起刪除。
+- 成員無法操作但服務正常：檢查是否仍參照已移除的 chart ClusterRole，依替代 RBAC 重新授權。
+
+需要重新安裝管理介面時，使用[單機 installer 流程](../get-started/quickstart.mdx)或[既有叢集流程](../get-started/install.mdx)，不要刪除既有專案再建立。
