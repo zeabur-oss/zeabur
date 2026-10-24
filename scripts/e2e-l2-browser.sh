@@ -23,7 +23,7 @@ first=zeabur-e2e           # web/e2e/manifests/talker.yaml
 second=zeabur-e2e-second   # web/e2e/manifests/second-project.yaml
 users=(admin e2e-admin e2e-developer e2e-viewer e2e-member e2e-db-admin e2e-db-developer e2e-db-viewer
   e2e-git-admin e2e-git-developer e2e-git-private-admin e2e-git-private-developer
-  e2e-image-admin e2e-image-developer)
+  e2e-image-admin e2e-image-developer e2e-usage-admin e2e-usage-viewer)
 
 for file in "$out/kubeconfig" "$tls/ca.crt" "$tls/tls.crt" "$zeabur_identityctl"; do
   [[ -e "$file" ]] || { echo "error: $file is missing; run scripts/e2e-l2.sh first" >&2; exit 1; }
@@ -44,6 +44,8 @@ member_link=$("$zeabur_identityctl" invite --username e2e-member)
 db_admin_link=$("$zeabur_identityctl" invite --username e2e-db-admin --group admins \
   --elevated-group admins)
 image_admin_link=$("$zeabur_identityctl" invite --username e2e-image-admin --group admins \
+  --elevated-group admins)
+usage_admin_link=$("$zeabur_identityctl" invite --username e2e-usage-admin --group admins \
   --elevated-group admins)
 # Deploy from Git, when Zeabur Builder runs here (e2e/l2/git.spec.ts skips otherwise), and from a
 # private repository when E2E_PRIVATE_GIT_REPO names one (e2e/l2/git-private.spec.ts).
@@ -88,7 +90,7 @@ NODE_EXTRA_CA_CERTS="$tls/ca.crt" \
   ZEABUR_L2_URL="https://$zeabur_host" ZEABUR_L2_SPKI="$spki" \
   ZEABUR_L2_SETUP_LINK="$setup_link" ZEABUR_L2_ADMIN_LINK="$admin_link" \
   ZEABUR_L2_MEMBER_LINK="$member_link" ZEABUR_L2_DB_ADMIN_LINK="$db_admin_link" \
-  ZEABUR_L2_IMAGE_ADMIN_LINK="$image_admin_link" \
+  ZEABUR_L2_IMAGE_ADMIN_LINK="$image_admin_link" ZEABUR_L2_USAGE_ADMIN_LINK="$usage_admin_link" \
   ZEABUR_L2_GIT_ADMIN_LINK="$git_admin_link" ZEABUR_L2_GIT_PRIVATE_ADMIN_LINK="$git_private_admin_link" \
   ZEABUR_L2_S3_ENDPOINT="$s3_endpoint" ZEABUR_L2_MONGODB="$mongodb" \
   ZEABUR_L2_DB_KEEP="${ZEABUR_L2_DB_KEEP:-}" \
