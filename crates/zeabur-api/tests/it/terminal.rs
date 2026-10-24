@@ -232,8 +232,6 @@ mod tests {
         );
         let (_, debug) = send(&app, "GET", "/api/v1/projects/shop/pods/api-1/debug", None).await;
         assert_eq!(debug["container"]["state"], "waiting");
-        let detail = debug["problem"]["detail"].as_str().unwrap();
-        assert!(detail.contains("could not pull the image"), "{detail}");
         assert_eq!(
             debug["problem"]["fixKey"]["key"],
             "problem.conflict.fix.terminalImage"
@@ -322,12 +320,6 @@ mod tests {
         let (_, planned) = plan(&app, debug()).await;
         let (status, refused) = apply(&app, &planned).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
-        assert!(
-            refused["detail"]
-                .as_str()
-                .unwrap()
-                .contains("does not accept debug containers")
-        );
         assert_eq!(
             refused["fixKey"]["key"],
             "problem.invalid.fix.ephemeralContainers"

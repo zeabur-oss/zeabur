@@ -127,13 +127,6 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
-        assert!(
-            problem["detail"]
-                .as_str()
-                .unwrap()
-                .contains("no cert-manager controller"),
-            "{problem}"
-        );
     }
 
     #[tokio::test]

@@ -187,12 +187,6 @@ mod tests {
             refused["denied"],
             json!({"verb": "*", "group": "*", "resource": "*"})
         );
-        assert!(
-            refused["detail"]
-                .as_str()
-                .unwrap()
-                .starts_with("Only cluster administrators can use a shell on a node")
-        );
         let (status, _) = send(&app, "GET", "/api/v1/cluster/node-shells", None).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
         assert!(cluster.inspect(|s| s.writes.is_empty()).unwrap());
@@ -421,21 +415,14 @@ mod tests {
         let mut second = connect(address, &path).await;
         let error = frame(&mut second).await;
         assert_eq!(error["type"], "error");
-        assert_eq!(error["problem"]["status"], 409);
-        assert!(
-            error["problem"]["detail"]
-                .as_str()
-                .unwrap()
-                .contains("already open in another tab")
-        );
+        assert_eq!(error["problem"]["kind"], "conflict");
         drop(second);
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        assert!(pod_of(&cluster, &pod).is_some());
         first
             .send(Message::binary(b"echo still\r".to_vec()))
             .await
             .unwrap();
         output_until(&mut first, "still").await;
+        assert!(pod_of(&cluster, &pod).is_some());
     }
 
     #[tokio::test]

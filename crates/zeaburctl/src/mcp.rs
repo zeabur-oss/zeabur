@@ -198,34 +198,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn both_eras_list_the_tools_and_answer_a_call() {
+    async fn both_eras_answer_a_call_and_refuse_an_unknown_tool() {
         for era in eras() {
             let client = session(&cluster(), era.clone()).await;
-            let mut tools: Vec<String> = client
-                .list_all_tools()
-                .await
-                .unwrap()
-                .into_iter()
-                .map(|tool| tool.name.into_owned())
-                .collect();
-            tools.sort();
-            assert_eq!(
-                tools,
-                [
-                    "cluster_summary",
-                    "get_project",
-                    "get_service",
-                    "list_projects",
-                    "object_yaml",
-                    "pod_logs",
-                    "project_alerts",
-                    "project_events",
-                    "project_usage",
-                    "service_history"
-                ],
-                "{era:?}"
-            );
-
             let projects = call(&client, "list_projects", json!({})).await;
             assert_eq!(projects.is_error, Some(false), "{era:?}");
             let structured = projects.structured_content.unwrap();

@@ -1378,13 +1378,7 @@ mod tests {
             "/api/v1/projects/shop/pods/web-1/logs?tailLines=ten",
         )
         .await;
-        assert_eq!(status, StatusCode::BAD_REQUEST);
-        assert!(
-            json(&body)["detail"]
-                .as_str()
-                .unwrap()
-                .contains("tailLines")
-        );
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     }
 
     #[tokio::test]

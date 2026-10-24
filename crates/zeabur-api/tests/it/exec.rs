@@ -360,18 +360,18 @@ mod tests {
 
     #[tokio::test]
     async fn a_missing_pod_or_container_or_one_that_is_not_running_is_a_problem() {
-        for (query, status, detail) in [
-            ("?container=db", 404, "Pod web-1 has no container db."),
+        for (query, status, fix) in [
+            ("?container=db", 404, Value::Null),
             (
                 "?container=worker",
                 409,
-                "Container worker in pod web-1 is not running (CrashLoopBackOff).",
+                json!("problem.conflict.fix.waitForContainer"),
             ),
         ] {
             let mut socket = connect(app(&cluster()), query).await;
             let error = frame(&mut socket).await;
             assert_eq!(error["problem"]["status"], status, "{query}");
-            assert_eq!(error["problem"]["detail"], detail, "{query}");
+            assert_eq!(error["problem"]["fixKey"]["key"], fix, "{query}");
         }
         let empty = MemoryCluster::new(State::default());
         let mut socket = connect(app(&empty), "").await;

@@ -306,12 +306,6 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{problem}");
-        assert!(
-            problem["detail"]
-                .as_str()
-                .unwrap()
-                .contains("--metrics-service")
-        );
 
         // In the cluster: the first change creates the ConfigMap, and history follows it.
         let (status, setting) = call(

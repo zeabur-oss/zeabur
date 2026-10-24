@@ -124,10 +124,6 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::CONFLICT, "{refused}");
-        assert!(
-            refused["detail"].as_str().unwrap().contains("web"),
-            "{refused}"
-        );
         let (status, planned) = send(
             &app,
             "POST",

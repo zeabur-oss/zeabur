@@ -358,7 +358,14 @@ pub(crate) mod tests {
                 Step::Create(grant("shop", ProjectRole::Developer)),
             ]
         );
-        assert_eq!(steps("ada", &current, &[]).len(), 3);
+        assert_eq!(
+            steps("ada", &current, &[]),
+            [
+                Step::Delete(binding("ada", "shop", Some(ProjectRole::Viewer))),
+                Step::Delete(binding("ada", "blog", Some(ProjectRole::Developer))),
+                Step::Delete(binding("ada", "old", Some(ProjectRole::Viewer))),
+            ]
+        );
         assert_eq!(steps("cy", &current, &[]), []);
     }
 

@@ -494,8 +494,7 @@ mod tests {
             ]
         );
         assert_eq!(made.last().unwrap(), "delete User/bob");
-        assert_eq!(made.len(), 8);
-        assert_eq!(planned(&plan).len(), 8);
+        assert_eq!(planned(&plan), made);
         assert_eq!(plan["writes"][0]["namespace"], "blog");
         assert_eq!(plan["writes"][2].get("namespace"), None);
         let credential = plan["writes"]

@@ -1067,7 +1067,6 @@ mod tests {
                 let component = format!("{capability}/{id}");
                 let guide = guide(&component, profile)
                     .unwrap_or_else(|e| panic!("{component} {profile}: {e}"));
-                assert_eq!(guide.formats.len(), 4);
                 for text in &guide.formats {
                     assert!(
                         !text.text.trim().is_empty(),

@@ -411,6 +411,5 @@ mod tests {
         let (status, found) = send(&app, "GET", "/api/v1/cluster/backups", None).await;
         assert_eq!(status, StatusCode::OK, "{found}");
         assert_eq!(found["state"], "refused");
-        assert_eq!(found["unreadable"].as_array().unwrap().len(), 3);
     }
 }

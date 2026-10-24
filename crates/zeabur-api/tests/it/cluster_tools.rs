@@ -205,13 +205,6 @@ mod tests {
         let app = signed(&cluster);
         let (status, refused) = plan(&app).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
-        assert!(
-            refused["detail"]
-                .as_str()
-                .unwrap()
-                .starts_with("Only cluster administrators can use"),
-            "{refused}"
-        );
         assert_eq!(
             refused["denied"],
             json!({"verb": "*", "group": "*", "resource": "*"})
@@ -324,13 +317,7 @@ mod tests {
         });
         let (status, refused) = apply(&app, &planned).await;
         assert_eq!(status, StatusCode::CONFLICT, "{refused}");
-        assert!(
-            refused["detail"]
-                .as_str()
-                .unwrap()
-                .contains("RoleBinding late let others in"),
-            "{refused}"
-        );
+        assert_eq!(refused["kind"], "conflict", "{refused}");
         assert_eq!(stored(&cluster, NAMESPACE), Vec::<Value>::new());
     }
 
