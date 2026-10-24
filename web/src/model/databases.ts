@@ -23,6 +23,7 @@
 // https://www.dragonflydb.io/docs/managing-dragonfly/backups
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
+import type { Translate } from "@/i18n"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
 import type { Event, Health } from "@/model/service"
 
@@ -728,6 +729,46 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
       }
       return [keys, edit()]
     }
+  }
+}
+
+/** Engines whose database restarts once its backups are turned on: a sidecar or new arguments. */
+const restartsForBackups = (engine: Engine) =>
+  engine === "postgresql" || engine === "mongodb" || engine === "dragonfly"
+
+/** What `enableBackups` does, in the form's words. */
+export function backupsSummary(t: Translate, database: Database, target: BackupTarget) {
+  const names = backupNames(database.name)
+  const namespace = database.origin.namespace ?? ""
+  const path = fixedFolder(database.engine)
+    ? `moco/${namespace}/${database.name}`
+    : folder(target, database.name)
+  const where = `s3://${target.bucket.trim()}/${path} (${target.endpoint.trim()})`
+  return {
+    lines: [
+      t("db.backup.said", database.name, target.frequency === "weekly", where),
+      keepsEverything(database.engine)
+        ? t("db.backup.keepsEverything")
+        : t("db.backup.saidKeep", target.keepDays),
+      target.destination === undefined
+        ? t("db.backup.saidKeys", names.secret)
+        : t("confirm.copyS3Keys", names.secret, target.destination),
+      ...(restartsForBackups(database.engine) ? [t("db.backup.saidRestart", database.name)] : []),
+    ],
+    action: t("db.backup.setUp"),
+  }
+}
+
+/** What `backUpNow` does, in the form's words. */
+export function backUpNowSummary(t: Translate, database: Database) {
+  const destination = database.backups.store?.destination
+  return {
+    lines: [
+      destination
+        ? t("db.backup.saidNow", database.name, destination)
+        : t("db.backup.planNow", database.name),
+    ],
+    action: t("db.backup.now"),
   }
 }
 

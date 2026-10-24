@@ -2564,6 +2564,12 @@ export const zhCN: Messages = {
   "db.backup.problem.keys": "两个密钥都需要填写。",
   "db.backup.problem.keep": "1 到 365 天。",
   "db.backup.plan": (name) => `备份 ${name}`,
+  "db.backup.said": (name, weekly, where) =>
+    `每${weekly ? "周日" : "天"} 03:00 UTC 把 ${name} 备份到 ${where}。`,
+  "db.backup.saidKeep": (days) => `每份备份保留 ${days} 天。`,
+  "db.backup.saidKeys": (secret) => `访问密钥会保存为 Secret ${secret}。`,
+  "db.backup.saidRestart": (name) => `${name} 会重启，开始备份。`,
+  "db.backup.saidNow": (name, where) => `立即把 ${name} 备份到 ${where}。`,
   "db.backup.now": "立即备份",
   "db.backup.starting": "数据库带着备份设置重启后就能用",
   "db.backup.planNow": (name) => `立即备份 ${name}`,

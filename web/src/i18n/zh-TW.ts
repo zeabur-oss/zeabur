@@ -2570,6 +2570,12 @@ export const zhTW: Messages = {
   "db.backup.problem.keys": "兩個金鑰都需要填寫。",
   "db.backup.problem.keep": "1 到 365 天。",
   "db.backup.plan": (name) => `備份 ${name}`,
+  "db.backup.said": (name, weekly, where) =>
+    `每${weekly ? "週日" : "天"} 03:00 UTC 把 ${name} 備份到 ${where}。`,
+  "db.backup.saidKeep": (days) => `每份備份保留 ${days} 天。`,
+  "db.backup.saidKeys": (secret) => `存取金鑰會存成 Secret ${secret}。`,
+  "db.backup.saidRestart": (name) => `${name} 會重新啟動，開始備份。`,
+  "db.backup.saidNow": (name, where) => `立即把 ${name} 備份到 ${where}。`,
   "db.backup.now": "立即備份",
   "db.backup.starting": "資料庫帶著備份設定重新啟動後就能用",
   "db.backup.planNow": (name) => `立即備份 ${name}`,

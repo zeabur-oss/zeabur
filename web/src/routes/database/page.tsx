@@ -48,6 +48,8 @@ import {
   canBackUpNow,
   connectionUri,
   deleteDatabase,
+  backupsSummary,
+  backUpNowSummary,
   enableBackups,
   engineName,
   eventsOf,
@@ -319,6 +321,7 @@ function BackUpNow({ project, database }: { project: string; database: Database 
     planner.plan({
       title: t("db.backup.planNow", database.name),
       changes: backUpNow(database, new Date()),
+      summary: backUpNowSummary(t, database),
     })
   return (
     <>
@@ -725,6 +728,7 @@ function SetUp({ project, database }: { project: string; database: Database }) {
     planner.plan({
       title: t("db.backup.plan", database.name),
       changes: enableBackups(database, target),
+      summary: backupsSummary(t, database, target),
       notes: startsEmpty ? [t("db.backup.startsEmpty")] : undefined,
     })
   }

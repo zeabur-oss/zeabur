@@ -72,6 +72,10 @@ interface PlanProps {
   hooks?: PlanHooks
 }
 
+/** A form's summary already says what its edits do; they are not hand-written YAML. */
+const weighAsk = (ask: PlanAsk, podsOf: PodsOf) =>
+  weigh(ask.summary ? ask.changes.filter((c) => c.op !== "edit") : ask.changes, podsOf)
+
 /** The plan of an ask: what it says, and its buttons. */
 function usePlan(
   { project, ask, reviewed, onClose, onConfirmed, onApplied, reopen, onRefused, hooks }: PlanProps,
@@ -103,7 +107,7 @@ function usePlan(
     (serviceOf(workload)?.containers ?? []).flatMap((c) =>
       c.mounts.filter((m) => m.category === "persistent").map((m) => m.mountPath),
     )
-  const weight = weigh(ask.changes, podsOf)
+  const weight = weighAsk(ask, podsOf)
   const left = useSecondsLeft(plan.data?.expiresAt)
   const expired = left !== undefined && left <= 0
   const description = plan.data

@@ -393,6 +393,9 @@ export interface Description {
 export interface Asked {
   changes: readonly Change[]
   service?: WorkloadRef
+  /** A form's own words for what it asks when its changes are only the means: the review's
+   * lines, in place of the changes' own, and its button. */
+  summary?: { lines: string[]; action: string }
 }
 
 export function describe(
@@ -416,19 +419,11 @@ export function describe(
     many && isBulk(ask.changes) ? outcomeGroups(t, ask.changes, plan, podsOf, mountsOf) : undefined
   const fields = many && !outcomes ? editGroups(t, plan) : []
   const edits = fields.length > 0 ? fields : undefined
-  const lines: string[] = []
-  const said: WorkloadRef[] = []
+  const lines = sentencesOf(t, ask, plan, podsOf, !!outcomes, !!edits)
+  const said = ask.changes.flatMap((c) => (c.op === "restart" ? [c.workload] : []))
   const consequences = reasons
     .map((r) => consequence(t, r, ask.service))
     .filter((s): s is string => !!s)
-  for (const change of ask.changes) {
-    if (change.op === "restart") said.push(change.workload)
-    // Grouped, the rows say what variables, compute and health checks change.
-    if (outcomes) continue
-    const part = partOf(change)
-    if (edits && (part === "variables" || part === "compute" || part === "health-checks")) continue
-    lines.push(sentenceOf(t, change, podsOf, plan))
-  }
   if (edits && ask.service) said.push(ask.service)
   lines.push(...terminalLines(t, plan))
   if (ask.changes.some((c) => c.op === "rollback") && hasWarning(plan, "configNotRolledBack"))
@@ -504,6 +499,25 @@ export function describe(
     outcomes,
     removalsSaid: ask.changes.every((c) => c.op === "configReload") || undefined,
   }
+}
+
+const grouped = new Set<string | undefined>(["variables", "compute", "health-checks"])
+
+/** A sentence for each change, less what the form's summary or the groups say instead. */
+function sentencesOf(
+  t: Translate,
+  ask: Asked,
+  plan: Plan,
+  podsOf: PodsOf,
+  outcomes: boolean,
+  edits: boolean,
+): string[] {
+  if (ask.summary) return [...ask.summary.lines]
+  if (outcomes) return []
+  // Grouped, the rows say what variables, compute and health checks change.
+  return ask.changes
+    .filter((change) => !(edits && grouped.has(partOf(change))))
+    .map((change) => sentenceOf(t, change, podsOf, plan))
 }
 
 /** Whether the changes create objects a person wrote as YAML. */
@@ -728,13 +742,12 @@ const secretName = (object: unknown): string => {
 
 /** The confirm button, the same whether a form, YAML or a drawer asked (`docs/wording.md`). */
 export function actionOf(t: Translate, ask: Asked): string {
-  const ops = new Set(ask.changes.map(opOf))
   const [change] = ask.changes
   if (!change) return t("plan.apply")
+  if (ask.summary) return ask.summary.action
+  const many = manyAction(t, ask.changes)
+  if (many) return many
   const count = ask.changes.length
-  if (count > 1 && ops.size === 1 && ops.has("create")) return t("create.buttonMany", count)
-  if (count > 1 && [...ops].every((op) => storageOps.has(op))) return t("action.saveVolumes")
-  if (ops.size > 1) return t("action.applyMany", editCount(ask.changes))
   switch (change.op) {
     case "restart":
       return count > 1 ? t("action.restartMany", count) : t("action.restart")
@@ -803,6 +816,16 @@ export function actionOf(t: Translate, ask: Asked): string {
     default:
       return accessAction(t, change)
   }
+}
+
+/** The button for changes of more than one kind, or for only creates or only storage. */
+function manyAction(t: Translate, changes: readonly Change[]): string | undefined {
+  const ops = new Set(changes.map(opOf))
+  const count = changes.length
+  if (count > 1 && ops.size === 1 && ops.has("create")) return t("create.buttonMany", count)
+  if (count > 1 && [...ops].every((op) => storageOps.has(op))) return t("action.saveVolumes")
+  if (ops.size > 1) return t("action.applyMany", editCount(changes))
+  return undefined
 }
 
 function accessAction(t: Translate, change: AccessChange | ServiceChange): string {
