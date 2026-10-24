@@ -417,6 +417,47 @@ export const zhCN: Messages = {
   "cluster.whatUsage": "节点用量",
   "cluster.whatWarnings": "集群的警告",
   "cluster.whatComponents": "已安装的组件",
+  "clusterUsage.title": "资源用量",
+  "clusterUsage.sort": "排序依据",
+  "clusterUsage.mostMemory": (name, amount, share) =>
+    share
+      ? `${name} 用的内存最多：${amount}，占集群的 ${share}。`
+      : `${name} 用的内存最多：${amount}。`,
+  "clusterUsage.mostCpu": (name, amount, share) =>
+    share
+      ? `${name} 用的 CPU 最多：${amount}，占集群的 ${share}。`
+      : `${name} 用的 CPU 最多：${amount}。`,
+  "clusterUsage.reservesMostMemory": (name, amount, share) =>
+    share
+      ? `${name} 预留的内存最多：${amount}，占集群的 ${share}。`
+      : `${name} 预留的内存最多：${amount}。`,
+  "clusterUsage.reservesMostCpu": (name, amount, share) =>
+    share
+      ? `${name} 预留的 CPU 最多：${amount}，占集群的 ${share}。`
+      : `${name} 预留的 CPU 最多：${amount}。`,
+  "clusterUsage.nothingRunning": "目前没有运行中的 Pod。",
+  "clusterUsage.projectsTotal": (amount) => `项目 ${amount}`,
+  "clusterUsage.othersTotal": (amount) => `其他 Namespace ${amount}`,
+  "clusterUsage.systemTotal": (amount) => `Kubernetes 系统 ${amount}`,
+  "clusterUsage.projects": "项目",
+  "clusterUsage.others": "其他 Namespace",
+  "clusterUsage.namespaces": "Namespace",
+  "clusterUsage.system": "Kubernetes 系统",
+  "clusterUsage.pods": (n) => `${n} 个 Pod`,
+  "clusterUsage.notMeasured": (n) => `${n} 个还没有数据`,
+  "clusterUsage.reserved": (amount) => `预留 ${amount}`,
+  "clusterUsage.ofCluster": (share) => `占集群的 ${share}`,
+  "clusterUsage.nearMaximum": "内存快到上限",
+  "clusterUsage.noServices": "这个项目没有可以显示用量的服务。",
+  "clusterUsage.servicesUnreadable": "Zeabur 读不到这个项目的服务。",
+  "clusterUsage.unknown.not-installed":
+    "无法得知实际用量：没有安装 metrics-server。下面列出 Pod 预留的量。",
+  "clusterUsage.unknown.unavailable":
+    "无法得知实际用量：metrics-server 没有响应。下面列出 Pod 预留的量。",
+  "clusterUsage.unknown.unreadable": "下面列出 Pod 预留的量。",
+  "clusterUsage.whatUsage": "Pod 的用量",
+  "clusterUsage.whatPods": "每个 Namespace 的用量",
+  "clusterUsage.whatProjects": "哪些 Namespace 是项目",
   "join.add": "添加节点",
   "join.title": "添加节点",
   "join.body":

@@ -1214,6 +1214,29 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/usage:
+    get:
+      tags:
+      - cluster
+      summary: What each namespace's pods reserve, may use at most and use now.
+      description: |-
+        Requests and limits are summed from every unfinished pod, as for the nodes; a pod without a
+        limit adds nothing and is counted in `unlimited`. Usage comes from metrics-server and is
+        approximate. `403` when pods cannot be listed in all namespaces. Without metrics-server, or
+        without the right to read it, `metrics` says so and usage is absent. Without `list` on
+        namespaces, `adopted` is absent.
+      operationId: getClusterUsage
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterUsage"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/members:
     get:
       tags:
@@ -6348,6 +6371,54 @@ components:
           items:
             $ref: "#/components/schemas/ShellWrite"
           description: The writes, in order; none when it uses a running pod.
+    ClusterUsage:
+      type: object
+      description: What each namespace reserves and uses.
+      required:
+      - id
+      - items
+      - totals
+      - podScan
+      - podsScanned
+      - metrics
+      - unreadable
+      properties:
+        id:
+          type: string
+          description: "`cluster/usage`."
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NamespaceUsage"
+          description: Each namespace with a pod or a sample, by name.
+        metrics:
+          $ref: "#/components/schemas/MetricsState"
+          description: Whether usage could be read.
+        podScan:
+          $ref: "#/components/schemas/PodScan"
+          description: "`complete`, or `partial` when the read stopped at 5,000 pods."
+        podsScanned:
+          type: integer
+          description: How many unfinished pods were read.
+          minimum: 0
+        timestamp:
+          type:
+          - string
+          - "null"
+          description: When the newest sample was taken (RFC 3339).
+        totals:
+          $ref: "#/components/schemas/UsageTotals"
+          description: Every namespace together.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
+        window:
+          type:
+          - string
+          - "null"
+          description: The window CPU is averaged over, as metrics-server writes it (`15s`).
     Component:
       type: object
       description: "One component of the catalogue: an upstream project that provides a capability."
@@ -10685,6 +10756,60 @@ components:
       - kubeconfig
       - nodes
       - address
+    NamespaceUsage:
+      type: object
+      description: One namespace's pods together.
+      required:
+      - origin
+      - namespace
+      - system
+      - pods
+      - requests
+      - limits
+      - unlimited
+      properties:
+        adopted:
+          type:
+          - boolean
+          - "null"
+          description: |-
+            A project: the Namespace has the label `zeabur.com/project`. Absent when namespaces
+            cannot be listed.
+        displayName:
+          type:
+          - string
+          - "null"
+          description: A project's display name, when it has one.
+        limits:
+          $ref: "#/components/schemas/Resources"
+          description: What those pods may use at most; a pod without a limit adds nothing.
+        namespace:
+          type: string
+          description: The namespace.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: Its Namespace.
+        pods:
+          type: integer
+          format: int64
+          description: Its unfinished pods that were read.
+          minimum: 0
+        requests:
+          $ref: "#/components/schemas/Resources"
+          description: What those pods reserve.
+        system:
+          type: boolean
+          description: A namespace Kubernetes keeps for itself (`kube-` prefix).
+        unlimited:
+          $ref: "#/components/schemas/Unlimited"
+          description: Pods that set no limit.
+        usage:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: |-
+              What its pods use now, with `pods` the number measured; absent unless `metrics` is
+              `available`.
+          - type: "null"
     NetworkPolicyAccess:
       type: string
       description: How far a peer may reach.
@@ -16408,6 +16533,23 @@ components:
       - no-previous-run
       - not-started
       - removed
+    Unlimited:
+      type: object
+      description: How many pods set no limit, for each resource.
+      required:
+      - cpu
+      - memory
+      properties:
+        cpu:
+          type: integer
+          format: int64
+          description: Pods without a CPU limit.
+          minimum: 0
+        memory:
+          type: integer
+          format: int64
+          description: Pods without a memory limit.
+          minimum: 0
     UnreadableReason:
       type: string
       description: Why an image's configuration could not be read.
@@ -16534,6 +16676,24 @@ components:
           items:
             type: string
           description: Nodes system-upgrade-controller is upgrading now.
+    UsageTotals:
+      type: object
+      description: Every namespace together.
+      required:
+      - requests
+      - limits
+      properties:
+        limits:
+          $ref: "#/components/schemas/Resources"
+          description: Limits.
+        requests:
+          $ref: "#/components/schemas/Resources"
+          description: Reserved.
+        usage:
+          oneOf:
+          - $ref: "#/components/schemas/Resources"
+            description: In use; absent unless `metrics` is `available`.
+          - type: "null"
     ValueSource:
       type: object
       description: "The source of a value: its kind and, for references, the object and key it reads."

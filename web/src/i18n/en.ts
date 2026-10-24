@@ -444,6 +444,47 @@ export const en = {
   "cluster.whatUsage": "node usage",
   "cluster.whatWarnings": "the cluster's warnings",
   "cluster.whatComponents": "the installed components",
+  "clusterUsage.title": "Resource usage",
+  "clusterUsage.sort": "Sort by",
+  "clusterUsage.mostMemory": (name: string, amount: string, share?: string) =>
+    share
+      ? `${name} uses the most memory: ${amount}, ${share} of the cluster.`
+      : `${name} uses the most memory: ${amount}.`,
+  "clusterUsage.mostCpu": (name: string, amount: string, share?: string) =>
+    share
+      ? `${name} uses the most CPU: ${amount}, ${share} of the cluster.`
+      : `${name} uses the most CPU: ${amount}.`,
+  "clusterUsage.reservesMostMemory": (name: string, amount: string, share?: string) =>
+    share
+      ? `${name} reserves the most memory: ${amount}, ${share} of the cluster.`
+      : `${name} reserves the most memory: ${amount}.`,
+  "clusterUsage.reservesMostCpu": (name: string, amount: string, share?: string) =>
+    share
+      ? `${name} reserves the most CPU: ${amount}, ${share} of the cluster.`
+      : `${name} reserves the most CPU: ${amount}.`,
+  "clusterUsage.nothingRunning": "No pods are running.",
+  "clusterUsage.projectsTotal": (amount: string) => `Projects ${amount}`,
+  "clusterUsage.othersTotal": (amount: string) => `Other namespaces ${amount}`,
+  "clusterUsage.systemTotal": (amount: string) => `Kubernetes system ${amount}`,
+  "clusterUsage.projects": "Projects",
+  "clusterUsage.others": "Other namespaces",
+  "clusterUsage.namespaces": "Namespaces",
+  "clusterUsage.system": "Kubernetes system",
+  "clusterUsage.pods": (n: number) => plural(n, "pod", "pods"),
+  "clusterUsage.notMeasured": (n: number) => `${n} not measured yet`,
+  "clusterUsage.reserved": (amount: string) => `${amount} reserved`,
+  "clusterUsage.ofCluster": (share: string) => `${share} of the cluster`,
+  "clusterUsage.nearMaximum": "Memory near its maximum",
+  "clusterUsage.noServices": "No service in this project has usage to show.",
+  "clusterUsage.servicesUnreadable": "Zeabur could not read this project's services.",
+  "clusterUsage.unknown.not-installed":
+    "Use is unknown: metrics-server is not installed. The rows show what pods reserve.",
+  "clusterUsage.unknown.unavailable":
+    "Use is unknown: metrics-server did not respond. The rows show what pods reserve.",
+  "clusterUsage.unknown.unreadable": "The rows show what pods reserve.",
+  "clusterUsage.whatUsage": "what pods use",
+  "clusterUsage.whatPods": "what each namespace uses",
+  "clusterUsage.whatProjects": "which namespaces are projects",
   "join.add": "Add node",
   "join.title": "Add node",
   "join.body":

@@ -11,6 +11,7 @@
 //! | `GET /api/v1/cluster` | the cluster: its Kubernetes version and distribution |
 //! | `GET /api/v1/cluster/upgrades` | end of life, version skew and newer versions from Plans |
 //! | `GET /api/v1/cluster/nodes` | nodes, with requests against allocatable |
+//! | `GET /api/v1/cluster/usage` | what each namespace's pods reserve, may use at most and use now |
 //! | `GET /api/v1/cluster/events` | events of every namespace, newest first, `limit` of them |
 //! | `GET /api/v1/cluster/gaps` | what the cluster itself is missing, with fixes |
 //! | `GET /api/v1/cluster/incidents` | components down and nodes not ready, with the domains and projects they reach |
@@ -248,6 +249,7 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::maintenance::apply))
         .routes(routes!(cluster::maintenance::evict))
         .routes(routes!(cluster::nodes))
+        .routes(routes!(cluster::usage::get))
         .routes(routes!(cluster::health))
         .routes(routes!(cluster::upgrades))
         .routes(routes!(cluster::events))

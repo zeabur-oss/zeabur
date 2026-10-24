@@ -837,6 +837,30 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/usage": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What each namespace's pods reserve, may use at most and use now.
+     * @description Requests and limits are summed from every unfinished pod, as for the nodes; a pod without a
+     *     limit adds nothing and is counted in `unlimited`. Usage comes from metrics-server and is
+     *     approximate. `403` when pods cannot be listed in all namespaces. Without metrics-server, or
+     *     without the right to read it, `metrics` says so and usage is absent. Without `list` on
+     *     namespaces, `adopted` is absent.
+     */
+    get: operations["getClusterUsage"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/members": {
     parameters: {
       query?: never
@@ -3319,6 +3343,27 @@ export interface components {
       /** @description The writes, in order; none when it uses a running pod. */
       writes: components["schemas"]["ShellWrite"][]
     }
+    /** @description What each namespace reserves and uses. */
+    ClusterUsage: {
+      /** @description `cluster/usage`. */
+      id: string
+      /** @description Each namespace with a pod or a sample, by name. */
+      items: components["schemas"]["NamespaceUsage"][]
+      /** @description Whether usage could be read. */
+      metrics: components["schemas"]["MetricsState"]
+      /** @description `complete`, or `partial` when the read stopped at 5,000 pods. */
+      podScan: components["schemas"]["PodScan"]
+      /** @description How many unfinished pods were read. */
+      podsScanned: number
+      /** @description When the newest sample was taken (RFC 3339). */
+      timestamp?: string | null
+      /** @description Every namespace together. */
+      totals: components["schemas"]["UsageTotals"]
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+      /** @description The window CPU is averaged over, as metrics-server writes it (`15s`). */
+      window?: string | null
+    }
     /** @description One component of the catalogue: an upstream project that provides a capability. */
     Component: {
       /** @description The capability it provides (`ingress`). */
@@ -5595,6 +5640,34 @@ export interface components {
      * @enum {string}
      */
     NameSource: "setting" | "install" | "kubeconfig" | "nodes" | "address"
+    /** @description One namespace's pods together. */
+    NamespaceUsage: {
+      /**
+       * @description A project: the Namespace has the label `zeabur.com/project`. Absent when namespaces
+       *     cannot be listed.
+       */
+      adopted?: boolean | null
+      /** @description A project's display name, when it has one. */
+      displayName?: string | null
+      /** @description What those pods may use at most; a pod without a limit adds nothing. */
+      limits: components["schemas"]["Resources"]
+      /** @description The namespace. */
+      namespace: string
+      /** @description Its Namespace. */
+      origin: components["schemas"]["Origin"]
+      /**
+       * Format: int64
+       * @description Its unfinished pods that were read.
+       */
+      pods: number
+      /** @description What those pods reserve. */
+      requests: components["schemas"]["Resources"]
+      /** @description A namespace Kubernetes keeps for itself (`kube-` prefix). */
+      system: boolean
+      /** @description Pods that set no limit. */
+      unlimited: components["schemas"]["Unlimited"]
+      usage?: components["schemas"]["Resources"] | null
+    }
     /**
      * @description How far a peer may reach.
      * @enum {string}
@@ -8499,6 +8572,19 @@ export interface components {
      * @enum {string}
      */
     UnavailableLog: "no-previous-run" | "not-started" | "removed"
+    /** @description How many pods set no limit, for each resource. */
+    Unlimited: {
+      /**
+       * Format: int64
+       * @description Pods without a CPU limit.
+       */
+      cpu: number
+      /**
+       * Format: int64
+       * @description Pods without a memory limit.
+       */
+      memory: number
+    }
     /**
      * @description Why an image's configuration could not be read.
      * @enum {string}
@@ -8570,6 +8656,14 @@ export interface components {
       unreadable: components["schemas"]["UnreadableView"][]
       /** @description Nodes system-upgrade-controller is upgrading now. */
       upgrading: string[]
+    }
+    /** @description Every namespace together. */
+    UsageTotals: {
+      /** @description Limits. */
+      limits: components["schemas"]["Resources"]
+      /** @description Reserved. */
+      requests: components["schemas"]["Resources"]
+      usage?: components["schemas"]["Resources"] | null
     }
     /** @description The source of a value: its kind and, for references, the object and key it reads. */
     ValueSource: {
@@ -10536,6 +10630,33 @@ export interface operations {
         }
       }
       401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getClusterUsage: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ClusterUsage"]
+        }
+      }
+      403: {
         headers: {
           [name: string]: unknown
         }

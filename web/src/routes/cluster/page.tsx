@@ -23,6 +23,7 @@ import { DomainsSection } from "@/routes/cluster/domains"
 import { HealthSection } from "@/routes/cluster/health"
 import { IssuersSection } from "@/routes/cluster/issuers"
 import { NodesSection } from "@/routes/cluster/nodes"
+import { UsageSection } from "@/routes/cluster/usage"
 import { Section } from "@/routes/cluster/section"
 
 export function ClusterPage() {
@@ -32,6 +33,7 @@ export function ClusterPage() {
       <ClusterGaps />
       <HealthSection />
       <NodesSection />
+      <UsageSection />
       <WarningsSection />
       <DomainsSection />
       <IssuersSection />

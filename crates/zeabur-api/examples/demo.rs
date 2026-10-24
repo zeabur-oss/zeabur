@@ -2040,8 +2040,8 @@ fn state() -> State {
                      "message": "The certificate request has failed to complete and will be retried: Failed to wait for order resource \"dashboard-tls-1-2718281\" to become ready: order is in \"errored\" state: Failed to create Order: 429 urn:ietf:params:acme:error:rateLimited: too many certificates already issued for this exact set of identifiers in the last 168h0m0s"}]),
             ),
             usage("vps-1", "1420m", "1730Mi"),
-            usage("vps-2", "310m", "2210Mi"),
-            usage("vps-3", "180m", "940Mi"),
+            usage("vps-2", "860m", "3900Mi"),
+            usage("vps-3", "1240m", "4600Mi"),
             from(json!({
                 "apiVersion": "apps/v1", "kind": "Deployment",
                 "metadata": {"name": "reloader", "namespace": "reloader",
@@ -2637,15 +2637,21 @@ fn usage(node: &str, cpu: &str, memory: &str) -> DynamicObject {
 
 const MIB: f64 = 1_048_576.0;
 
-/// What a pod of `app` uses, as shares of its template's CPU request and memory limit.
-fn shares(app: &str) -> (f64, f64) {
-    match app {
+/// What `pod` uses, as shares of its template's CPU request and memory limit. `analytics` runs
+/// many small workers, so the pods together stay below what the nodes' `NodeMetrics` say.
+fn shares(pod: &DemoPod) -> (f64, f64) {
+    let (cpu, memory) = match pod.app.as_str() {
         "web" => (0.35, 0.42),
         "api" => (1.6, 0.68),
         "worker" => (0.9, 0.93),
         "db" => (0.4, 0.61),
         "redis" => (0.08, 0.22),
         _ => (0.3, 0.4),
+    };
+    if pod.namespace == "analytics" && !pod.stateful {
+        (cpu / 4.0, memory / 4.0)
+    } else {
+        (cpu, memory)
     }
 }
 
@@ -2741,7 +2747,7 @@ fn pod_metrics(pods: &[DemoPod]) -> Vec<DynamicObject> {
         .filter(|pod| pod.ready)
         .map(|pod| {
             let (cpu_request, memory_limit) = room(pod.stateful);
-            let (cpu_share, memory_share) = shares(&pod.app);
+            let (cpu_share, memory_share) = shares(pod);
             let mut noise = Noise::new(&format!("live:{}", pod.name));
             let cpu = cpu_request * cpu_share * noise.next().mul_add(0.6, 0.7);
             let memory = memory_limit * memory_share * noise.next().mul_add(0.04, 0.95);
@@ -2879,7 +2885,7 @@ fn store(path: &str) -> Result<Value, zeabur_core::problem::KubernetesStatus> {
         .iter()
         .map(|run| {
             let (cpu_request, memory_limit) = room(run.pod.stateful);
-            let (cpu_share, memory_share) = shares(&run.pod.app);
+            let (cpu_share, memory_share) = shares(&run.pod);
             let mut noise = Noise::new(&format!("history:{}:{}", run.name, end - start));
             let phase = (Noise::new(&format!("phase:{}", run.name)).next() * period as f64) as i64;
             let mut walk: f64 = 1.0;
@@ -3666,6 +3672,12 @@ fn maintenance(s: &mut State) {
             ..NamespaceObjects::default()
         },
     );
+    s.dynamic.push(from(json!({
+        "apiVersion": "metrics.k8s.io/v1beta1", "kind": "PodMetrics",
+        "metadata": {"name": "zeabur-6c9f7d8b5-r2xkq", "namespace": "zeabur"},
+        "timestamp": minutes_ago(0), "window": "15.012s",
+        "containers": [{"name": "zeabur", "usage": {"cpu": "14m", "memory": "41Mi"}}]
+    })));
     if let Some(lab) = s.objects.get_mut("lab") {
         lab.pods.push(from(json!({
             "metadata": {"name": "debug-toolbox", "namespace": "lab",

@@ -182,6 +182,14 @@ export const templateQuery = (template: string) =>
     staleTime: Infinity,
   })
 
+export const clusterUsageQuery = queryOptions({
+  queryKey: ["cluster", "usage"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/usage", { signal })),
+  refetchInterval: CLUSTER_POLL,
+  refetchIntervalInBackground: false,
+  retryOnMount: false,
+})
+
 export const clusterHealthQuery = queryOptions({
   queryKey: ["cluster", "health"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/health", { signal })),

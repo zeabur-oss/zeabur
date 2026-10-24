@@ -417,6 +417,47 @@ export const zhTW: Messages = {
   "cluster.whatUsage": "節點用量",
   "cluster.whatWarnings": "叢集的警告",
   "cluster.whatComponents": "已安裝的元件",
+  "clusterUsage.title": "資源用量",
+  "clusterUsage.sort": "排序依據",
+  "clusterUsage.mostMemory": (name, amount, share) =>
+    share
+      ? `${name} 用的記憶體最多：${amount}，佔叢集的 ${share}。`
+      : `${name} 用的記憶體最多：${amount}。`,
+  "clusterUsage.mostCpu": (name, amount, share) =>
+    share
+      ? `${name} 用的 CPU 最多：${amount}，佔叢集的 ${share}。`
+      : `${name} 用的 CPU 最多：${amount}。`,
+  "clusterUsage.reservesMostMemory": (name, amount, share) =>
+    share
+      ? `${name} 保留的記憶體最多：${amount}，佔叢集的 ${share}。`
+      : `${name} 保留的記憶體最多：${amount}。`,
+  "clusterUsage.reservesMostCpu": (name, amount, share) =>
+    share
+      ? `${name} 保留的 CPU 最多：${amount}，佔叢集的 ${share}。`
+      : `${name} 保留的 CPU 最多：${amount}。`,
+  "clusterUsage.nothingRunning": "目前沒有執行中的 Pod。",
+  "clusterUsage.projectsTotal": (amount) => `專案 ${amount}`,
+  "clusterUsage.othersTotal": (amount) => `其他 Namespace ${amount}`,
+  "clusterUsage.systemTotal": (amount) => `Kubernetes 系統 ${amount}`,
+  "clusterUsage.projects": "專案",
+  "clusterUsage.others": "其他 Namespace",
+  "clusterUsage.namespaces": "Namespace",
+  "clusterUsage.system": "Kubernetes 系統",
+  "clusterUsage.pods": (n) => `${n} 個 Pod`,
+  "clusterUsage.notMeasured": (n) => `${n} 個還沒有資料`,
+  "clusterUsage.reserved": (amount) => `保留 ${amount}`,
+  "clusterUsage.ofCluster": (share) => `佔叢集的 ${share}`,
+  "clusterUsage.nearMaximum": "記憶體快到上限",
+  "clusterUsage.noServices": "這個專案沒有可以顯示用量的服務。",
+  "clusterUsage.servicesUnreadable": "Zeabur 讀不到這個專案的服務。",
+  "clusterUsage.unknown.not-installed":
+    "無法得知實際用量：沒有安裝 metrics-server。下面列出 Pod 保留的量。",
+  "clusterUsage.unknown.unavailable":
+    "無法得知實際用量：metrics-server 沒有回應。下面列出 Pod 保留的量。",
+  "clusterUsage.unknown.unreadable": "下面列出 Pod 保留的量。",
+  "clusterUsage.whatUsage": "Pod 的用量",
+  "clusterUsage.whatPods": "每個 Namespace 的用量",
+  "clusterUsage.whatProjects": "哪些 Namespace 是專案",
   "join.add": "新增節點",
   "join.title": "新增節點",
   "join.body":

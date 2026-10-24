@@ -11,6 +11,7 @@
 //! | `GET /cluster` | `/version` | nothing: every signed-in person (`system:public-info-viewer`) |
 //! | `GET /cluster/upgrades` | `/version`; nodes and Plans when allowed | nothing; nodes and Plans add skew and progress |
 //! | `GET /cluster/nodes` | nodes; pods, node metrics and the metrics store when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get` on the metrics store's `services/proxy` for disks |
+//! | `GET /cluster/usage` | pods, all namespaces; pod metrics and namespaces when allowed | `list pods` (all namespaces); `list pods.metrics.k8s.io` for usage; `list namespaces` to tell projects apart (see [`usage`]) |
 //! | `GET /cluster/health` | `/readyz?verbose`; the scheduler's and controller manager's leases when allowed | nothing: every signed-in person (`system:public-info-viewer`); `get leases.coordination.k8s.io` in `kube-system` adds the leases |
 //! | `GET /cluster/events` | `events.k8s.io` events, all namespaces (`scope=cluster` keeps those about the cluster) | `list events.events.k8s.io` |
 //! | `GET /cluster/alerts` | Falco's `ClusterPolicyReport`s (`zeabur_modules::falco`) | `list clusterpolicyreports.wgpolicyk8s.io`; refused or not installed is a state, not an error |
@@ -33,7 +34,7 @@
 //!     resources: [events]
 //!     verbs: [list]
 //!   - apiGroups: [metrics.k8s.io]
-//!     resources: [nodes]
+//!     resources: [nodes, pods]
 //!     verbs: [list]
 //!   - apiGroups: [upgrade.cattle.io]
 //!     resources: [plans]
@@ -64,6 +65,7 @@ pub mod node_shells;
 pub mod s3_destinations;
 pub mod templates;
 pub mod tools;
+pub mod usage;
 
 use std::collections::BTreeMap;
 

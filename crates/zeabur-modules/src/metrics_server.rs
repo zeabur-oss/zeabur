@@ -36,7 +36,7 @@ pub const NODE_METRICS: Read = Read {
     kind: "NodeMetrics",
 };
 
-/// `metrics.k8s.io/v1beta1` `PodMetrics`, read in one namespace.
+/// `metrics.k8s.io/v1beta1` `PodMetrics`, read in one namespace or cluster-wide.
 pub const POD_METRICS: Read = Read {
     group: "metrics.k8s.io",
     version: "v1beta1",
@@ -82,6 +82,8 @@ pub struct ContainerUsage {
 /// What one pod uses, as metrics-server last measured it.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PodUsage {
+    /// The pod's namespace.
+    pub namespace: String,
     /// The pod.
     pub pod: String,
     /// When the sample was taken (RFC 3339).
@@ -92,12 +94,13 @@ pub struct PodUsage {
     pub containers: Vec<ContainerUsage>,
 }
 
-/// Each pod's usage from its `PodMetrics` object, by name.
+/// Each pod's usage from its `PodMetrics` object, by namespace and name.
 #[must_use]
 pub fn pod_usage(objects: &[DynamicObject]) -> Vec<PodUsage> {
     let mut pods: Vec<PodUsage> = objects
         .iter()
         .map(|object| PodUsage {
+            namespace: object.metadata.namespace.clone().unwrap_or_default(),
             pod: object.metadata.name.clone().unwrap_or_default(),
             timestamp: text(object, "/timestamp"),
             window: text(object, "/window"),
@@ -115,7 +118,7 @@ pub fn pod_usage(objects: &[DynamicObject]) -> Vec<PodUsage> {
                 .collect(),
         })
         .collect();
-    pods.sort_by(|a, b| a.pod.cmp(&b.pod));
+    pods.sort_by(|a, b| (&a.namespace, &a.pod).cmp(&(&b.namespace, &b.pod)));
     pods
 }
 
@@ -157,6 +160,7 @@ mod tests {
         ]);
         assert_eq!(pods.len(), 2);
         assert_eq!(pods[0].pod, "web-1");
+        assert_eq!(pods[0].namespace, "shop");
         assert_eq!(pods[0].containers, []);
         assert_eq!(pods[1].window.as_deref(), Some("15.012s"));
         assert_eq!(

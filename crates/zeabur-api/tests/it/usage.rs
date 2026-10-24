@@ -1,4 +1,5 @@
-//! Resource usage against an in-memory cluster: live usage from `PodMetrics`, history from a
+//! Resource usage against an in-memory cluster: live usage from `PodMetrics` per project and per
+//! namespace across the cluster, history from a
 //! metrics store reached through the service proxy (canned answers), disk use from the same
 //! store, and the metrics store setting, kept in a ConfigMap written as the person.
 
@@ -10,8 +11,9 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_api::Settings;
     use zeabur_core::problem::KubernetesStatus;
+    use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod};
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Identity, ServedResource, WriteBody};
+    use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
 
     use crate::common::{app_with, send};
 
@@ -108,6 +110,188 @@ mod tests {
         assert_eq!(usage["state"], "unreadable");
         assert_eq!(usage["unreadable"][0]["resource"], "pods.metrics.k8s.io");
         assert_eq!(usage["unreadable"][0]["kubernetes"]["code"], 403);
+    }
+
+    fn pod(namespace: &str, name: &str, phase: &str, resources: &Value) -> Pod {
+        serde_json::from_value(json!({
+            "metadata": {"name": name, "namespace": namespace},
+            "spec": {"containers": [{"name": "app", "image": "app:1", "resources": resources}]},
+            "status": {"phase": phase}
+        }))
+        .unwrap()
+    }
+
+    fn sample(namespace: &str, name: &str, cpu: &str, memory: &str) -> zeabur_kube::DynamicObject {
+        serde_json::from_value(json!({
+            "apiVersion": "metrics.k8s.io/v1beta1", "kind": "PodMetrics",
+            "metadata": {"name": name, "namespace": namespace},
+            "timestamp": "2026-10-16T08:00:00Z", "window": "15s",
+            "containers": [{"name": "app", "usage": {"cpu": cpu, "memory": memory}}]
+        }))
+        .unwrap()
+    }
+
+    /// `shop` is a project with two running pods, one without a memory limit, and a finished
+    /// one; `lab` is a namespace that is not a project; `kube-system` is Kubernetes' own.
+    fn cluster_with_namespaces() -> MemoryCluster {
+        let namespace = |name: &str, labels: Value| -> Namespace {
+            serde_json::from_value(json!({"metadata": {"name": name, "labels": labels}})).unwrap()
+        };
+        let objects = |namespace: &str, pods: Vec<Pod>| NamespaceObjects {
+            namespace: namespace.to_owned(),
+            pods,
+            ..NamespaceObjects::default()
+        };
+        let limited = json!({"requests": {"cpu": "250m", "memory": "256Mi"},
+                             "limits": {"cpu": "1", "memory": "512Mi"}});
+        let open = json!({"requests": {"cpu": "100m", "memory": "128Mi"}});
+        MemoryCluster::new(State {
+            identity: Identity {
+                username: "alice".to_owned(),
+                groups: vec![],
+            },
+            namespaces: vec![
+                serde_json::from_value(json!({"metadata": {"name": "shop",
+                    "labels": {"zeabur.com/project": "true"},
+                    "annotations": {"zeabur.com/display-name": "Shop"}}}))
+                .unwrap(),
+                namespace("lab", json!({})),
+                namespace("kube-system", json!({})),
+            ],
+            objects: BTreeMap::from([
+                (
+                    "shop".to_owned(),
+                    objects(
+                        "shop",
+                        vec![
+                            pod("shop", "web-1", "Running", &limited),
+                            pod("shop", "worker-1", "Running", &open),
+                            pod("shop", "migrate-1", "Succeeded", &limited),
+                        ],
+                    ),
+                ),
+                (
+                    "lab".to_owned(),
+                    objects("lab", vec![pod("lab", "toolbox", "Pending", &open)]),
+                ),
+                (
+                    "kube-system".to_owned(),
+                    objects(
+                        "kube-system",
+                        vec![pod("kube-system", "coredns-1", "Running", &open)],
+                    ),
+                ),
+            ]),
+            ..State::default()
+        })
+    }
+
+    fn item<'a>(usage: &'a Value, namespace: &str) -> &'a Value {
+        usage["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["namespace"] == namespace)
+            .unwrap_or_else(|| panic!("{namespace} missing: {usage}"))
+    }
+
+    #[tokio::test]
+    async fn cluster_usage_sums_each_namespace_and_says_what_it_is() {
+        let cluster = cluster_with_namespaces();
+        let usage = get(&cluster, "/api/v1/cluster/usage").await;
+        assert_eq!(usage["metrics"], "not-installed");
+        assert_eq!(usage["podScan"], "complete");
+        let shop = item(&usage, "shop");
+        assert_eq!(
+            (&shop["adopted"], &shop["system"]),
+            (&json!(true), &json!(false))
+        );
+        assert_eq!(shop["displayName"], "Shop");
+        // The finished pod reserves nothing; the pod without limits adds none.
+        assert_eq!(shop["pods"], 2);
+        assert_eq!(
+            shop["requests"],
+            json!({"cpuMillicores": 350, "memoryBytes": 384 << 20})
+        );
+        assert_eq!(
+            shop["limits"],
+            json!({"cpuMillicores": 1000, "memoryBytes": 512 << 20})
+        );
+        assert_eq!(shop["unlimited"], json!({"cpu": 1, "memory": 1}));
+        assert!(shop.get("usage").is_none(), "unknown, not zero: {shop}");
+        let lab = item(&usage, "lab");
+        assert_eq!(
+            (&lab["adopted"], &lab["system"]),
+            (&json!(false), &json!(false))
+        );
+        let system = item(&usage, "kube-system");
+        assert_eq!(
+            (&system["adopted"], &system["system"]),
+            (&json!(false), &json!(true))
+        );
+        assert_eq!(usage["totals"]["requests"]["cpuMillicores"], 550);
+        assert!(usage["totals"].get("usage").is_none());
+
+        cluster.update(|s| {
+            s.served.push(ServedResource::readable(
+                "metrics.k8s.io",
+                "v1beta1",
+                "pods",
+                "PodMetrics",
+                true,
+            ));
+            s.dynamic.push(sample("shop", "web-1", "120m", "200Mi"));
+            s.dynamic
+                .push(sample("shop", "worker-1", "1500000n", "100Mi"));
+            s.dynamic
+                .push(sample("kube-system", "coredns-1", "3m", "20Mi"));
+        });
+        let usage = get(&cluster, "/api/v1/cluster/usage").await;
+        assert_eq!(usage["metrics"], "available");
+        assert_eq!(usage["window"], "15s");
+        assert_eq!(
+            item(&usage, "shop")["usage"],
+            json!({"cpuMillicores": 122, "memoryBytes": 300 << 20, "pods": 2})
+        );
+        // Pending, so metrics-server has no sample of it.
+        assert_eq!(item(&usage, "lab")["usage"]["pods"], 0);
+        assert_eq!(
+            usage["totals"]["usage"],
+            json!({"cpuMillicores": 125, "memoryBytes": 320 << 20, "pods": 3})
+        );
+
+        cluster.update(|s| {
+            s.forbidden_resources
+                .insert("pods.metrics.k8s.io".to_owned());
+        });
+        let usage = get(&cluster, "/api/v1/cluster/usage").await;
+        assert_eq!(usage["metrics"], "unreadable");
+        assert_eq!(usage["unreadable"][0]["resource"], "pods.metrics.k8s.io");
+        assert_eq!(item(&usage, "shop")["requests"]["cpuMillicores"], 350);
+        assert!(item(&usage, "shop").get("usage").is_none());
+    }
+
+    #[tokio::test]
+    async fn cluster_usage_is_refused_without_listing_pods_everywhere() {
+        let cluster = cluster_with_namespaces();
+        cluster.update(|s| {
+            s.forbidden_resources.insert("pods".to_owned());
+        });
+        let (status, problem) = call(
+            &cluster,
+            Settings::default(),
+            "GET",
+            "/api/v1/cluster/usage",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["kind"], "forbidden");
+        assert_eq!(
+            problem["denied"],
+            json!({"verb": "list", "group": "", "resource": "pods"})
+        );
+        assert!(problem.get("items").is_none());
     }
 
     /// The query of a proxied range query, its `start`, `end` and `step`.

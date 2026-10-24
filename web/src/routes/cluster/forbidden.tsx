@@ -21,7 +21,7 @@ export const overviewRole: Role = {
   rules: [
     { group: "", resources: ["nodes", "namespaces", "pods"] },
     { group: "events.k8s.io", resources: ["events"] },
-    { group: "metrics.k8s.io", resources: ["nodes"] },
+    { group: "metrics.k8s.io", resources: ["nodes", "pods"] },
     { group: "upgrade.cattle.io", resources: ["plans"] },
   ],
 }
