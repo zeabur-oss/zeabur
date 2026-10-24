@@ -12,7 +12,8 @@ description: Day-to-day development loop for the Zeabur repository — environme
 - The workspace is a flat `crates/` directory; dependencies only point downwards. Each crate has
   a level in `Cargo.toml` `[workspace.metadata.levels]` (table in `docs/architecture.md`). Put new
   code in the lowest crate that can hold it; never add an upward dependency. Binaries: `zeabur`
-  (in-cluster server) and `zeaburctl` (CLI: `ui`, `mcp`, `doctor`).
+  (in-cluster server), `zeaburctl` (CLI: `ui`, `mcp`, `doctor`) and `zeabur-installer` (runs as
+  root on a Linux server; crates `zeabur-installer-*`, guide in `docs/installer/`).
 - `zeabur-kube` is the only crate that talks to kube-apiserver, and only through clients bound to
   a person's credential. Never build a client from Zeabur's service account token, and never
   impersonate.
@@ -31,6 +32,9 @@ nix develop -c ./scripts/check-levels.sh
 nix develop -c bash -c 'shellcheck scripts/*.sh && actionlint && nixfmt --check flake.nix'
 nix develop -c cargo build --release --locked --no-default-features -p zeabur -p zeaburctl
 ```
+The installer's web interface (`crates/zeabur-installer/web`) is not in CI: run
+`nix develop -c bash -c 'cd crates/zeabur-installer/web && bun install && bun run fmt:check && bun run lint && bun run typecheck'`
+and `nix develop -c scripts/build-installer-ui.sh`.
 Iterate per crate with `-p <crate>` to keep builds short. Cluster tests: see
 `zeabur-cluster-tests`. Web interface: see `zeabur-ui`. Each CI job is `scripts/ci.sh <job>`
 (`--list` names them), the same on GitHub and on any Linux machine with Nix;
@@ -43,8 +47,8 @@ environment, not a fresh one; on a VM, snapshot its clean state and restore it a
 - `unsafe` is forbidden. No panics on input: no `unwrap`/`expect`/indexing outside tests.
 - Suppress a lint only with `#[expect(lint, reason = "…")]`; never `#[allow]`.
 - Matches in security logic are exhaustive (no wildcard arms on enums).
-- Output to stdout/stderr only through a binary's `output` module; everything else uses
-  `tracing`.
+- Output to stdout/stderr only through a binary's `output` module (`out` in `zeabur-installer`);
+  everything else uses `tracing`.
 - Integration tests wrap their tests in `#[cfg(test)] mod tests` (clippy
   `tests_outside_test_module`).
 - Docs: identifiers in backticks (clippy `doc_markdown`); add proper nouns to `clippy.toml`

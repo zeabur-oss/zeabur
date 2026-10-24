@@ -178,6 +178,15 @@ missing bound.
 - An idempotent reconcile needs no leader election. A Lease does not fence: guard an external
   effect that must not repeat separately.
 
+**Installer** (`zeabur-installer`, on one host)
+- Bound parallel work (downloads, `kubectl` calls): a fixed number of worker threads, never one
+  `thread::spawn` per item of an open-ended list.
+- Wait for a condition with a deadline and backoff, and report what was last seen. Do not loop
+  without a limit.
+- Values and manifests the installer writes into one object (a `HelmChart`, a Secret, a
+  ConfigMap) stay under the object limits above.
+- Required state lives in the cluster or on disk, never only in memory.
+
 **Observability**
 - A metric label takes a bounded set of values (aim under 10, look again over 100): no person,
   project or object IDs.
@@ -208,4 +217,6 @@ Leave alone: a GET by name in a watch-driven reconcile; one-shot LISTs in a CLI;
 over a fixed small set; a namespace per project; one Job per real workload; replicas without
 leader election when reconcile is idempotent; polling an external system that has no watch API,
 with backoff; a scan bounded by a quota or a documented ceiling; the cost of fail-closed
-admission, RBAC and plan review.
+admission, RBAC and plan review; in the installer, one-shot LISTs and GETs during `apply`,
+polling `kubectl` for readiness with a deadline, and bounded fan-out over the fixed set of
+components.
