@@ -10,6 +10,7 @@
 #   steps:                      # optional; selectors only, never visible text
 #     - click: '[data-testid="deploy-button"]'   # or fill, hover, press, wait
 #   clip: main                  # optional selector to crop to; at least 24 px around it
+#   until: '#cluster-nodes'     # optional, with clip: the crop ends at the bottom of this element
 #   viewport: desktop           # desktop (1440x900) or phone (390x844); default desktop
 #   locales: [en]               # optional; default en, zh-TW, zh-CN
 #   themes: [light, dark]       # optional; default [light]
@@ -480,3 +481,4 @@
     - click: '[data-slot="draft-bar"] button:last-child'
     - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
   clip: '[data-slot="dialog-content"]'
+  until: '[aria-labelledby="components-catalogue"] section:nth-of-type(2)'

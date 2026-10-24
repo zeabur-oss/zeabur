@@ -25,35 +25,93 @@ async function run(page: Page, step: Step) {
   else await page.keyboard.press(step.press)
 }
 
-// Content must not touch the edge of the image. Take the element alone, then put it on its
-// background with space added on each side where its own padding is under 24 px.
-async function cropped(page: Page, selector: string, path: string) {
+async function settle(page: Page) {
+  await page.waitForLoadState("networkidle")
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  )
+}
+
+// A scroll area as tall as the window (the app's main), or a page at least as tall as the window,
+// cuts its content off at the window's edge or ends in empty space. Make the window as tall as
+// the content.
+async function fit(page: Page, selector = "html") {
   const element = page.locator(selector).first()
-  const frame = await element.evaluate((el) => {
+  const scrolls = await element.evaluate(
+    (el) => el === document.documentElement || /auto|scroll/.test(getComputedStyle(el).overflowY),
+  )
+  if (!scrolls) return
+  const { width, height } = page.viewportSize()!
+  const chrome = height - (await element.evaluate((el) => el.clientHeight))
+  await page.setViewportSize({ width, height: 200 })
+  await settle(page)
+  // Down to the lowest box that shows something: wrappers and margins below it are left out,
+  // since the crop adds its own space.
+  const content = await element.evaluate((el) => {
+    const top = el.getBoundingClientRect().top - el.scrollTop
+    let bottom = 0
+    for (const e of el.querySelectorAll("*")) {
+      const r = e.getBoundingClientRect()
+      if (r.width <= 1 || r.height <= 1) continue
+      const s = getComputedStyle(e)
+      const painted =
+        e.childElementCount === 0 ||
+        s.backgroundColor !== "rgba(0, 0, 0, 0)" ||
+        s.backgroundImage !== "none" ||
+        parseFloat(s.borderBottomWidth) > 0 ||
+        s.boxShadow !== "none"
+      if (painted && s.visibility !== "hidden") bottom = Math.max(bottom, r.bottom - top)
+    }
+    return Math.ceil(bottom)
+  })
+  await page.setViewportSize({ width, height: content + chrome })
+  await settle(page)
+}
+
+// Content must not touch the edge of the image. Take the element alone, then put it on its
+// background with space added on each side where its own padding is under 24 px. With `until`
+// the image ends at the bottom of that element.
+async function cropped(page: Page, selector: string, until: string | undefined, path: string) {
+  const element = page.locator(selector).first()
+  const end = until ? await page.locator(until).first().boundingBox() : null
+  const frame = await element.evaluate((el, end) => {
     const s = getComputedStyle(el)
     const pad = (side: string) =>
-      Math.max(0, 24 - parseFloat(s.getPropertyValue(`padding-${side}`)))
+      Math.max(
+        0,
+        24 - (end && side === "bottom" ? 0 : parseFloat(s.getPropertyValue(`padding-${side}`))),
+      )
     let bg = "transparent"
     for (let e: Element | null = el; e && bg === "transparent"; e = e.parentElement) {
       const c = getComputedStyle(e).backgroundColor
       if (c !== "rgba(0, 0, 0, 0)") bg = c
     }
+    const box = el.getBoundingClientRect()
     return {
-      width: el.getBoundingClientRect().width,
+      box: {
+        x: box.x,
+        y: box.y,
+        width: box.width,
+        height: (end ? end.y + end.height : box.bottom) - box.y,
+      },
       padding: ["top", "right", "bottom", "left"].map(pad),
       bg,
       radius: s.borderRadius,
     }
-  })
+  }, end)
   const options = { animations: "disabled", caret: "hide" } as const
+  const shoot = (path?: string) =>
+    end
+      ? page.screenshot({ ...options, path, clip: frame.box })
+      : element.screenshot({ ...options, path })
   if (frame.padding.every((p) => p === 0) && parseFloat(frame.radius) === 0)
-    return void (await element.screenshot({ ...options, path }))
-  const image = (await element.screenshot(options)).toString("base64")
+    return void (await shoot(path))
+  const image = (await shoot()).toString("base64")
   const sheet = await page.context().newPage()
   await sheet.setContent(
     `<body style="margin:0"><div style="display:inline-block;background:${frame.bg};` +
       `padding:${frame.padding.map((p) => `${p}px`).join(" ")}">` +
-      `<img style="display:block;width:${frame.width}px;border-radius:${frame.radius}" src="data:image/png;base64,${image}"></div>`,
+      `<img style="display:block;width:${frame.box.width}px;border-radius:${frame.radius}" src="data:image/png;base64,${image}"></div>`,
   )
   await sheet.locator("div").screenshot({ path })
   await sheet.close()
@@ -73,15 +131,16 @@ for (const shot of readManifest(manifest).filter((s) => serversOf(s).includes(se
       await page.goto(shot.path, { waitUntil: "networkidle" })
       if (shot.wait) await page.locator(shot.wait).first().waitFor()
       for (const step of shot.steps) await run(page, step)
+      await fit(page, shot.clip)
       // A pointer left over a link or a row shows its hover state.
-      const { width, height } = viewports[shot.viewport]
+      const { width, height } = page.viewportSize()!
       if (!("hover" in (shot.steps.at(-1) ?? {}))) await page.mouse.move(width - 1, height - 1)
       await page.waitForLoadState("networkidle")
       await page.evaluate(() => document.fonts.ready)
       const path = `${out}/${info.project.name}/${shot.id}.png`
       const options = { path, animations: "disabled", caret: "hide" } as const
-      if (shot.clip) await cropped(page, shot.clip, path)
-      else await page.screenshot(options)
+      if (shot.clip) await cropped(page, shot.clip, shot.until, path)
+      else await page.screenshot({ ...options, fullPage: true })
     })
   })
 }

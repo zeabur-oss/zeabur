@@ -20,6 +20,7 @@ export type Shot = {
   wait?: string
   steps: Step[]
   clip?: string
+  until?: string
   viewport: "desktop" | "phone"
   env: Record<string, string>
   locales: Locale[]
@@ -44,6 +45,7 @@ const shotKeys = [
   "wait",
   "steps",
   "clip",
+  "until",
   "viewport",
   "env",
   "locales",
@@ -106,7 +108,7 @@ function shot(value: unknown, index: number): Shot {
   if (!isRecord(value)) throw new Error(`shot ${index}: expected a mapping`)
   const at = typeof value.id === "string" ? value.id : `shot ${index}`
   for (const key of Object.keys(value)) check(shotKeys.includes(key), `${at}: unknown key "${key}"`)
-  const { id, app = "zeabur", path, wait, clip, viewport = "desktop", steps = [] } = value
+  const { id, app = "zeabur", path, wait, clip, until, viewport = "desktop", steps = [] } = value
   const { locales: shotLocales = Object.keys(locales), themes: shotThemes = ["light"] } = value
   check(
     typeof id === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id),
@@ -116,6 +118,8 @@ function shot(value: unknown, index: number): Shot {
   check(typeof path === "string" && path.startsWith("/"), `${at}: path must start with /`)
   check(isSelector(wait), `${at}: wait must be a CSS selector`)
   check(isSelector(clip), `${at}: clip must be a CSS selector`)
+  check(isSelector(until), `${at}: until must be a CSS selector`)
+  check(until === undefined || clip !== undefined, `${at}: until needs clip`)
   check(viewport === "desktop" || viewport === "phone", `${at}: viewport must be desktop or phone`)
   check(
     value.fresh === undefined || typeof value.fresh === "boolean",
@@ -129,6 +133,7 @@ function shot(value: unknown, index: number): Shot {
     wait: wait as string | undefined,
     steps: steps.map((s, i) => step(s, `${at}: step ${i + 1}`)),
     clip: clip as string | undefined,
+    until: until as string | undefined,
     viewport: viewport as Shot["viewport"],
     env: environment(value.env, at),
     locales: subset(shotLocales, Object.keys(locales) as Locale[], `${at}: locales`),

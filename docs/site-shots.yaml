@@ -20,6 +20,7 @@
   path: /cluster
   wait: main h1
   clip: main
+  until: '#cluster-nodes'
   themes: [light, dark]
 - id: installer
   app: installer
@@ -27,5 +28,6 @@
   steps:
     - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
-    - wait: '[data-slot="checkbox"][data-checked]'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[role="alert"]'
   themes: [light, dark]

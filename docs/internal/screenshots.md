@@ -41,6 +41,7 @@ fails, Playwright's trace is in `target/docs-shots-results`. The demo listens on
     - press: Escape
     - wait: '[role="alert"]'
   clip: main                    # optional: CSS selector to crop to; at least 24 px around it
+  until: '#cluster-nodes'       # optional, with clip: the crop ends at the bottom of this element
   viewport: desktop             # desktop (1440×900) or phone (390×844); default desktop
   locales: [en]                 # optional: en, zh-TW, zh-CN; default all three
   themes: [light, dark]         # optional: light, dark; default [light]
@@ -58,6 +59,10 @@ A shot whose steps change what the demo holds, such as creating a join token or 
 invitation, sets `fresh: true`: it gets its own demo server for each locale and theme, so every
 locale shows the same state. The demo's `ZEABUR_DEMO_*` variables are listed at the top of
 `crates/zeabur-api/examples/demo.rs`.
+
+A shot ends where its content does. The window grows or shrinks to the height of the page, or of
+`clip` when it is a scroll area such as `main`, so the image shows all of it and no empty space
+below. To stop higher, at the end of a section, name that section in `until`.
 
 With `app: installer` the script builds the installer's pages and serves them with `vite
 preview` and the captured responses in `crates/zeabur-installer/web/scripts/dev-api.ts`.
