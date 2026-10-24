@@ -14,7 +14,7 @@ import { invite, member, signInAsAdmin, toast } from "./members.ts"
 // with GitHub's refusal; once it is, the service builds and runs; when the key is taken off
 // again the next poll fails and the service says so. Skipped unless E2E_PRIVATE_GIT_REPO is set.
 //
-//   E2E_PRIVATE_GIT_REPO   the repository, e.g. git@github.com:zeabur/oss-private-git-demo.git
+//   E2E_PRIVATE_GIT_REPO   the repository, e.g. git@github.com:zeabur-oss/oss-private-git-demo.git
 //   E2E_PRIVATE_GIT_TEXT   text its index.html holds
 //   E2E_GH_DEPLOY_KEY=1    add the key (read-only) and remove it with `gh repo deploy-key`, as
 //                          the account `gh` is signed in with; otherwise the test prints the key
