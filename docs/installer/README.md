@@ -11,11 +11,11 @@
   scanning and intrusion prevention.
 - **[Zeabur Identity](https://github.com/zeabur/identity)**. You sign in to the cluster with a
   passkey; no `admin.conf` gets copied around.
-- **[Zeabur](https://github.com/zeabur/zeabur)**, the web console for the cluster.
+- **[Zeabur](../../README.md)**, the web console for the cluster.
 
 > **Status: v0.0.1 alpha.** Nothing is published yet, so an install names development
 > sources (see [examples/development.yaml](examples/development.yaml)). It has not been run end
-> to end on a fresh server yet; see [What is verified](docs/how-it-works.md#what-is-verified).
+> to end on a fresh server yet; see [What is verified](how-it-works.md#what-is-verified).
 
 ## Quick start
 
@@ -23,7 +23,7 @@ On a fresh server running systemd, as root:
 
 ```sh
 mkdir -p /etc/zeabur-installer
-cp examples/domain.yaml /etc/zeabur-installer/config.yaml   # then edit the host names
+cp docs/installer/examples/domain.yaml /etc/zeabur-installer/config.yaml   # then edit the host names
 zeabur-installer plan     # what will be installed, and warnings; changes nothing
 zeabur-installer apply    # install; safe to run again
 ```
@@ -60,7 +60,7 @@ access:
   zeabur: zeabur.example.com
 ```
 
-[docs/configuration.md](docs/configuration.md) describes every field: presets, adding and
+[configuration.md](configuration.md) describes every field: presets, adding and
 removing components, component inputs, secret files, the RKE2 version and host settings.
 
 ## Multiple servers
@@ -102,10 +102,10 @@ Things to know:
 
 ## Learn more
 
-- [How it works](docs/how-it-works.md): the steps of `apply`, the security defaults, and what has
+- [How it works](how-it-works.md): the steps of `apply`, the security defaults, and what has
   and has not been tested.
-- [Contributing](CONTRIBUTING.md) and the [security policy](SECURITY.md).
+- [Contributing](../../CONTRIBUTING.md#installer) and the [security policy](../../SECURITY.md).
 
 ## License
 
-[Apache-2.0](LICENSE).
+[Apache-2.0](../../LICENSE).

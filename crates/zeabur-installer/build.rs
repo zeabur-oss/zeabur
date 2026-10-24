@@ -1,7 +1,7 @@
 //! Generates the table of embedded web-interface files.
 //!
 //! The only input is the directory named by `ZEABUR_INSTALLER_UI_DIST`, which
-//! `scripts/build-ui.sh` fills with the built interface, its brotli encodings and `manifest.tsv`.
+//! `scripts/build-installer-ui.sh` fills with the built interface, its brotli encodings and `manifest.tsv`.
 //! This script runs no JavaScript tool and makes no network request, so `cargo build` stays
 //! hermetic.
 //!
@@ -26,7 +26,7 @@ fn main() {
         },
         None if env::var("PROFILE").as_deref() == Ok("release") => compile_error(&format!(
             "{VAR} is not set. A release build must embed the web interface: run \
-             scripts/build-ui.sh and set {VAR} to its output directory."
+             scripts/build-installer-ui.sh and set {VAR} to its output directory."
         )),
         None => placeholder_table(),
     };

@@ -161,7 +161,7 @@ are backed up.
 - **No long-lived admin credential handed out.** People reach the cluster through Zeabur
   Identity. Their everyday tokens can read the cluster; changing it takes a fresh passkey tap.
   `/etc/rancher/rke2/rke2.yaml` stays on the server as root's credential of last resort.
-- **Pinned RKE2 digests.** See the [security policy](../SECURITY.md#what-the-installer-trusts).
+- **Pinned RKE2 digests.** See the [security policy](../../SECURITY.md#what-the-installer-trusts).
 
 ## What is verified
 
