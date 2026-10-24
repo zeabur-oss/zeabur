@@ -1,7 +1,7 @@
 //! Downloads checked against a SHA-256 digest.
 
 use std::fs::{self, File};
-use std::io::{self, Read as _, Write as _};
+use std::io::{self, BufRead as _, Read as _, Write as _};
 use std::path::Path;
 use std::time::Duration;
 
@@ -118,9 +118,17 @@ pub fn fetch_text(agent: &Agent, url: &str) -> Result<String, HostError> {
 ///
 /// When it cannot be read.
 pub fn sha256_file(path: &Path) -> Result<String, HostError> {
-    let mut file = File::open(path).map_err(HostError::io(path))?;
+    let mut file = io::BufReader::new(File::open(path).map_err(HostError::io(path))?);
     let mut hasher = Sha256::new();
-    io::copy(&mut file, &mut hasher).map_err(HostError::io(path))?;
+    loop {
+        let chunk = file.fill_buf().map_err(HostError::io(path))?;
+        if chunk.is_empty() {
+            break;
+        }
+        hasher.update(chunk);
+        let n = chunk.len();
+        file.consume(n);
+    }
     Ok(hex::encode(hasher.finalize()))
 }
 

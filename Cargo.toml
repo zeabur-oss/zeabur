@@ -90,9 +90,9 @@ zeabur-installer-host = { path = "crates/zeabur-installer-host" }
 # Third-party crates.
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }
 # Already in the binary through k8s-openapi; Secret values are base64 on the wire.
-base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+base64 = { version = "0.23", default-features = false, features = ["alloc"] }
 # The htpasswd hash of a basic auth password (zeabur-plan); Traefik reads bcrypt.
-bcrypt = { version = "0.17", default-features = false, features = ["alloc"] }
+bcrypt = { version = "0.19", default-features = false, features = ["alloc"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "tracing", "json", "ws"] }
 clap = { version = "4", default-features = false, features = ["std", "derive", "env", "help", "usage", "error-context"] }
 # Unpacking the RKE2 release and packing a local chart (zeabur-installer-host).
@@ -129,16 +129,16 @@ serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
 serde_json = "1"
 # SHA-256 for derived names in the pure crates (zeabur-kernel), which hold no C library.
-sha2 = { version = "0.10", default-features = false }
+sha2 = { version = "0.11", default-features = false }
 tar = { version = "0.4", default-features = false }
 tempfile = "3"
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal", "time", "sync", "io-util"] }
 # A WebSocket client for the terminal's tests; the server side comes with axum's `ws` feature.
-tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect"] }
+tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect"] }
 tower = { version = "0.5", default-features = false, features = ["util"] }
 # The request tracing of kube-rs's default client (zeabur-kube).
-tower-http = { version = "0.6", default-features = false, features = ["trace"] }
+tower-http = { version = "0.7", default-features = false, features = ["trace"] }
 tracing = "0.1"
 # OpenAPI from the code. Reviewed 2026-10-14 (zeabur-api README): no `yaml` feature (it pulls a
 # c2rust libyaml); the spec is written with serde-saphyr. Never enable `config`.

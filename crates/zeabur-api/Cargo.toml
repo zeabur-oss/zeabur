@@ -36,7 +36,7 @@ serde_json.workspace = true
 # Reads the vendored error-pages template.
 serde-saphyr.workspace = true
 secrecy.workspace = true
-sha2 = { workspace = true, features = ["std"] }
+sha2.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tower.workspace = true
@@ -48,6 +48,7 @@ utoipa-axum.workspace = true
 zeabur-kube = { workspace = true, features = ["memory"] }
 zeabur-test-support = { workspace = true, features = ["sandbox"] }
 zeabur-ui.workspace = true
+hex.workspace = true
 http-body-util.workspace = true
 tokio-tungstenite.workspace = true
 # YAML output of the OpenAPI document, for the committed copy only.

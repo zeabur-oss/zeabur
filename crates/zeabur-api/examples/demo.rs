@@ -449,7 +449,7 @@ impl Registry {
             "config": {"ExposedPorts": {"8080/tcp": {}}, "User": "101"},
         }))
         .expect("example config");
-        let digest = format!("sha256:{:x}", Sha256::digest(&config));
+        let digest = format!("sha256:{}", hex::encode(Sha256::digest(&config)));
         let manifest = serde_json::to_vec(&json!({
             "schemaVersion": 2,
             "mediaType": "application/vnd.docker.distribution.manifest.v2+json",

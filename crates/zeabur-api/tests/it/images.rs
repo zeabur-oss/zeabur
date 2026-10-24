@@ -24,7 +24,7 @@ mod tests {
     const PATH: &str = "/api/v1/projects/shop/images/inspect";
 
     fn digest(body: &[u8]) -> String {
-        format!("sha256:{:x}", Sha256::digest(body))
+        format!("sha256:{}", hex::encode(Sha256::digest(body)))
     }
 
     /// A registry that wants Basic credentials and holds one single-platform image.

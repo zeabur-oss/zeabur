@@ -131,7 +131,7 @@ mod tests {
     async fn an_rke2_cluster_gives_the_supervisor_ca_hash_location_and_live_tokens() {
         let cluster = cluster("v1.34.1+rke2r1");
         let body = join(&cluster).await;
-        let hash = format!("{:x}", Sha256::digest(CA.as_bytes()));
+        let hash = hex::encode(Sha256::digest(CA.as_bytes()));
         assert_eq!(
             body,
             json!({
