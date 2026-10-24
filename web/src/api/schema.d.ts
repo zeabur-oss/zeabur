@@ -6330,12 +6330,12 @@ export interface components {
       | {
           /** @enum {string} */
           code: "domainMoved"
-          /** @description The Ingress it leaves. */
-          from: string
+          /** @description The route it leaves. */
+          from: components["schemas"]["ObjectName"]
           /** @description The hostname. */
           hostname: string
-          /** @description Its new Ingress. */
-          to: string
+          /** @description Its new route. */
+          to: components["schemas"]["ObjectName"]
         }
       | {
           /** @enum {string} */
@@ -7369,7 +7369,10 @@ export interface components {
      * @enum {string}
      */
     RolloutStatus: "progressing" | "done" | "stuck" | "paused" | "waitsForDeletion"
-    /** @description An Ingress routing to workloads' Services: how they are reached from outside. */
+    /**
+     * @description An Ingress or a Gateway API `HTTPRoute` routing to workloads' Services: how they are reached
+     *     from outside.
+     */
     Route: {
       /** @description The Services it routes to, sorted, without duplicates. */
       backends: string[]
@@ -7394,7 +7397,7 @@ export interface components {
       issuer?: string | null
       /** @description The hosts that show the maintenance page instead of their workload, sorted. */
       maintenance?: string[]
-      /** @description The Ingress's name. */
+      /** @description The Ingress's or `HTTPRoute`'s name. */
       name: string
       /** @description The Ingress object. */
       origin: components["schemas"]["Origin"]
@@ -7428,8 +7431,15 @@ export interface components {
     RouteMiddleware: {
       /** @description The host it acts on; absent when it acts on every host of the Ingress. */
       host?: string | null
-      /** @description The `Middleware`'s name. */
+      /** @description The `Middleware`'s name; on an `HTTPRoute`, which redirects with a filter, the route's. */
       middleware: string
+      /** @description Whether that redirect is permanent (status 301 or 308). */
+      permanent?: boolean | null
+      /**
+       * @description The host a redirect sends to, when the route says it: an `HTTPRoute`'s `RequestRedirect`
+       *     filter. A Traefik redirect says it in its `Middleware`.
+       */
+      to?: string | null
     }
     /** @description A route object: an Ingress or a Gateway API `HTTPRoute`. */
     RouteRef: {
@@ -7768,8 +7778,8 @@ export interface components {
       /** @description Its pods, sorted by name. */
       pods: components["schemas"]["PodSummary"][]
       /**
-       * @description The names of the Ingresses routing to those Services, sorted by name; each is in the
-       *     document's `routes`.
+       * @description The names of the Ingresses and `HTTPRoute`s routing to those Services, sorted by name;
+       *     each is in the document's `routes`.
        */
       routeNames: string[]
       runAs?: components["schemas"]["RunAs"] | null

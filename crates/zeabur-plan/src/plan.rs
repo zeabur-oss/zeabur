@@ -1046,6 +1046,40 @@ impl<'a> Planner<'a> {
         })
     }
 
+    /// The name "Add domain" gives the route of `hostname`, after the first workload behind
+    /// `services` (else `fallback`), so deleting the service takes the route along. Refused when a
+    /// route has it.
+    pub(crate) fn own_route_name(
+        &self,
+        services: &BTreeSet<String>,
+        fallback: &str,
+        hostname: &str,
+    ) -> Result<String, PlanError> {
+        let workload = self.behind(services).into_iter().next();
+        let name = route_name(
+            workload.as_ref().map_or(fallback, |w| w.name.as_str()),
+            hostname,
+        );
+        let taken =
+            self.input
+                .snapshot
+                .ingresses
+                .iter()
+                .any(|i| i.metadata.name.as_deref() == Some(name.as_str()))
+                || self.http_routes().any(|(_, r)| r.name() == name)
+                || self.objects.iter().any(|w| {
+                    w.target == ingress_target(&name) || w.target == http_route_target(&name)
+                });
+        if taken {
+            return Err(error(
+                ErrorKind::Conflict,
+                "route_name_taken",
+                format!("A route named {name} already exists."),
+            ));
+        }
+        Ok(name)
+    }
+
     /// The workloads behind Services `services`.
     pub(crate) fn behind(&self, services: &BTreeSet<String>) -> Vec<WorkloadRef> {
         self.project

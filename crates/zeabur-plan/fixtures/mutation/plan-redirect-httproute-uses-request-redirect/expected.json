@@ -7,7 +7,8 @@
         "operations": [
           {"op": "test", "path": "/metadata/resourceVersion", "value": "5"},
           {"op": "test", "path": "/spec/rules", "value": [{"backendRefs": [{"name": "web", "port": 8080}]}]},
-          {"op": "replace", "path": "/spec/rules", "value": [{"filters": [{"type": "RequestRedirect", "requestRedirect": {"scheme": "https", "hostname": "shop.example.test", "statusCode": 302}}]}]}
+          {"op": "replace", "path": "/spec/rules", "value": [{"filters": [{"type": "RequestRedirect", "requestRedirect": {"scheme": "https", "hostname": "shop.example.test", "statusCode": 302}}]}]},
+          {"op": "add", "path": "/metadata/annotations", "value": {"zeabur.com/redirect-rules": "[{\"backendRefs\":[{\"name\":\"web\",\"port\":8080}]}]"}}
         ]
       }
     }

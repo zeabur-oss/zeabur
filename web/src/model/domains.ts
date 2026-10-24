@@ -5,11 +5,11 @@ import type { PublicRoute } from "@/model/service"
 export function domainsLead(routes: PublicRoute[]): { hosts: number; plain: number } {
   const hosts = new Map<string, boolean>()
   for (const route of routes)
-    if (route.host) hosts.set(route.host, (hosts.get(route.host) ?? true) && route.https)
-  return { hosts: hosts.size, plain: [...hosts.values()].filter((https) => !https).length }
+    if (route.host) hosts.set(route.host, (hosts.get(route.host) ?? false) || route.https === false)
+  return { hosts: hosts.size, plain: [...hosts.values()].filter(Boolean).length }
 }
 
-const isPlain = (route: PublicRoute) => Boolean(route.host) && !route.https
+const isPlain = (route: PublicRoute) => Boolean(route.host) && route.https === false
 
 /** Hosts without HTTPS first; otherwise in the order the routes list them. */
 export const plainFirst = (routes: PublicRoute[]) =>

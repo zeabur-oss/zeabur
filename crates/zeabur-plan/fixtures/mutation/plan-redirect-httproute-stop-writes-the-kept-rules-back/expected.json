@@ -1,0 +1,17 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "HTTPRoute", "name": "web-www"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "5"},
+          {"op": "test", "path": "/spec/rules", "value": [{"filters": [{"type": "RequestRedirect", "requestRedirect": {"scheme": "https", "hostname": "shop.example.test", "statusCode": 301}}]}]},
+          {"op": "replace", "path": "/spec/rules", "value": [{"matches": [{"path": {"type": "PathPrefix", "value": "/api"}}], "backendRefs": [{"name": "web", "port": 8080}]}]},
+          {"op": "test", "path": "/metadata/annotations/zeabur.com~1redirect-rules", "value": "[{\"matches\":[{\"path\":{\"type\":\"PathPrefix\",\"value\":\"/api\"}}],\"backendRefs\":[{\"name\":\"web\",\"port\":8080}]}]"},
+          {"op": "remove", "path": "/metadata/annotations/zeabur.com~1redirect-rules"}
+        ]
+      }
+    }
+  ]
+}

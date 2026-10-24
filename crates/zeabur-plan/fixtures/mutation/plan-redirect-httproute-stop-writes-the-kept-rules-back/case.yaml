@@ -1,0 +1,10 @@
+description: "Stopping the redirect of an HTTPRoute writes back the rules it kept, not a rule to the workload's first Service, and removes the annotation."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: redirect
+        route: {kind: HTTPRoute, name: web-www}
+        workload: {kind: Deployment, name: web}
+        hostname: www.shop.example.test
+        permanent: true

@@ -302,8 +302,9 @@ export function NetworkingTab({
                       const more = folded ? "max-sm:hidden" : undefined
                       const check = edit ? undefined : checkOf(route.host)
                       const firstOfHost = shown.findIndex((r) => r.host === route.host) === i
-                      const ingress = ingressOf(network, service, route)
-                      const traefik = traefikOnly(ingress)
+                      const owner = routeFor(network, service, route)
+                      const ingress = owner?.origin.kind === "Ingress" ? owner : undefined
+                      const access = withAccess(owner)
                       const removeLabel =
                         route.host && lastHost(network, service, route, route.host)
                           ? t("edit.removeWithRoute", route.host, route.ingress)
@@ -345,10 +346,10 @@ export function NetworkingTab({
                                 <span className="flex min-w-0 flex-col gap-1 max-sm:w-full">
                                   <span className="flex min-w-0 items-center gap-2">
                                     <Host route={route} certificate={check?.certificate} />
-                                    <PagesMarks route={ingress} host={route.host} />
-                                    <AccessMarks route={traefik} host={route.host} />
+                                    <PagesMarks route={owner} host={route.host} />
+                                    <AccessMarks route={access} host={route.host} />
                                     <span className="flex-1 sm:hidden" />
-                                    {route.host && !route.https ? (
+                                    {route.host && route.https === false ? (
                                       <span className="shrink-0 type-meta text-warn-strong">
                                         {t("net.noHttps")}
                                       </span>
@@ -412,7 +413,7 @@ export function NetworkingTab({
                                     plan={planner.plan}
                                   />
                                   <PagesButton
-                                    route={ingress}
+                                    route={owner}
                                     host={route.host}
                                     managed={managed}
                                     gate={domainGate}
@@ -421,7 +422,7 @@ export function NetworkingTab({
                                     plan={planner.plan}
                                   />
                                   <AccessButton
-                                    route={traefik}
+                                    route={access}
                                     host={route.host}
                                     managed={managed}
                                     gate={domainGate}
@@ -649,23 +650,22 @@ function ExposeHint({ project, command }: { project: string; command?: string })
   )
 }
 
-/** A domain control, closed when another tool owns the routes or the person's role cannot change
- * domains. */
-// Redirects and passwords are Traefik middlewares, which only an Ingress that Traefik serves
-// can list.
-function traefikOnly(route?: Schemas["Route"]): Schemas["Route"] | undefined {
-  return route && servedByTraefik(route) ? route : undefined
+// On an Ingress, redirects and passwords are Traefik middlewares, which only an Ingress that
+// Traefik serves can list. An HTTPRoute redirects with a filter.
+function withAccess(route?: Schemas["Route"]): Schemas["Route"] | undefined {
+  return route && (isGateway(route) || servedByTraefik(route)) ? route : undefined
 }
+
+const isGateway = (route: Schemas["Route"]) => route.origin.kind === "HTTPRoute"
 
 const servedByTraefik = (route: Schemas["Route"]) => !route.class || route.class.includes("traefik")
 
-function ingressOf(
+function routeFor(
   network: Network,
   service: Service,
   publicRoute: PublicRoute,
 ): Schemas["Route"] | undefined {
-  const route = routesOf(network, service).find((r) => r.name === publicRoute.ingress)
-  return route?.origin.kind === "Ingress" ? route : undefined
+  return routesOf(network, service).find((r) => r.name === publicRoute.ingress)
 }
 
 /** Whether `host` is all the route routes, so removing it deletes the route. */
@@ -756,7 +756,7 @@ function PagesButton({ route, host, ...rest }: RowDrawerProps) {
           service={rest.service}
           route={route}
           host={host}
-          traefik={servedByTraefik(route)}
+          traefik={!isGateway(route) && servedByTraefik(route)}
           plan={rest.plan}
           onClose={onClose}
         />
@@ -1060,7 +1060,9 @@ function Host({
       ? t("domain.cert.failed")
       : route.https
         ? t("domains.https")
-        : undefined
+        : route.https === undefined
+          ? t("domains.gatewayHttps")
+          : undefined
   return (
     <span className="flex min-w-0 items-center gap-1.5 text-xs">
       <Icon

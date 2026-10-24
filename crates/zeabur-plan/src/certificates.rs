@@ -30,7 +30,7 @@ use zeabur_adapters::error_pages::{MAINTENANCE_ANNOTATION, maintenance};
 use zeabur_adapters::traefik;
 
 use crate::access::{meta_of, owner_of};
-use crate::change::{CertificateSource, RouteKind, RouteRef, Target, Warning};
+use crate::change::{CertificateSource, ObjectName, RouteKind, RouteRef, Target, Warning};
 use crate::checks::ResourceRef;
 use crate::edit::LAST_APPLIED;
 use crate::error_pages::errors_spec;
@@ -391,7 +391,6 @@ impl Planner<'_> {
         let meta = meta_of(&current);
         let ingress = route.name.as_str();
         refuse_move(&meta, ingress, hostname)?;
-        // Named as "Add domain" names a route, so the service's deletion takes it along.
         let services = array(&current, "/spec/rules")
             .iter()
             .filter(|r| r.get("host").and_then(Value::as_str) == Some(hostname))
@@ -402,26 +401,7 @@ impl Planner<'_> {
                     .map(str::to_owned)
             })
             .collect();
-        let workload = self.behind(&services).into_iter().next();
-        let name = route_name(
-            workload.as_ref().map_or(ingress, |w| w.name.as_str()),
-            hostname,
-        );
-        let target = ingress_target(&name);
-        let taken = self
-            .input
-            .snapshot
-            .ingresses
-            .iter()
-            .any(|i| i.metadata.name.as_deref() == Some(name.as_str()))
-            || self.objects.iter().any(|w| w.target == target);
-        if taken {
-            return Err(error(
-                ErrorKind::Conflict,
-                "route_name_taken",
-                format!("A route named {name} already exists."),
-            ));
-        }
+        let name = self.own_route_name(&services, ingress, hostname)?;
         let pages = traefik::middlewares(&meta)
             .contains(&traefik::error_pages_name(ingress))
             .then(|| traefik::error_pages_name(&name));
@@ -435,11 +415,11 @@ impl Planner<'_> {
         if let Some(issued) = issued {
             self.delete_issued(&issued, ingress);
         }
-        self.created(target, body);
+        self.created(ingress_target(&name), body);
         self.warnings.push(Warning::DomainMoved {
             hostname: hostname.to_owned(),
-            from: ingress.to_owned(),
-            to: name.clone(),
+            from: ObjectName::of("Ingress", ingress),
+            to: ObjectName::of("Ingress", &name),
         });
         let moved = self.objects.len() - 1;
         self.use_own(moved, &name, hostname)

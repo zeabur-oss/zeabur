@@ -39,7 +39,7 @@
     }
   ],
   "warnings": [
-    {"code": "domainMoved", "hostname": "shop.example.test", "from": "shop", "to": "web-shop-example-test"},
+    {"code": "domainMoved", "hostname": "shop.example.test", "from": {"kind": "Ingress", "name": "shop"}, "to": {"kind": "Ingress", "name": "web-shop-example-test"}},
     {"code": "ownCertificate", "hostname": "shop.example.test", "notAfter": "2027-01-01T00:00:00Z"}
   ]
 }

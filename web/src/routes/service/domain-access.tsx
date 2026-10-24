@@ -73,11 +73,13 @@ function userProblems(t: Translate, form: PasswordForm) {
 /** The redirect Zeabur wrote for `host`, with its target once the Middleware loads. */
 function useExisting(project: string, route: Schemas["Route"], host: string) {
   const redirect = route.redirects?.find((r) => r.host === host)
+  // An HTTPRoute's redirect is a filter of the route, which the document already has.
+  const said = redirect?.to ? { to: redirect.to, permanent: redirect.permanent ?? true } : undefined
   const current = useQuery({
     ...objectQuery(project, middlewareAddress(redirect?.middleware ?? "")),
-    enabled: redirect !== undefined,
+    enabled: redirect !== undefined && !said,
   })
-  const was = redirectOf(current.data?.yaml)
+  const was = said ?? redirectOf(current.data?.yaml)
   return redirect && { middleware: redirect.middleware, to: was?.to, permanent: was?.permanent }
 }
 
@@ -161,14 +163,20 @@ export default function DomainAccessDrawer({
     password: "",
   })
   const [tried, setTried] = useState(false)
-  const routeRef = { kind: "Ingress", name: route.name } as const
+  const gateway = route.origin.kind === "HTTPRoute"
+  const routeRef = { kind: route.origin.kind as Schemas["RouteKind"], name: route.name }
   const workload = { kind: service.kind, name: service.name }
   const others = route.hostnames.filter((h) => h !== host)
 
-  const problems = problemsOf(t, host, target, passwordForm)
+  const problems = problemsOf(
+    t,
+    host,
+    target,
+    gateway ? { ...passwordForm, on: false } : passwordForm,
+  )
   const changes = [
     ...redirectChanges(routeRef, workload, host, existing, target),
-    ...passwordChanges(routeRef, passwordForm, protectedNow),
+    ...(gateway ? [] : passwordChanges(routeRef, passwordForm, protectedNow)),
   ]
   const nothing = tried && changes.length === 0
   const review = () => {
@@ -201,15 +209,29 @@ export default function DomainAccessDrawer({
           onChange={setRedirectForm}
           shownTo={target.shown}
           permanent={target.permanent}
+          moves={gateway && others.length > 0 ? others : []}
           errors={shown(problems.to)}
         />
-        <PasswordFields
-          others={others}
-          form={passwordForm}
-          onChange={setPasswordForm}
-          errors={{ username: shown(problems.username), password: shown(problems.password) }}
-        />
-        <AccessDetails route={route} host={host} redirect={existing?.middleware} />
+        {gateway ? (
+          <p className="type-meta text-muted-foreground">{t("domainAccess.gatewayNoPassword")}</p>
+        ) : (
+          <PasswordFields
+            others={others}
+            form={passwordForm}
+            onChange={setPasswordForm}
+            errors={{ username: shown(problems.username), password: shown(problems.password) }}
+          />
+        )}
+        {gateway ? (
+          <KubeDetails
+            facts={[
+              [t("domainAccess.kube.redirect"), `HTTPRoute/${route.name} RequestRedirect`],
+              [t("domainAccess.kube.kept"), `HTTPRoute/${route.name} zeabur.com/redirect-rules`],
+            ]}
+          />
+        ) : (
+          <AccessDetails route={route} host={host} redirect={existing?.middleware} />
+        )}
       </ReviewForm>
     </FormDrawer>
   )
@@ -223,6 +245,7 @@ function RedirectFields({
   onChange,
   shownTo,
   permanent,
+  moves,
   errors,
 }: {
   service: Service
@@ -232,6 +255,8 @@ function RedirectFields({
   onChange: (form: RedirectForm) => void
   shownTo: string
   permanent: boolean
+  /** The other domains of an HTTPRoute, which keep the route when this one redirects. */
+  moves: string[]
   errors: string[]
 }) {
   const t = useT()
@@ -247,6 +272,11 @@ function RedirectFields({
       </RadioGroup>
       {form.mode === "redirect" ? (
         <div className="flex flex-col gap-4">
+          {moves.length > 0 ? (
+            <p className="type-meta text-muted-foreground">
+              {t("domainAccess.gatewayMoves", t("common.list", moves))}
+            </p>
+          ) : null}
           <FormField label={t("domainAccess.to")} hint={t("domainAccess.toHint")} errors={errors}>
             <Input
               size="sm"

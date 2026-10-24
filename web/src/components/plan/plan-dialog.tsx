@@ -845,7 +845,12 @@ function routeWarning(
     case "maintenanceRestored":
       return t("warn.maintenanceRestored", warning.hostname, warning.service, warning.port)
     case "domainMoved":
-      return t("warn.domainMoved", warning.hostname, warning.from, warning.to)
+      return t(
+        "warn.domainMoved",
+        warning.hostname,
+        `${warning.from.kind} ${warning.from.name}`,
+        `${warning.to.kind} ${warning.to.name}`,
+      )
     case "routeDeleted":
       return t("warn.routeDeleted", `${warning.route.kind} ${warning.route.name}`, warning.hostname)
   }

@@ -7,12 +7,13 @@ use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use serde_json::Value;
 use zeabur_adapters::provenance::{detect_tool, managed_by};
-use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, traefik};
+use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, gateway, traefik};
 use zeabur_model::{
     Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin,
     ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,
-    Route, RouteMiddleware, RouteTls, Service, WorkloadRef,
+    Route, RouteMiddleware, RouteRule, RouteTls, Service, WorkloadRef,
 };
 
 use crate::attribution::{attribution_of, ingress_backends, relations_of};
@@ -217,6 +218,8 @@ fn route(object: &Ingress) -> Route {
         .map(|host| RouteMiddleware {
             host: Some(host.clone()),
             middleware: traefik::redirect_name(name, host),
+            to: None,
+            permanent: None,
         })
         .filter(|r| middlewares.contains(&r.middleware))
         .collect();
@@ -227,12 +230,16 @@ fn route(object: &Ingress) -> Route {
         .map(|middleware| RouteMiddleware {
             host: None,
             middleware,
+            to: None,
+            permanent: None,
         });
     let error_pages = Some(traefik::error_pages_name(name))
         .filter(|m| middlewares.contains(m))
         .map(|middleware| RouteMiddleware {
             host: None,
             middleware,
+            to: None,
+            permanent: None,
         });
     Route {
         name: name.to_owned(),
@@ -252,6 +259,200 @@ fn route(object: &Ingress) -> Route {
         tls,
         provenance: provenance(&object.metadata),
         origin: Origin::object("Ingress", name),
+    }
+}
+
+/// Adds the Gateway API `HTTPRoute`s of the namespace to `project`.
+///
+/// Each is named by the services whose Kubernetes Services it sends to. A route named as an Ingress
+/// is left out: the document names routes by name alone.
+pub fn with_http_routes(project: &mut Project, http_routes: &[Value]) {
+    for route in http_routes.iter().filter_map(http_route) {
+        if project.route(&route.name).is_some() {
+            continue;
+        }
+        for service in &mut project.services {
+            if service
+                .endpoint_names
+                .iter()
+                .any(|e| route.backends.contains(e))
+            {
+                service.route_names.push(route.name.clone());
+                service.route_names.sort();
+                service.route_names.dedup();
+            }
+        }
+        project.routes.push(route);
+        project.routes.sort_by(|a, b| a.name.cmp(&b.name));
+    }
+}
+
+/// An `HTTPRoute` as a route. While a hostname shows the maintenance page or redirects, its
+/// rules are the ones Zeabur kept, so the route still names the services it returns to.
+fn http_route(object: &Value) -> Option<Route> {
+    let meta: ObjectMeta = serde_json::from_value(object.get("metadata")?.clone()).ok()?;
+    let name = meta.name.clone()?;
+    let strings = |at: &str| -> Vec<String> {
+        object
+            .pointer(at)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|v| v.as_str().map(str::to_owned))
+            .collect()
+    };
+    let hostnames = strings("/spec/hostnames");
+    let spec_rules: Vec<Value> = object
+        .pointer("/spec/rules")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let rules = gateway::redirect_rules(&meta).unwrap_or_else(|| spec_rules.clone());
+    let down = error_pages::maintenance(&meta).unwrap_or_default();
+    let kept = hostnames.iter().find_map(|h| down.get(h));
+    let route_rules = http_route_rules(&name, &hostnames, &rules, kept);
+    let mut backends: Vec<String> = route_rules.iter().map(|r| r.service.clone()).collect();
+    backends.sort();
+    backends.dedup();
+    let redirects = http_route_redirects(&name, &hostnames, &spec_rules);
+    Some(Route {
+        hostnames,
+        backends,
+        class: None,
+        rules: route_rules,
+        tls_hosts: Vec::new(),
+        redirects,
+        basic_auth: None,
+        error_pages: None,
+        maintenance: down.into_keys().collect(),
+        issuer: None,
+        tls: Vec::new(),
+        provenance: provenance(&meta),
+        origin: Origin::object("HTTPRoute", &name),
+        name,
+    })
+}
+
+/// The rules of `HTTPRoute` `name` that send to a Service of its namespace, for each hostname and
+/// path. `kept` is the `backendRefs` of each rule from before maintenance.
+fn http_route_rules(
+    name: &str,
+    hostnames: &[String],
+    rules: &[Value],
+    kept: Option<&Value>,
+) -> Vec<RouteRule> {
+    let hosts: Vec<Option<String>> = if hostnames.is_empty() {
+        vec![None]
+    } else {
+        hostnames.iter().cloned().map(Some).collect()
+    };
+    let mut route_rules = Vec::new();
+    for (r, rule) in rules.iter().enumerate() {
+        let refs = kept
+            .and_then(|k| k.get(r))
+            .filter(|k| !k.is_null())
+            .or_else(|| rule.get("backendRefs"));
+        let paths: Vec<(String, String)> = rule
+            .get("matches")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|m| m.get("path"))
+            .map(|p| {
+                let kind = p
+                    .get("type")
+                    .and_then(Value::as_str)
+                    .unwrap_or("PathPrefix");
+                let value = p.get("value").and_then(Value::as_str).unwrap_or("/");
+                (value.to_owned(), path_type(kind).to_owned())
+            })
+            .collect();
+        let paths = if paths.is_empty() {
+            vec![("/".to_owned(), "Prefix".to_owned())]
+        } else {
+            paths
+        };
+        for (b, backend) in refs
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .enumerate()
+        {
+            let local = backend.get("namespace").is_none()
+                && backend
+                    .get("group")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .is_empty()
+                && backend
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Service")
+                    == "Service";
+            let Some(service) = backend
+                .get("name")
+                .and_then(Value::as_str)
+                .filter(|_| local)
+            else {
+                continue;
+            };
+            for host in &hosts {
+                for (path, kind) in &paths {
+                    route_rules.push(RouteRule {
+                        host: host.clone(),
+                        path: Some(path.clone()),
+                        path_type: Some(kind.clone()),
+                        service: service.to_owned(),
+                        port: backend.get("port").map(Value::to_string),
+                        origin: Origin::field(
+                            "HTTPRoute",
+                            name,
+                            format!("spec.rules[{r}].backendRefs[{b}]"),
+                        ),
+                    });
+                }
+            }
+        }
+    }
+    route_rules
+}
+
+/// The redirect of each hostname of an `HTTPRoute` whose rules redirect.
+fn http_route_redirects(name: &str, hostnames: &[String], rules: &[Value]) -> Vec<RouteMiddleware> {
+    let redirect = rules
+        .iter()
+        .flat_map(|rule| {
+            rule.get("filters")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+        })
+        .find_map(|f| f.get("requestRedirect"));
+    redirect.map_or_else(Vec::new, |redirect| {
+        hostnames
+            .iter()
+            .map(|host| RouteMiddleware {
+                host: Some(host.clone()),
+                middleware: name.to_owned(),
+                to: redirect
+                    .get("hostname")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned),
+                permanent: Some(matches!(
+                    redirect.get("statusCode").and_then(Value::as_i64),
+                    Some(301 | 308)
+                )),
+            })
+            .collect()
+    })
+}
+
+/// The Ingress `pathType` for a Gateway API path match type.
+fn path_type(kind: &str) -> &'static str {
+    match kind {
+        "Exact" => "Exact",
+        "PathPrefix" => "Prefix",
+        _ => "ImplementationSpecific",
     }
 }
 

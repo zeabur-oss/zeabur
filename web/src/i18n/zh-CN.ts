@@ -608,6 +608,7 @@ export const zhCN: Messages = {
   "events.forPod": "副本",
   "events.clearPod": "显示所有副本",
   "domains.https": "已配置 HTTPS",
+  "domains.gatewayHttps": "HTTPS 由 Gateway 决定",
   "resource.unused": "未使用",
   "resource.unusedCount": (n) => `${n} 个未使用`,
   "storage.requestedTotal": (size) => `共申请 ${size}`,
@@ -3240,6 +3241,10 @@ export const zhCN: Messages = {
   "domainAccess.passwordHint": "访客要先输入用户名和密码才能看到服务。Zeabur 只保存密码的哈希值。",
   "domainAccess.passwordShared": (hosts) =>
     `${hosts} 和这个域名共用同一个 Ingress，也会要求同一组密码。`,
+  "domainAccess.gatewayNoPassword":
+    "Gateway API 没有要求输入密码的 filter，所以这个域名的 HTTPRoute 无法设置密码。",
+  "domainAccess.gatewayMoves": (hosts) =>
+    `重定向会应用到整个 HTTPRoute，所以这个域名会移到自己的路由，${hosts} 留在原处。`,
   "domainAccess.passwordSet": "已设置密码。",
   "domainAccess.change": "更改",
   "domainAccess.username": "用户名",
@@ -3251,6 +3256,7 @@ export const zhCN: Messages = {
   "domainAccess.protected": "密码",
   "domainAccess.kube.annotation": "Middleware 列表",
   "domainAccess.kube.redirect": "重定向",
+  "domainAccess.kube.kept": "原来的规则",
   "domainAccess.kube.password": "密码",
   "domainAccess.kube.users": "用户",
   "domainAccess.kube.usersValue": (name) =>
@@ -3364,7 +3370,7 @@ export const zhCN: Messages = {
   "useShared.kube.whenValue": "Pod 重启时；这个更改会替换 Pod",
   "warn.taskImageCopied": (service, image) =>
     `任务使用 ${service} 当前的镜像 ${image}；之后 ${service} 换镜像，任务不会跟着换`,
-  "warn.domainMoved": (host, from, to) => `${host} 从 Ingress ${from} 移到自己的 Ingress ${to}`,
+  "warn.domainMoved": (host, from, to) => `${host} 从 ${from} 移到自己的路由 ${to}`,
   "warn.routeDeleted": (route, host) => `${route} 只路由 ${host}，所以会一起删除`,
   "warn.maintenanceRestored": (host, service, port) =>
     `维护期间 ${host} 的规则改过，原来的后端对不上，显示维护页的路径会改发到 ${service}:${port}`,

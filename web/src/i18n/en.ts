@@ -656,6 +656,7 @@ export const en = {
   "events.forPod": "Replica",
   "events.clearPod": "Show every replica",
   "domains.https": "HTTPS configured",
+  "domains.gatewayHttps": "HTTPS decided by the Gateway",
   "resource.unused": "Unused",
   "resource.unusedCount": (n: number) => `${n} unused`,
   "storage.requestedTotal": (size: string) => `${size} requested`,
@@ -3517,6 +3518,10 @@ export const en = {
     "Visitors enter a username and password before they see the service. Zeabur keeps only a hash of the password.",
   "domainAccess.passwordShared": (hosts: string) =>
     `The password also covers ${hosts}, because they share this Ingress.`,
+  "domainAccess.gatewayNoPassword":
+    "Gateway API has no filter that asks for a password, so this domain's HTTPRoute can't ask for one.",
+  "domainAccess.gatewayMoves": (hosts: string) =>
+    `A redirect applies to the whole HTTPRoute, so this domain moves to a route of its own. ${hosts} stay where they are.`,
   "domainAccess.passwordSet": "A password is set.",
   "domainAccess.change": "Change",
   "domainAccess.username": "Username",
@@ -3528,6 +3533,7 @@ export const en = {
   "domainAccess.protected": "Password",
   "domainAccess.kube.annotation": "Middleware list",
   "domainAccess.kube.redirect": "Redirect",
+  "domainAccess.kube.kept": "Rules from before",
   "domainAccess.kube.password": "Password",
   "domainAccess.kube.users": "Users",
   "domainAccess.kube.usersValue": (name: string) =>
@@ -3650,7 +3656,7 @@ export const en = {
   "warn.taskImageCopied": (service: string, image: string) =>
     `The task runs ${image}, ${service}'s image now; a later image change to ${service} doesn't reach it`,
   "warn.domainMoved": (host: string, from: string, to: string) =>
-    `${host} moves from Ingress ${from} to its own Ingress ${to}`,
+    `${host} moves from ${from} to a route of its own, ${to}`,
   "warn.routeDeleted": (route: string, host: string) =>
     `${route} routes only ${host}, so it is deleted with it`,
   "warn.maintenanceRestored": (host: string, service: string, port: number) =>

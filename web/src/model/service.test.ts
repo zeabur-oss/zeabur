@@ -56,6 +56,7 @@ describe("a service's domains", () => {
       routes: [
         {
           name: "public",
+          origin: { kind: "Ingress", name: "public" },
           rules: [
             { service: "api", host: "api.example.com" },
             { service: "web", host: "example.com" },

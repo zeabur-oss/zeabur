@@ -1,4 +1,4 @@
-description: "A redirect on an HTTPRoute that serves only its hostname replaces the rules with one RequestRedirect rule, as Gateway API refuses the filter next to backendRefs."
+description: "A redirect on an HTTPRoute that serves only its hostname replaces the rules with one RequestRedirect rule, as Gateway API refuses the filter next to backendRefs. The rules from before are kept in an annotation."
 operation: mutation.plan
 params:
   request:

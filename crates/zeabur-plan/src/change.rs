@@ -1192,16 +1192,16 @@ pub enum Warning {
         /// Its name.
         pod: String,
     },
-    /// The hostname moved to an Ingress of its own, so its certificate can differ from the
-    /// issued certificates of the others.
+    /// The hostname moved to a route of its own: for its own certificate, or for a redirect or
+    /// maintenance that would apply to every hostname of an `HTTPRoute`.
     #[serde(rename_all = "camelCase")]
     DomainMoved {
         /// The hostname.
         hostname: String,
-        /// The Ingress it leaves.
-        from: String,
-        /// Its new Ingress.
-        to: String,
+        /// The route it leaves.
+        from: ObjectName,
+        /// Its new route.
+        to: ObjectName,
     },
     /// The hostname was the route's last, so the route is deleted with it.
     #[serde(rename_all = "camelCase")]
@@ -1288,6 +1288,15 @@ pub struct ObjectName {
     pub kind: String,
     /// The name.
     pub name: String,
+}
+
+impl ObjectName {
+    pub(crate) fn of(kind: &str, name: &str) -> Self {
+        Self {
+            kind: kind.to_owned(),
+            name: name.to_owned(),
+        }
+    }
 }
 
 /// A connection between two services of the project.

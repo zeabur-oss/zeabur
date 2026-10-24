@@ -230,8 +230,9 @@ function worstHealth(statuses: Status[]): Health {
 export interface Domain {
   host: string
   ingress: string
-  /** Listed in the Ingress's TLS section; says nothing of the certificate's validity. */
-  https: boolean
+  /** Listed in the Ingress's TLS section; says nothing of the certificate's validity. Unknown
+   * for an HTTPRoute, as the Gateway's listener decides. */
+  https?: boolean
   service: Service
 }
 
@@ -243,7 +244,8 @@ export interface PublicRoute {
   ingress: string
   backend: string
   port?: string
-  https: boolean
+  /** Unknown for an HTTPRoute, as the Gateway's listener decides. */
+  https?: boolean
 }
 
 export function publicRoutesOf(network: Network, service: Service): PublicRoute[] {
@@ -258,7 +260,12 @@ export function publicRoutesOf(network: Network, service: Service): PublicRoute[
         ingress: route.name,
         backend: rule.service,
         port: rule.port ?? undefined,
-        https: rule.host ? (route.tlsHosts?.includes(rule.host) ?? false) : false,
+        https:
+          route.origin.kind === "HTTPRoute"
+            ? undefined
+            : rule.host
+              ? (route.tlsHosts?.includes(rule.host) ?? false)
+              : false,
       })),
   )
 }
@@ -277,7 +284,7 @@ export function domainsOf(network: Network, service: Service): Domain[] {
 }
 
 export const hostUrl = (domain: Pick<Domain, "host" | "https">) =>
-  `${domain.https ? "https" : "http"}://${domain.host}`
+  `${domain.https === false ? "http" : "https"}://${domain.host}`
 
 /** The Secrets a service's variables read with `env` or `envFrom`; mounted ones are files. */
 export function envSecretsOf(service: Service): string[] {

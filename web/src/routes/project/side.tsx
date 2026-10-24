@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import CaretRightIcon from "~icons/ph/caret-right"
+import GlobeIcon from "~icons/ph/globe"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 import LockSimpleOpenIcon from "~icons/ph/lock-simple-open"
 
@@ -449,7 +450,8 @@ function ShowAll({
   )
 }
 
-const domainRank = (d: Domain) => (d.https ? 10 : 0) + healthRank[statusOf(d.service).health]
+const domainRank = (d: Domain) =>
+  (d.https === false ? 0 : 10) + healthRank[statusOf(d.service).health]
 
 /** Domains without HTTPS, then those of failing services, then the rest by host. */
 const byException = (domains: Domain[]) =>
@@ -457,10 +459,19 @@ const byException = (domains: Domain[]) =>
 
 function DomainRow({ project, domain }: { project: string; domain: Domain }) {
   const t = useT()
-  const Lock = domain.https ? LockSimpleIcon : LockSimpleOpenIcon
+  const Lock =
+    domain.https === undefined ? GlobeIcon : domain.https ? LockSimpleIcon : LockSimpleOpenIcon
   return (
     <li className={sideRow}>
-      <Tooltip content={domain.https ? t("domains.https") : "HTTP"}>
+      <Tooltip
+        content={
+          domain.https === undefined
+            ? t("domains.gatewayHttps")
+            : domain.https
+              ? t("domains.https")
+              : "HTTP"
+        }
+      >
         <Lock
           aria-hidden="true"
           className={cn("size-3.5 shrink-0", domain.https ? "text-ok" : "text-muted-foreground")}
@@ -544,7 +555,7 @@ export function Domains({
       </div>
     )
   const shown = firstRows(domains)
-  const insecure = domains.filter((d) => !d.https).length
+  const insecure = domains.filter((d) => d.https === false).length
   return (
     <section aria-labelledby="project-domains" className="flex flex-col gap-1">
       <Heading id="project-domains" title={t("common.domains")} count={domains.length} />
