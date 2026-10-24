@@ -31,9 +31,10 @@ approval() { # $1 = crate name, $2 = kind
 # Download sources first; the scan reads them from the Cargo home.
 cargo fetch --locked --quiet
 
-# The shipped graph: normal and build dependencies of the three binaries (Zeabur, zeaburctl, Zeabur Proxy) for the image target.
+# The shipped graph: normal and build dependencies of the shipped binaries (Zeabur, zeaburctl, Zeabur Proxy,
+# zeabur-installer) for the image target.
 # Dev-dependencies and the test-only crates never reach a binary and are not listed.
-shipped=$(cargo tree --locked -p zeabur -p zeaburctl -p zeabur-proxy --all-features -e normal,build --target "$target" \
+shipped=$(cargo tree --locked -p zeabur -p zeaburctl -p zeabur-proxy -p zeabur-installer --all-features -e normal,build --target "$target" \
   --prefix none --format '{p}' | sed 's/ (.*//; s/ v/@/' | sort -u)
 
 # Every shipped non-workspace package, with its source directory and whether it declares `links`

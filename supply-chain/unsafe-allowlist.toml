@@ -1109,3 +1109,41 @@ name = "byteorder"
 kind = "unsafe"
 reason = "bcrypt -> blowfish, for the Traefik basic-auth hashes. Reads and writes integers of fixed byte order through pointer copies over slices it has checked for length"
 approved = "2026-10-23"
+
+# --- Installer: unpacking the RKE2 release and packing a local chart. Pending a maintainer's review.
+
+[[crate]]
+name = "crc32fast"
+kind = "unsafe"
+reason = "gzip checksums"
+approved = "pending"
+
+[[crate]]
+name = "filetime"
+kind = "unsafe"
+reason = "file times when unpacking the RKE2 tarball"
+approved = "pending"
+
+[[crate]]
+name = "flate2"
+kind = "unsafe"
+reason = "gzip"
+approved = "pending"
+
+[[crate]]
+name = "simd-adler32"
+kind = "unsafe"
+reason = "zlib checksums (flate2's Rust backend)"
+approved = "pending"
+
+[[crate]]
+name = "tar"
+kind = "unsafe"
+reason = "unpacking the RKE2 tarball"
+approved = "pending"
+
+[[crate]]
+name = "utf8-zero"
+kind = "unsafe"
+reason = "ureq's text decoding"
+approved = "pending"
