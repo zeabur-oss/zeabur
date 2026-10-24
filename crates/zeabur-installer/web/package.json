@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
-    "@zeabur/design-system": "github:zeabur-oss/design-system#d5ef81dbd9de89250914722005e97887bcd9c615",
+    "@zeabur/design-system": "git+ssh://git@github.com/zeabur-oss/design-system.git#c656ef79d0e6fa844bf94a188d572fbdbe596192",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.0",
     "react": "19.3.1",
