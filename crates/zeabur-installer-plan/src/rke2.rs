@@ -241,16 +241,42 @@ pub const EMPTY_AUTHN: &str = "apiVersion: apiserver.config.k8s.io/v1\n\
                                anonymous:\n  enabled: false\n\
                                jwt: []\n";
 
-/// Request metadata for every call, never bodies: Secret values stay out of the log. RKE2 keeps 30
-/// days, 10 files of 100 MB, in /var/lib/rancher/rke2/server/logs/audit.log.
-const AUDIT_POLICY: &str = "# Written by zeabur-installer.\n\
-                            apiVersion: audit.k8s.io/v1\n\
-                            kind: Policy\n\
-                            omitStages: [RequestReceived]\n\
-                            rules:\n\
-                            \x20 - level: None\n\
-                            \x20   nonResourceURLs: [/healthz*, /livez*, /readyz*, /version]\n\
-                            \x20 - level: Metadata\n";
+/// Metadata only, never bodies, so Secret values stay out of the log. Every request on Secrets
+/// is kept, reads included, with who made it. Of the rest, only changes by people and workloads
+/// are kept: reads, events, leases, token and access reviews, and requests from nodes and
+/// control-plane components are frequent and routine. The first rule that matches decides. RKE2 keeps 30 days, 10 files of
+/// 100 MB, in /var/lib/rancher/rke2/server/logs/audit.log.
+const AUDIT_POLICY: &str = r#"# Written by zeabur-installer.
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages: [RequestReceived]
+rules:
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: [secrets]
+  - level: None
+    nonResourceURLs: [/healthz*, /livez*, /readyz*, /version]
+  - level: None
+    userGroups: [system:nodes]
+  - level: None
+    users: [system:apiserver, system:kube-controller-manager, system:kube-scheduler, system:kube-proxy]
+  - level: None
+    verbs: [get, list, watch]
+  - level: None
+    resources:
+      - group: ""
+        resources: [events]
+      - group: events.k8s.io
+        resources: [events]
+      - group: coordination.k8s.io
+        resources: [leases]
+      - group: authentication.k8s.io
+        resources: [tokenreviews]
+      - group: authorization.k8s.io
+        resources: [subjectaccessreviews]
+  - level: Metadata
+"#;
 
 fn config(options: &Options) -> String {
     let mut out = String::from(HEADER);
@@ -357,6 +383,22 @@ mod tests {
         assert_eq!(label_value("fsn1-dc14").unwrap(), "fsn1-dc14");
         assert_eq!(label_value(":::"), None);
         assert_eq!(label_value(&"a".repeat(80)).unwrap().len(), 63);
+    }
+
+    #[test]
+    fn the_audit_policy_keeps_every_secret_request_first_and_never_bodies() {
+        let policy: serde_json::Value = serde_saphyr::from_str(AUDIT_POLICY).unwrap();
+        let rules = policy["rules"].as_array().unwrap();
+        assert_eq!(
+            rules[0],
+            serde_json::json!({"level": "Metadata",
+                               "resources": [{"group": "", "resources": ["secrets"]}]})
+        );
+        assert!(
+            rules
+                .iter()
+                .all(|r| ["None", "Metadata"].contains(&r["level"].as_str().unwrap()))
+        );
     }
 
     #[test]

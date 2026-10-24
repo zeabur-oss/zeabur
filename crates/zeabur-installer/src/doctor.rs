@@ -107,8 +107,48 @@ pub(crate) fn run() -> ExitCode {
         ),
     };
     results.push((encryption.0, encryption.1.to_owned()));
+    results.push(secrets_encryption(
+        std::fs::read_to_string(ENCRYPTION_CONFIG).ok().as_deref(),
+    ));
 
     report(&results)
+}
+
+/// The kube-apiserver encryption configuration RKE2 writes.
+const ENCRYPTION_CONFIG: &str = "/var/lib/rancher/rke2/server/cred/encryption-config.json";
+
+/// Whether kube-apiserver writes Secrets to etcd encrypted: the first provider for `secrets` is the
+/// one it writes with, and `identity` writes them as they are.
+fn secrets_encryption(config: Option<&str>) -> (Status, String) {
+    let Some(config) = config else {
+        return (
+            Status::Fail,
+            format!("{ENCRYPTION_CONFIG} is missing: Secrets in etcd are not encrypted"),
+        );
+    };
+    let config: Value = serde_json::from_str(config).unwrap_or_default();
+    let writer = config["resources"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .find(|r| {
+            r["resources"]
+                .as_array()
+                .is_some_and(|names| names.iter().any(|n| n == "secrets"))
+        })
+        .and_then(|r| r["providers"].get(0))
+        .and_then(Value::as_object)
+        .and_then(|p| p.keys().next().cloned());
+    match writer.as_deref() {
+        Some("identity") | None => (
+            Status::Fail,
+            "Secrets in etcd are not encrypted: rke2 secrets-encrypt status".to_owned(),
+        ),
+        Some(provider) => (
+            Status::Pass,
+            format!("Secrets in etcd are encrypted ({provider})"),
+        ),
+    }
 }
 
 /// Prints the results and gives the exit code of the worst.
@@ -289,5 +329,22 @@ fn deployment(kubectl: &Kubectl, namespace: &str, name: &str) -> (Status, String
                 "{namespace}/{name} is not available: kubectl describe -n {namespace} {target}"
             ),
         ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn secrets_are_encrypted_only_when_the_first_provider_is_not_identity() {
+        let rke2 = r#"{"kind":"EncryptionConfiguration","apiVersion":"apiserver.config.k8s.io/v1",
+            "resources":[{"resources":["secrets"],
+            "providers":[{"aescbc":{"keys":[{"name":"aescbckey","secret":"x"}]}},{"identity":{}}]}]}"#;
+        assert_eq!(secrets_encryption(Some(rke2)).0, Status::Pass);
+        let identity = rke2.replacen("aescbc", "identity", 1);
+        assert_eq!(secrets_encryption(Some(&identity)).0, Status::Fail);
+        assert_eq!(secrets_encryption(Some("{}")).0, Status::Fail);
+        assert_eq!(secrets_encryption(None).0, Status::Fail);
     }
 }
