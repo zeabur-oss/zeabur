@@ -38,6 +38,9 @@ pub const ACME_ISSUER: &str = "letsencrypt";
 /// RKE2's own memory at idle on one node, measured on the test VM (`kubectl top` plus containerd
 /// and the rke2 process), rounded up.
 const RKE2_IDLE_MIB: u64 = 1300;
+/// The least memory of a server with 4 GiB, RKE2's minimum. The kernel and the firmware keep part
+/// of the 4096 MiB, so such a server reports less.
+const MIN_MEMORY_MIB: u64 = 3800;
 
 /// Why components' pods need more than `restricted`: those the catalog does not mark privileged,
 /// and those whose reason is worth more than the catalog's flag.
@@ -611,11 +614,13 @@ fn memory(components: &[ComponentPlan], host_mib: u64, warnings: &mut Vec<Warnin
         unmeasured,
         host_mib,
     };
-    if host_mib < 3800 {
+    if host_mib < MIN_MEMORY_MIB {
         warnings.push(warning(
             "memory.low",
             &[&host_mib.to_string()],
-            format!("RKE2 asks for at least 4096 MiB of memory; this host has {host_mib} MiB."),
+            format!(
+                "RKE2 asks for a server with at least 4 GiB of memory; this host has {host_mib} MiB."
+            ),
         ));
     } else if memory.rke2_mib + memory.components_mib > host_mib * 3 / 4 {
         let idle = memory.rke2_mib + memory.components_mib;
@@ -1475,5 +1480,18 @@ mod tests {
             panic!("a development build needs sources");
         };
         assert_eq!(keys, ["identityImage", "identityctl", "zeaburChart"]);
+    }
+
+    #[test]
+    fn a_server_with_4_gib_is_enough_memory() {
+        for (host_mib, low) in [(3800, false), (3799, true)] {
+            let mut warnings = Vec::new();
+            memory(&[], host_mib, &mut warnings);
+            assert_eq!(
+                warnings.iter().any(|w| w.code == "memory.low"),
+                low,
+                "{host_mib} MiB"
+            );
+        }
     }
 }

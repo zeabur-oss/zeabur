@@ -228,7 +228,7 @@ export const en = {
   "warning.local.dns": (identity: string, zeabur: string) =>
     `${zeabur} and ${identity} must resolve to this server through DNS, for browsers and for the server itself. A hosts file is not enough: pods do not read it.`,
   "warning.memory.low": (host: string) =>
-    `RKE2 asks for at least ${mib(4096)} of memory; this server has ${mib(host)}.`,
+    `RKE2 asks for a server with at least 4 GiB of memory; this server has ${mib(host)}.`,
   "warning.memory.tight": (idle: string, host: string) =>
     `At idle, RKE2 and the components use about ${mib(idle)} of this server's ${mib(host)}.`,
   "warning.rke2.unsupported": (version: string) =>

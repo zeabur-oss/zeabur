@@ -208,8 +208,7 @@ export const zhTW: Messages = {
   "warning.metrics.missing": () => "少了 VictoriaMetrics，Zeabur 就不會顯示用量歷史。",
   "warning.local.dns": (identity, zeabur) =>
     `${zeabur} 和 ${identity} 必須透過 DNS 解析到這台伺服器，瀏覽器和伺服器本身都是。只改 hosts 檔不夠：Pod 不會讀它。`,
-  "warning.memory.low": (host) =>
-    `RKE2 至少需要 ${mib(4096)} 記憶體，這台伺服器只有 ${mib(host)}。`,
+  "warning.memory.low": (host) => `RKE2 需要記憶體至少 4 GiB 的伺服器，這台只有 ${mib(host)}。`,
   "warning.memory.tight": (idle, host) =>
     `閒置時，RKE2 和元件約使用 ${mib(idle)}，這台伺服器共有 ${mib(host)}。`,
   "warning.rke2.unsupported": (version) =>

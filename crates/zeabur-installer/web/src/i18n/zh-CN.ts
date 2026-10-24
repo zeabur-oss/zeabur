@@ -208,7 +208,7 @@ export const zhCN: Messages = {
   "warning.metrics.missing": () => "缺少 VictoriaMetrics，Zeabur 将不显示用量历史。",
   "warning.local.dns": (identity, zeabur) =>
     `${zeabur} 和 ${identity} 必须通过 DNS 解析到这台服务器，浏览器和服务器本身都需要。只改 hosts 文件不够：Pod 不会读取它。`,
-  "warning.memory.low": (host) => `RKE2 至少需要 ${mib(4096)} 内存，这台服务器只有 ${mib(host)}。`,
+  "warning.memory.low": (host) => `RKE2 需要内存至少 4 GiB 的服务器，这台只有 ${mib(host)}。`,
   "warning.memory.tight": (idle, host) =>
     `空闲时，RKE2 和组件约使用 ${mib(idle)}，这台服务器共有 ${mib(host)}。`,
   "warning.rke2.unsupported": (version) =>
