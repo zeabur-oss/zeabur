@@ -22,6 +22,32 @@ async function run(page: Page, step: Step) {
   else await page.keyboard.press(step.press)
 }
 
+// Content must not touch the edge of the image. Add space around the element until it has 24 px
+// on each side, its own padding included. Null: the element has enough padding of its own.
+async function padded(page: Page, selector: string) {
+  return page
+    .locator(selector)
+    .first()
+    .evaluate((el) => {
+      const s = getComputedStyle(el)
+      const own = Math.min(
+        ...[s.paddingTop, s.paddingRight, s.paddingBottom, s.paddingLeft].map(parseFloat),
+      )
+      const pad = Math.max(0, 24 - own)
+      if (pad === 0) return null
+      el.scrollIntoView({ block: "center" })
+      const r = el.getBoundingClientRect()
+      const x = Math.max(0, r.left - pad)
+      const y = Math.max(0, r.top - pad)
+      return {
+        x,
+        y,
+        width: Math.min(innerWidth, r.right + pad) - x,
+        height: Math.min(innerHeight, r.bottom + pad) - y,
+      }
+    })
+}
+
 for (const shot of readManifest(manifest).filter((s) => serverKey(s) === server)) {
   test.describe(() => {
     test.use({ viewport: viewports[shot.viewport] })
@@ -39,7 +65,9 @@ for (const shot of readManifest(manifest).filter((s) => serverKey(s) === server)
       await page.evaluate(() => document.fonts.ready)
       const path = `${out}/${info.project.name}/${shot.id}.png`
       const options = { path, animations: "disabled", caret: "hide" } as const
-      if (shot.clip) await page.locator(shot.clip).first().screenshot(options)
+      const clip = shot.clip && (await padded(page, shot.clip))
+      if (clip) await page.screenshot({ ...options, clip })
+      else if (shot.clip) await page.locator(shot.clip).first().screenshot(options)
       else await page.screenshot(options)
     })
   })

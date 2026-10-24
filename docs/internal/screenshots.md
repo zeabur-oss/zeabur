@@ -39,7 +39,7 @@ fails, Playwright's trace is in `target/docs-shots-results`.
     - hover: 'a[href="/projects/shop/settings"]'
     - press: Escape
     - wait: '[role="alert"]'
-  clip: main                    # optional: CSS selector to crop to
+  clip: main                    # optional: CSS selector to crop to; at least 24 px around it
   viewport: desktop             # desktop (1440×900) or phone (390×844); default desktop
   locales: [en]                 # optional: en, zh-TW, zh-CN; default all three
   themes: [light, dark]         # optional: light, dark; default [light]
