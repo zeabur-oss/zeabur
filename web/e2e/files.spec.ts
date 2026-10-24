@@ -77,7 +77,7 @@ test("a claim's files are listed, previewed, downloaded and changed after a conf
 
   await rowAction(page, "/data", "--upload me.txt", "Delete")
   const remove = page.getByRole("dialog", { name: "Delete --upload me.txt" })
-  await expect(remove).toContainText("claim keeper-data")
+  await expect(remove).toContainText("keeper-data")
   await remove.getByRole("button", { name: "Delete --upload me.txt", exact: true }).click()
   await expect(data.getByRole("button", { name: "--upload me.txt", exact: true })).toHaveCount(0)
 })

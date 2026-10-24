@@ -535,6 +535,7 @@ test("Objects lists the project's objects and opens one as YAML", async ({ page 
   await list.getByRole("button", { name: /^editor-config/ }).click()
   await expect(page).toHaveURL(/object=core(%2F|\/)v1(%2F|\/)configmaps(%2F|\/)editor-config/)
   const panel = page.getByRole("dialog").filter({ hasText: "editor-config" })
+  await panel.getByRole("tab", { name: "YAML" }).click()
   await expect(panel.getByRole("figure", { name: "YAML of editor-config" })).toContainText(
     /mode: (blue|green)/,
   )
@@ -565,6 +566,7 @@ test("Objects loads unusual kinds on click and on a scan", async ({ page }) => {
 
 test("YAML never shows a Secret's values", async ({ page }) => {
   await page.goto(`${project}/objects?object=core/v1/secrets/${secret}`)
+  await page.getByRole("tab", { name: "YAML" }).click()
   const yaml = page.getByRole("figure", { name: `YAML of ${secret}` })
   await expect(yaml).toContainText("kind: Secret")
   await expect(yaml).toContainText("greeting")
@@ -739,7 +741,7 @@ test("restart of a single pod is confirmed in full, then reported in a toast", a
   await expect(page).toHaveURL(tabUrl("deployments"))
 })
 
-test("a change made meanwhile is refused in a toast, and Review again plans it afresh", async ({
+test("a change made meanwhile is planned again in the review, and saved from there", async ({
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${editor}?tab=variables`)
@@ -758,10 +760,10 @@ test("a change made meanwhile is refused in a toast, and Review again plans it a
   })
 
   await dialog.getByRole("button", { name: "Save variables" }).click()
-  await expect(dialog).toHaveCount(0)
-  const refused = toast(page, "changed after you reviewed it")
-  await expect(refused).toBeVisible({ timeout: 15_000 })
-  await refused.getByRole("button", { name: "Review again" }).click()
+  await expect(dialog.getByRole("status")).toContainText(
+    "Something changed after you reviewed this.",
+    { timeout: 15_000 },
+  )
   await confirmPlan(page, `Save changes to ${editor}`, "Save variables", "Add E2E_REVIEWED")
   await expect(panel).toContainText("E2E_REVIEWED", { timeout: 15_000 })
 })
@@ -865,6 +867,7 @@ test("Deployments lists the releases and rolls back to one through a plan", asyn
 test("an object's YAML is edited and planned", async ({ page }) => {
   await page.goto(`${project}/objects?object=core/v1/configmaps/editor-config`)
   const panel = page.getByRole("dialog").filter({ hasText: "editor-config" })
+  await panel.getByRole("tab", { name: "YAML" }).click()
   await panel.getByRole("button", { name: "Edit" }).click()
   const text = panel.getByRole("textbox", { name: "YAML of editor-config" })
   await expect(panel.locator(".cm-editor")).toHaveCSS("display", "flex")
@@ -1041,6 +1044,7 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
   await allowIngress()
   const address = `networking.k8s.io/v1/networkpolicies/${policy}`
   await page.goto(`${project}/objects?object=${encodeURIComponent(address)}`)
+  await page.getByRole("tab", { name: "YAML" }).click()
   await page.getByRole("button", { name: "Delete", exact: true }).click()
   const dialog = page.getByRole("dialog", {
     name: `Delete NetworkPolicy ${policy}`,

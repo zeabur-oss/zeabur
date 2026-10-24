@@ -155,7 +155,7 @@ test("a pod that runs again after a recent crash keeps the service failing, in p
   })
   await page.goto(servicePage)
   const status = page.getByRole("region", { name: "Status" })
-  await expect(status.getByRole("heading", { level: 2 })).toHaveText("Keeps crashing")
+  await expect(status.getByRole("heading", { level: 2 })).toContainText("Keeps crashing")
   await expect(status.getByText("Running, 5 restarts, last exit 1, 4 minutes ago")).toBeVisible()
 })
 

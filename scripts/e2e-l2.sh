@@ -331,6 +331,9 @@ fi
 helm uninstall zeabur --namespace "$namespace" --wait --timeout 3m
 kubectl delete rolebindings,clusterrolebindings -A -l zeabur.com/member --wait
 kubectl delete namespace "$namespace" --wait --timeout=180s
+# The chart keeps the S3 destinations' namespace on purpose; the project's name is the person's.
+kubectl delete namespace zeabur-s3-destinations --wait --timeout=180s
+kubectl annotate namespace "$project" zeabur.com/display-name-
 snapshot >"$out/after.txt"
 if ! diff -u "$out/before.txt" "$out/after.txt"; then
   echo "error: the cluster differs from before the installation (above)" >&2
