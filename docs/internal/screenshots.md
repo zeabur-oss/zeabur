@@ -82,3 +82,11 @@ each. `docs/readme-shots.yaml` declares them, and `scripts/readme-images.sh` tak
 pixel per CSS pixel, light and dark, English only. The script sets `ZEABUR_SHOTS_SCALE=1` and
 `ZEABUR_SHOTS_BUDGET_KB=30` for `scripts/docs-shots.sh`, which lowers the AVIF quality in steps
 until each file fits.
+
+## Landing images
+
+The landing page at oss.zeabur.com uses its own set, also in git: `docs/site-shots.yaml` declares
+them and `scripts/site-images.sh` takes them at twice the pixel density, light and dark, in all
+three locales, into `docs/images/site/<locale>/<theme>/<id>.avif` (at most 150 KB each). The
+landing shows them at most 1152 CSS px wide, so text stays sharp on Hi-DPI screens. The README
+images stay as they are.
