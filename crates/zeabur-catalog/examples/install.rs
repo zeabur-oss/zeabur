@@ -1,8 +1,10 @@
 //! Prints the Helm commands that install a catalogue component, the text Cluster → Components
-//! shows. `scripts/dev-cluster.sh` runs them:
+//! shows, with each `<input>=<value>` given filling that input's placeholder.
+//! `scripts/dev-cluster.sh` runs them:
 //!
 //! ```sh
-//! cargo run -q -p zeabur-catalog --example install -- databases/cloudnative-pg single-node | bash
+//! cargo run -q -p zeabur-catalog --example install -- container-registry/zot single-node \
+//!   cluster-ip=10.43.0.50 | bash
 //! ```
 
 use std::error::Error;
@@ -12,14 +14,24 @@ use zeabur_catalog::install::{InstallFormat, guide};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let [component, profile] = args.as_slice() else {
-        return Err("usage: install <capability>/<id> <profile>".into());
+    let [component, profile, inputs @ ..] = args.as_slice() else {
+        return Err("usage: install <capability>/<id> <profile> [<input>=<value>...]".into());
     };
-    let text = guide(component, profile)?
+    let mut text = guide(component, profile)?
         .formats
         .into_iter()
         .find(|f| f.format == InstallFormat::Helm)
         .map_or_default(|f| f.text);
+    for input in inputs {
+        let Some((name, value)) = input.split_once('=') else {
+            return Err(format!("{input}: not <input>=<value>").into());
+        };
+        let placeholder = format!("'<{name}>'");
+        if !text.contains(&placeholder) {
+            return Err(format!("{component} takes no input {name}").into());
+        }
+        text = text.replace(&placeholder, &format!("'{}'", value.replace('\'', r"'\''")));
+    }
     std::io::stdout().write_all(text.as_bytes())?;
     Ok(())
 }
