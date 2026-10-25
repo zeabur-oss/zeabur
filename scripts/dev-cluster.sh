@@ -77,7 +77,7 @@ down() {
   if [[ -f "$state/images" ]]; then
     xargs -r docker image rm -f <"$state/images" >/dev/null 2>&1 || true
   fi
-  rm -rf "$tls" "$state/kubeconfig" "$state/images" "$state/profile" "$state/before.txt" \
+  rm -rf "$tls" "$state/kubeconfig" "$state/images" "$state/profile" "$state/before.txt" "$state/after.txt" \
     "$state/registries.yaml" "$state/install.yaml" "$state/identityctl"
   echo "cluster $cluster deleted"
 }
@@ -379,8 +379,7 @@ EOF
   if kubectl -n zeabur-identity get users.identity.zeabur.com admin >/dev/null 2>&1; then
     echo "Admin:   enrolled; a new setup link: $identityctl setup-link --username admin"
   else
-    echo "Enroll the first admin's passkey (works once, for 24 hours):"
-    echo "  $("$identityctl" setup-link --username admin --valid-for 24h)"
+    "$identityctl" setup-link --username admin --valid-for 24h
   fi
   echo "CA:      $tls/ca.crt (trust it in the browser, or accept the certificate)"
   echo "kubectl: export KUBECONFIG=$KUBECONFIG"
